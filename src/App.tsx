@@ -791,6 +791,13 @@ const filters: { id: FilterMode; label: string }[] = [
   { id: 'attachments', label: '附件' },
 ];
 
+const searchShortcuts = [
+  { label: '未读', query: 'is:unread' },
+  { label: '附件名', query: 'filename:' },
+  { label: '发件人', query: 'from:' },
+  { label: '邮箱', query: 'account:' },
+];
+
 const emptyAccountCreateForm: AccountCreateInput = {
   email: '',
   display_name: '',
@@ -2736,6 +2743,34 @@ export default function App() {
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已清除搜索');
   }
 
+  async function applySearchShortcut(shortcutQuery: string) {
+    const nextQuery = shortcutQuery.endsWith(':')
+      ? `${query.trim()} ${shortcutQuery}`.trim()
+      : shortcutQuery;
+    setQuery(nextQuery);
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    await loadMessagesWithVisibleFallback(folderId, nextQuery, filter);
+    searchInputRef.current?.focus();
+    if (shortcutQuery.endsWith(':')) {
+      searchInputRef.current?.setSelectionRange(nextQuery.length, nextQuery.length);
+      setStatus(`已插入搜索条件：${shortcutQuery}`);
+    } else {
+      setStatus(`已搜索：${nextQuery}`);
+    }
+  }
+
+  async function clearSearchAndFilter() {
+    setQuery('');
+    setFilter('all');
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    await loadMessagesWithVisibleFallback(folderId, '', 'all');
+    setStatus('已清空搜索和筛选');
+  }
+
   async function runSavedSearch(savedSearch: SavedSearch) {
     setQuery(savedSearch.query);
     setFilter(savedSearch.filter);
@@ -3377,15 +3412,29 @@ export default function App() {
 
       <section className="message-list-panel">
         <header className="toolbar">
-          <form onSubmit={runSearch} className="search-box">
-            <Search size={17} />
-            <input
-              ref={searchInputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索主题、发件人、正文；支持 from/to/cc/bcc/account/mailbox/filename"
-            />
-          </form>
+          <div className="search-cluster">
+            <form onSubmit={runSearch} className="search-box">
+              <Search size={17} />
+              <input
+                ref={searchInputRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索主题、发件人、正文"
+              />
+              {(query.trim() || filter !== 'all') && (
+                <button type="button" className="search-clear-button" title="清空搜索和筛选" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
+                  <X size={14} />
+                </button>
+              )}
+            </form>
+            <div className="search-shortcuts" aria-label="高级搜索快捷条件">
+              {searchShortcuts.map((item) => (
+                <button type="button" key={item.label} onClick={() => applySearchShortcut(item.query).catch((error) => setStatus(String(error)))}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button className="icon-button" title="刷新" onClick={refreshAll}>
             <RefreshCw size={17} />
           </button>

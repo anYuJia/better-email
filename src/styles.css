@@ -499,15 +499,20 @@ button { cursor: pointer; }
   min-width: 0;
 }
 .toolbar {
-  height: 60px;
+  min-height: 60px;
   padding: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid #e2e6ea;
 }
-.search-box {
+.search-cluster {
   flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+.search-box {
   height: 36px;
   border: 1px solid #d8dde4;
   border-radius: 8px;
@@ -518,6 +523,39 @@ button { cursor: pointer; }
   color: #68717d;
 }
 .search-box input { border: none; outline: none; width: 100%; }
+.search-clear-button {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(104, 113, 125, 0.10);
+  color: inherit;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.search-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.search-shortcuts::-webkit-scrollbar { display: none; }
+.search-shortcuts button {
+  min-height: 24px;
+  border: 1px solid rgba(216, 221, 228, 0.78);
+  border-radius: 999px;
+  background: rgba(245, 247, 250, 0.86);
+  color: #68717d;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 720;
+  white-space: nowrap;
+}
 .icon-button, .reader-actions button, .reader-actions select, .composer header button, .settings-modal header button {
   border: 1px solid #d8dde4;
   border-radius: 7px;
@@ -2785,11 +2823,15 @@ kbd {
 }
 
 .toolbar {
-  height: 68px;
+  min-height: 68px;
   padding: 14px;
   border-bottom-color: var(--line);
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.search-cluster {
+  gap: 7px;
 }
 
 .search-box {
@@ -2811,6 +2853,24 @@ kbd {
 .search-box input {
   background: transparent;
   color: var(--text);
+}
+
+.search-clear-button:hover {
+  background: rgba(10, 132, 255, 0.12);
+  color: var(--accent-strong);
+}
+
+.search-shortcuts button {
+  border-color: rgba(10, 132, 255, 0.12);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.76);
+}
+
+.search-shortcuts button:hover {
+  border-color: rgba(10, 132, 255, 0.28);
+  background: #fff;
+  color: var(--accent-strong);
 }
 
 .icon-button,
@@ -3995,12 +4055,14 @@ h1 {
 }
 
 .toolbar {
-  height: 62px;
-  padding: 12px 14px 10px;
+  min-height: 74px;
+  height: auto;
+  padding: 10px 14px 9px;
+  align-items: stretch;
 }
 
 .search-box {
-  height: 38px;
+  height: 36px;
   border-radius: 8px;
 }
 

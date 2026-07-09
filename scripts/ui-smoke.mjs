@@ -341,6 +341,17 @@ async function main() {
     await fillInput(cdp, '.search-box input', 'Quarterly');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
+    await waitForExpression(cdp, "document.querySelector('.search-shortcuts') && document.body.innerText.includes('附件名') && document.body.innerText.includes('发件人')");
+    await clickButton(cdp, '附件名', "document.querySelector('.search-shortcuts')");
+    await waitForExpression(cdp, "document.querySelector('.search-box input').value === 'Quarterly filename:' && document.body.innerText.includes('已插入搜索条件：filename:')");
+    await fillInput(cdp, '.search-box input', 'filename:security-checklist.pdf');
+    await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
+    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
+    await evalInPage(cdp, "document.querySelector('.search-clear-button').click()");
+    await waitForExpression(cdp, "document.querySelector('.search-box input').value === '' && document.querySelectorAll('.message-card').length >= 2 && document.body.innerText.includes('已清空搜索和筛选')");
+    await fillInput(cdp, '.search-box input', 'Quarterly');
+    await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
+    await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
     await openDetails(cdp, '.sidebar-tools');
     await fillInput(cdp, '.saved-search-form input', '季度更新');
     await clickButton(cdp, '保存', "document.querySelector('.saved-search-form')");

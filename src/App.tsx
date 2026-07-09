@@ -521,9 +521,9 @@ function backgroundTaskTitle(kind: BackgroundTaskKind, source: 'manual' | 'timer
 function loadNotificationPolicy(): NotificationPolicy {
   try {
     const stored = window.localStorage.getItem(notificationPolicyStorageKey);
-    return stored ? { ...defaultNotificationPolicy, ...JSON.parse(stored) } : defaultNotificationPolicy;
+    return stored ? { ...defaultNotificationPolicy, ...JSON.parse(stored) } : { ...defaultNotificationPolicy };
   } catch {
-    return defaultNotificationPolicy;
+    return { ...defaultNotificationPolicy };
   }
 }
 
@@ -532,6 +532,22 @@ function normalizeContactAliases(value: string): string[] {
     .split(/[;,\n]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean))];
+}
+
+function toggleAccountNotificationList(
+  policy: NotificationPolicy,
+  key: 'mutedAccounts' | 'priorityAccounts',
+  email: string,
+): NotificationPolicy {
+  const normalizedEmail = email.trim().toLowerCase();
+  const current = policy[key]
+    .split(/[\n,;，；]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  const next = current.includes(normalizedEmail)
+    ? current.filter((item) => item !== normalizedEmail)
+    : [...current, normalizedEmail];
+  return { ...policy, [key]: next.join('\n') };
 }
 
 function loadProviderVerifications(): Record<string, ProviderVerificationRecord> {
@@ -2358,6 +2374,7 @@ export default function App() {
     if (!body) {
       if (decision.reason === 'quiet-hours') setNotificationStatus('免打扰时段已静音');
       if (decision.reason === 'vip-only-no-match') setNotificationStatus('VIP 策略已过滤');
+      if (decision.reason === 'account-muted') setNotificationStatus('账号静音已过滤');
       return;
     }
 
@@ -2372,7 +2389,13 @@ export default function App() {
         return;
       }
       sendNotification({ title: 'SwiftMail', body });
-      setNotificationStatus(decision.vipMatches > 0 ? 'VIP 系统提醒已发送' : '系统提醒已发送');
+      setNotificationStatus(
+        decision.vipMatches > 0
+          ? 'VIP 系统提醒已发送'
+          : decision.priorityMatches > 0
+            ? '重点账号提醒已发送'
+            : '系统提醒已发送',
+      );
     } catch {
       setNotificationStatus('系统提醒不可用');
     }
@@ -4335,7 +4358,15 @@ export default function App() {
             <section className="tool-panel" data-settings-section="notifications">
               <header className="tool-header">
                 <strong>通知策略</strong>
-                <span>{notificationPolicy.vipOnly ? '仅 VIP' : notificationPolicy.quietHoursEnabled ? '免打扰已配置' : '全部新邮件'}</span>
+                <span>
+                  {notificationPolicy.vipOnly
+                    ? '仅 VIP'
+                    : notificationPolicy.priorityAccounts.trim()
+                      ? '重点账号优先'
+                      : notificationPolicy.quietHoursEnabled
+                        ? '免打扰已配置'
+                        : '全部新邮件'}
+                </span>
               </header>
               <label className="checkbox-row">
                 <input
@@ -4377,6 +4408,51 @@ export default function App() {
                   placeholder={'ada@example.com\n@customer.com'}
                 />
               </label>
+              <label>
+                静音账号
+                <textarea
+                  value={notificationPolicy.mutedAccounts}
+                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, mutedAccounts: event.target.value })}
+                  placeholder={'archive@example.com\n2'}
+                />
+              </label>
+              <label>
+                重点账号
+                <textarea
+                  value={notificationPolicy.priorityAccounts}
+                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, priorityAccounts: event.target.value })}
+                  placeholder={'work@example.com\n@company.com'}
+                />
+              </label>
+              <div className="notification-account-grid">
+                {accounts.map((item) => {
+                  const email = item.email.toLowerCase();
+                  const muted = notificationPolicy.mutedAccounts.toLowerCase().includes(email);
+                  const priority = notificationPolicy.priorityAccounts.toLowerCase().includes(email);
+                  return (
+                    <div key={item.id}>
+                      <strong>{item.display_name || item.email}</strong>
+                      <span>{item.email}</span>
+                      <div>
+                        <button
+                          type="button"
+                          className={muted ? 'active' : ''}
+                          onClick={() => setNotificationPolicy(toggleAccountNotificationList(notificationPolicy, 'mutedAccounts', item.email))}
+                        >
+                          {muted ? '取消静音' : '静音'}
+                        </button>
+                        <button
+                          type="button"
+                          className={priority ? 'active' : ''}
+                          onClick={() => setNotificationPolicy(toggleAccountNotificationList(notificationPolicy, 'priorityAccounts', item.email))}
+                        >
+                          {priority ? '取消重点' : '重点'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </section>
             <label className="checkbox-row">
               <input type="checkbox" checked={accountForm.remote_images_allowed} onChange={(event) => setAccountForm({ ...accountForm, remote_images_allowed: event.target.checked })} />

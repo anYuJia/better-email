@@ -54,6 +54,8 @@ export type SyncRunSummary = {
 };
 
 export type NewMailMessageSummary = {
+  account_id?: number;
+  account_email?: string;
   sender_email: string;
   sender_name: string;
   subject: string;
@@ -65,12 +67,16 @@ export type NotificationPolicy = {
   quietEnd: string;
   vipOnly: boolean;
   vipSenders: string;
+  mutedAccounts: string;
+  priorityAccounts: string;
 };
 
 export type NewMailNotificationDecision = {
   body: string | null;
-  reason: 'send' | 'no-new-mail' | 'quiet-hours' | 'vip-only-no-match';
+  reason: 'send' | 'no-new-mail' | 'quiet-hours' | 'vip-only-no-match' | 'account-muted';
   vipMatches: number;
+  priorityMatches: number;
+  mutedMatches: number;
 };
 
 export const defaultNotificationPolicy: NotificationPolicy = {
@@ -79,6 +85,8 @@ export const defaultNotificationPolicy: NotificationPolicy = {
   quietEnd: '08:00',
   vipOnly: false,
   vipSenders: '',
+  mutedAccounts: '',
+  priorityAccounts: '',
 };
 
 export function syncStatusLabel(run: SyncRunSummary): string {
@@ -97,17 +105,23 @@ export function newMailNotificationDecision(
   now = new Date(),
 ): NewMailNotificationDecision {
   const defaultBody = newMailNotificationBody(run);
-  if (!defaultBody) return { body: null, reason: 'no-new-mail', vipMatches: 0 };
+  if (!defaultBody) return { body: null, reason: 'no-new-mail', vipMatches: 0, priorityMatches: 0, mutedMatches: 0 };
 
   const candidates = messages.slice(0, Math.max(0, run.imported_messages));
-  const vipMessages = candidates.filter((message) => isVipSender(message, policy.vipSenders));
+  const activeMessages = candidates.filter((message) => !isAccountListed(message, policy.mutedAccounts));
+  const mutedMatches = candidates.length - activeMessages.length;
+  if (activeMessages.length === 0 && candidates.length > 0) {
+    return { body: null, reason: 'account-muted', vipMatches: 0, priorityMatches: 0, mutedMatches };
+  }
+  const priorityMessages = activeMessages.filter((message) => isAccountListed(message, policy.priorityAccounts));
+  const vipMessages = activeMessages.filter((message) => isVipSender(message, policy.vipSenders));
   const quietActive = policy.quietHoursEnabled && isQuietHoursActive(policy, now);
 
   if (policy.vipOnly && vipMessages.length === 0) {
-    return { body: null, reason: 'vip-only-no-match', vipMatches: 0 };
+    return { body: null, reason: 'vip-only-no-match', vipMatches: 0, priorityMatches: priorityMessages.length, mutedMatches };
   }
-  if (quietActive && vipMessages.length === 0) {
-    return { body: null, reason: 'quiet-hours', vipMatches: 0 };
+  if (quietActive && vipMessages.length === 0 && priorityMessages.length === 0) {
+    return { body: null, reason: 'quiet-hours', vipMatches: 0, priorityMatches: 0, mutedMatches };
   }
   if (vipMessages.length > 0) {
     const first = vipMessages[0];
@@ -116,10 +130,22 @@ export function newMailNotificationDecision(
     const prefix = policy.vipOnly || quietActive
       ? `VIP 新邮件 ${vipMessages.length} 封`
       : `已同步 ${run.imported_messages} 封新邮件，含 VIP ${vipMessages.length} 封`;
-    return { body: `${prefix}：${sender} · ${subject}`, reason: 'send', vipMatches: vipMessages.length };
+    return { body: `${prefix}：${sender} · ${subject}`, reason: 'send', vipMatches: vipMessages.length, priorityMatches: priorityMessages.length, mutedMatches };
+  }
+  if (priorityMessages.length > 0) {
+    const first = priorityMessages[0];
+    const subject = first.subject.trim() || '(无主题)';
+    const account = first.account_email?.trim() || '重点账号';
+    return {
+      body: `重点账号新邮件 ${priorityMessages.length} 封：${account} · ${subject}`,
+      reason: 'send',
+      vipMatches: 0,
+      priorityMatches: priorityMessages.length,
+      mutedMatches,
+    };
   }
 
-  return { body: defaultBody, reason: 'send', vipMatches: 0 };
+  return { body: defaultBody, reason: 'send', vipMatches: 0, priorityMatches: 0, mutedMatches };
 }
 
 export function senderDomain(senderEmail: string): string {
@@ -156,6 +182,17 @@ function isVipSender(message: NewMailMessageSummary, vipSenders: string): boolea
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean)
     .some((entry) => (entry.startsWith('@') ? sender.endsWith(entry) : sender === entry));
+}
+
+function isAccountListed(message: NewMailMessageSummary, accountList: string): boolean {
+  const accountEmail = message.account_email?.trim().toLowerCase() ?? '';
+  const accountId = message.account_id ? String(message.account_id) : '';
+  if (!accountEmail && !accountId) return false;
+  return accountList
+    .split(/[\n,;，；]/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+    .some((entry) => entry === accountEmail || entry === accountId || (entry.startsWith('@') && accountEmail.endsWith(entry)));
 }
 
 function timeToMinutes(value: string): number | null {

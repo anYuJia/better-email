@@ -79,7 +79,15 @@ describe('mail UI utilities', () => {
     expect(
       newMailNotificationDecision(
         run,
-        { quietHoursEnabled: true, quietStart: '22:00', quietEnd: '08:00', vipOnly: false, vipSenders: '' },
+        {
+          quietHoursEnabled: true,
+          quietStart: '22:00',
+          quietEnd: '08:00',
+          vipOnly: false,
+          vipSenders: '',
+          mutedAccounts: '',
+          priorityAccounts: '',
+        },
         messages,
         new Date('2026-07-09T23:30:00'),
       ),
@@ -88,7 +96,15 @@ describe('mail UI utilities', () => {
     expect(
       newMailNotificationDecision(
         run,
-        { quietHoursEnabled: true, quietStart: '22:00', quietEnd: '08:00', vipOnly: false, vipSenders: 'ada@example.com' },
+        {
+          quietHoursEnabled: true,
+          quietStart: '22:00',
+          quietEnd: '08:00',
+          vipOnly: false,
+          vipSenders: 'ada@example.com',
+          mutedAccounts: '',
+          priorityAccounts: '',
+        },
         messages,
         new Date('2026-07-09T23:30:00'),
       ),
@@ -97,10 +113,64 @@ describe('mail UI utilities', () => {
     expect(
       newMailNotificationDecision(
         run,
-        { quietHoursEnabled: false, quietStart: '22:00', quietEnd: '08:00', vipOnly: true, vipSenders: 'boss@example.com' },
+        {
+          quietHoursEnabled: false,
+          quietStart: '22:00',
+          quietEnd: '08:00',
+          vipOnly: true,
+          vipSenders: 'boss@example.com',
+          mutedAccounts: '',
+          priorityAccounts: '',
+        },
         messages,
       ),
     ).toMatchObject({ body: null, reason: 'vip-only-no-match' });
+  });
+
+  it('applies per-account notification routing for multi-account mailboxes', () => {
+    const run = {
+      imported_messages: 3,
+      finished_at: 'not-a-date',
+      message: '统一同步完成',
+    };
+    const messages = [
+      { account_id: 1, account_email: 'work@example.com', sender_name: 'PM', sender_email: 'pm@example.com', subject: 'Roadmap' },
+      { account_id: 2, account_email: 'archive@example.com', sender_name: 'Robot', sender_email: 'bot@example.com', subject: 'Digest' },
+      { account_id: 3, account_email: 'ops@example.com', sender_name: 'Ops', sender_email: 'ops@example.com', subject: 'Alert' },
+    ];
+
+    expect(
+      newMailNotificationDecision(
+        run,
+        {
+          quietHoursEnabled: true,
+          quietStart: '22:00',
+          quietEnd: '08:00',
+          vipOnly: false,
+          vipSenders: '',
+          mutedAccounts: 'archive@example.com',
+          priorityAccounts: 'ops@example.com',
+        },
+        messages,
+        new Date('2026-07-09T23:30:00'),
+      ),
+    ).toMatchObject({ reason: 'send', priorityMatches: 1, mutedMatches: 1 });
+
+    expect(
+      newMailNotificationDecision(
+        { ...run, imported_messages: 1 },
+        {
+          quietHoursEnabled: false,
+          quietStart: '22:00',
+          quietEnd: '08:00',
+          vipOnly: false,
+          vipSenders: '',
+          mutedAccounts: 'work@example.com',
+          priorityAccounts: '',
+        },
+        messages,
+      ),
+    ).toMatchObject({ body: null, reason: 'account-muted', mutedMatches: 1 });
   });
 
   it('keeps provider presets aligned with the compatibility matrix', () => {

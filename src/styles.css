@@ -1830,6 +1830,52 @@ h1 {
   background: rgba(10, 132, 255, 0.10);
   color: #075ca8;
 }
+.notification-account-grid {
+  display: grid;
+  gap: 8px;
+}
+.notification-account-grid > div {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px 10px;
+}
+.notification-account-grid strong,
+.notification-account-grid span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notification-account-grid span {
+  color: #68717d;
+  font-size: 12px;
+}
+.notification-account-grid > div > div {
+  display: flex;
+  gap: 6px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+.notification-account-grid button {
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 999px;
+  background: #fff;
+  color: #52616f;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+  padding: 5px 9px;
+}
+.notification-account-grid button.active {
+  border-color: rgba(10, 132, 255, 0.24);
+  background: rgba(10, 132, 255, 0.10);
+  color: #075ca8;
+}
 .rule-editor {
   display: grid;
   gap: 6px;
@@ -3631,6 +3677,7 @@ h1 {
 
 .mailbox-grid div,
 .sync-schedule-card,
+.notification-account-grid > div,
 .preview-result pre,
 .oauth-session-list div {
   border-color: var(--line);

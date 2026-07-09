@@ -498,6 +498,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/swiftmail-backup.json') && document.body.innerText.includes('凭据未包含')");

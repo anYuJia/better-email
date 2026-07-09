@@ -1916,15 +1916,73 @@ h1 {
 }
 .rule-editor {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
 }
-.rule-editor input {
+.rule-editor input,
+.rule-editor select {
   width: 100%;
   border: 1px solid #edf0f3;
   border-radius: 7px;
   padding: 8px;
   font-size: 12px;
+  background: #fff;
+  color: #20242a;
+}
+.rule-builder {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.78);
+}
+.rule-builder label {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.rule-builder label span {
+  color: #68717d;
+  font-size: 12px;
+  font-weight: 760;
+}
+.rule-action-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rule-action-chips button {
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #fff;
+  color: #52616f;
+  box-shadow: none;
+}
+.rule-action-chips button.active {
+  border-color: rgba(10, 132, 255, 0.26);
+  background: rgba(10, 132, 255, 0.10);
+  color: #075ca8;
+}
+.rule-advanced {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.70);
+  overflow: hidden;
+}
+.rule-advanced summary {
+  cursor: pointer;
+  padding: 7px 9px;
+  color: #52616f;
+  font-size: 12px;
+  font-weight: 760;
+}
+.rule-advanced small {
+  display: block;
+  padding: 0 9px 8px;
+  color: #8a95a1;
+  font-size: 11px;
 }
 .rule-editor label {
   display: inline-flex;

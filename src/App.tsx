@@ -492,6 +492,51 @@ const emptyRuleForm: MailRuleInput = {
   enabled: true,
 };
 
+type RuleConditionField = 'from' | 'subject' | 'body' | 'to';
+
+const ruleConditionFields: { id: RuleConditionField; label: string }[] = [
+  { id: 'from', label: '发件人' },
+  { id: 'subject', label: '主题' },
+  { id: 'body', label: '正文' },
+  { id: 'to', label: '收件人' },
+];
+
+const ruleActionPresets = [
+  { id: 'mark read', label: '标为已读' },
+  { id: 'star', label: '加星标' },
+  { id: 'move to archive', label: '归档' },
+  { id: 'move to trash', label: '移到废纸篓' },
+  { id: 'stop processing', label: '停止后续规则' },
+];
+
+function parseRuleCondition(condition: string): { field: RuleConditionField; value: string } {
+  const normalized = condition.trim();
+  const match = normalized.match(/^(from|subject|body|to|sender|recipients)\s+contains\s+(.*)$/i);
+  if (!match) return { field: 'from', value: '' };
+  const fieldAlias = match[1].toLowerCase();
+  const field: RuleConditionField =
+    fieldAlias === 'sender' ? 'from' : fieldAlias === 'recipients' ? 'to' : (fieldAlias as RuleConditionField);
+  return { field, value: match[2] ?? '' };
+}
+
+function buildRuleCondition(field: RuleConditionField, value: string): string {
+  return `${field} contains ${value}`;
+}
+
+function ruleActionParts(action: string): string[] {
+  return action
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function setRuleActionPart(action: string, prefix: string, nextPart: string): string {
+  const parts = ruleActionParts(action).filter((part) => !part.toLowerCase().startsWith(prefix.toLowerCase()));
+  const trimmedPart = nextPart.trim();
+  if (trimmedPart) parts.unshift(trimmedPart);
+  return parts.join('; ');
+}
+
 const emptyContactForm: ContactCreateInput = {
   name: '',
   email: '',
@@ -885,6 +930,8 @@ export default function App() {
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(false);
   const [ruleForm, setRuleForm] = useState<MailRuleInput>(emptyRuleForm);
+  const [ruleBuilderField, setRuleBuilderField] = useState<RuleConditionField>('from');
+  const [ruleBuilderNeedle, setRuleBuilderNeedle] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
   const [status, setStatus] = useState('本地原型已就绪');
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
@@ -2717,7 +2764,10 @@ export default function App() {
   }
 
   function editRule(rule: MailRule) {
+    const parsed = parseRuleCondition(rule.condition);
     setEditingRuleId(rule.id);
+    setRuleBuilderField(parsed.field);
+    setRuleBuilderNeedle(parsed.value);
     setRuleForm({
       name: rule.name,
       condition: rule.condition,
@@ -2733,8 +2783,44 @@ export default function App() {
     if (editingRuleId === rule.id) {
       setEditingRuleId(null);
       setRuleForm(emptyRuleForm);
+      setRuleBuilderField('from');
+      setRuleBuilderNeedle('');
     }
     setStatus(`规则已删除：${rule.name}`);
+  }
+
+  function updateRuleConditionField(field: RuleConditionField) {
+    setRuleBuilderField(field);
+    setRuleForm((current) => ({ ...current, condition: buildRuleCondition(field, ruleBuilderNeedle) }));
+  }
+
+  function updateRuleConditionValue(value: string) {
+    setRuleBuilderNeedle(value);
+    setRuleForm((current) => ({ ...current, condition: buildRuleCondition(ruleBuilderField, value) }));
+  }
+
+  function toggleRuleAction(action: string) {
+    const normalizedAction = action.toLowerCase();
+    setRuleForm((current) => {
+      const parts = ruleActionParts(current.action);
+      const exists = parts.some((part) => part.toLowerCase() === normalizedAction);
+      return {
+        ...current,
+        action: (exists
+          ? parts.filter((part) => part.toLowerCase() !== normalizedAction)
+          : [...parts, action]
+        ).join('; '),
+      };
+    });
+  }
+
+  function updateRuleLabelAction(labelName: string) {
+    setRuleForm((current) => {
+      return {
+        ...current,
+        action: setRuleActionPart(current.action, 'apply label ', labelName ? `apply label ${labelName}` : ''),
+      };
+    });
   }
 
   async function runSearch(event: React.FormEvent) {
@@ -4945,16 +5031,71 @@ export default function App() {
                     onChange={(event) => setRuleForm({ ...ruleForm, name: event.target.value })}
                     placeholder="规则名称"
                   />
-                  <input
-                    value={ruleForm.condition}
-                    onChange={(event) => setRuleForm({ ...ruleForm, condition: event.target.value })}
-                    placeholder="条件，如 from contains customer"
-                  />
-                  <input
-                    value={ruleForm.action}
-                    onChange={(event) => setRuleForm({ ...ruleForm, action: event.target.value })}
-                    placeholder="动作，如 apply label 重要客户; mark read; star; stop processing"
-                  />
+                  <div className="rule-builder">
+                    <label>
+                      <span>如果</span>
+                      <select
+                        value={ruleBuilderField}
+                        onChange={(event) => updateRuleConditionField(event.target.value as RuleConditionField)}
+                      >
+                        {ruleConditionFields.map((field) => (
+                          <option key={field.id} value={field.id}>{field.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>包含</span>
+                      <input
+                        value={ruleBuilderNeedle}
+                        onChange={(event) => updateRuleConditionValue(event.target.value)}
+                        placeholder="关键词或邮箱"
+                      />
+                    </label>
+                    <label>
+                      <span>打标签</span>
+                      <select
+                        value={
+                          ruleActionParts(ruleForm.action)
+                            .find((part) => part.toLowerCase().startsWith('apply label '))
+                            ?.slice('apply label '.length) ?? ''
+                        }
+                        onChange={(event) => updateRuleLabelAction(event.target.value)}
+                      >
+                        <option value="">不打标签</option>
+                        {labels.map((label) => (
+                          <option key={label.id} value={label.name}>{label.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="rule-action-chips">
+                      {ruleActionPresets.map((item) => (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={ruleActionParts(ruleForm.action).some((part) => part.toLowerCase() === item.id) ? 'active' : ''}
+                          onClick={() => toggleRuleAction(item.id)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <details className="rule-advanced">
+                    <summary>高级语法</summary>
+                    <small>可手动组合多个动作，用分号分隔。</small>
+                    <input
+                      value={ruleForm.condition}
+                      onChange={(event) => setRuleForm({ ...ruleForm, condition: event.target.value })}
+                      placeholder="条件，如 from contains customer"
+                      aria-label="规则条件语法"
+                    />
+                    <input
+                      value={ruleForm.action}
+                      onChange={(event) => setRuleForm({ ...ruleForm, action: event.target.value })}
+                      placeholder="动作，如 apply label 重要客户; mark read; star; stop processing"
+                      aria-label="规则动作语法"
+                    />
+                  </details>
                   <label>
                     <input
                       type="checkbox"

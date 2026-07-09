@@ -544,8 +544,11 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('联系人已删除：Delete Me') && !document.querySelector('.settings-modal').innerText.includes('delete-me@example.com')");
 
     await fillInput(cdp, '.rule-editor input[placeholder=\"规则名称\"]', 'Smoke Rule');
-    await fillInput(cdp, '.rule-editor input[placeholder^=\"条件\"]', 'subject contains Smoke');
-    await fillInput(cdp, '.rule-editor input[placeholder^=\"动作\"]', 'apply label 工作');
+    await selectValue(cdp, '.rule-builder select', 'subject');
+    await fillInput(cdp, '.rule-builder input[placeholder=\"关键词或邮箱\"]', 'Smoke');
+    await selectOptionByText(cdp, '.rule-builder select', '工作', 1);
+    await clickButton(cdp, '加星标', "document.querySelector('.rule-action-chips')");
+    await waitForExpression(cdp, "document.querySelector('input[aria-label=\"规则条件语法\"]').value === 'subject contains Smoke' && document.querySelector('input[aria-label=\"规则动作语法\"]').value.includes('apply label 工作') && document.querySelector('input[aria-label=\"规则动作语法\"]').value.includes('star')");
     await clickButton(cdp, '新增规则', "document.querySelector('.rule-editor')");
     await waitForExpression(cdp, "document.body.innerText.includes('规则已保存：Smoke Rule') && document.body.innerText.includes('Smoke Rule')");
 

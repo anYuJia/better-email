@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default app permissions for SwiftMail desktop features.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-badge-count",
+    "core:window:allow-set-badge-label",
+    "dialog:default",
+    "shell:allow-open",
+    "notification:default"
+  ]
+}

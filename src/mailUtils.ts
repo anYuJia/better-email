@@ -1,0 +1,168 @@
+export type QuotedMessage = {
+  sender_name: string;
+  sender_email: string;
+  received_at: string;
+  subject: string;
+  body: string;
+  snippet: string;
+};
+
+export function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+export function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
+  const normalized = subject.trim() || '(无主题)';
+  const matcher = prefix === 'Re' ? /^(re|回复)\s*:/i : /^(fwd|fw|转发)\s*:/i;
+  return matcher.test(normalized) ? normalized : `${prefix}: ${normalized}`;
+}
+
+export function quoteMessage(message: QuotedMessage): string {
+  const sender = `${message.sender_name} <${message.sender_email}>`;
+  const date = formatDate(message.received_at);
+  const source = message.body.trim() || message.snippet.trim() || '(无正文)';
+  const quoted = source
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n');
+  return `\n\n---- 原始邮件 ----\n发件人：${sender}\n时间：${date}\n主题：${message.subject || '(无主题)'}\n\n${quoted}`;
+}
+
+export function syncIntervalMs(syncMode: string): number | null {
+  if (syncMode === '15min') return 15 * 60 * 1000;
+  if (syncMode === 'push') return 5 * 60 * 1000;
+  return null;
+}
+
+export type SyncRunSummary = {
+  imported_messages: number;
+  finished_at: string;
+  message: string;
+};
+
+export type NewMailMessageSummary = {
+  sender_email: string;
+  sender_name: string;
+  subject: string;
+};
+
+export type NotificationPolicy = {
+  quietHoursEnabled: boolean;
+  quietStart: string;
+  quietEnd: string;
+  vipOnly: boolean;
+  vipSenders: string;
+};
+
+export type NewMailNotificationDecision = {
+  body: string | null;
+  reason: 'send' | 'no-new-mail' | 'quiet-hours' | 'vip-only-no-match';
+  vipMatches: number;
+};
+
+export const defaultNotificationPolicy: NotificationPolicy = {
+  quietHoursEnabled: false,
+  quietStart: '22:00',
+  quietEnd: '08:00',
+  vipOnly: false,
+  vipSenders: '',
+};
+
+export function syncStatusLabel(run: SyncRunSummary): string {
+  return `${formatDate(run.finished_at)} · ${run.message}`;
+}
+
+export function newMailNotificationBody(run: SyncRunSummary): string | null {
+  if (run.imported_messages <= 0) return null;
+  return `已同步 ${run.imported_messages} 封新邮件`;
+}
+
+export function newMailNotificationDecision(
+  run: SyncRunSummary,
+  policy: NotificationPolicy = defaultNotificationPolicy,
+  messages: NewMailMessageSummary[] = [],
+  now = new Date(),
+): NewMailNotificationDecision {
+  const defaultBody = newMailNotificationBody(run);
+  if (!defaultBody) return { body: null, reason: 'no-new-mail', vipMatches: 0 };
+
+  const candidates = messages.slice(0, Math.max(0, run.imported_messages));
+  const vipMessages = candidates.filter((message) => isVipSender(message, policy.vipSenders));
+  const quietActive = policy.quietHoursEnabled && isQuietHoursActive(policy, now);
+
+  if (policy.vipOnly && vipMessages.length === 0) {
+    return { body: null, reason: 'vip-only-no-match', vipMatches: 0 };
+  }
+  if (quietActive && vipMessages.length === 0) {
+    return { body: null, reason: 'quiet-hours', vipMatches: 0 };
+  }
+  if (vipMessages.length > 0) {
+    const first = vipMessages[0];
+    const subject = first.subject.trim() || '(无主题)';
+    const sender = first.sender_name.trim() || first.sender_email;
+    const prefix = policy.vipOnly || quietActive
+      ? `VIP 新邮件 ${vipMessages.length} 封`
+      : `已同步 ${run.imported_messages} 封新邮件，含 VIP ${vipMessages.length} 封`;
+    return { body: `${prefix}：${sender} · ${subject}`, reason: 'send', vipMatches: vipMessages.length };
+  }
+
+  return { body: defaultBody, reason: 'send', vipMatches: 0 };
+}
+
+export function senderDomain(senderEmail: string): string {
+  const [, domain = ''] = senderEmail.trim().toLowerCase().split('@');
+  return domain.trim();
+}
+
+export function remoteImageTrustInput(
+  accountId: number,
+  senderEmail: string,
+  scope: 'sender' | 'domain',
+): { account_id: number; scope: 'sender' | 'domain'; value: string } {
+  const normalizedSender = senderEmail.trim().toLowerCase();
+  return {
+    account_id: accountId,
+    scope,
+    value: scope === 'domain' ? senderDomain(normalizedSender) : normalizedSender,
+  };
+}
+
+export function isQuietHoursActive(policy: NotificationPolicy, now = new Date()): boolean {
+  const start = timeToMinutes(policy.quietStart);
+  const end = timeToMinutes(policy.quietEnd);
+  if (start === null || end === null || start === end) return false;
+  const current = now.getHours() * 60 + now.getMinutes();
+  return start < end ? current >= start && current < end : current >= start || current < end;
+}
+
+function isVipSender(message: NewMailMessageSummary, vipSenders: string): boolean {
+  const sender = message.sender_email.trim().toLowerCase();
+  if (!sender) return false;
+  return vipSenders
+    .split(/[\n,;，；]/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean)
+    .some((entry) => (entry.startsWith('@') ? sender.endsWith(entry) : sender === entry));
+}
+
+function timeToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}

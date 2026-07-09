@@ -1,0 +1,35 @@
+{
+  "name": "swiftmail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "bench": "node scripts/benchmark.mjs",
+    "bench:release": "tauri build --no-bundle && npm run bench",
+    "bench:app": "tauri build --no-bundle && node scripts/benchmark.mjs --sample-app",
+    "bench:sync": "tauri build --no-bundle && node scripts/benchmark.mjs --sample-app --sample-sync",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  }
+}

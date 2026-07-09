@@ -50,6 +50,6 @@ npm run tauri:dev
 - 完善真实服务商附件兼容性矩阵和更细的大附件失败恢复策略。
 - 继续扩展远端已读/移动/删除状态回写的真实服务商兼容性验证。
 - 使用真实账号填充兼容性结果，补齐大附件分段下载失败恢复。
-- 增强多账号并发限流、多账号提醒策略和 Windows overlay icon 兼容。
+- 继续增强多账号提醒策略和 Windows overlay icon 兼容；统一邮箱同步已接入批次限流。
 - 补充真实服务商 HTML 邮件兼容性样本和更细的远程图片信任审计。
 - 继续补真实账号同步压力样本；当前已能报告前端产物、Tauri debug/release 二进制、bundle 产物、缺口提示，并可用 `npm run bench:sync` 采样 release App 前端 ready 时间、同步演练完成标记、空闲 RSS 和采样窗口峰值 RSS，当前本机样本约 769.76ms ready / 83.72 MB peak RSS。

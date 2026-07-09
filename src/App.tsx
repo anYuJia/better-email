@@ -298,6 +298,14 @@ type SyncRun = {
   message: string;
 };
 
+type SyncSchedulePlan = {
+  max_accounts_per_batch: number;
+  total_accounts: number;
+  batch_accounts: Account[];
+  delayed_accounts: Account[];
+  strategy: string;
+};
+
 type RemoteActionReport = {
   local_applied: boolean;
   remote_attempted: boolean;
@@ -858,6 +866,7 @@ export default function App() {
   const [status, setStatus] = useState('本地原型已就绪');
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
+  const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
   const [remoteImageTrusts, setRemoteImageTrusts] = useState<RemoteImageTrust[]>([]);
   const [lastNewMailNotice, setLastNewMailNotice] = useState<string | null>(null);
   const [notificationStatus, setNotificationStatus] = useState('系统提醒未检查');
@@ -873,6 +882,7 @@ export default function App() {
   const backgroundTaskWorkerRef = useRef(false);
   const frontendReadyRef = useRef(false);
   const benchmarkSyncRef = useRef(false);
+  const mailboxRefreshRef = useRef(0);
 
   function accountIdForScope(scope: AccountScope): number | null {
     return scope === 'all' ? null : scope;
@@ -1131,6 +1141,7 @@ export default function App() {
       nextThreads,
       nextOutbox,
       nextBackgroundTasks,
+      nextSyncSchedulePlan,
       nextRemoteImageTrusts,
       nextImapMailboxes,
       nextOauthSessions,
@@ -1148,6 +1159,7 @@ export default function App() {
       invoke<ThreadSummary[]>('list_threads'),
       invoke<OutboxItem[]>('list_outbox'),
       invoke<BackgroundTask[]>('list_background_tasks'),
+      invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
       invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
       invoke<ImapMailboxState[]>('list_imap_mailboxes'),
       invoke<OAuthSession[]>('list_oauth_sessions'),
@@ -1166,6 +1178,7 @@ export default function App() {
     setThreads(nextThreads);
     setOutbox(nextOutbox);
     setBackgroundTasks(nextBackgroundTasks);
+    setSyncSchedulePlan(nextSyncSchedulePlan);
     setRemoteImageTrusts(nextRemoteImageTrusts);
     setImapMailboxes(nextImapMailboxes);
     setOauthSessions(nextOauthSessions);
@@ -1192,8 +1205,14 @@ export default function App() {
     nextQuery = query,
     nextFilter = filter,
     nextScope: AccountScope = accountScope,
+    refreshId = mailboxRefreshRef.current,
   ) {
-    if (!nextFolderId) return [];
+    if (!nextFolderId) {
+      setMessages([]);
+      setSelectedId(null);
+      setSelectedMessageIds([]);
+      return [];
+    }
     const nextAccountId = accountIdForScope(nextScope);
     const nextMessages = await invoke<Message[]>('list_messages', {
       accountId: nextAccountId,
@@ -1202,6 +1221,7 @@ export default function App() {
       filter: nextFilter,
       limit: 80,
     });
+    if (refreshId !== mailboxRefreshRef.current) return nextMessages;
     setMessages(nextMessages);
     setSelectedMessageIds((current) =>
       current.filter((id) => nextMessages.some((message) => message.id === id)),
@@ -1218,6 +1238,23 @@ export default function App() {
       void maybeRunBenchmarkSync();
     }
     return nextMessages;
+  }
+
+  async function refreshMailbox(
+    nextScope: AccountScope = accountScope,
+    preferredFolderId: number | null = null,
+    nextQuery = query,
+    nextFilter = filter,
+  ) {
+    const refreshId = mailboxRefreshRef.current + 1;
+    mailboxRefreshRef.current = refreshId;
+    setMessages([]);
+    setSelectedId(null);
+    setSelectedMessageIds([]);
+    const nextFolderId = await loadMeta(preferredFolderId, nextScope);
+    if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
+    await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId);
+    return nextFolderId;
   }
 
   async function maybeRunBenchmarkSync() {
@@ -1275,12 +1312,13 @@ export default function App() {
   }, [appLayout]);
 
   useEffect(() => {
-    loadMeta(null).catch((error) => setStatus(String(error)));
+    refreshMailbox(accountScope, null).catch((error) => setStatus(String(error)));
   }, [accountScope]);
 
   useEffect(() => {
-    loadMessages().catch((error) => setStatus(String(error)));
-  }, [accountScope, folderId, filter]);
+    if (!folderId) return;
+    loadMessages(folderId, query, filter, accountScope).catch((error) => setStatus(String(error)));
+  }, [folderId, filter]);
 
   useEffect(() => {
     setQuickReplyBody('');
@@ -2278,9 +2316,19 @@ export default function App() {
   async function runBackgroundSync(reason: 'manual' | 'timer'): Promise<string> {
     if (backgroundSyncRef.current) return '同步任务已在运行';
     backgroundSyncRef.current = true;
+    const syncAccountId = accountIdForScope(accountScope);
     setBackgroundSyncStatus(reason === 'timer' ? '后台同步中...' : '手动同步中...');
     try {
-      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: accountIdForScope(accountScope) });
+      const plan = await invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: syncAccountId });
+      setSyncSchedulePlan(plan);
+      setBackgroundSyncStatus(
+        plan.total_accounts > 1
+          ? `同步中：本轮 ${plan.batch_accounts.length}/${plan.total_accounts} 个账号`
+          : reason === 'timer'
+            ? '后台同步中...'
+            : '手动同步中...',
+      );
+      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
       const released = await releaseDueSnoozedMessages();
       setSyncRuns((current) => [run, ...current].slice(0, 10));
       await loadMeta(folderId);
@@ -2686,7 +2734,7 @@ export default function App() {
     setActiveThread(null);
     setThreadMessages([]);
     setAttachments([]);
-    setStatus(nextScope === 'all' ? '已切换到统一邮箱视图' : '已切换到单账号视图');
+    setStatus(nextScope === 'all' ? '正在切换到统一邮箱视图...' : '正在切换到单账号视图...');
   }
 
   async function runCommandPaletteItem(item: CommandPaletteItem) {
@@ -4540,6 +4588,37 @@ export default function App() {
                   <button onClick={() => enqueueBackgroundTask('sync', 'manual')}>同步邮件头</button>
                 </div>
               </header>
+              {syncSchedulePlan && (
+                <div className="sync-schedule-card">
+                  <div>
+                    <span>同步调度与限流</span>
+                    <strong>
+                      本轮 {syncSchedulePlan.batch_accounts.length}/{syncSchedulePlan.total_accounts || 0} 个账号
+                    </strong>
+                  </div>
+                  <div className="sync-schedule-metrics">
+                    <span>每轮最多 {syncSchedulePlan.max_accounts_per_batch} 个账号</span>
+                    <span>
+                      下一批 {syncSchedulePlan.delayed_accounts.length
+                        ? `${syncSchedulePlan.delayed_accounts.length} 个账号`
+                        : '无等待'}
+                    </span>
+                  </div>
+                  <p>{syncSchedulePlan.strategy}</p>
+                  <div className="sync-account-strip">
+                    {syncSchedulePlan.batch_accounts.map((syncAccount) => (
+                      <span className="active" key={syncAccount.id}>
+                        {syncAccount.display_name || syncAccount.email}
+                      </span>
+                    ))}
+                    {syncSchedulePlan.delayed_accounts.slice(0, 3).map((syncAccount) => (
+                      <span key={syncAccount.id}>
+                        下轮 · {syncAccount.display_name || syncAccount.email}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {imapMailboxes.length > 0 && (
                 <div className="mailbox-grid">
                   {imapMailboxes.slice(0, 8).map((mailbox) => (

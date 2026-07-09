@@ -5,7 +5,8 @@ use crate::models::{
     LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
     MailStats, Message, OAuthCallbackReport, OAuthSession, OAuthStartReport,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, SyncRun, ThreadSummary,
+    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, SyncRun, SyncSchedulePlan,
+    ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -1697,6 +1698,40 @@ impl MailStore {
                 .query_map([], map_account)?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(accounts)
+        })
+    }
+
+    pub fn header_sync_schedule_plan(
+        &self,
+        account_id: Option<i64>,
+        max_accounts_per_batch: usize,
+    ) -> MailResult<SyncSchedulePlan> {
+        let accounts = self.accounts_for_header_sync(account_id)?;
+        let max_accounts_per_batch = max_accounts_per_batch.max(1);
+        let batch_accounts = accounts
+            .iter()
+            .take(max_accounts_per_batch)
+            .cloned()
+            .collect::<Vec<_>>();
+        let delayed_accounts = accounts
+            .iter()
+            .skip(max_accounts_per_batch)
+            .cloned()
+            .collect::<Vec<_>>();
+        let strategy = if account_id.is_some() {
+            "单账号同步不分批。".to_string()
+        } else {
+            format!(
+                "统一邮箱按待同步优先级串行限流；每轮最多同步 {} 个账号，其余账号留到下一轮。",
+                max_accounts_per_batch
+            )
+        };
+        Ok(SyncSchedulePlan {
+            max_accounts_per_batch: max_accounts_per_batch as i64,
+            total_accounts: accounts.len() as i64,
+            batch_accounts,
+            delayed_accounts,
+            strategy,
         })
     }
 
@@ -5236,6 +5271,63 @@ mod tests {
             .expect("second account mailbox exists");
         assert_eq!(scoped_mailbox.account_id, second_account.id);
         assert_eq!(scoped_mailbox.account_email, second_account.email);
+    }
+
+    #[test]
+    fn header_sync_schedule_plan_batches_unified_accounts() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        store
+            .save_imap_mailboxes_for_account(
+                Some(first_account.id),
+                &[ImapFolderProbe {
+                    name: "INBOX".to_string(),
+                    delimiter: "/".to_string(),
+                    attributes: vec!["Inbox".to_string()],
+                }],
+            )
+            .unwrap();
+
+        let second_account = store
+            .create_account(AccountCreateInput {
+                email: "schedule-second@swiftmail.local".to_string(),
+                display_name: "Schedule Second".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.second.test:993".to_string(),
+                smtp_host: "smtp.second.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+            })
+            .unwrap();
+        let third_account = store
+            .create_account(AccountCreateInput {
+                email: "schedule-third@swiftmail.local".to_string(),
+                display_name: "Schedule Third".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.third.test:993".to_string(),
+                smtp_host: "smtp.third.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+            })
+            .unwrap();
+
+        let priority = store.accounts_for_header_sync(None).unwrap();
+        let plan = store.header_sync_schedule_plan(None, 2).unwrap();
+        assert_eq!(plan.max_accounts_per_batch, 2);
+        assert_eq!(plan.total_accounts, 3);
+        assert_eq!(plan.batch_accounts.len(), 2);
+        assert_eq!(plan.delayed_accounts.len(), 1);
+        assert_eq!(plan.batch_accounts[0].id, priority[0].id);
+        assert_eq!(plan.batch_accounts[1].id, priority[1].id);
+        assert_eq!(plan.delayed_accounts[0].id, priority[2].id);
+        assert!(plan
+            .batch_accounts
+            .iter()
+            .any(|account| account.id == second_account.id || account.id == third_account.id));
     }
 
     #[test]

@@ -72,6 +72,7 @@ pub fn run() {
             commands::discover_imap_folders,
             commands::list_imap_mailboxes,
             commands::run_sync_dry_run,
+            commands::get_sync_schedule_plan,
             commands::sync_imap_headers,
             commands::fetch_message_body,
             commands::list_sync_runs,

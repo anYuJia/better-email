@@ -12,7 +12,7 @@ use crate::models::{
     OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
     RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, SyncRun,
-    ThreadSummary,
+    SyncSchedulePlan, ThreadSummary,
 };
 use crate::oauth;
 use crate::protocol;
@@ -25,6 +25,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: i64 = 25 * 1024 * 1024;
+const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 
 #[tauri::command]
 pub fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
@@ -747,11 +748,20 @@ pub fn run_sync_dry_run(store: State<'_, MailStore>) -> MailResult<SyncRun> {
 }
 
 #[tauri::command]
+pub fn get_sync_schedule_plan(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<SyncSchedulePlan> {
+    store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)
+}
+
+#[tauri::command]
 pub fn sync_imap_headers(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
-    let accounts = store.accounts_for_header_sync(account_id)?;
+    let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
+    let accounts = plan.batch_accounts.clone();
     if account_id.is_some() {
         let account = accounts
             .first()
@@ -777,23 +787,40 @@ pub fn sync_imap_headers(
     }
 
     let finished_at = Utc::now().to_rfc3339();
+    let delayed_count = plan.delayed_accounts.len();
     let status = if failures.is_empty() {
-        "imap_headers_multi"
+        if delayed_count > 0 {
+            "imap_headers_limited"
+        } else {
+            "imap_headers_multi"
+        }
     } else if synced_accounts > 0 {
         "imap_headers_partial"
     } else {
         "imap_headers_failed"
     };
     let message = if failures.is_empty() {
-        format!(
-            "统一邮箱同步完成：{} 个账号，扫描 {} 个文件夹，新增 {} 封。",
-            synced_accounts, scanned_folders, imported_messages
-        )
+        if delayed_count > 0 {
+            format!(
+                "统一邮箱限流同步完成：本轮 {} / {} 个账号，扫描 {} 个文件夹，新增 {} 封；{} 个账号留到下一轮。",
+                synced_accounts,
+                plan.total_accounts,
+                scanned_folders,
+                imported_messages,
+                delayed_count
+            )
+        } else {
+            format!(
+                "统一邮箱同步完成：{} 个账号，扫描 {} 个文件夹，新增 {} 封。",
+                synced_accounts, scanned_folders, imported_messages
+            )
+        }
     } else if synced_accounts > 0 {
         format!(
-            "统一邮箱同步部分完成：{} 个账号成功，{} 个账号失败，扫描 {} 个文件夹，新增 {} 封。{}",
+            "统一邮箱同步部分完成：{} 个账号成功，{} 个账号失败，{} 个账号延后，扫描 {} 个文件夹，新增 {} 封。{}",
             synced_accounts,
             failures.len(),
+            delayed_count,
             scanned_folders,
             imported_messages,
             failures.join("；")

@@ -1780,6 +1780,56 @@ h1 {
   color: #68717d;
   font-size: 12px;
 }
+.sync-schedule-card {
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(232, 243, 255, 0.90), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.86) inset;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+.sync-schedule-card > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sync-schedule-card span {
+  color: #68717d;
+  font-size: 12px;
+  font-weight: 650;
+}
+.sync-schedule-card strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 820;
+}
+.sync-schedule-card p {
+  color: #52616f;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+.sync-schedule-metrics,
+.sync-account-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sync-schedule-metrics span,
+.sync-account-strip span {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #52616f;
+  padding: 5px 9px;
+}
+.sync-account-strip span.active {
+  border-color: rgba(10, 132, 255, 0.24);
+  background: rgba(10, 132, 255, 0.10);
+  color: #075ca8;
+}
 .rule-editor {
   display: grid;
   gap: 6px;
@@ -3580,6 +3630,7 @@ h1 {
 }
 
 .mailbox-grid div,
+.sync-schedule-card,
 .preview-result pre,
 .oauth-session-list div {
   border-color: var(--line);

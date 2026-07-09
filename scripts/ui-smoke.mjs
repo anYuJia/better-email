@@ -97,11 +97,20 @@ async function openCdp(debugPort, pageUrl) {
   const pending = new Map();
   const events = [];
 
+  function failPending(error) {
+    for (const { reject, timer } of pending.values()) {
+      clearTimeout(timer);
+      reject(error);
+    }
+    pending.clear();
+  }
+
   ws.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     if (message.id && pending.has(message.id)) {
-      const { resolve, reject } = pending.get(message.id);
+      const { resolve, reject, timer } = pending.get(message.id);
       pending.delete(message.id);
+      clearTimeout(timer);
       if (message.error) reject(new Error(message.error.message));
       else resolve(message.result);
     } else if (message.method) {
@@ -115,10 +124,22 @@ async function openCdp(debugPort, pageUrl) {
   });
 
   function send(method, params = {}) {
+    if (ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
+    }
     const id = ++seq;
     ws.send(JSON.stringify({ id, method, params }));
-    return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`Timed out waiting for Chrome CDP response: ${method}`));
+      }, 10_000);
+      pending.set(id, { resolve, reject, timer });
+    });
   }
+
+  ws.addEventListener('error', () => failPending(new Error('Chrome CDP socket error')));
+  ws.addEventListener('close', () => failPending(new Error('Chrome CDP socket closed')));
 
   return { send, events, close: () => ws.close() };
 }
@@ -476,7 +497,7 @@ async function main() {
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"providers\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
-    await waitForExpression(cdp, "document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/swiftmail-backup.json') && document.body.innerText.includes('凭据未包含')");

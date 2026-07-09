@@ -38,6 +38,50 @@ const account = {
   signature: 'Sent from SwiftMail',
 };
 
+const mockAccounts = [
+  account,
+  {
+    ...account,
+    id: 2,
+    email: 'design@swiftmail.local',
+    display_name: 'Design Studio',
+    provider: 'icloud',
+    imap_host: 'imap.mail.me.com:993',
+    smtp_host: 'smtp.mail.me.com:587',
+    auth_type: 'password',
+    sync_mode: '15min',
+    signature: 'Sent from SwiftMail Studio',
+  },
+  {
+    ...account,
+    id: 3,
+    email: 'archive@swiftmail.local',
+    display_name: 'Archive Desk',
+    provider: 'outlook',
+    imap_host: 'outlook.office365.com:993',
+    smtp_host: 'smtp.office365.com:587',
+    auth_type: 'oauth2',
+    sync_mode: 'manual',
+    signature: 'Sent from SwiftMail Archive',
+  },
+];
+
+function mockSyncSchedulePlan(accountId: unknown) {
+  const numericAccountId = Number(accountId ?? 0);
+  const scoped = numericAccountId > 0
+    ? mockAccounts.filter((item) => item.id === numericAccountId)
+    : mockAccounts;
+  return {
+    max_accounts_per_batch: 2,
+    total_accounts: scoped.length,
+    batch_accounts: scoped.slice(0, numericAccountId > 0 ? 1 : 2),
+    delayed_accounts: numericAccountId > 0 ? [] : scoped.slice(2),
+    strategy: numericAccountId > 0
+      ? '单账号同步不分批。'
+      : '统一邮箱按待同步优先级串行限流；每轮最多同步 2 个账号，其余账号留到下一轮。',
+  };
+}
+
 type MockIdentity = {
   id: number;
   account_id: number;
@@ -508,9 +552,11 @@ function releaseDueSnoozedMessages(nowInput: string) {
 async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
   switch (command) {
     case 'list_accounts':
-      return [account] as T;
+      return mockAccounts as T;
     case 'get_account':
-      return account as T;
+      return (Number(args?.accountId ?? 0) > 0
+        ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
+        : account) as T;
     case 'list_folders':
       return folders as T;
     case 'create_custom_folder': {
@@ -554,6 +600,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return stats() as T;
     case 'list_sync_runs':
       return [] as T;
+    case 'get_sync_schedule_plan':
+      return mockSyncSchedulePlan(args?.accountId) as T;
     case 'list_contacts':
       return contacts as T;
     case 'list_contact_merge_suggestions':
@@ -892,17 +940,18 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'run_sync_dry_run':
     case 'sync_imap_headers': {
       const accountId = Number(args?.accountId ?? 0);
-      const scopedAccountCount = accountId > 0 ? 1 : 1;
+      const plan = mockSyncSchedulePlan(accountId);
+      const scopedAccountCount = plan.batch_accounts.length;
       return {
         id: 1,
         started_at: now,
         finished_at: now,
-        status: 'ok',
+        status: plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
         scanned_folders: scopedAccountCount,
         imported_messages: 1,
         message: args?.accountId
           ? 'UI smoke mock 同步完成：新增 1 封。'
-          : `UI smoke mock 统一同步完成：${scopedAccountCount} 个账号，新增 1 封。`,
+          : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
       } as T;
     }
     case 'download_attachment': {

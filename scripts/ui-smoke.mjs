@@ -444,8 +444,12 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('兼容性矩阵')");
+    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"providers\"]');
+    await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/swiftmail-backup.json') && document.body.innerText.includes('凭据未包含')");
 
@@ -463,6 +467,7 @@ async function main() {
     await clickButton(cdp, '新增规则', "document.querySelector('.rule-editor')");
     await waitForExpression(cdp, "document.body.innerText.includes('规则已保存：Smoke Rule') && document.body.innerText.includes('Smoke Rule')");
 
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"security-preview\"]');
     await clickButton(cdp, '解析');
     await waitForExpression(cdp, "document.body.innerText.includes('安全预览样例') && document.body.innerText.includes('HTML 正文包含 script 标签')");
 

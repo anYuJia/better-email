@@ -3344,12 +3344,12 @@ export default function App() {
                 <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
               </div>
               <div className="reader-actions">
-                <button className="primary-action" onClick={() => activeThreadSelected && composeFromMessage(activeThreadSelected, 'reply')}>
+                <button className="primary-action" title="回复" aria-label="回复" onClick={() => activeThreadSelected && composeFromMessage(activeThreadSelected, 'reply')}>
                   <Reply size={16} />
                   回复
                 </button>
                 <details className="reader-more-menu compact-menu">
-                  <summary>
+                  <summary title="更多操作" aria-label="更多操作">
                     <MoreHorizontal size={16} />
                     更多
                   </summary>
@@ -3394,15 +3394,15 @@ export default function App() {
                   <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
                 </button>
                 {selected.folder_role === 'drafts' ? (
-                  <button onClick={() => editDraftMessage(selected)}>继续编辑</button>
+                  <button title="继续编辑草稿" onClick={() => editDraftMessage(selected)}>继续编辑</button>
                 ) : (
-                  <button className="primary-action" onClick={() => composeFromMessage(selected, 'reply')}>
+                  <button className="primary-action" title="回复" aria-label="回复" onClick={() => composeFromMessage(selected, 'reply')}>
                     <Reply size={16} />
                     回复
                   </button>
                 )}
                 <details className="reader-more-menu compact-menu">
-                  <summary>
+                  <summary title="更多操作" aria-label="更多操作">
                     <MoreHorizontal size={16} />
                     更多
                   </summary>
@@ -3870,14 +3870,17 @@ export default function App() {
       {isSettingsOpen && accountForm && (
         <div className="composer-backdrop">
           <section className="settings-modal">
-            <header>
-              <strong>账号设置</strong>
+            <header className="settings-main-header">
+              <div className="settings-title">
+                <strong>账号设置</strong>
+                <span>{accountForm.email} · {accountForm.provider}</span>
+              </div>
               <button onClick={() => setSettingsOpen(false)}>关闭</button>
             </header>
             <div className="settings-body">
               <nav className="settings-nav" aria-label="设置分类">
                 <strong>设置</strong>
-                <span>账号、协议、安全与自动化</span>
+                <span>常用项优先，专业项折叠</span>
                 <button type="button" className={activeSettingsSection === 'accounts' ? 'active' : ''} onClick={() => scrollSettingsSection('accounts')}>账号</button>
                 <button type="button" className={activeSettingsSection === 'providers' ? 'active' : ''} onClick={() => scrollSettingsSection('providers')}>服务商</button>
                 <button type="button" className={activeSettingsSection === 'auth' ? 'active' : ''} onClick={() => scrollSettingsSection('auth')}>认证</button>
@@ -3944,87 +3947,96 @@ export default function App() {
                 </button>
               ))}
             </section>
-            <section className="provider-matrix" aria-label="服务商兼容性矩阵" data-settings-section="providers">
-              <header>
-                <strong>兼容性矩阵</strong>
-                <span>预设已内置，真实账号验证待补</span>
-              </header>
-              {providerCompatibilityMatrix.map((provider) => (
-                <button
-                  className={accountForm.provider === provider.provider ? 'active' : ''}
-                  key={provider.id}
-                  onClick={() => applyProviderPreset(provider)}
-                >
-                  <strong>{provider.label}</strong>
-                  <span>{provider.auth_type === 'oauth2' ? 'OAuth2' : '授权码'} · {provider.imap_host} · {provider.smtp_host}</span>
-                  <small>{provider.setup}</small>
-                  <em>{provider.tested_status === 'needs-account' ? '需真实账号验证' : '预设可用'} · {provider.limitations}</em>
-                  {providerVerifications[provider.id] && (
-                    <small>
-                      本地验证：{providerVerificationLabel(providerVerifications[provider.id].status)}
-                      {providerVerifications[provider.id].checked_at ? ` · ${formatDate(providerVerifications[provider.id].checked_at)}` : ''}
-                    </small>
-                  )}
-                </button>
-              ))}
-            </section>
-            {activeProviderVerification && (
-              <section className="tool-panel" data-settings-section="providers">
-                <header className="tool-header">
-                  <strong>真实账号验证记录</strong>
-                  <span>{providerVerificationLabel(activeProviderVerification.status)}</span>
+            <details className="settings-disclosure" data-settings-section="providers" open>
+              <summary>
+                <span>
+                  <strong>服务商兼容性与真实验证</strong>
+                  <em>预设、IMAP/SMTP/OAuth 状态和限制</em>
+                </span>
+                <b>{providerVerificationLabel(activeProviderVerification?.status ?? 'untested')}</b>
+              </summary>
+              <section className="provider-matrix" aria-label="服务商兼容性矩阵">
+                <header>
+                  <strong>兼容性矩阵</strong>
+                  <span>预设已内置，真实账号验证待补</span>
                 </header>
-                <label>
-                  验证状态
-                  <select
-                    value={activeProviderVerification.status}
-                    onChange={(event) =>
-                      updateProviderVerification(accountForm.provider, {
-                        status: event.target.value as ProviderVerificationStatus,
-                      })
-                    }
+                {providerCompatibilityMatrix.map((provider) => (
+                  <button
+                    className={accountForm.provider === provider.provider ? 'active' : ''}
+                    key={provider.id}
+                    onClick={() => applyProviderPreset(provider)}
                   >
-                    <option value="untested">未验证</option>
-                    <option value="passed">通过</option>
-                    <option value="partial">部分通过</option>
-                    <option value="failed">失败</option>
-                  </select>
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.imap_ok}
-                    onChange={(event) => updateProviderVerification(accountForm.provider, { imap_ok: event.target.checked })}
-                  />
-                  IMAP 登录 / 文件夹发现通过
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.smtp_ok}
-                    onChange={(event) => updateProviderVerification(accountForm.provider, { smtp_ok: event.target.checked })}
-                  />
-                  SMTP 发送通过
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.oauth_ok}
-                    onChange={(event) => updateProviderVerification(accountForm.provider, { oauth_ok: event.target.checked })}
-                  />
-                  OAuth2 / XOAUTH2 通过
-                </label>
-                <label>
-                  备注
-                  <textarea
-                    value={activeProviderVerification.notes}
-                    onChange={(event) => updateProviderVerification(accountForm.provider, { notes: event.target.value })}
-                    placeholder="记录失败原因、租户限制、授权码策略或附件/HTML 样本问题"
-                  />
-                </label>
-                <button onClick={saveProviderVerification}>保存验证记录</button>
+                    <strong>{provider.label}</strong>
+                    <span>{provider.auth_type === 'oauth2' ? 'OAuth2' : '授权码'} · {provider.imap_host} · {provider.smtp_host}</span>
+                    <small>{provider.setup}</small>
+                    <em>{provider.tested_status === 'needs-account' ? '需真实账号验证' : '预设可用'} · {provider.limitations}</em>
+                    {providerVerifications[provider.id] && (
+                      <small>
+                        本地验证：{providerVerificationLabel(providerVerifications[provider.id].status)}
+                        {providerVerifications[provider.id].checked_at ? ` · ${formatDate(providerVerifications[provider.id].checked_at)}` : ''}
+                      </small>
+                    )}
+                  </button>
+                ))}
               </section>
-            )}
+              {activeProviderVerification && (
+                <section className="tool-panel">
+                  <header className="tool-header">
+                    <strong>真实账号验证记录</strong>
+                    <span>{providerVerificationLabel(activeProviderVerification.status)}</span>
+                  </header>
+                  <label>
+                    验证状态
+                    <select
+                      value={activeProviderVerification.status}
+                      onChange={(event) =>
+                        updateProviderVerification(accountForm.provider, {
+                          status: event.target.value as ProviderVerificationStatus,
+                        })
+                      }
+                    >
+                      <option value="untested">未验证</option>
+                      <option value="passed">通过</option>
+                      <option value="partial">部分通过</option>
+                      <option value="failed">失败</option>
+                    </select>
+                  </label>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={activeProviderVerification.imap_ok}
+                      onChange={(event) => updateProviderVerification(accountForm.provider, { imap_ok: event.target.checked })}
+                    />
+                    IMAP 登录 / 文件夹发现通过
+                  </label>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={activeProviderVerification.smtp_ok}
+                      onChange={(event) => updateProviderVerification(accountForm.provider, { smtp_ok: event.target.checked })}
+                    />
+                    SMTP 发送通过
+                  </label>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={activeProviderVerification.oauth_ok}
+                      onChange={(event) => updateProviderVerification(accountForm.provider, { oauth_ok: event.target.checked })}
+                    />
+                    OAuth2 / XOAUTH2 通过
+                  </label>
+                  <label>
+                    备注
+                    <textarea
+                      value={activeProviderVerification.notes}
+                      onChange={(event) => updateProviderVerification(accountForm.provider, { notes: event.target.value })}
+                      placeholder="记录失败原因、租户限制、授权码策略或附件/HTML 样本问题"
+                    />
+                  </label>
+                  <button onClick={saveProviderVerification}>保存验证记录</button>
+                </section>
+              )}
+            </details>
             <label>
               IMAP
               <input value={accountForm.imap_host} onChange={(event) => setAccountForm({ ...accountForm, imap_host: event.target.value })} />
@@ -4049,6 +4061,14 @@ export default function App() {
               </p>
             </div>
             {accountForm.auth_type === 'oauth2' && (
+              <details className="settings-disclosure" data-settings-section="auth">
+                <summary>
+                  <span>
+                    <strong>OAuth2 高级流程</strong>
+                    <em>PKCE、回调、Token 交换与刷新</em>
+                  </span>
+                  <b>{oauthSessions.length} 个会话</b>
+                </summary>
               <section className="oauth-pkce-panel">
                 <label>
                   OAuth2 Client ID
@@ -4139,6 +4159,7 @@ export default function App() {
                   </div>
                 )}
               </section>
+              </details>
             )}
             <label>
               同步策略
@@ -4281,52 +4302,69 @@ export default function App() {
                 <button onClick={saveSettings}>保存设置</button>
               </div>
             </footer>
-            {diagnosticExport && (
+            <details className="settings-disclosure" data-settings-section="backup">
+              <summary>
+                <span>
+                  <strong>备份、诊断与连接报告</strong>
+                  <em>导入导出、脱敏 JSON、连接测试详情</em>
+                </span>
+                <b>{localBackupSummary ? `${localBackupSummary.messages} 封` : '未备份'}</b>
+              </summary>
+              {diagnosticExport && (
+                <section className="tool-panel">
+                  <header className="tool-header">
+                    <strong>脱敏诊断</strong>
+                    <span>{Math.round(diagnosticExport.length / 1024)} KB JSON</span>
+                  </header>
+                  <textarea readOnly value={diagnosticExport.slice(0, 2500)} />
+                </section>
+              )}
               <section className="tool-panel">
                 <header className="tool-header">
-                  <strong>脱敏诊断</strong>
-                  <span>{Math.round(diagnosticExport.length / 1024)} KB JSON</span>
+                  <strong>本地备份与恢复</strong>
+                  <span>{localBackupSummary ? `${localBackupSummary.messages} 封邮件` : '不包含系统凭据'}</span>
                 </header>
-                <textarea readOnly value={diagnosticExport.slice(0, 2500)} />
-              </section>
-            )}
-            <section className="tool-panel" data-settings-section="backup">
-              <header className="tool-header">
-                <strong>本地备份与恢复</strong>
-                <span>{localBackupSummary ? `${localBackupSummary.messages} 封邮件` : '不包含系统凭据'}</span>
-              </header>
-              <p>备份包含账号配置、文件夹、邮件、标签、附件元数据、规则、发件箱和同步记录；密码与 OAuth token 仍保留在系统 Keychain。</p>
-              <div className="tool-actions">
-                <button className="secondary" onClick={previewLocalBackup}>预览备份</button>
-                <button className="secondary" onClick={importLocalBackup}>恢复备份</button>
-                <button onClick={exportLocalBackup}>导出本地备份</button>
-              </div>
-              {localBackupSummary && (
-                <div className="tool-row ok">
-                  <span>v{localBackupSummary.schema_version}</span>
-                  <em>{localBackupSummary.path || 'mock://swiftmail-backup.json'}</em>
-                  <small>{Math.max(1, Math.round(localBackupSummary.size_bytes / 1024))} KB</small>
-                  <p>
-                    账号 {localBackupSummary.accounts} · 邮件 {localBackupSummary.messages} · 标签 {localBackupSummary.labels} · 规则 {localBackupSummary.rules} · 凭据
-                    {localBackupSummary.credentials_included ? '已包含' : '未包含'}
-                  </p>
+                <p>备份包含账号配置、文件夹、邮件、标签、附件元数据、规则、发件箱和同步记录；密码与 OAuth token 仍保留在系统 Keychain。</p>
+                <div className="tool-actions">
+                  <button className="secondary" onClick={previewLocalBackup}>预览备份</button>
+                  <button className="secondary" onClick={importLocalBackup}>恢复备份</button>
+                  <button onClick={exportLocalBackup}>导出本地备份</button>
                 </div>
-              )}
-            </section>
-            {connectionReport && (
-              <section className="tool-panel">
-                <strong>连接测试</strong>
-                {connectionReport.endpoints.map((endpoint) => (
-                  <div className={endpoint.reachable ? 'tool-row ok' : 'tool-row warn'} key={endpoint.name}>
-                    <span>{endpoint.name}</span>
-                    <em>{endpoint.address}</em>
-                    <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
-                    <p>{endpoint.message}</p>
+                {localBackupSummary && (
+                  <div className="tool-row ok">
+                    <span>v{localBackupSummary.schema_version}</span>
+                    <em>{localBackupSummary.path || 'mock://swiftmail-backup.json'}</em>
+                    <small>{Math.max(1, Math.round(localBackupSummary.size_bytes / 1024))} KB</small>
+                    <p>
+                      账号 {localBackupSummary.accounts} · 邮件 {localBackupSummary.messages} · 标签 {localBackupSummary.labels} · 规则 {localBackupSummary.rules} · 凭据
+                      {localBackupSummary.credentials_included ? '已包含' : '未包含'}
+                    </p>
                   </div>
-                ))}
+                )}
               </section>
-            )}
-            <section className="tool-panel" data-settings-section="sync">
+              {connectionReport && (
+                <section className="tool-panel">
+                  <strong>连接测试</strong>
+                  {connectionReport.endpoints.map((endpoint) => (
+                    <div className={endpoint.reachable ? 'tool-row ok' : 'tool-row warn'} key={endpoint.name}>
+                      <span>{endpoint.name}</span>
+                      <em>{endpoint.address}</em>
+                      <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
+                      <p>{endpoint.message}</p>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </details>
+            <details className="settings-disclosure" data-settings-section="sync">
+              <summary>
+                <span>
+                  <strong>同步与发信高级工具</strong>
+                  <em>IMAP 发现、同步演练、发件箱队列</em>
+                </span>
+                <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
+              </summary>
+            <section className="tool-panel">
               <header className="tool-header">
                 <strong>IMAP 文件夹发现</strong>
                 <button onClick={discoverImapFolders}>发现文件夹</button>
@@ -4379,7 +4417,7 @@ export default function App() {
                 </div>
               )}
             </section>
-            <section className="tool-panel" data-settings-section="sync">
+            <section className="tool-panel">
               <header className="tool-header">
                 <strong>同步演练</strong>
                 <div className="tool-actions">
@@ -4410,7 +4448,7 @@ export default function App() {
                 ))
               )}
             </section>
-            <section className="tool-panel" data-settings-section="sync">
+            <section className="tool-panel">
               <header className="tool-header">
                 <strong>发件箱队列</strong>
                 <div className="tool-actions">
@@ -4440,6 +4478,7 @@ export default function App() {
                 ))
               )}
             </section>
+            </details>
             <section className="tool-panel grid-tools" data-settings-section="rules">
               <div>
                 <strong>联系人</strong>
@@ -4525,39 +4564,48 @@ export default function App() {
                 ))}
               </div>
             </section>
-            <section className="tool-panel raw-preview" data-settings-section="security-preview">
-              <header className="tool-header">
-                <strong>原始邮件安全预览</strong>
-                <button onClick={parseRawMessage}>解析</button>
-              </header>
-              <textarea value={rawMessage} onChange={(event) => setRawMessage(event.target.value)} />
-              {parsedPreview && (
-                <div className="preview-result">
-                  <strong>{parsedPreview.subject}</strong>
-                  <span>{parsedPreview.from} → {parsedPreview.to}</span>
-                  <pre>{parsedPreview.body_preview}</pre>
-                  {parsedPreview.sanitized_html && (
-                    <>
-                      <div
-                        className="sanitized-html-preview"
-                        dangerouslySetInnerHTML={{ __html: parsedPreview.sanitized_html }}
-                      />
-                      <details>
-                        <summary>清洗后的 HTML 源码</summary>
-                        <pre>{parsedPreview.sanitized_html}</pre>
-                      </details>
-                    </>
-                  )}
-                  {parsedPreview.attachment_count > 0 && (
-                    <div className="preview-metadata">
-                      <span>附件 {parsedPreview.attachment_count}</span>
-                      {parsedPreview.attachment_names.map((name) => <em key={name}>{name}</em>)}
-                    </div>
-                  )}
-                  {parsedPreview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-                </div>
-              )}
-            </section>
+            <details className="settings-disclosure" data-settings-section="security-preview">
+              <summary>
+                <span>
+                  <strong>原始邮件安全预览</strong>
+                  <em>调试 HTML 清洗、附件和安全警告</em>
+                </span>
+                <b>{parsedPreview ? `${parsedPreview.attachment_count} 附件` : '调试'}</b>
+              </summary>
+              <section className="tool-panel raw-preview">
+                <header className="tool-header">
+                  <strong>原始邮件安全预览</strong>
+                  <button onClick={parseRawMessage}>解析</button>
+                </header>
+                <textarea value={rawMessage} onChange={(event) => setRawMessage(event.target.value)} />
+                {parsedPreview && (
+                  <div className="preview-result">
+                    <strong>{parsedPreview.subject}</strong>
+                    <span>{parsedPreview.from} → {parsedPreview.to}</span>
+                    <pre>{parsedPreview.body_preview}</pre>
+                    {parsedPreview.sanitized_html && (
+                      <>
+                        <div
+                          className="sanitized-html-preview"
+                          dangerouslySetInnerHTML={{ __html: parsedPreview.sanitized_html }}
+                        />
+                        <details>
+                          <summary>清洗后的 HTML 源码</summary>
+                          <pre>{parsedPreview.sanitized_html}</pre>
+                        </details>
+                      </>
+                    )}
+                    {parsedPreview.attachment_count > 0 && (
+                      <div className="preview-metadata">
+                        <span>附件 {parsedPreview.attachment_count}</span>
+                        {parsedPreview.attachment_names.map((name) => <em key={name}>{name}</em>)}
+                      </div>
+                    )}
+                    {parsedPreview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  </div>
+                )}
+              </section>
+            </details>
               </div>
             </div>
           </section>

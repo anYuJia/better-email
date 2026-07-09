@@ -393,14 +393,16 @@ button { cursor: pointer; }
 }
 
 .contact-tool-actions,
-.contact-edit-form > div {
+.contact-edit-form > div,
+.contact-create-form {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
 .contact-tool-actions button,
-.contact-edit-form button {
+.contact-edit-form button,
+.contact-create-form button {
   min-height: 28px;
   border: 1px solid rgba(10, 132, 255, 0.16);
   border-radius: 7px;
@@ -410,15 +412,45 @@ button { cursor: pointer; }
   font-size: 12px;
 }
 
-.contact-edit-form {
+.contact-tool-actions button.danger {
+  border-color: rgba(217, 45, 32, 0.18);
+  background: rgba(217, 45, 32, 0.08);
+  color: var(--danger, #d92d20);
+}
+
+.contact-create-form,
+.contact-edit-form,
+.contact-merge-picker {
   display: grid;
   gap: 8px;
 }
 
+.contact-create-form {
+  margin: 8px 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
 .contact-edit-form input,
-.contact-edit-form textarea {
+.contact-edit-form textarea,
+.contact-create-form input,
+.contact-create-form textarea,
+.contact-merge-picker select {
   width: 100%;
   min-width: 0;
+}
+
+.contact-create-form .checkbox-row {
+  margin: 0;
+}
+
+.contact-merge-picker {
+  margin-top: 8px;
+  color: var(--text-soft, #374151);
+  font-size: 12px;
+  font-weight: 720;
 }
 
 .message-list-panel {

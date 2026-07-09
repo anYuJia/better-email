@@ -1,9 +1,9 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
-    BackgroundTaskInput, Contact, ContactInput, DraftInput, Folder, ImapFolderProbe,
-    ImapHeaderBatch, ImapMailboxState, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
-    OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
+    BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, DraftInput, Folder,
+    ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, Label, LocalBackup, LocalBackupRow,
+    LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats,
+    Message, OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
     OutboundAttachmentInput, OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput,
     RemoteMessageBody, SyncRun, ThreadSummary,
 };
@@ -1865,6 +1865,35 @@ impl MailStore {
         })
     }
 
+    pub fn create_contact(&self, input: ContactCreateInput) -> MailResult<Contact> {
+        self.with_conn(|conn| {
+            let email = normalize_email(&input.email);
+            if email.is_empty() {
+                return Err(MailError::Imap("联系人邮箱不能为空".to_string()));
+            }
+            let name = input.name.trim();
+            let display_name = if name.is_empty() {
+                email.as_str()
+            } else {
+                name
+            };
+            let aliases = normalize_contact_aliases(input.aliases, &email);
+            let now = Utc::now().to_rfc3339();
+            conn.execute(
+                "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                params![
+                    display_name,
+                    email,
+                    contact_aliases_to_text(&aliases),
+                    if input.vip { 1 } else { 0 },
+                    now,
+                ],
+            )?;
+            get_contact_for_conn(conn, conn.last_insert_rowid())
+        })
+    }
+
     pub fn update_contact(&self, contact_id: i64, input: ContactInput) -> MailResult<Contact> {
         self.with_conn(|conn| {
             let existing = conn.query_row(
@@ -1899,6 +1928,55 @@ impl MailStore {
                 name: if name.is_empty() { existing.name } else { name.to_string() },
                 ..existing
             })
+        })
+    }
+
+    pub fn delete_contact(&self, contact_id: i64) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute("DELETE FROM contacts WHERE id = ?1", params![contact_id])?;
+            Ok(())
+        })
+    }
+
+    pub fn merge_contacts(
+        &self,
+        target_contact_id: i64,
+        source_contact_id: i64,
+    ) -> MailResult<Contact> {
+        if target_contact_id == source_contact_id {
+            return Err(MailError::Imap("请选择两个不同联系人进行合并".to_string()));
+        }
+        self.with_conn(|conn| {
+            let target = get_contact_for_conn(conn, target_contact_id)?;
+            let source = get_contact_for_conn(conn, source_contact_id)?;
+            let mut aliases = target.aliases.clone();
+            aliases.push(source.email.clone());
+            aliases.extend(source.aliases.clone());
+            let aliases = normalize_contact_aliases(aliases, &target.email);
+            let name = if target.name.trim().is_empty() || target.name == target.email {
+                source.name.as_str()
+            } else {
+                target.name.as_str()
+            };
+            let message_count = target.message_count + source.message_count;
+            let last_seen_at = if source.last_seen_at > target.last_seen_at {
+                source.last_seen_at.as_str()
+            } else {
+                target.last_seen_at.as_str()
+            };
+            conn.execute(
+                "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4, message_count = ?5, last_seen_at = ?6 WHERE id = ?1",
+                params![
+                    target_contact_id,
+                    name,
+                    contact_aliases_to_text(&aliases),
+                    if target.vip || source.vip { 1 } else { 0 },
+                    message_count,
+                    last_seen_at,
+                ],
+            )?;
+            conn.execute("DELETE FROM contacts WHERE id = ?1", params![source_contact_id])?;
+            get_contact_for_conn(conn, target_contact_id)
         })
     }
 
@@ -3126,6 +3204,10 @@ fn contact_aliases_from_text(raw: String) -> Vec<String> {
         .collect()
 }
 
+fn normalize_email(value: &str) -> String {
+    value.trim().to_ascii_lowercase()
+}
+
 fn normalize_contact_aliases(aliases: Vec<String>, primary_email: &str) -> Vec<String> {
     let primary = primary_email.trim().to_ascii_lowercase();
     let mut normalized = Vec::new();
@@ -3137,6 +3219,25 @@ fn normalize_contact_aliases(aliases: Vec<String>, primary_email: &str) -> Vec<S
         normalized.push(value);
     }
     normalized
+}
+
+fn get_contact_for_conn(conn: &Connection, contact_id: i64) -> MailResult<Contact> {
+    conn.query_row(
+        "SELECT id, name, email, aliases, vip, message_count, last_seen_at FROM contacts WHERE id = ?1",
+        params![contact_id],
+        |row| {
+            Ok(Contact {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                email: row.get(2)?,
+                aliases: contact_aliases_from_text(row.get(3)?),
+                vip: row.get::<_, i64>(4)? != 0,
+                message_count: row.get(5)?,
+                last_seen_at: row.get(6)?,
+            })
+        },
+    )
+    .map_err(Into::into)
 }
 
 fn normalize_remote_image_trust_scope(scope: &str) -> MailResult<String> {
@@ -5463,6 +5564,68 @@ mod tests {
             vec!["ada@personal.example.com".to_string()]
         );
         assert!(!preserved_name.vip);
+    }
+
+    #[test]
+    fn contact_create_delete_and_merge_manage_address_book() {
+        let store = test_store();
+        let created = store
+            .create_contact(ContactCreateInput {
+                name: "Merge Source".to_string(),
+                email: " MERGE-SOURCE@EXAMPLE.COM ".to_string(),
+                aliases: vec![
+                    "source.alias@example.com".to_string(),
+                    "merge-source@example.com".to_string(),
+                ],
+                vip: true,
+            })
+            .unwrap();
+        assert_eq!(created.email, "merge-source@example.com");
+        assert_eq!(created.name, "Merge Source");
+        assert_eq!(
+            created.aliases,
+            vec!["source.alias@example.com".to_string()]
+        );
+        assert!(created.vip);
+
+        let target = store
+            .list_contacts()
+            .unwrap()
+            .into_iter()
+            .find(|contact| contact.email == "ada@example.com")
+            .unwrap();
+        let merged = store.merge_contacts(target.id, created.id).unwrap();
+        assert!(merged
+            .aliases
+            .contains(&"merge-source@example.com".to_string()));
+        assert!(merged
+            .aliases
+            .contains(&"source.alias@example.com".to_string()));
+        assert!(merged.vip);
+        assert_eq!(
+            merged.message_count,
+            target.message_count + created.message_count
+        );
+        assert!(store
+            .list_contacts()
+            .unwrap()
+            .iter()
+            .all(|contact| contact.id != created.id));
+
+        let deleted = store
+            .create_contact(ContactCreateInput {
+                name: "Delete Me".to_string(),
+                email: "delete-me@example.com".to_string(),
+                aliases: Vec::new(),
+                vip: false,
+            })
+            .unwrap();
+        store.delete_contact(deleted.id).unwrap();
+        assert!(store
+            .list_contacts()
+            .unwrap()
+            .iter()
+            .all(|contact| contact.id != deleted.id));
     }
 
     #[test]

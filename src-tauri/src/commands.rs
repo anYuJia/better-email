@@ -3,14 +3,14 @@ use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
-    BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactInput, CredentialInput,
-    CredentialStatus, DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession,
-    DiagnosticOutboxItem, DraftInput, Folder, ImapMailboxState, ImapProbeReport, Label,
-    LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
-    MailStats, Message, OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput,
-    OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport,
-    OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem,
-    ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
+    ContactInput, CredentialInput, CredentialStatus, DiagnosticAccount, DiagnosticExport,
+    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder, ImapMailboxState,
+    ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput,
+    MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput, OAuthCallbackReport,
+    OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput,
+    OAuthStartReport, OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput,
+    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
     RemoteImageTrustInput, SyncRun, ThreadSummary,
 };
 use crate::oauth;
@@ -1292,12 +1292,34 @@ pub fn list_contacts(store: State<'_, MailStore>) -> MailResult<Vec<Contact>> {
 }
 
 #[tauri::command]
+pub fn create_contact(
+    store: State<'_, MailStore>,
+    input: ContactCreateInput,
+) -> MailResult<Contact> {
+    store.create_contact(input)
+}
+
+#[tauri::command]
 pub fn update_contact(
     store: State<'_, MailStore>,
     contact_id: i64,
     input: ContactInput,
 ) -> MailResult<Contact> {
     store.update_contact(contact_id, input)
+}
+
+#[tauri::command]
+pub fn delete_contact(store: State<'_, MailStore>, contact_id: i64) -> MailResult<()> {
+    store.delete_contact(contact_id)
+}
+
+#[tauri::command]
+pub fn merge_contacts(
+    store: State<'_, MailStore>,
+    target_contact_id: i64,
+    source_contact_id: i64,
+) -> MailResult<Contact> {
+    store.merge_contacts(target_contact_id, source_contact_id)
 }
 
 #[tauri::command]

@@ -327,6 +327,13 @@ type Contact = {
   last_seen_at: string;
 };
 
+type ContactCreateInput = {
+  name: string;
+  email: string;
+  aliases: string[];
+  vip: boolean;
+};
+
 type MailRule = {
   id: number;
   name: string;
@@ -468,6 +475,13 @@ const emptyRuleForm: MailRuleInput = {
   condition: 'from contains ',
   action: 'apply label ',
   enabled: true,
+};
+
+const emptyContactForm: ContactCreateInput = {
+  name: '',
+  email: '',
+  aliases: [],
+  vip: false,
 };
 
 const notificationPolicyStorageKey = 'swiftmail.notificationPolicy';
@@ -776,6 +790,9 @@ export default function App() {
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactEditName, setContactEditName] = useState('');
   const [contactEditAliases, setContactEditAliases] = useState('');
+  const [contactForm, setContactForm] = useState<ContactCreateInput>(emptyContactForm);
+  const [contactFormAliases, setContactFormAliases] = useState('');
+  const [mergeSourceContactId, setMergeSourceContactId] = useState<number | null>(null);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
   const [identityForm, setIdentityForm] = useState<MailIdentityInput>(emptyIdentityForm);
   const [rules, setRules] = useState<MailRule[]>([]);
@@ -1902,6 +1919,25 @@ export default function App() {
     setContactEditAliases(contact.aliases.join(', '));
   }
 
+  async function createManagedContact() {
+    const email = contactForm.email.trim().toLowerCase();
+    if (!email) {
+      setStatus('请输入联系人邮箱');
+      return;
+    }
+    const created = await invoke<Contact>('create_contact', {
+      input: {
+        ...contactForm,
+        email,
+        aliases: normalizeContactAliases(contactFormAliases).filter((alias) => alias !== email),
+      },
+    });
+    setContacts((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+    setContactForm(emptyContactForm);
+    setContactFormAliases('');
+    setStatus(`联系人已新增：${created.name || created.email}`);
+  }
+
   async function saveContactOverride(contact: Contact) {
     const aliases = normalizeContactAliases(contactEditAliases).filter((alias) => alias !== contact.email.trim().toLowerCase());
     const updated = await invoke<Contact>('update_contact', {
@@ -1938,6 +1974,33 @@ export default function App() {
       return { ...current, vipSenders: nextSenders.join('\n') };
     });
     setStatus(nextVip ? `已设为 VIP：${updated.name || updated.email}` : `已取消 VIP：${updated.name || updated.email}`);
+  }
+
+  async function deleteManagedContact(contact: Contact) {
+    await invoke('delete_contact', { contactId: contact.id });
+    setContacts((current) => current.filter((item) => item.id !== contact.id));
+    if (editingContactId === contact.id) {
+      setEditingContactId(null);
+    }
+    if (mergeSourceContactId === contact.id) {
+      setMergeSourceContactId(null);
+    }
+    setStatus(`联系人已删除：${contact.name || contact.email}`);
+  }
+
+  async function mergeManagedContact(target: Contact) {
+    if (!mergeSourceContactId || mergeSourceContactId === target.id) {
+      setStatus('请选择要合并进来的联系人');
+      return;
+    }
+    const source = contacts.find((contact) => contact.id === mergeSourceContactId);
+    const merged = await invoke<Contact>('merge_contacts', {
+      targetContactId: target.id,
+      sourceContactId: mergeSourceContactId,
+    });
+    setContacts((current) => [merged, ...current.filter((item) => item.id !== target.id && item.id !== mergeSourceContactId)]);
+    setMergeSourceContactId(null);
+    setStatus(`已合并联系人：${source?.name || source?.email || '来源联系人'} → ${merged.name || merged.email}`);
   }
 
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
@@ -4482,6 +4545,34 @@ export default function App() {
             <section className="tool-panel grid-tools" data-settings-section="rules">
               <div>
                 <strong>联系人</strong>
+                <div className="contact-create-form">
+                  <input
+                    value={contactForm.name}
+                    onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })}
+                    placeholder="联系人名称"
+                  />
+                  <input
+                    value={contactForm.email}
+                    onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })}
+                    placeholder="邮箱地址"
+                  />
+                  <textarea
+                    value={contactFormAliases}
+                    onChange={(event) => setContactFormAliases(event.target.value)}
+                    placeholder="别名邮箱，逗号或换行分隔"
+                  />
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={contactForm.vip}
+                      onChange={(event) => setContactForm({ ...contactForm, vip: event.target.checked })}
+                    />
+                    设为 VIP
+                  </label>
+                  <button type="button" onClick={() => createManagedContact().catch((error) => setStatus(String(error)))}>
+                    新增联系人
+                  </button>
+                </div>
                 {managedContacts.slice(0, 6).map((contact) => (
                   <div className="tool-row contact-tool-row" key={contact.id}>
                     {editingContactId === contact.id ? (
@@ -4511,11 +4602,27 @@ export default function App() {
                         <div className="contact-tool-actions">
                           <button type="button" onClick={() => startEditContact(contact)}>编辑</button>
                           <button type="button" onClick={() => toggleContactVip(contact).catch((error) => setStatus(String(error)))}>{contact.vip ? '取消 VIP' : '设为 VIP'}</button>
+                          <button type="button" onClick={() => mergeManagedContact(contact).catch((error) => setStatus(String(error)))}>合并</button>
+                          <button type="button" className="danger" onClick={() => deleteManagedContact(contact).catch((error) => setStatus(String(error)))}>删除</button>
                         </div>
                       </>
                     )}
                   </div>
                 ))}
+                <label className="contact-merge-picker">
+                  合并来源
+                  <select
+                    value={mergeSourceContactId ?? ''}
+                    onChange={(event) => setMergeSourceContactId(event.target.value ? Number(event.target.value) : null)}
+                  >
+                    <option value="">选择一个联系人</option>
+                    {managedContacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name || contact.email} · {contact.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
               <div>
                 <strong>规则</strong>

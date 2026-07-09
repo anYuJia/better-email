@@ -170,6 +170,7 @@ let nextAttachmentId = 2;
 let nextOutboxId = 1;
 let nextRuleId = 4;
 let nextIdentityId = 3;
+let nextContactId = 4;
 
 let labels = [
   { id: 1, name: '重要', color: '#c2410c', message_count: 1 },
@@ -509,6 +510,28 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return [] as T;
     case 'list_contacts':
       return contacts as T;
+    case 'create_contact': {
+      const input = args?.input as { name?: string; email?: string; aliases?: string[]; vip?: boolean };
+      const email = String(input.email ?? '').trim().toLowerCase();
+      if (!email) throw new Error('联系人邮箱不能为空');
+      if (contacts.some((contact) => contact.email.toLowerCase() === email)) {
+        throw new Error('联系人邮箱已存在');
+      }
+      const aliases = [...new Set((input.aliases ?? [])
+        .map((alias) => String(alias).trim().toLowerCase())
+        .filter((alias) => alias && alias !== email))];
+      const created = {
+        id: nextContactId++,
+        name: input.name?.trim() || email,
+        email,
+        aliases,
+        vip: Boolean(input.vip),
+        message_count: 0,
+        last_seen_at: now,
+      };
+      contacts = [created, ...contacts];
+      return created as T;
+    }
     case 'update_contact': {
       const contactId = Number(args?.contactId);
       const input = args?.input as { name?: string; aliases?: string[]; vip?: boolean };
@@ -525,6 +548,32 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       };
       contacts = contacts.map((contact) => (contact.id === contactId ? updated : contact));
       return updated as T;
+    }
+    case 'delete_contact': {
+      const contactId = Number(args?.contactId);
+      contacts = contacts.filter((contact) => contact.id !== contactId);
+      return undefined as T;
+    }
+    case 'merge_contacts': {
+      const targetContactId = Number(args?.targetContactId);
+      const sourceContactId = Number(args?.sourceContactId);
+      if (targetContactId === sourceContactId) throw new Error('请选择两个不同联系人进行合并');
+      const target = contacts.find((contact) => contact.id === targetContactId);
+      const source = contacts.find((contact) => contact.id === sourceContactId);
+      if (!target || !source) throw new Error('contact not found');
+      const aliases = [...new Set([...target.aliases, source.email, ...source.aliases]
+        .map((alias) => alias.trim().toLowerCase())
+        .filter((alias) => alias && alias !== target.email.toLowerCase()))];
+      const merged = {
+        ...target,
+        name: target.name.trim() && target.name !== target.email ? target.name : source.name,
+        aliases,
+        vip: target.vip || source.vip,
+        message_count: target.message_count + source.message_count,
+        last_seen_at: source.last_seen_at > target.last_seen_at ? source.last_seen_at : target.last_seen_at,
+      };
+      contacts = [merged, ...contacts.filter((contact) => contact.id !== targetContactId && contact.id !== sourceContactId)];
+      return merged as T;
     }
     case 'list_rules':
       return rules as T;

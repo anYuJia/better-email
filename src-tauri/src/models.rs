@@ -393,6 +393,14 @@ pub struct ContactInput {
     pub vip: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactCreateInput {
+    pub name: String,
+    pub email: String,
+    pub aliases: Vec<String>,
+    pub vip: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MailRule {
     pub id: i64,

@@ -797,7 +797,7 @@ function folderIconForRole(role: FolderRole): React.ReactNode {
   return folderIcon[role as SystemFolderRole] ?? folderIcon.custom;
 }
 
-const primaryFolderRoles = new Set<FolderRole>(['inbox']);
+const primaryFolderRoles = new Set<FolderRole>(['inbox', 'sent', 'drafts', 'archive']);
 
 const shortcutGroups = [
   {
@@ -1474,7 +1474,7 @@ export default function App() {
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
     : `${messages.length} 封`;
   const visibleListSummary = `${messages.length} / ${stats?.total_messages ?? messages.length} 封`;
-  const currentViewLabel = listMode === 'threads' ? '线程' : '邮件';
+  const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
   const activeThreadSelected = activeThread
     ? threadMessages.find((message) => message.id === selectedId) ?? threadMessages[0] ?? selected
     : selected;
@@ -3340,7 +3340,7 @@ export default function App() {
         <div className="sidebar-secondary sidebar-quick-menus">
           <details className="sidebar-disclosure more-mailboxes">
             <summary>
-              <span>邮箱</span>
+              <span>更多邮箱</span>
               <em>{folders.filter((folder) => !primaryFolderRoles.has(folder.role)).length}</em>
             </summary>
             <nav className="folder-list folded-folder-list">
@@ -3709,7 +3709,10 @@ export default function App() {
             </button>
           ))}
           {messages.length === 0 && (
-            <div className="empty-state">
+            <div className="empty-state mailbox-empty-state">
+              <div className="empty-state-mark">
+                <Search size={22} />
+              </div>
               <strong>
                 {query.trim() || filter !== 'all' ? '没有匹配邮件' : '当前邮箱暂无可显示邮件'}
               </strong>
@@ -3718,11 +3721,16 @@ export default function App() {
                   ? '可以清空搜索/筛选，或切回“全部”查看当前邮箱。'
                   : '当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。'}
               </span>
-              {(query.trim() || filter !== 'all') && (
-                <button type="button" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
-                  清空搜索和筛选
+              <div className="empty-state-actions">
+                {(query.trim() || filter !== 'all') && (
+                  <button type="button" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
+                    清空搜索和筛选
+                  </button>
+                )}
+                <button type="button" onClick={refreshAll}>
+                  刷新邮箱
                 </button>
-              )}
+              </div>
             </div>
           )}
           {messages.length > 0 && (
@@ -4023,7 +4031,15 @@ export default function App() {
             )}
           </article>
         ) : (
-          <div className="empty-reader">选择一封邮件开始阅读</div>
+          <div className="empty-reader">
+            <div className="empty-reader-card">
+              <div className="empty-state-mark">
+                <Mail size={24} />
+              </div>
+              <strong>选择一封邮件开始阅读</strong>
+              <span>左侧保持常用操作，更多整理和安全动作会在选中邮件后显示。</span>
+            </div>
+          </div>
         )}
       </section>
 

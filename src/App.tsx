@@ -3464,23 +3464,32 @@ export default function App() {
                     回复
                   </button>
                 )}
+                {selected.folder_role !== 'drafts' && (
+                  <>
+                    <button type="button" title="回复全部" onClick={() => composeFromMessage(selected, 'replyAll')}>回复全部</button>
+                    <button type="button" title="转发" onClick={() => composeFromMessage(selected, 'forward')}>转发</button>
+                  </>
+                )}
+                {selected.folder_role === 'trash' ? (
+                  <button type="button" title="恢复" onClick={restoreSelectedFromTrash}>恢复</button>
+                ) : selected.folder_role !== 'drafts' && (
+                  <button type="button" aria-label="归档" title="归档" onClick={() => moveSelected('archive')}>
+                    <Archive size={16} />
+                    归档
+                  </button>
+                )}
+                {selected.folder_role !== 'drafts' && (
+                  <button type="button" title={selected.is_read ? '标为未读' : '标为已读'} onClick={() => toggleRead(selected)}>
+                    {selected.is_read ? '标为未读' : '标为已读'}
+                  </button>
+                )}
                 <details className="reader-more-menu compact-menu">
                   <summary title="更多操作" aria-label="更多操作">
                     <MoreHorizontal size={16} />
                     更多
                   </summary>
                   <div>
-                    <span className="menu-section-title">回复</span>
-                    {selected.folder_role !== 'drafts' && <button onClick={() => composeFromMessage(selected, 'replyAll')}>回复全部</button>}
-                    {selected.folder_role !== 'drafts' && <button onClick={() => composeFromMessage(selected, 'forward')}>转发</button>}
                     <span className="menu-section-title">整理</span>
-                    {!selected.is_read && <button onClick={() => toggleRead(selected)}>标为已读</button>}
-                    {selected.is_read && <button onClick={() => toggleRead(selected)}>标为未读</button>}
-                    {selected.folder_role === 'trash' ? (
-                      <button onClick={restoreSelectedFromTrash}>恢复</button>
-                    ) : selected.folder_role !== 'drafts' && (
-                      <button aria-label="归档" onClick={() => moveSelected('archive')}><Archive size={16} /> 归档</button>
-                    )}
                     {selected.folder_role === 'snoozed' ? (
                       <button onClick={unsnoozeSelected}><Clock size={16} /> 取消稍后</button>
                     ) : selected.folder_role !== 'trash' && (
@@ -3513,7 +3522,7 @@ export default function App() {
                         <button onClick={emptyCurrentTrash}>清空废纸篓</button>
                       </>
                     ) : (
-                      <button onClick={() => moveSelected('trash')}><Trash2 size={16} /> 删除</button>
+                      <button className="danger-menu-item" onClick={() => moveSelected('trash')}><Trash2 size={16} /> 删除</button>
                     )}
                     <span className="menu-section-title">移动到</span>
                     {movableFoldersForMessage(folders, selected).map((folder) => (

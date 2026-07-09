@@ -504,8 +504,7 @@ async function main() {
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
-    await openDetails(cdp, '.reader-more-menu');
-    await evalInPage(cdp, "document.querySelector('.reader-more-menu button[aria-label=\"归档\"]').click()");
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"归档\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar') && document.body.innerText.includes('归档') && document.body.innerText.includes('撤销')");
     await clickButton(cdp, '撤销', "document.querySelector('.undo-snackbar')");
     await waitForExpression(cdp, "document.body.innerText.includes('已撤销：归档') && document.body.innerText.includes('安全检查清单')");

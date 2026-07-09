@@ -568,11 +568,11 @@ button { cursor: pointer; }
 }
 .custom-folder-form { border-top: 0; }
 .bulk-toolbar {
-  min-height: 42px;
+  min-height: 38px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 7px 10px;
   border-bottom: 1px solid #edf0f3;
   background: #fbfcfd;
   overflow-x: auto;
@@ -591,8 +591,8 @@ button { cursor: pointer; }
   border-radius: 8px;
   background: #fff;
   color: #2f3a45;
-  min-height: 26px;
-  padding: 0 9px;
+  min-height: 28px;
+  padding: 0 10px;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -687,6 +687,15 @@ button { cursor: pointer; }
 .compact-menu > div button.active {
   background: rgba(10, 132, 255, 0.09);
   color: var(--accent-strong, #0066d6);
+}
+
+.compact-menu > div button.danger-menu-item {
+  color: var(--danger, #d92d20);
+}
+
+.compact-menu > div button.danger-menu-item:hover {
+  background: rgba(217, 45, 32, 0.09);
+  color: var(--danger, #d92d20);
 }
 
 .compact-menu > div button:disabled {
@@ -829,20 +838,30 @@ time { color: #7a8490; font-size: 12px; white-space: nowrap; }
   line-height: 1.55;
 }
 .reader-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   align-items: flex-start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(216, 221, 228, 0.78);
 }
-h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
-.reader-header p { color: #68717d; margin: 8px 0 0; }
+h1 {
+  margin: 0;
+  max-width: min(760px, 100%);
+  font-size: 26px;
+  letter-spacing: 0;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+.reader-header p { color: #68717d; margin: 8px 0 0; max-width: 620px; line-height: 1.4; }
 .reader-actions {
   position: relative;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
+  max-width: 100%;
 }
 .reader-actions button,
 .reader-more-menu summary {
@@ -852,7 +871,7 @@ h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
   white-space: nowrap;
 }
 .reader-more-menu > div {
-  width: 236px;
+  width: 248px;
 }
 .reader-meta { margin: 20px 0 12px; color: #68717d; display: flex; gap: 14px; }
 .label-tools {
@@ -3919,13 +3938,14 @@ h1 {
 
 .reader-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 22px;
+  gap: 14px;
 }
 
 .reader-header h1 {
-  max-width: 680px;
+  max-width: min(760px, 100%);
+  overflow-wrap: anywhere;
 }
 
 .reader-actions {
@@ -3933,6 +3953,8 @@ h1 {
   padding: 5px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.70);
+  justify-content: flex-start;
+  max-width: 100%;
 }
 
 .reader-actions button,

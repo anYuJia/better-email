@@ -142,6 +142,7 @@ type Message = {
 type UndoMessageSnapshot = {
   id: number;
   subject: string;
+  account_id: number;
   folder_role: FolderRole;
   is_read: boolean;
   is_starred: boolean;
@@ -836,6 +837,8 @@ const filters: { id: FilterMode; label: string }[] = [
   { id: 'attachments', label: '附件' },
 ];
 
+const messagePageSize = 40;
+
 const searchShortcuts = [
   { label: '未读', query: 'is:unread' },
   { label: '附件名', query: 'filename:' },
@@ -903,6 +906,8 @@ export default function App() {
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messageLimit, setMessageLimit] = useState(messagePageSize);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
@@ -1187,6 +1192,13 @@ export default function App() {
     return account?.id ?? accounts[0]?.id ?? null;
   }
 
+  function visibleFolderIdForRole(role: FolderRole, accountId?: number | null): number | null {
+    return (
+      folders.find((folder) => folder.role === role && (folder.is_virtual || !accountId || folder.account_id === accountId))?.id ??
+      null
+    );
+  }
+
   async function releaseDueSnoozedMessages() {
     return invoke<Message[]>('release_due_snoozed_messages', { now: new Date().toISOString() });
   }
@@ -1276,9 +1288,11 @@ export default function App() {
     nextFilter = filter,
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
+    nextLimit = messagePageSize,
   ) {
     if (!nextFolderId) {
       setMessages([]);
+      setHasMoreMessages(false);
       setSelectedId(null);
       setSelectedMessageIds([]);
       return [];
@@ -1289,25 +1303,28 @@ export default function App() {
       folderId: nextFolderId,
       query: nextQuery.trim() || null,
       filter: nextFilter,
-      limit: 80,
+      limit: nextLimit + 1,
     });
     if (refreshId !== mailboxRefreshRef.current) return nextMessages;
-    setMessages(nextMessages);
+    const visibleMessages = nextMessages.slice(0, nextLimit);
+    setMessageLimit(nextLimit);
+    setHasMoreMessages(nextMessages.length > nextLimit);
+    setMessages(visibleMessages);
     setSelectedMessageIds((current) =>
-      current.filter((id) => nextMessages.some((message) => message.id === id)),
+      current.filter((id) => visibleMessages.some((message) => message.id === id)),
     );
     setSelectedId((current) => {
-      if (current && nextMessages.some((message) => message.id === current)) return current;
-      return nextMessages[0]?.id ?? null;
+      if (current && visibleMessages.some((message) => message.id === current)) return current;
+      return visibleMessages[0]?.id ?? null;
     });
     if (!frontendReadyRef.current) {
       frontendReadyRef.current = true;
       void invoke('mark_frontend_ready', {
-        message: `folder=${nextFolderId};messages=${nextMessages.length};scope=${nextScope}`,
+        message: `folder=${nextFolderId};messages=${visibleMessages.length};scope=${nextScope}`,
       });
       void maybeRunBenchmarkSync();
     }
-    return nextMessages;
+    return visibleMessages;
   }
 
   async function loadMessagesWithVisibleFallback(
@@ -1317,8 +1334,9 @@ export default function App() {
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
     visibleFolders = folders,
+    nextLimit = messagePageSize,
   ) {
-    const nextMessages = await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId);
+    const nextMessages = await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, nextLimit);
     if (
       nextMessages.length > 0 ||
       !nextFolderId ||
@@ -1331,7 +1349,7 @@ export default function App() {
 
     const selectedFolder = visibleFolders.find((folder) => folder.id === nextFolderId);
     if (!selectedFolder || selectedFolder.unread_count <= 0) return nextMessages;
-    const unreadMessages = await loadMessages(nextFolderId, '', 'unread', nextScope, refreshId);
+    const unreadMessages = await loadMessages(nextFolderId, '', 'unread', nextScope, refreshId, nextLimit);
     if (unreadMessages.length === 0 || refreshId !== mailboxRefreshRef.current) return nextMessages;
     setFilter('unread');
     setStatus('当前文件夹暂无全部邮件，已切到未读视图显示可见邮件。');
@@ -1346,13 +1364,15 @@ export default function App() {
   ) {
     const refreshId = mailboxRefreshRef.current + 1;
     mailboxRefreshRef.current = refreshId;
+    setMessageLimit(messagePageSize);
+    setHasMoreMessages(false);
     setMessages([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
     const meta = await loadMeta(preferredFolderId, nextScope);
     const nextFolderId = meta.folderId;
     if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
-    await loadMessagesWithVisibleFallback(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, meta.folders);
+    await loadMessagesWithVisibleFallback(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, meta.folders, messagePageSize);
     return nextFolderId;
   }
 
@@ -1416,7 +1436,7 @@ export default function App() {
 
   useEffect(() => {
     if (!folderId) return;
-    loadMessages(folderId, query, filter, accountScope).catch((error) => setStatus(String(error)));
+    loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, messagePageSize).catch((error) => setStatus(String(error)));
   }, [folderId, filter]);
 
   useEffect(() => {
@@ -1453,6 +1473,7 @@ export default function App() {
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
     : `${messages.length} 封`;
+  const visibleListSummary = `${messages.length} / ${stats?.total_messages ?? messages.length} 封`;
   const currentViewLabel = listMode === 'threads' ? '线程' : '邮件';
   const activeThreadSelected = activeThread
     ? threadMessages.find((message) => message.id === selectedId) ?? threadMessages[0] ?? selected
@@ -1495,7 +1516,7 @@ export default function App() {
 
   async function refreshAll() {
     const meta = await loadMeta(folderId);
-    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders);
+    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, messagePageSize);
     if (activeThread) {
       await openThread(activeThread, false);
     }
@@ -1533,6 +1554,7 @@ export default function App() {
     return items.map((message) => ({
       id: message.id,
       subject: message.subject || '(无主题)',
+      account_id: message.account_id,
       folder_role: message.folder_role,
       is_read: message.is_read,
       is_starred: message.is_starred,
@@ -1583,8 +1605,13 @@ export default function App() {
     }
     setUndoAction(null);
     setSelectedMessageIds([]);
-    await refreshAll();
-    setSelectedId(action.snapshots[0]?.id ?? null);
+    const firstSnapshot = action.snapshots[0];
+    const restoredFolderId = firstSnapshot
+      ? visibleFolderIdForRole(firstSnapshot.folder_role, firstSnapshot.account_id) ?? folderId
+      : folderId;
+    await loadMeta(restoredFolderId);
+    await loadMessages(restoredFolderId);
+    setSelectedId(firstSnapshot?.id ?? null);
     setStatus(`已撤销：${action.title}`);
   }
 
@@ -1676,7 +1703,10 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role });
-    await refreshAll();
+    const targetFolderId = visibleFolderIdForRole(role, selected.account_id) ?? folderId;
+    await loadMeta(targetFolderId);
+    await loadMessages(targetFolderId);
+    setSelectedId(selected.id);
     setStatus(report.message);
     queueUndoAction(role === 'trash' ? '删除' : role === 'archive' ? '归档' : `移动到 ${role}`, undoSnapshots);
   }
@@ -1685,7 +1715,9 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role: folder.role });
-    await refreshAll();
+    await loadMeta(folder.id);
+    await loadMessages(folder.id);
+    setSelectedId(selected.id);
     setStatus(`已移动到 ${folder.name}`);
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, report.message);
   }
@@ -1694,7 +1726,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
-    const spamFolderId = folders.find((folder) => folder.account_id === selected.account_id && folder.role === 'spam')?.id ?? folderId;
+    const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
     await loadMeta(spamFolderId);
     await loadMessages(spamFolderId);
     setSelectedId(selected.id);
@@ -1706,7 +1738,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const restored = await invoke<Message>('restore_message_to_inbox', { messageId: selected.id });
-    const inboxFolderId = folders.find((folder) => folder.account_id === restored.account_id && folder.role === 'inbox')?.id ?? folderId;
+    const inboxFolderId = visibleFolderIdForRole('inbox', restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId);
     await loadMessages(inboxFolderId);
     setSelectedId(restored.id);
@@ -1718,7 +1750,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const restored = await invoke<Message>('restore_message_to_inbox', { messageId: selected.id });
-    const inboxFolderId = folders.find((folder) => folder.account_id === restored.account_id && folder.role === 'inbox')?.id ?? folderId;
+    const inboxFolderId = visibleFolderIdForRole('inbox', restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId);
     await loadMessages(inboxFolderId);
     setSelectedId(restored.id);
@@ -1753,7 +1785,7 @@ export default function App() {
     }
     const folder = await invoke<Folder>('create_custom_folder', { accountId, name });
     setCustomFolderName('');
-    const { folderId: nextFolderId } = await loadMeta(folder.id);
+    const { folderId: nextFolderId } = await loadMeta(folderId);
     await loadMessages(nextFolderId);
     setStatus(`已创建文件夹：${folder.name}`);
   }
@@ -1779,7 +1811,7 @@ export default function App() {
 
   async function deleteCustomFolder(folder: Folder) {
     await invoke('delete_custom_folder', { folderId: folder.id });
-    const inboxFolderId = folders.find((entry) => entry.account_id === folder.account_id && entry.role === 'inbox')?.id ?? null;
+    const inboxFolderId = visibleFolderIdForRole('inbox', folder.account_id);
     const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
     await loadMessages(nextFolderId);
     setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
@@ -1793,7 +1825,7 @@ export default function App() {
       messageId: selected.id,
       snoozedUntil,
     });
-    const snoozedFolderId = folders.find((folder) => folder.role === 'snoozed')?.id ?? folderId;
+    const snoozedFolderId = visibleFolderIdForRole('snoozed', selected.account_id) ?? folderId;
     await loadMeta(snoozedFolderId);
     await loadMessages(snoozedFolderId);
     setSelectedId(updated.id);
@@ -1805,7 +1837,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const updated = await invoke<Message>('unsnooze_message', { messageId: selected.id });
-    const inboxFolderId = folders.find((folder) => folder.role === 'inbox')?.id ?? folderId;
+    const inboxFolderId = visibleFolderIdForRole('inbox', updated.account_id) ?? folderId;
     await loadMeta(inboxFolderId);
     await loadMessages(inboxFolderId);
     setSelectedId(updated.id);
@@ -2532,7 +2564,7 @@ export default function App() {
     });
     setRules((current) => [...current.filter((rule) => rule.id !== saved.id), saved]);
     await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
-    const spamFolderId = folders.find((folder) => folder.account_id === selected.account_id && folder.role === 'spam')?.id ?? folderId;
+    const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
     await loadMeta(spamFolderId);
     await loadMessages(spamFolderId);
     setSelectedId(selected.id);
@@ -2825,7 +2857,7 @@ export default function App() {
 
   async function runSearch(event: React.FormEvent) {
     event.preventDefault();
-    await loadMessagesWithVisibleFallback(folderId, query, filter);
+    await loadMessagesWithVisibleFallback(folderId, query, filter, accountScope, mailboxRefreshRef.current, folders, messagePageSize);
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已清除搜索');
   }
 
@@ -2837,7 +2869,7 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(folderId, nextQuery, filter);
+    await loadMessagesWithVisibleFallback(folderId, nextQuery, filter, accountScope, mailboxRefreshRef.current, folders, messagePageSize);
     searchInputRef.current?.focus();
     if (shortcutQuery.endsWith(':')) {
       searchInputRef.current?.setSelectionRange(nextQuery.length, nextQuery.length);
@@ -2853,8 +2885,22 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(folderId, '', 'all');
+    await loadMessagesWithVisibleFallback(folderId, '', 'all', accountScope, mailboxRefreshRef.current, folders, messagePageSize);
     setStatus('已清空搜索和筛选');
+  }
+
+  async function loadMoreMessages() {
+    const nextLimit = messageLimit + messagePageSize;
+    const nextMessages = await loadMessagesWithVisibleFallback(
+      folderId,
+      query,
+      filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      nextLimit,
+    );
+    setStatus(`已加载 ${nextMessages.length} 封邮件`);
   }
 
   async function runSavedSearch(savedSearch: SavedSearch) {
@@ -2863,7 +2909,7 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessages(folderId, savedSearch.query, savedSearch.filter);
+    await loadMessages(folderId, savedSearch.query, savedSearch.filter, accountScope, mailboxRefreshRef.current, messagePageSize);
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
 
@@ -3528,7 +3574,7 @@ export default function App() {
         <div className="list-control-strip">
           <div className="list-summary">
             <strong>{currentViewLabel}</strong>
-            <span>{messageListSummary}</span>
+            <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
             <em>{activeFilterLabel}</em>
           </div>
           <div className="list-control-actions">
@@ -3664,9 +3710,29 @@ export default function App() {
           ))}
           {messages.length === 0 && (
             <div className="empty-state">
-              {query.trim() || filter !== 'all'
-                ? '没有匹配邮件，可清空搜索或切回全部'
-                : '当前文件夹暂无可显示邮件'}
+              <strong>
+                {query.trim() || filter !== 'all' ? '没有匹配邮件' : '当前邮箱暂无可显示邮件'}
+              </strong>
+              <span>
+                {query.trim() || filter !== 'all'
+                  ? '可以清空搜索/筛选，或切回“全部”查看当前邮箱。'
+                  : '当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。'}
+              </span>
+              {(query.trim() || filter !== 'all') && (
+                <button type="button" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
+                  清空搜索和筛选
+                </button>
+              )}
+            </div>
+          )}
+          {messages.length > 0 && (
+            <div className="message-list-footer">
+              <span>已显示 {messages.length} 封{hasMoreMessages ? ' · 还有更多' : ' · 已到底'}</span>
+              {hasMoreMessages && (
+                <button type="button" onClick={() => loadMoreMessages().catch((error) => setStatus(String(error)))}>
+                  加载更多
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -3748,12 +3814,6 @@ export default function App() {
                     回复
                   </button>
                 )}
-                {selected.folder_role !== 'drafts' && (
-                  <>
-                    <button type="button" title="回复全部" onClick={() => composeFromMessage(selected, 'replyAll')}>回复全部</button>
-                    <button type="button" title="转发" onClick={() => composeFromMessage(selected, 'forward')}>转发</button>
-                  </>
-                )}
                 {selected.folder_role === 'trash' ? (
                   <button type="button" title="恢复" onClick={restoreSelectedFromTrash}>恢复</button>
                 ) : selected.folder_role !== 'drafts' && (
@@ -3773,6 +3833,12 @@ export default function App() {
                     更多
                   </summary>
                   <div>
+                    {selected.folder_role !== 'drafts' && (
+                      <>
+                        <button type="button" title="回复全部" onClick={() => composeFromMessage(selected, 'replyAll')}>回复全部</button>
+                        <button type="button" title="转发" onClick={() => composeFromMessage(selected, 'forward')}>转发</button>
+                      </>
+                    )}
                     <span className="menu-section-title">整理</span>
                     {selected.folder_role === 'snoozed' ? (
                       <button onClick={unsnoozeSelected}><Clock size={16} /> 取消稍后</button>

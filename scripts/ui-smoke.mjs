@@ -305,7 +305,9 @@ async function main() {
     });
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('SwiftMail')");
 
-    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
+    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length === 40 && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
+    await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
+    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
     await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
     const checks = [true, true, true];
 
@@ -443,13 +445,13 @@ async function main() {
     await clickButton(cdp, '发件箱', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.body.innerText.includes('邮件已加入发件箱队列')");
 
-    await evalInPage(cdp, "document.querySelectorAll('.message-card input[type=\"checkbox\"]')[0].click(); document.querySelectorAll('.message-card input[type=\"checkbox\"]')[1].click();");
+    await evalInPage(cdp, "(() => { const cards = [...document.querySelectorAll('.message-card')].filter((card) => card.textContent.includes('Low memory digest')); cards.slice(0, 2).forEach((card) => card.querySelector('input[type=\"checkbox\"]').click()); })()");
     await waitForExpression(cdp, "document.body.innerText.includes('已选 2')");
     await openDetails(cdp, '.bulk-more-menu');
     await clickButton(cdp, '星标', "document.querySelector('.bulk-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已批量添加星标 2 封邮件')");
 
-    await evalInPage(cdp, "document.querySelectorAll('.message-card input[type=\"checkbox\"]')[0].click(); document.querySelectorAll('.message-card input[type=\"checkbox\"]')[1].click();");
+    await evalInPage(cdp, "(() => { const cards = [...document.querySelectorAll('.message-card')].filter((card) => card.textContent.includes('Low memory digest')).slice(2, 4); cards.forEach((card) => card.querySelector('input[type=\"checkbox\"]').click()); })()");
     await waitForExpression(cdp, "document.body.innerText.includes('已选 2')");
     await openDetails(cdp, '.bulk-more-menu');
     await clickButton(cdp, '工作', "document.querySelector('.bulk-more-menu')");

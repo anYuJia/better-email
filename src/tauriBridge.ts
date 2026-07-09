@@ -187,6 +187,39 @@ let messages = [
   },
 ];
 
+messages = [
+  ...messages,
+  ...Array.from({ length: 48 }, (_, index) => {
+    const id = index + 3;
+    return {
+      id,
+      account_id: 1,
+      account_email: account.email,
+      folder_id: 101,
+      folder_role: 'inbox',
+      sender_name: `Digest ${index + 1}`,
+      sender_email: `digest-${index + 1}@example.com`,
+      recipients: account.email,
+      cc: '',
+      bcc: '',
+      subject: `Low memory digest ${String(index + 1).padStart(2, '0')}`,
+      snippet: '用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。',
+      body: '分页加载样本，帮助验证低内存邮件列表体验。',
+      sanitized_html: '',
+      security_warnings: [],
+      received_at: `2026-07-${String(7 - Math.floor(index / 12)).padStart(2, '0')}T${String(18 - (index % 12)).padStart(2, '0')}:00:00+08:00`,
+      is_read: true,
+      is_starred: false,
+      has_attachments: false,
+      snoozed_until: '',
+      labels: [],
+      attachment_count: 0,
+      remote_mailbox: 'INBOX',
+      remote_uid: 100 + id,
+    };
+  }),
+];
+
 type MockMessage = (typeof messages)[number];
 type MockDraftInput = {
   draft_id?: number;
@@ -425,7 +458,19 @@ function refreshLabelCounts() {
 function listMessages(args: InvokeArgs) {
   const query = String(args?.query ?? '').trim().toLowerCase();
   const filter = String(args?.filter ?? 'all');
+  const limit = Math.max(1, Number(args?.limit ?? 80));
+  const accountId = Number(args?.accountId ?? 0);
+  const folderId = Number(args?.folderId ?? 0);
+  const folder = folders.find((entry) => entry.id === folderId);
   return messages.filter((message) => {
+    if (accountId > 0 && message.account_id !== accountId) return false;
+    if (folder) {
+      if (folder.is_virtual) {
+        if (message.folder_role !== folder.role) return false;
+      } else if (message.folder_id !== folder.id) {
+        return false;
+      }
+    }
     if (filter === 'unread' && message.is_read) return false;
     if (filter === 'starred' && !message.is_starred) return false;
     if (filter === 'attachments' && !message.has_attachments) return false;
@@ -482,7 +527,7 @@ function listMessages(args: InvokeArgs) {
       }
     }
     return true;
-  });
+  }).slice(0, limit);
 }
 
 function normalizedThreadKey(subject: string) {
@@ -491,14 +536,20 @@ function normalizedThreadKey(subject: string) {
 
 function listThreadMessages(args: InvokeArgs) {
   const threadKey = String(args?.threadKey ?? args?.thread_key ?? '').trim();
+  const accountId = Number(args?.accountId ?? 0);
   return messages
     .filter((message) => normalizedThreadKey(message.subject) === threadKey)
+    .filter((message) => accountId <= 0 || message.account_id === accountId)
     .sort((left, right) => left.received_at.localeCompare(right.received_at));
 }
 
-function listThreads() {
+function listThreads(args?: InvokeArgs) {
+  const accountId = Number(args?.accountId ?? 0);
+  const scopedMessages = accountId > 0
+    ? messages.filter((message) => message.account_id === accountId)
+    : messages;
   const grouped = new Map<string, typeof messages>();
-  for (const message of messages) {
+  for (const message of scopedMessages) {
     const key = normalizedThreadKey(message.subject);
     grouped.set(key, [...(grouped.get(key) ?? []), message]);
   }
@@ -517,13 +568,17 @@ function listThreads() {
     .sort((left, right) => right.latest_at.localeCompare(left.latest_at));
 }
 
-function stats() {
+function stats(args?: InvokeArgs) {
+  const accountId = Number(args?.accountId ?? 0);
+  const scopedMessages = accountId > 0
+    ? messages.filter((message) => message.account_id === accountId)
+    : messages;
   return {
-    total_messages: messages.length,
-    unread_messages: messages.filter((message) => !message.is_read).length,
-    starred_messages: messages.filter((message) => message.is_starred).length,
-    draft_messages: messages.filter((message) => message.folder_role === 'drafts').length,
-    attachment_messages: messages.filter((message) => message.has_attachments).length,
+    total_messages: scopedMessages.length,
+    unread_messages: scopedMessages.filter((message) => !message.is_read).length,
+    starred_messages: scopedMessages.filter((message) => message.is_starred).length,
+    draft_messages: scopedMessages.filter((message) => message.folder_role === 'drafts').length,
+    attachment_messages: scopedMessages.filter((message) => message.has_attachments).length,
   };
 }
 
@@ -576,7 +631,11 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
         : account) as T;
     case 'list_folders':
-      return folders as T;
+      return folders.filter((folder) => {
+        const accountId = Number(args?.accountId ?? 0);
+        if (accountId <= 0) return folder.is_virtual || String(folder.role).startsWith('custom:');
+        return !folder.is_virtual && folder.account_id === accountId;
+      }) as T;
     case 'create_custom_folder': {
       const name = normalizeCustomFolderName(args?.name);
       const folder = {
@@ -615,7 +674,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       refreshLabelCounts();
       return labels as T;
     case 'get_stats':
-      return stats() as T;
+      return stats(args) as T;
     case 'list_sync_runs':
       return [] as T;
     case 'get_sync_schedule_plan':
@@ -692,7 +751,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'list_rules':
       return rules as T;
     case 'list_threads':
-      return listThreads() as T;
+      return listThreads(args) as T;
     case 'list_outbox':
       return outbox as T;
     case 'list_imap_mailboxes':

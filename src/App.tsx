@@ -1204,7 +1204,7 @@ export default function App() {
         ? nextFolderId
         : nextFolders[0]?.id ?? null;
     setFolderId(resolvedFolderId);
-    return resolvedFolderId;
+    return { folderId: resolvedFolderId, folders: nextFolders };
   }
 
   async function updateAppUnreadBadge(unreadCount: number) {
@@ -1256,6 +1256,34 @@ export default function App() {
     return nextMessages;
   }
 
+  async function loadMessagesWithVisibleFallback(
+    nextFolderId = folderId,
+    nextQuery = query,
+    nextFilter = filter,
+    nextScope: AccountScope = accountScope,
+    refreshId = mailboxRefreshRef.current,
+    visibleFolders = folders,
+  ) {
+    const nextMessages = await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId);
+    if (
+      nextMessages.length > 0 ||
+      !nextFolderId ||
+      nextQuery.trim() ||
+      nextFilter !== 'all' ||
+      refreshId !== mailboxRefreshRef.current
+    ) {
+      return nextMessages;
+    }
+
+    const selectedFolder = visibleFolders.find((folder) => folder.id === nextFolderId);
+    if (!selectedFolder || selectedFolder.unread_count <= 0) return nextMessages;
+    const unreadMessages = await loadMessages(nextFolderId, '', 'unread', nextScope, refreshId);
+    if (unreadMessages.length === 0 || refreshId !== mailboxRefreshRef.current) return nextMessages;
+    setFilter('unread');
+    setStatus('当前文件夹暂无全部邮件，已切到未读视图显示可见邮件。');
+    return unreadMessages;
+  }
+
   async function refreshMailbox(
     nextScope: AccountScope = accountScope,
     preferredFolderId: number | null = null,
@@ -1267,9 +1295,10 @@ export default function App() {
     setMessages([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
-    const nextFolderId = await loadMeta(preferredFolderId, nextScope);
+    const meta = await loadMeta(preferredFolderId, nextScope);
+    const nextFolderId = meta.folderId;
     if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
-    await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId);
+    await loadMessagesWithVisibleFallback(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, meta.folders);
     return nextFolderId;
   }
 
@@ -1411,8 +1440,8 @@ export default function App() {
   }, [selectedId]);
 
   async function refreshAll() {
-    await loadMeta(folderId);
-    await loadMessages();
+    const meta = await loadMeta(folderId);
+    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders);
     if (activeThread) {
       await openThread(activeThread, false);
     }
@@ -1670,7 +1699,7 @@ export default function App() {
     }
     const folder = await invoke<Folder>('create_custom_folder', { accountId, name });
     setCustomFolderName('');
-    const nextFolderId = await loadMeta(folder.id);
+    const { folderId: nextFolderId } = await loadMeta(folder.id);
     await loadMessages(nextFolderId);
     setStatus(`已创建文件夹：${folder.name}`);
   }
@@ -1689,7 +1718,7 @@ export default function App() {
     const renamed = await invoke<Folder>('rename_custom_folder', { folderId: folder.id, name });
     setRenamingFolderId(null);
     setRenamingFolderName('');
-    const nextFolderId = await loadMeta(folderId);
+    const { folderId: nextFolderId } = await loadMeta(folderId);
     await loadMessages(nextFolderId);
     setStatus(`已重命名文件夹：${renamed.name}`);
   }
@@ -1697,7 +1726,7 @@ export default function App() {
   async function deleteCustomFolder(folder: Folder) {
     await invoke('delete_custom_folder', { folderId: folder.id });
     const inboxFolderId = folders.find((entry) => entry.account_id === folder.account_id && entry.role === 'inbox')?.id ?? null;
-    const nextFolderId = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
+    const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
     await loadMessages(nextFolderId);
     setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
   }
@@ -2140,7 +2169,7 @@ export default function App() {
     setMessages([]);
     setSelectedId(null);
     setAttachments([]);
-    const nextFolderId = await loadMeta(null, created.id);
+    const { folderId: nextFolderId } = await loadMeta(null, created.id);
     await loadMessages(nextFolderId, query, filter, created.id);
     setStatus(`已创建账号：${created.email}`);
   }
@@ -2268,7 +2297,7 @@ export default function App() {
       return;
     }
     setLocalBackupSummary(summary);
-    const nextFolderId = await loadMeta(null);
+    const { folderId: nextFolderId } = await loadMeta(null);
     await loadMessages(nextFolderId);
     setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号`);
   }
@@ -2703,7 +2732,7 @@ export default function App() {
 
   async function runSearch(event: React.FormEvent) {
     event.preventDefault();
-    await loadMessages(folderId, query, filter);
+    await loadMessagesWithVisibleFallback(folderId, query, filter);
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已清除搜索');
   }
 
@@ -3354,7 +3383,7 @@ export default function App() {
               ref={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索主题、发件人、正文；支持 from: to: subject: label: after: before: has:attachment is:unread"
+              placeholder="搜索主题、发件人、正文；支持 from/to/cc/bcc/account/mailbox/filename"
             />
           </form>
           <button className="icon-button" title="刷新" onClick={refreshAll}>
@@ -3498,7 +3527,13 @@ export default function App() {
               </div>
             </button>
           ))}
-          {messages.length === 0 && <div className="empty-state">没有匹配邮件</div>}
+          {messages.length === 0 && (
+            <div className="empty-state">
+              {query.trim() || filter !== 'all'
+                ? '没有匹配邮件，可清空搜索或切回全部'
+                : '当前文件夹暂无可显示邮件'}
+            </div>
+          )}
         </div>
         )}
       </section>

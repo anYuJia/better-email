@@ -437,11 +437,29 @@ function listMessages(args: InvokeArgs) {
         if (!message.sender_name.toLowerCase().includes(value) && !message.sender_email.toLowerCase().includes(value)) return false;
       } else if (term.startsWith('to:')) {
         if (!message.recipients.toLowerCase().includes(term.replace(/^to:/, ''))) return false;
+      } else if (term.startsWith('cc:')) {
+        if (!message.cc.toLowerCase().includes(term.replace(/^cc:/, ''))) return false;
+      } else if (term.startsWith('bcc:')) {
+        if (!message.bcc.toLowerCase().includes(term.replace(/^bcc:/, ''))) return false;
       } else if (term.startsWith('subject:')) {
         if (!message.subject.toLowerCase().includes(term.replace(/^subject:/, ''))) return false;
       } else if (term.startsWith('label:')) {
         const value = term.replace(/^label:/, '');
         if (!message.labels.some((label) => label.toLowerCase().includes(value))) return false;
+      } else if (term.startsWith('account:')) {
+        const value = term.replace(/^account:/, '');
+        if (!message.account_email.toLowerCase().includes(value)) return false;
+      } else if (term.startsWith('mailbox:') || term.startsWith('folder:')) {
+        const value = term.replace(/^(mailbox|folder):/, '');
+        if (!message.remote_mailbox.toLowerCase().includes(value) && !message.folder_role.toLowerCase().includes(value)) return false;
+      } else if (term.startsWith('filename:') || term.startsWith('attachment:')) {
+        const value = term.replace(/^(filename|attachment):/, '');
+        const matched = attachments.some(
+          (attachment) =>
+            attachment.message_id === message.id &&
+            attachment.filename.toLowerCase().includes(value),
+        );
+        if (!matched) return false;
       } else if (term.startsWith('after:')) {
         if (message.received_at < `${term.replace(/^after:/, '')}T00:00:00`) return false;
       } else if (term.startsWith('before:')) {

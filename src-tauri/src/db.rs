@@ -2988,8 +2988,13 @@ struct SearchCriteria {
     text: Option<String>,
     from: Option<String>,
     to: Option<String>,
+    cc: Option<String>,
+    bcc: Option<String>,
     subject: Option<String>,
     label: Option<String>,
+    account: Option<String>,
+    mailbox: Option<String>,
+    filename: Option<String>,
     after: Option<String>,
     before: Option<String>,
     has_attachment: bool,
@@ -3014,6 +3019,12 @@ impl SearchCriteria {
             } else if let Some(value) = token.strip_prefix("to:").filter(|value| !value.is_empty())
             {
                 criteria.to = Some(value.to_string());
+            } else if let Some(value) = token.strip_prefix("cc:").filter(|value| !value.is_empty())
+            {
+                criteria.cc = Some(value.to_string());
+            } else if let Some(value) = token.strip_prefix("bcc:").filter(|value| !value.is_empty())
+            {
+                criteria.bcc = Some(value.to_string());
             } else if let Some(value) = token
                 .strip_prefix("subject:")
                 .filter(|value| !value.is_empty())
@@ -3024,6 +3035,31 @@ impl SearchCriteria {
                 .filter(|value| !value.is_empty())
             {
                 criteria.label = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("account:")
+                .filter(|value| !value.is_empty())
+            {
+                criteria.account = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("mailbox:")
+                .filter(|value| !value.is_empty())
+            {
+                criteria.mailbox = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("folder:")
+                .filter(|value| !value.is_empty())
+            {
+                criteria.mailbox = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("filename:")
+                .filter(|value| !value.is_empty())
+            {
+                criteria.filename = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("attachment:")
+                .filter(|value| !value.is_empty())
+            {
+                criteria.filename = Some(value.to_string());
             } else if let Some(value) = token
                 .strip_prefix("after:")
                 .filter(|value| !value.is_empty())
@@ -3073,11 +3109,28 @@ impl SearchCriteria {
         if let Some(to) = &self.to {
             params.push(build_like_query(to));
         }
+        if let Some(cc) = &self.cc {
+            params.push(build_like_query(cc));
+        }
+        if let Some(bcc) = &self.bcc {
+            params.push(build_like_query(bcc));
+        }
         if let Some(subject) = &self.subject {
             params.push(build_like_query(subject));
         }
         if let Some(label) = &self.label {
             params.push(build_like_query(label));
+        }
+        if let Some(account) = &self.account {
+            let value = build_like_query(account);
+            params.extend(std::iter::repeat_n(value, 2));
+        }
+        if let Some(mailbox) = &self.mailbox {
+            let value = build_like_query(mailbox);
+            params.extend(std::iter::repeat_n(value, 2));
+        }
+        if let Some(filename) = &self.filename {
+            params.push(build_like_query(filename));
         }
         if let Some(after) = &self.after {
             params.push(after.clone());
@@ -3132,6 +3185,12 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
     if search.to.is_some() {
         sql.push_str("AND m.recipients LIKE ? ESCAPE '\\' ");
     }
+    if search.cc.is_some() {
+        sql.push_str("AND m.cc LIKE ? ESCAPE '\\' ");
+    }
+    if search.bcc.is_some() {
+        sql.push_str("AND m.bcc LIKE ? ESCAPE '\\' ");
+    }
     if search.subject.is_some() {
         sql.push_str("AND m.subject LIKE ? ESCAPE '\\' ");
     }
@@ -3142,6 +3201,21 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
                 FROM message_labels ml
                 JOIN labels l ON l.id = ml.label_id
                 WHERE ml.message_id = m.id AND l.name LIKE ? ESCAPE '\\'
+            ) ",
+        );
+    }
+    if search.account.is_some() {
+        sql.push_str("AND (a.email LIKE ? ESCAPE '\\' OR a.display_name LIKE ? ESCAPE '\\') ");
+    }
+    if search.mailbox.is_some() {
+        sql.push_str("AND (m.remote_mailbox LIKE ? ESCAPE '\\' OR f.name LIKE ? ESCAPE '\\') ");
+    }
+    if search.filename.is_some() {
+        sql.push_str(
+            "AND EXISTS (
+                SELECT 1
+                FROM attachments att
+                WHERE att.message_id = m.id AND att.filename LIKE ? ESCAPE '\\'
             ) ",
         );
     }
@@ -4485,6 +4559,32 @@ mod tests {
         assert!(to_matches
             .iter()
             .all(|message| message.recipients.contains("demo@swiftmail.local")));
+        let account_matches = store
+            .list_messages_for_scope(None, inbox.id, Some("account:demo".to_string()), None, 50)
+            .unwrap();
+        assert!(!account_matches.is_empty());
+        assert!(account_matches
+            .iter()
+            .all(|message| message.account_email.contains("demo")));
+        let mailbox_matches = store
+            .list_messages_for_scope(None, inbox.id, Some("mailbox:收件箱".to_string()), None, 50)
+            .unwrap();
+        assert!(!mailbox_matches.is_empty());
+        assert!(mailbox_matches
+            .iter()
+            .all(|message| message.folder_role == "inbox"));
+        let attachment_name_matches = store
+            .list_messages_for_scope(
+                None,
+                inbox.id,
+                Some("filename:security-checklist.pdf".to_string()),
+                None,
+                50,
+            )
+            .unwrap();
+        assert!(attachment_name_matches
+            .iter()
+            .all(|message| message.has_attachments && message.attachment_count > 0));
         let label_matches = store
             .list_messages_for_scope(None, inbox.id, Some("label:重要".to_string()), None, 50)
             .unwrap();

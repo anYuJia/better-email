@@ -4,14 +4,15 @@ use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
     BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
-    ContactInput, CredentialInput, CredentialStatus, DiagnosticAccount, DiagnosticExport,
-    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder, ImapMailboxState,
-    ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput,
-    MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput, OAuthCallbackReport,
-    OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput,
-    OAuthStartReport, OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput,
-    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
-    RemoteImageTrustInput, SyncRun, ThreadSummary,
+    ContactInput, ContactMergeSuggestion, CredentialInput, CredentialStatus, DiagnosticAccount,
+    DiagnosticExport, DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder,
+    ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity,
+    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput,
+    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
+    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
+    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
+    RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, SyncRun,
+    ThreadSummary,
 };
 use crate::oauth;
 use crate::protocol;
@@ -1289,6 +1290,13 @@ mod tests {
 #[tauri::command]
 pub fn list_contacts(store: State<'_, MailStore>) -> MailResult<Vec<Contact>> {
     store.list_contacts()
+}
+
+#[tauri::command]
+pub fn list_contact_merge_suggestions(
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<ContactMergeSuggestion>> {
+    store.list_contact_merge_suggestions()
 }
 
 #[tauri::command]

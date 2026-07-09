@@ -1,11 +1,11 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
-    BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, DraftInput, Folder,
-    ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, Label, LocalBackup, LocalBackupRow,
-    LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats,
-    Message, OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
-    OutboundAttachmentInput, OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput,
-    RemoteMessageBody, SyncRun, ThreadSummary,
+    BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, ContactMergeSuggestion,
+    DraftInput, Folder, ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, Label, LocalBackup,
+    LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
+    MailStats, Message, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
+    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, SyncRun, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -1865,6 +1865,11 @@ impl MailStore {
         })
     }
 
+    pub fn list_contact_merge_suggestions(&self) -> MailResult<Vec<ContactMergeSuggestion>> {
+        let contacts = self.list_contacts()?;
+        Ok(detect_contact_merge_suggestions(contacts))
+    }
+
     pub fn create_contact(&self, input: ContactCreateInput) -> MailResult<Contact> {
         self.with_conn(|conn| {
             let email = normalize_email(&input.email);
@@ -3219,6 +3224,78 @@ fn normalize_contact_aliases(aliases: Vec<String>, primary_email: &str) -> Vec<S
         normalized.push(value);
     }
     normalized
+}
+
+fn contact_identity_keys(contact: &Contact) -> Vec<String> {
+    let mut keys = vec![normalize_email(&contact.email)];
+    keys.extend(contact.aliases.iter().map(|alias| normalize_email(alias)));
+    keys.extend(
+        contact
+            .name
+            .split(|character: char| !character.is_ascii_alphanumeric())
+            .map(str::trim)
+            .filter(|part| part.len() >= 4)
+            .map(|part| part.to_ascii_lowercase()),
+    );
+    let domain = contact.email.split('@').nth(1).unwrap_or("").trim();
+    if !domain.is_empty() {
+        let name_key = contact.name.trim().to_ascii_lowercase();
+        if !name_key.is_empty() && name_key != normalize_email(&contact.email) {
+            keys.push(format!("{name_key}@{domain}"));
+        }
+    }
+    let mut unique = Vec::new();
+    for key in keys {
+        if !key.is_empty() && !unique.iter().any(|item| item == &key) {
+            unique.push(key);
+        }
+    }
+    unique
+}
+
+fn contact_suggestion_reason(shared_keys: &[String]) -> String {
+    if shared_keys.iter().any(|key| key.contains('@')) {
+        "邮箱或别名重叠".to_string()
+    } else {
+        "名称相近，建议检查是否同一联系人".to_string()
+    }
+}
+
+fn detect_contact_merge_suggestions(mut contacts: Vec<Contact>) -> Vec<ContactMergeSuggestion> {
+    contacts.sort_by(|left, right| {
+        right
+            .message_count
+            .cmp(&left.message_count)
+            .then_with(|| right.last_seen_at.cmp(&left.last_seen_at))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    let mut suggestions = Vec::new();
+    for left_index in 0..contacts.len() {
+        let left = &contacts[left_index];
+        let left_keys = contact_identity_keys(left);
+        for right in contacts.iter().skip(left_index + 1) {
+            let right_keys = contact_identity_keys(right);
+            let shared_keys = left_keys
+                .iter()
+                .filter(|key| right_keys.iter().any(|right_key| right_key == *key))
+                .take(4)
+                .cloned()
+                .collect::<Vec<_>>();
+            if shared_keys.is_empty() {
+                continue;
+            }
+            suggestions.push(ContactMergeSuggestion {
+                target: left.clone(),
+                source: right.clone(),
+                reason: contact_suggestion_reason(&shared_keys),
+                shared_keys,
+            });
+            if suggestions.len() >= 8 {
+                return suggestions;
+            }
+        }
+    }
+    suggestions
 }
 
 fn get_contact_for_conn(conn: &Connection, contact_id: i64) -> MailResult<Contact> {
@@ -5626,6 +5703,38 @@ mod tests {
             .unwrap()
             .iter()
             .all(|contact| contact.id != deleted.id));
+    }
+
+    #[test]
+    fn contact_merge_suggestions_find_alias_and_name_matches() {
+        let store = test_store();
+        let target = store
+            .list_contacts()
+            .unwrap()
+            .into_iter()
+            .find(|contact| contact.email == "ada@example.com")
+            .unwrap();
+        let duplicate = store
+            .create_contact(ContactCreateInput {
+                name: "Ada".to_string(),
+                email: "ada.duplicate@example.com".to_string(),
+                aliases: vec!["ada@example.com".to_string()],
+                vip: false,
+            })
+            .unwrap();
+
+        let suggestions = store.list_contact_merge_suggestions().unwrap();
+        let suggestion = suggestions
+            .iter()
+            .find(|suggestion| {
+                (suggestion.target.id == target.id && suggestion.source.id == duplicate.id)
+                    || (suggestion.target.id == duplicate.id && suggestion.source.id == target.id)
+            })
+            .unwrap();
+        assert!(suggestion
+            .shared_keys
+            .contains(&"ada@example.com".to_string()));
+        assert_eq!(suggestion.reason, "邮箱或别名重叠");
     }
 
     #[test]

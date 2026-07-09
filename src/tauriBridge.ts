@@ -188,8 +188,15 @@ type MockContact = {
   last_seen_at: string;
 };
 
+type MockContactMergeSuggestion = {
+  target: MockContact;
+  source: MockContact;
+  reason: string;
+  shared_keys: string[];
+};
+
 let contacts: MockContact[] = [
-  { id: 1, name: 'Ada', email: 'ada@example.com', aliases: [], vip: false, message_count: 7, last_seen_at: now },
+  { id: 1, name: 'Ada', email: 'ada@example.com', aliases: ['ada@personal.example.com'], vip: false, message_count: 7, last_seen_at: now },
   {
     id: 2,
     name: 'Security Team',
@@ -209,6 +216,45 @@ let contacts: MockContact[] = [
     last_seen_at: '2026-07-09T07:34:00+08:00',
   },
 ];
+
+function contactIdentityKeys(contact: MockContact) {
+  const keys = [contact.email, ...contact.aliases].map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const domain = contact.email.split('@')[1] ?? '';
+  const name = contact.name.trim().toLowerCase();
+  if (domain && name && name !== contact.email.toLowerCase()) keys.push(`${name}@${domain}`);
+  contact.name
+    .split(/[^a-zA-Z0-9]+/)
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length >= 4)
+    .forEach((part) => keys.push(part));
+  return [...new Set(keys)];
+}
+
+function contactMergeSuggestions(): MockContactMergeSuggestion[] {
+  const sorted = [...contacts].sort((left, right) =>
+    right.message_count - left.message_count ||
+    right.last_seen_at.localeCompare(left.last_seen_at) ||
+    left.name.localeCompare(right.name),
+  );
+  const suggestions: MockContactMergeSuggestion[] = [];
+  for (let leftIndex = 0; leftIndex < sorted.length; leftIndex += 1) {
+    const target = sorted[leftIndex];
+    const leftKeys = contactIdentityKeys(target);
+    for (const source of sorted.slice(leftIndex + 1)) {
+      const rightKeys = contactIdentityKeys(source);
+      const shared_keys = leftKeys.filter((key) => rightKeys.includes(key)).slice(0, 4);
+      if (shared_keys.length === 0) continue;
+      suggestions.push({
+        target,
+        source,
+        reason: shared_keys.some((key) => key.includes('@')) ? '邮箱或别名重叠' : '名称相近，建议检查是否同一联系人',
+        shared_keys,
+      });
+      if (suggestions.length >= 8) return suggestions;
+    }
+  }
+  return suggestions;
+}
 
 let attachments = [
   {
@@ -510,6 +556,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return [] as T;
     case 'list_contacts':
       return contacts as T;
+    case 'list_contact_merge_suggestions':
+      return contactMergeSuggestions() as T;
     case 'create_contact': {
       const input = args?.input as { name?: string; email?: string; aliases?: string[]; vip?: boolean };
       const email = String(input.email ?? '').trim().toLowerCase();

@@ -86,6 +86,7 @@ pub fn run() {
             commands::exchange_oauth2_token,
             commands::refresh_oauth2_token,
             commands::list_contacts,
+            commands::list_contact_merge_suggestions,
             commands::create_contact,
             commands::update_contact,
             commands::delete_contact,

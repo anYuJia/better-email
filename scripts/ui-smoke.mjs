@@ -202,6 +202,21 @@ async function selectValue(cdp, selector, value, index = 0) {
   );
 }
 
+async function selectOptionByText(cdp, selector, text, index = 0) {
+  await evalInPage(
+    cdp,
+    `(() => {
+      const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+      if (!element) throw new Error('Select not found: ${selector}[${index}]');
+      const option = [...element.options].find((item) => item.textContent.includes(${JSON.stringify(text)}));
+      if (!option) throw new Error('Select option not found: ${text}');
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter.call(element, option.value);
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`,
+  );
+}
+
 async function dragElement(cdp, selector, deltaX) {
   const rect = await evalInPage(
     cdp,
@@ -473,14 +488,21 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('联系人已更新：Ada Lovelace') && document.body.innerText.includes('Ada Lovelace') && document.body.innerText.includes('别名 1')");
     await clickButton(cdp, '设为 VIP', "document.querySelector('.contact-tool-row')");
     await waitForExpression(cdp, "document.body.innerText.includes('已设为 VIP：Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('★ Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('别名 1') && JSON.parse(localStorage.getItem('swiftmail.notificationPolicy')).vipSenders.includes('ada@work.example.com')");
+    await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Ada Duplicate');
+    await fillInput(cdp, '.contact-create-form input[placeholder="邮箱地址"]', 'ada.duplicate@example.com');
+    await fillInput(cdp, '.contact-create-form textarea[placeholder^="别名邮箱"]', 'ada@example.com');
+    await clickButton(cdp, '新增联系人', "document.querySelector('.contact-create-form')");
+    await waitForExpression(cdp, "document.body.innerText.includes('重复联系人建议') && document.body.innerText.includes('Ada Duplicate') && document.body.innerText.includes('邮箱或别名重叠')");
+    await clickButton(cdp, '一键合并', "document.querySelector('.contact-suggestion-panel')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已按建议合并：Ada Duplicate') && !document.querySelector('.settings-modal').innerText.includes('ada.duplicate@example.com')");
     await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Merge Source');
     await fillInput(cdp, '.contact-create-form input[placeholder="邮箱地址"]', 'merge-source@example.com');
     await fillInput(cdp, '.contact-create-form textarea[placeholder^="别名邮箱"]', 'merge.alias@example.com');
     await clickButton(cdp, '新增联系人', "document.querySelector('.contact-create-form')");
     await waitForExpression(cdp, "document.body.innerText.includes('联系人已新增：Merge Source') && document.body.innerText.includes('merge-source@example.com')");
-    await selectValue(cdp, '.contact-merge-picker select', '4');
+    await selectOptionByText(cdp, '.contact-merge-picker select', 'merge-source@example.com');
     await clickButton(cdp, '合并', "[...document.querySelectorAll('.contact-tool-row')].find((row) => row.innerText.includes('Ada Lovelace'))");
-    await waitForExpression(cdp, "document.body.innerText.includes('已合并联系人：Merge Source') && [...document.querySelectorAll('.contact-tool-row')].find((row) => row.innerText.includes('Ada Lovelace'))?.innerText.includes('别名 3')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已合并联系人：Merge Source') && [...document.querySelectorAll('.contact-tool-row')].find((row) => row.innerText.includes('Ada Lovelace'))?.innerText.includes('别名 4')");
     await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Delete Me');
     await fillInput(cdp, '.contact-create-form input[placeholder="邮箱地址"]', 'delete-me@example.com');
     await clickButton(cdp, '新增联系人', "document.querySelector('.contact-create-form')");
@@ -578,7 +600,7 @@ async function main() {
         'outbox queue and cancel works',
         'settings modal opens',
         'local backup export works',
-        'contact create edit merge delete and VIP sync works',
+        'contact create edit suggested merge manual merge delete and VIP sync works',
         'rules create flow works',
         'raw MIME preview works',
         'snooze and unsnooze flow works',

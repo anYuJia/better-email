@@ -394,7 +394,9 @@ button { cursor: pointer; }
 
 .contact-tool-actions,
 .contact-edit-form > div,
-.contact-create-form {
+.contact-create-form,
+.contact-suggestion-panel header,
+.contact-suggestion {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -420,9 +422,45 @@ button { cursor: pointer; }
 
 .contact-create-form,
 .contact-edit-form,
-.contact-merge-picker {
+.contact-merge-picker,
+.contact-suggestion-panel {
   display: grid;
   gap: 8px;
+}
+
+.contact-suggestion-panel {
+  margin: 8px 0 10px;
+  padding: 10px;
+  border: 1px solid rgba(10, 132, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(10, 132, 255, 0.06);
+}
+
+.contact-suggestion-panel header {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.contact-suggestion-panel header span,
+.contact-suggestion span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.contact-suggestion-panel em,
+.contact-suggestion small {
+  color: var(--muted, #68717d);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.contact-suggestion {
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .contact-create-form {

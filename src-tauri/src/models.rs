@@ -386,6 +386,14 @@ pub struct Contact {
     pub last_seen_at: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactMergeSuggestion {
+    pub target: Contact,
+    pub source: Contact,
+    pub reason: String,
+    pub shared_keys: Vec<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ContactInput {
     pub name: String,

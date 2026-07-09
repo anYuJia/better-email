@@ -327,6 +327,13 @@ type Contact = {
   last_seen_at: string;
 };
 
+type ContactMergeSuggestion = {
+  target: Contact;
+  source: Contact;
+  reason: string;
+  shared_keys: string[];
+};
+
 type ContactCreateInput = {
   name: string;
   email: string;
@@ -787,6 +794,7 @@ export default function App() {
   const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactMergeSuggestions, setContactMergeSuggestions] = useState<ContactMergeSuggestion[]>([]);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactEditName, setContactEditName] = useState('');
   const [contactEditAliases, setContactEditAliases] = useState('');
@@ -1117,6 +1125,7 @@ export default function App() {
       nextStats,
       nextSyncRuns,
       nextContacts,
+      nextContactMergeSuggestions,
       nextIdentities,
       nextRules,
       nextThreads,
@@ -1133,6 +1142,7 @@ export default function App() {
       invoke<MailStats>('get_stats', { accountId: nextAccountId }),
       invoke<SyncRun[]>('list_sync_runs'),
       invoke<Contact[]>('list_contacts'),
+      invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions'),
       invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
       invoke<MailRule[]>('list_rules'),
       invoke<ThreadSummary[]>('list_threads'),
@@ -1150,6 +1160,7 @@ export default function App() {
     setStats(nextStats);
     setSyncRuns(nextSyncRuns);
     setContacts(nextContacts);
+    setContactMergeSuggestions(nextContactMergeSuggestions);
     setIdentities(nextIdentities);
     setRules(nextRules);
     setThreads(nextThreads);
@@ -1919,6 +1930,11 @@ export default function App() {
     setContactEditAliases(contact.aliases.join(', '));
   }
 
+  async function refreshContactMergeSuggestions() {
+    const suggestions = await invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions');
+    setContactMergeSuggestions(suggestions);
+  }
+
   async function createManagedContact() {
     const email = contactForm.email.trim().toLowerCase();
     if (!email) {
@@ -1935,6 +1951,7 @@ export default function App() {
     setContacts((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     setContactForm(emptyContactForm);
     setContactFormAliases('');
+    await refreshContactMergeSuggestions();
     setStatus(`联系人已新增：${created.name || created.email}`);
   }
 
@@ -1950,6 +1967,7 @@ export default function App() {
     });
     setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setEditingContactId(null);
+    await refreshContactMergeSuggestions();
     setStatus(`联系人已更新：${updated.name}`);
   }
 
@@ -1965,6 +1983,7 @@ export default function App() {
       },
     });
     setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    await refreshContactMergeSuggestions();
     setNotificationPolicy((current) => {
       const vipSenders = normalizeContactAliases(current.vipSenders);
       const contactEmails = [contact.email, ...aliases].map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -1985,6 +2004,7 @@ export default function App() {
     if (mergeSourceContactId === contact.id) {
       setMergeSourceContactId(null);
     }
+    await refreshContactMergeSuggestions();
     setStatus(`联系人已删除：${contact.name || contact.email}`);
   }
 
@@ -2000,7 +2020,30 @@ export default function App() {
     });
     setContacts((current) => [merged, ...current.filter((item) => item.id !== target.id && item.id !== mergeSourceContactId)]);
     setMergeSourceContactId(null);
+    await refreshContactMergeSuggestions();
     setStatus(`已合并联系人：${source?.name || source?.email || '来源联系人'} → ${merged.name || merged.email}`);
+  }
+
+  async function mergeSuggestedContact(suggestion: ContactMergeSuggestion) {
+    const merged = await invoke<Contact>('merge_contacts', {
+      targetContactId: suggestion.target.id,
+      sourceContactId: suggestion.source.id,
+    });
+    setContacts((current) => [merged, ...current.filter((item) => item.id !== suggestion.target.id && item.id !== suggestion.source.id)]);
+    setContactMergeSuggestions((current) =>
+      current.filter(
+        (item) =>
+          item.target.id !== suggestion.target.id &&
+          item.source.id !== suggestion.target.id &&
+          item.target.id !== suggestion.source.id &&
+          item.source.id !== suggestion.source.id,
+      ),
+    );
+    if (mergeSourceContactId === suggestion.source.id || mergeSourceContactId === suggestion.target.id) {
+      setMergeSourceContactId(null);
+    }
+    await refreshContactMergeSuggestions();
+    setStatus(`已按建议合并：${suggestion.source.name || suggestion.source.email} → ${merged.name || merged.email}`);
   }
 
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
@@ -4554,6 +4597,28 @@ export default function App() {
             <section className="tool-panel grid-tools" data-settings-section="rules">
               <div>
                 <strong>联系人</strong>
+                {contactMergeSuggestions.length > 0 && (
+                  <section className="contact-suggestion-panel">
+                    <header>
+                      <span>
+                        <strong>重复联系人建议</strong>
+                        <em>{contactMergeSuggestions.length} 组待处理</em>
+                      </span>
+                    </header>
+                    {contactMergeSuggestions.slice(0, 3).map((suggestion) => (
+                      <div className="contact-suggestion" key={`${suggestion.target.id}-${suggestion.source.id}`}>
+                        <span>
+                          <strong>{suggestion.source.name || suggestion.source.email}</strong>
+                          <em>合并到 {suggestion.target.name || suggestion.target.email}</em>
+                          <small>{suggestion.reason} · {suggestion.shared_keys.join(', ')}</small>
+                        </span>
+                        <button type="button" onClick={() => mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error)))}>
+                          一键合并
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <div className="contact-create-form">
                   <input
                     value={contactForm.name}

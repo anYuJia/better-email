@@ -16,10 +16,33 @@ pub fn send_outbound(
     account: &Account,
     message: &OutboundMessage,
     secret: &AccountSecret,
-) -> Result<(), MailError> {
+) -> Result<Vec<u8>, MailError> {
+    let email = build_outbound_email(message)?;
+    let raw_message = email.formatted();
+    let mailer = authenticated_transport(account, secret)?;
+
+    mailer
+        .send(&email)
+        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))?;
+    Ok(raw_message)
+}
+
+pub fn render_outbound(message: &OutboundMessage) -> Result<Vec<u8>, MailError> {
+    Ok(build_outbound_email(message)?.formatted())
+}
+
+pub fn outbound_message_id(message: &OutboundMessage) -> String {
+    format!(
+        "<better-email-{}-{}@better-email.local>",
+        message.account_id, message.id
+    )
+}
+
+fn build_outbound_email(message: &OutboundMessage) -> Result<Message, MailError> {
     let mut builder = Message::builder()
         .from(mailbox(&message.sender_name, &message.sender_email)?)
-        .subject(&message.subject);
+        .subject(&message.subject)
+        .message_id(Some(outbound_message_id(message)));
     if !message.reply_to.trim().is_empty() {
         builder = builder.reply_to(mailbox("", &message.reply_to)?);
     }
@@ -34,13 +57,7 @@ pub fn send_outbound(
         builder = builder.bcc(mailbox("", &recipient)?);
     }
 
-    let email = build_email(builder, message)?;
-    let mailer = authenticated_transport(account, secret)?;
-
-    mailer
-        .send(&email)
-        .map(|_| ())
-        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))
+    build_email(builder, message)
 }
 
 pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(), MailError> {
@@ -284,6 +301,31 @@ mod tests {
         assert!(rendered.contains("text/plain"));
         assert!(rendered.contains("text/html"));
         assert!(rendered.contains("<strong>Hello rich text</strong>"));
+    }
+
+    #[test]
+    fn rendered_outbound_uses_stable_message_id() {
+        let message = OutboundMessage {
+            id: 42,
+            account_id: 7,
+            sender_name: "Me".to_string(),
+            sender_email: "me@example.com".to_string(),
+            reply_to: String::new(),
+            recipients: "friend@example.com".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Stable id".to_string(),
+            body: "Body".to_string(),
+            html_body: String::new(),
+            attachments: Vec::new(),
+        };
+        let rendered = String::from_utf8(render_outbound(&message).unwrap()).unwrap();
+
+        assert_eq!(
+            outbound_message_id(&message),
+            "<better-email-7-42@better-email.local>"
+        );
+        assert!(rendered.contains("Message-ID: <better-email-7-42@better-email.local>"));
     }
 
     #[test]

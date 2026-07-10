@@ -8,7 +8,7 @@ use crate::models::{
 use crate::protocol;
 use chrono::Utc;
 use imap_proto::parser::bodystructure::BodyStructParser;
-use imap_proto::types::{BodyStructure, ContentDisposition, SectionPath};
+use imap_proto::types::{BodyStructure, ContentDisposition, SectionPath, UidSetMember};
 use mail_parser::{MessageParser, MimeHeaders};
 use std::collections::BTreeSet;
 use std::io::Write;
@@ -335,6 +335,59 @@ pub struct RemoteAttachmentWrite {
     pub size_bytes: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteAppendResult {
+    pub remote_uid: i64,
+}
+
+pub fn append_sent_message(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    message_id_header: &str,
+    raw_message: &[u8],
+) -> Result<RemoteAppendResult, MailError> {
+    if raw_message.is_empty() {
+        return Err(MailError::Imap(
+            "远端已发送留档缺少原始邮件内容。".to_string(),
+        ));
+    }
+
+    with_selected_mailbox(account, secret, remote_name, |session| {
+        if let Some(remote_uid) = find_any_remote_uid_by_message_id(session, message_id_header)? {
+            return Ok(RemoteAppendResult { remote_uid });
+        }
+
+        let mut append = session.append(remote_name, raw_message);
+        append.flag(imap::types::Flag::Seen);
+        let appended = append
+            .finish()
+            .map_err(|error| MailError::Imap(format!("IMAP 留档到已发送失败：{error}")))?;
+        let remote_uid = single_appended_uid(appended.uids.as_deref())
+            .or_else(|| {
+                find_any_remote_uid_by_message_id(session, message_id_header)
+                    .ok()
+                    .flatten()
+            })
+            .unwrap_or_default();
+
+        Ok(RemoteAppendResult { remote_uid })
+    })
+}
+
+fn single_appended_uid(uids: Option<&[UidSetMember]>) -> Option<i64> {
+    let [member] = uids? else {
+        return None;
+    };
+    match member {
+        UidSetMember::Uid(uid) => Some(i64::from(*uid)),
+        UidSetMember::UidRange(range) if range.start() == range.end() => {
+            Some(i64::from(*range.start()))
+        }
+        UidSetMember::UidRange(_) => None,
+    }
+}
+
 pub fn download_attachment_to_writer(
     account: &Account,
     secret: &AccountSecret,
@@ -551,6 +604,23 @@ fn find_remote_uid_by_message_id(
         return Ok(None);
     }
     Ok(remote_uids.into_iter().next().map(i64::from))
+}
+
+fn find_any_remote_uid_by_message_id(
+    session: &mut imap::Session<imap::Connection>,
+    message_id_header: &str,
+) -> Result<Option<i64>, MailError> {
+    if message_id_header.trim().is_empty() {
+        return Ok(None);
+    }
+    let query = format!(
+        "HEADER Message-ID {}",
+        quote_imap_string(message_id_header)?
+    );
+    let remote_uids = session
+        .uid_search(query)
+        .map_err(|error| MailError::Imap(format!("IMAP 按 Message-ID 检查留档失败：{error}")))?;
+    Ok(remote_uids.into_iter().max().map(i64::from))
 }
 
 fn quote_imap_string(value: &str) -> Result<String, MailError> {
@@ -1129,6 +1199,27 @@ mod tests {
             "\"Projects/\\\"Alpha\\\"\""
         );
         assert!(quote_imap_string("Projects\r\nEXPUNGE").is_err());
+    }
+
+    #[test]
+    fn parses_single_append_uidplus_result() {
+        assert_eq!(
+            single_appended_uid(Some(&[UidSetMember::Uid(42)])),
+            Some(42)
+        );
+        assert_eq!(
+            single_appended_uid(Some(&[UidSetMember::UidRange(7..=7)])),
+            Some(7)
+        );
+        assert_eq!(
+            single_appended_uid(Some(&[UidSetMember::UidRange(7..=9)])),
+            None
+        );
+        assert_eq!(
+            single_appended_uid(Some(&[UidSetMember::Uid(7), UidSetMember::Uid(8)])),
+            None
+        );
+        assert_eq!(single_appended_uid(None), None);
     }
 
     #[test]

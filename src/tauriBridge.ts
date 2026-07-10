@@ -1474,13 +1474,24 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           )
           .map((item) => item.message_id),
       );
+      const archivedMessageIds = new Set(
+        outbox
+          .filter(
+            (item) =>
+              item.status === 'sent_remote_pending'
+              && (!item.next_attempt_at || Date.parse(item.next_attempt_at) <= Date.now()),
+          )
+          .map((item) => item.message_id),
+      );
       outbox = outbox.map((item) =>
         sentMessageIds.has(item.message_id)
           ? { ...item, status: 'sent', attempts: item.attempts + 1, last_error: '', next_attempt_at: '' }
+          : archivedMessageIds.has(item.message_id)
+            ? { ...item, status: 'sent', last_error: '', next_attempt_at: '' }
           : item,
       );
       messages = messages.map((message) =>
-        sentMessageIds.has(message.id)
+        sentMessageIds.has(message.id) || archivedMessageIds.has(message.id)
           ? { ...message, folder_role: 'sent', folder_id: folderIdForRole('sent', message.account_id) }
           : message,
       );

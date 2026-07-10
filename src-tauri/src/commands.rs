@@ -11,9 +11,10 @@ use crate::models::{
     MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput,
     OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
     OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
-    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
-    RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput,
-    RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary, TrashActionReport,
+    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
+    ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary,
+    TrashActionReport,
 };
 use crate::oauth;
 use crate::protocol;
@@ -2193,8 +2194,69 @@ pub fn flush_outbox_dry_run(store: State<'_, MailStore>) -> MailResult<Vec<Outbo
     store.flush_outbox_dry_run()
 }
 
+fn archive_sent_message(
+    store: &MailStore,
+    account: &Account,
+    secret: &credentials::AccountSecret,
+    message: &OutboundMessage,
+    raw_message: &[u8],
+) -> MailResult<()> {
+    let Some(remote_name) = store.remote_mailbox_for_account_role(account.id, "sent")? else {
+        return store.mark_outbox_remote_archive_failed(
+            message.id,
+            "SMTP 已发送；未发现已映射的远端已发送目录，稍后仅重试留档。",
+        );
+    };
+    let message_id_header = smtp::outbound_message_id(message);
+    match imap_probe::append_sent_message(
+        account,
+        secret,
+        &remote_name,
+        &message_id_header,
+        raw_message,
+    ) {
+        Ok(result) => {
+            store.mark_outbox_remote_archived(message.id, &remote_name, result.remote_uid)
+        }
+        Err(error) => store.mark_outbox_remote_archive_failed(
+            message.id,
+            &format!("SMTP 已发送；远端已发送留档失败：{error}"),
+        ),
+    }
+}
+
+fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
+    for message in store.pending_remote_archive_messages()? {
+        let account = store.get_account_by_id(Some(message.account_id))?;
+        let secret = match credentials::get_account_secret(&account) {
+            Ok(secret) => secret,
+            Err(error) => {
+                store.mark_outbox_remote_archive_failed(
+                    message.id,
+                    &format!("SMTP 已发送；读取凭据以重试远端留档失败：{error}"),
+                )?;
+                continue;
+            }
+        };
+        let raw_message = match smtp::render_outbound(&message) {
+            Ok(raw_message) => raw_message,
+            Err(error) => {
+                store.mark_outbox_remote_archive_failed(
+                    message.id,
+                    &format!("SMTP 已发送；重建原始邮件以重试远端留档失败：{error}"),
+                )?;
+                continue;
+            }
+        };
+        archive_sent_message(store, &account, &secret, &message, &raw_message)?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    retry_pending_remote_archives(store.inner())?;
+
     for message in store.pending_outbox_messages()? {
         let account = store.get_account_by_id(Some(message.account_id))?;
         let secret = match credentials::get_account_secret(&account) {
@@ -2205,7 +2267,11 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
             }
         };
         match smtp::send_outbound(&account, &message, &secret) {
-            Ok(()) => store.mark_outbox_sent(message.id)?,
+            Ok(raw_message) => {
+                let message_id_header = smtp::outbound_message_id(&message);
+                store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
+                archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
+            }
             Err(error) => store.mark_outbox_failed(message.id, &error.to_string())?,
         }
     }

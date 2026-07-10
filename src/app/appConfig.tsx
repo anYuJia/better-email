@@ -349,6 +349,7 @@ export function outboxStatusLabel(status: string): string {
   if (status === 'queued') return '排队中';
   if (status === 'retry') return '等待重试';
   if (status === 'failed') return '发送失败';
+  if (status === 'sent_remote_pending') return '已发送 · 留档待重试';
   if (status === 'sent') return '已发送';
   if (status === 'sent_dry_run') return '演练完成';
   if (status === 'cancelled') return '已撤回';
@@ -359,6 +360,9 @@ export function outboxTimingLabel(item: OutboxItem): string {
   if (item.status === 'scheduled' && item.next_attempt_at) return `定时发送 ${formatDate(item.next_attempt_at)}`;
   if (item.status === 'retry' && item.next_attempt_at) return `下次重试 ${formatDate(item.next_attempt_at)}`;
   if (item.status === 'failed' && item.next_attempt_at) return `下次尝试 ${formatDate(item.next_attempt_at)}`;
+  if (item.status === 'sent_remote_pending' && item.next_attempt_at) {
+    return `远端留档重试 ${formatDate(item.next_attempt_at)}`;
+  }
   if (item.queued_at) return `入队 ${formatDate(item.queued_at)}`;
   return '';
 }

@@ -2873,6 +2873,52 @@ impl MailStore {
         })
     }
 
+    pub fn pending_remote_archive_messages(&self) -> MailResult<Vec<OutboundMessage>> {
+        self.pending_remote_archive_messages_due_at(&Utc::now().to_rfc3339())
+    }
+
+    pub fn pending_remote_archive_messages_due_at(
+        &self,
+        now: &str,
+    ) -> MailResult<Vec<OutboundMessage>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT m.id, m.account_id, m.sender_name, m.sender_email,
+                       COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
+                       m.sanitized_html
+                FROM outbox_queue q
+                JOIN messages m ON m.id = q.message_id
+                LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
+                WHERE q.status = 'sent_remote_pending'
+                  AND (q.next_attempt_at = '' OR q.next_attempt_at <= ?1)
+                ORDER BY q.queued_at ASC
+                LIMIT 20
+                ",
+            )?;
+            let messages = stmt
+                .query_map(params![now.trim()], |row| {
+                    let message_id = row.get(0)?;
+                    Ok(OutboundMessage {
+                        id: message_id,
+                        account_id: row.get(1)?,
+                        sender_name: row.get(2)?,
+                        sender_email: row.get(3)?,
+                        reply_to: row.get(4)?,
+                        recipients: row.get(5)?,
+                        cc: row.get(6)?,
+                        bcc: row.get(7)?,
+                        subject: row.get(8)?,
+                        body: row.get(9)?,
+                        html_body: row.get(10)?,
+                        attachments: attachments_for_message_conn(conn, message_id)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(messages)
+        })
+    }
+
     pub fn cancel_outbox_item(&self, outbox_id: i64) -> MailResult<OutboxItem> {
         self.with_conn(|conn| {
             let (message_id, status): (i64, String) = conn.query_row(
@@ -2880,7 +2926,10 @@ impl MailStore {
                 params![outbox_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
-            if matches!(status.as_str(), "sent" | "sent_dry_run" | "cancelled") {
+            if matches!(
+                status.as_str(),
+                "sent" | "sent_remote_pending" | "sent_dry_run" | "cancelled"
+            ) {
                 return Err(crate::db::MailError::Imap(format!(
                     "当前状态为 {status}，不能撤回。"
                 )));
@@ -2902,20 +2951,83 @@ impl MailStore {
         })
     }
 
-    pub fn mark_outbox_sent(&self, message_id: i64) -> MailResult<()> {
+    pub fn mark_outbox_smtp_sent_pending_archive(
+        &self,
+        message_id: i64,
+        message_id_header: &str,
+    ) -> MailResult<()> {
         self.with_conn(|conn| {
             let sent_id = folder_id_for_message_role(conn, message_id, "sent")?;
             conn.execute(
                 "
                 UPDATE outbox_queue
-                SET status = 'sent', attempts = attempts + 1, last_error = '', next_attempt_at = ''
+                SET status = 'sent_remote_pending',
+                    attempts = attempts + 1,
+                    last_error = '',
+                    next_attempt_at = ''
                 WHERE message_id = ?1
                 ",
                 params![message_id],
             )?;
             conn.execute(
-                "UPDATE messages SET folder_id = ?1 WHERE id = ?2",
-                params![sent_id, message_id],
+                "
+                UPDATE messages
+                SET folder_id = ?1,
+                    message_id_header = ?2
+                WHERE id = ?3
+                ",
+                params![sent_id, message_id_header.trim(), message_id],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn mark_outbox_remote_archived(
+        &self,
+        message_id: i64,
+        remote_mailbox: &str,
+        remote_uid: i64,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "
+                UPDATE outbox_queue
+                SET status = 'sent',
+                    last_error = '',
+                    next_attempt_at = ''
+                WHERE message_id = ?1
+                ",
+                params![message_id],
+            )?;
+            conn.execute(
+                "
+                UPDATE messages
+                SET remote_mailbox = ?1,
+                    remote_uid = ?2
+                WHERE id = ?3
+                ",
+                params![remote_mailbox.trim(), remote_uid.max(0), message_id],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn mark_outbox_remote_archive_failed(
+        &self,
+        message_id: i64,
+        error: &str,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            let next_attempt_at = (Utc::now() + Duration::minutes(5)).to_rfc3339();
+            conn.execute(
+                "
+                UPDATE outbox_queue
+                SET status = 'sent_remote_pending',
+                    last_error = ?1,
+                    next_attempt_at = ?2
+                WHERE message_id = ?3
+                ",
+                params![error.trim(), next_attempt_at, message_id],
             )?;
             Ok(())
         })
@@ -7579,7 +7691,78 @@ mod tests {
             .iter()
             .any(|message| message.id == item.message_id));
 
-        store.mark_outbox_sent(item.message_id).unwrap();
+        let message_id_header = "<better-email-test-outbox@better-email.local>";
+        store
+            .mark_outbox_smtp_sent_pending_archive(item.message_id, message_id_header)
+            .unwrap();
+        let archive_pending_item = store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == item.id)
+            .unwrap();
+        assert_eq!(archive_pending_item.status, "sent_remote_pending");
+        assert_eq!(archive_pending_item.attempts, 2);
+        assert!(archive_pending_item.last_error.is_empty());
+        assert!(archive_pending_item.next_attempt_at.is_empty());
+        assert!(store
+            .pending_outbox_messages()
+            .unwrap()
+            .iter()
+            .all(|message| message.id != item.message_id));
+        assert!(store
+            .pending_remote_archive_messages()
+            .unwrap()
+            .iter()
+            .any(|message| message.id == item.message_id));
+
+        let (folder_role, saved_message_id): (String, String) = store
+            .with_conn(|conn| {
+                conn.query_row(
+                    "
+                    SELECT f.role, m.message_id_header
+                    FROM messages m
+                    JOIN folders f ON f.id = m.folder_id
+                    WHERE m.id = ?1
+                    ",
+                    params![item.message_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .map_err(MailError::from)
+            })
+            .unwrap();
+        assert_eq!(folder_role, "sent");
+        assert_eq!(saved_message_id, message_id_header);
+
+        store
+            .mark_outbox_remote_archive_failed(item.message_id, "temporary IMAP append failure")
+            .unwrap();
+        let archive_retry_item = store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == item.id)
+            .unwrap();
+        assert_eq!(archive_retry_item.status, "sent_remote_pending");
+        assert_eq!(
+            archive_retry_item.last_error,
+            "temporary IMAP append failure"
+        );
+        assert!(!archive_retry_item.next_attempt_at.is_empty());
+        assert!(store
+            .pending_remote_archive_messages_due_at(&archive_retry_item.queued_at)
+            .unwrap()
+            .iter()
+            .all(|message| message.id != item.message_id));
+        assert!(store
+            .pending_remote_archive_messages_due_at(&archive_retry_item.next_attempt_at)
+            .unwrap()
+            .iter()
+            .any(|message| message.id == item.message_id));
+
+        store
+            .mark_outbox_remote_archived(item.message_id, "Sent", 42)
+            .unwrap();
         let sent_item = store
             .list_outbox()
             .unwrap()
@@ -7587,7 +7770,19 @@ mod tests {
             .find(|entry| entry.id == item.id)
             .unwrap();
         assert_eq!(sent_item.status, "sent");
+        assert!(sent_item.last_error.is_empty());
         assert!(sent_item.next_attempt_at.is_empty());
+        let remote_ref: (String, i64) = store
+            .with_conn(|conn| {
+                conn.query_row(
+                    "SELECT remote_mailbox, remote_uid FROM messages WHERE id = ?1",
+                    params![item.message_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .map_err(MailError::from)
+            })
+            .unwrap();
+        assert_eq!(remote_ref, ("Sent".to_string(), 42));
     }
 
     #[test]

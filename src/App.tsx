@@ -673,7 +673,7 @@ export default function App() {
     const nextScheduledItem = outbox
       .filter(
         (item) =>
-          ['scheduled', 'retry', 'failed'].includes(item.status)
+          ['scheduled', 'retry', 'failed', 'sent_remote_pending'].includes(item.status)
           && item.next_attempt_at
           && Number.isFinite(Date.parse(item.next_attempt_at)),
       )
@@ -2072,9 +2072,12 @@ export default function App() {
     await loadMeta(folderId);
     const failed = items.filter((item) => item.status === 'retry').length;
     const pendingRetry = items.filter((item) => item.status === 'retry' && item.next_attempt_at).length;
+    const archivePending = items.filter((item) => item.status === 'sent_remote_pending').length;
     const message =
       failed > 0
         ? `SMTP 发送完成，${failed} 封需重试${pendingRetry > 0 ? '，已安排下次尝试' : ''}`
+        : archivePending > 0
+          ? `SMTP 发送完成，${archivePending} 封仅等待远端已发送留档重试`
         : 'SMTP 发件箱发送完成';
     setStatus(message);
     return message;

@@ -24,6 +24,7 @@ import ShortcutHelpModal from './components/ShortcutHelpModal';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
 import useAppShortcuts from './hooks/useAppShortcuts';
+import useAccountConnectionController from './hooks/useAccountConnectionController';
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
@@ -39,7 +40,6 @@ import {
   remoteImageTrustInput,
   senderDomain,
 } from './mailUtils';
-import { type AccountProviderPreset, providerCompatibilityMatrix } from './providerCatalog';
 import { getCurrentWindow, invoke } from './tauriBridge';
 
 import type {
@@ -304,6 +304,52 @@ export default function App() {
     loadMeta,
     loadMessages,
     releaseDueSnoozedMessages,
+  });
+  const {
+    activeProviderVerification,
+    updateProviderVerification,
+    saveSettings,
+    createNewAccount,
+    removeCurrentAccount,
+    setDefaultAccount,
+    applyProviderPreset,
+    applyNewAccountPreset,
+    saveProviderVerification,
+    testConnection,
+    verifyAccountCredentials,
+    discoverImapFolders,
+    mapImapMailbox,
+    createAndMapImapMailbox,
+    runSyncDryRun,
+    syncImapHistoryPage,
+  } = useAccountConnectionController({
+    accountForm,
+    newAccountForm,
+    providerVerifications,
+    diagnosticExport,
+    folderId,
+    query,
+    filter,
+    setAccount,
+    setAccounts,
+    setAccountScope,
+    setAccountForm,
+    setNewAccountForm,
+    setFolderId,
+    setMessages,
+    setSelectedId,
+    setAttachments,
+    setSettingsOpen,
+    setProviderVerifications,
+    setConnectionReport,
+    setCredentialVerification,
+    setCredentialStatus,
+    setImapProbe,
+    setImapMailboxes,
+    setSyncRuns,
+    setStatus,
+    loadMeta,
+    loadMessages,
   });
 
   function accountIdForScope(scope: AccountScope): number | null {
@@ -726,11 +772,6 @@ export default function App() {
       ),
     [remoteImageTrusts, selected?.account_id, selected?.sender_email, selectedSenderDomain],
   );
-  const activeProviderVerification = useMemo(
-    () => (accountForm ? providerVerificationFor(accountForm.provider) : null),
-    [accountForm?.provider, providerVerifications],
-  );
-
   useEffect(() => {
     if (!selected) {
       setAttachments([]);
@@ -1508,230 +1549,6 @@ export default function App() {
     const nextRecipients = [...existing, contact.email].join(', ');
     setDraft({ ...draft, [field]: nextRecipients });
     setStatus(`已添加联系人：${contact.name || contact.email}`);
-  }
-
-  async function saveSettings() {
-    if (!accountForm) return;
-    const updated = await invoke<Account>('update_account_settings', { accountId: accountForm.id, input: accountForm });
-    setAccount(updated);
-    setAccountForm(updated);
-    setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    setSettingsOpen(false);
-    setStatus('账号和同步设置已保存');
-  }
-
-  async function createNewAccount() {
-    if (!newAccountForm.email.trim()) {
-      setStatus('请先填写新账号邮箱地址');
-      return;
-    }
-    const created = await invoke<Account>('create_account', { input: newAccountForm });
-    setAccounts((current) => [...current, created]);
-    setAccountScope(created.id);
-    setAccount(created);
-    setAccountForm(created);
-    setNewAccountForm(emptyAccountCreateForm);
-    setFolderId(null);
-    setMessages([]);
-    setSelectedId(null);
-    setAttachments([]);
-    const { folderId: nextFolderId } = await loadMeta(null, created.id);
-    await loadMessages(nextFolderId, query, filter, created.id);
-    setStatus(`已创建账号：${created.email}`);
-  }
-
-  async function removeCurrentAccount() {
-    if (!accountForm) return;
-    const removedAccount = accountForm;
-    const nextAccount = await invoke<Account>('delete_account', { accountId: removedAccount.id });
-    try {
-      const credentialResult = await invoke<CredentialStatus>('delete_account_secret', {
-        accountEmail: removedAccount.email,
-      });
-      setCredentialStatus(credentialResult);
-    } catch {
-      setCredentialStatus({
-        account_email: removedAccount.email,
-        exists: false,
-        message: '账号已移除，但系统安全存储中的凭据需要手动检查。',
-      });
-    }
-    setAccountScope(nextAccount.id);
-    setAccount(nextAccount);
-    setAccountForm(nextAccount);
-    setFolderId(null);
-    setMessages([]);
-    setSelectedId(null);
-    setAttachments([]);
-    const { folderId: nextFolderId } = await loadMeta(null, nextAccount.id);
-    await loadMessages(nextFolderId, query, filter, nextAccount.id);
-    setSettingsOpen(false);
-    setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
-  }
-
-  async function setDefaultAccount(accountId: number) {
-    const updated = await invoke<Account>('set_default_account', { accountId });
-    setAccounts((current) => current
-      .map((item) => ({ ...item, is_default: item.id === updated.id }))
-      .sort((left, right) => Number(right.is_default) - Number(left.is_default) || left.id - right.id));
-    setAccount((current) => {
-      if (!current) return current;
-      return current.id === updated.id ? updated : { ...current, is_default: false };
-    });
-    setAccountForm((current) => {
-      if (!current) return current;
-      return current.id === updated.id ? updated : { ...current, is_default: false };
-    });
-    setStatus(`默认发件账号已设为：${updated.email}`);
-  }
-
-  function applyProviderPreset(preset: AccountProviderPreset) {
-    if (!accountForm) return;
-    setAccountForm({
-      ...accountForm,
-      provider: preset.provider,
-      imap_host: preset.imap_host,
-      smtp_host: preset.smtp_host,
-      auth_type: preset.auth_type,
-    });
-    setStatus(`${preset.label} 服务商预设已填入，可继续保存和测试连接`);
-  }
-
-  function applyNewAccountPreset(preset: AccountProviderPreset) {
-    setNewAccountForm({
-      ...newAccountForm,
-      provider: preset.provider,
-      imap_host: preset.imap_host,
-      smtp_host: preset.smtp_host,
-      auth_type: preset.auth_type,
-    });
-    setStatus(`${preset.label} 预设已填入新账号表单`);
-  }
-
-  function providerVerificationKey(providerName: string): string {
-    const normalized = providerName.trim().toLowerCase();
-    return providerCompatibilityMatrix.find((provider) => provider.provider === normalized)?.id ?? normalized ?? 'custom';
-  }
-
-  function providerVerificationFor(providerName: string): ProviderVerificationRecord {
-    const key = providerVerificationKey(providerName);
-    const catalogEntry = providerCompatibilityMatrix.find((provider) => provider.id === key || provider.provider === providerName);
-    return (
-      providerVerifications[key] ?? {
-        provider_key: key,
-        provider_label: catalogEntry?.label ?? (providerName.trim() || 'Custom'),
-        status: 'untested',
-        imap_ok: false,
-        smtp_ok: false,
-        oauth_ok: false,
-        diagnostic_exported: false,
-        checked_at: '',
-        notes: '',
-      }
-    );
-  }
-
-  function updateProviderVerification(providerName: string, patch: Partial<ProviderVerificationRecord>) {
-    const current = providerVerificationFor(providerName);
-    setProviderVerifications((records) => ({
-      ...records,
-      [current.provider_key]: {
-        ...current,
-        ...patch,
-        checked_at: patch.checked_at ?? current.checked_at,
-      },
-    }));
-  }
-
-  function saveProviderVerification() {
-    if (!accountForm) return;
-    updateProviderVerification(accountForm.provider, {
-      checked_at: new Date().toISOString(),
-      diagnostic_exported: Boolean(diagnosticExport),
-    });
-    setStatus('服务商兼容性验证记录已保存到本地');
-  }
-
-  async function testConnection() {
-    const report = await invoke<ConnectionReport>('test_connection', { accountId: accountForm?.id });
-    setConnectionReport(report);
-    setStatus(report.ready_for_credentials ? '服务器连接成功；账号是否可登录仍需点击“验证登录”' : '服务器测试完成，请查看网络结果');
-  }
-
-  async function verifyAccountCredentials() {
-    const report = await invoke<CredentialVerificationReport>('verify_account_credentials', { accountId: accountForm?.id });
-    setCredentialVerification(report);
-    if (accountForm && report.status !== 'credential_error') {
-      const imapOk = report.checks.some((check) => check.name === 'IMAP' && check.authenticated);
-      const smtpOk = report.checks.some((check) => check.name === 'SMTP' && check.authenticated);
-      const patch: Partial<ProviderVerificationRecord> = {
-        status: report.authenticated ? 'passed' : imapOk || smtpOk ? 'partial' : 'failed',
-        imap_ok: imapOk,
-        smtp_ok: smtpOk,
-        checked_at: report.checked_at,
-      };
-      if (accountForm.auth_type === 'oauth2') patch.oauth_ok = report.authenticated;
-      updateProviderVerification(accountForm.provider, patch);
-    }
-    setStatus(report.message);
-  }
-
-  async function discoverImapFolders() {
-    const report = await invoke<ImapProbeReport>('discover_imap_folders', { accountId: accountForm?.id });
-    setImapProbe(report);
-    const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
-    setImapMailboxes(mailboxes);
-    setStatus(report.message);
-  }
-
-  async function mapImapMailbox(mailbox: ImapMailboxState, targetFolderId: number | null) {
-    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
-      mailboxId: mailbox.id,
-      folderId: targetFolderId,
-    });
-    setImapMailboxes((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
-    setStatus(
-      mapped.local_folder_id
-        ? `已将 ${mapped.remote_name} 映射到 ${mapped.local_folder_name}`
-        : `已取消 ${mapped.remote_name} 的本地映射`,
-    );
-  }
-
-  async function createAndMapImapMailbox(mailbox: ImapMailboxState) {
-    const separator = mailbox.delimiter || '/';
-    const suggestedName = mailbox.remote_name
-      .split(separator)
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .pop() || mailbox.remote_name.trim() || '远端文件夹';
-    const folder = await invoke<Folder>('create_custom_folder', {
-      accountId: mailbox.account_id,
-      name: suggestedName,
-    });
-    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
-      mailboxId: mailbox.id,
-      folderId: folder.id,
-    });
-    setImapMailboxes((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
-    await loadMeta(folderId);
-    setStatus(`已创建 ${folder.name} 并映射远端目录 ${mapped.remote_name}`);
-  }
-
-  async function runSyncDryRun() {
-    const run = await invoke<SyncRun>('run_sync_dry_run', { accountId: accountForm?.id });
-    setSyncRuns((current) => [run, ...current].slice(0, 10));
-    await loadMeta(folderId);
-    setStatus('同步演练已完成并记录');
-    return run;
-  }
-
-  async function syncImapHistoryPage() {
-    const run = await invoke<SyncRun>('sync_imap_history', { accountId: accountForm?.id });
-    setSyncRuns((current) => [run, ...current].slice(0, 10));
-    await loadMeta(folderId);
-    await loadMessages(folderId, query, filter);
-    setStatus(run.message);
-    return run;
   }
 
   async function exportDiagnostics() {

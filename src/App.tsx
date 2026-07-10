@@ -24,6 +24,7 @@ import ShortcutHelpModal from './components/ShortcutHelpModal';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
 import useAppShortcuts from './hooks/useAppShortcuts';
+import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
 import useOAuthFlow from './hooks/useOAuthFlow';
@@ -32,18 +33,14 @@ import {
   defaultNotificationPolicy,
   formatBytes,
   formatDate,
-  newMailNotificationDecision,
-  newMailNotificationBody,
   type NotificationPolicy,
   prefixedSubject,
   quoteMessage,
   remoteImageTrustInput,
   senderDomain,
-  syncIntervalMs,
-  syncStatusLabel,
 } from './mailUtils';
 import { type AccountProviderPreset, providerCompatibilityMatrix } from './providerCatalog';
-import { getCurrentWindow, invoke, isPermissionGranted, requestPermission, sendNotification } from './tauriBridge';
+import { getCurrentWindow, invoke } from './tauriBridge';
 
 import type {
   SystemFolderRole,
@@ -51,8 +48,6 @@ import type {
   FilterMode,
   ListMode,
   AccountScope,
-  BackgroundTaskKind,
-  BackgroundTaskStatus,
   Account,
   AccountCreateInput,
   Folder,
@@ -285,12 +280,31 @@ export default function App() {
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const outboxScheduleTimerRef = useRef<number | null>(null);
-  const backgroundSyncRef = useRef(false);
-  const backgroundTaskWorkerRef = useRef(false);
   const frontendReadyRef = useRef(false);
   const benchmarkSyncRef = useRef(false);
   const mailboxRefreshRef = useRef(0);
+  const { enqueueBackgroundTask } = useBackgroundTaskCoordinator({
+    account,
+    accountScope,
+    folderId,
+    query,
+    filter,
+    messages,
+    outbox,
+    notificationPolicy,
+    setOutbox,
+    setBackgroundTasks,
+    setBackgroundSyncStatus,
+    setSyncSchedulePlan,
+    setSyncRuns,
+    setLastNewMailNotice,
+    setNotificationStatus,
+    setPendingSendUndo,
+    setStatus,
+    loadMeta,
+    loadMessages,
+    releaseDueSnoozedMessages,
+  });
 
   function accountIdForScope(scope: AccountScope): number | null {
     return scope === 'all' ? null : scope;
@@ -628,12 +642,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    isPermissionGranted()
-      .then((granted) => setNotificationStatus(granted ? '系统提醒已启用' : '系统提醒待授权'))
-      .catch(() => setNotificationStatus('系统提醒不可用'));
-  }, []);
-
-  useEffect(() => {
     window.localStorage.setItem(notificationPolicyStorageKey, JSON.stringify(notificationPolicy));
   }, [notificationPolicy]);
 
@@ -663,45 +671,6 @@ export default function App() {
     window.localStorage.setItem(composerAutosaveStorageKey, JSON.stringify(autosave));
     setComposerAutosave(autosave);
   }, [draft, isRichComposer, isComposerOpen]);
-
-  useEffect(() => {
-    if (outboxScheduleTimerRef.current) {
-      window.clearTimeout(outboxScheduleTimerRef.current);
-      outboxScheduleTimerRef.current = null;
-    }
-
-    const nextScheduledItem = outbox
-      .filter(
-        (item) =>
-          ['scheduled', 'retry', 'failed', 'sent_remote_pending'].includes(item.status)
-          && item.next_attempt_at
-          && Number.isFinite(Date.parse(item.next_attempt_at)),
-      )
-      .sort((left, right) => Date.parse(left.next_attempt_at) - Date.parse(right.next_attempt_at))[0];
-    if (!nextScheduledItem) return;
-
-    const maxTimerDelay = 2_147_000_000;
-    const dueAt = Date.parse(nextScheduledItem.next_attempt_at);
-    const timerDelay = Math.min(Math.max(dueAt - Date.now(), 0), maxTimerDelay);
-    outboxScheduleTimerRef.current = window.setTimeout(() => {
-      outboxScheduleTimerRef.current = null;
-      if (dueAt > Date.now()) {
-        setOutbox((current) => [...current]);
-        return;
-      }
-      setPendingSendUndo((current) => (
-        current?.outboxId === nextScheduledItem.id ? null : current
-      ));
-      enqueueBackgroundTask('outbox-smtp', 'timer').catch((error) => setStatus(String(error)));
-    }, timerDelay);
-
-    return () => {
-      if (outboxScheduleTimerRef.current) {
-        window.clearTimeout(outboxScheduleTimerRef.current);
-        outboxScheduleTimerRef.current = null;
-      }
-    };
-  }, [outbox]);
 
   useEffect(() => {
     refreshMailbox(accountScope, null).catch((error) => setStatus(String(error)));
@@ -1833,134 +1802,6 @@ export default function App() {
     setStatus(`已导入 EML：${imported.subject || '(无主题)'}`);
   }
 
-  async function refreshBackgroundTasks() {
-    const tasks = await invoke<BackgroundTask[]>('list_background_tasks');
-    setBackgroundTasks(tasks);
-    return tasks;
-  }
-
-  async function enqueueBackgroundTask(kind: BackgroundTaskKind, source: 'manual' | 'timer' = 'manual') {
-    const task = await invoke<BackgroundTask>('enqueue_background_task', { input: { kind, source } });
-    const tasks = await refreshBackgroundTasks();
-    const isReusedActiveTask = task.kind === 'sync' && task.status !== 'queued';
-    setBackgroundSyncStatus(isReusedActiveTask ? '同步任务已在队列中' : `${task.title} 已入队`);
-    if (!tasks.some((item) => item.status === 'queued')) return;
-    void drainBackgroundTaskQueue();
-  }
-
-  async function drainBackgroundTaskQueue() {
-    if (backgroundTaskWorkerRef.current) return;
-    backgroundTaskWorkerRef.current = true;
-    try {
-      while (true) {
-        const nextTask = await invoke<BackgroundTask | null>('next_background_task');
-        if (!nextTask) break;
-
-        const runningTask = await invoke<BackgroundTask>('mark_background_task_running', { taskId: nextTask.id });
-        await refreshBackgroundTasks();
-        setBackgroundSyncStatus(`${runningTask.title}执行中...`);
-        try {
-          const message = await executeBackgroundTask(runningTask);
-          await invoke<BackgroundTask>('complete_background_task', {
-            taskId: runningTask.id,
-            message,
-          });
-          await refreshBackgroundTasks();
-          setBackgroundSyncStatus(message);
-        } catch (error) {
-          const message = String(error);
-          await invoke<BackgroundTask>('fail_background_task', {
-            taskId: runningTask.id,
-            message,
-          });
-          await refreshBackgroundTasks();
-          setBackgroundSyncStatus(`${runningTask.title}失败：${message}`);
-          if (runningTask.source === 'manual') setStatus(message);
-        }
-      }
-    } finally {
-      backgroundTaskWorkerRef.current = false;
-    }
-  }
-
-  async function executeBackgroundTask(task: BackgroundTask): Promise<string> {
-    if (task.kind === 'sync') return runBackgroundSync(task.source);
-    if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
-    return flushOutboxDryRun();
-  }
-
-  async function runBackgroundSync(reason: 'manual' | 'timer'): Promise<string> {
-    if (backgroundSyncRef.current) return '同步任务已在运行';
-    backgroundSyncRef.current = true;
-    const syncAccountId = accountIdForScope(accountScope);
-    setBackgroundSyncStatus(reason === 'timer' ? '后台同步中...' : '手动同步中...');
-    try {
-      const plan = await invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: syncAccountId });
-      setSyncSchedulePlan(plan);
-      setBackgroundSyncStatus(
-        plan.total_accounts > 1
-          ? `同步中：本轮 ${plan.batch_accounts.length}/${plan.total_accounts} 个账号`
-          : reason === 'timer'
-            ? '后台同步中...'
-            : '手动同步中...',
-      );
-      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
-      const released = await releaseDueSnoozedMessages();
-      setSyncRuns((current) => [run, ...current].slice(0, 10));
-      await loadMeta(folderId);
-      const latestMessages = await loadMessages(folderId, query, filter);
-      setBackgroundSyncStatus(
-        released.length > 0 ? `${syncStatusLabel(run)}；已恢复 ${released.length} 封稍后邮件` : syncStatusLabel(run),
-      );
-      await notifyNewMail(run, latestMessages);
-      if (reason === 'manual') {
-        setStatus(released.length > 0 ? `${run.message} 已恢复 ${released.length} 封稍后邮件。` : run.message);
-      }
-      return released.length > 0 ? `${syncStatusLabel(run)}；已恢复 ${released.length} 封稍后邮件` : syncStatusLabel(run);
-    } catch (error) {
-      const message = String(error);
-      setBackgroundSyncStatus(`后台同步暂停：${message}`);
-      if (reason === 'manual') setStatus(message);
-      throw error;
-    } finally {
-      backgroundSyncRef.current = false;
-    }
-  }
-
-  async function notifyNewMail(run: SyncRun, latestMessages: Message[] = messages) {
-    const decision = newMailNotificationDecision(run, notificationPolicy, latestMessages);
-    const body = decision.body;
-    setLastNewMailNotice(body);
-    if (!body) {
-      if (decision.reason === 'quiet-hours') setNotificationStatus('免打扰时段已静音');
-      if (decision.reason === 'vip-only-no-match') setNotificationStatus('VIP 策略已过滤');
-      if (decision.reason === 'account-muted') setNotificationStatus('账号静音已过滤');
-      return;
-    }
-
-    try {
-      let granted = await isPermissionGranted();
-      if (!granted) {
-        const permission = await requestPermission();
-        granted = permission === 'granted';
-      }
-      if (!granted) {
-        setNotificationStatus('系统提醒未授权');
-        return;
-      }
-      sendNotification({ title: 'Better Email', body });
-      setNotificationStatus(
-        decision.vipMatches > 0
-          ? 'VIP 系统提醒已发送'
-          : decision.priorityMatches > 0
-            ? '重点账号提醒已发送'
-            : '系统提醒已发送',
-      );
-    } catch {
-      setNotificationStatus('系统提醒不可用');
-    }
-  }
-
   async function fetchSelectedBody() {
     if (!selected) return;
     const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
@@ -2055,32 +1896,6 @@ export default function App() {
     if (!selected) return;
     const message = await invoke<string>('export_message_as_eml', { messageId: selected.id });
     setStatus(message);
-  }
-
-  async function flushOutboxDryRun(): Promise<string> {
-    const items = await invoke<OutboxItem[]>('flush_outbox_dry_run');
-    setOutbox(items);
-    await loadMeta(folderId);
-    const message = '发件箱队列已完成本地发送演练';
-    setStatus(message);
-    return message;
-  }
-
-  async function flushOutboxSmtp(): Promise<string> {
-    const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
-    setOutbox(items);
-    await loadMeta(folderId);
-    const failed = items.filter((item) => item.status === 'retry').length;
-    const pendingRetry = items.filter((item) => item.status === 'retry' && item.next_attempt_at).length;
-    const archivePending = items.filter((item) => item.status === 'sent_remote_pending').length;
-    const message =
-      failed > 0
-        ? `SMTP 发送完成，${failed} 封需重试${pendingRetry > 0 ? '，已安排下次尝试' : ''}`
-        : archivePending > 0
-          ? `SMTP 发送完成，${archivePending} 封仅等待远端已发送留档重试`
-        : 'SMTP 发件箱发送完成';
-    setStatus(message);
-    return message;
   }
 
   async function parseRawMessage() {
@@ -2415,19 +2230,6 @@ export default function App() {
     toggleRead,
     moveSelected,
   });
-
-  useEffect(() => {
-    const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
-    if (!intervalMs) {
-      setBackgroundSyncStatus('后台同步已关闭');
-      return;
-    }
-    setBackgroundSyncStatus(`后台同步已启用：${account?.sync_mode === 'push' ? '每 5 分钟' : '每 15 分钟'}`);
-    const timer = window.setInterval(() => {
-      enqueueBackgroundTask('sync', 'timer');
-    }, intervalMs);
-    return () => window.clearInterval(timer);
-  }, [account?.sync_mode, accountScope, folderId, query, filter]);
 
   return (
     <main

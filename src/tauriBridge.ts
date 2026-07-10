@@ -727,10 +727,10 @@ function listThreadMessages(args: InvokeArgs) {
 }
 
 function listThreads(args?: InvokeArgs) {
-  const accountId = Number(args?.accountId ?? 0);
-  const scopedMessages = accountId > 0
-    ? messages.filter((message) => message.account_id === accountId)
-    : messages;
+  const scopedMessages = listMessages({
+    ...(args ?? {}),
+    limit: Math.max(messages.length, 1),
+  });
   const grouped = new Map<string, typeof messages>();
   for (const message of scopedMessages) {
     const key = messageThreadKey(message);

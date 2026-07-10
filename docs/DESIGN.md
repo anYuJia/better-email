@@ -116,6 +116,7 @@ SQLite local store + OS keychain
 - `accounts`：邮箱账号、显示名、服务商、认证方式、同步策略和安全偏好。
 - `folders`：账号下文件夹，含系统角色：inbox/sent/drafts/outbox/archive/trash/spam/snoozed，以及 `custom:*` 自定义文件夹；统一邮箱通过虚拟文件夹按角色聚合多账号，并展示真实自定义文件夹。
 - `messages`：邮件头、摘要、正文、状态、稍后处理时间、时间、线程 ID、附件数量，以及 `message_id_header`、`in_reply_to_header`、`references_header` 标准会话引用链。
+- 会话摘要查询先以当前账号、文件夹、搜索词和筛选条件构造 `scoped_messages`，再在该集合内按标准引用链聚合；普通邮件与会话查询复用同一筛选构建器，保证列表模式切换不会改变用户当前邮箱视图的边界。
 - `recipients`：to/cc/bcc 明细。
 - `labels` / `message_labels`：标签系统。
 - 草稿直接存储在 `messages` 的 `drafts` 文件夹角色中，附件、身份、远端 mailbox/UID 和稳定 Message-ID 与普通邮件共用同一数据模型。

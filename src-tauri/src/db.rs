@@ -2547,33 +2547,83 @@ impl MailStore {
         })
     }
 
-    pub fn list_threads(&self) -> MailResult<Vec<ThreadSummary>> {
+    pub fn list_threads_for_scope(
+        &self,
+        account_id: Option<i64>,
+        folder_id: Option<i64>,
+        query: Option<String>,
+        filter: Option<String>,
+        limit: i64,
+    ) -> MailResult<Vec<ThreadSummary>> {
         self.with_conn(|conn| {
-            let mut stmt = conn.prepare(
+            let limit = limit.clamp(1, 200);
+            let search = query
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let filter = filter
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "all".to_string());
+            let search_criteria = SearchCriteria::parse(search.as_deref());
+            let mut scope_conditions = Vec::new();
+            let mut query_params = Vec::new();
+            if let Some(folder_id) = folder_id {
+                if folder_id > 0 {
+                    scope_conditions.push("m.folder_id = ?".to_string());
+                    query_params.push(Value::Integer(folder_id));
+                } else {
+                    let role = role_for_virtual_folder_id(folder_id)
+                        .ok_or_else(|| MailError::MissingFolderRole(folder_id.to_string()))?;
+                    scope_conditions.push("f.role = ?".to_string());
+                    query_params.push(Value::Text(role.to_string()));
+                }
+            }
+            if let Some(account_id) = account_id {
+                scope_conditions.push("m.account_id = ?".to_string());
+                query_params.push(Value::Integer(account_id));
+            }
+            let scope_condition = if scope_conditions.is_empty() {
+                "1 = 1".to_string()
+            } else {
+                scope_conditions.join(" AND ")
+            };
+            let filter_clause = build_message_filter_clause(&search_criteria, &filter);
+            let sql = format!(
                 "
-                SELECT m.thread_key,
+                WITH scoped_messages AS (
+                    SELECT m.id, m.thread_key, m.subject, m.sender_name,
+                           m.received_at, m.is_read
+                    FROM messages m
+                    JOIN accounts a ON a.id = m.account_id
+                    JOIN folders f ON f.id = m.folder_id
+                    WHERE {scope_condition} {filter_clause}
+                )
+                SELECT scoped.thread_key,
                        COALESCE(
                            (
                                SELECT latest.subject
-                               FROM messages latest
-                               WHERE latest.thread_key = m.thread_key
+                               FROM scoped_messages latest
+                               WHERE latest.thread_key = scoped.thread_key
                                ORDER BY latest.received_at DESC, latest.id DESC
                                LIMIT 1
                            ),
                            '(无主题)'
                        ) AS subject,
                        COUNT(*) AS message_count,
-                       SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
-                       MAX(m.received_at) AS latest_at,
-                       GROUP_CONCAT(DISTINCT m.sender_name) AS participants
-                FROM messages m
-                GROUP BY m.thread_key
+                       SUM(CASE WHEN scoped.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
+                       MAX(scoped.received_at) AS latest_at,
+                       GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants
+                FROM scoped_messages scoped
+                GROUP BY scoped.thread_key
                 ORDER BY latest_at DESC
-                LIMIT 50
+                LIMIT ?
                 ",
-            )?;
+            );
+            query_params.extend(search_criteria.params().into_iter().map(Value::Text));
+            query_params.push(Value::Integer(limit));
+            let mut stmt = conn.prepare(&sql)?;
             let threads = stmt
-                .query_map([], |row| {
+                .query_map(params_from_iter(query_params), |row| {
                     Ok(ThreadSummary {
                         thread_key: row.get(0)?,
                         subject: row.get(1)?,
@@ -3860,6 +3910,13 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
     sql.push_str("WHERE ");
     sql.push_str(scope_condition);
     sql.push(' ');
+    sql.push_str(&build_message_filter_clause(search, filter));
+    sql.push_str("ORDER BY m.received_at DESC LIMIT ?");
+    sql
+}
+
+fn build_message_filter_clause(search: &SearchCriteria, filter: &str) -> String {
+    let mut sql = String::new();
     if let Some(term) = &search.text {
         if should_use_fts(term) {
             sql.push_str(
@@ -3946,7 +4003,6 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
         "attachments" => sql.push_str("AND m.has_attachments = 1 "),
         _ => {}
     }
-    sql.push_str("ORDER BY m.received_at DESC LIMIT ?");
     sql
 }
 
@@ -6666,6 +6722,183 @@ mod tests {
     }
 
     #[test]
+    fn thread_summaries_follow_account_folder_search_and_filter_scope() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = store
+            .create_account(AccountCreateInput {
+                email: "thread-scope@better-email.local".to_string(),
+                display_name: "Thread Scope".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.thread-scope.test:993".to_string(),
+                smtp_host: "smtp.thread-scope.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+            })
+            .unwrap();
+        let first_folders = store
+            .list_folders_for_account(Some(first_account.id))
+            .unwrap();
+        let first_inbox = first_folders
+            .iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let first_archive = first_folders
+            .iter()
+            .find(|folder| folder.role == "archive")
+            .unwrap();
+        let second_inbox = store
+            .list_folders_for_account(Some(second_account.id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let unified_inbox = store
+            .list_folders_for_account(None)
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let thread_key = "msgid:<scope-thread@example.com>";
+
+        store
+            .with_conn(|conn| {
+                let insert = |account_id: i64,
+                              folder_id: i64,
+                              subject: &str,
+                              received_at: &str,
+                              is_read: i64|
+                 -> MailResult<()> {
+                    conn.execute(
+                        "
+                        INSERT INTO messages(
+                            account_id, folder_id, sender_name, sender_email, recipients,
+                            subject, snippet, body, received_at, is_read, thread_key
+                        ) VALUES (?1, ?2, 'Scope Sender', 'scope@example.com', 'reader@example.com',
+                                  ?3, ?3, ?3, ?4, ?5, ?6)
+                        ",
+                        params![
+                            account_id,
+                            folder_id,
+                            subject,
+                            received_at,
+                            is_read,
+                            thread_key
+                        ],
+                    )?;
+                    Ok(())
+                };
+                insert(
+                    first_account.id,
+                    first_inbox.id,
+                    "Alpha inbox scope",
+                    "2026-07-10T08:00:00Z",
+                    0,
+                )?;
+                insert(
+                    first_account.id,
+                    first_archive.id,
+                    "Archive scope",
+                    "2026-07-10T08:05:00Z",
+                    1,
+                )?;
+                insert(
+                    second_account.id,
+                    second_inbox.id,
+                    "Second account scope",
+                    "2026-07-10T08:10:00Z",
+                    0,
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let first_threads = store
+            .list_threads_for_scope(Some(first_account.id), Some(first_inbox.id), None, None, 50)
+            .unwrap();
+        let first_thread = first_threads
+            .iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        assert_eq!(first_thread.message_count, 1);
+        assert_eq!(first_thread.subject, "Alpha inbox scope");
+
+        let second_threads = store
+            .list_threads_for_scope(
+                Some(second_account.id),
+                Some(second_inbox.id),
+                None,
+                None,
+                50,
+            )
+            .unwrap();
+        let second_thread = second_threads
+            .iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        assert_eq!(second_thread.message_count, 1);
+        assert_eq!(second_thread.subject, "Second account scope");
+
+        let unified_threads = store
+            .list_threads_for_scope(None, Some(unified_inbox.id), None, None, 50)
+            .unwrap();
+        let unified_thread = unified_threads
+            .iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        assert_eq!(unified_thread.message_count, 2);
+        assert_eq!(unified_thread.unread_count, 2);
+
+        let archive_threads = store
+            .list_threads_for_scope(
+                Some(first_account.id),
+                Some(first_archive.id),
+                None,
+                None,
+                50,
+            )
+            .unwrap();
+        let archive_thread = archive_threads
+            .iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        assert_eq!(archive_thread.message_count, 1);
+        assert_eq!(archive_thread.subject, "Archive scope");
+
+        let search_threads = store
+            .list_threads_for_scope(
+                Some(first_account.id),
+                Some(first_inbox.id),
+                Some("subject:Alpha".to_string()),
+                Some("unread".to_string()),
+                50,
+            )
+            .unwrap();
+        assert_eq!(
+            search_threads
+                .iter()
+                .filter(|thread| thread.thread_key == thread_key)
+                .count(),
+            1
+        );
+
+        let starred_threads = store
+            .list_threads_for_scope(
+                Some(first_account.id),
+                Some(first_inbox.id),
+                None,
+                Some("starred".to_string()),
+                50,
+            )
+            .unwrap();
+        assert!(starred_threads
+            .iter()
+            .all(|thread| thread.thread_key != thread_key));
+    }
+
+    #[test]
     fn default_account_can_be_changed_and_remains_unique() {
         let store = test_store();
         let first_account = store.get_account().unwrap();
@@ -7148,7 +7381,7 @@ mod tests {
 
         let thread_key = format!("msgid:{}", root_message_id.to_ascii_lowercase());
         let thread = store
-            .list_threads()
+            .list_threads_for_scope(None, None, None, None, 50)
             .unwrap()
             .into_iter()
             .find(|thread| thread.thread_key == thread_key)
@@ -7897,7 +8130,13 @@ mod tests {
         let store = test_store();
         assert!(store.list_contacts().unwrap().len() >= 3);
         assert!(store.list_rules().unwrap().len() >= 3);
-        assert!(store.list_threads().unwrap().len() >= 3);
+        assert!(
+            store
+                .list_threads_for_scope(None, None, None, None, 50)
+                .unwrap()
+                .len()
+                >= 3
+        );
         let item = store
             .queue_outbox_message(DraftInput {
                 draft_id: 0,
@@ -8284,7 +8523,7 @@ mod tests {
     fn thread_messages_are_loaded_in_chronological_order() {
         let store = test_store();
         let thread = store
-            .list_threads()
+            .list_threads_for_scope(None, None, None, None, 50)
             .unwrap()
             .into_iter()
             .find(|thread| thread.message_count > 0)

@@ -619,6 +619,11 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('会话操作') && document.querySelector('[data-context-item=\"bulk-read-state\"]')");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"bulk-read-state\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已对会话') && document.querySelector('.status-line')?.innerText.includes('标为')");
+    await fillInput(cdp, '.search-box input', '安全检查清单');
+    await evalInPage(cdp, "document.querySelector('.search-box').requestSubmit()");
+    await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length === 1 && document.querySelector('.thread-card')?.innerText.includes('安全检查清单')");
+    await evalInPage(cdp, "document.querySelector('.search-clear-button').click()");
+    await waitForExpression(cdp, "document.querySelector('.message-list') && !document.querySelector('.thread-list')");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.message-list')");
 
@@ -848,6 +853,10 @@ async function main() {
     await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
     await waitForExpression(cdp, "document.body.innerText.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
+    await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
+    await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
+    await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
+    await waitForExpression(cdp, "document.querySelector('.message-list')");
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-trigger]') && !document.querySelector('[data-account-remove-trigger]').disabled");
     await evalInPage(cdp, "document.querySelector('[data-account-remove-trigger]').click()");
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-dialog]') && document.querySelector('[data-account-remove-confirm]').disabled");
@@ -976,6 +985,7 @@ async function main() {
         'keyboard select all bulk action and escape clear work',
         'thread view opens conversations',
         'thread actions and context menu work',
+        'thread scope follows search and active account',
         'message drag drop move and undo works',
         'custom folder create rename and move works',
         'trash restore syncs the remote inbox',

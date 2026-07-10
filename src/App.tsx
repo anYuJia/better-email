@@ -525,7 +525,6 @@ export default function App() {
       nextContactMergeSuggestions,
       nextIdentities,
       nextRules,
-      nextThreads,
       nextOutbox,
       nextBackgroundTasks,
       nextSyncSchedulePlan,
@@ -543,7 +542,6 @@ export default function App() {
       invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions'),
       invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
       invoke<MailRule[]>('list_rules'),
-      invoke<ThreadSummary[]>('list_threads'),
       invoke<OutboxItem[]>('list_outbox'),
       invoke<BackgroundTask[]>('list_background_tasks'),
       invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
@@ -562,7 +560,6 @@ export default function App() {
     setContactMergeSuggestions(nextContactMergeSuggestions);
     setIdentities(nextIdentities);
     setRules(nextRules);
-    setThreads(nextThreads);
     setOutbox(nextOutbox);
     setBackgroundTasks(nextBackgroundTasks);
     setSyncSchedulePlan(nextSyncSchedulePlan);
@@ -597,20 +594,31 @@ export default function App() {
   ) {
     if (!nextFolderId) {
       setMessages([]);
+      setThreads([]);
       setHasMoreMessages(false);
       setSelectedId(null);
       setSelectedMessageIds([]);
       return [];
     }
     const nextAccountId = accountIdForScope(nextScope);
-    const nextMessages = await invoke<Message[]>('list_messages', {
-      accountId: nextAccountId,
-      folderId: nextFolderId,
-      query: nextQuery.trim() || null,
-      filter: nextFilter,
-      limit: nextLimit + 1,
-    });
+    const [nextMessages, nextThreads] = await Promise.all([
+      invoke<Message[]>('list_messages', {
+        accountId: nextAccountId,
+        folderId: nextFolderId,
+        query: nextQuery.trim() || null,
+        filter: nextFilter,
+        limit: nextLimit + 1,
+      }),
+      invoke<ThreadSummary[]>('list_threads', {
+        accountId: nextAccountId,
+        folderId: nextFolderId,
+        query: nextQuery.trim() || null,
+        filter: nextFilter,
+        limit: 80,
+      }),
+    ]);
     if (refreshId !== mailboxRefreshRef.current) return nextMessages;
+    setThreads(nextThreads);
     const visibleMessages = nextMessages.slice(0, nextLimit);
     setMessageLimit(nextLimit);
     setHasMoreMessages(nextMessages.length > nextLimit);
@@ -672,6 +680,7 @@ export default function App() {
     setMessageLimit(messagePageSize);
     setHasMoreMessages(false);
     setMessages([]);
+    setThreads([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
     const meta = await loadMeta(preferredFolderId, nextScope);

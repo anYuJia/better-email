@@ -2295,8 +2295,15 @@ pub fn delete_rule(store: State<'_, MailStore>, rule_id: i64) -> MailResult<()> 
 }
 
 #[tauri::command]
-pub fn list_threads(store: State<'_, MailStore>) -> MailResult<Vec<ThreadSummary>> {
-    store.list_threads()
+pub fn list_threads(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+    folder_id: Option<i64>,
+    query: Option<String>,
+    filter: Option<String>,
+    limit: i64,
+) -> MailResult<Vec<ThreadSummary>> {
+    store.list_threads_for_scope(account_id, folder_id, query, filter, limit)
 }
 
 #[tauri::command]

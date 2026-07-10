@@ -35,6 +35,8 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 - 网易 163 授权码复测记录：2026-07-10 使用后续新提供的授权码再次验证时，IMAP 返回登录密码错误、SMTP 返回 `535 authentication failed`，完整邮箱与邮箱名前缀两种用户名格式均被拒绝；TLS 和服务端可达性正常，未发送邮件且凭据未落盘。该结果说明授权码样本需要重新生成，不能把历史通过样本等同于所有后续授权码持续有效。
 - Clippy 通过：`cargo clippy --all-targets -- -D warnings` 无警告。
 
+- 会话作用域回归已覆盖：后端测试验证线程摘要遵循账号、文件夹、搜索和筛选条件；Chrome headless UI 冒烟验证搜索后线程结果同步收窄，切换到无邮件账号后线程列表为空。本轮 `npm run test:ui` 共通过 74 项核心断言。
+
 ## 已覆盖功能
 
 | 功能域 | 当前状态 | 说明 |
@@ -64,6 +66,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
 - 初始化数据库会创建核心文件夹、标签、种子邮件和附件元数据。
 - 搜索、保存搜索快捷方式、过滤、附件查询和 `from:`/`to:`/`cc:`/`bcc:`/`subject:`/`label:`/`account:`/`mailbox:`/`folder:`/`filename:`/`attachment:`/`after:`/`before:`/`has:`/`is:` 操作符可组合使用。
+- 邮件列表与会话摘要使用相同的账号、文件夹、搜索、筛选和分页作用域；空账号或无文件夹状态不会残留上一视图的线程结果。
 - 邮件状态、移动文件夹、稍后处理时间、到期稍后邮件释放、标签增删可持久化。
 - 草稿和本地发送会进入对应系统文件夹并保存写信附件元数据；草稿可重建带稳定 Message-ID 的 MIME，并持久化远端 Drafts mailbox/UID。
 - 账号设置可编辑并持久化；新增账号会校验邮箱唯一性、创建默认系统文件夹和默认发件身份，并可立即切换到新账号或统一邮箱；默认发件账号在数据库中保持唯一，统一邮箱写信优先使用该账号，删除默认账号后剩余账号自动接管；账号移除要求完整邮箱确认并至少保留一个账号。

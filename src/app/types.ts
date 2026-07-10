@@ -2,6 +2,7 @@ export type SystemFolderRole = 'inbox' | 'sent' | 'drafts' | 'outbox' | 'archive
 export type FolderRole = SystemFolderRole | `custom:${string}`;
 export type FilterMode = 'all' | 'unread' | 'starred' | 'attachments';
 export type ListMode = 'messages' | 'threads';
+export type ListSort = 'newest' | 'oldest' | 'sender' | 'subject';
 export type AccountScope = number | 'all';
 export type ProviderVerificationStatus = 'untested' | 'passed' | 'partial' | 'failed';
 export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';

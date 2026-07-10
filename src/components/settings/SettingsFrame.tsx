@@ -2,6 +2,8 @@ import type React from 'react';
 import {
   BadgeCheck,
   Bell,
+  ChevronLeft,
+  ChevronRight,
   ContactRound,
   DatabaseBackup,
   EyeOff,
@@ -133,6 +135,17 @@ const navigationGroups = [
   },
 ];
 
+const navigationItems = navigationGroups.flatMap((group) => (
+  group.items.map((item) => ({ ...item, groupLabel: group.label }))
+));
+
+const connectionSections = new Set<SettingsSectionId>([
+  'accounts',
+  'providers',
+  'auth',
+  'sync',
+]);
+
 export default function SettingsFrame({
   title,
   subtitle,
@@ -147,6 +160,11 @@ export default function SettingsFrame({
     group.items.some((item) => item.id === activeSection)
   )) ?? navigationGroups[0];
   const activeItem = activeGroup.items.find((item) => item.id === activeSection) ?? activeGroup.items[0];
+  const activeIndex = navigationItems.findIndex((item) => item.id === activeSection);
+  const previousItem = activeIndex > 0 ? navigationItems[activeIndex - 1] : null;
+  const nextItem = activeIndex >= 0 && activeIndex < navigationItems.length - 1
+    ? navigationItems[activeIndex + 1]
+    : null;
 
   return (
     <div className="composer-backdrop settings-backdrop">
@@ -157,16 +175,18 @@ export default function SettingsFrame({
             <span>{subtitle}</span>
           </div>
           <div className="settings-header-actions">
-            <button
-              type="button"
-              className="settings-header-button secondary"
-              aria-label="服务器测试"
-              title="只测试当前账号的 IMAP 与 SMTP 服务器网络连接"
-              onClick={onTestConnection}
-            >
-              <FlaskConical size={14} />
-              <span>服务器测试</span>
-            </button>
+            {connectionSections.has(activeSection) && (
+              <button
+                type="button"
+                className="settings-header-button secondary"
+                aria-label="服务器测试"
+                title="只测试当前账号的 IMAP 与 SMTP 服务器网络连接"
+                onClick={onTestConnection}
+              >
+                <FlaskConical size={14} />
+                <span>服务器测试</span>
+              </button>
+            )}
             <button
               type="button"
               className="settings-header-button primary"
@@ -208,8 +228,10 @@ export default function SettingsFrame({
                       title={item.label}
                       onClick={() => onNavigate(item.id)}
                     >
-                      <Icon size={15} />
-                      <span>{item.label}</span>
+                      <span className="settings-nav-icon">
+                        <Icon size={15} />
+                      </span>
+                      <span className="settings-nav-label">{item.label}</span>
                     </button>
                   );
                 })}
@@ -217,13 +239,40 @@ export default function SettingsFrame({
             ))}
           </nav>
           <div className="settings-content">
-            <section className="settings-page" aria-labelledby={`settings-page-${activeSection}`}>
+            <section
+              className="settings-page"
+              data-settings-page={activeSection}
+              aria-labelledby={`settings-page-${activeSection}`}
+            >
               <header className="settings-page-header">
-                <span>{activeGroup.label}</span>
+                <div className="settings-page-eyebrow">
+                  <span>{activeGroup.label}</span>
+                  <em>{activeIndex + 1} / {navigationItems.length}</em>
+                </div>
                 <strong id={`settings-page-${activeSection}`}>{activeItem.label}</strong>
                 <p>{activeItem.description}</p>
               </header>
               <div className="settings-page-content">{children}</div>
+              <footer className="settings-page-pagination" aria-label="设置分页">
+                {previousItem ? (
+                  <button type="button" onClick={() => onNavigate(previousItem.id)}>
+                    <ChevronLeft size={15} />
+                    <span>
+                      <small>上一项</small>
+                      <strong>{previousItem.label}</strong>
+                    </span>
+                  </button>
+                ) : <span />}
+                {nextItem ? (
+                  <button type="button" className="next" onClick={() => onNavigate(nextItem.id)}>
+                    <span>
+                      <small>下一项</small>
+                      <strong>{nextItem.label}</strong>
+                    </span>
+                    <ChevronRight size={15} />
+                  </button>
+                ) : <span />}
+              </footer>
             </section>
           </div>
         </div>

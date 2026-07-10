@@ -1114,12 +1114,25 @@ impl MailStore {
         })
     }
 
+    #[allow(dead_code)]
     pub fn list_messages_for_scope(
         &self,
         account_id: Option<i64>,
         folder_id: i64,
         query: Option<String>,
         filter: Option<String>,
+        limit: i64,
+    ) -> MailResult<Vec<Message>> {
+        self.list_messages_for_scope_sorted(account_id, folder_id, query, filter, None, limit)
+    }
+
+    pub fn list_messages_for_scope_sorted(
+        &self,
+        account_id: Option<i64>,
+        folder_id: i64,
+        query: Option<String>,
+        filter: Option<String>,
+        sort: Option<String>,
         limit: i64,
     ) -> MailResult<Vec<Message>> {
         self.with_conn(|conn| {
@@ -1148,8 +1161,12 @@ impl MailStore {
                 scope_conditions.push("m.account_id = ?".to_string());
                 query_params.push(Value::Integer(account_id));
             }
-            let sql =
-                build_message_query(&search_criteria, &filter, &scope_conditions.join(" AND "));
+            let sql = build_message_query(
+                &search_criteria,
+                &filter,
+                &scope_conditions.join(" AND "),
+                sort.as_deref(),
+            );
             query_params.extend(search_criteria.params().into_iter().map(Value::Text));
             query_params.push(Value::Integer(limit));
             let mut stmt = conn.prepare(&sql)?;
@@ -2577,12 +2594,25 @@ impl MailStore {
         })
     }
 
+    #[allow(dead_code)]
     pub fn list_threads_for_scope(
         &self,
         account_id: Option<i64>,
         folder_id: Option<i64>,
         query: Option<String>,
         filter: Option<String>,
+        limit: i64,
+    ) -> MailResult<Vec<ThreadSummary>> {
+        self.list_threads_for_scope_sorted(account_id, folder_id, query, filter, None, limit)
+    }
+
+    pub fn list_threads_for_scope_sorted(
+        &self,
+        account_id: Option<i64>,
+        folder_id: Option<i64>,
+        query: Option<String>,
+        filter: Option<String>,
+        sort: Option<String>,
         limit: i64,
     ) -> MailResult<Vec<ThreadSummary>> {
         self.with_conn(|conn| {
@@ -2618,6 +2648,7 @@ impl MailStore {
                 scope_conditions.join(" AND ")
             };
             let filter_clause = build_message_filter_clause(&search_criteria, &filter);
+            let order_clause = thread_order_clause(sort.as_deref());
             let sql = format!(
                 "
                 WITH scoped_messages AS (
@@ -2645,7 +2676,7 @@ impl MailStore {
                        GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants
                 FROM scoped_messages scoped
                 GROUP BY scoped.thread_key
-                ORDER BY latest_at DESC
+                ORDER BY {order_clause}
                 LIMIT ?
                 ",
             );
@@ -3924,7 +3955,12 @@ impl SearchCriteria {
     }
 }
 
-fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &str) -> String {
+fn build_message_query(
+    search: &SearchCriteria,
+    filter: &str,
+    scope_condition: &str,
+    sort: Option<&str>,
+) -> String {
     let mut sql = String::from(
         "
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
@@ -3941,8 +3977,39 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
     sql.push_str(scope_condition);
     sql.push(' ');
     sql.push_str(&build_message_filter_clause(search, filter));
-    sql.push_str("ORDER BY m.received_at DESC LIMIT ?");
+    sql.push_str("ORDER BY ");
+    sql.push_str(message_order_clause(sort));
+    sql.push_str(" LIMIT ?");
     sql
+}
+
+fn normalized_list_sort(sort: Option<&str>) -> &'static str {
+    match sort.map(str::trim) {
+        Some("oldest") => "oldest",
+        Some("sender") => "sender",
+        Some("subject") => "subject",
+        _ => "newest",
+    }
+}
+
+fn message_order_clause(sort: Option<&str>) -> &'static str {
+    match normalized_list_sort(sort) {
+        "oldest" => "m.received_at ASC, m.id ASC",
+        "sender" => {
+            "lower(m.sender_name) ASC, lower(m.sender_email) ASC, m.received_at DESC, m.id DESC"
+        }
+        "subject" => "lower(m.subject) ASC, m.received_at DESC, m.id DESC",
+        _ => "m.received_at DESC, m.id DESC",
+    }
+}
+
+fn thread_order_clause(sort: Option<&str>) -> &'static str {
+    match normalized_list_sort(sort) {
+        "oldest" => "latest_at ASC, scoped.thread_key ASC",
+        "sender" => "lower(participants) ASC, latest_at DESC, scoped.thread_key ASC",
+        "subject" => "lower(subject) ASC, latest_at DESC, scoped.thread_key ASC",
+        _ => "latest_at DESC, scoped.thread_key ASC",
+    }
 }
 
 fn build_message_filter_clause(search: &SearchCriteria, filter: &str) -> String {
@@ -5804,6 +5871,127 @@ mod tests {
         let stats = store.get_stats_for_account(None).expect("stats load");
         assert!(stats.total_messages >= 4);
         assert!(stats.attachment_messages >= 1);
+    }
+
+    #[test]
+    fn list_sorting_orders_messages_and_threads_with_safe_fallbacks() {
+        let store = test_store();
+        let inbox = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+
+        let newest_messages = store
+            .list_messages_for_scope_sorted(
+                None,
+                inbox.id,
+                None,
+                None,
+                Some("newest".to_string()),
+                50,
+            )
+            .unwrap();
+        let oldest_messages = store
+            .list_messages_for_scope_sorted(
+                None,
+                inbox.id,
+                None,
+                None,
+                Some("oldest".to_string()),
+                50,
+            )
+            .unwrap();
+        let invalid_messages = store
+            .list_messages_for_scope_sorted(
+                None,
+                inbox.id,
+                None,
+                None,
+                Some("received_at DESC; DROP TABLE messages".to_string()),
+                50,
+            )
+            .unwrap();
+        assert!(newest_messages.len() >= 2);
+        assert_eq!(
+            newest_messages.first().map(|message| message.id),
+            invalid_messages.first().map(|message| message.id)
+        );
+        assert!(
+            newest_messages.first().unwrap().received_at
+                >= newest_messages.last().unwrap().received_at
+        );
+        assert!(
+            oldest_messages.first().unwrap().received_at
+                <= oldest_messages.last().unwrap().received_at
+        );
+        assert_eq!(
+            newest_messages.first().unwrap().id,
+            oldest_messages.last().unwrap().id
+        );
+
+        let newest_threads = store
+            .list_threads_for_scope_sorted(
+                None,
+                Some(inbox.id),
+                None,
+                None,
+                Some("newest".to_string()),
+                50,
+            )
+            .unwrap();
+        let oldest_threads = store
+            .list_threads_for_scope_sorted(
+                None,
+                Some(inbox.id),
+                None,
+                None,
+                Some("oldest".to_string()),
+                50,
+            )
+            .unwrap();
+        let invalid_threads = store
+            .list_threads_for_scope_sorted(
+                None,
+                Some(inbox.id),
+                None,
+                None,
+                Some("latest_at DESC; DROP TABLE messages".to_string()),
+                50,
+            )
+            .unwrap();
+        assert!(newest_threads.len() >= 2);
+        assert_eq!(
+            newest_threads
+                .first()
+                .map(|thread| thread.thread_key.as_str()),
+            invalid_threads
+                .first()
+                .map(|thread| thread.thread_key.as_str())
+        );
+        assert!(
+            newest_threads.first().unwrap().latest_at >= newest_threads.last().unwrap().latest_at
+        );
+        assert!(
+            oldest_threads.first().unwrap().latest_at <= oldest_threads.last().unwrap().latest_at
+        );
+        assert_eq!(
+            newest_threads.first().unwrap().thread_key,
+            oldest_threads.last().unwrap().thread_key
+        );
+
+        assert_eq!(normalized_list_sort(Some("sender")), "sender");
+        assert_eq!(normalized_list_sort(Some("subject")), "subject");
+        assert_eq!(normalized_list_sort(Some("unknown")), "newest");
+        assert_eq!(
+            message_order_clause(Some("oldest")),
+            "m.received_at ASC, m.id ASC"
+        );
+        assert_eq!(
+            thread_order_clause(Some("oldest")),
+            "latest_at ASC, scoped.thread_key ASC"
+        );
     }
 
     #[test]

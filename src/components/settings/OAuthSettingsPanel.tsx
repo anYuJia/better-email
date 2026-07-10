@@ -72,14 +72,14 @@ export default function OAuthSettingsPanel({
       </section>
 
       {authType === 'oauth2' && (
-        <details className="settings-disclosure" data-settings-section="auth" open>
-          <summary>
+        <section className="settings-static-section" data-settings-section="auth">
+          <header className="settings-static-header">
             <span>
               <strong>OAuth2 高级流程</strong>
               <em>PKCE、回调、Token 交换与刷新</em>
             </span>
             <b>{sessions.length} 个会话</b>
-          </summary>
+          </header>
           <section className="oauth-pkce-panel settings-oauth-panel">
             <div className="settings-oauth-grid">
               <label>
@@ -182,7 +182,7 @@ export default function OAuthSettingsPanel({
               </div>
             )}
           </section>
-        </details>
+        </section>
       )}
     </>
   );

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { OutboxItem } from './types';
 import {
   canCancelOutboxItem,
+  isListSort,
   outboxStatusLabel,
   outboxTimingLabel,
 } from './appConfig';
@@ -29,5 +30,17 @@ describe('outbox remote archive state', () => {
   it('does not allow cancelling after SMTP delivery succeeded', () => {
     expect(canCancelOutboxItem('sent_remote_pending')).toBe(false);
     expect(canCancelOutboxItem('queued')).toBe(true);
+  });
+});
+
+describe('message list sorting', () => {
+  it('accepts only the supported persisted sort modes', () => {
+    expect(isListSort('newest')).toBe(true);
+    expect(isListSort('oldest')).toBe(true);
+    expect(isListSort('sender')).toBe(true);
+    expect(isListSort('subject')).toBe(true);
+    expect(isListSort('received_at desc')).toBe(false);
+    expect(isListSort('')).toBe(false);
+    expect(isListSort(null)).toBe(false);
   });
 });

@@ -52,6 +52,7 @@ import type {
   FolderRole,
   FilterMode,
   ListMode,
+  ListSort,
   AccountScope,
   Account,
   AccountCreateInput,
@@ -112,10 +113,12 @@ import {
   composeTemplatesStorageKey,
   composerAutosaveStorageKey,
   sendUndoDelayStorageKey,
+  listSortStorageKey,
   filterModes,
   backgroundTaskTitle,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
+  loadListSort,
   removeAppStorage,
   loadProviderVerifications,
   isFilterMode,
@@ -182,6 +185,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const [listMode, setListMode] = useState<ListMode>('messages');
+  const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState('');
@@ -297,6 +301,7 @@ export default function App() {
     folderId,
     query,
     filter,
+    listSort,
     folders,
     setMessages,
     setThreads,
@@ -704,6 +709,10 @@ export default function App() {
   }, [sendUndoDelaySeconds]);
 
   useEffect(() => {
+    window.localStorage.setItem(listSortStorageKey, listSort);
+  }, [listSort]);
+
+  useEffect(() => {
     window.localStorage.setItem(providerVerificationStorageKey, JSON.stringify(providerVerifications));
   }, [providerVerifications]);
 
@@ -733,7 +742,7 @@ export default function App() {
   useEffect(() => {
     if (!folderId) return;
     loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, messagePageSize).catch((error) => setStatus(String(error)));
-  }, [folderId, filter]);
+  }, [folderId, filter, listSort]);
 
   useEffect(() => {
     setQuickReplyBody('');
@@ -2102,6 +2111,7 @@ export default function App() {
         query={query}
         filter={filter}
         listMode={listMode}
+        listSort={listSort}
         selectedMessageIds={selectedMessageIds}
         folders={folders}
         labels={labels}
@@ -2126,6 +2136,7 @@ export default function App() {
         }}
         onShowThreads={() => setListMode('threads')}
         onFilterChange={setFilter}
+        onSortChange={setListSort}
         onToggleAllVisible={toggleAllVisibleMessages}
         onRunBulkAction={runBulkAction}
         onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error))); }}
@@ -2250,7 +2261,7 @@ export default function App() {
 
       {isSettingsOpen && accountForm && (
         <SettingsFrame
-          title="账号设置"
+          title="设置"
           subtitle={`${accountForm.email} · ${accountForm.provider}`}
           activeSection={activeSettingsSection}
           onNavigate={scrollSettingsSection}

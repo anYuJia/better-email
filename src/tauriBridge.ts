@@ -1,4 +1,4 @@
-import type { Message } from './app/types';
+import type { ListSort, Message } from './app/types';
 
 type InvokeArgs = Record<string, unknown> | undefined;
 type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };
@@ -616,9 +616,34 @@ function refreshLabelCounts() {
   }));
 }
 
+function normalizeListSort(value: unknown): ListSort {
+  return value === 'oldest' || value === 'sender' || value === 'subject'
+    ? value
+    : 'newest';
+}
+
+function compareMessagesBySort(left: MockMessage, right: MockMessage, sort: ListSort) {
+  if (sort === 'oldest') {
+    return left.received_at.localeCompare(right.received_at) || left.id - right.id;
+  }
+  if (sort === 'sender') {
+    return left.sender_name.localeCompare(right.sender_name)
+      || left.sender_email.localeCompare(right.sender_email)
+      || right.received_at.localeCompare(left.received_at)
+      || right.id - left.id;
+  }
+  if (sort === 'subject') {
+    return left.subject.localeCompare(right.subject)
+      || right.received_at.localeCompare(left.received_at)
+      || right.id - left.id;
+  }
+  return right.received_at.localeCompare(left.received_at) || right.id - left.id;
+}
+
 function listMessages(args: InvokeArgs) {
   const query = String(args?.query ?? '').trim().toLowerCase();
   const filter = String(args?.filter ?? 'all');
+  const sort = normalizeListSort(args?.sort);
   const limit = Math.max(1, Number(args?.limit ?? 80));
   const accountId = Number(args?.accountId ?? 0);
   const folderId = Number(args?.folderId ?? 0);
@@ -688,7 +713,7 @@ function listMessages(args: InvokeArgs) {
       }
     }
     return true;
-  }).slice(0, limit);
+  }).sort((left, right) => compareMessagesBySort(left, right, sort)).slice(0, limit);
 }
 
 function normalizedThreadSubject(subject: string) {
@@ -727,6 +752,7 @@ function listThreadMessages(args: InvokeArgs) {
 }
 
 function listThreads(args?: InvokeArgs) {
+  const sort = normalizeListSort(args?.sort);
   const scopedMessages = listMessages({
     ...(args ?? {}),
     limit: Math.max(messages.length, 1),
@@ -749,7 +775,22 @@ function listThreads(args?: InvokeArgs) {
         participants: [...new Set(items.map((message) => message.sender_name))].join(', '),
       };
     })
-    .sort((left, right) => right.latest_at.localeCompare(left.latest_at));
+    .sort((left, right) => {
+      if (sort === 'oldest') {
+        return left.latest_at.localeCompare(right.latest_at) || left.thread_key.localeCompare(right.thread_key);
+      }
+      if (sort === 'sender') {
+        return left.participants.localeCompare(right.participants)
+          || right.latest_at.localeCompare(left.latest_at)
+          || left.thread_key.localeCompare(right.thread_key);
+      }
+      if (sort === 'subject') {
+        return left.subject.localeCompare(right.subject)
+          || right.latest_at.localeCompare(left.latest_at)
+          || left.thread_key.localeCompare(right.thread_key);
+      }
+      return right.latest_at.localeCompare(left.latest_at) || left.thread_key.localeCompare(right.thread_key);
+    });
 }
 
 function stats(args?: InvokeArgs) {

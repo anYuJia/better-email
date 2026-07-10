@@ -4,6 +4,7 @@ import type {
   AccountScope,
   FilterMode,
   Folder,
+  ListSort,
   Message,
   ThreadSummary,
 } from '../app/types';
@@ -19,6 +20,7 @@ type MailboxRequestArgs = {
   folderId: number;
   query: string | null;
   filter: FilterMode;
+  sort: ListSort;
   limit: number;
 };
 
@@ -27,6 +29,7 @@ type UseMailboxDataOptions = {
   folderId: number | null;
   query: string;
   filter: FilterMode;
+  listSort: ListSort;
   folders: Folder[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
@@ -53,6 +56,7 @@ export function buildMailboxRequests(
   folderId: number,
   query: string,
   filter: FilterMode,
+  sort: ListSort,
   limit: number,
 ): MailboxRequests {
   const common = {
@@ -60,6 +64,7 @@ export function buildMailboxRequests(
     folderId,
     query: query.trim() || null,
     filter,
+    sort,
   };
   return {
     messages: {
@@ -105,6 +110,7 @@ export default function useMailboxData({
   folderId,
   query,
   filter,
+  listSort,
   folders,
   setMessages,
   setThreads,
@@ -141,6 +147,7 @@ export default function useMailboxData({
       nextFolderId,
       nextQuery,
       nextFilter,
+      listSort,
       nextLimit,
     );
     const [nextMessages, nextThreads] = await Promise.all([

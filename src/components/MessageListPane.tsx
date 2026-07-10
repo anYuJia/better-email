@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ArrowDownUp,
   MoreHorizontal,
   Paperclip,
   RefreshCw,
@@ -7,13 +8,19 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
-import { filters, movableFoldersForBulk, searchShortcuts } from '../app/appConfig';
+import {
+  filters,
+  listSortOptions,
+  movableFoldersForBulk,
+  searchShortcuts,
+} from '../app/appConfig';
 import type {
   AccountScope,
   FilterMode,
   Folder,
   Label,
   ListMode,
+  ListSort,
   Message,
   ThreadSummary,
 } from '../app/types';
@@ -35,6 +42,7 @@ export type MessageListPaneProps = {
   query: string;
   filter: FilterMode;
   listMode: ListMode;
+  listSort: ListSort;
   selectedMessageIds: number[];
   folders: Folder[];
   labels: Label[];
@@ -55,6 +63,7 @@ export type MessageListPaneProps = {
   onShowMessages: () => void;
   onShowThreads: () => void;
   onFilterChange: (filter: FilterMode) => void;
+  onSortChange: (sort: ListSort) => void;
   onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
@@ -77,6 +86,7 @@ export default function MessageListPane({
   query,
   filter,
   listMode,
+  listSort,
   selectedMessageIds,
   folders,
   labels,
@@ -97,6 +107,7 @@ export default function MessageListPane({
   onShowMessages,
   onShowThreads,
   onFilterChange,
+  onSortChange,
   onToggleAllVisible,
   onRunBulkAction,
   onMoveBulkToFolder,
@@ -131,6 +142,7 @@ export default function MessageListPane({
   const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
   const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
+  const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
   const contextMessage = messageMenu?.message;
   const isBulkContext = Boolean(messageMenu?.bulk && selectedMessages.length > 1);
   const messageContextItems = isBulkContext
@@ -239,6 +251,25 @@ export default function MessageListPane({
                   key={item.id}
                   className={filter === item.id ? 'active' : ''}
                   onClick={() => onFilterChange(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </details>
+          <details className="compact-menu sort-menu">
+            <summary className={listSort !== 'newest' ? 'active' : ''}>
+              <ArrowDownUp size={15} />
+              {activeSortLabel}
+            </summary>
+            <div>
+              <span className="menu-section-title">排序方式</span>
+              {listSortOptions.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={listSort === item.id ? 'active' : ''}
+                  onClick={() => onSortChange(item.id)}
                 >
                   {item.label}
                 </button>

@@ -118,9 +118,10 @@ pub fn list_messages(
     folder_id: i64,
     query: Option<String>,
     filter: Option<String>,
+    sort: Option<String>,
     limit: i64,
 ) -> MailResult<Vec<Message>> {
-    store.list_messages_for_scope(account_id, folder_id, query, filter, limit)
+    store.list_messages_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
 }
 
 #[tauri::command]
@@ -2310,9 +2311,10 @@ pub fn list_threads(
     folder_id: Option<i64>,
     query: Option<String>,
     filter: Option<String>,
+    sort: Option<String>,
     limit: i64,
 ) -> MailResult<Vec<ThreadSummary>> {
-    store.list_threads_for_scope(account_id, folder_id, query, filter, limit)
+    store.list_threads_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
 }
 
 #[tauri::command]

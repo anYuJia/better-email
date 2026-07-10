@@ -35,14 +35,14 @@ export default function DataSafetySettings({
         </div>
       </div>
 
-      <details className="settings-disclosure" data-settings-section="backup" open>
-        <summary>
+      <section className="settings-static-section" data-settings-section="backup">
+        <header className="settings-static-header">
           <span>
             <strong>备份、诊断与连接报告</strong>
             <em>导入导出、脱敏 JSON、服务器测试详情</em>
           </span>
           <b>{localBackupSummary ? `${localBackupSummary.messages} 封` : '未备份'}</b>
-        </summary>
+        </header>
         {diagnosticExport && (
           <section className="tool-panel settings-diagnostic-panel">
             <header className="tool-header">
@@ -114,7 +114,7 @@ export default function DataSafetySettings({
             </div>
           </section>
         )}
-      </details>
+      </section>
     </div>
   );
 }

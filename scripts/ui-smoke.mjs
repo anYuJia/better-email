@@ -736,7 +736,12 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page-eyebrow em')?.textContent.trim() === '1 / 12' && document.querySelectorAll('.settings-nav button').length === 12");
+    await clickButton(cdp, '下一项', "document.querySelector('.settings-page-pagination')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page-header strong')?.textContent.trim() === '服务商' && document.querySelector('.settings-page-eyebrow em')?.textContent.trim() === '2 / 12'");
+    await clickButton(cdp, '上一项', "document.querySelector('.settings-page-pagination')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号' && document.querySelector('.settings-page-eyebrow em')?.textContent.trim() === '1 / 12'");
     await openSettingsSection(cdp, '认证', 'auth', '.settings-oauth-panel');
     await fillInput(cdp, '.settings-oauth-panel input[placeholder*="Client ID"]', 'smoke-client-id');
     await clickButton(cdp, '打开 OAuth2 授权页', "document.querySelector('.settings-oauth-panel')");
@@ -766,12 +771,27 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')?.innerText.includes('默认发件') && document.querySelector('[data-context-item=\"set-default-account\"]').disabled");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号' && document.querySelector('.settings-account-page-accounts') && [...document.querySelectorAll('[data-settings-section]')].every((item) => item.dataset.settingsSection === 'accounts')");
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号' && document.querySelector('.settings-account-page-accounts') && [...document.querySelectorAll('[data-settings-section]')].every((item) => item.dataset.settingsSection === 'accounts')");
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('服务器测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
     await clickButton(cdp, '服务器测试', "document.querySelector('.settings-header-actions')");
     await openSettingsSection(cdp, '备份', 'backup', '.settings-backup-panel');
+    await waitForExpression(cdp, "!document.querySelector('.settings-header-actions')?.innerText.includes('服务器测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置')");
     await waitForExpression(cdp, "document.querySelector('.settings-connection-report')?.innerText.includes('imap.mail.me.com:993') && document.querySelector('.settings-connection-report')?.innerText.includes('smtp.mail.me.com:587')");
     await openSettingsSection(cdp, '发送', 'sending', '.settings-send-panel');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 600,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 600 && getComputedStyle(document.querySelector('.settings-nav')).flexDirection === 'row' && [...document.querySelectorAll('.settings-nav-label')].every((label) => getComputedStyle(label).display !== 'none') && document.querySelector('.settings-nav').scrollWidth > document.querySelector('.settings-nav').clientWidth");
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 1440 && getComputedStyle(document.querySelector('.settings-nav')).flexDirection === 'column'");
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
@@ -854,8 +874,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('规则已保存：Smoke Rule') && document.body.innerText.includes('Smoke Rule')");
 
     await openSettingsSection(cdp, '安全预览', 'security-preview', '.settings-security-preview');
-    await clickButton(cdp, '解析', "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"]')");
-    await waitForExpression(cdp, "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('HTML 正文包含 script 标签')");
+    await clickButton(cdp, '解析', "document.querySelector('.settings-security-stack[data-settings-section=\"security-preview\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-security-stack[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-security-stack[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('HTML 正文包含 script 标签')");
 
     await openSettingsSection(cdp, '同步', 'sync', '.settings-sync-panel');
     await clickButton(cdp, '撤回');
@@ -890,8 +910,7 @@ async function main() {
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
     await openSettingsSection(cdp, '账号', 'accounts', '.settings-account-page-accounts');
-    await waitForExpression(cdp, "document.body.innerText.includes('添加邮箱账号')");
-    await openDetails(cdp, '.add-account-disclosure');
+    await waitForExpression(cdp, "document.body.innerText.includes('添加邮箱账号') && document.querySelector('.settings-add-account-panel')");
     await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"name@example.com\"]', 'qa-new@better-email.local');
     await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"留空则使用邮箱地址\"]', 'QA New');
     await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-add-account-panel')");
@@ -1043,6 +1062,10 @@ async function main() {
         'outbox queue and cancel works',
         'settings modal opens',
         'settings navigation renders one page at a time',
+        'settings previous and next pagination works',
+        'settings narrow layout keeps labeled horizontal navigation',
+        'settings connection test only appears on relevant pages',
+        'settings primary sections open without redundant disclosure',
         'settings primary actions stay visible in header',
         'settings header save completes update flow',
         'new account preset creation and scope switch work',

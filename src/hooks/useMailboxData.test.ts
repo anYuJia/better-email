@@ -3,12 +3,13 @@ import { buildMailboxRequests } from './useMailboxData';
 
 describe('buildMailboxRequests', () => {
   it('keeps message and thread queries in the same scoped mailbox view', () => {
-    expect(buildMailboxRequests(7, 42, '  subject:Roadmap  ', 'unread', 50)).toEqual({
+    expect(buildMailboxRequests(7, 42, '  subject:Roadmap  ', 'unread', 'sender', 50)).toEqual({
       messages: {
         accountId: 7,
         folderId: 42,
         query: 'subject:Roadmap',
         filter: 'unread',
+        sort: 'sender',
         limit: 51,
       },
       threads: {
@@ -16,18 +17,20 @@ describe('buildMailboxRequests', () => {
         folderId: 42,
         query: 'subject:Roadmap',
         filter: 'unread',
+        sort: 'sender',
         limit: 80,
       },
     });
   });
 
   it('uses a null account and query for unified unfiltered views', () => {
-    expect(buildMailboxRequests('all', -1, '   ', 'all', 25)).toEqual({
+    expect(buildMailboxRequests('all', -1, '   ', 'all', 'newest', 25)).toEqual({
       messages: {
         accountId: null,
         folderId: -1,
         query: null,
         filter: 'all',
+        sort: 'newest',
         limit: 26,
       },
       threads: {
@@ -35,6 +38,7 @@ describe('buildMailboxRequests', () => {
         folderId: -1,
         query: null,
         filter: 'all',
+        sort: 'newest',
         limit: 80,
       },
     });

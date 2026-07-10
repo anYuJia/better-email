@@ -16,14 +16,14 @@ export default function SecurityPreviewSettings({
   onParseRawMessage,
 }: SecurityPreviewSettingsProps) {
   return (
-    <details className="settings-disclosure" data-settings-section="security-preview" open>
-      <summary>
+    <div className="settings-security-stack" data-settings-section="security-preview">
+      <section className="settings-section-overview">
         <span>
-          <strong>原始邮件安全预览</strong>
-          <em>调试 HTML 清洗、附件和安全警告</em>
+          <strong>安全解析状态</strong>
+          <em>调试 HTML 清洗、附件和远程资源风险</em>
         </span>
-        <b>{parsedPreview ? `${parsedPreview.attachment_count} 附件` : '调试'}</b>
-      </summary>
+        <b>{parsedPreview ? `${parsedPreview.attachment_count} 附件` : '等待解析'}</b>
+      </section>
       <section className="tool-panel raw-preview settings-security-preview">
         <header className="tool-header">
           <span>
@@ -70,6 +70,6 @@ export default function SecurityPreviewSettings({
           </div>
         )}
       </section>
-    </details>
+    </div>
   );
 }

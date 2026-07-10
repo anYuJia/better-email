@@ -87,14 +87,14 @@ export default function SyncOperationsSettings({
   ).length;
 
   return (
-    <details className="settings-disclosure" data-settings-section="sync" open>
-      <summary>
+    <div className="settings-sync-stack" data-settings-section="sync">
+      <section className="settings-section-overview">
         <span>
           <strong>同步与发信高级工具</strong>
           <em>回写验收、IMAP 发现、同步演练和发件箱队列</em>
         </span>
         <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
-      </summary>
+      </section>
 
       <ProviderWriteValidationSettings
         status={writeValidationStatus}
@@ -315,6 +315,6 @@ export default function SyncOperationsSettings({
           </div>
         )}
       </section>
-    </details>
+    </div>
   );
 }

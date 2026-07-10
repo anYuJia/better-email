@@ -12,6 +12,7 @@ import type {
   FilterMode,
   Folder,
   FolderRole,
+  ListSort,
   MailIdentityInput,
   MailRuleInput,
   Message,
@@ -120,6 +121,7 @@ export const composerAutosaveStorageKey = 'better-email.composerAutosave';
 export const appLayoutStorageKey = 'better-email.appLayout.v2';
 export const sendUndoDelayStorageKey = 'better-email.sendUndoDelaySeconds';
 export const favoriteFolderKeysStorageKey = 'better-email.favoriteFolderKeys.v1';
+export const listSortStorageKey = 'better-email.listSort.v1';
 const legacyStorageKeyByCurrent: Record<string, string> = {
   [notificationPolicyStorageKey]: 'swiftmail.notificationPolicy',
   [providerVerificationStorageKey]: 'swiftmail.providerVerifications',
@@ -129,9 +131,17 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
   [appLayoutStorageKey]: 'swiftmail.appLayout.v2',
   [sendUndoDelayStorageKey]: 'swiftmail.sendUndoDelaySeconds',
   [favoriteFolderKeysStorageKey]: 'swiftmail.favoriteFolderKeys.v1',
+  [listSortStorageKey]: 'swiftmail.listSort.v1',
 };
 export const defaultAppLayout: AppLayout = { sidebar: 244, list: 388 };
 export const filterModes: FilterMode[] = ['all', 'unread', 'starred', 'attachments'];
+export const listSortModes: ListSort[] = ['newest', 'oldest', 'sender', 'subject'];
+export const listSortOptions: { id: ListSort; label: string }[] = [
+  { id: 'newest', label: '最新优先' },
+  { id: 'oldest', label: '最早优先' },
+  { id: 'sender', label: '发件人 / 参与者' },
+  { id: 'subject', label: '主题 A-Z' },
+];
 export type SendUndoDelaySeconds = 0 | 5 | 10 | 20 | 30;
 export const sendUndoDelayOptions: { value: SendUndoDelaySeconds; label: string }[] = [
   { value: 0, label: '关闭，立即发送' },
@@ -188,6 +198,19 @@ export function loadSendUndoDelaySeconds(): SendUndoDelaySeconds {
       : 10;
   } catch {
     return 10;
+  }
+}
+
+export function isListSort(value: unknown): value is ListSort {
+  return typeof value === 'string' && listSortModes.includes(value as ListSort);
+}
+
+export function loadListSort(): ListSort {
+  try {
+    const stored = readAppStorage(listSortStorageKey);
+    return isListSort(stored) ? stored : 'newest';
+  } catch {
+    return 'newest';
   }
 }
 

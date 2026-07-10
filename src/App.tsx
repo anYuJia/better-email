@@ -14,6 +14,8 @@ import Sidebar from './components/Sidebar';
 import MessageListPane from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import ComposerWindow from './components/ComposerWindow';
+import ExperienceSettings from './components/settings/ExperienceSettings';
+import SettingsFrame from './components/settings/SettingsFrame';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -2729,34 +2731,13 @@ export default function App() {
       )}
 
       {isSettingsOpen && accountForm && (
-        <div className="composer-backdrop">
-          <section className="settings-modal">
-            <header className="settings-main-header">
-              <div className="settings-title">
-                <strong>账号设置</strong>
-                <span>{accountForm.email} · {accountForm.provider}</span>
-              </div>
-              <button onClick={() => setSettingsOpen(false)}>关闭</button>
-            </header>
-            <div className="settings-body">
-              <nav className="settings-nav" aria-label="设置分类">
-                <strong>设置</strong>
-                <span>常用项优先，专业项折叠</span>
-                <span className="settings-nav-group">账号与连接</span>
-                <button type="button" className={activeSettingsSection === 'accounts' ? 'active' : ''} onClick={() => scrollSettingsSection('accounts')}>账号</button>
-                <button type="button" className={activeSettingsSection === 'providers' ? 'active' : ''} onClick={() => scrollSettingsSection('providers')}>服务商</button>
-                <button type="button" className={activeSettingsSection === 'auth' ? 'active' : ''} onClick={() => scrollSettingsSection('auth')}>认证</button>
-                <span className="settings-nav-group">体验与隐私</span>
-                <button type="button" className={activeSettingsSection === 'notifications' ? 'active' : ''} onClick={() => scrollSettingsSection('notifications')}>通知</button>
-                <button type="button" className={activeSettingsSection === 'privacy' ? 'active' : ''} onClick={() => scrollSettingsSection('privacy')}>隐私</button>
-                <button type="button" className={activeSettingsSection === 'identities' ? 'active' : ''} onClick={() => scrollSettingsSection('identities')}>身份</button>
-                <span className="settings-nav-group">数据与自动化</span>
-                <button type="button" className={activeSettingsSection === 'backup' ? 'active' : ''} onClick={() => scrollSettingsSection('backup')}>备份</button>
-                <button type="button" className={activeSettingsSection === 'sync' ? 'active' : ''} onClick={() => scrollSettingsSection('sync')}>同步</button>
-                <button type="button" className={activeSettingsSection === 'rules' ? 'active' : ''} onClick={() => scrollSettingsSection('rules')}>规则</button>
-                <button type="button" className={activeSettingsSection === 'security-preview' ? 'active' : ''} onClick={() => scrollSettingsSection('security-preview')}>安全预览</button>
-              </nav>
-              <div className="settings-content">
+        <SettingsFrame
+          title="账号设置"
+          subtitle={`${accountForm.email} · ${accountForm.provider}`}
+          activeSection={activeSettingsSection}
+          onNavigate={scrollSettingsSection}
+          onClose={() => setSettingsOpen(false)}
+        >
             <details className="settings-disclosure add-account-disclosure" data-settings-section="accounts">
               <summary>
                 <span>
@@ -3046,184 +3027,21 @@ export default function App() {
                 <option value="push">推送优先</option>
               </select>
             </label>
-            <section className="tool-panel" data-settings-section="notifications">
-              <header className="tool-header">
-                <strong>通知策略</strong>
-                <span>
-                  {notificationPolicy.vipOnly
-                    ? '仅 VIP'
-                    : notificationPolicy.priorityAccounts.trim()
-                      ? '重点账号优先'
-                      : notificationPolicy.quietHoursEnabled
-                        ? '免打扰已配置'
-                        : '全部新邮件'}
-                </span>
-              </header>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={notificationPolicy.quietHoursEnabled}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, quietHoursEnabled: event.target.checked })}
-                />
-                启用免打扰时段
-              </label>
-              <label>
-                免打扰开始
-                <input
-                  type="time"
-                  value={notificationPolicy.quietStart}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, quietStart: event.target.value })}
-                />
-              </label>
-              <label>
-                免打扰结束
-                <input
-                  type="time"
-                  value={notificationPolicy.quietEnd}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, quietEnd: event.target.value })}
-                />
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={notificationPolicy.vipOnly}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, vipOnly: event.target.checked })}
-                />
-                只提醒 VIP 发件人
-              </label>
-              <label>
-                VIP 发件人
-                <textarea
-                  value={notificationPolicy.vipSenders}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, vipSenders: event.target.value })}
-                  placeholder={'ada@example.com\n@customer.com'}
-                />
-              </label>
-              <label>
-                静音账号
-                <textarea
-                  value={notificationPolicy.mutedAccounts}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, mutedAccounts: event.target.value })}
-                  placeholder={'archive@example.com\n2'}
-                />
-              </label>
-              <label>
-                重点账号
-                <textarea
-                  value={notificationPolicy.priorityAccounts}
-                  onChange={(event) => setNotificationPolicy({ ...notificationPolicy, priorityAccounts: event.target.value })}
-                  placeholder={'work@example.com\n@company.com'}
-                />
-              </label>
-              <div className="notification-account-grid">
-                {accounts.map((item) => {
-                  const email = item.email.toLowerCase();
-                  const muted = notificationPolicy.mutedAccounts.toLowerCase().includes(email);
-                  const priority = notificationPolicy.priorityAccounts.toLowerCase().includes(email);
-                  return (
-                    <div key={item.id}>
-                      <strong>{item.display_name || item.email}</strong>
-                      <span>{item.email}</span>
-                      <div>
-                        <button
-                          type="button"
-                          className={muted ? 'active' : ''}
-                          onClick={() => setNotificationPolicy(toggleAccountNotificationList(notificationPolicy, 'mutedAccounts', item.email))}
-                        >
-                          {muted ? '取消静音' : '静音'}
-                        </button>
-                        <button
-                          type="button"
-                          className={priority ? 'active' : ''}
-                          onClick={() => setNotificationPolicy(toggleAccountNotificationList(notificationPolicy, 'priorityAccounts', item.email))}
-                        >
-                          {priority ? '取消重点' : '重点'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-            <label className="checkbox-row">
-              <input type="checkbox" checked={accountForm.remote_images_allowed} onChange={(event) => setAccountForm({ ...accountForm, remote_images_allowed: event.target.checked })} />
-              允许远程图片
-            </label>
-            <section className="tool-panel" data-settings-section="privacy">
-              <header className="tool-header">
-                <strong>远程图片信任列表</strong>
-                <span>{remoteImageTrusts.filter((trust) => trust.account_id === accountForm.id).length} 条</span>
-              </header>
-              {remoteImageTrusts.filter((trust) => trust.account_id === accountForm.id).length === 0 ? (
-                <p>默认阻止远程图片；在阅读面可按发件人或域名加入信任列表。</p>
-              ) : (
-                remoteImageTrusts
-                  .filter((trust) => trust.account_id === accountForm.id)
-                  .map((trust) => (
-                    <div className="tool-row" key={trust.id}>
-                      <span>{trust.scope === 'sender' ? '发件人' : '域名'}</span>
-                      <em>{trust.value}</em>
-                      <small>{formatDate(trust.created_at)}</small>
-                      <button type="button" onClick={() => deleteRemoteImageTrust(trust)}>移除</button>
-                    </div>
-                  ))
-              )}
-            </section>
-            <label>
-              签名
-              <textarea value={accountForm.signature} onChange={(event) => setAccountForm({ ...accountForm, signature: event.target.value })} />
-            </label>
-            <section className="tool-panel identity-panel" data-settings-section="identities">
-              <header className="tool-header">
-                <strong>发件身份 / 别名</strong>
-                <span>{identities.filter((identity) => identity.account_id === accountForm.id).length} 个</span>
-              </header>
-              {identities
-                .filter((identity) => identity.account_id === accountForm.id)
-                .map((identity) => (
-                  <div className="tool-row" key={identity.id}>
-                    <span>{identity.is_default ? '默认' : '别名'}</span>
-                    <em>{identity.name} &lt;{identity.email}&gt;</em>
-                    <small>{identity.reply_to ? `回复到 ${identity.reply_to}` : '无 Reply-To'}</small>
-                    <button type="button" onClick={() => editIdentity(identity)}>编辑</button>
-                    {!identity.is_default && <button type="button" onClick={() => deleteIdentity(identity)}>删除</button>}
-                  </div>
-                ))}
-              <div className="identity-form">
-                <input
-                  value={identityForm.name}
-                  onChange={(event) => setIdentityForm({ ...identityForm, name: event.target.value })}
-                  placeholder="显示名"
-                />
-                <input
-                  value={identityForm.email}
-                  onChange={(event) => setIdentityForm({ ...identityForm, email: event.target.value })}
-                  placeholder="发件邮箱 / 别名"
-                />
-                <input
-                  value={identityForm.reply_to}
-                  onChange={(event) => setIdentityForm({ ...identityForm, reply_to: event.target.value })}
-                  placeholder="Reply-To，可选"
-                />
-                <textarea
-                  value={identityForm.signature}
-                  onChange={(event) => setIdentityForm({ ...identityForm, signature: event.target.value })}
-                  placeholder="该身份专用签名"
-                />
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={identityForm.is_default}
-                    onChange={(event) => setIdentityForm({ ...identityForm, is_default: event.target.checked })}
-                  />
-                  设为默认发件身份
-                </label>
-                <div>
-                  <button type="button" className="secondary" onClick={() => setIdentityForm(emptyIdentityForm)}>清空</button>
-                  <button type="button" onClick={() => saveIdentity().catch((error) => setStatus(String(error)))}>保存身份</button>
-                </div>
-              </div>
-            </section>
+            <ExperienceSettings
+              accountForm={accountForm}
+              accounts={accounts}
+              notificationPolicy={notificationPolicy}
+              remoteImageTrusts={remoteImageTrusts}
+              identities={identities}
+              identityForm={identityForm}
+              onAccountFormChange={setAccountForm}
+              onNotificationPolicyChange={setNotificationPolicy}
+              onDeleteRemoteImageTrust={deleteRemoteImageTrust}
+              onIdentityFormChange={setIdentityForm}
+              onEditIdentity={editIdentity}
+              onDeleteIdentity={deleteIdentity}
+              onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
+            />
             <div className="settings-action-bar">
               <span>凭据后续接入系统 Keychain，本地数据库只保存非敏感配置。</span>
               <div>
@@ -3690,10 +3508,7 @@ export default function App() {
                 )}
               </section>
             </details>
-              </div>
-            </div>
-          </section>
-        </div>
+        </SettingsFrame>
       )}
       {isShortcutsOpen && (
         <div className="composer-backdrop shortcut-backdrop">

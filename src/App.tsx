@@ -2779,7 +2779,6 @@ export default function App() {
     >
       <Sidebar
         accountScope={accountScope}
-        account={account}
         accounts={accounts}
         folders={folders}
         folderId={folderId}

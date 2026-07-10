@@ -43,23 +43,6 @@ button { cursor: pointer; }
 .brand strong { display: block; font-size: 16px; }
 .brand span { color: #b6c0ca; font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
-.account-switcher {
-  display: grid;
-  gap: 6px;
-  color: #b6c0ca;
-  font-size: 12px;
-}
-.account-switcher select {
-  width: 100%;
-  min-height: 34px;
-  border: 1px solid rgba(255,255,255,0.16);
-  border-radius: 7px;
-  background: rgba(255,255,255,0.10);
-  color: #fff;
-  padding: 0 8px;
-}
-.account-switcher option { color: #20242a; }
-
 .compose-button, .settings-button {
   height: 40px;
   border: none;

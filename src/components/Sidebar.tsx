@@ -21,12 +21,12 @@ import type {
   Label,
   SavedSearch,
 } from '../app/types';
+import AccountSwitcher from './AccountSwitcher';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import SidebarFolderNavigation from './SidebarFolderNavigation';
 
 export type SidebarProps = {
   accountScope: AccountScope;
-  account: Account | null;
   accounts: Account[];
   folders: Folder[];
   folderId: number | null;
@@ -78,7 +78,6 @@ export type SidebarProps = {
 
 export default function Sidebar({
   accountScope,
-  account,
   accounts,
   folders,
   folderId,
@@ -189,18 +188,14 @@ export default function Sidebar({
         <div className="brand-mark">B</div>
         <div>
           <strong>Better Email</strong>
-          <span>{accountScope === 'all' ? `统一邮箱 · ${accounts.length || 1} 个账号` : account?.email ?? '低内存邮箱客户端'}</span>
+          <span>跨平台 · 本地优先</span>
         </div>
       </div>
-      <label className="account-switcher">
-        <span>邮箱范围</span>
-        <select value={accountScope} onChange={(event) => onAccountScopeChange(event.target.value)}>
-          <option value="all">统一邮箱</option>
-          {accounts.map((item) => (
-            <option key={item.id} value={item.id}>{item.email}</option>
-          ))}
-        </select>
-      </label>
+      <AccountSwitcher
+        accountScope={accountScope}
+        accounts={accounts}
+        onChange={onAccountScopeChange}
+      />
       <button className="compose-button" onClick={onCompose}>
         <Edit3 size={17} /> 写邮件
       </button>

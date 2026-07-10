@@ -1,0 +1,119 @@
+.account-switcher {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.account-switcher-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+.account-switcher .account-switcher-heading > span {
+  padding: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 680;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.account-switcher-heading em {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 620;
+}
+
+.account-switcher-trigger {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  color: var(--ui-text);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 1px 2px rgba(24, 33, 45, 0.04);
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.account-switcher-trigger:hover,
+.account-switcher-trigger[aria-expanded='true'] {
+  border-color: rgba(8, 127, 245, 0.3);
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(24, 33, 45, 0.04),
+    0 0 0 3px rgba(8, 127, 245, 0.075);
+}
+
+.account-switcher-trigger:focus-visible {
+  outline: 2px solid rgba(8, 127, 245, 0.34);
+  outline-offset: 2px;
+}
+
+.account-switcher .account-switcher-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(8, 127, 245, 0.12);
+  border-radius: 8px;
+  color: var(--ui-accent);
+  background: rgba(8, 127, 245, 0.08);
+}
+
+.account-switcher-copy {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+}
+
+.account-switcher-copy strong,
+.account-switcher .account-switcher-copy > span {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-switcher-copy strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 720;
+}
+
+.account-switcher .account-switcher-copy > span {
+  margin-top: 1px;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 520;
+}
+
+.account-switcher-chevron {
+  color: var(--ui-text-tertiary);
+  transition: transform 140ms ease;
+}
+
+.account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
+  transform: rotate(180deg);
+}

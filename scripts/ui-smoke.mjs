@@ -355,6 +355,7 @@ async function main() {
       `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === ${initialLayout.sidebar} && JSON.parse(localStorage.getItem('better-email.appLayout.v2')).list === ${initialLayout.list}`,
     );
     await waitForExpression(cdp, "document.querySelector('.brand-mark')?.textContent.trim() === 'B'");
+    await waitForExpression(cdp, "document.querySelector('.account-switcher-trigger') && !document.querySelector('.account-switcher select')");
     await openDetails(cdp, '.more-mailboxes');
     await waitForExpression(cdp, "(() => { const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect(); const list = document.querySelector('.more-mailboxes[open] > .folded-folder-list')?.getBoundingClientRect(); return sidebar && list && list.left >= sidebar.left && list.right <= sidebar.right + 1; })()");
     await evalInPage(
@@ -660,8 +661,10 @@ async function main() {
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
-    await selectValue(cdp, '.account-switcher select', '2');
-    await waitForExpression(cdp, "document.querySelector('.brand')?.innerText.includes('design@better-email.local')");
+    await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
+    await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('design@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('iCloud')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
@@ -731,8 +734,10 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
-    await selectValue(cdp, '.account-switcher select', 'all');
-    await waitForExpression(cdp, "document.querySelector('.brand')?.innerText.includes('统一邮箱')");
+    await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
+    await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]')");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"all\"]')?.innerText.includes('统一邮箱')");
 
     await clickButton(cdp, '写邮件');
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
@@ -810,6 +815,7 @@ async function main() {
         'Better Email brand mark rendered',
         'legacy SwiftMail settings migrate to better-email keys',
         'resizable panes persist and reset',
+        'modern account switcher menu works',
         'more mailbox list stays inside sidebar',
         'favorite mailbox pin persists and can be removed',
         'folder context menu marks all messages read',

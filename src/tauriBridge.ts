@@ -158,6 +158,30 @@ let folders: MockFolder[] = [
   ),
 ];
 
+function discoveredImapMailboxesForAccount(accountId: number, accountEmail: string) {
+  const baseId = accountId * 1000;
+  return [
+    { id: baseId + 1, remote_name: 'INBOX', local_role: 'inbox', attributes: 'Inbox' },
+    { id: baseId + 2, remote_name: 'Sent', local_role: 'sent', attributes: 'Sent' },
+    { id: baseId + 3, remote_name: 'Archive', local_role: 'archive', attributes: 'Archive' },
+    { id: baseId + 4, remote_name: 'Projects/Alpha', local_role: 'custom', attributes: '' },
+  ].map((mailbox) => ({
+    ...mailbox,
+    account_id: accountId,
+    account_email: accountEmail,
+    delimiter: '/',
+    local_folder_id: null as number | null,
+    local_folder_name: '',
+    uid_validity: '',
+    highest_uid: 0,
+    last_seen_at: now,
+    last_sync_at: '',
+  }));
+}
+
+let mockImapMailboxes = mockAccounts.flatMap((mockAccount) =>
+  discoveredImapMailboxesForAccount(mockAccount.id, mockAccount.email));
+
 let messages = [
   {
     id: 1,
@@ -770,6 +794,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       );
       mockAccounts = mockAccounts.filter((item) => item.id !== accountId);
       folders = folders.filter((folder) => folder.account_id !== accountId);
+      mockImapMailboxes = mockImapMailboxes.filter((mailbox) => mailbox.account_id !== accountId);
       messages = messages.filter((message) => message.account_id !== accountId);
       attachments = attachments.filter((attachment) => !removedMessageIds.has(attachment.message_id));
       identities = identities.filter((identity) => identity.account_id !== accountId);
@@ -842,6 +867,10 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           : message,
       );
       folders = folders.filter((entry) => entry.id !== folderId);
+      mockImapMailboxes = mockImapMailboxes.map((mailbox) =>
+        mailbox.local_folder_id === folderId
+          ? { ...mailbox, local_folder_id: null, local_folder_name: '' }
+          : mailbox);
       return undefined as T;
     }
     case 'list_labels':
@@ -929,7 +958,28 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'list_outbox':
       return outbox as T;
     case 'list_imap_mailboxes':
-      return [] as T;
+      return mockImapMailboxes as T;
+    case 'map_imap_mailbox': {
+      const mailboxId = Number(args?.mailboxId);
+      const mailbox = mockImapMailboxes.find((item) => item.id === mailboxId);
+      if (!mailbox) throw new Error('remote mailbox not found');
+      if (mailbox.local_role !== 'custom') throw new Error('系统目录由服务商角色自动映射，不需要手动绑定。');
+      const folderId = Number(args?.folderId ?? 0);
+      const folder = folderId > 0
+        ? folders.find((item) =>
+          item.id === folderId
+          && item.account_id === mailbox.account_id
+          && String(item.role).startsWith('custom:'))
+        : undefined;
+      if (folderId > 0 && !folder) throw new Error('请选择同一账号的本地自定义文件夹。');
+      const updated = {
+        ...mailbox,
+        local_folder_id: folder?.id ?? null,
+        local_folder_name: folder?.name ?? '',
+      };
+      mockImapMailboxes = mockImapMailboxes.map((item) => (item.id === mailboxId ? updated : item));
+      return updated as T;
+    }
     case 'list_oauth_sessions':
       return oauthSessions as T;
     case 'start_oauth2_pkce': {
@@ -1333,17 +1383,33 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     }
     case 'discover_imap_folders': {
       const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
+      const previous = new Map(
+        mockImapMailboxes
+          .filter((mailbox) => mailbox.account_id === targetAccount.id)
+          .map((mailbox) => [mailbox.remote_name, mailbox]),
+      );
+      const discovered = discoveredImapMailboxesForAccount(targetAccount.id, targetAccount.email)
+        .map((mailbox) => ({
+          ...mailbox,
+          local_folder_id: previous.get(mailbox.remote_name)?.local_folder_id ?? null,
+          local_folder_name: previous.get(mailbox.remote_name)?.local_folder_name ?? '',
+        }));
+      mockImapMailboxes = [
+        ...mockImapMailboxes.filter((mailbox) => mailbox.account_id !== targetAccount.id),
+        ...discovered,
+      ];
       return {
         account_email: targetAccount.email,
         checked_at: now,
-        folder_count: 3,
+        folder_count: 4,
         folders: [
           { name: 'INBOX', delimiter: '/', attributes: ['Inbox'] },
           { name: 'Sent', delimiter: '/', attributes: ['Sent'] },
           { name: 'Archive', delimiter: '/', attributes: ['Archive'] },
+          { name: 'Projects/Alpha', delimiter: '/', attributes: [] },
         ],
         status: 'ok',
-        message: `UI smoke mock 已发现 ${targetAccount.email} 的 3 个 IMAP 文件夹。`,
+        message: `UI smoke mock 已发现 ${targetAccount.email} 的 4 个 IMAP 文件夹。`,
       } as T;
     }
     case 'export_diagnostics':
@@ -1380,8 +1446,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         scanned_folders: scannedFolderCount,
         imported_messages: 1,
         message: args?.accountId
-          ? `UI smoke mock 同步完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个核心文件夹，新增 1 封。`
-          : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，扫描 ${scannedFolderCount} 个核心文件夹，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
+          ? `UI smoke mock 同步完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个已映射文件夹，新增 1 封。`
+          : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，扫描 ${scannedFolderCount} 个已映射文件夹，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
       };
       syncRuns = [run, ...syncRuns].slice(0, 10);
       return run as T;

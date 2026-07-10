@@ -362,6 +362,8 @@ pub struct ImapMailboxState {
     pub delimiter: String,
     pub attributes: String,
     pub local_role: String,
+    pub local_folder_id: Option<i64>,
+    pub local_folder_name: String,
     pub uid_validity: String,
     pub highest_uid: i64,
     pub last_seen_at: String,

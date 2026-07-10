@@ -101,7 +101,7 @@ SQLite local store + OS keychain
 - `src-tauri/src/smtp.rs`：基于 `lettre` 的真实 SMTP 发件箱发送路径，支持密码/授权码、XOAUTH2 认证、纯文本/HTML `multipart/alternative` 和带附件的 `multipart/mixed`。
 - `src-tauri/src/imap_probe.rs`：基于 `imap` 的真实登录和远端文件夹发现，支持密码/授权码和 XOAUTH2 认证。
 - `src-tauri/capabilities/default.json`：桌面能力声明，开放 shell/dialog/notification 与应用角标的最小默认权限。
-- `imap_mailboxes`：远端文件夹映射、系统角色推断、UIDVALIDITY/highest UID 游标。
+- `imap_mailboxes`：远端文件夹映射、系统角色推断、可空的本地自定义文件夹引用、UIDVALIDITY/highest UID 游标。
 - `messages.remote_mailbox/remote_uid/message_id_header`：远端邮件头导入去重和后续正文拉取锚点。
 - `oauth_sessions`：OAuth2 PKCE 授权会话，保存 state、code challenge、verifier、scopes、授权码和交换状态，用于本地回调/token 交换恢复；access/refresh token 和 client 元数据只写入系统 Keychain。
 - 品牌升级迁移：新安装使用 `better-email` 包名、`Better Email` 产品名、`app.betteremail.client` 标识、`better-email.sqlite3` 数据库和 `Better Email` Keychain 服务；升级时自动读取并迁移旧 `swiftmail.*` localStorage、`swiftmail.sqlite3`/旧应用数据目录和 `SwiftMail` Keychain 凭据。
@@ -124,7 +124,7 @@ SQLite local store + OS keychain
 - 附件下载先按元数据做大小保护，当前默认 25 MB 上限；真实 IMAP 下载优先用 BODYSTRUCTURE 定位 MIME part，再通过 `BODY.PEEK[part]<offset.count>` 以 256 KB 块写入临时文件并原子替换到本地附件目录，找不到 part 时仅对上限内小附件回退整封解析。
 - SQLite 查询只返回 UI 必需字段，正文搜索走 FTS。
 - 同步任务串行限流，避免一次性解析大量邮件。
-- 单账号邮件头同步顺序处理 `inbox/sent/drafts/archive/trash/spam` 六类已映射核心目录，每个目录单次最多读取 25 条邮件头并立即落库后释放批次；目录级失败只进入账号汇总警告，不阻断其他核心目录。尚未建立本地映射的自定义远端目录会跳过，禁止回退导入收件箱。
+- 单账号邮件头同步顺序处理 `inbox/sent/drafts/archive/trash/spam` 六类核心目录和已绑定的自定义远端目录，每个目录单次最多读取 25 条邮件头并立即落库后释放批次；目录级失败只进入账号汇总警告，不阻断其他目录。自定义远端目录可直接绑定同账号的本地自定义文件夹，未绑定或解除绑定后会跳过，禁止回退导入收件箱。
 - 手动同步、定时同步和发件箱发送共用 SQLite 持久化任务队列，避免重复触发协议任务并保留最近任务状态；发件箱定时项和失败项共用 `next_attempt_at`，真实 SMTP 发送只处理已到调度或重试窗口的 queued/scheduled/retry/failed 项。
 - 撤销发送、用户指定稍后发送和失败重试共用 `outbox_queue.next_attempt_at`；前端只为最早到期项保留一个定时器，同类 queued/running 后台任务在 SQLite 层去重，避免重复 SMTP 执行和额外常驻轮询。
 - WebView 前端不使用大型 UI 框架，只用 React + CSS + 少量图标。
@@ -158,7 +158,7 @@ SQLite local store + OS keychain
 - 服务商兼容性矩阵已具备 UI 展示、预设复用、脱敏诊断导出和本地真实账号验证记录；网易 163 已完成 IMAP/SMTP TLS 与授权码认证验证，继续补其他服务商和真实发送/附件结果。
 - MIME 解析增强、远程图片信任审计和真实 HTML 邮件样本兼容。
 - 账号认证方式向导、真实账号 OAuth2 兼容性验证和连接诊断。
-- 多账号统一邮箱已具备账号创建、账号范围切换、虚拟系统文件夹、待同步账号优先级、统一邮箱批次限流、每账号顺序同步六类已映射核心目录、目录级失败隔离、自定义目录安全跳过、当前账号服务器测试/登录验证/IMAP 文件夹发现/同步演练和脱敏账号级诊断；继续增强真实服务商验证。
+- 多账号统一邮箱已具备账号创建、账号范围切换、虚拟系统文件夹、待同步账号优先级、统一邮箱批次限流、每账号顺序同步六类核心目录和已绑定自定义目录、目录级失败隔离、自定义目录选择/一键创建同名文件夹/解除映射、当前账号服务器测试/登录验证/IMAP 文件夹发现/同步演练和脱敏账号级诊断；继续增强真实服务商验证。
 - 系统通知已具备新邮件摘要、免打扰时段、VIP 发件人名单、仅 VIP 提醒策略、账号静音、重点账号提醒和应用未读角标；继续增强 Windows overlay icon 兼容。
 
 ### Phase 3：接近完整邮箱 App

@@ -286,6 +286,7 @@ impl MailStore {
                     delimiter TEXT NOT NULL DEFAULT '',
                     attributes TEXT NOT NULL DEFAULT '',
                     local_role TEXT NOT NULL DEFAULT 'custom',
+                    local_folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     uid_validity TEXT NOT NULL DEFAULT '',
                     highest_uid INTEGER NOT NULL DEFAULT 0,
                     last_seen_at TEXT NOT NULL,
@@ -420,6 +421,12 @@ impl MailStore {
             )?;
             add_column_if_missing(conn, "contacts", "aliases", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "contacts", "vip", "INTEGER NOT NULL DEFAULT 0")?;
+            add_column_if_missing(
+                conn,
+                "imap_mailboxes",
+                "local_folder_id",
+                "INTEGER REFERENCES folders(id) ON DELETE SET NULL",
+            )?;
             ensure_default_identities_for_conn(conn)?;
             Ok(())
         })
@@ -1900,6 +1907,10 @@ impl MailStore {
                         delimiter = excluded.delimiter,
                         attributes = excluded.attributes,
                         local_role = excluded.local_role,
+                        local_folder_id = CASE
+                            WHEN excluded.local_role = 'custom' THEN imap_mailboxes.local_folder_id
+                            ELSE NULL
+                        END,
                         last_seen_at = excluded.last_seen_at
                     ",
                     params![
@@ -1925,6 +1936,48 @@ impl MailStore {
         account_id: Option<i64>,
     ) -> MailResult<Vec<ImapMailboxState>> {
         self.with_conn(|conn| list_imap_mailboxes_for_conn(conn, account_id))
+    }
+
+    pub fn map_imap_mailbox(
+        &self,
+        mailbox_id: i64,
+        folder_id: Option<i64>,
+    ) -> MailResult<ImapMailboxState> {
+        self.with_conn(|conn| {
+            let (account_id, local_role): (i64, String) = conn.query_row(
+                "SELECT account_id, local_role FROM imap_mailboxes WHERE id = ?1",
+                params![mailbox_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
+            if local_role != "custom" {
+                return Err(MailError::Imap(
+                    "系统目录由服务商角色自动映射，不需要手动绑定。".to_string(),
+                ));
+            }
+
+            if let Some(folder_id) = folder_id {
+                let folder = folder_for_conn(conn, folder_id)?;
+                if folder.account_id != Some(account_id) {
+                    return Err(MailError::Imap(
+                        "远端目录只能绑定到同一邮箱账号的本地文件夹。".to_string(),
+                    ));
+                }
+                if !is_custom_folder_role(&folder.role) {
+                    return Err(MailError::Imap(
+                        "远端自定义目录只能绑定到本地自定义文件夹。".to_string(),
+                    ));
+                }
+            }
+
+            conn.execute(
+                "UPDATE imap_mailboxes SET local_folder_id = ?2 WHERE id = ?1",
+                params![mailbox_id, folder_id],
+            )?;
+            list_imap_mailboxes_for_conn(conn, Some(account_id))?
+                .into_iter()
+                .find(|mailbox| mailbox.id == mailbox_id)
+                .ok_or_else(|| MailError::Imap("未找到远端目录映射。".to_string()))
+        })
     }
 
     pub fn accounts_for_header_sync(&self, account_id: Option<i64>) -> MailResult<Vec<Account>> {
@@ -4446,9 +4499,11 @@ fn list_imap_mailboxes_for_conn(
     let mut stmt = conn.prepare(&format!(
         "
         SELECT m.id, m.account_id, a.email, m.remote_name, m.delimiter, m.attributes,
-               m.local_role, m.uid_validity, m.highest_uid, m.last_seen_at, m.last_sync_at
+               m.local_role, m.local_folder_id, COALESCE(f.name, ''),
+               m.uid_validity, m.highest_uid, m.last_seen_at, m.last_sync_at
         FROM imap_mailboxes m
         JOIN accounts a ON a.id = m.account_id
+        LEFT JOIN folders f ON f.id = m.local_folder_id
         {account_filter}
         ORDER BY
             CASE WHEN m.last_sync_at = '' THEN 0 ELSE 1 END,
@@ -4481,10 +4536,12 @@ fn list_imap_mailboxes_for_conn(
                 delimiter: row.get(4)?,
                 attributes: row.get(5)?,
                 local_role: row.get(6)?,
-                uid_validity: row.get(7)?,
-                highest_uid: row.get(8)?,
-                last_seen_at: row.get(9)?,
-                last_sync_at: row.get(10)?,
+                local_folder_id: row.get(7)?,
+                local_folder_name: row.get(8)?,
+                uid_validity: row.get(9)?,
+                highest_uid: row.get(10)?,
+                last_seen_at: row.get(11)?,
+                last_sync_at: row.get(12)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -4496,17 +4553,27 @@ fn import_imap_headers_for_conn(
     mailbox_id: i64,
     batch: &ImapHeaderBatch,
 ) -> MailResult<i64> {
-    let (account_id, local_role): (i64, String) = conn.query_row(
-        "SELECT account_id, local_role FROM imap_mailboxes WHERE id = ?1",
+    let (account_id, local_role, local_folder_id): (i64, String, Option<i64>) = conn.query_row(
+        "SELECT account_id, local_role, local_folder_id FROM imap_mailboxes WHERE id = ?1",
         params![mailbox_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
-    if local_role == "custom" {
-        return Err(MailError::Imap(
-            "远端自定义目录尚未建立本地映射，已跳过导入以避免误归入收件箱。".to_string(),
-        ));
-    }
-    let folder_id = folder_id_for_account_role(conn, account_id, &local_role)?;
+    let folder_id = if local_role == "custom" {
+        let folder_id = local_folder_id.ok_or_else(|| {
+            MailError::Imap(
+                "远端自定义目录尚未建立本地映射，已跳过导入以避免误归入收件箱。".to_string(),
+            )
+        })?;
+        let folder = folder_for_conn(conn, folder_id)?;
+        if folder.account_id != Some(account_id) || !is_custom_folder_role(&folder.role) {
+            return Err(MailError::Imap(
+                "远端自定义目录的本地映射无效，请重新选择文件夹。".to_string(),
+            ));
+        }
+        folder_id
+    } else {
+        folder_id_for_account_role(conn, account_id, &local_role)?
+    };
     let mut imported_messages = 0;
 
     for header in &batch.headers {
@@ -6259,6 +6326,102 @@ mod tests {
             )
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn mapped_custom_imap_mailbox_imports_into_selected_folder() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        let local_folder = store
+            .create_custom_folder(Some(account.id), "项目 Alpha".to_string())
+            .unwrap();
+        let mailboxes = store
+            .save_imap_mailboxes(&[
+                ImapFolderProbe {
+                    name: "Projects/Alpha".to_string(),
+                    delimiter: "/".to_string(),
+                    attributes: Vec::new(),
+                },
+                ImapFolderProbe {
+                    name: "INBOX".to_string(),
+                    delimiter: "/".to_string(),
+                    attributes: vec!["Inbox".to_string()],
+                },
+            ])
+            .unwrap();
+        let remote_custom = mailboxes
+            .iter()
+            .find(|item| item.remote_name == "Projects/Alpha")
+            .unwrap();
+        let remote_inbox = mailboxes
+            .iter()
+            .find(|item| item.remote_name == "INBOX")
+            .unwrap();
+
+        let mapped = store
+            .map_imap_mailbox(remote_custom.id, Some(local_folder.id))
+            .unwrap();
+        assert_eq!(mapped.local_folder_id, Some(local_folder.id));
+        assert_eq!(mapped.local_folder_name, local_folder.name);
+        assert!(store
+            .map_imap_mailbox(remote_inbox.id, Some(local_folder.id))
+            .unwrap_err()
+            .to_string()
+            .contains("自动映射"));
+
+        let batch = ImapHeaderBatch {
+            remote_name: "Projects/Alpha".to_string(),
+            uid_validity: "custom-map-1".to_string(),
+            highest_uid: 71,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 71,
+                message_id: "<custom-mapped@example.com>".to_string(),
+                subject: "Mapped custom folder message".to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: account.email.clone(),
+                snippet: "mapped custom header".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+            }],
+        };
+        assert_eq!(
+            store
+                .import_imap_headers_batch(remote_custom.id, &batch)
+                .unwrap(),
+            1
+        );
+        let imported = store
+            .list_messages_for_scope(
+                Some(account.id),
+                local_folder.id,
+                Some("Mapped custom folder message".to_string()),
+                None,
+                10,
+            )
+            .unwrap();
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].folder_id, local_folder.id);
+
+        let unmapped = store.map_imap_mailbox(remote_custom.id, None).unwrap();
+        assert_eq!(unmapped.local_folder_id, None);
+        assert!(store
+            .import_imap_headers_batch(
+                remote_custom.id,
+                &ImapHeaderBatch {
+                    highest_uid: 72,
+                    headers: vec![crate::models::RemoteMessageHeader {
+                        remote_uid: 72,
+                        message_id: "<custom-unmapped@example.com>".to_string(),
+                        subject: "Should not import after unmapping".to_string(),
+                        ..batch.headers[0].clone()
+                    }],
+                    ..batch
+                },
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("尚未建立本地映射"));
     }
 
     #[test]

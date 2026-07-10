@@ -76,6 +76,7 @@ pub fn run() {
             commands::verify_account_credentials,
             commands::discover_imap_folders,
             commands::list_imap_mailboxes,
+            commands::map_imap_mailbox,
             commands::run_sync_dry_run,
             commands::get_sync_schedule_plan,
             commands::sync_imap_headers,

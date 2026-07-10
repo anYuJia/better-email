@@ -258,6 +258,8 @@ export type ImapMailboxState = {
   delimiter: string;
   attributes: string;
   local_role: string;
+  local_folder_id: number | null;
+  local_folder_name: string;
   uid_validity: string;
   highest_uid: number;
   last_seen_at: string;

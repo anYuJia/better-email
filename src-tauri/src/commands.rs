@@ -993,6 +993,15 @@ pub fn list_imap_mailboxes(store: State<'_, MailStore>) -> MailResult<Vec<ImapMa
 }
 
 #[tauri::command]
+pub fn map_imap_mailbox(
+    store: State<'_, MailStore>,
+    mailbox_id: i64,
+    folder_id: Option<i64>,
+) -> MailResult<ImapMailboxState> {
+    store.map_imap_mailbox(mailbox_id, folder_id)
+}
+
+#[tauri::command]
 pub fn run_sync_dry_run(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
@@ -1114,14 +1123,14 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
         let report = imap_probe::discover_folders(account, &secret)?;
         mailboxes = store.save_imap_mailboxes_for_account(Some(account.id), &report.folders)?;
     }
-    let (mailboxes, skipped_custom_folders) = mapped_core_mailboxes(mailboxes);
+    let (mailboxes, skipped_custom_folders) = syncable_mailboxes(mailboxes);
     if mailboxes.is_empty() {
         return Err(crate::db::MailError::Imap(
             "IMAP 未发现可同步的核心文件夹。".to_string(),
         ));
     }
 
-    let total_core_folders = mailboxes.len();
+    let total_mapped_folders = mailboxes.len();
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
     let mut failures = Vec::new();
@@ -1154,9 +1163,9 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
     };
     if scanned_folders == 0 {
         let message = format!(
-            "{} 的 {} 个核心文件夹同步均失败。{}{}",
+            "{} 的 {} 个已映射文件夹同步均失败。{}{}",
             account.email,
-            total_core_folders,
+            total_mapped_folders,
             failures.join("；"),
             custom_note
         );
@@ -1175,7 +1184,7 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
         (
             "imap_headers_account",
             format!(
-                "{} 同步完成：扫描 {} 个核心文件夹，新增 {} 封。{}",
+                "{} 同步完成：扫描 {} 个已映射文件夹，新增 {} 封。{}",
                 account.email, scanned_folders, imported_messages, custom_note
             ),
         )
@@ -1183,10 +1192,10 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
         (
             "imap_headers_account_partial",
             format!(
-                "{} 同步部分完成：扫描 {}/{} 个核心文件夹，新增 {} 封；{} 个目录失败：{}。{}",
+                "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增 {} 封；{} 个目录失败：{}。{}",
                 account.email,
                 scanned_folders,
-                total_core_folders,
+                total_mapped_folders,
                 imported_messages,
                 failures.len(),
                 failures.join("；"),
@@ -1204,11 +1213,13 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
     )
 }
 
-fn mapped_core_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState>, usize) {
+fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState>, usize) {
     let mut syncable = Vec::new();
     let mut skipped_custom = 0;
     for mailbox in mailboxes {
-        if SYNCABLE_IMAP_ROLES.contains(&mailbox.local_role.as_str()) {
+        if SYNCABLE_IMAP_ROLES.contains(&mailbox.local_role.as_str())
+            || (mailbox.local_role == "custom" && mailbox.local_folder_id.is_some())
+        {
             syncable.push(mailbox);
         } else {
             skipped_custom += 1;
@@ -1587,8 +1598,8 @@ fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64
 #[cfg(test)]
 mod tests {
     use super::{
-        credential_error_report, credential_verification_report, mapped_core_mailboxes, mask_email,
-        mask_recipient_list, render_eml_message, sanitize_filename,
+        credential_error_report, credential_verification_report, mask_email, mask_recipient_list,
+        render_eml_message, sanitize_filename, syncable_mailboxes,
         validate_attachment_download_size, MAX_ATTACHMENT_DOWNLOAD_BYTES,
     };
     use crate::models::{Account, Attachment, ImapMailboxState, Message};
@@ -1618,6 +1629,8 @@ mod tests {
             delimiter: "/".to_string(),
             attributes: String::new(),
             local_role: local_role.to_string(),
+            local_folder_id: None,
+            local_folder_name: String::new(),
             uid_validity: String::new(),
             highest_uid: 0,
             last_seen_at: String::new(),
@@ -1720,7 +1733,7 @@ mod tests {
     }
 
     #[test]
-    fn mapped_core_mailboxes_only_keeps_supported_roles() {
+    fn syncable_mailboxes_keep_core_and_mapped_custom_roles() {
         let roles = [
             ("INBOX", "inbox"),
             ("Sent", "sent"),
@@ -1730,19 +1743,26 @@ mod tests {
             ("Junk", "spam"),
             ("Projects/Alpha", "custom"),
         ];
-        let mailboxes = roles
+        let mut mailboxes = roles
             .into_iter()
             .enumerate()
             .map(|(index, (remote_name, local_role))| {
                 sample_mailbox(index as i64 + 1, remote_name, local_role)
             })
-            .collect();
+            .collect::<Vec<_>>();
+        mailboxes.push(ImapMailboxState {
+            local_folder_id: Some(42),
+            local_folder_name: "项目 Alpha".to_string(),
+            ..sample_mailbox(8, "Projects/Mapped", "custom")
+        });
 
-        let (mapped, skipped_custom) = mapped_core_mailboxes(mailboxes);
+        let (mapped, skipped_custom) = syncable_mailboxes(mailboxes);
 
-        assert_eq!(mapped.len(), 6);
+        assert_eq!(mapped.len(), 7);
         assert_eq!(skipped_custom, 1);
-        assert!(mapped.iter().all(|mailbox| mailbox.local_role != "custom"));
+        assert!(mapped
+            .iter()
+            .any(|mailbox| mailbox.local_folder_name == "项目 Alpha"));
     }
 }
 

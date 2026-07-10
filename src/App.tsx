@@ -1701,6 +1701,39 @@ export default function App() {
     setStatus(report.message);
   }
 
+  async function mapImapMailbox(mailbox: ImapMailboxState, targetFolderId: number | null) {
+    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
+      mailboxId: mailbox.id,
+      folderId: targetFolderId,
+    });
+    setImapMailboxes((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
+    setStatus(
+      mapped.local_folder_id
+        ? `已将 ${mapped.remote_name} 映射到 ${mapped.local_folder_name}`
+        : `已取消 ${mapped.remote_name} 的本地映射`,
+    );
+  }
+
+  async function createAndMapImapMailbox(mailbox: ImapMailboxState) {
+    const separator = mailbox.delimiter || '/';
+    const suggestedName = mailbox.remote_name
+      .split(separator)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .pop() || mailbox.remote_name.trim() || '远端文件夹';
+    const folder = await invoke<Folder>('create_custom_folder', {
+      accountId: mailbox.account_id,
+      name: suggestedName,
+    });
+    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
+      mailboxId: mailbox.id,
+      folderId: folder.id,
+    });
+    setImapMailboxes((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
+    await loadMeta(folderId);
+    setStatus(`已创建 ${folder.name} 并映射远端目录 ${mapped.remote_name}`);
+  }
+
   async function runSyncDryRun() {
     const run = await invoke<SyncRun>('run_sync_dry_run', { accountId: accountForm?.id });
     setSyncRuns((current) => [run, ...current].slice(0, 10));
@@ -2926,6 +2959,7 @@ export default function App() {
               imapProbe={imapProbe}
               syncSchedulePlan={syncSchedulePlan}
               imapMailboxes={imapMailboxes}
+              folders={folders}
               syncRuns={syncRuns}
               outbox={outbox}
               onCredentialSecretChange={setCredentialSecret}
@@ -2935,6 +2969,12 @@ export default function App() {
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
+              onMapImapMailbox={(mailbox, targetFolderId) => {
+                mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
+              }}
+              onCreateAndMapImapMailbox={(mailbox) => {
+                createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
+              }}
               onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
               onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
             />

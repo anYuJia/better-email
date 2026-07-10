@@ -262,7 +262,7 @@
 }
 
 .settings-sync-panel .mailbox-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   margin-bottom: 9px;
 }
@@ -273,6 +273,74 @@
   border-color: #e0e5ea;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.settings-sync-panel .mailbox-map-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.settings-sync-panel .mailbox-map-card.custom {
+  grid-column: span 3;
+}
+
+.mailbox-map-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 8px;
+}
+
+.mailbox-map-title > span {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid #cfe2d5;
+  border-radius: 999px;
+  color: #32724a;
+  background: #f2faf4;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.mailbox-map-title > span.pending {
+  border-color: #e5d6b8;
+  color: #86621f;
+  background: #fff9ed;
+}
+
+.mailbox-map-controls {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.mailbox-map-controls select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 28px 0 9px;
+  border: 1px solid #d7dde3;
+  border-radius: 7px;
+  color: #20262d;
+  background-color: #ffffff;
+  font-size: 10.5px;
+}
+
+.mailbox-map-controls .mailbox-create-map {
+  min-height: 30px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+
+.mailbox-map-card > small {
+  overflow: hidden;
+  color: #7b838c;
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-sync-panel .mailbox-grid strong,
@@ -312,6 +380,10 @@
   .settings-sync-panel .mailbox-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .settings-sync-panel .mailbox-map-card.custom {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 720px) {
@@ -331,6 +403,14 @@
   .settings-endpoint-grid,
   .settings-folder-grid,
   .settings-sync-panel .mailbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-sync-panel .mailbox-map-card.custom {
+    grid-column: span 1;
+  }
+
+  .mailbox-map-controls {
     grid-template-columns: 1fr;
   }
 

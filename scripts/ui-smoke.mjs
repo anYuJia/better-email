@@ -711,11 +711,14 @@ async function main() {
     await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('账号登录验证') && document.querySelector('.settings-credential-panel')?.innerText.includes('全部通过') && document.querySelector('.settings-credential-panel')?.innerText.includes('IMAP') && document.querySelector('.settings-credential-panel')?.innerText.includes('SMTP') && document.body.innerText.includes('未发送任何邮件')");
     await clickButton(cdp, '发现文件夹', "document.querySelector('.settings-imap-discovery')");
-    await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('3 个')");
+    await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('4 个')");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未映射')");
+    await clickButton(cdp, '新建同名', "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('已映射') && document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('同步到 Alpha') && document.querySelector('select[aria-label=\"映射远端目录 Projects/Alpha\"]')?.value");
     await clickButton(cdp, '演练', "document.querySelector('.settings-sync-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('design@better-email.local')");
     await clickButton(cdp, '同步邮件头', "document.querySelector('.settings-sync-panel')");
-    await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('扫描 4 个文件夹') && document.querySelector('.settings-sync-panel')?.innerText.includes('4 个核心文件夹')");
+    await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('扫描 4 个文件夹') && document.querySelector('.settings-sync-panel')?.innerText.includes('4 个已映射文件夹')");
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导入 EML');
@@ -918,7 +921,8 @@ async function main() {
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'credential login verification separates IMAP and SMTP authentication',
-        'manual sync scans multiple mapped core folders',
+        'remote custom mailbox creates and maps a local folder',
+        'manual sync scans multiple mapped folders',
         'undo send delay settings persist',
         'undo send returns message to drafts',
         'scheduled send automatically flushes to sent',

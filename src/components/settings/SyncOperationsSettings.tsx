@@ -1,4 +1,4 @@
-import { BadgeCheck, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { BadgeCheck, FolderPlus, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import {
   canCancelOutboxItem,
   outboxStatusLabel,
@@ -9,6 +9,7 @@ import type {
   BackgroundTaskKind,
   CredentialStatus,
   CredentialVerificationReport,
+  Folder,
   ImapMailboxState,
   ImapProbeReport,
   OutboxItem,
@@ -26,6 +27,7 @@ type SyncOperationsSettingsProps = {
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
+  folders: Folder[];
   syncRuns: SyncRun[];
   outbox: OutboxItem[];
   onCredentialSecretChange: (value: string) => void;
@@ -35,6 +37,8 @@ type SyncOperationsSettingsProps = {
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
+  onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
+  onCreateAndMapImapMailbox: (mailbox: ImapMailboxState) => void;
   onEnqueueBackgroundTask: (kind: BackgroundTaskKind, source: 'manual' | 'timer') => void;
   onCancelOutboxItem: (item: OutboxItem) => void;
 };
@@ -47,6 +51,7 @@ export default function SyncOperationsSettings({
   imapProbe,
   syncSchedulePlan,
   imapMailboxes,
+  folders,
   syncRuns,
   outbox,
   onCredentialSecretChange,
@@ -56,9 +61,16 @@ export default function SyncOperationsSettings({
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
+  onMapImapMailbox,
+  onCreateAndMapImapMailbox,
   onEnqueueBackgroundTask,
   onCancelOutboxItem,
 }: SyncOperationsSettingsProps) {
+  const accountMailboxes = imapMailboxes.filter((mailbox) => mailbox.account_id === accountForm.id);
+  const customFolders = folders.filter(
+    (folder) => folder.account_id === accountForm.id && folder.role.startsWith('custom:'),
+  );
+
   return (
     <details className="settings-disclosure" data-settings-section="sync">
       <summary>
@@ -216,12 +228,58 @@ export default function SyncOperationsSettings({
             </div>
           </div>
         )}
-        {imapMailboxes.length > 0 && (
+        {accountMailboxes.length > 0 && (
           <div className="mailbox-grid">
-            {imapMailboxes.slice(0, 8).map((mailbox) => (
-              <div key={mailbox.id}>
-                <strong>{mailbox.remote_name}</strong>
-                <span>{mailbox.local_role} · UID {mailbox.highest_uid || 0}</span>
+            {accountMailboxes.slice(0, 12).map((mailbox) => (
+              <div
+                className={mailbox.local_role === 'custom' ? 'mailbox-map-card custom' : 'mailbox-map-card'}
+                data-imap-mailbox={mailbox.remote_name}
+                key={mailbox.id}
+              >
+                <div className="mailbox-map-title">
+                  <strong>{mailbox.remote_name}</strong>
+                  <span className={mailbox.local_role === 'custom' && !mailbox.local_folder_id ? 'pending' : 'mapped'}>
+                    {mailbox.local_role === 'custom'
+                      ? mailbox.local_folder_id ? '已映射' : '未映射'
+                      : '自动映射'}
+                  </span>
+                </div>
+                {mailbox.local_role === 'custom' ? (
+                  <div className="mailbox-map-controls">
+                    <select
+                      aria-label={`映射远端目录 ${mailbox.remote_name}`}
+                      onChange={(event) => {
+                        const nextFolderId = Number(event.target.value);
+                        onMapImapMailbox(mailbox, nextFolderId > 0 ? nextFolderId : null);
+                      }}
+                      value={mailbox.local_folder_id ?? ''}
+                    >
+                      <option value="">暂不同步</option>
+                      {customFolders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>{folder.name}</option>
+                      ))}
+                    </select>
+                    {!mailbox.local_folder_id && (
+                      <button
+                        className="secondary mailbox-create-map"
+                        onClick={() => onCreateAndMapImapMailbox(mailbox)}
+                        type="button"
+                      >
+                        <FolderPlus size={13} />
+                        新建同名
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <span>{mailbox.local_role} · UID {mailbox.highest_uid || 0}</span>
+                )}
+                {mailbox.local_role === 'custom' && (
+                  <small>
+                    {mailbox.local_folder_name
+                      ? `同步到 ${mailbox.local_folder_name} · UID ${mailbox.highest_uid || 0}`
+                      : '选择本地文件夹后加入增量同步'}
+                  </small>
+                )}
               </div>
             ))}
           </div>

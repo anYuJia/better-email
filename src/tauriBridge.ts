@@ -1142,23 +1142,34 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         message.id === args?.messageId ? { ...message, is_starred: Boolean(args?.isStarred) } : message,
       );
       return undefined as T;
-    case 'move_message_to_role':
-      messages = messages.map((message) =>
-        message.id === args?.messageId
-          ? {
-              ...message,
-              folder_role: String(args?.role ?? message.folder_role),
-              folder_id: folderIdForRole(String(args?.role ?? message.folder_role), message.account_id),
-              snoozed_until: '',
-            }
-          : message,
-      );
+    case 'move_message_to_role': {
+      const messageId = Number(args?.messageId);
+      const targetRole = String(args?.role ?? '');
+      let targetRemoteMailbox = '';
+      messages = messages.map((message) => {
+        if (message.id !== messageId) return message;
+        const targetFolderId = folderIdForRole(targetRole || message.folder_role, message.account_id);
+        targetRemoteMailbox = mockImapMailboxes.find((mailbox) =>
+          mailbox.account_id === message.account_id
+          && (mailbox.local_role === targetRole || mailbox.local_folder_id === targetFolderId))
+          ?.remote_name ?? '';
+        return {
+          ...message,
+          folder_role: targetRole || message.folder_role,
+          folder_id: targetFolderId,
+          remote_mailbox: targetRemoteMailbox || message.remote_mailbox,
+          snoozed_until: '',
+        };
+      });
       return {
         local_applied: true,
-        remote_attempted: false,
-        remote_applied: false,
-        message: '本地已移动；UI smoke mock 跳过远端移动。',
+        remote_attempted: Boolean(targetRemoteMailbox),
+        remote_applied: Boolean(targetRemoteMailbox),
+        message: targetRemoteMailbox
+          ? `本地已移动；远端邮件已移动到 ${targetRemoteMailbox}。`
+          : '本地已移动；UI smoke mock 未找到远端目标目录。',
       } as T;
+    }
     case 'restore_message_to_inbox': {
       const messageId = Number(args?.messageId);
       let restored: MockMessage | null = null;

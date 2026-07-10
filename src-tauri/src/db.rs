@@ -1712,15 +1712,21 @@ impl MailStore {
         self.with_conn(|conn| {
             conn.query_row(
                 "
-                SELECT remote_name
-                FROM imap_mailboxes
-                WHERE account_id = ?1 AND local_role = ?2
+                SELECT m.remote_name
+                FROM imap_mailboxes m
+                LEFT JOIN folders f ON f.id = m.local_folder_id
+                WHERE m.account_id = ?1
+                  AND (m.local_role = ?2 OR f.role = ?2)
                 ORDER BY
                     CASE
-                        WHEN remote_name = 'INBOX' THEN 1
-                        ELSE 2
+                        WHEN m.local_role = ?2 THEN 0
+                        ELSE 1
                     END,
-                    remote_name
+                    CASE
+                        WHEN m.remote_name = 'INBOX' THEN 0
+                        ELSE 1
+                    END,
+                    m.remote_name
                 LIMIT 1
                 ",
                 params![account_id, role],
@@ -5363,7 +5369,11 @@ mod tests {
     #[test]
     fn remote_mailbox_lookup_uses_local_role_mapping() {
         let store = test_store();
-        store
+        let account = store.get_account().unwrap();
+        let custom_folder = store
+            .create_custom_folder(Some(account.id), "项目 Alpha".to_string())
+            .unwrap();
+        let mailboxes = store
             .save_imap_mailboxes(&[
                 ImapFolderProbe {
                     name: "Archive".to_string(),
@@ -5375,7 +5385,19 @@ mod tests {
                     delimiter: "/".to_string(),
                     attributes: vec!["Trash".to_string()],
                 },
+                ImapFolderProbe {
+                    name: "Projects/Alpha".to_string(),
+                    delimiter: "/".to_string(),
+                    attributes: Vec::new(),
+                },
             ])
+            .unwrap();
+        let custom_mailbox = mailboxes
+            .iter()
+            .find(|mailbox| mailbox.remote_name == "Projects/Alpha")
+            .unwrap();
+        store
+            .map_imap_mailbox(custom_mailbox.id, Some(custom_folder.id))
             .unwrap();
         assert_eq!(
             store.remote_mailbox_for_role("archive").unwrap(),
@@ -5386,6 +5408,15 @@ mod tests {
             Some("Deleted Items".to_string())
         );
         assert_eq!(store.remote_mailbox_for_role("spam").unwrap(), None);
+        assert_eq!(
+            store.remote_mailbox_for_role(&custom_folder.role).unwrap(),
+            Some("Projects/Alpha".to_string())
+        );
+        store.map_imap_mailbox(custom_mailbox.id, None).unwrap();
+        assert_eq!(
+            store.remote_mailbox_for_role(&custom_folder.role).unwrap(),
+            None
+        );
     }
 
     #[test]

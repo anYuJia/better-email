@@ -773,6 +773,16 @@ async function main() {
 
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
+    await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Imported EML Sample')");
+    await evalInPage(
+      cdp,
+      "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Imported EML Sample')).click()",
+    );
+    await openDetails(cdp, '.reader-more-menu');
+    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.trim() === 'Alpha')");
+    await clickButton(cdp, 'Alpha', "document.querySelector('.reader-more-menu')");
+    await waitForExpression(cdp, "document.querySelector('.undo-snackbar')?.innerText.includes('远端邮件已移动到 Projects/Alpha')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.body.innerText.includes('添加邮箱账号')");
     await openDetails(cdp, '.add-account-disclosure');
@@ -923,6 +933,7 @@ async function main() {
         'credential login verification separates IMAP and SMTP authentication',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',
+        'mapped custom mailbox resolves as a remote move target',
         'undo send delay settings persist',
         'undo send returns message to drafts',
         'scheduled send automatically flushes to sent',

@@ -1,12 +1,12 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
     BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, ContactMergeSuggestion,
-    DraftInput, Folder, ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, Label, LocalBackup,
-    LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
-    MailStats, Message, OAuthCallbackReport, OAuthSession, OAuthStartReport,
-    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, SyncRun, SyncSchedulePlan,
-    ThreadSummary,
+    DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch, ImapMailboxState,
+    ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary, MailIdentity,
+    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackReport,
+    OAuthSession, OAuthStartReport, OAuthTokenExchangeReport, OutboundAttachmentInput,
+    OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody,
+    SyncRun, SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -15,7 +15,7 @@ use rusqlite::{
     types::{Value, ValueRef},
     Connection, OptionalExtension,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -2155,6 +2155,14 @@ impl MailStore {
         batch: &ImapHeaderBatch,
     ) -> MailResult<i64> {
         self.with_conn(|conn| import_imap_headers_for_conn(conn, mailbox_id, batch))
+    }
+
+    pub fn reconcile_imap_flag_snapshot(
+        &self,
+        mailbox_id: i64,
+        snapshot: &ImapFlagSnapshot,
+    ) -> MailResult<ImapReconcileResult> {
+        self.with_conn(|conn| reconcile_imap_flag_snapshot_for_conn(conn, mailbox_id, snapshot))
     }
 
     pub fn list_sync_runs(&self) -> MailResult<Vec<SyncRun>> {
@@ -4743,7 +4751,9 @@ fn import_imap_headers_for_conn(
                 UPDATE messages
                 SET folder_id = ?1,
                     remote_mailbox = ?2,
-                    remote_uid = ?3
+                    remote_uid = ?3,
+                    is_read = ?6,
+                    is_starred = ?7
                 WHERE id = (
                     SELECT id
                     FROM messages
@@ -4760,12 +4770,37 @@ fn import_imap_headers_for_conn(
                     batch.remote_name,
                     header.remote_uid,
                     account_id,
-                    header.message_id
+                    header.message_id,
+                    bool_to_int(header.is_read),
+                    bool_to_int(header.is_starred)
                 ],
             )?;
             if rebound > 0 {
                 continue;
             }
+        }
+
+        let updated = conn.execute(
+            "
+            UPDATE messages
+            SET folder_id = ?1,
+                is_read = ?2,
+                is_starred = ?3
+            WHERE account_id = ?4
+              AND remote_mailbox = ?5
+              AND remote_uid = ?6
+            ",
+            params![
+                folder_id,
+                bool_to_int(header.is_read),
+                bool_to_int(header.is_starred),
+                account_id,
+                batch.remote_name,
+                header.remote_uid
+            ],
+        )?;
+        if updated > 0 {
+            continue;
         }
 
         let changed = conn.execute(
@@ -4775,7 +4810,7 @@ fn import_imap_headers_for_conn(
                 snippet, body, received_at, is_read, is_starred, has_attachments,
                 thread_key, remote_mailbox, remote_uid, message_id_header
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, 0, 0, ?10, ?11, ?12, ?13)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14)
             ",
             params![
                 account_id,
@@ -4787,6 +4822,7 @@ fn import_imap_headers_for_conn(
                 header.snippet,
                 header.received_at,
                 bool_to_int(header.is_read),
+                bool_to_int(header.is_starred),
                 header.subject.to_lowercase(),
                 batch.remote_name,
                 header.remote_uid,
@@ -4834,6 +4870,95 @@ fn import_imap_headers_for_conn(
         ],
     )?;
     Ok(imported_messages)
+}
+
+fn reconcile_imap_flag_snapshot_for_conn(
+    conn: &Connection,
+    mailbox_id: i64,
+    snapshot: &ImapFlagSnapshot,
+) -> MailResult<ImapReconcileResult> {
+    let (account_id, remote_name): (i64, String) = conn.query_row(
+        "SELECT account_id, remote_name FROM imap_mailboxes WHERE id = ?1",
+        params![mailbox_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let mut updated_messages = 0_i64;
+    let remote_uids = snapshot
+        .states
+        .iter()
+        .map(|state| state.remote_uid)
+        .filter(|uid| *uid > 0)
+        .collect::<BTreeSet<_>>();
+
+    for state in &snapshot.states {
+        updated_messages += conn.execute(
+            "
+            UPDATE messages
+            SET is_read = ?1,
+                is_starred = ?2
+            WHERE account_id = ?3
+              AND remote_mailbox = ?4
+              AND remote_uid = ?5
+              AND (is_read <> ?1 OR is_starred <> ?2)
+            ",
+            params![
+                bool_to_int(state.is_read),
+                bool_to_int(state.is_starred),
+                account_id,
+                remote_name,
+                state.remote_uid
+            ],
+        )? as i64;
+    }
+
+    let should_scan_local = snapshot.complete || snapshot.floor_uid > 0;
+    let mut removed_messages = 0_i64;
+    if should_scan_local {
+        let mut stmt = if snapshot.complete {
+            conn.prepare(
+                "
+                SELECT id, remote_uid
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid > 0
+                ",
+            )?
+        } else {
+            conn.prepare(
+                "
+                SELECT id, remote_uid
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid >= ?3
+                ",
+            )?
+        };
+        let local_rows = if snapshot.complete {
+            stmt.query_map(params![account_id, remote_name], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+        } else {
+            stmt.query_map(
+                params![account_id, remote_name, snapshot.floor_uid],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )?
+            .collect::<Result<Vec<_>, _>>()?
+        };
+        for (message_id, remote_uid) in local_rows {
+            if !remote_uids.contains(&remote_uid) {
+                removed_messages +=
+                    conn.execute("DELETE FROM messages WHERE id = ?1", params![message_id])? as i64;
+            }
+        }
+    }
+
+    Ok(ImapReconcileResult {
+        updated_messages,
+        removed_messages,
+    })
 }
 
 fn infer_local_role(remote_name: &str, attributes: &[String]) -> String {
@@ -6456,12 +6581,24 @@ mod tests {
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: true,
             }],
         };
         let first = store.import_imap_headers(mailbox.id, &batch).unwrap();
         let second = store.import_imap_headers(mailbox.id, &batch).unwrap();
         assert_eq!(first.imported_messages, 1);
         assert_eq!(second.imported_messages, 0);
+        let imported_starred: i64 = store
+            .with_conn(|conn| {
+                conn.query_row(
+                    "SELECT is_starred FROM messages WHERE remote_mailbox = 'INBOX' AND remote_uid = 7",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(MailError::from)
+            })
+            .unwrap();
+        assert_eq!(imported_starred, 1);
         assert_eq!(
             store
                 .list_imap_mailboxes()
@@ -6472,6 +6609,88 @@ mod tests {
                 .highest_uid,
             7
         );
+    }
+
+    #[test]
+    fn imap_flag_snapshot_updates_flags_and_removes_missing_messages() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let header = |remote_uid: i64| crate::models::RemoteMessageHeader {
+            remote_uid,
+            message_id: format!("<snapshot-{remote_uid}@example.com>"),
+            subject: format!("Snapshot {remote_uid}"),
+            sender_name: "Remote".to_string(),
+            sender_email: "remote@example.com".to_string(),
+            recipients: "demo@better-email.local".to_string(),
+            snippet: "snapshot header".to_string(),
+            received_at: Utc::now().to_rfc3339(),
+            is_read: false,
+            is_starred: false,
+        };
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "snapshot-1".to_string(),
+                    highest_uid: 11,
+                    lowest_uid: 10,
+                    history_complete: true,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(10), header(11)],
+                },
+            )
+            .unwrap();
+
+        let reconciled = store
+            .reconcile_imap_flag_snapshot(
+                mailbox.id,
+                &ImapFlagSnapshot {
+                    floor_uid: 11,
+                    complete: true,
+                    states: vec![crate::models::ImapFlagState {
+                        remote_uid: 11,
+                        is_read: true,
+                        is_starred: true,
+                    }],
+                },
+            )
+            .unwrap();
+        assert_eq!(reconciled.updated_messages, 1);
+        assert_eq!(reconciled.removed_messages, 1);
+
+        let rows = store
+            .with_conn(|conn| {
+                let mut stmt = conn.prepare(
+                    "
+                    SELECT remote_uid, is_read, is_starred
+                    FROM messages
+                    WHERE remote_mailbox = 'INBOX'
+                      AND remote_uid IN (10, 11)
+                    ORDER BY remote_uid
+                    ",
+                )?;
+                let rows = stmt
+                    .query_map([], |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, i64>(2)?,
+                        ))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(rows)
+            })
+            .unwrap();
+        assert_eq!(rows, vec![(11, 1, 1)]);
     }
 
     #[test]
@@ -6495,6 +6714,7 @@ mod tests {
             snippet: "history header".to_string(),
             received_at: Utc::now().to_rfc3339(),
             is_read: false,
+            is_starred: false,
         };
 
         store
@@ -6585,6 +6805,7 @@ mod tests {
                     snippet: "uid validity".to_string(),
                     received_at: Utc::now().to_rfc3339(),
                     is_read: false,
+                    is_starred: false,
                 }],
             }
         };
@@ -6651,6 +6872,7 @@ mod tests {
                 snippet: "moved header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         assert_eq!(
@@ -6723,6 +6945,7 @@ mod tests {
                 snippet: "batch header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         let initial_sync_runs = store.list_sync_runs().unwrap().len();
@@ -6770,6 +6993,7 @@ mod tests {
                         snippet: "custom header".to_string(),
                         received_at: Utc::now().to_rfc3339(),
                         is_read: false,
+                        is_starred: false,
                     }],
                 },
             )
@@ -6853,6 +7077,7 @@ mod tests {
                 snippet: "mapped custom header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         assert_eq!(
@@ -6923,6 +7148,7 @@ mod tests {
                 snippet: "Please review".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         store.import_imap_headers(mailbox.id, &batch).unwrap();
@@ -6974,6 +7200,7 @@ mod tests {
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         store.import_imap_headers(mailbox.id, &batch).unwrap();
@@ -7037,6 +7264,7 @@ mod tests {
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
+                is_starred: false,
             }],
         };
         store.import_imap_headers(mailbox.id, &batch).unwrap();
@@ -7569,6 +7797,7 @@ mod tests {
                         snippet: "Rule engine should apply actions and stop.".to_string(),
                         received_at: "2026-07-09T13:00:00+08:00".to_string(),
                         is_read: false,
+                        is_starred: false,
                     }],
                 },
             )

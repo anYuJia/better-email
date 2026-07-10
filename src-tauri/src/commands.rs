@@ -619,8 +619,9 @@ pub fn set_message_starred(
     store: State<'_, MailStore>,
     message_id: i64,
     is_starred: bool,
-) -> MailResult<()> {
-    store.set_message_starred(message_id, is_starred)
+) -> MailResult<RemoteActionReport> {
+    store.set_message_starred(message_id, is_starred)?;
+    sync_remote_flagged(&store, message_id, is_starred)
 }
 
 #[tauri::command]
@@ -1234,6 +1235,8 @@ fn sync_imap_headers_for_account(
     let total_mapped_folders = mailboxes.len();
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
+    let mut updated_remote_states = 0;
+    let mut removed_remote_messages = 0;
     let mut failures = Vec::new();
     let mut completed_history_folders = 0;
     for mailbox in mailboxes {
@@ -1254,13 +1257,21 @@ fn sync_imap_headers_for_account(
                 include_history: true,
             },
         ) {
-            Ok(batch) => match store.import_imap_headers_batch(mailbox.id, &batch) {
-                Ok(imported) => {
-                    scanned_folders += 1;
-                    imported_messages += imported;
+            Ok(fetch) => {
+                let reconcile = store.reconcile_imap_flag_snapshot(mailbox.id, &fetch.flags);
+                let imported = store.import_imap_headers_batch(mailbox.id, &fetch.headers);
+                match (reconcile, imported) {
+                    (Ok(reconciled), Ok(imported)) => {
+                        scanned_folders += 1;
+                        imported_messages += imported;
+                        updated_remote_states += reconciled.updated_messages;
+                        removed_remote_messages += reconciled.removed_messages;
+                    }
+                    (Err(error), _) | (_, Err(error)) => {
+                        failures.push(format!("{}: {error}", mailbox.remote_name));
+                    }
                 }
-                Err(error) => failures.push(format!("{}: {error}", mailbox.remote_name)),
-            },
+            }
             Err(error) => failures.push(format!("{}: {error}", mailbox.remote_name)),
         }
     }
@@ -1325,17 +1336,24 @@ fn sync_imap_headers_for_account(
             },
             if history_only {
                 format!(
-                    "{} 历史回填完成：扫描 {} 个文件夹，补充 {} 封；{} 个目录此前已完成。{}",
+                    "{} 历史回填完成：扫描 {} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录此前已完成。{}",
                     account.email,
                     scanned_folders,
                     imported_messages,
+                    updated_remote_states,
+                    removed_remote_messages,
                     completed_history_folders,
                     custom_note
                 )
             } else {
                 format!(
-                    "{} 同步完成：扫描 {} 个已映射文件夹，新增或补充 {} 封，并推进历史回填。{}",
-                    account.email, scanned_folders, imported_messages, custom_note
+                    "{} 同步完成：扫描 {} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封，并推进历史回填。{}",
+                    account.email,
+                    scanned_folders,
+                    imported_messages,
+                    updated_remote_states,
+                    removed_remote_messages,
+                    custom_note
                 )
             },
         )
@@ -1348,22 +1366,26 @@ fn sync_imap_headers_for_account(
             },
             if history_only {
                 format!(
-                    "{} 历史回填部分完成：扫描 {}/{} 个文件夹，补充 {} 封；{} 个目录失败：{}。{}",
+                    "{} 历史回填部分完成：扫描 {}/{} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}",
                     account.email,
                     scanned_folders,
                     total_mapped_folders,
                     imported_messages,
+                    updated_remote_states,
+                    removed_remote_messages,
                     failures.len(),
                     failures.join("；"),
                     custom_note
                 )
             } else {
                 format!(
-                    "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增或补充 {} 封；{} 个目录失败：{}。{}",
+                    "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}",
                     account.email,
                     scanned_folders,
                     total_mapped_folders,
                     imported_messages,
+                    updated_remote_states,
+                    removed_remote_messages,
                     failures.len(),
                     failures.join("；"),
                     custom_note
@@ -1560,6 +1582,39 @@ fn sync_remote_seen(
         })),
         Err(error) => Ok(remote_failed_report(format!(
             "本地已更新；远端已读状态回写失败：{error}"
+        ))),
+    }
+}
+
+fn sync_remote_flagged(
+    store: &MailStore,
+    message_id: i64,
+    is_starred: bool,
+) -> MailResult<RemoteActionReport> {
+    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
+    if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
+        return Ok(local_only_report(
+            "本地星标已更新；该邮件没有远端 UID，跳过远端星标回写。",
+        ));
+    }
+    let account = store.get_message_account(message_id)?;
+    let secret = match credentials::get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => {
+            return Ok(remote_skipped_report(format!(
+                "本地星标已更新；无法读取系统凭据，远端星标回写已跳过：{error}"
+            )));
+        }
+    };
+    match imap_probe::set_remote_flagged(&account, &secret, &remote_mailbox, remote_uid, is_starred)
+    {
+        Ok(()) => Ok(remote_ok_report(if is_starred {
+            "本地已添加星标，远端 \\Flagged 状态已同步。"
+        } else {
+            "本地已取消星标，远端 \\Flagged 状态已同步。"
+        })),
+        Err(error) => Ok(remote_failed_report(format!(
+            "本地星标已更新；远端星标状态回写失败：{error}"
         ))),
     }
 }

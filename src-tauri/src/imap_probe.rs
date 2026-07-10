@@ -1,8 +1,9 @@
 use crate::credentials::AccountSecret;
 use crate::db::MailError;
 use crate::models::{
-    Account, ImapFolderProbe, ImapHeaderBatch, ImapProbeReport, RemoteAttachmentMetadata,
-    RemoteAttachmentPayload, RemoteMessageBody, RemoteMessageHeader,
+    Account, ImapFetchResult, ImapFlagSnapshot, ImapFlagState, ImapFolderProbe, ImapHeaderBatch,
+    ImapProbeReport, RemoteAttachmentMetadata, RemoteAttachmentPayload, RemoteMessageBody,
+    RemoteMessageHeader,
 };
 use crate::protocol;
 use chrono::Utc;
@@ -13,6 +14,7 @@ use std::collections::BTreeSet;
 use std::io::Write;
 
 const HEADER_FETCH_LIMIT: usize = 25;
+const FLAG_RECONCILE_LIMIT: u32 = 50;
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 
 fn select_recent_uid_page(mut uids: Vec<i64>, initial_sync: bool) -> Vec<i64> {
@@ -129,7 +131,7 @@ pub fn fetch_header_page(
     secret: &AccountSecret,
     remote_name: &str,
     options: ImapHeaderFetchOptions<'_>,
-) -> Result<ImapHeaderBatch, MailError> {
+) -> Result<ImapFetchResult, MailError> {
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = imap::ClientBuilder::new(host.as_str(), port)
         .connect()
@@ -241,17 +243,63 @@ pub fn fetch_header_page(
         (0, value) | (value, 0) => value,
         (current, page) => current.min(page),
     };
+    let flags = fetch_recent_flag_snapshot(&mut session, mailbox.exists)?;
     let _ = session.logout();
 
-    Ok(ImapHeaderBatch {
-        remote_name: remote_name.to_string(),
-        uid_validity,
-        highest_uid,
-        lowest_uid,
-        history_complete: next_history_complete,
-        history_scanned,
-        cursor_reset,
-        headers,
+    Ok(ImapFetchResult {
+        headers: ImapHeaderBatch {
+            remote_name: remote_name.to_string(),
+            uid_validity,
+            highest_uid,
+            lowest_uid,
+            history_complete: next_history_complete,
+            history_scanned,
+            cursor_reset,
+            headers,
+        },
+        flags,
+    })
+}
+
+fn fetch_recent_flag_snapshot(
+    session: &mut imap::Session<imap::Connection>,
+    exists: u32,
+) -> Result<ImapFlagSnapshot, MailError> {
+    if exists == 0 {
+        return Ok(ImapFlagSnapshot {
+            floor_uid: 0,
+            complete: true,
+            states: Vec::new(),
+        });
+    }
+
+    let first_sequence = exists
+        .saturating_sub(FLAG_RECONCILE_LIMIT.saturating_sub(1))
+        .max(1);
+    let fetches = session
+        .fetch(format!("{first_sequence}:*"), "(UID FLAGS)")
+        .map_err(|error| MailError::Imap(format!("IMAP 对账邮件状态失败：{error}")))?;
+    let mut states = fetches
+        .iter()
+        .filter_map(flag_state_from_fetch)
+        .collect::<Vec<_>>();
+    states.sort_unstable_by_key(|state| state.remote_uid);
+    let expected_count = exists.min(FLAG_RECONCILE_LIMIT) as usize;
+    if states.len() != expected_count {
+        return Err(MailError::Imap(format!(
+            "IMAP 状态快照不完整：预期 {expected_count} 封，实际返回 {} 封；本轮未执行删除对账。",
+            states.len()
+        )));
+    }
+    let floor_uid = states
+        .first()
+        .map(|state| state.remote_uid)
+        .unwrap_or_default();
+
+    Ok(ImapFlagSnapshot {
+        floor_uid,
+        complete: exists <= FLAG_RECONCILE_LIMIT,
+        states,
     })
 }
 
@@ -363,6 +411,27 @@ pub fn set_remote_seen_batch(
             .uid_store(uid_set.as_str(), query)
             .map(|_| ())
             .map_err(|error| MailError::Imap(format!("IMAP 回写已读状态失败：{error}")))
+    })
+}
+
+pub fn set_remote_flagged(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    remote_uid: i64,
+    is_starred: bool,
+) -> Result<(), MailError> {
+    let uid_set = remote_uid_set(&[remote_uid])?;
+    with_selected_mailbox(account, secret, remote_name, |session| {
+        let query = if is_starred {
+            "+FLAGS.SILENT (\\Flagged)"
+        } else {
+            "-FLAGS.SILENT (\\Flagged)"
+        };
+        session
+            .uid_store(uid_set.as_str(), query)
+            .map(|_| ())
+            .map_err(|error| MailError::Imap(format!("IMAP 回写星标状态失败：{error}")))
     })
 }
 
@@ -766,7 +835,18 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         snippet: "远端邮件头已同步，正文将在按需读取阶段拉取。".to_string(),
         received_at,
         is_read: flags.contains("Seen"),
+        is_starred: flags.contains("Flagged"),
     }
+}
+
+fn flag_state_from_fetch(fetch: &imap::types::Fetch<'_>) -> Option<ImapFlagState> {
+    let remote_uid = fetch.uid.map(i64::from)?;
+    let flags = format!("{:?}", fetch.flags());
+    Some(ImapFlagState {
+        remote_uid,
+        is_read: flags.contains("Seen"),
+        is_starred: flags.contains("Flagged"),
+    })
 }
 
 fn header_value(headers: &str, name: &str) -> Option<String> {

@@ -1057,9 +1057,12 @@ export default function App() {
 
   async function toggleStar(message: Message) {
     const undoSnapshots = snapshotMessages([message]);
-    await invoke('set_message_starred', { messageId: message.id, isStarred: !message.is_starred });
+    const report = await invoke<RemoteActionReport>('set_message_starred', {
+      messageId: message.id,
+      isStarred: !message.is_starred,
+    });
     await refreshAll();
-    setStatus(message.is_starred ? '已取消星标' : '已添加星标');
+    setStatus(report.message);
     queueUndoAction(message.is_starred ? '取消星标' : '添加星标', undoSnapshots);
   }
 

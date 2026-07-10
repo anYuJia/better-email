@@ -384,6 +384,7 @@ pub struct RemoteMessageHeader {
     pub snippet: String,
     pub received_at: String,
     pub is_read: bool,
+    pub is_starred: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -396,6 +397,32 @@ pub struct ImapHeaderBatch {
     pub history_scanned: bool,
     pub cursor_reset: bool,
     pub headers: Vec<RemoteMessageHeader>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImapFlagState {
+    pub remote_uid: i64,
+    pub is_read: bool,
+    pub is_starred: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImapFlagSnapshot {
+    pub floor_uid: i64,
+    pub complete: bool,
+    pub states: Vec<ImapFlagState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImapFetchResult {
+    pub headers: ImapHeaderBatch,
+    pub flags: ImapFlagSnapshot,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImapReconcileResult {
+    pub updated_messages: i64,
+    pub removed_messages: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

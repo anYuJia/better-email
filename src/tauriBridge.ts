@@ -1184,11 +1184,22 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           : '该文件夹没有未读邮件。',
       } as T;
     }
-    case 'set_message_starred':
+    case 'set_message_starred': {
+      const target = messages.find((message) => message.id === args?.messageId);
+      const isStarred = Boolean(args?.isStarred);
       messages = messages.map((message) =>
-        message.id === args?.messageId ? { ...message, is_starred: Boolean(args?.isStarred) } : message,
+        message.id === args?.messageId ? { ...message, is_starred: isStarred } : message,
       );
-      return undefined as T;
+      const remoteApplied = Boolean(target?.remote_mailbox && target.remote_uid > 0);
+      return {
+        local_applied: true,
+        remote_attempted: remoteApplied,
+        remote_applied: remoteApplied,
+        message: remoteApplied
+          ? `本地已${isStarred ? '添加' : '取消'}星标，远端 \\Flagged 状态已同步。`
+          : `本地星标已更新；该邮件没有远端 UID，跳过远端星标回写。`,
+      } as T;
+    }
     case 'move_message_to_role': {
       const messageId = Number(args?.messageId);
       const targetRole = String(args?.role ?? '');

@@ -421,6 +421,10 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "document.querySelector('.search-clear-button').click()");
     await waitForExpression(cdp, "document.querySelector('.search-box input').value === '' && document.querySelectorAll('.message-card').length >= 2 && document.body.innerText.includes('已清空搜索和筛选')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-actions button[aria-label=\"取消星标\"]')");
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"取消星标\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('远端 \\\\Flagged 状态已同步')");
     await fillInput(cdp, '.search-box input', 'Quarterly');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
@@ -907,6 +911,7 @@ async function main() {
         'shortcut help opens from button and keyboard',
         'command palette opens and runs commands',
         'message list loaded',
+        'single-message star syncs remote flagged state',
         'reader warning displayed',
         'search works',
         'saved search shortcuts work',

@@ -124,9 +124,21 @@
   padding: 6px 17px 7px 79px;
   border-bottom: 1px solid var(--ui-border);
   background: #fafbfc;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+.composer .recipient-suggestions::-webkit-scrollbar {
+  display: none;
 }
 
 .composer .recipient-suggestions > span {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding-right: 4px;
+  background: #fafbfc;
   color: #939ba6;
   font-size: 10.5px;
 }

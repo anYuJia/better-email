@@ -60,7 +60,11 @@ export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
 export function quoteMessage(message: QuotedMessage): string {
   const sender = `${message.sender_name} <${message.sender_email}>`;
   const date = formatDate(message.received_at);
-  const source = message.body.trim() || message.snippet.trim() || '(无正文)';
+  const rawBody = message.body.trim();
+  const bodySource = /<(?:html|body|p|div|br|img|table|blockquote)\b/i.test(rawBody)
+    ? message.snippet.trim()
+    : rawBody;
+  const source = bodySource || message.snippet.trim() || '(无正文)';
   const quoted = source
     .split('\n')
     .map((line) => `> ${line}`)

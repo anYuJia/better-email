@@ -1059,12 +1059,17 @@ async function main() {
     await openDetails(cdp, 'article .label-menu');
     await clickButton(cdp, '重要', "document.querySelector('article .label-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已添加标签：重要') && document.querySelector('article .label-menu button.active')");
-    await clickButton(cdp, '下载');
+    await clickButton(cdp, '下载全部 1 个', "document.querySelector('.attachment-section-header')");
     await waitForExpression(cdp, "document.querySelector('.attachment-transfer-status')?.innerText.includes('64 KB 下载进度') && [...document.querySelectorAll('.attachments button')].some((item) => item.textContent.includes('重试')) && document.body.innerText.includes('附件下载失败')");
     await evalInPage(cdp, "document.querySelectorAll('details[open]').forEach((item) => { item.open = false; }); document.querySelector('button[aria-label=\"关闭撤销提示\"]')?.click();");
     await captureScreenshot(cdp, 'attachment-download-retry');
     await clickButton(cdp, '重试', "document.querySelector('.attachments')");
     await waitForExpression(cdp, "document.body.innerText.includes('附件已从 64 KB 继续下载：security-checklist.pdf') && document.body.innerText.includes('打开')");
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"转发\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[placeholder=\"主题\"]')?.value === 'Fwd: 安全检查清单' && document.querySelector('.composer-attachment-list')?.innerText.includes('security-checklist.pdf') && document.querySelector('.status-line')?.textContent.includes('已带入 1 个附件')");
+    await captureScreenshot(cdp, 'forward-with-source-attachment');
+    await evalInPage(cdp, "document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]').click()");
+    await waitForExpression(cdp, "!document.querySelector('.composer')");
     await openDetails(cdp, '.reader-warning-actions');
     await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-warning-actions')");
     await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com') && document.body.innerText.includes('垃圾邮件')");
@@ -1168,7 +1173,8 @@ async function main() {
         'inline quick reply preserves standard thread headers',
         'message EML export works',
         'label toggle works',
-        'attachment download failure resume and retry flow works',
+        'sequential download all preserves failure resume and retry flow',
+        'forward draft carries downloaded source attachments',
         'blocked sender rule moves message to spam',
         'remote image sender trust re-renders reader',
       ],

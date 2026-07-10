@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Archive,
   Clock,
+  Download,
   Forward,
   Mail,
   MailOpen,
@@ -152,14 +153,17 @@ export default function ReaderPane({
     () => new Set(),
   );
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
+  const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
+  const pendingAttachmentCount = attachments.filter((attachment) => !attachment.is_downloaded).length;
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());
     setAttachmentErrors({});
+    setIsDownloadingAllAttachments(false);
   }, [selectedId]);
 
-  async function handleAttachmentDownload(attachment: Attachment) {
-    if (downloadingAttachmentIds.has(attachment.id)) return;
+  async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
+    if (downloadingAttachmentIds.has(attachment.id)) return false;
     setAttachmentErrors((current) => {
       const next = { ...current };
       delete next[attachment.id];
@@ -172,17 +176,33 @@ export default function ReaderPane({
     });
     try {
       await onDownloadAttachment(attachment);
+      return true;
     } catch (error) {
       setAttachmentErrors((current) => ({
         ...current,
         [attachment.id]: attachmentErrorMessage(error),
       }));
+      return false;
     } finally {
       setDownloadingAttachmentIds((current) => {
         const next = new Set(current);
         next.delete(attachment.id);
         return next;
       });
+    }
+  }
+
+  async function handleDownloadAllAttachments() {
+    if (isDownloadingAllAttachments) return;
+    const pending = attachments.filter((attachment) => !attachment.is_downloaded);
+    if (pending.length === 0) return;
+    setIsDownloadingAllAttachments(true);
+    try {
+      for (const attachment of pending) {
+        await handleAttachmentDownload(attachment);
+      }
+    } finally {
+      setIsDownloadingAllAttachments(false);
     }
   }
 
@@ -506,42 +526,63 @@ export default function ReaderPane({
         </div>
 
         {attachments.length > 0 && (
-          <div className="attachments">
-            {attachments.map((attachment) => {
-              const downloading = downloadingAttachmentIds.has(attachment.id);
-              const transferError = attachmentErrors[attachment.id] ?? '';
-              return (
-              <div className={transferError ? 'attachment-download-failed' : ''} key={attachment.id}>
-                <span className="attachment-icon"><Paperclip size={15} /></span>
-                <strong>{attachment.filename}</strong>
-                <span>{attachment.mime_type}</span>
-                <em>{formatBytes(attachment.size_bytes)}</em>
+          <div className="attachment-section">
+            <header className="attachment-section-header">
+              <span>
+                <strong>附件</strong>
+                <small>{attachments.length} 个 · {formatBytes(attachments.reduce((sum, item) => sum + item.size_bytes, 0))}</small>
+              </span>
+              {pendingAttachmentCount > 0 && (
                 <button
                   type="button"
-                  title={attachment.local_path || attachment.filename}
-                  disabled={downloading}
-                  aria-busy={downloading}
-                  onClick={() => attachment.is_downloaded
-                    ? onOpenAttachment(attachment)
-                    : handleAttachmentDownload(attachment)}
+                  disabled={isDownloadingAllAttachments}
+                  aria-busy={isDownloadingAllAttachments}
+                  onClick={handleDownloadAllAttachments}
                 >
-                  {attachment.is_downloaded
-                    ? '打开'
-                    : downloading ? '下载中…' : transferError ? '重试' : '下载'}
+                  <Download size={14} />
+                  {isDownloadingAllAttachments
+                    ? '顺序下载中…'
+                    : `下载全部 ${pendingAttachmentCount} 个`}
                 </button>
-                {attachment.is_downloaded && (
-                  <button type="button" title={`另存为 ${attachment.filename}`} onClick={() => onSaveAttachmentAs(attachment)}>
-                    另存为
+              )}
+            </header>
+            <div className="attachments">
+              {attachments.map((attachment) => {
+                const downloading = downloadingAttachmentIds.has(attachment.id);
+                const transferError = attachmentErrors[attachment.id] ?? '';
+                return (
+                <div className={transferError ? 'attachment-download-failed' : ''} key={attachment.id}>
+                  <span className="attachment-icon"><Paperclip size={15} /></span>
+                  <strong>{attachment.filename}</strong>
+                  <span>{attachment.mime_type}</span>
+                  <em>{formatBytes(attachment.size_bytes)}</em>
+                  <button
+                    type="button"
+                    title={attachment.local_path || attachment.filename}
+                    disabled={downloading}
+                    aria-busy={downloading}
+                    onClick={() => attachment.is_downloaded
+                      ? onOpenAttachment(attachment)
+                      : handleAttachmentDownload(attachment)}
+                  >
+                    {attachment.is_downloaded
+                      ? '打开'
+                      : downloading ? '下载中…' : transferError ? '重试' : '下载'}
                   </button>
-                )}
-                {transferError && (
-                  <small className="attachment-transfer-status" role="status">
-                    {transferError}
-                  </small>
-                )}
-              </div>
-              );
-            })}
+                  {attachment.is_downloaded && (
+                    <button type="button" title={`另存为 ${attachment.filename}`} onClick={() => onSaveAttachmentAs(attachment)}>
+                      另存为
+                    </button>
+                  )}
+                  {transferError && (
+                    <small className="attachment-transfer-status" role="status">
+                      {transferError}
+                    </small>
+                  )}
+                </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

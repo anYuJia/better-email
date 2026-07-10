@@ -46,6 +46,17 @@ describe('mail UI utilities', () => {
     expect(quoted).toContain('时间：bad-date');
     expect(quoted).toContain('主题：(无主题)');
     expect(quoted).toContain('> Line one\n> Line two');
+
+    const htmlQuoted = quoteMessage({
+      sender_name: 'Security',
+      sender_email: 'security@example.com',
+      received_at: 'bad-date',
+      subject: 'HTML message',
+      body: '<p>Rendered body</p><img src="https://example.com/open.png">',
+      snippet: 'Rendered body',
+    });
+    expect(htmlQuoted).toContain('> Rendered body');
+    expect(htmlQuoted).not.toContain('<img');
   });
 
   it('builds and deduplicates standards-compatible reply threading headers', () => {

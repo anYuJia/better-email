@@ -143,6 +143,10 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
+import {
+  buildForwardAttachmentPlan,
+  forwardAttachmentStatus,
+} from './app/forwarding';
 import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
@@ -1516,7 +1520,7 @@ export default function App() {
     setStatus(`已撤回发送：${pending.subject}`);
   }
 
-  function composeFromMessage(message: Message, mode: 'reply' | 'replyAll' | 'forward') {
+  async function composeFromMessage(message: Message, mode: 'reply' | 'replyAll' | 'forward') {
     const threading = mode === 'forward' ? null : replyThreadingHeaders(message);
     const replyRecipients = mode === 'forward' ? '' : message.sender_email;
     const includeOriginalRecipients =
@@ -1527,6 +1531,24 @@ export default function App() {
             .filter((recipient) => recipient && recipient !== account?.email)
             .join(', ')
         : '';
+    let forwardPlan = buildForwardAttachmentPlan([]);
+    if (mode === 'forward' && message.has_attachments) {
+      try {
+        const sourceAttachments = await invoke<Attachment[]>('list_attachments', {
+          messageId: message.id,
+        });
+        forwardPlan = buildForwardAttachmentPlan(
+          sourceAttachments,
+          message.attachment_count,
+        );
+      } catch {
+        forwardPlan = {
+          attachments: [],
+          unavailableCount: message.attachment_count,
+          totalCount: message.attachment_count,
+        };
+      }
+    }
     openComposer({
       draft_id: 0,
       account_id: message.account_id,
@@ -1538,11 +1560,17 @@ export default function App() {
       body: quoteMessage(message),
       html_body: '',
       send_at: '',
-      attachments: [],
+      attachments: mode === 'forward' ? forwardPlan.attachments : [],
       in_reply_to: threading?.in_reply_to ?? '',
       references: threading?.references ?? '',
     });
-    setStatus(mode === 'forward' ? '已创建转发草稿' : mode === 'replyAll' ? '已创建回复全部草稿' : '已创建回复草稿');
+    setStatus(
+      mode === 'forward'
+        ? forwardAttachmentStatus(forwardPlan)
+        : mode === 'replyAll'
+          ? '已创建回复全部草稿'
+          : '已创建回复草稿',
+    );
   }
 
   async function editDraftMessage(message: Message) {

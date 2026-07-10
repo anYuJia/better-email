@@ -4,6 +4,7 @@ import {
   Clock,
   Download,
   Forward,
+  Image as ImageIcon,
   Mail,
   MailOpen,
   MoreHorizontal,
@@ -19,6 +20,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
+import { resolveCidInlineImages } from '../app/inlineImages';
 import { canSnoozeRole } from '../app/snooze';
 import type {
   AccountScope,
@@ -29,6 +31,7 @@ import type {
   ThreadSummary,
 } from '../app/types';
 import { formatBytes, formatDate } from '../mailUtils';
+import { localFileAssetUrl } from '../tauriBridge';
 import type { BulkMessageAction } from './messageContextMenu';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
@@ -154,12 +157,25 @@ export default function ReaderPane({
   );
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
-  const pendingAttachmentCount = attachments.filter((attachment) => !attachment.is_downloaded).length;
+  const [isDownloadingInlineImages, setIsDownloadingInlineImages] = useState(false);
+  const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
+  const pendingAttachmentCount = regularAttachments.filter(
+    (attachment) => !attachment.is_downloaded,
+  ).length;
+  const inlineImageResolution = resolveCidInlineImages(
+    selected?.sanitized_html ?? '',
+    attachments,
+    localFileAssetUrl,
+  );
+  const inlineImageError = inlineImageResolution.pendingAttachments
+    .map((attachment) => attachmentErrors[attachment.id])
+    .find(Boolean) ?? '';
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());
     setAttachmentErrors({});
     setIsDownloadingAllAttachments(false);
+    setIsDownloadingInlineImages(false);
   }, [selectedId]);
 
   async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
@@ -194,7 +210,7 @@ export default function ReaderPane({
 
   async function handleDownloadAllAttachments() {
     if (isDownloadingAllAttachments) return;
-    const pending = attachments.filter((attachment) => !attachment.is_downloaded);
+    const pending = regularAttachments.filter((attachment) => !attachment.is_downloaded);
     if (pending.length === 0) return;
     setIsDownloadingAllAttachments(true);
     try {
@@ -203,6 +219,20 @@ export default function ReaderPane({
       }
     } finally {
       setIsDownloadingAllAttachments(false);
+    }
+  }
+
+  async function handleLoadInlineImages() {
+    if (isDownloadingInlineImages || inlineImageResolution.pendingAttachments.length === 0) {
+      return;
+    }
+    setIsDownloadingInlineImages(true);
+    try {
+      for (const attachment of inlineImageResolution.pendingAttachments) {
+        await handleAttachmentDownload(attachment);
+      }
+    } finally {
+      setIsDownloadingInlineImages(false);
     }
   }
 
@@ -525,12 +555,12 @@ export default function ReaderPane({
           </details>
         </div>
 
-        {attachments.length > 0 && (
+        {regularAttachments.length > 0 && (
           <div className="attachment-section">
             <header className="attachment-section-header">
               <span>
                 <strong>附件</strong>
-                <small>{attachments.length} 个 · {formatBytes(attachments.reduce((sum, item) => sum + item.size_bytes, 0))}</small>
+                <small>{regularAttachments.length} 个 · {formatBytes(regularAttachments.reduce((sum, item) => sum + item.size_bytes, 0))}</small>
               </span>
               {pendingAttachmentCount > 0 && (
                 <button
@@ -547,7 +577,7 @@ export default function ReaderPane({
               )}
             </header>
             <div className="attachments">
-              {attachments.map((attachment) => {
+              {regularAttachments.map((attachment) => {
                 const downloading = downloadingAttachmentIds.has(attachment.id);
                 const transferError = attachmentErrors[attachment.id] ?? '';
                 return (
@@ -586,6 +616,38 @@ export default function ReaderPane({
           </div>
         )}
 
+        {(inlineImageResolution.pendingAttachments.length > 0
+          || inlineImageResolution.missingContentIds.length > 0) && (
+          <div className="inline-image-notice" role="status">
+            <span className="inline-image-notice-icon" aria-hidden="true">
+              <ImageIcon size={16} />
+            </span>
+            <span className="inline-image-notice-copy">
+              <strong>
+                {inlineImageResolution.pendingAttachments.length > 0
+                  ? `正文包含 ${inlineImageResolution.pendingAttachments.length} 张内嵌图片`
+                  : '部分内嵌图片不可用'}
+              </strong>
+              <small>
+                {inlineImageError
+                  || (inlineImageResolution.missingContentIds.length > 0
+                    ? `${inlineImageResolution.missingContentIds.length} 张图片未包含在邮件中`
+                    : '按需加载，减少内存和网络占用')}
+              </small>
+            </span>
+            {inlineImageResolution.pendingAttachments.length > 0 && (
+              <button
+                type="button"
+                disabled={isDownloadingInlineImages}
+                aria-busy={isDownloadingInlineImages}
+                onClick={handleLoadInlineImages}
+              >
+                {isDownloadingInlineImages ? '加载中…' : inlineImageError ? '重试' : '显示图片'}
+              </button>
+            )}
+          </div>
+        )}
+
         {selected.security_warnings.length > 0 && (
           <div className="reader-warning-panel">
             <div className="reader-warning-heading">
@@ -613,7 +675,7 @@ export default function ReaderPane({
         )}
 
         {selected.sanitized_html ? (
-          <div className="reader-html" dangerouslySetInnerHTML={{ __html: selected.sanitized_html }} />
+          <div className="reader-html" dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }} />
         ) : (
           <div className="body-text">{selected.body}</div>
         )}

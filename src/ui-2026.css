@@ -1165,6 +1165,75 @@ textarea:disabled {
   margin-bottom: 6px;
 }
 
+.inline-image-notice {
+  width: min(100%, 760px);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  color: var(--ui-text-secondary);
+  background: #f8fafc;
+}
+
+.inline-image-notice-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.inline-image-notice-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.inline-image-notice-copy strong {
+  color: var(--ui-text);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.inline-image-notice-copy small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-image-notice button {
+  min-height: 29px;
+  padding: 0 10px;
+  border: 1px solid #bad8f7;
+  border-radius: 7px;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.inline-image-notice button:hover:not(:disabled) {
+  border-color: #91c3f5;
+  background: #e8f3ff;
+}
+
+.inline-image-notice button:disabled {
+  color: var(--ui-text-tertiary);
+  cursor: progress;
+  border-color: var(--ui-border);
+  background: #f2f4f6;
+}
+
 .body-text,
 .reader-html {
   min-height: 84px;
@@ -1177,6 +1246,10 @@ textarea:disabled {
   box-shadow: none;
   font-size: 14px;
   line-height: 1.72;
+}
+
+.reader-html img[data-better-email-inline-cid] {
+  display: none;
 }
 
 .quick-reply {

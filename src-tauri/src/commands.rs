@@ -357,6 +357,7 @@ pub fn download_attachment(
             remote_name: &remote_mailbox,
             remote_uid,
             filename: &attachment.filename,
+            content_id: &attachment.content_id,
             max_bytes: MAX_ATTACHMENT_DOWNLOAD_BYTES,
             start_offset: resume_offset,
         },
@@ -2255,6 +2256,8 @@ mod tests {
                 size_bytes: 12,
                 is_downloaded: false,
                 local_path: String::new(),
+                content_id: String::new(),
+                is_inline: false,
             }],
         );
 

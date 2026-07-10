@@ -270,6 +270,8 @@ mod tests {
                 size_bytes: 15,
                 is_downloaded: true,
                 local_path: path.to_string_lossy().to_string(),
+                content_id: String::new(),
+                is_inline: false,
             }],
         };
         let email = build_email(
@@ -382,6 +384,8 @@ mod tests {
                 size_bytes: 15,
                 is_downloaded: true,
                 local_path: path.to_string_lossy().to_string(),
+                content_id: String::new(),
+                is_inline: false,
             }],
         };
         let email = build_email(
@@ -425,6 +429,8 @@ mod tests {
                 size_bytes: 42,
                 is_downloaded: false,
                 local_path: String::new(),
+                content_id: String::new(),
+                is_inline: false,
             }],
         };
         let error = build_email(

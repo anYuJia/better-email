@@ -236,7 +236,9 @@ impl MailStore {
                     mime_type TEXT NOT NULL,
                     size_bytes INTEGER NOT NULL,
                     is_downloaded INTEGER NOT NULL DEFAULT 0,
-                    local_path TEXT NOT NULL DEFAULT ''
+                    local_path TEXT NOT NULL DEFAULT '',
+                    content_id TEXT NOT NULL DEFAULT '',
+                    is_inline INTEGER NOT NULL DEFAULT 0
                 );
 
                 CREATE TABLE IF NOT EXISTS remote_image_trusts (
@@ -447,6 +449,18 @@ impl MailStore {
                 "attachments",
                 "local_path",
                 "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "attachments",
+                "content_id",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "attachments",
+                "is_inline",
+                "INTEGER NOT NULL DEFAULT 0",
             )?;
             add_column_if_missing(
                 conn,
@@ -1559,13 +1573,18 @@ impl MailStore {
             )?;
             for attachment in &body.attachments {
                 conn.execute(
-                    "INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path)
-                     VALUES (?1, ?2, ?3, ?4, 0, '')",
+                    "INSERT INTO attachments(
+                        message_id, filename, mime_type, size_bytes, is_downloaded,
+                        local_path, content_id, is_inline
+                     )
+                     VALUES (?1, ?2, ?3, ?4, 0, '', ?5, ?6)",
                     params![
                         message_id,
                         attachment.filename,
                         attachment.mime_type,
-                        attachment.size_bytes
+                        attachment.size_bytes,
+                        attachment.content_id,
+                        bool_to_int(attachment.is_inline)
                     ],
                 )?;
             }
@@ -1620,13 +1639,18 @@ impl MailStore {
             let mut attachment_rows = Vec::with_capacity(imported.attachments.len());
             for attachment in imported.attachments {
                 conn.execute(
-                    "INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path)
-                     VALUES (?1, ?2, ?3, ?4, 0, '')",
+                    "INSERT INTO attachments(
+                        message_id, filename, mime_type, size_bytes, is_downloaded,
+                        local_path, content_id, is_inline
+                     )
+                     VALUES (?1, ?2, ?3, ?4, 0, '', ?5, ?6)",
                     params![
                         message_id,
                         &attachment.filename,
                         fallback_mime_type(&attachment.mime_type),
-                        attachment.bytes.len().min(i64::MAX as usize) as i64
+                        attachment.bytes.len().min(i64::MAX as usize) as i64,
+                        attachment.content_id,
+                        bool_to_int(attachment.is_inline)
                     ],
                 )?;
                 attachment_rows.push((conn.last_insert_rowid(), attachment));
@@ -1669,7 +1693,8 @@ impl MailStore {
     pub fn list_attachments(&self, message_id: i64) -> MailResult<Vec<Attachment>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded, local_path
+                "SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded,
+                        local_path, content_id, is_inline
                  FROM attachments WHERE message_id = ?1 ORDER BY filename",
             )?;
             let attachments = stmt
@@ -1682,6 +1707,8 @@ impl MailStore {
                         size_bytes: row.get(4)?,
                         is_downloaded: row.get::<_, i64>(5)? != 0,
                         local_path: row.get(6)?,
+                        content_id: row.get(7)?,
+                        is_inline: row.get::<_, i64>(8)? != 0,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -5873,7 +5900,8 @@ fn attachments_for_message_conn(
     message_id: i64,
 ) -> rusqlite::Result<Vec<Attachment>> {
     let mut stmt = conn.prepare(
-        "SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded, local_path
+        "SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded,
+                local_path, content_id, is_inline
          FROM attachments WHERE message_id = ?1 ORDER BY filename",
     )?;
     let attachments = stmt
@@ -5886,6 +5914,8 @@ fn attachments_for_message_conn(
                 size_bytes: row.get(4)?,
                 is_downloaded: row.get::<_, i64>(5)? != 0,
                 local_path: row.get(6)?,
+                content_id: row.get(7)?,
+                is_inline: row.get::<_, i64>(8)? != 0,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -5895,7 +5925,8 @@ fn attachments_for_message_conn(
 fn attachment_for_conn(conn: &Connection, attachment_id: i64) -> MailResult<Attachment> {
     conn.query_row(
         "
-        SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded, local_path
+        SELECT id, message_id, filename, mime_type, size_bytes, is_downloaded,
+               local_path, content_id, is_inline
         FROM attachments
         WHERE id = ?1
         ",
@@ -5909,6 +5940,8 @@ fn attachment_for_conn(conn: &Connection, attachment_id: i64) -> MailResult<Atta
                 size_bytes: row.get(4)?,
                 is_downloaded: row.get::<_, i64>(5)? != 0,
                 local_path: row.get(6)?,
+                content_id: row.get(7)?,
+                is_inline: row.get::<_, i64>(8)? != 0,
             })
         },
     )
@@ -7384,13 +7417,7 @@ mod tests {
             .is_empty());
 
         let first_thread = store
-            .list_threads_for_scope(
-                Some(first_account.id),
-                Some(first_inbox.id),
-                None,
-                None,
-                50,
-            )
+            .list_threads_for_scope(Some(first_account.id), Some(first_inbox.id), None, None, 50)
             .unwrap()
             .into_iter()
             .find(|thread| thread.thread_key == thread_key)
@@ -8634,9 +8661,11 @@ mod tests {
                     snippet: "Body with attachment".to_string(),
                     has_attachments: true,
                     attachments: vec![crate::models::RemoteAttachmentMetadata {
-                        filename: "remote.pdf".to_string(),
-                        mime_type: "application/pdf".to_string(),
+                        filename: "remote.png".to_string(),
+                        mime_type: "image/png".to_string(),
                         size_bytes: 42,
+                        content_id: "remote-image@example.com".to_string(),
+                        is_inline: true,
                     }],
                 },
             )
@@ -8645,18 +8674,22 @@ mod tests {
         assert!(updated.has_attachments);
         assert_eq!(updated.attachment_count, 1);
         assert_eq!(attachments.len(), 1);
-        assert_eq!(attachments[0].filename, "remote.pdf");
-        assert_eq!(attachments[0].mime_type, "application/pdf");
+        assert_eq!(attachments[0].filename, "remote.png");
+        assert_eq!(attachments[0].mime_type, "image/png");
         assert_eq!(attachments[0].size_bytes, 42);
         assert!(!attachments[0].is_downloaded);
         assert!(attachments[0].local_path.is_empty());
+        assert_eq!(attachments[0].content_id, "remote-image@example.com");
+        assert!(attachments[0].is_inline);
 
         let downloaded = store
-            .mark_attachment_downloaded(attachments[0].id, "/tmp/better-email/remote.pdf", 84)
+            .mark_attachment_downloaded(attachments[0].id, "/tmp/better-email/remote.png", 84)
             .unwrap();
         assert!(downloaded.is_downloaded);
-        assert_eq!(downloaded.local_path, "/tmp/better-email/remote.pdf");
+        assert_eq!(downloaded.local_path, "/tmp/better-email/remote.png");
         assert_eq!(downloaded.size_bytes, 84);
+        assert_eq!(downloaded.content_id, "remote-image@example.com");
+        assert!(downloaded.is_inline);
     }
 
     #[test]

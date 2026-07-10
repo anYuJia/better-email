@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="112" viewBox="0 0 420 112" role="img" aria-labelledby="title description">
+  <title id="title">Better Email</title>
+  <desc id="description">Better Email 内嵌邮件图片预览</desc>
+  <rect width="420" height="112" rx="22" fill="#f4f7fb"/>
+  <rect x="18" y="18" width="76" height="76" rx="20" fill="#1769e0"/>
+  <path d="M36 42h40v30H36z" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>
+  <path d="m38 45 18 14 18-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="116" y="54" fill="#182230" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="24" font-weight="700">Better Email</text>
+  <text x="116" y="79" fill="#667085" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14">Fast, focused, private.</text>
+</svg>

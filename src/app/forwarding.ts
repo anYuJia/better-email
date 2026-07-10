@@ -13,7 +13,13 @@ export function buildForwardAttachmentPlan(
   sourceAttachments: Attachment[],
   expectedTotalCount = sourceAttachments.length,
 ): ForwardAttachmentPlan {
-  const attachments = sourceAttachments
+  const inlineCount = sourceAttachments.filter((attachment) => attachment.is_inline).length;
+  const regularAttachments = sourceAttachments.filter((attachment) => !attachment.is_inline);
+  const totalCount = Math.max(
+    Math.max(0, expectedTotalCount - inlineCount),
+    regularAttachments.length,
+  );
+  const attachments = regularAttachments
     .filter((attachment) => attachment.is_downloaded && attachment.local_path.trim())
     .map((attachment) => ({
       filename: attachment.filename,
@@ -24,8 +30,8 @@ export function buildForwardAttachmentPlan(
 
   return {
     attachments,
-    unavailableCount: Math.max(expectedTotalCount, sourceAttachments.length) - attachments.length,
-    totalCount: Math.max(expectedTotalCount, sourceAttachments.length),
+    unavailableCount: totalCount - attachments.length,
+    totalCount,
   };
 }
 

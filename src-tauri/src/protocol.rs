@@ -155,35 +155,42 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
         .unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
     let in_reply_to_header = header_value(header_block, "in-reply-to").unwrap_or_default();
     let references_header = header_value(header_block, "references").unwrap_or_default();
-    let attachments = parsed
-        .as_ref()
-        .map(|message| {
-            message
-                .attachments()
-                .enumerate()
-                .map(|(index, part)| {
-                    let mime_type = part
-                        .content_type()
-                        .map(|content_type| {
-                            content_type
-                                .c_subtype
-                                .as_ref()
-                                .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
-                                .unwrap_or_else(|| content_type.c_type.to_string())
-                        })
-                        .unwrap_or_else(|| "application/octet-stream".to_string());
-                    ImportedEmlAttachment {
-                        filename: part
-                            .attachment_name()
-                            .map(str::to_string)
-                            .unwrap_or_else(|| format!("attachment-{}", index + 1)),
-                        mime_type,
-                        bytes: part.contents().to_vec(),
-                    }
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let attachments =
+        parsed
+            .as_ref()
+            .map(|message| {
+                message
+                    .attachments()
+                    .enumerate()
+                    .map(|(index, part)| {
+                        let mime_type = part
+                            .content_type()
+                            .map(|content_type| {
+                                content_type
+                                    .c_subtype
+                                    .as_ref()
+                                    .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
+                                    .unwrap_or_else(|| content_type.c_type.to_string())
+                            })
+                            .unwrap_or_else(|| "application/octet-stream".to_string());
+                        let content_id = normalize_content_id(part.content_id());
+                        let is_inline = part
+                            .content_disposition()
+                            .is_some_and(|disposition| disposition.is_inline())
+                            || !content_id.is_empty();
+                        ImportedEmlAttachment {
+                            filename: part.attachment_name().map(str::to_string).unwrap_or_else(
+                                || inline_attachment_filename(&mime_type, &content_id, index),
+                            ),
+                            mime_type,
+                            bytes: part.contents().to_vec(),
+                            content_id,
+                            is_inline,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
     ImportedEmlMessage {
         sender_name: display_name_from_address(&from),
@@ -274,6 +281,64 @@ pub(crate) fn sanitize_html(html: &str) -> String {
 
 pub(crate) fn sanitize_html_with_remote_images(html: &str) -> String {
     sanitize_html_inner(html, true)
+}
+
+pub(crate) fn normalize_content_id(value: Option<&str>) -> String {
+    value
+        .unwrap_or_default()
+        .trim()
+        .trim_start_matches("cid:")
+        .trim_matches(|ch| ch == '<' || ch == '>')
+        .trim()
+        .to_ascii_lowercase()
+}
+
+pub(crate) fn inline_attachment_filename(
+    mime_type: &str,
+    content_id: &str,
+    index: usize,
+) -> String {
+    let safe_id = content_id
+        .chars()
+        .take(80)
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let stem = safe_id.trim_matches('_');
+    let stem = if stem.is_empty() {
+        format!("inline-{}", index + 1)
+    } else {
+        stem.to_string()
+    };
+    format!("{stem}.{}", attachment_extension(mime_type))
+}
+
+fn attachment_extension(mime_type: &str) -> String {
+    match mime_type.trim().to_ascii_lowercase().as_str() {
+        "image/jpeg" => "jpg".to_string(),
+        "image/svg+xml" => "svg".to_string(),
+        "image/x-icon" | "image/vnd.microsoft.icon" => "ico".to_string(),
+        "application/pdf" => "pdf".to_string(),
+        "text/plain" => "txt".to_string(),
+        value => value
+            .split_once('/')
+            .map(|(_, subtype)| subtype)
+            .and_then(|subtype| subtype.split([';', '+']).next())
+            .map(|subtype| {
+                subtype
+                    .chars()
+                    .filter(|ch| ch.is_ascii_alphanumeric())
+                    .take(8)
+                    .collect::<String>()
+            })
+            .filter(|extension| !extension.is_empty())
+            .unwrap_or_else(|| "bin".to_string()),
+    }
 }
 
 fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
@@ -602,6 +667,42 @@ mod tests {
         assert_eq!(imported.attachments[0].filename, "note.txt");
         assert_eq!(imported.attachments[0].mime_type, "text/plain");
         assert_eq!(imported.attachments[0].bytes, b"imported attachment");
+        assert!(imported.attachments[0].content_id.is_empty());
+        assert!(!imported.attachments[0].is_inline);
+    }
+
+    #[test]
+    fn parses_imported_cid_image_with_safe_extension() {
+        let raw = concat!(
+            "Subject: Inline image\r\n",
+            "From: sender@example.com\r\n",
+            "To: demo@better-email.local\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/related; boundary=\"related\"\r\n",
+            "\r\n",
+            "--related\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p>Logo</p><img src=\"cid:Logo@Example.COM\">\r\n",
+            "--related\r\n",
+            "Content-Type: image/png\r\n",
+            "Content-Disposition: inline\r\n",
+            "Content-ID: <Logo@Example.COM>\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "iVBORw0KGgo=\r\n",
+            "--related--\r\n",
+        );
+        let imported = parse_imported_eml(raw);
+
+        assert!(imported
+            .sanitized_html
+            .contains("src=\"cid:Logo@Example.COM\""));
+        assert_eq!(imported.attachments.len(), 1);
+        assert_eq!(imported.attachments[0].content_id, "logo@example.com");
+        assert!(imported.attachments[0].is_inline);
+        assert_eq!(imported.attachments[0].mime_type, "image/png");
+        assert_eq!(imported.attachments[0].filename, "logo_example_com.png");
     }
 
     #[test]

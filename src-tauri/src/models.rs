@@ -191,6 +191,8 @@ pub struct Attachment {
     pub size_bytes: i64,
     pub is_downloaded: bool,
     pub local_path: String,
+    pub content_id: String,
+    pub is_inline: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -198,6 +200,8 @@ pub struct RemoteAttachmentMetadata {
     pub filename: String,
     pub mime_type: String,
     pub size_bytes: i64,
+    pub content_id: String,
+    pub is_inline: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -205,6 +209,8 @@ pub struct ImportedEmlAttachment {
     pub filename: String,
     pub mime_type: String,
     pub bytes: Vec<u8>,
+    pub content_id: String,
+    pub is_inline: bool,
 }
 
 #[derive(Debug, Clone)]

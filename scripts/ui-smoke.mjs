@@ -1073,6 +1073,10 @@ async function main() {
     await openDetails(cdp, 'article .label-menu');
     await clickButton(cdp, '重要', "document.querySelector('article .label-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已添加标签：重要') && document.querySelector('article .label-menu button.active')");
+    await waitForExpression(
+      cdp,
+      "(() => { const image = document.querySelector('.reader-html img[src=\"/inline-image-preview.svg\"]'); const attachmentText = document.querySelector('.attachments')?.innerText || ''; return image?.complete && image.naturalWidth > 0 && document.querySelectorAll('.attachments > div').length === 1 && attachmentText.includes('security-checklist.pdf') && !attachmentText.includes('better-email-inline-logo'); })()",
+    );
     await clickButton(cdp, '下载全部 1 个', "document.querySelector('.attachment-section-header')");
     await waitForExpression(cdp, "document.querySelector('.attachment-transfer-status')?.innerText.includes('64 KB 下载进度') && [...document.querySelectorAll('.attachments button')].some((item) => item.textContent.includes('重试')) && document.body.innerText.includes('附件下载失败')");
     await evalInPage(cdp, "document.querySelectorAll('details[open]').forEach((item) => { item.open = false; }); document.querySelector('button[aria-label=\"关闭撤销提示\"]')?.click();");
@@ -1188,6 +1192,7 @@ async function main() {
         'inline quick reply preserves standard thread headers',
         'message EML export works',
         'label toggle works',
+        'downloaded CID image renders inside the body without entering the attachment list',
         'sequential download all preserves failure resume and retry flow',
         'forward draft carries downloaded source attachments',
         'blocked sender rule moves message to spam',

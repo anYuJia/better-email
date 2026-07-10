@@ -1,3 +1,4 @@
+import { convertFileSrc } from '@tauri-apps/api/core';
 import type { ListSort, Message } from './app/types';
 
 type InvokeArgs = Record<string, unknown> | undefined;
@@ -220,8 +221,8 @@ let messages: MockMessage[] = [
     bcc: '',
     subject: '安全检查清单',
     snippet: 'Better Email 的 HTML 安全预览、附件和规则都可以验证。',
-    body: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
-    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img>',
+    body: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="cid:better-email-logo@example.com"><img src="https://cdn.example.com/open.png">',
+    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="cid:better-email-logo@example.com" alt="Better Email">',
     security_warnings: ['检测到远程图片，默认已阻止自动加载。'],
     received_at: now,
     is_read: false,
@@ -229,7 +230,7 @@ let messages: MockMessage[] = [
     has_attachments: true,
     snoozed_until: '',
     labels: ['重要'],
-    attachment_count: 1,
+    attachment_count: 2,
     remote_mailbox: 'INBOX',
     remote_uid: 42,
     message_id_header: '<mock-1-1@better-email.local>',
@@ -414,7 +415,7 @@ type MockOutboundAttachmentInput = {
 };
 
 let nextMessageId = Math.max(...messages.map((message) => message.id)) + 1;
-let nextAttachmentId = 2;
+let nextAttachmentId = 3;
 let nextOutboxId = 1;
 let nextRuleId = 4;
 let nextIdentityId = 3;
@@ -514,6 +515,19 @@ let attachments = [
     size_bytes: 184320,
     is_downloaded: false,
     local_path: '',
+    content_id: '',
+    is_inline: false,
+  },
+  {
+    id: 2,
+    message_id: 1,
+    filename: 'better-email-inline-logo.svg',
+    mime_type: 'image/svg+xml',
+    size_bytes: 892,
+    is_downloaded: true,
+    local_path: '/tmp/better-email/better-email-inline-logo.svg',
+    content_id: 'better-email-logo@example.com',
+    is_inline: true,
   },
 ];
 const attachmentDownloadAttempts = new Map<number, number>();
@@ -668,6 +682,8 @@ function accountMessageFromDraft(
       size_bytes: Number(attachment.size_bytes ?? 0),
       is_downloaded: Boolean(attachment.local_path?.trim()),
       local_path: attachment.local_path?.trim() || '',
+      content_id: '',
+      is_inline: false,
     })),
     ...attachments,
   ];
@@ -1989,6 +2005,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           size_bytes: 24,
           is_downloaded: true,
           local_path: '/tmp/better-email/imported-note.txt',
+          content_id: '',
+          is_inline: false,
         },
         ...attachments,
       ];
@@ -2132,6 +2150,18 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
 
 export function invoke<T>(command: string, args?: InvokeArgs): Promise<T> {
   return mockMode ? mockInvoke<T>(command, args) : loadCore().then(({ invoke: tauriInvoke }) => tauriInvoke<T>(command, args));
+}
+
+export function localFileAssetUrl(localPath: string): string {
+  const normalizedPath = localPath.trim();
+  if (!normalizedPath) return '';
+  if (mockMode) {
+    if (normalizedPath.endsWith('/better-email-inline-logo.svg')) {
+      return '/inline-image-preview.svg';
+    }
+    return encodeURI(`file://${normalizedPath}`);
+  }
+  return convertFileSrc(normalizedPath);
 }
 
 export function getCurrentWindow() {

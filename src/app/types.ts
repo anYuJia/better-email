@@ -57,6 +57,8 @@ export type Attachment = {
   size_bytes: number;
   is_downloaded: boolean;
   local_path: string;
+  content_id: string;
+  is_inline: boolean;
 };
 
 export type OutboundAttachmentInput = {

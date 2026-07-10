@@ -14,6 +14,8 @@ function attachment(overrides: Partial<Attachment> = {}): Attachment {
     size_bytes: 1024,
     is_downloaded: true,
     local_path: '/tmp/report.pdf',
+    content_id: '',
+    is_inline: false,
     ...overrides,
   };
 }
@@ -69,5 +71,29 @@ describe('forward attachment planning', () => {
     });
     expect(forwardAttachmentStatus(plan))
       .toBe('已创建转发草稿；2 个附件尚未下载，未自动加入');
+  });
+
+  it('does not forward decorative inline images as regular attachments', () => {
+    const plan = buildForwardAttachmentPlan([
+      attachment(),
+      attachment({
+        id: 2,
+        filename: 'signature.png',
+        mime_type: 'image/png',
+        content_id: 'signature@example.com',
+        is_inline: true,
+      }),
+    ], 2);
+
+    expect(plan).toEqual({
+      attachments: [{
+        filename: 'report.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 1024,
+        local_path: '/tmp/report.pdf',
+      }],
+      unavailableCount: 0,
+      totalCount: 1,
+    });
   });
 });

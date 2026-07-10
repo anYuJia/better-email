@@ -23,6 +23,7 @@ import SecurityPreviewSettings from './components/settings/SecurityPreviewSettin
 import CommandPalette from './components/CommandPalette';
 import ShortcutHelpModal from './components/ShortcutHelpModal';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
+import useAppLayout from './hooks/useAppLayout';
 import useUndoQueue from './hooks/useUndoQueue';
 import {
   defaultNotificationPolicy,
@@ -93,7 +94,6 @@ import type {
   OAuthRefreshReport,
   ProviderVerificationRecord,
   BackgroundTask,
-  AppLayout,
 } from './app/types';
 import {
   emptyDraft,
@@ -110,11 +110,8 @@ import {
   savedSearchesStorageKey,
   composeTemplatesStorageKey,
   composerAutosaveStorageKey,
-  appLayoutStorageKey,
   sendUndoDelayStorageKey,
-  defaultAppLayout,
   filterModes,
-  clampNumber,
   backgroundTaskTitle,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
@@ -127,7 +124,6 @@ import {
   isDraftEmpty,
   normalizeDraftInput,
   loadComposerAutosave,
-  loadAppLayout,
   outboxStatusLabel,
   outboxTimingLabel,
   canCancelOutboxItem,
@@ -236,7 +232,16 @@ export default function App() {
   const [appBadgeStatus, setAppBadgeStatus] = useState('应用角标未同步');
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
-  const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
+  const {
+    appLayout,
+    beginLayoutResize,
+    beginLayoutMouseResize,
+    moveLayoutResize,
+    moveLayoutMouseResize,
+    endLayoutResize,
+    endLayoutMouseResize,
+    resetAppLayout,
+  } = useAppLayout();
   const {
     undoAction,
     clearUndoAction,
@@ -245,7 +250,6 @@ export default function App() {
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const layoutResizeRef = useRef<{ pane: 'sidebar' | 'list'; startX: number; origin: AppLayout } | null>(null);
   const outboxScheduleTimerRef = useRef<number | null>(null);
   const backgroundSyncRef = useRef(false);
   const backgroundTaskWorkerRef = useRef(false);
@@ -262,71 +266,6 @@ export default function App() {
     document
       .querySelector(`[data-settings-section="${section}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function resetAppLayout() {
-    setAppLayout(defaultAppLayout);
-    setStatus('已恢复默认三栏宽度');
-  }
-
-  function beginLayoutResizeFromClientX(pane: 'sidebar' | 'list', clientX: number) {
-    layoutResizeRef.current = {
-      pane,
-      startX: clientX,
-      origin: appLayout,
-    };
-    document.body.classList.add('pane-resizing');
-  }
-
-  function beginLayoutResize(pane: 'sidebar' | 'list', event: React.PointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    beginLayoutResizeFromClientX(pane, event.clientX);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function beginLayoutMouseResize(pane: 'sidebar' | 'list', event: React.MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    beginLayoutResizeFromClientX(pane, event.clientX);
-  }
-
-  function moveLayoutResizeFromClientX(clientX: number) {
-    const resize = layoutResizeRef.current;
-    if (!resize) return;
-    const delta = clientX - resize.startX;
-    if (resize.pane === 'sidebar') {
-      setAppLayout({
-        ...resize.origin,
-        sidebar: clampNumber(resize.origin.sidebar + delta, 228, 320),
-      });
-      return;
-    }
-    setAppLayout({
-      ...resize.origin,
-      list: clampNumber(resize.origin.list + delta, 340, 500),
-    });
-  }
-
-  function moveLayoutResize(event: React.PointerEvent<HTMLElement>) {
-    moveLayoutResizeFromClientX(event.clientX);
-  }
-
-  function moveLayoutMouseResize(event: React.MouseEvent<HTMLElement>) {
-    moveLayoutResizeFromClientX(event.clientX);
-  }
-
-  function endLayoutResize(event: React.PointerEvent<HTMLElement>) {
-    if (!layoutResizeRef.current) return;
-    layoutResizeRef.current = null;
-    document.body.classList.remove('pane-resizing');
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  function endLayoutMouseResize() {
-    if (!layoutResizeRef.current) return;
-    layoutResizeRef.current = null;
-    document.body.classList.remove('pane-resizing');
   }
 
   function openComposer(nextDraft?: DraftInput) {
@@ -689,10 +628,6 @@ export default function App() {
     window.localStorage.setItem(composerAutosaveStorageKey, JSON.stringify(autosave));
     setComposerAutosave(autosave);
   }, [draft, isRichComposer, isComposerOpen]);
-
-  useEffect(() => {
-    window.localStorage.setItem(appLayoutStorageKey, JSON.stringify(appLayout));
-  }, [appLayout]);
 
   useEffect(() => {
     if (outboxScheduleTimerRef.current) {
@@ -2816,7 +2751,10 @@ export default function App() {
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onSync={() => enqueueBackgroundTask('sync', 'manual')}
-        onResetLayout={resetAppLayout}
+        onResetLayout={() => {
+          resetAppLayout();
+          setStatus('已恢复默认三栏宽度');
+        }}
       />
 
       <button

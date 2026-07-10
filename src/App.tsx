@@ -28,6 +28,7 @@ import useAccountConnectionController from './hooks/useAccountConnectionControll
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
+import useMessageCollectionActions from './hooks/useMessageCollectionActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useUndoQueue from './hooks/useUndoQueue';
 import {
@@ -809,7 +810,7 @@ export default function App() {
     });
     setActiveThread(thread);
     setThreadMessages(nextMessages);
-    setSelectedId(nextMessages[0]?.id ?? null);
+    setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
     setSelectedMessageIds([]);
     if (announce) {
       setStatus(`已打开线程：${thread.subject} · ${nextMessages.length} 封`);
@@ -841,6 +842,23 @@ export default function App() {
     }));
   }
 
+  const {
+    runBulkAction,
+    runThreadAction,
+    moveSelectedMessagesToFolder,
+    moveThreadToFolder,
+    toggleBulkLabel,
+    toggleThreadLabel,
+  } = useMessageCollectionActions({
+    folders,
+    selectedMessages,
+    refreshAll,
+    setSelectedMessageIds,
+    setStatus,
+    snapshotMessages,
+    queueUndoAction,
+  });
+
   async function restoreUndoAction() {
     const action = consumeUndoAction();
     if (!action) return;
@@ -869,56 +887,6 @@ export default function App() {
     await loadMessages(restoredFolderId);
     setSelectedId(firstSnapshot?.id ?? null);
     setStatus(`已撤销：${action.title}`);
-  }
-
-  async function runBulkAction(action: 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash') {
-    if (selectedMessages.length === 0) {
-      setStatus('请先选择邮件');
-      return;
-    }
-    const undoSnapshots = snapshotMessages(selectedMessages);
-    for (const message of selectedMessages) {
-      if (action === 'read' || action === 'unread') {
-        await invoke('set_message_read', { messageId: message.id, isRead: action === 'read' });
-      } else if (action === 'star' || action === 'unstar') {
-        await invoke('set_message_starred', { messageId: message.id, isStarred: action === 'star' });
-      } else {
-        await invoke('move_message_to_role', { messageId: message.id, role: action });
-      }
-    }
-    const count = selectedMessages.length;
-    setSelectedMessageIds([]);
-    await refreshAll();
-    const actionLabel =
-      action === 'read'
-        ? '标为已读'
-        : action === 'unread'
-          ? '标为未读'
-          : action === 'star'
-            ? '添加星标'
-            : action === 'unstar'
-              ? '取消星标'
-              : action === 'archive'
-                ? '归档'
-                : '删除';
-    setStatus(`已批量${actionLabel} ${count} 封邮件`);
-    queueUndoAction(`批量${actionLabel}`, undoSnapshots, `${count} 封邮件`);
-  }
-
-  async function moveSelectedMessagesToFolder(role: FolderRole, folderName: string = role) {
-    if (selectedMessages.length === 0) {
-      setStatus('请先选择邮件');
-      return;
-    }
-    const undoSnapshots = snapshotMessages(selectedMessages);
-    for (const message of selectedMessages) {
-      await invoke('move_message_to_role', { messageId: message.id, role });
-    }
-    const count = selectedMessages.length;
-    setSelectedMessageIds([]);
-    await refreshAll();
-    setStatus(`已批量移动到 ${folderName}：${count} 封邮件`);
-    queueUndoAction(`批量移动到 ${folderName}`, undoSnapshots, `${count} 封邮件`);
   }
 
   async function moveMessagesToFolderByIds(folder: Folder, messageIds: number[]) {
@@ -958,30 +926,6 @@ export default function App() {
     await refreshAll();
     setStatus(`已拖动到 ${folder.name}：${messagesToMove.length} 封邮件`);
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, `${messagesToMove.length} 封邮件`);
-  }
-
-  async function toggleBulkLabel(label: Label) {
-    if (selectedMessages.length === 0) {
-      setStatus('请先选择邮件');
-      return;
-    }
-    const undoSnapshots = snapshotMessages(selectedMessages);
-    const shouldRemove = selectedMessages.every((message) => message.labels.includes(label.name));
-    for (const message of selectedMessages) {
-      const hasLabel = message.labels.includes(label.name);
-      if (shouldRemove ? hasLabel : !hasLabel) {
-        await invoke(shouldRemove ? 'remove_label_from_message' : 'apply_label_to_message', {
-          messageId: message.id,
-          labelId: label.id,
-        });
-      }
-    }
-    const count = selectedMessages.length;
-    setSelectedMessageIds([]);
-    await refreshAll();
-    const actionLabel = shouldRemove ? '移除' : '添加';
-    setStatus(`已批量${actionLabel}标签 ${label.name}：${count} 封邮件`);
-    queueUndoAction(`批量${actionLabel}标签 ${label.name}`, undoSnapshots, `${count} 封邮件`);
   }
 
   async function runMessageAction(message: Message, action: MessageContextAction) {
@@ -2185,13 +2129,22 @@ export default function App() {
         onFilterChange={setFilter}
         onToggleAllVisible={toggleAllVisibleMessages}
         onRunBulkAction={runBulkAction}
-        onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder.role as FolderRole, folder.name).catch((error) => setStatus(String(error))); }}
+        onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error))); }}
         onToggleBulkLabel={(label) => { toggleBulkLabel(label).catch((error) => setStatus(String(error))); }}
         onRunMessageAction={(message, action) => { runMessageAction(message, action).catch((error) => setStatus(String(error))); }}
         onMoveMessageToFolder={(message, folder) => { moveMessageToFolder(message, folder).catch((error) => setStatus(String(error))); }}
         onToggleMessageLabel={(message, label) => { toggleMessageLabel(message, label).catch((error) => setStatus(String(error))); }}
         onComposeFromMessage={composeFromMessage}
         onOpenThread={openThread}
+        onRunThreadAction={(thread, items, action) => {
+          runThreadAction(thread, items, action).catch((error) => setStatus(String(error)));
+        }}
+        onMoveThreadToFolder={(thread, items, folder) => {
+          moveThreadToFolder(thread, items, folder).catch((error) => setStatus(String(error)));
+        }}
+        onToggleThreadLabel={(thread, items, label) => {
+          toggleThreadLabel(thread, items, label).catch((error) => setStatus(String(error)));
+        }}
         onSelectMessage={setSelectedId}
         onToggleMessageSelection={toggleMessageSelection}
         onLoadMore={() => { loadMoreMessages().catch((error) => setStatus(String(error))); }}
@@ -2222,6 +2175,18 @@ export default function App() {
         quickReplyBody={quickReplyBody}
         onSelectMessage={setSelectedId}
         onComposeFromMessage={composeFromMessage}
+        onRunThreadAction={(action) => {
+          if (!activeThread) return;
+          runThreadAction(activeThread, threadMessages, action).catch((error) => setStatus(String(error)));
+        }}
+        onMoveThreadToFolder={(folder) => {
+          if (!activeThread) return;
+          moveThreadToFolder(activeThread, threadMessages, folder).catch((error) => setStatus(String(error)));
+        }}
+        onToggleThreadLabel={(label) => {
+          if (!activeThread) return;
+          toggleThreadLabel(activeThread, threadMessages, label).catch((error) => setStatus(String(error)));
+        }}
         onToggleStar={toggleStar}
         onEditDraft={editDraftMessage}
         onRestoreFromTrash={restoreSelectedFromTrash}

@@ -608,7 +608,17 @@ async function main() {
     await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length >= 1 && document.body.innerText.includes('封 · 未读')");
     await evalInPage(cdp, "document.querySelector('.thread-card').click()");
-    await waitForExpression(cdp, "document.querySelector('.thread-reader') && document.querySelectorAll('.thread-message').length >= 1");
+    await waitForExpression(cdp, "document.querySelector('.thread-reader') && document.querySelectorAll('.thread-message').length >= 1 && document.querySelector('.thread-message:last-child')?.classList.contains('active')");
+    await waitForExpression(cdp, "document.querySelector('.thread-reader .reader-actions [title=\"添加整个会话星标\"], .thread-reader .reader-actions [title=\"取消整个会话星标\"]')");
+    await evalInPage(cdp, "document.querySelector('.thread-reader .reader-actions [title=\"添加整个会话星标\"], .thread-reader .reader-actions [title=\"取消整个会话星标\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已对会话') && document.querySelector('.status-line')?.innerText.includes('星标')");
+    await evalInPage(
+      cdp,
+      "document.querySelector('.thread-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 360, button: 2 }))",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('会话操作') && document.querySelector('[data-context-item=\"bulk-read-state\"]')");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"bulk-read-state\"]').click()");
+    await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已对会话') && document.querySelector('.status-line')?.innerText.includes('标为')");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.message-list')");
 
@@ -965,6 +975,7 @@ async function main() {
         'bulk star and label actions work',
         'keyboard select all bulk action and escape clear work',
         'thread view opens conversations',
+        'thread actions and context menu work',
         'message drag drop move and undo works',
         'custom folder create rename and move works',
         'trash restore syncs the remote inbox',

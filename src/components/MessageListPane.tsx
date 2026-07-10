@@ -28,7 +28,7 @@ import {
 } from './messageContextMenu';
 import { writeMessageDragPayload } from './messageDrag';
 
-export type { MessageContextAction } from './messageContextMenu';
+export type { BulkMessageAction, MessageContextAction } from './messageContextMenu';
 
 export type MessageListPaneProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -63,7 +63,10 @@ export type MessageListPaneProps = {
   onMoveMessageToFolder: (message: Message, folder: Folder) => void;
   onToggleMessageLabel: (message: Message, label: Label) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
-  onOpenThread: (thread: ThreadSummary) => void;
+  onOpenThread: (thread: ThreadSummary) => Promise<Message[]>;
+  onRunThreadAction: (thread: ThreadSummary, messages: Message[], action: BulkMessageAction) => void;
+  onMoveThreadToFolder: (thread: ThreadSummary, messages: Message[], folder: Folder) => void;
+  onToggleThreadLabel: (thread: ThreadSummary, messages: Message[], label: Label) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => void;
@@ -103,6 +106,9 @@ export default function MessageListPane({
   onToggleMessageLabel,
   onComposeFromMessage,
   onOpenThread,
+  onRunThreadAction,
+  onMoveThreadToFolder,
+  onToggleThreadLabel,
   onSelectMessage,
   onToggleMessageSelection,
   onLoadMore,
@@ -114,6 +120,12 @@ export default function MessageListPane({
     bulk: boolean;
   } | null>(null);
   const [draggingMessageIds, setDraggingMessageIds] = React.useState<number[]>([]);
+  const [threadMenu, setThreadMenu] = React.useState<{
+    x: number;
+    y: number;
+    thread: ThreadSummary;
+    messages: Message[];
+  } | null>(null);
   const selectedMessageSet = new Set(selectedMessageIds);
   const draggingMessageSet = new Set(draggingMessageIds);
   const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
@@ -121,7 +133,7 @@ export default function MessageListPane({
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const contextMessage = messageMenu?.message;
   const isBulkContext = Boolean(messageMenu?.bulk && selectedMessages.length > 1);
-  const contextItems = isBulkContext
+  const messageContextItems = isBulkContext
     ? buildBulkMessageContextItems({
         selectedMessages,
         folders,
@@ -142,6 +154,21 @@ export default function MessageListPane({
           onToggleMessageLabel,
         })
       : [];
+  const threadContextMessages = threadMenu?.messages ?? [];
+  const threadMovableMessages = threadContextMessages.filter(
+    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+  );
+  const threadContextItems = threadMenu
+    ? buildBulkMessageContextItems({
+        selectedMessages: threadContextMessages,
+        movableMessages: threadMovableMessages,
+        folders,
+        labels,
+        onRunBulkAction: (action) => onRunThreadAction(threadMenu.thread, threadContextMessages, action),
+        onMoveBulkToFolder: (folder) => onMoveThreadToFolder(threadMenu.thread, threadContextMessages, folder),
+        onToggleBulkLabel: (label) => onToggleThreadLabel(threadMenu.thread, threadContextMessages, label),
+      })
+    : [];
 
   return (
     <section className="message-list-panel">
@@ -269,7 +296,18 @@ export default function MessageListPane({
             <button
               key={thread.thread_key}
               className={activeThread?.thread_key === thread.thread_key ? 'thread-card selected' : 'thread-card'}
-              onClick={() => onOpenThread(thread)}
+              onClick={() => {
+                setThreadMenu(null);
+                void onOpenThread(thread);
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                const { clientX: x, clientY: y } = event;
+                setThreadMenu(null);
+                void onOpenThread(thread).then((nextMessages) => {
+                  setThreadMenu({ x, y, thread, messages: nextMessages });
+                });
+              }}
             >
               <div>
                 <strong>{thread.subject || '(无主题)'}</strong>
@@ -387,11 +425,22 @@ export default function MessageListPane({
           )}
         </div>
       )}
+      {threadMenu && (
+        <ContextMenu
+          x={threadMenu.x}
+          y={threadMenu.y}
+          items={threadContextItems}
+          title={threadMenu.thread.subject || '(无主题)'}
+          detail={`${threadMenu.messages.length} 封邮件 · 会话操作`}
+          ariaLabel={`${threadMenu.thread.subject || '会话'}操作`}
+          onClose={() => setThreadMenu(null)}
+        />
+      )}
       {messageMenu && (
         <ContextMenu
           x={messageMenu.x}
           y={messageMenu.y}
-          items={contextItems}
+          items={messageContextItems}
           title={isBulkContext ? `已选择 ${selectedMessages.length} 封邮件` : messageMenu.message.subject || '(无主题)'}
           detail={isBulkContext ? '操作将应用到当前选择' : messageMenu.message.sender_name || messageMenu.message.sender_email}
           ariaLabel={isBulkContext ? '批量邮件操作' : `${messageMenu.message.subject || '邮件'}操作`}

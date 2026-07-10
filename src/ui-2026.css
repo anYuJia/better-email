@@ -936,6 +936,15 @@ textarea:disabled {
   left: auto;
 }
 
+.reader-more-menu .menu-empty-note {
+  display: block;
+  max-width: 220px;
+  padding: 7px 10px 9px;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
 .reader-meta {
   gap: 6px;
   margin: 0;

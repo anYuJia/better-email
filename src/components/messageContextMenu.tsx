@@ -41,6 +41,7 @@ export type MessageContextAction =
 
 type BulkContextOptions = {
   selectedMessages: Message[];
+  movableMessages?: Message[];
   folders: Folder[];
   labels: Label[];
   onRunBulkAction: (action: BulkMessageAction) => void;
@@ -50,6 +51,7 @@ type BulkContextOptions = {
 
 export function buildBulkMessageContextItems({
   selectedMessages,
+  movableMessages = selectedMessages,
   folders,
   labels,
   onRunBulkAction,
@@ -58,7 +60,7 @@ export function buildBulkMessageContextItems({
 }: BulkContextOptions): ContextMenuItem[] {
   const allRead = selectedMessages.every((message) => message.is_read);
   const allStarred = selectedMessages.every((message) => message.is_starred);
-  const movableFolders = movableFoldersForBulk(folders, selectedMessages);
+  const movableFolders = movableFoldersForBulk(folders, movableMessages);
 
   return [
     {

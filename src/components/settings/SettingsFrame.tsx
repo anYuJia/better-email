@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import './settings.css';
-import './settings-frame.css';
+import './settings-shell.css';
 
 export type SettingsSectionId =
   | 'accounts'
@@ -248,7 +248,7 @@ export default function SettingsFrame({
           <nav className="settings-nav" aria-label="设置分类">
             <div className="settings-nav-intro">
               <strong>偏好设置</strong>
-              <span>每项设置在独立页面中打开</span>
+              <span>{navigationItems.length} 个独立页面</span>
             </div>
             {navigationGroups.map((group) => (
               <div className="settings-nav-section" key={group.label}>
@@ -311,7 +311,7 @@ export default function SettingsFrame({
                     <ActiveIcon size={19} />
                   </span>
                   <div>
-                    <span>{activeGroup.label}</span>
+                    <span>{activeGroup.label} · {activeIndex + 1}/{navigationItems.length}</span>
                     <strong id={`settings-page-${activeSection}`}>{activeItem.label}</strong>
                   </div>
                 </div>

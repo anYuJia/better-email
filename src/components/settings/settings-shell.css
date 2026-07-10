@@ -1,0 +1,796 @@
+.settings-backdrop {
+  --settings-border: #dfe3e8;
+  --settings-border-strong: #cfd5dc;
+  --settings-text: #1c2025;
+  --settings-text-secondary: #5d6671;
+  --settings-text-tertiary: #8a939e;
+  --settings-accent: #0a7aff;
+  --settings-accent-hover: #006ee6;
+  --settings-accent-soft: #eaf3ff;
+  --settings-canvas: #f7f8fa;
+  --settings-sidebar: #f2f4f7;
+  padding: 16px;
+  background: rgba(24, 29, 36, 0.32);
+  backdrop-filter: blur(24px) saturate(1.08);
+}
+
+.settings-modal {
+  width: min(1140px, calc(100vw - 32px));
+  height: min(800px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(205, 211, 218, 0.96);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow:
+    0 38px 110px rgba(15, 23, 42, 0.24),
+    0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.settings-modal .settings-main-header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--settings-border);
+  background: rgba(252, 252, 253, 0.96);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.settings-modal .settings-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-app-mark {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cfe1f6;
+  border-radius: 9px;
+  color: #086bd1;
+  background: #edf6ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.settings-app-mark svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.settings-title-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-title-copy :is(strong, small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-title-copy strong {
+  color: var(--settings-text);
+  font-size: 13.5px;
+  font-weight: 720;
+}
+
+.settings-title-copy small {
+  color: var(--settings-text-tertiary);
+  font-size: 10px;
+  font-weight: 520;
+}
+
+.settings-modal .settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-modal .settings-header-button,
+.settings-modal .settings-close-button {
+  min-height: 33px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.settings-modal .settings-header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-modal .settings-header-button.secondary {
+  border: 1px solid #d9dee4;
+  color: var(--settings-text-secondary);
+  background: #fff;
+}
+
+.settings-modal .settings-header-button.secondary:hover {
+  border-color: #bdd5ef;
+  color: #075fb9;
+  background: #f6faff;
+}
+
+.settings-modal .settings-header-button.primary {
+  border: 1px solid var(--settings-accent);
+  color: #fff;
+  background: var(--settings-accent);
+  box-shadow: 0 2px 7px rgba(10, 122, 255, 0.2);
+}
+
+.settings-modal .settings-header-button.primary:hover {
+  border-color: var(--settings-accent-hover);
+  background: var(--settings-accent-hover);
+}
+
+.settings-modal .settings-close-button {
+  width: 33px;
+  min-width: 33px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: #747d88;
+  background: transparent;
+}
+
+.settings-modal .settings-close-button:hover {
+  color: #252a31;
+  background: #eceff2;
+}
+
+.settings-modal .settings-body {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  overflow: hidden;
+  background: #fff;
+}
+
+.settings-modal .settings-nav {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 16px 11px 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid var(--settings-border);
+  background: var(--settings-sidebar);
+  scrollbar-width: thin;
+  scrollbar-color: #cfd5dc transparent;
+}
+
+.settings-modal .settings-nav-intro {
+  min-height: 43px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 0 9px 7px;
+}
+
+.settings-modal .settings-nav-intro strong {
+  color: var(--settings-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.settings-modal .settings-nav-intro span {
+  color: var(--settings-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.settings-modal .settings-nav-section {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-nav .settings-nav-group {
+  display: block;
+  margin: 12px 9px 5px;
+  color: #9099a4;
+  font-size: 9px;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+}
+
+.settings-modal .settings-nav-section > button {
+  position: relative;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #58626e;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 620;
+  text-align: left;
+}
+
+.settings-modal .settings-nav-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: #7d8792;
+  background: transparent;
+}
+
+.settings-modal .settings-nav-section > button:hover {
+  border-color: rgba(210, 216, 223, 0.72);
+  color: #252a31;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.settings-modal .settings-nav-section > button.active {
+  border-color: #cfe0f2;
+  color: #075fae;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(21, 37, 55, 0.06),
+    0 4px 12px rgba(21, 37, 55, 0.035);
+}
+
+.settings-modal .settings-nav-section > button.active .settings-nav-icon {
+  color: #0872db;
+  background: var(--settings-accent-soft);
+}
+
+.settings-modal .settings-nav-active-dot {
+  width: 4px;
+  height: 4px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--settings-accent);
+}
+
+.settings-modal .settings-content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+  background: var(--settings-canvas);
+}
+
+.settings-mobile-toolbar {
+  display: none;
+}
+
+.settings-modal .settings-page {
+  width: min(100%, 880px);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #c8cfd7 transparent;
+  animation: settings-page-enter 140ms ease-out both;
+}
+
+@keyframes settings-page-enter {
+  from {
+    opacity: 0.88;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.settings-modal .settings-page-header {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 27px 32px 20px;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.settings-modal .settings-page-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-modal .settings-page-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d3e3f5;
+  border-radius: 10px;
+  color: #0b6fce;
+  background: #eef6ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.settings-modal .settings-page-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-page-heading span {
+  color: var(--settings-text-tertiary);
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.settings-modal .settings-page-heading strong {
+  overflow: hidden;
+  color: var(--settings-text);
+  font-size: 21px;
+  font-weight: 740;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-page-header > p {
+  max-width: 670px;
+  margin: 0 0 0 52px;
+  color: var(--settings-text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.settings-modal .settings-page-content {
+  flex: 1 0 auto;
+  align-content: start;
+  display: grid;
+  gap: 13px;
+  padding: 0 32px 26px;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) {
+  margin-left: 0;
+  margin-right: 0;
+  border-color: var(--settings-border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 28, 38, 0.025);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-static-section,
+  .settings-section-overview
+):hover {
+  border-color: var(--settings-border-strong);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-header,
+  .settings-static-header,
+  .settings-section-overview
+) {
+  border-bottom-color: #e9edf1;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-header,
+  .settings-static-header,
+  .settings-section-overview
+) strong {
+  color: var(--settings-text);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-header,
+  .settings-static-header,
+  .settings-section-overview
+) :is(small, em) {
+  color: var(--settings-text-tertiary);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-header,
+  .settings-static-header,
+  .settings-section-overview
+) > em,
+.settings-modal .settings-page-content :is(
+  .settings-static-header,
+  .settings-section-overview
+) > b {
+  border-color: #d8e5f4;
+  color: #1767ae;
+  background: #f3f8fd;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea) {
+  min-width: 0;
+  border: 1px solid #d7dde4;
+  border-radius: 8px;
+  color: var(--settings-text);
+  background-color: #fff;
+  box-shadow: inset 0 1px 1px rgba(24, 33, 45, 0.025);
+}
+
+.settings-modal .settings-page-content :is(input, select) {
+  min-height: 37px;
+}
+
+.settings-modal .settings-page-content textarea {
+  line-height: 1.5;
+}
+
+.settings-modal .settings-page-content select {
+  appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #7e8792 50%),
+    linear-gradient(135deg, #7e8792 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):hover {
+  border-color: #c2cad3;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):focus {
+  border-color: rgba(10, 122, 255, 0.62);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(10, 122, 255, 0.1);
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"] {
+  position: relative;
+  width: 32px;
+  min-width: 32px;
+  min-height: 19px;
+  height: 19px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  border: 1px solid #b8c1ca;
+  border-radius: 999px;
+  background: #c7ced6;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  transition: transform 150ms ease;
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]:checked {
+  border-color: var(--settings-accent);
+  background: var(--settings-accent);
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]:checked::after {
+  transform: translateX(13px);
+}
+
+.settings-modal :is(
+  .settings-page-content button,
+  .settings-nav button,
+  .settings-header-actions button
+):focus-visible {
+  outline: 2px solid rgba(10, 122, 255, 0.42);
+  outline-offset: 2px;
+}
+
+.settings-modal .settings-page-content button {
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.settings-modal .settings-page-content button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.settings-modal .settings-page-pagination {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 0 32px 30px;
+  border: 0;
+  background: transparent;
+}
+
+.settings-modal .settings-page-pagination > button {
+  min-width: 0;
+  min-height: 45px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 1px solid var(--settings-border);
+  border-radius: 9px;
+  color: var(--settings-text-secondary);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+  text-align: left;
+}
+
+.settings-modal .settings-page-pagination > button.next {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.settings-modal .settings-page-pagination > button:hover {
+  border-color: #bdd5ed;
+  color: #0868c5;
+  background: #fff;
+}
+
+.settings-modal .settings-page-pagination > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.settings-modal .settings-page-pagination > button :is(small, strong) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-page-pagination > button small {
+  color: var(--settings-text-tertiary);
+  font-size: 8.5px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-page-pagination > button strong {
+  color: inherit;
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+@media (max-width: 900px) {
+  .settings-backdrop {
+    padding: 9px;
+  }
+
+  .settings-modal {
+    width: calc(100vw - 18px);
+    height: calc(100vh - 18px);
+    max-height: calc(100vh - 18px);
+    border-radius: 13px;
+  }
+
+  .settings-modal .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-nav {
+    display: none;
+  }
+
+  .settings-modal .settings-content {
+    grid-row: 1;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-mobile-toolbar {
+    position: relative;
+    z-index: 8;
+    display: block;
+    padding: 9px 18px;
+    border-bottom: 1px solid var(--settings-border);
+    background: rgba(250, 251, 252, 0.96);
+    backdrop-filter: blur(16px);
+  }
+
+  .settings-modal .settings-page-picker {
+    position: relative;
+    min-height: 39px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 34px 0 11px;
+    border: 1px solid var(--settings-border);
+    border-radius: 9px;
+    color: #1768b4;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(20, 28, 38, 0.025);
+  }
+
+  .settings-modal .settings-page-picker > span {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .settings-modal .settings-page-picker strong {
+    overflow: hidden;
+    color: var(--settings-text);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-modal .settings-page-picker select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .settings-modal .settings-page-picker > svg:last-child {
+    position: absolute;
+    right: 11px;
+    color: #7e8792;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-modal {
+    grid-template-rows: 55px minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-main-header {
+    min-height: 55px;
+    padding: 0 8px 0 11px;
+  }
+
+  .settings-app-mark {
+    width: 29px;
+    height: 29px;
+  }
+
+  .settings-modal .settings-title > .settings-app-mark,
+  .settings-modal .settings-title > .settings-title-copy {
+    display: grid;
+  }
+
+  .settings-title-copy small,
+  .settings-modal .settings-header-button.secondary span {
+    display: none;
+  }
+
+  .settings-modal .settings-header-button {
+    width: 33px;
+    padding: 0;
+  }
+
+  .settings-modal .settings-header-button.primary {
+    width: auto;
+    padding: 0 10px;
+  }
+
+  .settings-modal .settings-header-button.primary span {
+    display: inline;
+  }
+
+  .settings-modal .settings-mobile-toolbar {
+    padding: 8px 14px;
+  }
+
+  .settings-modal .settings-page-header {
+    padding: 21px 17px 17px;
+  }
+
+  .settings-modal .settings-page-icon {
+    width: 37px;
+    height: 37px;
+  }
+
+  .settings-modal .settings-page-heading strong {
+    font-size: 19px;
+  }
+
+  .settings-modal .settings-page-header > p {
+    margin-left: 0;
+  }
+
+  .settings-modal .settings-page-content {
+    padding: 0 17px 21px;
+  }
+
+  .settings-modal .settings-page-pagination {
+    padding: 0 17px 22px;
+  }
+
+  .settings-modal .settings-page-pagination > button {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 460px) {
+  .settings-title-copy strong {
+    max-width: 112px;
+  }
+
+  .settings-modal .settings-header-actions {
+    gap: 4px;
+  }
+
+  .settings-modal .settings-page-header {
+    padding-top: 18px;
+  }
+
+  .settings-modal .settings-page-pagination {
+    gap: 7px;
+  }
+
+  .settings-modal .settings-page-pagination > button {
+    padding-inline: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-modal .settings-page {
+    animation: none;
+  }
+
+  .settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]::after {
+    transition: none;
+  }
+}

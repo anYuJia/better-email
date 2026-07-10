@@ -168,6 +168,15 @@ export type DraftInput = {
   attachments: OutboundAttachmentInput[];
 };
 
+export type DraftSaveReport = {
+  draft_id: number;
+  remote_attempted: boolean;
+  remote_synced: boolean;
+  remote_mailbox: string;
+  remote_uid: number;
+  message: string;
+};
+
 export type ComposeTemplate = {
   id: string;
   name: string;

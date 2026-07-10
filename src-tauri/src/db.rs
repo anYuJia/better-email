@@ -1265,8 +1265,39 @@ impl MailStore {
         })
     }
 
+    pub fn set_message_remote_identity(
+        &self,
+        message_id: i64,
+        remote_mailbox: &str,
+        remote_uid: i64,
+        message_id_header: &str,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "
+                UPDATE messages
+                SET remote_mailbox = ?2,
+                    remote_uid = ?3,
+                    message_id_header = ?4
+                WHERE id = ?1
+                ",
+                params![
+                    message_id,
+                    remote_mailbox.trim(),
+                    remote_uid.max(0),
+                    message_id_header.trim()
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn get_message(&self, message_id: i64) -> MailResult<Message> {
         self.with_conn(|conn| message_for_conn(conn, message_id))
+    }
+
+    pub fn get_outbound_message(&self, message_id: i64) -> MailResult<OutboundMessage> {
+        self.with_conn(|conn| outbound_message_for_conn(conn, message_id))
     }
 
     pub fn get_message_account(&self, message_id: i64) -> MailResult<Account> {
@@ -4371,6 +4402,38 @@ fn message_remote_ref_for_conn(conn: &Connection, message_id: i64) -> MailResult
     .map_err(Into::into)
 }
 
+fn outbound_message_for_conn(conn: &Connection, message_id: i64) -> MailResult<OutboundMessage> {
+    conn.query_row(
+        "
+        SELECT m.id, m.account_id, m.sender_name, m.sender_email,
+               COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
+               m.sanitized_html
+        FROM messages m
+        LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
+        WHERE m.id = ?1
+        ",
+        params![message_id],
+        |row| {
+            let id = row.get(0)?;
+            Ok(OutboundMessage {
+                id,
+                account_id: row.get(1)?,
+                sender_name: row.get(2)?,
+                sender_email: row.get(3)?,
+                reply_to: row.get(4)?,
+                recipients: row.get(5)?,
+                cc: row.get(6)?,
+                bcc: row.get(7)?,
+                subject: row.get(8)?,
+                body: row.get(9)?,
+                html_body: row.get(10)?,
+                attachments: attachments_for_message_conn(conn, id)?,
+            })
+        },
+    )
+    .map_err(Into::into)
+}
+
 fn trash_remote_refs_for_conn(
     conn: &Connection,
     account_id: Option<i64>,
@@ -5916,6 +5979,41 @@ mod tests {
             .unwrap()
             .iter()
             .any(|message| message.id == sent_id));
+    }
+
+    #[test]
+    fn draft_can_be_rendered_and_bound_to_remote_identity() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        let draft_id = store
+            .save_draft(DraftInput {
+                draft_id: 0,
+                account_id: account.id,
+                identity_id: 0,
+                to: "friend@example.com".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
+                subject: "Remote draft".to_string(),
+                body: "Draft body".to_string(),
+                html_body: "<p>Draft body</p>".to_string(),
+                send_at: String::new(),
+                attachments: Vec::new(),
+            })
+            .unwrap();
+        let outbound = store.get_outbound_message(draft_id).unwrap();
+        let message_id_header = crate::smtp::outbound_message_id(&outbound);
+        let raw_message = crate::smtp::render_outbound(&outbound).unwrap();
+        let rendered = String::from_utf8_lossy(&raw_message);
+        assert!(rendered.contains(&format!("Message-ID: {message_id_header}")));
+        assert!(rendered.contains("Remote draft"));
+
+        store
+            .set_message_remote_identity(draft_id, "Drafts", 73, &message_id_header)
+            .unwrap();
+        let reference = store.get_message_remote_reference(draft_id).unwrap();
+        assert_eq!(reference.remote_mailbox, "Drafts");
+        assert_eq!(reference.remote_uid, 73);
+        assert_eq!(reference.message_id_header, message_id_header);
     }
 
     #[test]

@@ -65,6 +65,7 @@ import type {
   MailIdentity,
   MailIdentityInput,
   DraftInput,
+  DraftSaveReport,
   ComposeTemplate,
   ComposerAutosave,
   MailStats,
@@ -1366,13 +1367,14 @@ export default function App() {
       setStatus('草稿为空，未保存');
       return;
     }
-    const wasUpdatingDraft = draft.draft_id > 0;
-    await invoke('save_draft', { input: draftInputForCurrentAccount(draft) });
+    const report = await invoke<DraftSaveReport>('save_draft', {
+      input: draftInputForCurrentAccount(draft),
+    });
     setDraft(emptyDraft);
     clearComposerAutosave();
     closeComposer();
     await refreshAll();
-    setStatus(wasUpdatingDraft ? '草稿已更新' : '草稿已保存');
+    setStatus(report.message);
   }
 
   async function sendDraft() {

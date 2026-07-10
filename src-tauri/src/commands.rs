@@ -6,11 +6,11 @@ use crate::models::{
     BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
     ContactInput, ContactMergeSuggestion, CredentialInput, CredentialProtocolCheck,
     CredentialStatus, CredentialVerificationReport, DiagnosticAccount, DiagnosticExport,
-    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder, FolderReadReport,
-    ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity,
-    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput,
-    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
-    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
+    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder,
+    FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
+    OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput,
+    OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
     ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
     RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary,
@@ -803,8 +803,150 @@ pub fn delete_identity(store: State<'_, MailStore>, identity_id: i64) -> MailRes
 }
 
 #[tauri::command]
-pub fn save_draft(store: State<'_, MailStore>, input: DraftInput) -> MailResult<i64> {
-    store.save_draft(input)
+pub fn save_draft(store: State<'_, MailStore>, input: DraftInput) -> MailResult<DraftSaveReport> {
+    let was_update = input.draft_id > 0;
+    let previous_reference = if was_update {
+        Some(store.get_message_remote_reference(input.draft_id)?)
+    } else {
+        None
+    };
+    let draft_id = store.save_draft(input)?;
+    let message = store.get_outbound_message(draft_id)?;
+    let message_id_header = smtp::outbound_message_id(&message);
+    let account = store.get_account_by_id(Some(message.account_id))?;
+    let local_action = if was_update {
+        "草稿已更新"
+    } else {
+        "草稿已保存"
+    };
+    let Some(remote_mailbox) = store.remote_mailbox_for_account_role(account.id, "drafts")? else {
+        return Ok(DraftSaveReport {
+            draft_id,
+            remote_attempted: false,
+            remote_synced: false,
+            remote_mailbox: String::new(),
+            remote_uid: 0,
+            message: format!("{local_action}到本地；未发现已映射的远端草稿目录。"),
+        });
+    };
+
+    if let Some(previous) = previous_reference.as_ref() {
+        let previous_mailbox = if previous.remote_mailbox.trim().is_empty() {
+            store
+                .remote_mailbox_for_account_role(previous.account_id, "drafts")?
+                .unwrap_or_default()
+        } else {
+            previous.remote_mailbox.clone()
+        };
+        let moved_between_mailboxes = previous.account_id != account.id
+            || (!previous_mailbox.trim().is_empty()
+                && previous_mailbox.trim() != remote_mailbox.trim());
+        if moved_between_mailboxes
+            && !previous_mailbox.trim().is_empty()
+            && (previous.remote_uid > 0 || !previous.message_id_header.trim().is_empty())
+        {
+            let previous_account = store.get_account_by_id(Some(previous.account_id))?;
+            let previous_secret = match credentials::get_account_secret(&previous_account) {
+                Ok(secret) => secret,
+                Err(error) => {
+                    return Ok(DraftSaveReport {
+                        draft_id,
+                        remote_attempted: false,
+                        remote_synced: false,
+                        remote_mailbox,
+                        remote_uid: 0,
+                        message: format!(
+                            "{local_action}到本地；读取旧账号凭据以清理远端草稿失败：{error}"
+                        ),
+                    });
+                }
+            };
+            let candidates = [imap_probe::RemoteDeleteCandidate {
+                remote_uid: previous.remote_uid,
+                message_id_header: previous.message_id_header.clone(),
+            }];
+            if let Err(error) = imap_probe::delete_remote_messages(
+                &previous_account,
+                &previous_secret,
+                &previous_mailbox,
+                &candidates,
+            ) {
+                return Ok(DraftSaveReport {
+                    draft_id,
+                    remote_attempted: true,
+                    remote_synced: false,
+                    remote_mailbox,
+                    remote_uid: 0,
+                    message: format!("{local_action}到本地；清理旧远端草稿失败：{error}"),
+                });
+            }
+        }
+    }
+
+    let secret = match credentials::get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => {
+            return Ok(DraftSaveReport {
+                draft_id,
+                remote_attempted: false,
+                remote_synced: false,
+                remote_mailbox,
+                remote_uid: 0,
+                message: format!("{local_action}到本地；读取凭据以同步远端草稿失败：{error}"),
+            });
+        }
+    };
+    let raw_message = match smtp::render_outbound(&message) {
+        Ok(raw_message) => raw_message,
+        Err(error) => {
+            return Ok(DraftSaveReport {
+                draft_id,
+                remote_attempted: false,
+                remote_synced: false,
+                remote_mailbox,
+                remote_uid: 0,
+                message: format!("{local_action}到本地；构建远端草稿 MIME 失败：{error}"),
+            });
+        }
+    };
+    let previous_message_id_header = previous_reference
+        .as_ref()
+        .filter(|previous| previous.account_id == account.id)
+        .map(|previous| previous.message_id_header.as_str())
+        .unwrap_or_default();
+    match imap_probe::replace_draft_message(
+        &account,
+        &secret,
+        &remote_mailbox,
+        previous_message_id_header,
+        &message_id_header,
+        &raw_message,
+    ) {
+        Ok(result) => {
+            store.set_message_remote_identity(
+                draft_id,
+                &remote_mailbox,
+                result.remote_uid,
+                &message_id_header,
+            )?;
+            Ok(DraftSaveReport {
+                draft_id,
+                remote_attempted: true,
+                remote_synced: true,
+                remote_mailbox,
+                remote_uid: result.remote_uid,
+                message: format!("{local_action}并同步到远端草稿箱。"),
+            })
+        }
+        Err(error) => Ok(DraftSaveReport {
+            draft_id,
+            remote_attempted: true,
+            remote_synced: false,
+            remote_mailbox,
+            remote_uid: 0,
+            message: format!("{local_action}到本地；远端草稿同步失败：{error}"),
+        }),
+    }
 }
 
 #[tauri::command]

@@ -102,7 +102,7 @@ SQLite local store + OS keychain
 - `src-tauri/src/credentials.rs`：系统 Keychain 凭据读写边界，保存应用专用密码、授权码或 OAuth2 token，并在 access token 临近过期时触发 refresh token 自动刷新。
 - `src-tauri/src/oauth.rs`：OAuth2 PKCE 授权 URL 生成、授权码 token 交换和 refresh token 刷新，支持 Gmail/Outlook 授权页启动与 token 端点请求。
 - `src-tauri/src/smtp.rs`：基于 `lettre` 的真实 SMTP 发件箱发送路径，支持密码/授权码、XOAUTH2 认证、纯文本/HTML `multipart/alternative` 和带附件的 `multipart/mixed`；发送时生成稳定 Message-ID，并在成功后返回同一份原始 MIME 供远端留档。
-- `src-tauri/src/imap_probe.rs`：基于 `imap` 的真实登录、远端文件夹发现和已发送邮件 `APPEND` 留档，支持密码/授权码和 XOAUTH2 认证；留档前按 Message-ID 查重，优先读取 UIDPLUS 的 `APPENDUID`，缺失时再次搜索定位。
+- `src-tauri/src/imap_probe.rs`：基于 `imap` 的真实登录、远端文件夹发现、已发送邮件 `APPEND` 留档和远端草稿版本替换，支持密码/授权码和 XOAUTH2 认证；已发送留档前按 Message-ID 查重，优先读取 UIDPLUS 的 `APPENDUID`，缺失时再次搜索定位；保存草稿时在同一 Drafts 会话按旧/新 Message-ID 清理历史版本，再以 `\Draft` 标记追加最新 MIME。
 - `src-tauri/capabilities/default.json`：桌面能力声明，开放 shell/dialog/notification 与应用角标的最小默认权限。
 - `imap_mailboxes`：远端文件夹映射、系统角色推断、可空的本地自定义文件夹引用、UIDVALIDITY、最高/最低 UID 双游标、历史回填完成状态和最近历史回填时间。
 - `messages.remote_mailbox/remote_uid/message_id_header`：远端邮件头导入去重和后续正文拉取锚点。
@@ -118,7 +118,7 @@ SQLite local store + OS keychain
 - `messages`：邮件头、摘要、正文、状态、稍后处理时间、时间、线程 ID、附件数量。
 - `recipients`：to/cc/bcc 明细。
 - `labels` / `message_labels`：标签系统。
-- `drafts`：草稿，未来可合并进 messages。
+- 草稿直接存储在 `messages` 的 `drafts` 文件夹角色中，附件、身份、远端 mailbox/UID 和稳定 Message-ID 与普通邮件共用同一数据模型。
 - `sync_state`：UIDVALIDITY、最高 modseq、游标、失败状态。
 
 ## 6. 低内存策略
@@ -133,6 +133,7 @@ SQLite local store + OS keychain
 - 单账号邮件头同步顺序处理 `inbox/sent/drafts/archive/trash/spam` 六类核心目录和已绑定的自定义远端目录，每个目录单次最多读取 25 条邮件头并立即落库后释放批次；目录级失败只进入账号汇总警告，不阻断其他目录。自定义远端目录可直接绑定同账号的本地自定义文件夹；移动目标解析同时支持系统角色映射和 `local_folder_id → folders.role` 自定义映射，`UID MOVE` 成功后优先解析 `COPYUID` 写回目标 UID，缺失时按 Message-ID 定位，仍无法唯一定位则保存目标 mailbox + UID 0 并在下次同步原地重绑定；解除绑定后不再返回远端目标，未绑定目录继续跳过，禁止回退导入收件箱。
 - 手动同步、定时同步和发件箱发送共用 SQLite 持久化任务队列，避免重复触发协议任务并保留最近任务状态；发件箱定时项和 SMTP 失败项共用 `next_attempt_at`，真实 SMTP 只处理已到调度或重试窗口的 queued/scheduled/retry/failed 项。
 - SMTP 成功后邮件立即进入本地“已发送”并转为 `sent_remote_pending`，此时撤回入口关闭；后续只复用已持久化的原始 MIME 执行 IMAP `APPEND`，留档失败五分钟后重试，不重新连接 SMTP。APPEND 成功后转为 `sent` 并绑定远端 mailbox/UID；服务器不支持 UIDPLUS 且暂时无法搜索到 UID 时保存 UID 0，后续邮件头同步按 Message-ID 原地重绑定。
+- 显式保存草稿采用本地优先策略：SQLite 保存成功后重建同一稳定 Message-ID 的 MIME；若已映射远端 Drafts 且凭据可用，则在同一 IMAP 会话删除旧版本并以 `\Draft` 标记 APPEND 最新版本，再绑定 mailbox/UID。远端失败不会回滚或丢失本地草稿，UI 会明确显示仅本地保存原因，用户再次保存即可重试。
 - 撤销发送、用户指定稍后发送、SMTP 失败重试和远端留档重试共用 `outbox_queue.next_attempt_at`；前端只为最早到期项保留一个定时器，同类 queued/running 后台任务在 SQLite 层去重，避免重复协议执行和额外常驻轮询。
 - WebView 前端不使用大型 UI 框架，只用 React + CSS + 少量图标。
 - 图片、HTML、附件渲染走安全开关和懒加载。
@@ -162,6 +163,7 @@ SQLite local store + OS keychain
 - IMAP 附件文件下载、25 MB 安全上限、BODYSTRUCTURE 定位、BODY.PEEK part/chunk 分段写入、系统打开和另存为已具备首版入口；继续完善真实服务商兼容性矩阵。
 - 远端已读/星标/移动/恢复/永久删除状态回写已具备首版入口；星标通过 `\\Flagged` 回写，移动到已映射自定义文件夹时可解析对应远端 mailbox 并重绑定目标 UID，清空废纸篓按账号与远端目录批量执行 `\Deleted + UID EXPUNGE`，最近 50 封邮件会对账已读、星标与服务器删除状态，无法唯一定位的邮件安全跳过；继续做真实服务商验证和失败回滚策略。
 - SMTP 附件 MIME 构建、稳定 Message-ID、发送失败重试窗口，以及 SMTP 成功后通过 IMAP `APPEND` 写入已发送目录的两阶段状态机已具备首版入口；远端留档失败只重试 APPEND、不重复 SMTP，继续补真实账号附件发送、Sent 目录映射和 UIDPLUS/非 UIDPLUS 服务商兼容性验证。
+- 草稿已支持本地优先保存、稳定 MIME 重建、远端 Drafts 旧版本删除、`\Draft` APPEND 和结构化同步结果；继续验证网易/Gmail/Outlook/QQ 对 Drafts 映射、UIDPLUS 和重复 Message-ID 清理的兼容性。
 - 服务商兼容性矩阵已具备 UI 展示、预设复用、脱敏诊断导出和本地真实账号验证记录；网易 163 已完成 IMAP/SMTP TLS 与授权码认证验证，继续补其他服务商和真实发送/附件结果。
 - MIME 解析增强、远程图片信任审计和真实 HTML 邮件样本兼容。
 - 账号认证方式向导、真实账号 OAuth2 兼容性验证和连接诊断。
@@ -178,7 +180,7 @@ SQLite local store + OS keychain
 ## 9. 验证标准
 
 - `npm run build` 通过，前端类型检查和生产构建通过。
-- `npm run test:ui` 通过，Chrome headless 可在 mock Tauri 环境下验证三栏主界面、可拖拽三栏布局持久化/重置、文件夹右键全部标为已读/清空废纸篓、头像邮件列表、图标式高级搜索菜单、直接高频阅读动作、弹层边界、快捷键帮助按钮与键盘打开/关闭、全局 `Cmd/Ctrl + Z` 邮件操作撤销、`Cmd/Ctrl + A` 全选当前列表、键盘批量星标与 `Esc` 取消选择、线程列表/线程阅读视图、阅读安全提示、搜索、保存搜索快捷方式、联系人中心搜索/写信、联系人右键直达编辑表单、联系人新建/编辑/建议合并/手动合并/删除、命令面板联系人写信、写信工具区默认折叠、写信自动保存并在刷新后恢复、写信模板保存/插入、发件身份选择、联系人自动补全、写信附件按钮添加和拖拽投放添加、草稿保存、撤销发送档位持久化、倒计时内撤回到草稿箱、到期自动进入已发送、列表批量选择/星标/打标签、自定义文件夹创建/重命名/移动、废纸篓恢复、手动标为垃圾/不是垃圾、阻止发件人移入垃圾邮件、发件箱排队/撤回、设置弹窗、新账号默认目录/身份、账号移除邮箱确认和自动切换、本地 EML 导入、规则新增、原始 MIME 安全预览、稍后处理/取消稍后、单封标签切换、附件下载和远程图片信任重渲染。
+- `npm run test:ui` 通过，Chrome headless 可在 mock Tauri 环境下验证三栏主界面、可拖拽三栏布局持久化/重置、文件夹右键全部标为已读/清空废纸篓、头像邮件列表、图标式高级搜索菜单、直接高频阅读动作、弹层边界、快捷键帮助按钮与键盘打开/关闭、全局 `Cmd/Ctrl + Z` 邮件操作撤销、`Cmd/Ctrl + A` 全选当前列表、键盘批量星标与 `Esc` 取消选择、线程列表/线程阅读视图、阅读安全提示、搜索、保存搜索快捷方式、联系人中心搜索/写信、联系人右键直达编辑表单、联系人新建/编辑/建议合并/手动合并/删除、命令面板联系人写信、写信工具区默认折叠、写信自动保存并在刷新后恢复、写信模板保存/插入、发件身份选择、联系人自动补全、写信附件按钮添加和拖拽投放添加、草稿保存并显示远端 Drafts 同步成功、撤销发送档位持久化、倒计时内撤回到草稿箱、到期自动进入已发送、列表批量选择/星标/打标签、自定义文件夹创建/重命名/移动、废纸篓恢复、手动标为垃圾/不是垃圾、阻止发件人移入垃圾邮件、发件箱排队/撤回、设置弹窗、新账号默认目录/身份、账号移除邮箱确认和自动切换、本地 EML 导入、规则新增、原始 MIME 安全预览、稍后处理/取消稍后、单封标签切换、附件下载和远程图片信任重渲染。
 - `cargo test` 通过，数据库迁移、查询、状态切换、账号删除约束和关联数据级联清理可验证。
 - `cargo fmt` / `cargo clippy` 基本清洁。
 - 手动验证：启动 App 后能查看邮件、搜索、切换文件夹、标星、归档、删除、保存草稿。

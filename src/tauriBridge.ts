@@ -1413,11 +1413,25 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         attachments = attachments.filter((attachment) => attachment.message_id !== draftId);
         const message = accountMessageFromDraft(input, 'drafts', draftId);
         messages = messages.map((entry) => (entry.id === draftId ? message : entry));
-        return draftId as T;
+        return {
+          draft_id: draftId,
+          remote_attempted: true,
+          remote_synced: true,
+          remote_mailbox: 'Drafts',
+          remote_uid: message.remote_uid,
+          message: '草稿已更新并同步到远端草稿箱。',
+        } as T;
       }
       const message = accountMessageFromDraft(input, 'drafts');
       messages = [message, ...messages];
-      return message.id as T;
+      return {
+        draft_id: message.id,
+        remote_attempted: true,
+        remote_synced: true,
+        remote_mailbox: 'Drafts',
+        remote_uid: message.remote_uid,
+        message: '草稿已保存并同步到远端草稿箱。',
+      } as T;
     }
     case 'send_message': {
       const message = accountMessageFromDraft(args?.input as MockDraftInput, 'sent');

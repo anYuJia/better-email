@@ -375,6 +375,62 @@ pub fn append_sent_message(
     })
 }
 
+pub fn replace_draft_message(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    previous_message_id_header: &str,
+    message_id_header: &str,
+    raw_message: &[u8],
+) -> Result<RemoteAppendResult, MailError> {
+    if raw_message.is_empty() {
+        return Err(MailError::Imap(
+            "远端草稿同步缺少原始邮件内容。".to_string(),
+        ));
+    }
+
+    with_selected_mailbox(account, secret, remote_name, |session| {
+        let mut stale_uids = BTreeSet::new();
+        for header in [previous_message_id_header, message_id_header] {
+            if header.trim().is_empty() {
+                continue;
+            }
+            let query = format!("HEADER Message-ID {}", quote_imap_string(header)?);
+            stale_uids.extend(
+                session
+                    .uid_search(query)
+                    .map_err(|error| MailError::Imap(format!("IMAP 定位旧远端草稿失败：{error}")))?
+                    .into_iter()
+                    .map(i64::from),
+            );
+        }
+        if !stale_uids.is_empty() {
+            let uid_set = remote_uid_set(&stale_uids.into_iter().collect::<Vec<_>>())?;
+            session
+                .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
+                .map_err(|error| MailError::Imap(format!("IMAP 标记旧草稿删除失败：{error}")))?;
+            session
+                .uid_expunge(&uid_set)
+                .map_err(|error| MailError::Imap(format!("IMAP 删除旧草稿失败：{error}")))?;
+        }
+
+        let mut append = session.append(remote_name, raw_message);
+        append.flag(imap::types::Flag::Draft);
+        let appended = append
+            .finish()
+            .map_err(|error| MailError::Imap(format!("IMAP 同步远端草稿失败：{error}")))?;
+        let remote_uid = single_appended_uid(appended.uids.as_deref())
+            .or_else(|| {
+                find_any_remote_uid_by_message_id(session, message_id_header)
+                    .ok()
+                    .flatten()
+            })
+            .unwrap_or_default();
+
+        Ok(RemoteAppendResult { remote_uid })
+    })
+}
+
 fn single_appended_uid(uids: Option<&[UidSetMember]>) -> Option<i64> {
     let [member] = uids? else {
         return None;

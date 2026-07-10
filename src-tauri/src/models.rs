@@ -119,6 +119,16 @@ pub struct DraftInput {
     pub attachments: Vec<OutboundAttachmentInput>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct DraftSaveReport {
+    pub draft_id: i64,
+    pub remote_attempted: bool,
+    pub remote_synced: bool,
+    pub remote_mailbox: String,
+    pub remote_uid: i64,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OutboundAttachmentInput {
     pub filename: String,

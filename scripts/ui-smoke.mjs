@@ -520,7 +520,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.composer textarea').value.includes('Better Email Support')");
     await waitForExpression(cdp, "document.querySelector('.composer-html-source').value.includes('Better Email Support')");
     await clickButton(cdp, '保存草稿', "document.querySelector('.composer')");
-    await waitForExpression(cdp, "document.body.innerText.includes('草稿已保存') || document.body.innerText.includes('1 草稿')");
+    await waitForExpression(cdp, "document.body.innerText.includes('同步到远端草稿箱')");
 
     await clickButton(cdp, '写邮件');
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
@@ -957,7 +957,7 @@ async function main() {
         'composer rich text html works',
         'composer sender identity selector works',
         'composer signature insertion works',
-        'composer draft save works',
+        'composer draft save syncs remote drafts',
         'bulk star and label actions work',
         'keyboard select all bulk action and escape clear work',
         'thread view opens conversations',

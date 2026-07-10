@@ -4,9 +4,7 @@ import {
   Inbox,
   Keyboard,
   RefreshCw,
-  Search,
   Settings,
-  X,
 } from 'lucide-react';
 import './styles.css';
 import './ui-2026.css';
@@ -22,6 +20,9 @@ import SyncOperationsSettings from './components/settings/SyncOperationsSettings
 import ContactAutomationSettings from './components/settings/ContactAutomationSettings';
 import RuleAutomationSettings from './components/settings/RuleAutomationSettings';
 import SecurityPreviewSettings from './components/settings/SecurityPreviewSettings';
+import CommandPalette from './components/CommandPalette';
+import ShortcutHelpModal from './components/ShortcutHelpModal';
+import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useUndoQueue from './hooks/useUndoQueue';
 import {
   defaultNotificationPolicy,
@@ -136,7 +137,6 @@ import {
   folderIcon,
   folderIconForRole,
   primaryFolderRoles,
-  shortcutGroups,
   filters,
   messagePageSize,
   searchShortcuts,
@@ -146,13 +146,6 @@ import type {
   RuleConditionField,
   SendUndoDelaySeconds,
 } from './app/appConfig';
-
-type PendingSendUndo = {
-  outboxId: number;
-  subject: string;
-  expiresAt: string;
-  delaySeconds: SendUndoDelaySeconds;
-};
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -3103,111 +3096,32 @@ export default function App() {
             />
         </SettingsFrame>
       )}
-      {isShortcutsOpen && (
-        <div className="composer-backdrop shortcut-backdrop">
-          <section className="shortcut-modal" role="dialog" aria-modal="true" aria-label="快捷键帮助">
-            <header>
-              <div>
-                <strong>快捷键</strong>
-                <span>高频邮件操作，不离开键盘。</span>
-              </div>
-              <button type="button" onClick={() => setShortcutsOpen(false)}>关闭</button>
-            </header>
-            <div className="shortcut-grid">
-              {shortcutGroups.map((group) => (
-                <section className="shortcut-group" key={group.title}>
-                  <strong>{group.title}</strong>
-                  {group.items.map((item) => (
-                    <div className="shortcut-row" key={`${group.title}-${item.label}`}>
-                      <span>{item.label}</span>
-                      <div>
-                        {item.keys.map((key) => <kbd key={key}>{key}</kbd>)}
-                      </div>
-                    </div>
-                  ))}
-                </section>
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
-      {isCommandPaletteOpen && (
-        <div className="composer-backdrop command-palette-backdrop">
-          <section className="command-palette" role="dialog" aria-modal="true" aria-label="命令面板">
-            <header>
-              <Search size={18} />
-              <input
-                autoFocus
-                value={commandQuery}
-                onChange={(event) => setCommandQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const first = filteredCommandItems.find((item) => !item.disabled);
-                    if (first) void runCommandPaletteItem(first);
-                  }
-                }}
-                placeholder="搜索命令、邮箱、标签或动作"
-              />
-              <button type="button" onClick={() => setCommandPaletteOpen(false)} aria-label="关闭命令面板">
-                <X size={16} />
-              </button>
-            </header>
-            <div className="command-list">
-              {filteredCommandItems.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  disabled={item.disabled}
-                  onClick={() => runCommandPaletteItem(item).catch((error) => setStatus(String(error)))}
-                >
-                  <span>{item.section}</span>
-                  <strong>{item.title}</strong>
-                  <em>{item.hint}</em>
-                </button>
-              ))}
-              {filteredCommandItems.length === 0 && <p>没有匹配命令</p>}
-            </div>
-          </section>
-        </div>
-      )}
-      {(pendingSendUndo || undoAction) && (
-        <div className="snackbar-stack">
-          {pendingSendUndo && (
-            <section className="undo-snackbar send-undo-snackbar" role="status" aria-live="polite">
-              <div>
-                <strong>邮件将在 {pendingSendUndo.delaySeconds} 秒后发送</strong>
-                <span>{pendingSendUndo.subject} · 预计 {formatDate(pendingSendUndo.expiresAt)}</span>
-              </div>
-              <button type="button" onClick={() => undoPendingSend().catch((error) => setStatus(String(error)))}>
-                撤回发送
-              </button>
-              <button type="button" aria-label="关闭发送提示" onClick={() => setPendingSendUndo(null)}>
-                <X size={15} />
-              </button>
-              <span
-                className="send-undo-progress"
-                style={{ animationDuration: `${pendingSendUndo.delaySeconds}s` }}
-                aria-hidden="true"
-              />
-            </section>
-          )}
-          {undoAction && (
-            <section className="undo-snackbar" role="status" aria-live="polite">
-              <div>
-                <strong>{undoAction.title}</strong>
-                <span>{undoAction.detail}</span>
-              </div>
-              <button type="button" onClick={() => restoreUndoAction().catch((error) => setStatus(String(error)))}>
-                撤销
-              </button>
-              <button type="button" aria-label="关闭撤销提示" onClick={clearUndoAction}>
-                <X size={15} />
-              </button>
-            </section>
-          )}
-        </div>
-      )}
+      <ShortcutHelpModal
+        open={isShortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <CommandPalette
+        open={isCommandPaletteOpen}
+        query={commandQuery}
+        items={filteredCommandItems}
+        onQueryChange={setCommandQuery}
+        onRun={(item) => {
+          runCommandPaletteItem(item).catch((error) => setStatus(String(error)));
+        }}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+      <UndoSnackbarStack
+        pendingSendUndo={pendingSendUndo}
+        undoAction={undoAction}
+        onUndoSend={() => {
+          undoPendingSend().catch((error) => setStatus(String(error)));
+        }}
+        onDismissSend={() => setPendingSendUndo(null)}
+        onUndoAction={() => {
+          restoreUndoAction().catch((error) => setStatus(String(error)));
+        }}
+        onDismissAction={clearUndoAction}
+      />
       <div className="status-line">{status}</div>
     </main>
   );

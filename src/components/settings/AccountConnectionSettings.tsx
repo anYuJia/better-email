@@ -19,11 +19,13 @@ import type {
   ProviderVerificationStatus,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
+import AccountRemovalPanel from './AccountRemovalPanel';
 import OAuthSettingsPanel from './OAuthSettingsPanel';
 import './account-settings.css';
 
 type AccountConnectionSettingsProps = {
   accountForm: Account;
+  accountCount: number;
   newAccountForm: AccountCreateInput;
   providerVerifications: Record<string, ProviderVerificationRecord>;
   activeProviderVerification: ProviderVerificationRecord | null;
@@ -42,6 +44,7 @@ type AccountConnectionSettingsProps = {
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: () => void;
+  onRemoveAccount: () => Promise<void>;
   onUpdateProviderVerification: (providerName: string, patch: Partial<ProviderVerificationRecord>) => void;
   onSaveProviderVerification: () => void;
   onOauthClientIdChange: (value: string) => void;
@@ -89,6 +92,7 @@ function ProviderPresetGrid({
 
 export default function AccountConnectionSettings({
   accountForm,
+  accountCount,
   newAccountForm,
   providerVerifications,
   activeProviderVerification,
@@ -107,6 +111,7 @@ export default function AccountConnectionSettings({
   onApplyProviderPreset,
   onApplyNewAccountPreset,
   onCreateNewAccount,
+  onRemoveAccount,
   onUpdateProviderVerification,
   onSaveProviderVerification,
   onOauthClientIdChange,
@@ -262,6 +267,12 @@ export default function AccountConnectionSettings({
         </div>
       </section>
 
+      <AccountRemovalPanel
+        account={accountForm}
+        accountCount={accountCount}
+        onRemove={onRemoveAccount}
+      />
+
       <details className="settings-disclosure" data-settings-section="providers">
         <summary>
           <span>
@@ -408,6 +419,7 @@ export default function AccountConnectionSettings({
         onWaitForCallback={onWaitForOAuth2Callback}
         onExchange={onExchangeOAuth2Token}
       />
+
     </div>
   );
 }

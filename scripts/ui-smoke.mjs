@@ -766,10 +766,18 @@ async function main() {
     await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
     await waitForExpression(cdp, "document.body.innerText.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await waitForExpression(cdp, "document.querySelector('[data-account-remove-trigger]') && !document.querySelector('[data-account-remove-trigger]').disabled");
+    await evalInPage(cdp, "document.querySelector('[data-account-remove-trigger]').click()");
+    await waitForExpression(cdp, "document.querySelector('[data-account-remove-dialog]') && document.querySelector('[data-account-remove-confirm]').disabled");
+    await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'wrong@better-email.local');
+    await waitForExpression(cdp, "document.querySelector('[data-account-remove-confirm]').disabled");
+    await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'qa-new@better-email.local');
+    await waitForExpression(cdp, "!document.querySelector('[data-account-remove-confirm]').disabled");
+    await evalInPage(cdp, "document.querySelector('[data-account-remove-confirm]').click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('已移除 qa-new@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"1\"]')?.innerText.includes('demo@better-email.local')");
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]')");
-    await waitForExpression(cdp, "[...document.querySelectorAll('[data-context-item^=\"account-scope-\"]')].some((item) => item.innerText.includes('qa-new@better-email.local'))");
+    await waitForExpression(cdp, "![...document.querySelectorAll('[data-context-item^=\"account-scope-\"]')].some((item) => item.innerText.includes('qa-new@better-email.local'))");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"all\"]')?.innerText.includes('统一邮箱')");
 
@@ -887,6 +895,8 @@ async function main() {
         'settings header save completes update flow',
         'new account preset creation and scope switch work',
         'new account default folders and identity are available',
+        'account removal requires exact email confirmation',
+        'account removal clears scope and switches to a remaining account',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'undo send delay settings persist',

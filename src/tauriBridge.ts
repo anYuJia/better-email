@@ -420,6 +420,7 @@ type MockSyncRun = {
 
 type MockOAuthSession = {
   id: number;
+  account_id: number;
   provider: string;
   authorization_url: string;
   redirect_uri: string;
@@ -743,6 +744,27 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       ];
       return created as T;
     }
+    case 'delete_account': {
+      const accountId = Number(args?.accountId ?? 0);
+      const removedAccount = mockAccounts.find((item) => item.id === accountId);
+      if (!removedAccount) throw new Error('邮箱账号不存在或已被移除。');
+      if (mockAccounts.length <= 1) {
+        throw new Error('至少需要保留一个邮箱账号，无法移除当前唯一账号。');
+      }
+      const removedMessageIds = new Set(
+        messages.filter((message) => message.account_id === accountId).map((message) => message.id),
+      );
+      mockAccounts = mockAccounts.filter((item) => item.id !== accountId);
+      folders = folders.filter((folder) => folder.account_id !== accountId);
+      messages = messages.filter((message) => message.account_id !== accountId);
+      attachments = attachments.filter((attachment) => !removedMessageIds.has(attachment.message_id));
+      identities = identities.filter((identity) => identity.account_id !== accountId);
+      outbox = outbox.filter((item) => !removedMessageIds.has(item.message_id));
+      remoteImageTrusts = remoteImageTrusts.filter((trust) => trust.account_id !== accountId);
+      oauthSessions = oauthSessions.filter((session) => session.account_id !== accountId);
+      if (account.id === accountId) account = mockAccounts[0];
+      return account as T;
+    }
     case 'update_account_settings': {
       const accountId = Number(args?.accountId ?? 0);
       const existing = mockAccounts.find((item) => item.id === accountId);
@@ -906,6 +928,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const message = `UI smoke mock 已启动 ${provider} OAuth2 PKCE 授权。`;
       oauthSessions = [{
         id,
+        account_id: Number(input.account_id ?? account.id),
         provider,
         authorization_url: authorizationUrl,
         redirect_uri: redirectUri,

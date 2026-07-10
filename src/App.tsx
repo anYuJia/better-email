@@ -1555,6 +1555,35 @@ export default function App() {
     setStatus(`已创建账号：${created.email}`);
   }
 
+  async function removeCurrentAccount() {
+    if (!accountForm) return;
+    const removedAccount = accountForm;
+    const nextAccount = await invoke<Account>('delete_account', { accountId: removedAccount.id });
+    try {
+      const credentialResult = await invoke<CredentialStatus>('delete_account_secret', {
+        accountEmail: removedAccount.email,
+      });
+      setCredentialStatus(credentialResult);
+    } catch {
+      setCredentialStatus({
+        account_email: removedAccount.email,
+        exists: false,
+        message: '账号已移除，但系统安全存储中的凭据需要手动检查。',
+      });
+    }
+    setAccountScope(nextAccount.id);
+    setAccount(nextAccount);
+    setAccountForm(nextAccount);
+    setFolderId(null);
+    setMessages([]);
+    setSelectedId(null);
+    setAttachments([]);
+    const { folderId: nextFolderId } = await loadMeta(null, nextAccount.id);
+    await loadMessages(nextFolderId, query, filter, nextAccount.id);
+    setSettingsOpen(false);
+    setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
+  }
+
   function applyProviderPreset(preset: AccountProviderPreset) {
     if (!accountForm) return;
     setAccountForm({
@@ -2788,6 +2817,7 @@ export default function App() {
         >
             <AccountConnectionSettings
               accountForm={accountForm}
+              accountCount={accounts.length}
               newAccountForm={newAccountForm}
               providerVerifications={providerVerifications}
               activeProviderVerification={activeProviderVerification}
@@ -2806,6 +2836,7 @@ export default function App() {
               onApplyProviderPreset={applyProviderPreset}
               onApplyNewAccountPreset={applyNewAccountPreset}
               onCreateNewAccount={() => { createNewAccount().catch((error) => setStatus(String(error))); }}
+              onRemoveAccount={removeCurrentAccount}
               onUpdateProviderVerification={updateProviderVerification}
               onSaveProviderVerification={saveProviderVerification}
               onOauthClientIdChange={setOauthClientId}

@@ -729,6 +729,36 @@ impl MailStore {
         })
     }
 
+    pub fn delete_account(&self, account_id: i64) -> MailResult<Account> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let exists = transaction
+                .query_row(
+                    "SELECT 1 FROM accounts WHERE id = ?1",
+                    params![account_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .is_some();
+            if !exists {
+                return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
+            }
+
+            let account_count: i64 =
+                transaction.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
+            if account_count <= 1 {
+                return Err(MailError::Imap(
+                    "至少需要保留一个邮箱账号，无法移除当前唯一账号。".to_string(),
+                ));
+            }
+
+            transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
+            let next_account = account_for_conn(&transaction, None)?;
+            transaction.commit()?;
+            Ok(next_account)
+        })
+    }
+
     pub fn update_account_settings_for(
         &self,
         account_id: Option<i64>,
@@ -5652,6 +5682,124 @@ mod tests {
             )
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn accounts_can_be_safely_deleted_with_related_data() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = store
+            .create_account(AccountCreateInput {
+                email: "remove@better-email.local".to_string(),
+                display_name: "Remove Me".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.remove.test:993".to_string(),
+                smtp_host: "smtp.remove.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: "Remove signature".to_string(),
+            })
+            .unwrap();
+
+        let (message_id, attachment_id) = store
+            .with_conn(|conn| {
+                let inbox_id: i64 = conn.query_row(
+                    "SELECT id FROM folders WHERE account_id = ?1 AND role = 'inbox'",
+                    params![second_account.id],
+                    |row| row.get(0),
+                )?;
+                conn.execute(
+                    "INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at
+                     ) VALUES (?1, ?2, 'Sender', 'sender@example.com', ?3, 'Subject', 'Snippet', 'Body', ?4)",
+                    params![
+                        second_account.id,
+                        inbox_id,
+                        second_account.email,
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+                let message_id = conn.last_insert_rowid();
+                conn.execute(
+                    "INSERT INTO attachments(message_id, filename, mime_type, size_bytes)
+                     VALUES (?1, 'sample.txt', 'text/plain', 12)",
+                    params![message_id],
+                )?;
+                let attachment_id = conn.last_insert_rowid();
+                conn.execute(
+                    "INSERT INTO outbox_queue(message_id, status, queued_at)
+                     VALUES (?1, 'queued', ?2)",
+                    params![message_id, Utc::now().to_rfc3339()],
+                )?;
+                conn.execute(
+                    "INSERT INTO remote_image_trusts(account_id, scope, value, created_at)
+                     VALUES (?1, 'sender', 'sender@example.com', ?2)",
+                    params![second_account.id, Utc::now().to_rfc3339()],
+                )?;
+                conn.execute(
+                    "INSERT INTO imap_mailboxes(account_id, remote_name, last_seen_at)
+                     VALUES (?1, 'INBOX', ?2)",
+                    params![second_account.id, Utc::now().to_rfc3339()],
+                )?;
+                conn.execute(
+                    "INSERT INTO oauth_sessions(
+                        account_id, provider, authorization_url, redirect_uri, state,
+                        code_challenge, code_verifier, scopes, created_at
+                     ) VALUES (?1, 'custom', 'https://auth.example.com', 'better-email://oauth',
+                        ?2, 'challenge', 'verifier', 'mail.read', ?3)",
+                    params![
+                        second_account.id,
+                        format!("remove-account-{}", second_account.id),
+                        Utc::now().to_rfc3339()
+                    ],
+                )?;
+                Ok((message_id, attachment_id))
+            })
+            .unwrap();
+
+        let next_account = store.delete_account(second_account.id).unwrap();
+        assert_eq!(next_account.id, first_account.id);
+        assert_eq!(store.list_accounts().unwrap().len(), 1);
+
+        store
+            .with_conn(|conn| {
+                for table in [
+                    "folders",
+                    "messages",
+                    "mail_identities",
+                    "remote_image_trusts",
+                    "imap_mailboxes",
+                    "oauth_sessions",
+                ] {
+                    let sql = format!("SELECT COUNT(*) FROM {table} WHERE account_id = ?1");
+                    let count: i64 =
+                        conn.query_row(&sql, params![second_account.id], |row| row.get(0))?;
+                    assert_eq!(count, 0, "{table} should be cleared");
+                }
+                let outbox_count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM outbox_queue WHERE message_id = ?1",
+                    params![message_id],
+                    |row| row.get(0),
+                )?;
+                let attachment_count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM attachments WHERE id = ?1",
+                    params![attachment_id],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(outbox_count, 0);
+                assert_eq!(attachment_count, 0);
+                Ok(())
+            })
+            .unwrap();
+
+        let error = store
+            .delete_account(first_account.id)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("至少需要保留一个邮箱账号"));
+        assert_eq!(store.list_accounts().unwrap().len(), 1);
     }
 
     #[test]

@@ -80,6 +80,7 @@ pub fn run() {
             commands::run_sync_dry_run,
             commands::get_sync_schedule_plan,
             commands::sync_imap_headers,
+            commands::sync_imap_history,
             commands::fetch_message_body,
             commands::list_sync_runs,
             commands::parse_raw_message,

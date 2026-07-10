@@ -1116,7 +1116,7 @@ pub fn sync_imap_headers(
         let account = accounts
             .first()
             .ok_or_else(|| crate::db::MailError::Imap("没有可同步账号。".to_string()))?;
-        return sync_imap_headers_for_account(&store, account);
+        return sync_imap_headers_for_account(&store, account, false);
     }
 
     let started_at = Utc::now().to_rfc3339();
@@ -1127,7 +1127,7 @@ pub fn sync_imap_headers(
     let mut warnings = Vec::new();
 
     for account in accounts {
-        match sync_imap_headers_for_account(&store, &account) {
+        match sync_imap_headers_for_account(&store, &account, false) {
             Ok(run) => {
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
@@ -1203,7 +1203,20 @@ pub fn sync_imap_headers(
     )
 }
 
-fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailResult<SyncRun> {
+#[tauri::command]
+pub fn sync_imap_history(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<SyncRun> {
+    let account = store.get_account_by_id(account_id)?;
+    sync_imap_headers_for_account(&store, &account, true)
+}
+
+fn sync_imap_headers_for_account(
+    store: &MailStore,
+    account: &Account,
+    history_only: bool,
+) -> MailResult<SyncRun> {
     let secret = credentials::get_account_secret(account).map_err(crate::db::MailError::Imap)?;
     let started_at = Utc::now().to_rfc3339();
     let mut mailboxes = store.list_imap_mailboxes_for_account(Some(account.id))?;
@@ -1222,12 +1235,24 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
     let mut failures = Vec::new();
+    let mut completed_history_folders = 0;
     for mailbox in mailboxes {
-        match imap_probe::fetch_recent_headers(
+        if history_only && mailbox.history_complete {
+            completed_history_folders += 1;
+            continue;
+        }
+        match imap_probe::fetch_header_page(
             account,
             &secret,
             &mailbox.remote_name,
-            mailbox.highest_uid,
+            imap_probe::ImapHeaderFetchOptions {
+                uid_validity: &mailbox.uid_validity,
+                highest_uid: mailbox.highest_uid,
+                lowest_uid: mailbox.lowest_uid,
+                history_complete: mailbox.history_complete,
+                include_recent: !history_only,
+                include_history: true,
+            },
         ) {
             Ok(batch) => match store.import_imap_headers_batch(mailbox.id, &batch) {
                 Ok(imported) => {
@@ -1249,18 +1274,41 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
     } else {
         String::new()
     };
+    if history_only && scanned_folders == 0 && failures.is_empty() {
+        let message = format!(
+            "{} 的 {} 个已映射文件夹历史邮件已全部回填。{}",
+            account.email, completed_history_folders, custom_note
+        );
+        return store.record_sync_run(
+            &started_at,
+            &finished_at,
+            "imap_history_complete",
+            0,
+            0,
+            &message,
+        );
+    }
     if scanned_folders == 0 {
         let message = format!(
-            "{} 的 {} 个已映射文件夹同步均失败。{}{}",
+            "{} 的 {} 个已映射文件夹{}均失败。{}{}",
             account.email,
             total_mapped_folders,
+            if history_only {
+                "历史回填"
+            } else {
+                "同步"
+            },
             failures.join("；"),
             custom_note
         );
         store.record_sync_run(
             &started_at,
             &finished_at,
-            "imap_headers_account_failed",
+            if history_only {
+                "imap_history_account_failed"
+            } else {
+                "imap_headers_account_failed"
+            },
             0,
             0,
             &message,
@@ -1270,25 +1318,57 @@ fn sync_imap_headers_for_account(store: &MailStore, account: &Account) -> MailRe
 
     let (status, message) = if failures.is_empty() {
         (
-            "imap_headers_account",
-            format!(
-                "{} 同步完成：扫描 {} 个已映射文件夹，新增 {} 封。{}",
-                account.email, scanned_folders, imported_messages, custom_note
-            ),
+            if history_only {
+                "imap_history_account"
+            } else {
+                "imap_headers_account"
+            },
+            if history_only {
+                format!(
+                    "{} 历史回填完成：扫描 {} 个文件夹，补充 {} 封；{} 个目录此前已完成。{}",
+                    account.email,
+                    scanned_folders,
+                    imported_messages,
+                    completed_history_folders,
+                    custom_note
+                )
+            } else {
+                format!(
+                    "{} 同步完成：扫描 {} 个已映射文件夹，新增或补充 {} 封，并推进历史回填。{}",
+                    account.email, scanned_folders, imported_messages, custom_note
+                )
+            },
         )
     } else {
         (
-            "imap_headers_account_partial",
-            format!(
-                "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增 {} 封；{} 个目录失败：{}。{}",
-                account.email,
-                scanned_folders,
-                total_mapped_folders,
-                imported_messages,
-                failures.len(),
-                failures.join("；"),
-                custom_note
-            ),
+            if history_only {
+                "imap_history_account_partial"
+            } else {
+                "imap_headers_account_partial"
+            },
+            if history_only {
+                format!(
+                    "{} 历史回填部分完成：扫描 {}/{} 个文件夹，补充 {} 封；{} 个目录失败：{}。{}",
+                    account.email,
+                    scanned_folders,
+                    total_mapped_folders,
+                    imported_messages,
+                    failures.len(),
+                    failures.join("；"),
+                    custom_note
+                )
+            } else {
+                format!(
+                    "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增或补充 {} 封；{} 个目录失败：{}。{}",
+                    account.email,
+                    scanned_folders,
+                    total_mapped_folders,
+                    imported_messages,
+                    failures.len(),
+                    failures.join("；"),
+                    custom_note
+                )
+            },
         )
     };
     store.record_sync_run(
@@ -1792,6 +1872,9 @@ mod tests {
             local_folder_name: String::new(),
             uid_validity: String::new(),
             highest_uid: 0,
+            lowest_uid: 0,
+            history_complete: false,
+            history_last_sync_at: String::new(),
             last_seen_at: String::new(),
             last_sync_at: String::new(),
         }

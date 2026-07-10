@@ -15,6 +15,36 @@ use std::io::Write;
 const HEADER_FETCH_LIMIT: usize = 25;
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 
+fn select_recent_uid_page(mut uids: Vec<i64>, initial_sync: bool) -> Vec<i64> {
+    uids.sort_unstable();
+    if uids.len() <= HEADER_FETCH_LIMIT {
+        return uids;
+    }
+    if initial_sync {
+        uids.split_off(uids.len() - HEADER_FETCH_LIMIT)
+    } else {
+        uids.truncate(HEADER_FETCH_LIMIT);
+        uids
+    }
+}
+
+fn select_history_uid_page(mut uids: Vec<i64>) -> Vec<i64> {
+    uids.sort_unstable();
+    if uids.len() > HEADER_FETCH_LIMIT {
+        uids = uids.split_off(uids.len() - HEADER_FETCH_LIMIT);
+    }
+    uids
+}
+
+fn should_fetch_recent(
+    requested: bool,
+    cursor_reset: bool,
+    highest_uid: i64,
+    lowest_uid: i64,
+) -> bool {
+    requested || cursor_reset || (highest_uid <= 0 && lowest_uid <= 0)
+}
+
 #[derive(Debug, Clone)]
 pub struct RemoteDeleteCandidate {
     pub remote_uid: i64,
@@ -25,6 +55,16 @@ pub struct RemoteDeleteCandidate {
 pub struct RemoteDeleteBatchResult {
     pub deleted_count: i64,
     pub skipped_count: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ImapHeaderFetchOptions<'a> {
+    pub uid_validity: &'a str,
+    pub highest_uid: i64,
+    pub lowest_uid: i64,
+    pub history_complete: bool,
+    pub include_recent: bool,
+    pub include_history: bool,
 }
 
 pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(), MailError> {
@@ -84,11 +124,11 @@ pub fn failed_report(account_email: &str, message: String) -> ImapProbeReport {
     }
 }
 
-pub fn fetch_recent_headers(
+pub fn fetch_header_page(
     account: &Account,
     secret: &AccountSecret,
     remote_name: &str,
-    since_uid: i64,
+    options: ImapHeaderFetchOptions<'_>,
 ) -> Result<ImapHeaderBatch, MailError> {
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = imap::ClientBuilder::new(host.as_str(), port)
@@ -98,22 +138,72 @@ pub fn fetch_recent_headers(
     let mailbox = session
         .select(remote_name)
         .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
-    let search_query = if since_uid > 0 {
-        format!("UID {}:*", since_uid + 1)
+    let uid_validity = mailbox
+        .uid_validity
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    let cursor_reset = !options.uid_validity.is_empty()
+        && !uid_validity.is_empty()
+        && options.uid_validity != uid_validity;
+    let effective_highest_uid = if cursor_reset { 0 } else { options.highest_uid };
+    let effective_lowest_uid = if cursor_reset { 0 } else { options.lowest_uid };
+    let include_recent = should_fetch_recent(
+        options.include_recent,
+        cursor_reset,
+        effective_highest_uid,
+        effective_lowest_uid,
+    );
+    let mut next_history_complete = if cursor_reset {
+        false
     } else {
-        "ALL".to_string()
+        options.history_complete
     };
-    let mut uids = session
-        .uid_search(search_query)
-        .map_err(|error| MailError::Imap(format!("IMAP 搜索 UID 失败：{error}")))?
-        .into_iter()
-        .map(i64::from)
-        .filter(|uid| *uid > since_uid)
-        .collect::<Vec<_>>();
-    uids.sort_unstable();
-    if uids.len() > HEADER_FETCH_LIMIT {
-        uids = uids.split_off(uids.len() - HEADER_FETCH_LIMIT);
+    let mut history_scanned = false;
+    let mut uids = BTreeSet::new();
+
+    if include_recent {
+        let search_query = if effective_highest_uid > 0 {
+            format!("UID {}:*", effective_highest_uid + 1)
+        } else {
+            "ALL".to_string()
+        };
+        let mut recent_uids = session
+            .uid_search(search_query)
+            .map_err(|error| MailError::Imap(format!("IMAP 搜索 UID 失败：{error}")))?
+            .into_iter()
+            .map(i64::from)
+            .filter(|uid| *uid > effective_highest_uid)
+            .collect::<Vec<_>>();
+        if effective_highest_uid <= 0 {
+            history_scanned = options.include_history;
+            next_history_complete = recent_uids.len() <= HEADER_FETCH_LIMIT;
+        }
+        recent_uids = select_recent_uid_page(recent_uids, effective_highest_uid <= 0);
+        uids.extend(recent_uids);
     }
+
+    if options.include_history
+        && !next_history_complete
+        && !(include_recent && effective_highest_uid <= 0)
+    {
+        history_scanned = true;
+        if effective_lowest_uid <= 1 {
+            next_history_complete = true;
+        } else {
+            let mut history_uids = session
+                .uid_search(format!("UID 1:{}", effective_lowest_uid - 1))
+                .map_err(|error| MailError::Imap(format!("IMAP 搜索历史 UID 失败：{error}")))?
+                .into_iter()
+                .map(i64::from)
+                .filter(|uid| *uid > 0 && *uid < effective_lowest_uid)
+                .collect::<Vec<_>>();
+            next_history_complete = history_uids.len() <= HEADER_FETCH_LIMIT;
+            history_uids = select_history_uid_page(history_uids);
+            uids.extend(history_uids);
+        }
+    }
+
+    let uids = uids.into_iter().collect::<Vec<_>>();
 
     let headers = if uids.is_empty() {
         Vec::new()
@@ -140,16 +230,27 @@ pub fn fetch_recent_headers(
         .iter()
         .map(|header| header.remote_uid)
         .max()
-        .unwrap_or(since_uid);
+        .unwrap_or(effective_highest_uid)
+        .max(effective_highest_uid);
+    let page_lowest_uid = headers
+        .iter()
+        .map(|header| header.remote_uid)
+        .min()
+        .unwrap_or(effective_lowest_uid);
+    let lowest_uid = match (effective_lowest_uid, page_lowest_uid) {
+        (0, value) | (value, 0) => value,
+        (current, page) => current.min(page),
+    };
     let _ = session.logout();
 
     Ok(ImapHeaderBatch {
         remote_name: remote_name.to_string(),
-        uid_validity: mailbox
-            .uid_validity
-            .map(|value| value.to_string())
-            .unwrap_or_default(),
+        uid_validity,
         highest_uid,
+        lowest_uid,
+        history_complete: next_history_complete,
+        history_scanned,
+        cursor_reset,
         headers,
     })
 }
@@ -896,6 +997,34 @@ mod tests {
     fn builds_deduplicated_remote_uid_set() {
         assert_eq!(remote_uid_set(&[3, 1, 3, 0, -1]).unwrap(), "1,3");
         assert!(remote_uid_set(&[0, -1]).is_err());
+    }
+
+    #[test]
+    fn uid_pages_keep_initial_recent_and_incremental_order_without_gaps() {
+        let all_uids = (1..=100).collect::<Vec<_>>();
+        assert_eq!(
+            select_recent_uid_page(all_uids.clone(), true),
+            (76..=100).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            select_recent_uid_page(all_uids, false),
+            (1..=25).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn history_uid_page_stays_adjacent_to_low_watermark() {
+        assert_eq!(
+            select_history_uid_page((1..=75).collect()),
+            (51..=75).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn history_only_fetch_bootstraps_empty_or_reset_cursors() {
+        assert!(should_fetch_recent(false, false, 0, 0));
+        assert!(should_fetch_recent(false, true, 100, 76));
+        assert!(!should_fetch_recent(false, false, 100, 76));
     }
 
     #[test]

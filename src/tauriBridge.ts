@@ -174,6 +174,9 @@ function discoveredImapMailboxesForAccount(accountId: number, accountEmail: stri
     local_folder_name: '',
     uid_validity: '',
     highest_uid: 0,
+    lowest_uid: 0,
+    history_complete: false,
+    history_last_sync_at: '',
     last_seen_at: now,
     last_sync_at: '',
   }));
@@ -193,6 +196,9 @@ mockImapMailboxes.push({
   local_folder_name: '',
   uid_validity: '',
   highest_uid: 0,
+  lowest_uid: 0,
+  history_complete: false,
+  history_last_sync_at: '',
   last_seen_at: now,
   last_sync_at: '',
 });
@@ -1545,7 +1551,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         credentials_included: false,
       } as T;
     case 'run_sync_dry_run':
-    case 'sync_imap_headers': {
+    case 'sync_imap_headers':
+    case 'sync_imap_history': {
       const accountId = Number(args?.accountId ?? 0);
       const plan = mockSyncSchedulePlan(accountId);
       const scopedAccountCount = plan.batch_accounts.length;
@@ -1585,17 +1592,37 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           ...messages,
         ];
       }
-      const foldersPerAccount = command === 'sync_imap_headers' ? 4 : 1;
+      if (command === 'sync_imap_history') {
+        mockImapMailboxes = mockImapMailboxes.map((mailbox) => (
+          mailbox.account_id === targetAccount.id
+            ? {
+                ...mailbox,
+                lowest_uid: mailbox.lowest_uid > 0 ? Math.max(1, mailbox.lowest_uid - 25) : 5750,
+                highest_uid: mailbox.highest_uid || 6001,
+                history_complete: mailbox.lowest_uid > 0,
+                history_last_sync_at: now,
+                last_sync_at: now,
+              }
+            : mailbox
+        ));
+      }
+      const foldersPerAccount = command === 'sync_imap_headers'
+        ? 4
+        : command === 'sync_imap_history' ? 3 : 1;
       const scannedFolderCount = scopedAccountCount * foldersPerAccount;
       const run = {
         id: nextSyncRunId++,
         started_at: now,
         finished_at: now,
-        status: plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
+        status: command === 'sync_imap_history'
+          ? 'imap_history_account'
+          : plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
         scanned_folders: scannedFolderCount,
         imported_messages: 1,
-        message: args?.accountId
-          ? `UI smoke mock 同步完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个已映射文件夹，新增 1 封。`
+        message: command === 'sync_imap_history'
+          ? `UI smoke mock 历史回填完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个文件夹，补充 1 封。`
+          : args?.accountId
+          ? `UI smoke mock 同步完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个已映射文件夹，新增或补充 1 封。`
           : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，扫描 ${scannedFolderCount} 个已映射文件夹，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
       };
       syncRuns = [run, ...syncRuns].slice(0, 10);

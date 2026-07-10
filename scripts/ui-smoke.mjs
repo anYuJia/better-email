@@ -725,7 +725,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('4 个')");
     await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未映射')");
     await clickButton(cdp, '新建同名', "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')");
-    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('已映射') && document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('同步到 Alpha') && document.querySelector('select[aria-label=\"映射远端目录 Projects/Alpha\"]')?.value");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('已映射') && document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('等待首次同步') && document.querySelector('select[aria-label=\"映射远端目录 Projects/Alpha\"]')?.value");
+    await clickButton(cdp, '回填一页', "document.querySelector('.settings-sync-panel')");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('历史已回填至 UID 5750') && document.querySelector('.settings-sync-panel')?.innerText.includes('imap_history_account')");
     await clickButton(cdp, '演练', "document.querySelector('.settings-sync-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('design@better-email.local')");
     await clickButton(cdp, '同步邮件头', "document.querySelector('.settings-sync-panel')");

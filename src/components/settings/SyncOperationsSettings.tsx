@@ -1,4 +1,4 @@
-import { BadgeCheck, FolderPlus, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { BadgeCheck, FolderPlus, History, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import {
   canCancelOutboxItem,
   outboxStatusLabel,
@@ -37,6 +37,7 @@ type SyncOperationsSettingsProps = {
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
+  onSyncHistory: () => void;
   onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
   onCreateAndMapImapMailbox: (mailbox: ImapMailboxState) => void;
   onEnqueueBackgroundTask: (kind: BackgroundTaskKind, source: 'manual' | 'timer') => void;
@@ -61,6 +62,7 @@ export default function SyncOperationsSettings({
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
+  onSyncHistory,
   onMapImapMailbox,
   onCreateAndMapImapMailbox,
   onEnqueueBackgroundTask,
@@ -70,6 +72,9 @@ export default function SyncOperationsSettings({
   const customFolders = folders.filter(
     (folder) => folder.account_id === accountForm.id && folder.role.startsWith('custom:'),
   );
+  const pendingHistoryCount = accountMailboxes.filter(
+    (mailbox) => (mailbox.local_role !== 'custom' || mailbox.local_folder_id) && !mailbox.history_complete,
+  ).length;
 
   return (
     <details className="settings-disclosure" data-settings-section="sync">
@@ -193,6 +198,16 @@ export default function SyncOperationsSettings({
           </span>
           <div className="tool-actions">
             <button className="secondary" type="button" onClick={onRunSyncDryRun}>演练</button>
+            <button
+              className="secondary"
+              disabled={pendingHistoryCount === 0}
+              title={pendingHistoryCount === 0 ? '当前账号历史邮件已回填完成' : `为 ${pendingHistoryCount} 个目录各回填一页`}
+              type="button"
+              onClick={onSyncHistory}
+            >
+              <History size={14} />
+              回填一页
+            </button>
             <button type="button" onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
               <RefreshCw size={14} />
               同步邮件头
@@ -271,15 +286,17 @@ export default function SyncOperationsSettings({
                     )}
                   </div>
                 ) : (
-                  <span>{mailbox.local_role} · UID {mailbox.highest_uid || 0}</span>
+                  <span>{mailbox.local_role} · 最新 UID {mailbox.highest_uid || 0}</span>
                 )}
-                {mailbox.local_role === 'custom' && (
-                  <small>
-                    {mailbox.local_folder_name
-                      ? `同步到 ${mailbox.local_folder_name} · UID ${mailbox.highest_uid || 0}`
-                      : '选择本地文件夹后加入增量同步'}
-                  </small>
-                )}
+                <small>
+                  {mailbox.local_role === 'custom' && !mailbox.local_folder_name
+                    ? '选择本地文件夹后加入同步'
+                    : mailbox.history_complete
+                      ? `历史已完整 · 最早 UID ${mailbox.lowest_uid || 0}`
+                      : mailbox.lowest_uid > 0
+                        ? `历史已回填至 UID ${mailbox.lowest_uid}`
+                        : '等待首次同步'}
+                </small>
               </div>
             ))}
           </div>

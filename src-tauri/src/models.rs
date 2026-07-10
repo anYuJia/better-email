@@ -366,6 +366,9 @@ pub struct ImapMailboxState {
     pub local_folder_name: String,
     pub uid_validity: String,
     pub highest_uid: i64,
+    pub lowest_uid: i64,
+    pub history_complete: bool,
+    pub history_last_sync_at: String,
     pub last_seen_at: String,
     pub last_sync_at: String,
 }
@@ -388,6 +391,10 @@ pub struct ImapHeaderBatch {
     pub remote_name: String,
     pub uid_validity: String,
     pub highest_uid: i64,
+    pub lowest_uid: i64,
+    pub history_complete: bool,
+    pub history_scanned: bool,
+    pub cursor_reset: bool,
     pub headers: Vec<RemoteMessageHeader>,
 }
 

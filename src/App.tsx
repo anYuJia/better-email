@@ -1743,6 +1743,15 @@ export default function App() {
     return run;
   }
 
+  async function syncImapHistoryPage() {
+    const run = await invoke<SyncRun>('sync_imap_history', { accountId: accountForm?.id });
+    setSyncRuns((current) => [run, ...current].slice(0, 10));
+    await loadMeta(folderId);
+    await loadMessages(folderId, query, filter);
+    setStatus(run.message);
+    return run;
+  }
+
   async function exportDiagnostics() {
     const payload = await invoke<string>('export_diagnostics');
     setDiagnosticExport(payload);
@@ -2970,6 +2979,7 @@ export default function App() {
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
+              onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
               onMapImapMailbox={(mailbox, targetFolderId) => {
                 mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
               }}

@@ -297,6 +297,9 @@ impl MailStore {
                     local_folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     uid_validity TEXT NOT NULL DEFAULT '',
                     highest_uid INTEGER NOT NULL DEFAULT 0,
+                    lowest_uid INTEGER NOT NULL DEFAULT 0,
+                    history_complete INTEGER NOT NULL DEFAULT 0,
+                    history_last_sync_at TEXT NOT NULL DEFAULT '',
                     last_seen_at TEXT NOT NULL,
                     last_sync_at TEXT NOT NULL DEFAULT '',
                     UNIQUE(account_id, remote_name)
@@ -434,6 +437,42 @@ impl MailStore {
                 "imap_mailboxes",
                 "local_folder_id",
                 "INTEGER REFERENCES folders(id) ON DELETE SET NULL",
+            )?;
+            add_column_if_missing(
+                conn,
+                "imap_mailboxes",
+                "lowest_uid",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "imap_mailboxes",
+                "history_complete",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "imap_mailboxes",
+                "history_last_sync_at",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            conn.execute(
+                "
+                UPDATE imap_mailboxes
+                SET lowest_uid = COALESCE(
+                    (
+                        SELECT MIN(messages.remote_uid)
+                        FROM messages
+                        WHERE messages.account_id = imap_mailboxes.account_id
+                          AND messages.remote_mailbox = imap_mailboxes.remote_name
+                          AND messages.remote_uid > 0
+                    ),
+                    highest_uid
+                )
+                WHERE lowest_uid <= 0
+                  AND highest_uid > 0
+                ",
+                [],
             )?;
             ensure_default_identities_for_conn(conn)?;
             Ok(())
@@ -4605,7 +4644,8 @@ fn list_imap_mailboxes_for_conn(
         "
         SELECT m.id, m.account_id, a.email, m.remote_name, m.delimiter, m.attributes,
                m.local_role, m.local_folder_id, COALESCE(f.name, ''),
-               m.uid_validity, m.highest_uid, m.last_seen_at, m.last_sync_at
+               m.uid_validity, m.highest_uid, m.lowest_uid, m.history_complete,
+               m.history_last_sync_at, m.last_seen_at, m.last_sync_at
         FROM imap_mailboxes m
         JOIN accounts a ON a.id = m.account_id
         LEFT JOIN folders f ON f.id = m.local_folder_id
@@ -4645,8 +4685,11 @@ fn list_imap_mailboxes_for_conn(
                 local_folder_name: row.get(8)?,
                 uid_validity: row.get(9)?,
                 highest_uid: row.get(10)?,
-                last_seen_at: row.get(11)?,
-                last_sync_at: row.get(12)?,
+                lowest_uid: row.get(11)?,
+                history_complete: row.get::<_, i64>(12)? != 0,
+                history_last_sync_at: row.get(13)?,
+                last_seen_at: row.get(14)?,
+                last_sync_at: row.get(15)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -4680,6 +4723,18 @@ fn import_imap_headers_for_conn(
         folder_id_for_account_role(conn, account_id, &local_role)?
     };
     let mut imported_messages = 0;
+
+    if batch.cursor_reset {
+        conn.execute(
+            "
+            DELETE FROM messages
+            WHERE account_id = ?1
+              AND remote_mailbox = ?2
+              AND remote_uid > 0
+            ",
+            params![account_id, batch.remote_name],
+        )?;
+    }
 
     for header in &batch.headers {
         if !header.message_id.trim().is_empty() {
@@ -4749,14 +4804,32 @@ fn import_imap_headers_for_conn(
         "
         UPDATE imap_mailboxes
         SET uid_validity = ?2,
-            highest_uid = MAX(highest_uid, ?3),
-            last_sync_at = ?4
+            highest_uid = CASE
+                WHEN ?7 = 1 THEN ?3
+                ELSE MAX(highest_uid, ?3)
+            END,
+            lowest_uid = CASE
+                WHEN ?7 = 1 THEN ?4
+                WHEN ?4 <= 0 THEN lowest_uid
+                WHEN lowest_uid <= 0 THEN ?4
+                ELSE MIN(lowest_uid, ?4)
+            END,
+            history_complete = ?5,
+            history_last_sync_at = CASE
+                WHEN ?6 = 1 THEN ?8
+                ELSE history_last_sync_at
+            END,
+            last_sync_at = ?8
         WHERE id = ?1
         ",
         params![
             mailbox_id,
             batch.uid_validity,
             batch.highest_uid,
+            batch.lowest_uid,
+            bool_to_int(batch.history_complete),
+            bool_to_int(batch.history_scanned),
+            bool_to_int(batch.cursor_reset),
             Utc::now().to_rfc3339()
         ],
     )?;
@@ -6369,6 +6442,10 @@ mod tests {
             remote_name: "INBOX".to_string(),
             uid_validity: "42".to_string(),
             highest_uid: 7,
+            lowest_uid: 7,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 7,
                 message_id: "<m1@example.com>".to_string(),
@@ -6398,6 +6475,154 @@ mod tests {
     }
 
     #[test]
+    fn imap_history_cursor_moves_backward_until_complete() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let header = |remote_uid: i64, message_id: &str| crate::models::RemoteMessageHeader {
+            remote_uid,
+            message_id: message_id.to_string(),
+            subject: format!("History {remote_uid}"),
+            sender_name: "Remote".to_string(),
+            sender_email: "remote@example.com".to_string(),
+            recipients: "demo@better-email.local".to_string(),
+            snippet: "history header".to_string(),
+            received_at: Utc::now().to_rfc3339(),
+            is_read: false,
+        };
+
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "history-1".to_string(),
+                    highest_uid: 100,
+                    lowest_uid: 76,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(100, "<history-100@example.com>")],
+                },
+            )
+            .unwrap();
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "history-1".to_string(),
+                    highest_uid: 100,
+                    lowest_uid: 51,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(51, "<history-51@example.com>")],
+                },
+            )
+            .unwrap();
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "history-1".to_string(),
+                    highest_uid: 100,
+                    lowest_uid: 1,
+                    history_complete: true,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(1, "<history-1@example.com>")],
+                },
+            )
+            .unwrap();
+
+        let state = store
+            .list_imap_mailboxes()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.id == mailbox.id)
+            .unwrap();
+        assert_eq!(state.highest_uid, 100);
+        assert_eq!(state.lowest_uid, 1);
+        assert!(state.history_complete);
+        assert!(!state.history_last_sync_at.is_empty());
+    }
+
+    #[test]
+    fn imap_uidvalidity_reset_replaces_stale_remote_uid_rows() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let batch = |uid_validity: &str, message_id: &str, subject: &str, cursor_reset: bool| {
+            ImapHeaderBatch {
+                remote_name: "INBOX".to_string(),
+                uid_validity: uid_validity.to_string(),
+                highest_uid: 7,
+                lowest_uid: 7,
+                history_complete: false,
+                history_scanned: true,
+                cursor_reset,
+                headers: vec![crate::models::RemoteMessageHeader {
+                    remote_uid: 7,
+                    message_id: message_id.to_string(),
+                    subject: subject.to_string(),
+                    sender_name: "Remote".to_string(),
+                    sender_email: "remote@example.com".to_string(),
+                    recipients: "demo@better-email.local".to_string(),
+                    snippet: "uid validity".to_string(),
+                    received_at: Utc::now().to_rfc3339(),
+                    is_read: false,
+                }],
+            }
+        };
+
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &batch("uidvalidity-old", "<old@example.com>", "Old UID row", false),
+            )
+            .unwrap();
+        store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &batch("uidvalidity-new", "<new@example.com>", "New UID row", true),
+            )
+            .unwrap();
+
+        let (old_count, new_count): (i64, i64) = store
+            .with_conn(|conn| {
+                Ok((
+                    conn.query_row(
+                        "SELECT COUNT(*) FROM messages WHERE subject = 'Old UID row'",
+                        [],
+                        |row| row.get(0),
+                    )?,
+                    conn.query_row(
+                        "SELECT COUNT(*) FROM messages WHERE subject = 'New UID row'",
+                        [],
+                        |row| row.get(0),
+                    )?,
+                ))
+            })
+            .unwrap();
+        assert_eq!(old_count, 0);
+        assert_eq!(new_count, 1);
+    }
+
+    #[test]
     fn imap_header_sync_rebinds_pending_moved_message_uid() {
         let store = test_store();
         let mailbox = store
@@ -6412,6 +6637,10 @@ mod tests {
             remote_name: "Archive".to_string(),
             uid_validity: "archive-1".to_string(),
             highest_uid: 77,
+            lowest_uid: 77,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 77,
                 message_id: "<moved-rebind@example.com>".to_string(),
@@ -6480,6 +6709,10 @@ mod tests {
             remote_name: "INBOX".to_string(),
             uid_validity: "batch-1".to_string(),
             highest_uid: 41,
+            lowest_uid: 41,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 41,
                 message_id: "<batch-no-log@example.com>".to_string(),
@@ -6523,6 +6756,10 @@ mod tests {
                     remote_name: mailbox.remote_name.clone(),
                     uid_validity: "custom-1".to_string(),
                     highest_uid: 51,
+                    lowest_uid: 51,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
                     headers: vec![crate::models::RemoteMessageHeader {
                         remote_uid: 51,
                         message_id: "<custom-folder@example.com>".to_string(),
@@ -6602,6 +6839,10 @@ mod tests {
             remote_name: "Projects/Alpha".to_string(),
             uid_validity: "custom-map-1".to_string(),
             highest_uid: 71,
+            lowest_uid: 71,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 71,
                 message_id: "<custom-mapped@example.com>".to_string(),
@@ -6668,6 +6909,10 @@ mod tests {
             remote_name: "INBOX".to_string(),
             uid_validity: "rules-1".to_string(),
             highest_uid: 21,
+            lowest_uid: 21,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 21,
                 message_id: "<customer@example.com>".to_string(),
@@ -6715,6 +6960,10 @@ mod tests {
             remote_name: "INBOX".to_string(),
             uid_validity: "42".to_string(),
             highest_uid: 8,
+            lowest_uid: 8,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 8,
                 message_id: "<m2@example.com>".to_string(),
@@ -6774,6 +7023,10 @@ mod tests {
             remote_name: "INBOX".to_string(),
             uid_validity: "1".to_string(),
             highest_uid: 9,
+            lowest_uid: 9,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 9,
                 message_id: "<attachment@example.com>".to_string(),
@@ -7302,6 +7555,10 @@ mod tests {
                     remote_name: "INBOX".to_string(),
                     uid_validity: "rule-stop".to_string(),
                     highest_uid: 9901,
+                    lowest_uid: 9901,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
                     headers: vec![crate::models::RemoteMessageHeader {
                         remote_uid: 9901,
                         message_id: "rule-stop-9901@example.com".to_string(),

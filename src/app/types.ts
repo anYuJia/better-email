@@ -262,6 +262,9 @@ export type ImapMailboxState = {
   local_folder_name: string;
   uid_validity: string;
   highest_uid: number;
+  lowest_uid: number;
+  history_complete: boolean;
+  history_last_sync_at: string;
   last_seen_at: string;
   last_sync_at: string;
 };

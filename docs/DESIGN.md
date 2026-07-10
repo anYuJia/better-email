@@ -101,7 +101,7 @@ SQLite local store + OS keychain
 - `src-tauri/src/smtp.rs`：基于 `lettre` 的真实 SMTP 发件箱发送路径，支持密码/授权码、XOAUTH2 认证、纯文本/HTML `multipart/alternative` 和带附件的 `multipart/mixed`。
 - `src-tauri/src/imap_probe.rs`：基于 `imap` 的真实登录和远端文件夹发现，支持密码/授权码和 XOAUTH2 认证。
 - `src-tauri/capabilities/default.json`：桌面能力声明，开放 shell/dialog/notification 与应用角标的最小默认权限。
-- `imap_mailboxes`：远端文件夹映射、系统角色推断、可空的本地自定义文件夹引用、UIDVALIDITY/highest UID 游标。
+- `imap_mailboxes`：远端文件夹映射、系统角色推断、可空的本地自定义文件夹引用、UIDVALIDITY、最高/最低 UID 双游标、历史回填完成状态和最近历史回填时间。
 - `messages.remote_mailbox/remote_uid/message_id_header`：远端邮件头导入去重和后续正文拉取锚点。
 - `oauth_sessions`：OAuth2 PKCE 授权会话，保存 state、code challenge、verifier、scopes、授权码和交换状态，用于本地回调/token 交换恢复；access/refresh token 和 client 元数据只写入系统 Keychain。
 - 品牌升级迁移：新安装使用 `better-email` 包名、`Better Email` 产品名、`app.betteremail.client` 标识、`better-email.sqlite3` 数据库和 `Better Email` Keychain 服务；升级时自动读取并迁移旧 `swiftmail.*` localStorage、`swiftmail.sqlite3`/旧应用数据目录和 `SwiftMail` Keychain 凭据。
@@ -120,6 +120,7 @@ SQLite local store + OS keychain
 ## 6. 低内存策略
 
 - 邮件列表分页加载，默认只加载 50 条头信息。
+- IMAP 邮件头同步将新邮件增量与历史回填分离：新邮件从最高 UID 向前每页最多 25 封，历史邮件从最低 UID 向后每个目录每轮最多 25 封；首次同步只取最近一页，后续后台同步或手动“回填一页”逐步补齐，避免长连接和瞬时内存峰值。
 - 阅读面板按需拉正文，附件只存元数据，点击才下载。
 - 附件下载先按元数据做大小保护，当前默认 25 MB 上限；真实 IMAP 下载优先用 BODYSTRUCTURE 定位 MIME part，再通过 `BODY.PEEK[part]<offset.count>` 以 256 KB 块写入临时文件并原子替换到本地附件目录，找不到 part 时仅对上限内小附件回退整封解析。
 - SQLite 查询只返回 UI 必需字段，正文搜索走 FTS。

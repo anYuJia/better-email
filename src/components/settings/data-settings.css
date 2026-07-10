@@ -439,18 +439,87 @@
   color: #b43c3c;
 }
 
-.settings-credential-panel > label {
+.settings-credential-panel .tool-header > em.stored {
+  color: #287a4c;
+  border-color: #cce4d6;
+  background: #f2faf5;
+}
+
+.credential-guide-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0 12px;
+  border-bottom: 1px solid #e8ebee;
+}
+
+.credential-guide-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #cfe2f5;
+  border-radius: 8px;
+  color: #17699f;
+  background: #f3f8fd;
+}
+
+.credential-guide-card > div {
+  min-width: 0;
+}
+
+.credential-guide-card strong {
+  display: block;
+  color: var(--ui-text);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.credential-guide-card p {
+  margin: 3px 0 0;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.credential-provider-tag {
+  align-self: start;
+  padding: 4px 7px;
+  border: 1px solid #d9e2ea;
+  border-radius: 7px;
+  color: #53616f;
+  background: #fafbfc;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settings-credential-panel .credential-field {
   display: grid;
   gap: 6px;
+  margin-top: 12px;
   color: var(--ui-text-secondary);
   font-size: 10.5px;
   font-weight: 650;
 }
 
-.settings-credential-panel input {
+.credential-field > small {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.credential-input-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.settings-credential-panel .credential-input-shell input {
   min-height: 36px;
   width: 100%;
-  padding: 0 9px;
+  padding: 0 68px 0 10px;
   border: 1px solid #dce2e8;
   border-radius: 8px;
   color: var(--ui-text);
@@ -458,9 +527,70 @@
   box-shadow: inset 0 1px 1px rgba(24, 33, 45, 0.025);
 }
 
-.settings-credential-panel input:focus {
+.settings-credential-panel .credential-input-shell input:focus {
   border-color: rgba(8, 127, 245, 0.52);
   box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.10);
+}
+
+.credential-input-tools {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+
+.credential-input-tools button {
+  display: grid;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: #667381;
+  background: transparent;
+}
+
+.credential-input-tools button:hover:not(:disabled) {
+  color: #17699f;
+  background: #eef5fb;
+}
+
+.credential-input-tools button:disabled {
+  opacity: 0.35;
+}
+
+.credential-safety-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credential-safety-points li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid #e2e7eb;
+  border-radius: 8px;
+  color: #586573;
+  background: #fafbfc;
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.credential-safety-points svg {
+  flex: 0 0 auto;
+  color: #287a4c;
 }
 
 .settings-credential-panel .credential-actions {
@@ -473,6 +603,11 @@
 
 .settings-credential-panel .credential-actions button.danger {
   color: var(--ui-danger);
+}
+
+.settings-credential-panel .credential-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .settings-credential-panel .settings-auth-summary {
@@ -687,6 +822,33 @@
   }
 
   .settings-write-validation-actions > button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .credential-guide-card {
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .credential-provider-tag {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .credential-safety-points {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-credential-panel .credential-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-credential-panel .credential-actions button {
+    width: 100%;
+  }
+
+  .settings-credential-panel .credential-actions [data-credential-primary-action] {
     grid-column: 1 / -1;
   }
 }

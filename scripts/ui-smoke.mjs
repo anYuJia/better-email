@@ -766,6 +766,13 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await waitForExpression(cdp, "document.querySelector('.settings-credential-panel[data-credential-provider=\"icloud\"]')?.innerText.includes('自定义邮箱') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后立即清空输入框') && document.querySelector('[data-credential-primary-action]')?.innerText.includes('验证登录')");
+    await fillInput(cdp, '.credential-input-shell input', 'local-smoke-app-password');
+    await waitForExpression(cdp, "document.querySelector('[data-credential-primary-action]')?.innerText.includes('保存并验证') && document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]')");
+    await evalInPage(cdp, "document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.credential-input-shell input')?.type === 'text' && document.querySelector('.credential-input-tools button[aria-label=\"隐藏凭据\"]')");
+    await evalInPage(cdp, "document.querySelector('.credential-input-tools button[aria-label=\"清空凭据输入\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.credential-input-shell input')?.value === '' && document.querySelector('.credential-input-shell input')?.type === 'password' && document.querySelector('[data-credential-primary-action]')?.innerText.includes('验证登录')");
     await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
     await waitForExpression(cdp, "document.querySelector('[data-connection-diagnostics]')?.innerText.includes('账号连接已就绪') && [...document.querySelectorAll('[data-diagnostic-step]')].length === 4 && [...document.querySelectorAll('[data-diagnostic-step]')].every((step) => step.classList.contains('success')) && !document.querySelector('.connection-technical-details')?.open");
     await clickButton(cdp, '一键验收', "document.querySelector('[data-connection-diagnostics]')");
@@ -1020,6 +1027,7 @@ async function main() {
         'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
+        'provider-aware secure credential controls protect and clear local input',
         'provider-aware credential diagnostics guide recovery and fold technical details',
         'read-only provider validation runs connection login folder and header checks',
         'write validation prepares a self-addressed draft without automatic sending',

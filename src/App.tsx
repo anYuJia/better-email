@@ -1683,11 +1683,11 @@ export default function App() {
   async function storeCredential() {
     if (!account?.email) {
       setStatus('账号尚未加载，无法保存凭据');
-      return;
+      return null;
     }
     if (!credentialSecret.trim()) {
       setStatus(account.auth_type === 'oauth2' ? '请输入 OAuth2 访问/刷新 Token' : '请输入应用专用密码或授权码');
-      return;
+      return null;
     }
     const result = await invoke<CredentialStatus>('store_account_secret', {
       input: { account_email: account.email, secret: credentialSecret },
@@ -1696,6 +1696,13 @@ export default function App() {
     setCredentialVerification(null);
     setCredentialSecret('');
     setStatus(result.message);
+    return result;
+  }
+
+  async function storeAndVerifyCredential() {
+    const result = await storeCredential();
+    if (!result?.exists) return;
+    await verifyAccountCredentials();
   }
 
   async function checkCredential() {
@@ -2343,6 +2350,9 @@ export default function App() {
               }}
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
+              onStoreAndVerifyCredential={() => {
+                storeAndVerifyCredential().catch((error) => setStatus(String(error)));
+              }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
               onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
               onMapImapMailbox={(mailbox, targetFolderId) => {

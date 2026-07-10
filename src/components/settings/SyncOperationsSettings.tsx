@@ -1,14 +1,11 @@
 import {
-  BadgeCheck,
   FileCheck2,
   FolderPlus,
   History,
   Inbox,
-  KeyRound,
   RefreshCw,
   Search,
   Send,
-  Trash2,
 } from 'lucide-react';
 import {
   canCancelOutboxItem,
@@ -31,7 +28,7 @@ import type {
   SyncSchedulePlan,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
-import ConnectionDiagnosticsPanel from './ConnectionDiagnosticsPanel';
+import CredentialSecuritySettings from './CredentialSecuritySettings';
 import './data-settings.css';
 
 type SyncOperationsSettingsProps = {
@@ -60,6 +57,7 @@ type SyncOperationsSettingsProps = {
   onLocateWriteValidation: (role: 'sent' | 'inbox') => void;
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
+  onStoreAndVerifyCredential: () => void;
   onRunSyncDryRun: () => void;
   onSyncHistory: () => void;
   onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
@@ -94,6 +92,7 @@ export default function SyncOperationsSettings({
   onLocateWriteValidation,
   onDeleteCredential,
   onStoreCredential,
+  onStoreAndVerifyCredential,
   onRunSyncDryRun,
   onSyncHistory,
   onMapImapMailbox,
@@ -153,49 +152,22 @@ export default function SyncOperationsSettings({
         )}
       </section>
 
-      <section className="tool-panel settings-credential-panel" data-settings-section="auth">
-        <header className="tool-header">
-          <span>
-            <strong>系统凭据库</strong>
-            <small>{accountForm.email}</small>
-          </span>
-          <em>{credentialStatus?.exists ? '已保存' : '未保存'}</em>
-        </header>
-        <label>
-          {accountForm.auth_type === 'oauth2' ? 'OAuth2 Token' : '应用专用密码 / 授权码'}
-          <input
-            type="password"
-            value={credentialSecret}
-            autoComplete="new-password"
-            onChange={(event) => onCredentialSecretChange(event.target.value)}
-            placeholder="只写入系统安全存储，不进入本地数据库"
-          />
-        </label>
-        <div className="credential-actions">
-          <button className="secondary" type="button" onClick={onCheckCredential}>检查存储</button>
-          <button className="secondary danger" type="button" onClick={onDeleteCredential}>
-            <Trash2 size={14} />
-            删除
-          </button>
-          <button className="secondary" type="button" onClick={onStoreCredential}>
-            <KeyRound size={14} />
-            保存凭据
-          </button>
-          <button type="button" title="验证 IMAP 与 SMTP 登录，不会发送邮件" onClick={onVerifyCredential}>
-            <BadgeCheck size={14} />
-            验证登录
-          </button>
-        </div>
-        <ConnectionDiagnosticsPanel
-          account={accountForm}
-          credentialStatus={credentialStatus}
-          connectionReport={connectionReport}
-          credentialVerification={credentialVerification}
-          providerValidationReport={providerValidationReport}
-          providerValidationRunning={providerValidationRunning}
-          onRunProviderValidation={onRunProviderValidation}
-        />
-      </section>
+      <CredentialSecuritySettings
+        account={accountForm}
+        credentialSecret={credentialSecret}
+        credentialStatus={credentialStatus}
+        connectionReport={connectionReport}
+        credentialVerification={credentialVerification}
+        providerValidationReport={providerValidationReport}
+        providerValidationRunning={providerValidationRunning}
+        onCredentialSecretChange={onCredentialSecretChange}
+        onCheckCredential={onCheckCredential}
+        onVerifyCredential={onVerifyCredential}
+        onRunProviderValidation={onRunProviderValidation}
+        onDeleteCredential={onDeleteCredential}
+        onStoreCredential={onStoreCredential}
+        onStoreAndVerifyCredential={onStoreAndVerifyCredential}
+      />
 
       <section className="tool-panel settings-sync-panel">
         <header className="tool-header">

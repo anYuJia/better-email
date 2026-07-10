@@ -662,6 +662,26 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
+    await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]')");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
+    await clickButton(cdp, '设置');
+    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('OAuth2 向导')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"auth\"]');
+    await fillInput(cdp, '.settings-oauth-panel input[placeholder*="Client ID"]', 'smoke-client-id');
+    await clickButton(cdp, '打开 OAuth2 授权页', "document.querySelector('.settings-oauth-panel')");
+    await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('outlook · Session #1') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('authorization_pending')");
+    await fillInput(cdp, '.settings-oauth-callback input[placeholder="回调 state"]', 'mock-state-1');
+    await fillInput(cdp, '.settings-oauth-callback input[placeholder="授权码 code"]', 'smoke-authorization-code');
+    await clickButton(cdp, '记录回调授权码', "document.querySelector('.settings-oauth-callback')");
+    await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('code_received') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('交换并保存 Token')");
+    await clickButton(cdp, '交换并保存 Token', "document.querySelector('.settings-oauth-sessions')");
+    await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('token_stored')");
+    await clickButton(cdp, '刷新已保存 Token', "document.querySelector('.settings-oauth-actions')");
+    await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('refreshed') && document.body.innerText.includes('OAuth2 Token 已刷新')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+
+    await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('design@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('iCloud')");
@@ -849,6 +869,7 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'undo send delay settings persist',
         'undo send returns message to drafts',

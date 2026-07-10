@@ -417,10 +417,26 @@ type MockSyncRun = {
   message: string;
 };
 
+type MockOAuthSession = {
+  id: number;
+  provider: string;
+  authorization_url: string;
+  redirect_uri: string;
+  state: string;
+  code_challenge: string;
+  scopes: string[];
+  status: string;
+  created_at: string;
+  completed_at: string;
+  message: string;
+};
+
 let backgroundTasks: MockBackgroundTask[] = [];
 let syncRuns: MockSyncRun[] = [];
+let oauthSessions: MockOAuthSession[] = [];
 let nextFolderId = 1001;
 let nextSyncRunId = 1;
+let nextOAuthSessionId = 1;
 
 function folderIdForRole(role: string, accountId: number = account.id) {
   return (
@@ -814,8 +830,113 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'list_outbox':
       return outbox as T;
     case 'list_imap_mailboxes':
-    case 'list_oauth_sessions':
       return [] as T;
+    case 'list_oauth_sessions':
+      return oauthSessions as T;
+    case 'start_oauth2_pkce': {
+      const input = (args?.input ?? {}) as Record<string, unknown>;
+      const id = nextOAuthSessionId++;
+      const provider = String(input.provider ?? 'outlook');
+      const redirectUri = String(input.redirect_uri ?? 'http://127.0.0.1:17645/oauth/callback');
+      const state = `mock-state-${id}`;
+      const scopes = provider.toLowerCase() === 'gmail'
+        ? ['openid', 'email', 'https://mail.google.com/']
+        : ['openid', 'offline_access', 'https://outlook.office.com/IMAP.AccessAsUser.All'];
+      const authorizationUrl = `https://login.example.test/oauth2/authorize?state=${state}`;
+      const message = `UI smoke mock 已启动 ${provider} OAuth2 PKCE 授权。`;
+      oauthSessions = [{
+        id,
+        provider,
+        authorization_url: authorizationUrl,
+        redirect_uri: redirectUri,
+        state,
+        code_challenge: `mock-challenge-${id}`,
+        scopes,
+        status: 'authorization_pending',
+        created_at: now,
+        completed_at: '',
+        message,
+      }, ...oauthSessions];
+      return {
+        session_id: id,
+        provider,
+        authorization_url: authorizationUrl,
+        redirect_uri: redirectUri,
+        state,
+        code_challenge: `mock-challenge-${id}`,
+        code_verifier_hint: `mock-verifier-${id}`,
+        scopes,
+        message,
+      } as T;
+    }
+    case 'complete_oauth2_callback': {
+      const input = (args?.input ?? {}) as Record<string, unknown>;
+      const state = String(input.state ?? '');
+      const session = oauthSessions.find((item) => item.state === state);
+      if (!session) throw new Error('OAuth2 session not found');
+      oauthSessions = oauthSessions.map((item) => item.id === session.id
+        ? {
+            ...item,
+            status: 'code_received',
+            completed_at: now,
+            message: 'UI smoke mock 已记录 OAuth2 回调授权码。',
+          }
+        : item);
+      return {
+        session_id: session.id,
+        provider: session.provider,
+        status: 'code_received',
+        message: 'UI smoke mock 已记录 OAuth2 回调授权码。',
+      } as T;
+    }
+    case 'wait_for_oauth2_callback': {
+      const session = oauthSessions[0];
+      if (!session) throw new Error('OAuth2 session not found');
+      oauthSessions = oauthSessions.map((item) => item.id === session.id
+        ? {
+            ...item,
+            status: 'code_received',
+            completed_at: now,
+            message: 'UI smoke mock 本地回调监听完成。',
+          }
+        : item);
+      return {
+        session_id: session.id,
+        provider: session.provider,
+        status: 'code_received',
+        message: 'UI smoke mock 本地回调监听完成。',
+      } as T;
+    }
+    case 'exchange_oauth2_token': {
+      const input = (args?.input ?? {}) as Record<string, unknown>;
+      const sessionId = Number(input.session_id);
+      const session = oauthSessions.find((item) => item.id === sessionId);
+      if (!session) throw new Error('OAuth2 session not found');
+      oauthSessions = oauthSessions.map((item) => item.id === sessionId
+        ? {
+            ...item,
+            status: 'token_stored',
+            completed_at: now,
+            message: 'UI smoke mock Token 已写入安全存储。',
+          }
+        : item);
+      return {
+        session_id: session.id,
+        provider: session.provider,
+        status: 'token_stored',
+        expires_at: new Date(Date.parse(now) + 3_600_000).toISOString(),
+        message: 'UI smoke mock Token 已写入安全存储。',
+      } as T;
+    }
+    case 'refresh_oauth2_token': {
+      const provider = oauthSessions[0]?.provider ?? account.provider;
+      return {
+        provider,
+        status: 'refreshed',
+        expires_at: new Date(Date.parse(now) + 7_200_000).toISOString(),
+        message: 'UI smoke mock OAuth2 Token 已刷新。',
+      } as T;
+    }
     case 'list_background_tasks':
       return backgroundTasks as T;
     case 'list_remote_image_trusts':

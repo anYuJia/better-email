@@ -6,31 +6,51 @@ use crate::models::{
     RemoteMessageHeader,
 };
 use crate::protocol;
+use base64::Engine as _;
 use chrono::Utc;
 use imap_proto::parser::bodystructure::BodyStructParser;
-use imap_proto::types::{BodyStructure, ContentDisposition, SectionPath, UidSetMember};
+use imap_proto::types::{
+    BodyStructure, ContentDisposition, ContentEncoding, SectionPath, UidSetMember,
+};
 use mail_parser::{MessageParser, MimeHeaders};
 use std::collections::BTreeSet;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::thread;
+use std::time::Duration;
 
 const HEADER_FETCH_LIMIT: usize = 25;
 const FLAG_RECONCILE_LIMIT: u32 = 50;
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
+const ATTACHMENT_RETRY_BASE_DELAY_MS: u64 = 150;
 
 fn retry_attachment_fetch<T>(
+    operation: impl FnMut() -> Result<T, MailError>,
+) -> Result<T, MailError> {
+    retry_attachment_fetch_with_sleeper(operation, thread::sleep)
+}
+
+fn retry_attachment_fetch_with_sleeper<T>(
     mut operation: impl FnMut() -> Result<T, MailError>,
+    mut sleeper: impl FnMut(Duration),
 ) -> Result<T, MailError> {
     let mut last_error = String::new();
-    for _ in 0..ATTACHMENT_FETCH_ATTEMPTS {
+    for attempt in 0..ATTACHMENT_FETCH_ATTEMPTS {
         match operation() {
             Ok(value) => return Ok(value),
             Err(error) => last_error = error.to_string(),
+        }
+        if attempt + 1 < ATTACHMENT_FETCH_ATTEMPTS {
+            sleeper(attachment_retry_delay(attempt));
         }
     }
     Err(MailError::Imap(format!(
         "附件 IMAP 请求在 {ATTACHMENT_FETCH_ATTEMPTS} 次尝试后仍失败：{last_error}"
     )))
+}
+
+fn attachment_retry_delay(attempt: usize) -> Duration {
+    Duration::from_millis(ATTACHMENT_RETRY_BASE_DELAY_MS.saturating_mul(1_u64 << attempt.min(10)))
 }
 
 fn select_recent_uid_page(mut uids: Vec<i64>, initial_sync: bool) -> Vec<i64> {
@@ -349,6 +369,43 @@ pub fn fetch_message_body(
 pub struct RemoteAttachmentWrite {
     pub filename: String,
     pub size_bytes: i64,
+    pub transfer_encoding: AttachmentTransferEncoding,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttachmentTransferEncoding {
+    Identity,
+    Base64,
+    QuotedPrintable,
+    Other(String),
+}
+
+impl AttachmentTransferEncoding {
+    fn from_imap(value: &ContentEncoding<'_>) -> Self {
+        match value {
+            ContentEncoding::SevenBit | ContentEncoding::EightBit | ContentEncoding::Binary => {
+                Self::Identity
+            }
+            ContentEncoding::Base64 => Self::Base64,
+            ContentEncoding::QuotedPrintable => Self::QuotedPrintable,
+            ContentEncoding::Other(value) => Self::Other(value.to_string()),
+        }
+    }
+
+    fn max_transfer_bytes(&self, max_decoded_bytes: i64) -> i64 {
+        match self {
+            Self::Base64 => max_decoded_bytes.saturating_mul(2),
+            Self::QuotedPrintable => max_decoded_bytes.saturating_mul(4),
+            Self::Identity | Self::Other(_) => max_decoded_bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AttachmentPartMetadata {
+    path: Vec<u32>,
+    transfer_encoding: AttachmentTransferEncoding,
+    encoded_octets: i64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -475,10 +532,10 @@ pub fn download_attachment_to_writer(
     options: AttachmentDownloadOptions<'_>,
     writer: &mut impl Write,
 ) -> Result<RemoteAttachmentWrite, MailError> {
-    if options.start_offset as i64 > options.max_bytes {
+    if options.start_offset as i64 > options.max_bytes.saturating_mul(4) {
         return Err(MailError::Imap(format!(
-            "附件断点超过当前下载上限（{} MB）。",
-            options.max_bytes / 1024 / 1024
+            "附件断点超过当前传输安全上限（{} MB）。",
+            options.max_bytes.saturating_mul(4) / 1024 / 1024
         )));
     }
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
@@ -491,16 +548,16 @@ pub fn download_attachment_to_writer(
         .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
 
     let result = match retry_attachment_fetch(|| {
-        find_attachment_part_path(&mut session, options.remote_uid, options.filename)
+        find_attachment_part_metadata(&mut session, options.remote_uid, options.filename)
     }) {
-        Ok(part_path) => download_attachment_part_to_writer(
+        Ok(part) => download_attachment_part_to_writer(
             &mut session,
             options.remote_uid,
             options.filename,
             options.max_bytes,
             options.start_offset,
             writer,
-            part_path,
+            part,
         ),
         Err(part_error) => {
             if options.start_offset > 0 {
@@ -523,6 +580,7 @@ pub fn download_attachment_to_writer(
                 Ok(RemoteAttachmentWrite {
                     filename: payload.filename,
                     size_bytes: payload.bytes.len() as i64,
+                    transfer_encoding: AttachmentTransferEncoding::Identity,
                 })
             }
         }
@@ -815,11 +873,11 @@ fn fetch_attachment_payload_from_selected(
         .ok_or_else(|| MailError::Imap(format!("IMAP 正文中未找到附件：{}", filename.trim())))
 }
 
-fn find_attachment_part_path(
+fn find_attachment_part_metadata(
     session: &mut imap::Session<imap::Connection>,
     remote_uid: i64,
     filename: &str,
-) -> Result<Vec<u32>, MailError> {
+) -> Result<AttachmentPartMetadata, MailError> {
     let requested = filename.trim();
     let fetches = session
         .uid_fetch(remote_uid.to_string(), "BODYSTRUCTURE")
@@ -828,7 +886,7 @@ fn find_attachment_part_path(
         .iter()
         .find_map(|fetch| fetch.bodystructure())
         .ok_or_else(|| MailError::Imap("IMAP 未返回 BODYSTRUCTURE。".to_string()))?;
-    attachment_part_path(bodystructure, requested)
+    attachment_part_metadata(bodystructure, requested)
         .ok_or_else(|| MailError::Imap(format!("IMAP BODYSTRUCTURE 中未找到附件：{requested}")))
 }
 
@@ -839,11 +897,25 @@ fn download_attachment_part_to_writer(
     max_bytes: i64,
     start_offset: usize,
     writer: &mut impl Write,
-    part_path: Vec<u32>,
+    part: AttachmentPartMetadata,
 ) -> Result<RemoteAttachmentWrite, MailError> {
     let requested = filename.trim();
-    let section_path = SectionPath::Part(part_path.clone(), None);
-    let section = part_path
+    let transfer_limit = part.transfer_encoding.max_transfer_bytes(max_bytes);
+    if part.encoded_octets > transfer_limit {
+        return Err(MailError::Imap(format!(
+            "附件传输内容超过安全上限（{} MB）。",
+            transfer_limit / 1024 / 1024
+        )));
+    }
+    if start_offset as i64 > transfer_limit {
+        return Err(MailError::Imap(format!(
+            "附件断点超过当前传输安全上限（{} MB）。",
+            transfer_limit / 1024 / 1024
+        )));
+    }
+    let section_path = SectionPath::Part(part.path.clone(), None);
+    let section = part
+        .path
         .iter()
         .map(u32::to_string)
         .collect::<Vec<_>>()
@@ -870,10 +942,10 @@ fn download_attachment_part_to_writer(
             break;
         }
         written += chunk.len();
-        if written as i64 > max_bytes {
+        if written as i64 > transfer_limit {
             return Err(MailError::Imap(format!(
-                "附件超过当前下载上限（{} MB）。",
-                max_bytes / 1024 / 1024
+                "附件传输内容超过安全上限（{} MB）。",
+                transfer_limit / 1024 / 1024
             )));
         }
         writer.write_all(&chunk)?;
@@ -882,22 +954,276 @@ fn download_attachment_part_to_writer(
         }
         offset += chunk.len();
     }
+    if part.encoded_octets > 0 && (written as i64) < part.encoded_octets {
+        return Err(MailError::Imap(format!(
+            "附件分段提前结束：已获取 {written} 字节，服务器声明 {} 字节。",
+            part.encoded_octets
+        )));
+    }
 
     Ok(RemoteAttachmentWrite {
         filename: requested.to_string(),
         size_bytes: written as i64,
+        transfer_encoding: part.transfer_encoding,
     })
 }
 
-fn attachment_part_path(bodystructure: &BodyStructure<'_>, filename: &str) -> Option<Vec<u32>> {
+fn attachment_part_metadata(
+    bodystructure: &BodyStructure<'_>,
+    filename: &str,
+) -> Option<AttachmentPartMetadata> {
     let parser = BodyStructParser::new(bodystructure);
     let requested = filename.trim();
-    parser.search(|body| {
+    let path = parser.search(|body| {
         let Some(name) = attachment_filename_from_bodystructure(body) else {
             return false;
         };
         requested.is_empty() || name == requested
+    })?;
+    let body = bodystructure_at_path(bodystructure, &path)?;
+    let other = match body {
+        BodyStructure::Basic { other, .. }
+        | BodyStructure::Text { other, .. }
+        | BodyStructure::Message { other, .. } => other,
+        BodyStructure::Multipart { .. } => return None,
+    };
+    Some(AttachmentPartMetadata {
+        path,
+        transfer_encoding: AttachmentTransferEncoding::from_imap(&other.transfer_encoding),
+        encoded_octets: i64::from(other.octets),
     })
+}
+
+fn bodystructure_at_path<'a>(
+    bodystructure: &'a BodyStructure<'a>,
+    path: &[u32],
+) -> Option<&'a BodyStructure<'a>> {
+    let mut current = bodystructure;
+    for part in path {
+        let BodyStructure::Multipart { bodies, .. } = current else {
+            return None;
+        };
+        current = bodies.get(part.checked_sub(1)? as usize)?;
+    }
+    Some(current)
+}
+
+pub fn decode_attachment_transfer(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    transfer_encoding: &AttachmentTransferEncoding,
+    max_decoded_bytes: i64,
+) -> Result<i64, MailError> {
+    match transfer_encoding {
+        AttachmentTransferEncoding::Identity => {
+            copy_attachment_bytes(reader, writer, max_decoded_bytes)
+        }
+        AttachmentTransferEncoding::Base64 => {
+            decode_base64_attachment(reader, writer, max_decoded_bytes)
+        }
+        AttachmentTransferEncoding::QuotedPrintable => {
+            decode_quoted_printable_attachment(reader, writer, max_decoded_bytes)
+        }
+        AttachmentTransferEncoding::Other(value) => Err(MailError::Imap(format!(
+            "附件使用了暂不支持的传输编码：{value}"
+        ))),
+    }
+}
+
+fn copy_attachment_bytes(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    max_decoded_bytes: i64,
+) -> Result<i64, MailError> {
+    let mut total = 0_i64;
+    let mut buffer = [0_u8; 32 * 1024];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        write_decoded_bytes(writer, &buffer[..count], &mut total, max_decoded_bytes)?;
+    }
+    Ok(total)
+}
+
+fn decode_base64_attachment(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    max_decoded_bytes: i64,
+) -> Result<i64, MailError> {
+    let mut input = [0_u8; 32 * 1024];
+    let mut quartet = [0_u8; 4];
+    let mut quartet_len = 0_usize;
+    let mut finished = false;
+    let mut output = Vec::with_capacity(32 * 1024);
+    let mut total = 0_i64;
+
+    loop {
+        let count = reader.read(&mut input)?;
+        if count == 0 {
+            break;
+        }
+        for &byte in &input[..count] {
+            if byte.is_ascii_whitespace() {
+                continue;
+            }
+            if finished {
+                return Err(MailError::Imap(
+                    "附件 Base64 结尾后仍包含非空白数据。".to_string(),
+                ));
+            }
+            quartet[quartet_len] = byte;
+            quartet_len += 1;
+            if quartet_len < quartet.len() {
+                continue;
+            }
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(quartet)
+                .map_err(|error| MailError::Imap(format!("附件 Base64 解码失败：{error}")))?;
+            output.extend_from_slice(&decoded);
+            finished = quartet.contains(&b'=');
+            quartet_len = 0;
+            flush_decoded_buffer(writer, &mut output, &mut total, max_decoded_bytes, false)?;
+        }
+    }
+
+    if quartet_len == 1 {
+        return Err(MailError::Imap("附件 Base64 数据长度不完整。".to_string()));
+    }
+    if quartet_len > 1 {
+        for byte in quartet.iter_mut().skip(quartet_len) {
+            *byte = b'=';
+        }
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(quartet)
+            .map_err(|error| MailError::Imap(format!("附件 Base64 解码失败：{error}")))?;
+        output.extend_from_slice(&decoded);
+    }
+    flush_decoded_buffer(writer, &mut output, &mut total, max_decoded_bytes, true)?;
+    Ok(total)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuotedPrintableDecodeState {
+    Normal,
+    Equals,
+    EqualsCr,
+    Hex(u8),
+}
+
+fn decode_quoted_printable_attachment(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    max_decoded_bytes: i64,
+) -> Result<i64, MailError> {
+    let mut input = [0_u8; 32 * 1024];
+    let mut output = Vec::with_capacity(32 * 1024);
+    let mut total = 0_i64;
+    let mut state = QuotedPrintableDecodeState::Normal;
+
+    loop {
+        let count = reader.read(&mut input)?;
+        if count == 0 {
+            break;
+        }
+        for &byte in &input[..count] {
+            state = match state {
+                QuotedPrintableDecodeState::Normal if byte == b'=' => {
+                    QuotedPrintableDecodeState::Equals
+                }
+                QuotedPrintableDecodeState::Normal => {
+                    output.push(byte);
+                    QuotedPrintableDecodeState::Normal
+                }
+                QuotedPrintableDecodeState::Equals if byte == b'\n' => {
+                    QuotedPrintableDecodeState::Normal
+                }
+                QuotedPrintableDecodeState::Equals if byte == b'\r' => {
+                    QuotedPrintableDecodeState::EqualsCr
+                }
+                QuotedPrintableDecodeState::Equals if matches!(byte, b' ' | b'\t') => {
+                    QuotedPrintableDecodeState::Equals
+                }
+                QuotedPrintableDecodeState::Equals => {
+                    let Some(value) = hex_value(byte) else {
+                        return Err(MailError::Imap(format!(
+                            "附件 Quoted-Printable 包含无效字符：0x{byte:02X}"
+                        )));
+                    };
+                    QuotedPrintableDecodeState::Hex(value)
+                }
+                QuotedPrintableDecodeState::EqualsCr if byte == b'\n' => {
+                    QuotedPrintableDecodeState::Normal
+                }
+                QuotedPrintableDecodeState::EqualsCr => {
+                    return Err(MailError::Imap(
+                        "附件 Quoted-Printable 软换行格式无效。".to_string(),
+                    ));
+                }
+                QuotedPrintableDecodeState::Hex(high) => {
+                    let Some(low) = hex_value(byte) else {
+                        return Err(MailError::Imap(format!(
+                            "附件 Quoted-Printable 包含无效十六进制字符：0x{byte:02X}"
+                        )));
+                    };
+                    output.push((high << 4) | low);
+                    QuotedPrintableDecodeState::Normal
+                }
+            };
+            flush_decoded_buffer(writer, &mut output, &mut total, max_decoded_bytes, false)?;
+        }
+    }
+
+    if state != QuotedPrintableDecodeState::Normal {
+        return Err(MailError::Imap(
+            "附件 Quoted-Printable 数据在转义序列中提前结束。".to_string(),
+        ));
+    }
+    flush_decoded_buffer(writer, &mut output, &mut total, max_decoded_bytes, true)?;
+    Ok(total)
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn flush_decoded_buffer(
+    writer: &mut impl Write,
+    buffer: &mut Vec<u8>,
+    total: &mut i64,
+    max_decoded_bytes: i64,
+    force: bool,
+) -> Result<(), MailError> {
+    if buffer.is_empty() || (!force && buffer.len() < 32 * 1024) {
+        return Ok(());
+    }
+    write_decoded_bytes(writer, buffer, total, max_decoded_bytes)?;
+    buffer.clear();
+    Ok(())
+}
+
+fn write_decoded_bytes(
+    writer: &mut impl Write,
+    bytes: &[u8],
+    total: &mut i64,
+    max_decoded_bytes: i64,
+) -> Result<(), MailError> {
+    let next_total = total.saturating_add(bytes.len() as i64);
+    if next_total > max_decoded_bytes {
+        return Err(MailError::Imap(format!(
+            "附件解码后超过当前下载上限（{} MB）。",
+            max_decoded_bytes / 1024 / 1024
+        )));
+    }
+    writer.write_all(bytes)?;
+    *total = next_total;
+    Ok(())
 }
 
 fn attachment_filename_from_bodystructure(bodystructure: &BodyStructure<'_>) -> Option<String> {
@@ -1223,32 +1549,96 @@ mod tests {
     #[test]
     fn attachment_fetch_retries_transient_failures() {
         let mut attempts = 0;
-        let value = retry_attachment_fetch(|| {
-            attempts += 1;
-            if attempts < ATTACHMENT_FETCH_ATTEMPTS {
-                Err(MailError::Imap("temporary failure".to_string()))
-            } else {
-                Ok(42)
-            }
-        })
+        let mut delays = Vec::new();
+        let value = retry_attachment_fetch_with_sleeper(
+            || {
+                attempts += 1;
+                if attempts < ATTACHMENT_FETCH_ATTEMPTS {
+                    Err(MailError::Imap("temporary failure".to_string()))
+                } else {
+                    Ok(42)
+                }
+            },
+            |delay| delays.push(delay),
+        )
         .expect("third attachment fetch attempt should succeed");
 
         assert_eq!(value, 42);
         assert_eq!(attempts, ATTACHMENT_FETCH_ATTEMPTS);
+        assert_eq!(
+            delays,
+            vec![Duration::from_millis(150), Duration::from_millis(300)]
+        );
     }
 
     #[test]
     fn attachment_fetch_reports_exhausted_retries() {
         let mut attempts = 0;
-        let error = retry_attachment_fetch::<()>(|| {
-            attempts += 1;
-            Err(MailError::Imap("connection reset".to_string()))
-        })
+        let mut delays = Vec::new();
+        let error = retry_attachment_fetch_with_sleeper::<()>(
+            || {
+                attempts += 1;
+                Err(MailError::Imap("connection reset".to_string()))
+            },
+            |delay| delays.push(delay),
+        )
         .expect_err("attachment fetch should fail after retries");
 
         assert_eq!(attempts, ATTACHMENT_FETCH_ATTEMPTS);
+        assert_eq!(
+            delays,
+            vec![Duration::from_millis(150), Duration::from_millis(300)]
+        );
         assert!(error.to_string().contains("3 次尝试"));
         assert!(error.to_string().contains("connection reset"));
+    }
+
+    #[test]
+    fn attachment_transfer_decodes_base64_with_mime_whitespace() {
+        let mut reader = std::io::Cursor::new(b"QmV0dGVy\r\nIEVtYWlsIQ==\n");
+        let mut output = Vec::new();
+        let size = decode_attachment_transfer(
+            &mut reader,
+            &mut output,
+            &AttachmentTransferEncoding::Base64,
+            1024,
+        )
+        .expect("base64 attachment should decode");
+
+        assert_eq!(size, 13);
+        assert_eq!(output, b"Better Email!");
+    }
+
+    #[test]
+    fn attachment_transfer_decodes_quoted_printable_across_soft_lines() {
+        let mut reader = std::io::Cursor::new(b"Better=20Email=\r\n=21");
+        let mut output = Vec::new();
+        let size = decode_attachment_transfer(
+            &mut reader,
+            &mut output,
+            &AttachmentTransferEncoding::QuotedPrintable,
+            1024,
+        )
+        .expect("quoted-printable attachment should decode");
+
+        assert_eq!(size, 13);
+        assert_eq!(output, b"Better Email!");
+    }
+
+    #[test]
+    fn attachment_transfer_rejects_decoded_size_over_limit() {
+        let mut reader = std::io::Cursor::new(b"1234");
+        let mut output = Vec::new();
+        let error = decode_attachment_transfer(
+            &mut reader,
+            &mut output,
+            &AttachmentTransferEncoding::Identity,
+            3,
+        )
+        .expect_err("oversized decoded attachment should fail");
+
+        assert!(error.to_string().contains("解码后超过"));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -1481,11 +1871,15 @@ mod tests {
                     })
                     .unwrap();
 
+                let metadata = attachment_part_metadata(bodystructure, "title.pdf")
+                    .expect("attachment metadata should be found");
+                assert_eq!(metadata.path, vec![2]);
                 assert_eq!(
-                    attachment_part_path(bodystructure, "title.pdf"),
-                    Some(vec![2])
+                    metadata.transfer_encoding,
+                    AttachmentTransferEncoding::Base64
                 );
-                assert_eq!(attachment_part_path(bodystructure, "missing.pdf"), None);
+                assert_eq!(metadata.encoded_octets, 333_980);
+                assert_eq!(attachment_part_metadata(bodystructure, "missing.pdf"), None);
             }
             _ => panic!("expected FETCH response"),
         };

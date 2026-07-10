@@ -22,20 +22,22 @@ use crate::smtp;
 use crate::vcard;
 use chrono::Utc;
 use std::collections::BTreeMap;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: i64 = 25 * 1024 * 1024;
+const MAX_ATTACHMENT_TRANSFER_BYTES: i64 = MAX_ATTACHMENT_DOWNLOAD_BYTES * 4;
 const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_VCARD_IMPORT_BYTES: usize = 5 * 1024 * 1024;
 const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 const SYNCABLE_IMAP_ROLES: [&str; 6] = ["inbox", "sent", "drafts", "archive", "trash", "spam"];
 
 fn attachment_resume_offset(bytes: u64) -> Option<usize> {
-    if bytes > MAX_ATTACHMENT_DOWNLOAD_BYTES as u64 {
+    if bytes > MAX_ATTACHMENT_TRANSFER_BYTES as u64 {
         return None;
     }
     usize::try_from(bytes).ok()
@@ -373,26 +375,59 @@ pub fn download_attachment(
             )));
         }
     };
-    if let Err(error) = validate_attachment_download_size(downloaded.size_bytes) {
-        let _ = fs::remove_file(&temp_path);
-        return Err(error);
-    }
     let filename = sanitize_filename(if downloaded.filename.trim().is_empty() {
         &attachment.filename
     } else {
         &downloaded.filename
     });
     let local_path = dir.join(format!("{}-{filename}", attachment.id));
-    if local_path.exists() {
-        fs::remove_file(&local_path)?;
-    }
-    fs::rename(&temp_path, &local_path)?;
+    let decoded_path = dir.join(format!("{}.decoded", attachment.id));
+    let decoded_size = match downloaded.transfer_encoding {
+        imap_probe::AttachmentTransferEncoding::Identity => {
+            if let Err(error) = validate_attachment_download_size(downloaded.size_bytes) {
+                let _ = fs::remove_file(&temp_path);
+                return Err(error);
+            }
+            if local_path.exists() {
+                fs::remove_file(&local_path)?;
+            }
+            fs::rename(&temp_path, &local_path)?;
+            downloaded.size_bytes
+        }
+        transfer_encoding => {
+            let decode_result = (|| -> MailResult<i64> {
+                let mut source = BufReader::new(File::open(&temp_path)?);
+                let decoded_file = File::create(&decoded_path)?;
+                let mut target = BufWriter::new(decoded_file);
+                let decoded_size = imap_probe::decode_attachment_transfer(
+                    &mut source,
+                    &mut target,
+                    &transfer_encoding,
+                    MAX_ATTACHMENT_DOWNLOAD_BYTES,
+                )?;
+                target.flush()?;
+                validate_attachment_download_size(decoded_size)?;
+                Ok(decoded_size)
+            })();
+            let decoded_size = match decode_result {
+                Ok(size) => size,
+                Err(error) => {
+                    let _ = fs::remove_file(&decoded_path);
+                    let _ = fs::remove_file(&temp_path);
+                    return Err(error);
+                }
+            };
+            if local_path.exists() {
+                fs::remove_file(&local_path)?;
+            }
+            fs::rename(&decoded_path, &local_path)?;
+            let _ = fs::remove_file(&temp_path);
+            decoded_size
+        }
+    };
     let local_path_string = local_path.to_string_lossy().into_owned();
-    let updated = store.mark_attachment_downloaded(
-        attachment.id,
-        &local_path_string,
-        downloaded.size_bytes,
-    )?;
+    let updated =
+        store.mark_attachment_downloaded(attachment.id, &local_path_string, decoded_size)?;
 
     Ok(AttachmentDownload {
         attachment: updated,
@@ -2132,7 +2167,7 @@ mod tests {
         attachment_resume_offset, credential_error_report, credential_verification_report,
         format_attachment_progress, mask_email, mask_recipient_list, render_eml_message,
         sanitize_filename, syncable_mailboxes, validate_attachment_download_size,
-        MAX_ATTACHMENT_DOWNLOAD_BYTES,
+        MAX_ATTACHMENT_DOWNLOAD_BYTES, MAX_ATTACHMENT_TRANSFER_BYTES,
     };
     use crate::models::{Account, Attachment, ImapMailboxState, Message};
 
@@ -2242,11 +2277,11 @@ mod tests {
     fn attachment_resume_offset_keeps_only_safe_partial_files() {
         assert_eq!(attachment_resume_offset(64 * 1024), Some(64 * 1024));
         assert_eq!(
-            attachment_resume_offset(MAX_ATTACHMENT_DOWNLOAD_BYTES as u64),
-            Some(MAX_ATTACHMENT_DOWNLOAD_BYTES as usize)
+            attachment_resume_offset(MAX_ATTACHMENT_TRANSFER_BYTES as u64),
+            Some(MAX_ATTACHMENT_TRANSFER_BYTES as usize)
         );
         assert_eq!(
-            attachment_resume_offset(MAX_ATTACHMENT_DOWNLOAD_BYTES as u64 + 1),
+            attachment_resume_offset(MAX_ATTACHMENT_TRANSFER_BYTES as u64 + 1),
             None
         );
         assert_eq!(format_attachment_progress(64 * 1024), "64 KB");

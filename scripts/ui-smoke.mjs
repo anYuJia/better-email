@@ -697,9 +697,9 @@ async function main() {
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证') && document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证')");
-    await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('连接测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
+    await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('服务器测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
-    await clickButton(cdp, '连接测试', "document.querySelector('.settings-header-actions')");
+    await clickButton(cdp, '服务器测试', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "document.querySelector('.settings-connection-report')?.innerText.includes('imap.mail.me.com:993') && document.querySelector('.settings-connection-report')?.innerText.includes('smtp.mail.me.com:587')");
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
@@ -708,6 +708,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
+    await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('账号登录验证') && document.querySelector('.settings-credential-panel')?.innerText.includes('全部通过') && document.querySelector('.settings-credential-panel')?.innerText.includes('IMAP') && document.querySelector('.settings-credential-panel')?.innerText.includes('SMTP') && document.body.innerText.includes('未发送任何邮件')");
     await clickButton(cdp, '发现文件夹', "document.querySelector('.settings-imap-discovery')");
     await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('3 个')");
     await clickButton(cdp, '演练', "document.querySelector('.settings-sync-panel')");
@@ -913,6 +915,7 @@ async function main() {
         'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
+        'credential login verification separates IMAP and SMTP authentication',
         'undo send delay settings persist',
         'undo send returns message to drafts',
         'scheduled send automatically flushes to sent',

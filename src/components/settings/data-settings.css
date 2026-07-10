@@ -235,6 +235,7 @@
 
 .settings-credential-panel .credential-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
   margin: 9px 0;
@@ -242,6 +243,14 @@
 
 .settings-credential-panel .credential-actions button.danger {
   color: var(--ui-danger);
+}
+
+.settings-credential-panel .settings-auth-summary {
+  margin-top: 10px;
+}
+
+.settings-credential-panel .settings-auth-checks {
+  margin-top: 7px;
 }
 
 .settings-sync-panel .sync-schedule-card {

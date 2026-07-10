@@ -4,12 +4,13 @@ use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
     BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
-    ContactInput, ContactMergeSuggestion, CredentialInput, CredentialStatus, DiagnosticAccount,
-    DiagnosticExport, DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder,
-    FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
-    OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput,
-    OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
+    ContactInput, ContactMergeSuggestion, CredentialInput, CredentialProtocolCheck,
+    CredentialStatus, CredentialVerificationReport, DiagnosticAccount, DiagnosticExport,
+    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder, FolderReadReport,
+    ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity,
+    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput,
+    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
+    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
     RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, SyncRun,
     SyncSchedulePlan, ThreadSummary,
@@ -866,6 +867,104 @@ pub fn test_connection(
 }
 
 #[tauri::command]
+pub fn verify_account_credentials(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<CredentialVerificationReport> {
+    let account = store.get_account_by_id(account_id)?;
+    let secret = match credentials::get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => return Ok(credential_error_report(&account, error)),
+    };
+    let imap_result =
+        imap_probe::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+    let smtp_result =
+        smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+    Ok(credential_verification_report(
+        &account,
+        imap_result,
+        smtp_result,
+    ))
+}
+
+fn credential_error_report(account: &Account, error: String) -> CredentialVerificationReport {
+    let message = format!("系统凭据不可用，未发起 IMAP/SMTP 登录验证：{error}");
+    CredentialVerificationReport {
+        account_email: account.email.clone(),
+        checked_at: Utc::now().to_rfc3339(),
+        checks: vec![
+            CredentialProtocolCheck {
+                name: "IMAP".to_string(),
+                address: account.imap_host.clone(),
+                authenticated: false,
+                message: "未发起登录：系统凭据不可用。".to_string(),
+            },
+            CredentialProtocolCheck {
+                name: "SMTP".to_string(),
+                address: account.smtp_host.clone(),
+                authenticated: false,
+                message: "未发起登录：系统凭据不可用。".to_string(),
+            },
+        ],
+        authenticated: false,
+        status: "credential_error".to_string(),
+        message,
+    }
+}
+
+fn credential_verification_report(
+    account: &Account,
+    imap_result: Result<(), String>,
+    smtp_result: Result<(), String>,
+) -> CredentialVerificationReport {
+    let checks = vec![
+        credential_protocol_check("IMAP", &account.imap_host, imap_result),
+        credential_protocol_check("SMTP", &account.smtp_host, smtp_result),
+    ];
+    let passed = checks.iter().filter(|check| check.authenticated).count();
+    let (status, message) = match passed {
+        2 => ("ok", "IMAP 与 SMTP 登录验证通过，未发送任何邮件。"),
+        1 => (
+            "partial",
+            "仅一个协议登录成功，请检查失败协议的服务器、授权码或 OAuth2 配置。",
+        ),
+        _ => (
+            "error",
+            "IMAP 与 SMTP 登录均未通过，请先确认系统凭据和服务商设置。",
+        ),
+    };
+    CredentialVerificationReport {
+        account_email: account.email.clone(),
+        checked_at: Utc::now().to_rfc3339(),
+        authenticated: passed == checks.len(),
+        checks,
+        status: status.to_string(),
+        message: message.to_string(),
+    }
+}
+
+fn credential_protocol_check(
+    name: &str,
+    address: &str,
+    result: Result<(), String>,
+) -> CredentialProtocolCheck {
+    match result {
+        Ok(()) => CredentialProtocolCheck {
+            name: name.to_string(),
+            address: address.to_string(),
+            authenticated: true,
+            message: format!("{name} 登录认证成功。"),
+        },
+        Err(message) => CredentialProtocolCheck {
+            name: name.to_string(),
+            address: address.to_string(),
+            authenticated: false,
+            message,
+        },
+    }
+}
+
+#[tauri::command]
 pub fn discover_imap_folders(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
@@ -1389,10 +1488,27 @@ fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64
 #[cfg(test)]
 mod tests {
     use super::{
-        mask_email, mask_recipient_list, render_eml_message, sanitize_filename,
-        validate_attachment_download_size, MAX_ATTACHMENT_DOWNLOAD_BYTES,
+        credential_error_report, credential_verification_report, mask_email, mask_recipient_list,
+        render_eml_message, sanitize_filename, validate_attachment_download_size,
+        MAX_ATTACHMENT_DOWNLOAD_BYTES,
     };
-    use crate::models::{Attachment, Message};
+    use crate::models::{Account, Attachment, Message};
+
+    fn sample_account() -> Account {
+        Account {
+            id: 1,
+            email: "me@example.com".to_string(),
+            display_name: "Me".to_string(),
+            provider: "custom".to_string(),
+            imap_host: "imap.example.com:993".to_string(),
+            smtp_host: "smtp.example.com:465".to_string(),
+            auth_type: "password".to_string(),
+            sync_mode: "manual".to_string(),
+            remote_images_allowed: false,
+            signature: String::new(),
+            is_default: true,
+        }
+    }
 
     #[test]
     fn filename_sanitizer_removes_path_and_control_chars() {
@@ -1464,6 +1580,28 @@ mod tests {
             "a***@example.com, b***@example.org"
         );
         assert_eq!(mask_email("not-an-email"), "***");
+    }
+
+    #[test]
+    fn credential_verification_report_tracks_success_and_partial_failure() {
+        let account = sample_account();
+        let success = credential_verification_report(&account, Ok(()), Ok(()));
+        assert!(success.authenticated);
+        assert_eq!(success.status, "ok");
+        assert!(success.checks.iter().all(|check| check.authenticated));
+
+        let partial =
+            credential_verification_report(&account, Ok(()), Err("SMTP 登录验证失败".to_string()));
+        assert!(!partial.authenticated);
+        assert_eq!(partial.status, "partial");
+        assert!(partial.checks[0].authenticated);
+        assert!(!partial.checks[1].authenticated);
+        assert!(partial.checks[1].message.contains("SMTP 登录验证失败"));
+
+        let missing = credential_error_report(&account, "未读取到系统凭据".to_string());
+        assert_eq!(missing.status, "credential_error");
+        assert!(!missing.authenticated);
+        assert!(missing.message.contains("未发起"));
     }
 }
 

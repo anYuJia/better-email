@@ -75,6 +75,7 @@ import type {
   LocalBackupSummary,
   EndpointCheck,
   ConnectionReport,
+  CredentialVerificationReport,
   ImapFolderProbe,
   ImapProbeReport,
   ImapMailboxState,
@@ -152,6 +153,7 @@ export default function App() {
   const [labels, setLabels] = useState<Label[]>([]);
   const [stats, setStats] = useState<MailStats | null>(null);
   const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
+  const [credentialVerification, setCredentialVerification] = useState<CredentialVerificationReport | null>(null);
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
   const [identityForm, setIdentityForm] = useState<MailIdentityInput>(emptyIdentityForm);
@@ -1670,7 +1672,25 @@ export default function App() {
   async function testConnection() {
     const report = await invoke<ConnectionReport>('test_connection', { accountId: accountForm?.id });
     setConnectionReport(report);
-    setStatus(report.ready_for_credentials ? '服务器连接成功，可以进入凭据验证' : '连接测试完成，请查看服务器结果');
+    setStatus(report.ready_for_credentials ? '服务器连接成功；账号是否可登录仍需点击“验证登录”' : '服务器测试完成，请查看网络结果');
+  }
+
+  async function verifyAccountCredentials() {
+    const report = await invoke<CredentialVerificationReport>('verify_account_credentials', { accountId: accountForm?.id });
+    setCredentialVerification(report);
+    if (accountForm && report.status !== 'credential_error') {
+      const imapOk = report.checks.some((check) => check.name === 'IMAP' && check.authenticated);
+      const smtpOk = report.checks.some((check) => check.name === 'SMTP' && check.authenticated);
+      const patch: Partial<ProviderVerificationRecord> = {
+        status: report.authenticated ? 'passed' : imapOk || smtpOk ? 'partial' : 'failed',
+        imap_ok: imapOk,
+        smtp_ok: smtpOk,
+        checked_at: report.checked_at,
+      };
+      if (accountForm.auth_type === 'oauth2') patch.oauth_ok = report.authenticated;
+      updateProviderVerification(accountForm.provider, patch);
+    }
+    setStatus(report.message);
   }
 
   async function discoverImapFolders() {
@@ -2025,6 +2045,7 @@ export default function App() {
       input: { account_email: account.email, secret: credentialSecret },
     });
     setCredentialStatus(result);
+    setCredentialVerification(null);
     setCredentialSecret('');
     setStatus(result.message);
   }
@@ -2044,6 +2065,7 @@ export default function App() {
       accountEmail: account.email,
     });
     setCredentialStatus(result);
+    setCredentialVerification(null);
     setCredentialSecret('');
     setStatus(result.message);
   }
@@ -2900,6 +2922,7 @@ export default function App() {
               accountForm={accountForm}
               credentialSecret={credentialSecret}
               credentialStatus={credentialStatus}
+              credentialVerification={credentialVerification?.account_email === accountForm.email ? credentialVerification : null}
               imapProbe={imapProbe}
               syncSchedulePlan={syncSchedulePlan}
               imapMailboxes={imapMailboxes}
@@ -2908,6 +2931,7 @@ export default function App() {
               onCredentialSecretChange={setCredentialSecret}
               onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
               onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
+              onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}

@@ -1317,6 +1317,20 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         ],
       } as T;
     }
+    case 'verify_account_credentials': {
+      const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
+      return {
+        account_email: targetAccount.email,
+        checked_at: now,
+        authenticated: true,
+        status: 'ok',
+        message: 'IMAP 与 SMTP 登录验证通过，未发送任何邮件。',
+        checks: [
+          { name: 'IMAP', address: targetAccount.imap_host, authenticated: true, message: 'IMAP 登录认证成功。' },
+          { name: 'SMTP', address: targetAccount.smtp_host, authenticated: true, message: 'SMTP 登录认证成功。' },
+        ],
+      } as T;
+    }
     case 'discover_imap_folders': {
       const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
       return {

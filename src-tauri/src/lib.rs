@@ -73,6 +73,7 @@ pub fn run() {
             commands::preview_local_backup,
             commands::import_local_backup,
             commands::test_connection,
+            commands::verify_account_credentials,
             commands::discover_imap_folders,
             commands::list_imap_mailboxes,
             commands::run_sync_dry_run,

@@ -219,6 +219,22 @@ export type ConnectionReport = {
   ready_for_credentials: boolean;
 };
 
+export type CredentialProtocolCheck = {
+  name: string;
+  address: string;
+  authenticated: boolean;
+  message: string;
+};
+
+export type CredentialVerificationReport = {
+  account_email: string;
+  checked_at: string;
+  checks: CredentialProtocolCheck[];
+  authenticated: boolean;
+  status: 'ok' | 'partial' | 'error' | 'credential_error';
+  message: string;
+};
+
 export type ImapFolderProbe = {
   name: string;
   delimiter: string;

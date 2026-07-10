@@ -92,12 +92,12 @@ export default function SettingsFrame({
             <button
               type="button"
               className="settings-header-button secondary"
-              aria-label="连接测试"
-              title="测试当前账号的 IMAP 与 SMTP 连接"
+              aria-label="服务器测试"
+              title="只测试当前账号的 IMAP 与 SMTP 服务器网络连接"
               onClick={onTestConnection}
             >
               <FlaskConical size={14} />
-              <span>连接测试</span>
+              <span>服务器测试</span>
             </button>
             <button
               type="button"

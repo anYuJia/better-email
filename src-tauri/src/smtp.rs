@@ -17,7 +17,6 @@ pub fn send_outbound(
     message: &OutboundMessage,
     secret: &AccountSecret,
 ) -> Result<(), MailError> {
-    let (host, port) = parse_smtp_endpoint(&account.smtp_host)?;
     let mut builder = Message::builder()
         .from(mailbox(&message.sender_name, &message.sender_email)?)
         .subject(&message.subject);
@@ -36,6 +35,30 @@ pub fn send_outbound(
     }
 
     let email = build_email(builder, message)?;
+    let mailer = authenticated_transport(account, secret)?;
+
+    mailer
+        .send(&email)
+        .map(|_| ())
+        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))
+}
+
+pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(), MailError> {
+    let mailer = authenticated_transport(account, secret)?;
+    match mailer.test_connection() {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(MailError::Smtp(
+            "SMTP 连接建立后未通过 NOOP 验证。".to_string(),
+        )),
+        Err(error) => Err(MailError::Smtp(format!("SMTP 登录验证失败：{error}"))),
+    }
+}
+
+fn authenticated_transport(
+    account: &Account,
+    secret: &AccountSecret,
+) -> Result<SmtpTransport, MailError> {
+    let (host, port) = parse_smtp_endpoint(&account.smtp_host)?;
     let mut mailer_builder = smtp_transport(&host, port)?.timeout(Some(Duration::from_secs(20)));
     match secret {
         AccountSecret::Password(password) => {
@@ -53,12 +76,7 @@ pub fn send_outbound(
                 .authentication(vec![Mechanism::Xoauth2]);
         }
     }
-    let mailer = mailer_builder.build();
-
-    mailer
-        .send(&email)
-        .map(|_| ())
-        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))
+    Ok(mailer_builder.build())
 }
 
 fn build_email(

@@ -1,4 +1,4 @@
-import { KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { BadgeCheck, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import {
   canCancelOutboxItem,
   outboxStatusLabel,
@@ -8,6 +8,7 @@ import type {
   Account,
   BackgroundTaskKind,
   CredentialStatus,
+  CredentialVerificationReport,
   ImapMailboxState,
   ImapProbeReport,
   OutboxItem,
@@ -21,6 +22,7 @@ type SyncOperationsSettingsProps = {
   accountForm: Account;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
+  credentialVerification: CredentialVerificationReport | null;
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
@@ -29,6 +31,7 @@ type SyncOperationsSettingsProps = {
   onCredentialSecretChange: (value: string) => void;
   onDiscoverImapFolders: () => void;
   onCheckCredential: () => void;
+  onVerifyCredential: () => void;
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
@@ -40,6 +43,7 @@ export default function SyncOperationsSettings({
   accountForm,
   credentialSecret,
   credentialStatus,
+  credentialVerification,
   imapProbe,
   syncSchedulePlan,
   imapMailboxes,
@@ -48,6 +52,7 @@ export default function SyncOperationsSettings({
   onCredentialSecretChange,
   onDiscoverImapFolders,
   onCheckCredential,
+  onVerifyCredential,
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
@@ -117,14 +122,18 @@ export default function SyncOperationsSettings({
           />
         </label>
         <div className="credential-actions">
-          <button className="secondary" type="button" onClick={onCheckCredential}>检查</button>
+          <button className="secondary" type="button" onClick={onCheckCredential}>检查存储</button>
           <button className="secondary danger" type="button" onClick={onDeleteCredential}>
             <Trash2 size={14} />
             删除
           </button>
-          <button type="button" onClick={onStoreCredential}>
+          <button className="secondary" type="button" onClick={onStoreCredential}>
             <KeyRound size={14} />
             保存凭据
+          </button>
+          <button type="button" title="验证 IMAP 与 SMTP 登录，不会发送邮件" onClick={onVerifyCredential}>
+            <BadgeCheck size={14} />
+            验证登录
           </button>
         </div>
         {credentialStatus && (
@@ -133,6 +142,34 @@ export default function SyncOperationsSettings({
             <em>{credentialStatus.account_email}</em>
             <p>{credentialStatus.message}</p>
           </div>
+        )}
+        {credentialVerification && (
+          <>
+            <div className={credentialVerification.authenticated ? 'tool-row ok settings-auth-summary' : 'tool-row warn settings-auth-summary'}>
+              <span>账号登录验证</span>
+              <em>
+                {credentialVerification.authenticated
+                  ? '全部通过'
+                  : credentialVerification.status === 'partial'
+                    ? '部分通过'
+                    : credentialVerification.status === 'credential_error'
+                      ? '凭据不可用'
+                      : '未通过'}
+              </em>
+              <small>{formatDate(credentialVerification.checked_at)}</small>
+              <p>{credentialVerification.message}</p>
+            </div>
+            <div className="settings-endpoint-grid settings-auth-checks" aria-label="账号登录验证结果">
+              {credentialVerification.checks.map((check) => (
+                <div className={check.authenticated ? 'tool-row ok' : 'tool-row warn'} key={check.name}>
+                  <span>{check.name}</span>
+                  <em>{check.address}</em>
+                  <small>{check.authenticated ? '登录成功' : '登录失败'}</small>
+                  <p>{check.message}</p>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 

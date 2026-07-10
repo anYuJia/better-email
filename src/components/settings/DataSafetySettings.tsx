@@ -39,7 +39,7 @@ export default function DataSafetySettings({
         <summary>
           <span>
             <strong>备份、诊断与连接报告</strong>
-            <em>导入导出、脱敏 JSON、连接测试详情</em>
+            <em>导入导出、脱敏 JSON、服务器测试详情</em>
           </span>
           <b>{localBackupSummary ? `${localBackupSummary.messages} 封` : '未备份'}</b>
         </summary>
@@ -97,8 +97,8 @@ export default function DataSafetySettings({
           <section className="tool-panel settings-connection-report">
             <header className="tool-header">
               <span>
-                <strong>连接测试</strong>
-                <small>IMAP、SMTP 和目标端点可达性</small>
+                <strong>服务器连接</strong>
+                <small>仅检查 IMAP、SMTP 网络端点，不验证账号凭据</small>
               </span>
               <em>{connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用</em>
             </header>

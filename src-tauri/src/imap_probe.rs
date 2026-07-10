@@ -15,6 +15,16 @@ use std::io::Write;
 const HEADER_FETCH_LIMIT: usize = 25;
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 
+pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(), MailError> {
+    let (host, port) = parse_imap_endpoint(&account.imap_host)?;
+    let client = imap::ClientBuilder::new(host.as_str(), port)
+        .connect()
+        .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
+    let mut session = login_imap(client, account, secret)?;
+    let _ = session.logout();
+    Ok(())
+}
+
 pub fn discover_folders(
     account: &Account,
     secret: &AccountSecret,

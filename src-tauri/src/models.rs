@@ -319,6 +319,24 @@ pub struct ConnectionReport {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct CredentialProtocolCheck {
+    pub name: String,
+    pub address: String,
+    pub authenticated: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CredentialVerificationReport {
+    pub account_email: String,
+    pub checked_at: String,
+    pub checks: Vec<CredentialProtocolCheck>,
+    pub authenticated: bool,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ImapFolderProbe {
     pub name: String,
     pub delimiter: String,

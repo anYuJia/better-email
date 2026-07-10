@@ -16,6 +16,7 @@ import ReaderPane from './components/ReaderPane';
 import ComposerWindow from './components/ComposerWindow';
 import ExperienceSettings from './components/settings/ExperienceSettings';
 import SettingsFrame from './components/settings/SettingsFrame';
+import AccountConnectionSettings from './components/settings/AccountConnectionSettings';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -30,7 +31,7 @@ import {
   syncIntervalMs,
   syncStatusLabel,
 } from './mailUtils';
-import { type AccountProviderPreset, providerCompatibilityMatrix, providerPresets } from './providerCatalog';
+import { type AccountProviderPreset, providerCompatibilityMatrix } from './providerCatalog';
 import { getCurrentWindow, invoke, isPermissionGranted, requestPermission, sendNotification } from './tauriBridge';
 
 import type {
@@ -39,7 +40,6 @@ import type {
   FilterMode,
   ListMode,
   AccountScope,
-  ProviderVerificationStatus,
   BackgroundTaskKind,
   BackgroundTaskStatus,
   Account,
@@ -113,7 +113,6 @@ import {
   backgroundTaskTitle,
   loadNotificationPolicy,
   normalizeContactAliases,
-  toggleAccountNotificationList,
   loadProviderVerifications,
   isFilterMode,
   loadSavedSearches,
@@ -122,7 +121,6 @@ import {
   normalizeDraftInput,
   loadComposerAutosave,
   loadAppLayout,
-  providerVerificationLabel,
   outboxStatusLabel,
   outboxTimingLabel,
   canCancelOutboxItem,
@@ -2738,295 +2736,39 @@ export default function App() {
           onNavigate={scrollSettingsSection}
           onClose={() => setSettingsOpen(false)}
         >
-            <details className="settings-disclosure add-account-disclosure" data-settings-section="accounts">
-              <summary>
-                <span>
-                  <strong>添加邮箱账号</strong>
-                  <em>选择服务商预设并填写邮箱地址</em>
-                </span>
-                <b>添加</b>
-              </summary>
-              <section className="tool-panel">
-              <header className="tool-header">
-                <strong>新增账号</strong>
-                <button onClick={createNewAccount}>创建账号</button>
-              </header>
-              <label>
-                邮箱地址
-                <input value={newAccountForm.email} onChange={(event) => setNewAccountForm({ ...newAccountForm, email: event.target.value })} placeholder="name@example.com" />
-              </label>
-              <label>
-                显示名称
-                <input value={newAccountForm.display_name} onChange={(event) => setNewAccountForm({ ...newAccountForm, display_name: event.target.value })} placeholder="留空则使用邮箱地址" />
-              </label>
-              <section className="provider-presets compact" aria-label="新账号服务商预设">
-                {providerPresets.map((preset) => (
-                  <button
-                    className={newAccountForm.provider === preset.provider ? 'active' : ''}
-                    key={preset.id}
-                    onClick={() => applyNewAccountPreset(preset)}
-                  >
-                    <strong>{preset.label}</strong>
-                    <span>{preset.hint}</span>
-                  </button>
-                ))}
-              </section>
-              <label>
-                IMAP
-                <input value={newAccountForm.imap_host} onChange={(event) => setNewAccountForm({ ...newAccountForm, imap_host: event.target.value })} />
-              </label>
-              <label>
-                SMTP
-                <input value={newAccountForm.smtp_host} onChange={(event) => setNewAccountForm({ ...newAccountForm, smtp_host: event.target.value })} />
-              </label>
-              </section>
-            </details>
-            <div className="settings-section-heading">
-              <strong>当前账号</strong>
-              <span>{accountForm.email}</span>
-            </div>
-            <label>
-              显示名称
-              <input value={accountForm.display_name} onChange={(event) => setAccountForm({ ...accountForm, display_name: event.target.value })} />
-            </label>
-            <label>
-              服务商
-              <input value={accountForm.provider} onChange={(event) => setAccountForm({ ...accountForm, provider: event.target.value })} />
-            </label>
-            <section className="provider-presets" aria-label="服务商预设">
-              {providerPresets.map((preset) => (
-                <button
-                  className={accountForm.provider === preset.provider ? 'active' : ''}
-                  key={preset.id}
-                  onClick={() => applyProviderPreset(preset)}
-                >
-                  <strong>{preset.label}</strong>
-                  <span>{preset.hint}</span>
-                </button>
-              ))}
-            </section>
-            <details className="settings-disclosure" data-settings-section="providers">
-              <summary>
-                <span>
-                  <strong>服务商兼容性与真实验证</strong>
-                  <em>预设、IMAP/SMTP/OAuth 状态和限制</em>
-                </span>
-                <b>{providerVerificationLabel(activeProviderVerification?.status ?? 'untested')}</b>
-              </summary>
-              <section className="provider-matrix" aria-label="服务商兼容性矩阵">
-                <header>
-                  <strong>兼容性矩阵</strong>
-                  <span>预设已内置，真实账号验证待补</span>
-                </header>
-                {providerCompatibilityMatrix.map((provider) => (
-                  <button
-                    className={accountForm.provider === provider.provider ? 'active' : ''}
-                    key={provider.id}
-                    onClick={() => applyProviderPreset(provider)}
-                  >
-                    <strong>{provider.label}</strong>
-                    <span>{provider.auth_type === 'oauth2' ? 'OAuth2' : '授权码'} · {provider.imap_host} · {provider.smtp_host}</span>
-                    <small>{provider.setup}</small>
-                    <em>{provider.tested_status === 'needs-account' ? '需真实账号验证' : '预设可用'} · {provider.limitations}</em>
-                    {providerVerifications[provider.id] && (
-                      <small>
-                        本地验证：{providerVerificationLabel(providerVerifications[provider.id].status)}
-                        {providerVerifications[provider.id].checked_at ? ` · ${formatDate(providerVerifications[provider.id].checked_at)}` : ''}
-                      </small>
-                    )}
-                  </button>
-                ))}
-              </section>
-              {activeProviderVerification && (
-                <section className="tool-panel">
-                  <header className="tool-header">
-                    <strong>真实账号验证记录</strong>
-                    <span>{providerVerificationLabel(activeProviderVerification.status)}</span>
-                  </header>
-                  <label>
-                    验证状态
-                    <select
-                      value={activeProviderVerification.status}
-                      onChange={(event) =>
-                        updateProviderVerification(accountForm.provider, {
-                          status: event.target.value as ProviderVerificationStatus,
-                        })
-                      }
-                    >
-                      <option value="untested">未验证</option>
-                      <option value="passed">通过</option>
-                      <option value="partial">部分通过</option>
-                      <option value="failed">失败</option>
-                    </select>
-                  </label>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={activeProviderVerification.imap_ok}
-                      onChange={(event) => updateProviderVerification(accountForm.provider, { imap_ok: event.target.checked })}
-                    />
-                    IMAP 登录 / 文件夹发现通过
-                  </label>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={activeProviderVerification.smtp_ok}
-                      onChange={(event) => updateProviderVerification(accountForm.provider, { smtp_ok: event.target.checked })}
-                    />
-                    SMTP 发送通过
-                  </label>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={activeProviderVerification.oauth_ok}
-                      onChange={(event) => updateProviderVerification(accountForm.provider, { oauth_ok: event.target.checked })}
-                    />
-                    OAuth2 / XOAUTH2 通过
-                  </label>
-                  <label>
-                    备注
-                    <textarea
-                      value={activeProviderVerification.notes}
-                      onChange={(event) => updateProviderVerification(accountForm.provider, { notes: event.target.value })}
-                      placeholder="记录失败原因、租户限制、授权码策略或附件/HTML 样本问题"
-                    />
-                  </label>
-                  <button onClick={saveProviderVerification}>保存验证记录</button>
-                </section>
-              )}
-            </details>
-            <label>
-              IMAP
-              <input value={accountForm.imap_host} onChange={(event) => setAccountForm({ ...accountForm, imap_host: event.target.value })} />
-            </label>
-            <label>
-              SMTP
-              <input value={accountForm.smtp_host} onChange={(event) => setAccountForm({ ...accountForm, smtp_host: event.target.value })} />
-            </label>
-            <label data-settings-section="auth">
-              认证方式
-              <select value={accountForm.auth_type} onChange={(event) => setAccountForm({ ...accountForm, auth_type: event.target.value })}>
-                <option value="password">应用专用密码 / 授权码</option>
-                <option value="oauth2">OAuth2 Token</option>
-              </select>
-            </label>
-            <div className="oauth-guide">
-              <strong>{accountForm.auth_type === 'oauth2' ? 'OAuth2 向导' : '授权码模式'}</strong>
-              <p>
-                {accountForm.auth_type === 'oauth2'
-                  ? '已支持 Gmail/Outlook PKCE 授权页、回调授权码记录、token 交换入 Keychain、自动刷新和 XOAUTH2 登录。'
-                  : '适用于 QQ、网易和自建邮箱的应用专用密码/授权码，密码只写入系统 Keychain。'}
-              </p>
-            </div>
-            {accountForm.auth_type === 'oauth2' && (
-              <details className="settings-disclosure" data-settings-section="auth">
-                <summary>
-                  <span>
-                    <strong>OAuth2 高级流程</strong>
-                    <em>PKCE、回调、Token 交换与刷新</em>
-                  </span>
-                  <b>{oauthSessions.length} 个会话</b>
-                </summary>
-              <section className="oauth-pkce-panel">
-                <label>
-                  OAuth2 Client ID
-                  <input
-                    value={oauthClientId}
-                    onChange={(event) => setOauthClientId(event.target.value)}
-                    placeholder="Gmail / Outlook 应用 Client ID"
-                  />
-                </label>
-                <label>
-                  Redirect URI
-                  <input
-                    value={oauthRedirectUri}
-                    onChange={(event) => setOauthRedirectUri(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Client Secret（可选）
-                  <input
-                    value={oauthClientSecret}
-                    onChange={(event) => setOauthClientSecret(event.target.value)}
-                    placeholder="桌面 PKCE 通常可留空"
-                    type="password"
-                  />
-                </label>
-                <button onClick={startOAuth2Pkce}>打开 OAuth2 授权页</button>
-                <button onClick={refreshOAuth2Token}>刷新已保存 Token</button>
-                {oauthReport && (
-                  <div className="oauth-result">
-                    <strong>{oauthReport.provider} · Session #{oauthReport.session_id}</strong>
-                    <span>{oauthReport.code_verifier_hint}</span>
-                    <small>Scopes: {oauthReport.scopes.join(', ')}</small>
-                    <em>State: {oauthReport.state}</em>
-                  </div>
-                )}
-                <div className="oauth-callback-form">
-                  <input
-                    value={oauthCallbackState}
-                    onChange={(event) => setOauthCallbackState(event.target.value)}
-                    placeholder="回调 state"
-                  />
-                  <input
-                    value={oauthCallbackCode}
-                    onChange={(event) => setOauthCallbackCode(event.target.value)}
-                    placeholder="授权码 code"
-                    type="password"
-                  />
-                <button onClick={completeOAuth2Callback}>记录回调授权码</button>
-                <button onClick={waitForOAuth2Callback}>监听本地回调</button>
-              </div>
-                {oauthCallbackReport && (
-                  <div className="oauth-result">
-                    <strong>{oauthCallbackReport.provider} · {oauthCallbackReport.status}</strong>
-                    <span>Session #{oauthCallbackReport.session_id}</span>
-                    <small>{oauthCallbackReport.message}</small>
-                  </div>
-                )}
-                {oauthExchangeReport && (
-                  <div className="oauth-result">
-                    <strong>{oauthExchangeReport.provider} · {oauthExchangeReport.status}</strong>
-                    <span>Session #{oauthExchangeReport.session_id}</span>
-                    <small>
-                      {oauthExchangeReport.expires_at
-                        ? `Access token 过期时间：${formatDate(oauthExchangeReport.expires_at)}`
-                        : oauthExchangeReport.message}
-                    </small>
-                  </div>
-                )}
-                {oauthRefreshReport && (
-                  <div className="oauth-result">
-                    <strong>{oauthRefreshReport.provider} · {oauthRefreshReport.status}</strong>
-                    <span>{oauthRefreshReport.message}</span>
-                    <small>Access token 过期时间：{formatDate(oauthRefreshReport.expires_at)}</small>
-                  </div>
-                )}
-                {oauthSessions.length > 0 && (
-                  <div className="oauth-session-list">
-                    {oauthSessions.slice(0, 3).map((session) => (
-                      <div key={session.id}>
-                        <strong>{session.provider} · {session.status}</strong>
-                        <span>{formatDate(session.created_at)} · {session.redirect_uri}</span>
-                        <small>{session.scopes.join(', ')}</small>
-                        {(session.status === 'code_received' || session.status === 'token_exchange_failed') && (
-                          <button onClick={() => exchangeOAuth2Token(session.id)}>交换并保存 Token</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-              </details>
-            )}
-            <label>
-              同步策略
-              <select value={accountForm.sync_mode} onChange={(event) => setAccountForm({ ...accountForm, sync_mode: event.target.value })}>
-                <option value="manual">手动</option>
-                <option value="15min">每 15 分钟</option>
-                <option value="push">推送优先</option>
-              </select>
-            </label>
+            <AccountConnectionSettings
+              accountForm={accountForm}
+              newAccountForm={newAccountForm}
+              providerVerifications={providerVerifications}
+              activeProviderVerification={activeProviderVerification}
+              oauthClientId={oauthClientId}
+              oauthClientSecret={oauthClientSecret}
+              oauthRedirectUri={oauthRedirectUri}
+              oauthCallbackState={oauthCallbackState}
+              oauthCallbackCode={oauthCallbackCode}
+              oauthReport={oauthReport}
+              oauthCallbackReport={oauthCallbackReport}
+              oauthExchangeReport={oauthExchangeReport}
+              oauthRefreshReport={oauthRefreshReport}
+              oauthSessions={oauthSessions}
+              onAccountFormChange={setAccountForm}
+              onNewAccountFormChange={setNewAccountForm}
+              onApplyProviderPreset={applyProviderPreset}
+              onApplyNewAccountPreset={applyNewAccountPreset}
+              onCreateNewAccount={() => { createNewAccount().catch((error) => setStatus(String(error))); }}
+              onUpdateProviderVerification={updateProviderVerification}
+              onSaveProviderVerification={saveProviderVerification}
+              onOauthClientIdChange={setOauthClientId}
+              onOauthClientSecretChange={setOauthClientSecret}
+              onOauthRedirectUriChange={setOauthRedirectUri}
+              onOauthCallbackStateChange={setOauthCallbackState}
+              onOauthCallbackCodeChange={setOauthCallbackCode}
+              onStartOAuth2Pkce={() => { startOAuth2Pkce().catch((error) => setStatus(String(error))); }}
+              onRefreshOAuth2Token={() => { refreshOAuth2Token().catch((error) => setStatus(String(error))); }}
+              onCompleteOAuth2Callback={() => { completeOAuth2Callback().catch((error) => setStatus(String(error))); }}
+              onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
+              onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
+            />
             <ExperienceSettings
               accountForm={accountForm}
               accounts={accounts}

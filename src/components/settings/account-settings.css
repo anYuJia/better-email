@@ -1,0 +1,407 @@
+.settings-account-stack {
+  display: grid;
+}
+
+.settings-account-stack .tool-panel {
+  padding: 14px;
+  border-color: #dfe4ea;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(24, 33, 45, 0.035);
+}
+
+.settings-account-stack .tool-header {
+  min-height: 42px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-account-stack .tool-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-account-stack .tool-header > span strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 720;
+}
+
+.settings-account-stack .tool-header > span small {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.settings-account-stack .tool-header > em {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid #dce8f5;
+  border-radius: 6px;
+  color: #1768ad;
+  background: #f3f8fe;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 680;
+}
+
+.settings-account-stack .tool-header button,
+.settings-primary-action,
+.settings-oauth-actions button,
+.settings-oauth-callback button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--ui-accent);
+  box-shadow: none;
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-account-stack .tool-header button:hover,
+.settings-primary-action:hover,
+.settings-oauth-actions button:hover,
+.settings-oauth-callback button:hover {
+  background: var(--ui-accent-hover);
+}
+
+.settings-account-form-grid,
+.settings-oauth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-account-form-grid > label,
+.settings-oauth-grid > label,
+.settings-provider-verification > label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.settings-account-stack :is(input, select, textarea) {
+  width: 100%;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  color: var(--ui-text);
+  background: #ffffff;
+  box-shadow: inset 0 1px 1px rgba(24, 33, 45, 0.025);
+}
+
+.settings-account-stack :is(input, select) {
+  min-height: 36px;
+  padding: 0 9px;
+}
+
+.settings-account-stack select {
+  padding-right: 30px;
+}
+
+.settings-account-stack textarea {
+  min-height: 82px;
+  padding: 9px 10px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.settings-account-stack :is(input, select, textarea):hover {
+  border-color: #c8d0d9;
+}
+
+.settings-account-stack :is(input, select, textarea):focus {
+  border-color: rgba(8, 127, 245, 0.52);
+  box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.10);
+}
+
+.settings-provider-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin: 10px 0;
+}
+
+.settings-provider-presets button {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid #dfe4ea;
+  border-radius: 9px;
+  color: var(--ui-text-secondary);
+  background: #fafbfc;
+  box-shadow: none;
+  text-align: left;
+}
+
+.settings-provider-presets button:hover {
+  border-color: #c1d9f0;
+  background: #f6faff;
+}
+
+.settings-provider-presets button.active {
+  color: #075eae;
+  border-color: #a9cff3;
+  background: #eaf5ff;
+  box-shadow: inset 0 0 0 1px rgba(8, 127, 245, 0.08);
+}
+
+.settings-provider-presets button strong,
+.settings-provider-presets button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-presets button strong {
+  color: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.settings-provider-presets button span {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+}
+
+.settings-provider-matrix {
+  gap: 7px;
+  margin: 10px 12px;
+}
+
+.settings-provider-matrix > header {
+  padding: 0 2px 7px;
+}
+
+.settings-provider-matrix > button {
+  min-height: 84px;
+  padding: 10px;
+  border-color: #dfe4ea;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.settings-provider-matrix > button:hover {
+  border-color: #bfd8f1;
+  background: #f8fbff;
+}
+
+.settings-provider-matrix > button.active {
+  border-color: #9fc9ef;
+  background: #edf7ff;
+}
+
+.settings-provider-verification .settings-toggle-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 8px 0;
+}
+
+.settings-provider-verification .checkbox-row {
+  min-height: 62px;
+}
+
+.settings-primary-action {
+  margin-top: 9px;
+}
+
+.settings-auth-guide {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 12px 18px;
+  padding: 12px;
+  border: 1px solid #cfe1f3;
+  border-radius: 10px;
+  color: #17436b;
+  background: #f1f7fd;
+}
+
+.settings-auth-guide > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--ui-accent);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(24, 33, 45, 0.06);
+}
+
+.settings-auth-guide > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-auth-guide strong {
+  font-size: 11.5px;
+}
+
+.settings-auth-guide p {
+  margin: 0;
+  color: #55728e;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.settings-oauth-panel {
+  display: grid;
+  gap: 9px;
+  margin: 12px;
+  padding: 13px;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.settings-oauth-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-oauth-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.settings-oauth-actions button.secondary,
+.settings-oauth-callback button.secondary {
+  border: 1px solid #dce2e8;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+}
+
+.settings-oauth-actions button.secondary:hover,
+.settings-oauth-callback button.secondary:hover {
+  color: var(--ui-accent);
+  border-color: #bfd8f1;
+  background: #f5faff;
+}
+
+.settings-oauth-callback {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  gap: 6px;
+}
+
+.settings-oauth-callback input {
+  min-width: 0;
+}
+
+.settings-account-stack .oauth-result {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #cfe7dc;
+  border-radius: 9px;
+  color: #255f46;
+  background: #f1faf5;
+}
+
+.settings-account-stack .oauth-result :is(span, small, em) {
+  min-width: 0;
+  overflow: hidden;
+  color: #5d7b6c;
+  font-size: 9.5px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-oauth-sessions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.settings-oauth-sessions > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid #e0e5ea;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.settings-oauth-sessions :is(strong, span, small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-oauth-sessions strong {
+  color: var(--ui-text);
+  font-size: 10.5px;
+}
+
+.settings-oauth-sessions :is(span, small) {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+}
+
+.settings-oauth-sessions button {
+  min-height: 28px;
+  margin-top: 4px;
+  border: 1px solid #c4d9ed;
+  border-radius: 7px;
+  color: var(--ui-accent);
+  background: #ffffff;
+  font-size: 9.5px;
+}
+
+@media (max-width: 940px) {
+  .settings-provider-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-provider-verification .settings-toggle-grid,
+  .settings-oauth-grid,
+  .settings-oauth-sessions {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-oauth-callback {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-account-form-grid,
+  .settings-provider-presets,
+  .settings-oauth-callback {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-account-stack .tool-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .settings-account-stack .tool-header > :is(button, em) {
+    align-self: flex-start;
+  }
+
+  .settings-oauth-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

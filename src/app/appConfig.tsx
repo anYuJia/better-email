@@ -356,10 +356,13 @@ export function isCustomFolder(folder: Folder): boolean {
   return folder.role.startsWith('custom:');
 }
 
+export function isMovableMessageFolder(folder: Folder): boolean {
+  return !folder.is_virtual && folder.role !== 'snoozed';
+}
+
 export function movableFoldersForMessage(folders: Folder[], message?: Message | null): Folder[] {
-  const blockedRoles = new Set<string>(['snoozed']);
   return folders.filter((folder) => {
-    if (folder.is_virtual || blockedRoles.has(folder.role)) return false;
+    if (!isMovableMessageFolder(folder)) return false;
     if (message && folder.account_id !== message.account_id) return false;
     return true;
   });
@@ -368,10 +371,9 @@ export function movableFoldersForMessage(folders: Folder[], message?: Message | 
 export function movableFoldersForBulk(folders: Folder[], selectedMessages: Message[]): Folder[] {
   if (selectedMessages.length === 0) return [];
   const accountIds = new Set(selectedMessages.map((message) => message.account_id));
-  const blockedRoles = new Set<string>(['snoozed']);
   if (accountIds.size !== 1) return [];
   return folders.filter((folder) => {
-    if (folder.is_virtual || blockedRoles.has(folder.role)) return false;
+    if (!isMovableMessageFolder(folder)) return false;
     return folder.account_id === selectedMessages[0].account_id;
   });
 }

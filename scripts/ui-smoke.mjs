@@ -538,6 +538,39 @@ async function main() {
     await fillInput(cdp, '.folder-rename input', '重点客户');
     await clickButton(cdp, '保存', "document.querySelector('.folder-rename')");
     await waitForExpression(cdp, "document.body.innerText.includes('已重命名文件夹：重点客户') && document.body.innerText.includes('重点客户')");
+    await evalInPage(cdp, `(() => {
+      const card = [...document.querySelectorAll('.message-card')]
+        .find((item) => item.textContent.includes('Quarterly update'));
+      const folder = [...document.querySelectorAll('.folder')]
+        .find((item) => item.textContent.includes('重点客户'));
+      if (!card || !folder) throw new Error('Message drag source or folder target not found');
+      const data = new DataTransfer();
+      window.__messageDragData = data;
+      window.__messageDragCard = card;
+      card.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: data }));
+      folder.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }));
+    })()`);
+    await waitForExpression(cdp, "document.querySelector('.message-card.dragging') && document.querySelector('.folder.message-drop-target')?.textContent.includes('重点客户')");
+    await evalInPage(cdp, `(() => {
+      const folder = [...document.querySelectorAll('.folder')]
+        .find((item) => item.textContent.includes('重点客户'));
+      if (!folder || !window.__messageDragData) throw new Error('Message drop target not ready');
+      folder.dispatchEvent(new DragEvent('drop', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: window.__messageDragData,
+      }));
+      window.__messageDragCard?.dispatchEvent(new DragEvent('dragend', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: window.__messageDragData,
+      }));
+    })()`);
+    await waitForExpression(cdp, "document.body.innerText.includes('已拖动到 重点客户：1 封邮件') && document.querySelector('.undo-snackbar')");
+    await clickButton(cdp, '重点客户', "document.querySelector('.more-mailboxes')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
+    await clickButton(cdp, '撤销', "document.querySelector('.undo-snackbar')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已撤销：移动到 重点客户') && document.body.innerText.includes('Quarterly update')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-more-menu') && !document.body.innerText.includes('导出 EML')");
     await openDetails(cdp, '.reader-more-menu');
@@ -727,6 +760,7 @@ async function main() {
         'composer draft save works',
         'bulk star and label actions work',
         'thread view opens conversations',
+        'message drag drop move and undo works',
         'custom folder create rename and move works',
         'trash restore flow works',
         'manual spam and not-spam correction works',

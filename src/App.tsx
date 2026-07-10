@@ -971,6 +971,45 @@ export default function App() {
     queueUndoAction(`批量移动到 ${folderName}`, undoSnapshots, `${count} 封邮件`);
   }
 
+  async function moveMessagesToFolderByIds(folder: Folder, messageIds: number[]) {
+    const uniqueMessageIds = [...new Set(messageIds)];
+    const messageById = new Map(messages.map((message) => [message.id, message]));
+    const draggedMessages = uniqueMessageIds
+      .map((messageId) => messageById.get(messageId))
+      .filter((message): message is Message => Boolean(message));
+
+    if (draggedMessages.length === 0) {
+      setStatus('没有找到可移动的邮件');
+      return;
+    }
+
+    const canMoveToFolder = movableFoldersForBulk(folders, draggedMessages)
+      .some((candidate) => candidate.id === folder.id);
+    if (!canMoveToFolder) {
+      const accountCount = new Set(draggedMessages.map((message) => message.account_id)).size;
+      setStatus(accountCount > 1 ? '不同账号的邮件不能拖到同一文件夹' : '此文件夹不能接收拖拽邮件');
+      return;
+    }
+
+    const messagesToMove = draggedMessages.filter((message) => message.folder_role !== folder.role);
+    if (messagesToMove.length === 0) {
+      setStatus(`邮件已在 ${folder.name}`);
+      return;
+    }
+
+    const undoSnapshots = snapshotMessages(messagesToMove);
+    for (const message of messagesToMove) {
+      await invoke('move_message_to_role', { messageId: message.id, role: folder.role });
+    }
+
+    const movedMessageIds = new Set(messagesToMove.map((message) => message.id));
+    setSelectedMessageIds([]);
+    if (selectedId !== null && movedMessageIds.has(selectedId)) setSelectedId(null);
+    await refreshAll();
+    setStatus(`已拖动到 ${folder.name}：${messagesToMove.length} 封邮件`);
+    queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, `${messagesToMove.length} 封邮件`);
+  }
+
   async function toggleBulkLabel(label: Label) {
     if (selectedMessages.length === 0) {
       setStatus('请先选择邮件');
@@ -2770,6 +2809,9 @@ export default function App() {
         onAccountScopeChange={changeAccountScope}
         onCompose={() => openComposer()}
         onSelectFolder={setFolderId}
+        onDropMessagesToFolder={(folder, messageIds) => {
+          moveMessagesToFolderByIds(folder, messageIds).catch((error) => setStatus(String(error)));
+        }}
         onRenamingFolderNameChange={setRenamingFolderName}
         onRenameFolder={(folder) => { renameCustomFolder(folder).catch((error) => setStatus(String(error))); }}
         onCancelRename={() => setRenamingFolderId(null)}

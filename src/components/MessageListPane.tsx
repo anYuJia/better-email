@@ -26,6 +26,7 @@ import {
   type ComposeMode,
   type MessageContextAction,
 } from './messageContextMenu';
+import { writeMessageDragPayload } from './messageDrag';
 
 export type { MessageContextAction } from './messageContextMenu';
 
@@ -112,7 +113,9 @@ export default function MessageListPane({
     message: Message;
     bulk: boolean;
   } | null>(null);
+  const [draggingMessageIds, setDraggingMessageIds] = React.useState<number[]>([]);
   const selectedMessageSet = new Set(selectedMessageIds);
+  const draggingMessageSet = new Set(draggingMessageIds);
   const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
   const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
@@ -283,8 +286,26 @@ export default function MessageListPane({
           {messages.map((message) => (
             <button
               key={message.id}
-              className={message.id === selectedId ? 'message-card selected' : 'message-card'}
+              className={[
+                'message-card',
+                message.id === selectedId ? 'selected' : '',
+                draggingMessageSet.has(message.id) ? 'dragging' : '',
+              ].filter(Boolean).join(' ')}
+              draggable
               onClick={() => onSelectMessage(message.id)}
+              onDragStart={(event) => {
+                const messageIds = selectedMessageSet.has(message.id) && selectedMessageIds.length > 0
+                  ? selectedMessageIds
+                  : [message.id];
+                const writtenIds = writeMessageDragPayload(event.dataTransfer, messageIds);
+                if (writtenIds.length === 0) {
+                  event.preventDefault();
+                  return;
+                }
+                setMessageMenu(null);
+                setDraggingMessageIds(writtenIds);
+              }}
+              onDragEnd={() => setDraggingMessageIds([])}
               onContextMenu={(event) => {
                 event.preventDefault();
                 const useBulkContext = selectedMessageSet.has(message.id) && selectedMessageIds.length > 1;

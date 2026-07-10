@@ -12,7 +12,12 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { folderIconForRole, isCustomFolder, primaryFolderRoles } from '../app/appConfig';
+import {
+  folderIconForRole,
+  isCustomFolder,
+  isMovableMessageFolder,
+  primaryFolderRoles,
+} from '../app/appConfig';
 import type {
   Account,
   AccountScope,
@@ -23,17 +28,25 @@ import type {
   SavedSearch,
 } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import {
+  hasMessageDragPayload,
+  readMessageDragPayload,
+} from './messageDrag';
 
 type FolderItemsProps = {
   folders: Folder[];
   folderId: number | null;
   renamingFolderId: number | null;
   renamingFolderName: string;
+  dropTargetFolderId: number | null;
   onSelectFolder: (folderId: number) => void;
   onRenamingFolderNameChange: (value: string) => void;
   onRenameFolder: (folder: Folder) => void;
   onCancelRename: () => void;
   onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => void;
+  onDragOverFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
+  onDragLeaveFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
+  onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
 };
 
 function FolderItems({
@@ -41,16 +54,29 @@ function FolderItems({
   folderId,
   renamingFolderId,
   renamingFolderName,
+  dropTargetFolderId,
   onSelectFolder,
   onRenamingFolderNameChange,
   onRenameFolder,
   onCancelRename,
   onOpenContextMenu,
+  onDragOverFolder,
+  onDragLeaveFolder,
+  onDropOnFolder,
 }: FolderItemsProps) {
   return folders.map((folder) => (
     <div
       key={folder.id}
-      className={folder.id === folderId ? 'folder active' : 'folder'}
+      className={[
+        'folder',
+        folder.id === folderId ? 'active' : '',
+        folder.id === dropTargetFolderId ? 'message-drop-target' : '',
+      ].filter(Boolean).join(' ')}
+      data-folder-id={folder.id}
+      data-folder-role={folder.role}
+      onDragOver={(event) => onDragOverFolder(event, folder)}
+      onDragLeave={(event) => onDragLeaveFolder(event, folder)}
+      onDrop={(event) => onDropOnFolder(event, folder)}
       onContextMenu={(event) => onOpenContextMenu(event, folder)}
     >
       {renamingFolderId === folder.id ? (
@@ -119,6 +145,7 @@ export type SidebarProps = {
   onAccountScopeChange: (value: string) => void;
   onCompose: () => void;
   onSelectFolder: (folderId: number) => void;
+  onDropMessagesToFolder: (folder: Folder, messageIds: number[]) => void;
   onRenamingFolderNameChange: (value: string) => void;
   onRenameFolder: (folder: Folder) => void;
   onCancelRename: () => void;
@@ -165,6 +192,7 @@ export default function Sidebar({
   onAccountScopeChange,
   onCompose,
   onSelectFolder,
+  onDropMessagesToFolder,
   onRenamingFolderNameChange,
   onRenameFolder,
   onCancelRename,
@@ -195,6 +223,7 @@ export default function Sidebar({
     detail?: string;
     items: ContextMenuItem[];
   } | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = React.useState<number | null>(null);
   const primaryFolders = folders.filter((folder) => primaryFolderRoles.has(folder.role));
   const secondaryFolders = folders.filter((folder) => !primaryFolderRoles.has(folder.role));
   const customFolderCount = folders.filter(isCustomFolder).length;
@@ -202,10 +231,30 @@ export default function Sidebar({
     folderId,
     renamingFolderId,
     renamingFolderName,
+    dropTargetFolderId,
     onSelectFolder,
     onRenamingFolderNameChange,
     onRenameFolder,
     onCancelRename,
+    onDragOverFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
+      if (!isMovableMessageFolder(folder) || !hasMessageDragPayload(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      setDropTargetFolderId(folder.id);
+    },
+    onDragLeaveFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
+      const nextTarget = event.relatedTarget as Node | null;
+      if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+      setDropTargetFolderId((current) => current === folder.id ? null : current);
+    },
+    onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
+      if (!isMovableMessageFolder(folder) || !hasMessageDragPayload(event.dataTransfer)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const messageIds = readMessageDragPayload(event.dataTransfer);
+      setDropTargetFolderId(null);
+      if (messageIds.length > 0) onDropMessagesToFolder(folder, messageIds);
+    },
     onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => {
       event.preventDefault();
       event.stopPropagation();

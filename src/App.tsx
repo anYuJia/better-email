@@ -3,15 +3,9 @@ import {
   Edit3,
   Inbox,
   Keyboard,
-  Mail,
-  Maximize2,
-  Minus,
-  Paperclip,
   RefreshCw,
   Search,
-  Send,
   Settings,
-  Wand2,
   X,
 } from 'lucide-react';
 import './styles.css';
@@ -19,6 +13,7 @@ import './ui-2026.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
+import ComposerWindow from './components/ComposerWindow';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -211,7 +206,6 @@ export default function App() {
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
   const [isComposerDropActive, setComposerDropActive] = useState(false);
-  const [composerPosition, setComposerPosition] = useState({ x: 0, y: 0 });
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -236,7 +230,6 @@ export default function App() {
   const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const composerDragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const layoutResizeRef = useRef<{ pane: 'sidebar' | 'list'; startX: number; origin: AppLayout } | null>(null);
   const undoTimerRef = useRef<number | null>(null);
   const backgroundSyncRef = useRef(false);
@@ -345,45 +338,11 @@ export default function App() {
   function closeComposer() {
     setComposerOpen(false);
     setComposerMinimized(false);
-    setComposerPosition({ x: 0, y: 0 });
   }
 
   function clearComposerAutosave() {
     window.localStorage.removeItem(composerAutosaveStorageKey);
     setComposerAutosave(null);
-  }
-
-  function composerTitle() {
-    const subject = draft.subject.trim();
-    return subject ? subject : '新邮件';
-  }
-
-  function beginComposerDrag(event: React.PointerEvent<HTMLElement>) {
-    if (isComposerMinimized || event.button !== 0) return;
-    if ((event.target as HTMLElement).closest('button, input, textarea, select, label, a')) return;
-    composerDragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: composerPosition.x,
-      originY: composerPosition.y,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function moveComposerDrag(event: React.PointerEvent<HTMLElement>) {
-    const drag = composerDragRef.current;
-    if (!drag) return;
-    const maxX = Math.max(window.innerWidth * 0.42, 120);
-    const maxY = Math.max(window.innerHeight * 0.36, 120);
-    const nextX = Math.min(Math.max(drag.originX + event.clientX - drag.startX, -maxX), maxX);
-    const nextY = Math.min(Math.max(drag.originY + event.clientY - drag.startY, -maxY), maxY);
-    setComposerPosition({ x: nextX, y: nextY });
-  }
-
-  function endComposerDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!composerDragRef.current) return;
-    composerDragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   function draftInputForCurrentAccount(input: DraftInput): DraftInput {
@@ -2563,7 +2522,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [composerPosition.x, composerPosition.y, isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, messages, selected, selectedId]);
+  }, [isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, messages, selected, selectedId]);
 
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
@@ -2733,265 +2692,40 @@ export default function App() {
       />
 
       {isComposerOpen && (
-        <div className={`composer-backdrop${isComposerMinimized ? ' composer-backdrop-minimized' : ''}`}>
-          {isComposerMinimized ? (
-            <section className="composer-minimized" aria-label="已最小化的新邮件">
-              <button className="composer-mini-main" type="button" onClick={() => setComposerMinimized(false)}>
-                <Mail size={17} />
-                <span>
-                  <strong>{composerTitle()}</strong>
-                  <small>{draft.to.trim() || '未填写收件人'}</small>
-                </span>
-              </button>
-              <div className="composer-mini-actions">
-                <button type="button" onClick={() => setComposerMinimized(false)} aria-label="展开写信窗口">
-                  <Maximize2 size={15} />
-                  展开
-                </button>
-                <button type="button" onClick={closeComposer} aria-label="关闭写信窗口">
-                  <X size={15} />
-                  关闭
-                </button>
-              </div>
-            </section>
-          ) : (
-          <section
-            className="composer"
-            style={{ transform: `translate(${composerPosition.x}px, ${composerPosition.y}px)` }}
-            onPointerMove={moveComposerDrag}
-            onPointerUp={endComposerDrag}
-            onPointerCancel={endComposerDrag}
-          >
-            <header onPointerDown={beginComposerDrag}>
-              <span className="composer-window-controls" aria-hidden="true">
-                <i className="control-dot close-dot" />
-                <i className="control-dot minimize-dot" />
-                <i className="control-dot zoom-dot" />
-              </span>
-              <strong>{composerTitle()}</strong>
-              <div className="composer-header-actions">
-                <button type="button" onClick={() => setComposerMinimized(true)} aria-label="最小化写信窗口">
-                  <Minus size={15} />
-                  最小化
-                </button>
-                <button type="button" onClick={closeComposer} aria-label="关闭写信窗口">
-                  <X size={15} />
-                  关闭
-                </button>
-              </div>
-            </header>
-            <datalist id="contact-suggestions">
-              {managedContacts.map((contact) => (
-                <React.Fragment key={contact.id}>
-                  <option value={contact.email}>
-                    {contact.name}
-                  </option>
-                  {contact.aliases.map((alias) => (
-                    <option key={`${contact.id}-${alias}`} value={alias}>
-                      {contact.name}
-                    </option>
-                  ))}
-                </React.Fragment>
-              ))}
-            </datalist>
-            <input
-              list="contact-suggestions"
-              value={draft.to}
-              onChange={(event) => setDraft({ ...draft, to: event.target.value })}
-              placeholder="收件人"
-            />
-            {managedContacts.length > 0 && (
-              <div className="recipient-suggestions">
-                <span>常用联系人</span>
-                {managedContacts.slice(0, 5).map((contact) => (
-                  <button type="button" key={contact.id} onClick={() => addContactToDraft(contact)}>
-                    {contact.vip ? '★ ' : ''}{contact.name || contact.email}
-                    <small>{contact.email}{contact.aliases.length ? ` · ${contact.aliases.length} 个别名` : ''}</small>
-                  </button>
-                ))}
-              </div>
-            )}
-            <input
-              value={draft.subject}
-              onChange={(event) => setDraft({ ...draft, subject: event.target.value })}
-              placeholder="主题"
-            />
-            <textarea
-              value={draft.body}
-              onChange={(event) => setDraft({ ...draft, body: event.target.value, html_body: isRichComposer ? `<p>${event.target.value.replace(/\n/g, '<br>')}</p>` : draft.html_body })}
-              placeholder="正文"
-            />
-            <details className="composer-advanced">
-              <summary>
-                <Wand2 size={15} />
-                工具
-                <span>
-                  {draft.attachments.length > 0 ? `${draft.attachments.length} 附件` : '身份 · 模板 · 附件'}
-                </span>
-              </summary>
-              <div className="composer-advanced-panel">
-                <section className="composer-tool-card">
-                  <strong>发送身份</strong>
-                  <label className="composer-from">
-                    发件账号
-                    <select
-                      value={draft.account_id || account?.id || 0}
-                      onChange={(event) => setDraft({ ...draft, account_id: Number(event.target.value), identity_id: 0 })}
-                    >
-                      {accounts.map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.display_name} &lt;{entry.email}&gt;
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="composer-from">
-                    发件身份
-                    <select
-                      aria-label="发件身份"
-                      value={identityForDraft()?.id || 0}
-                      onChange={(event) => setDraft({ ...draft, identity_id: Number(event.target.value) })}
-                    >
-                      {identitiesForDraftAccount().map((identity) => (
-                        <option key={identity.id} value={identity.id}>
-                          {identity.name} &lt;{identity.email}&gt;{identity.is_default ? ' · 默认' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="composer-recipient-grid">
-                    <input
-                      list="contact-suggestions"
-                      value={draft.cc}
-                      onChange={(event) => setDraft({ ...draft, cc: event.target.value })}
-                      placeholder="抄送"
-                    />
-                    <input
-                      list="contact-suggestions"
-                      value={draft.bcc}
-                      onChange={(event) => setDraft({ ...draft, bcc: event.target.value })}
-                      placeholder="密送"
-                    />
-                  </div>
-                </section>
-
-                <section className="composer-tool-card composer-template-card">
-                  <strong>模板</strong>
-                  <div className="composer-template-list">
-                    {composeTemplates.length === 0 && <small>暂无模板，可从当前正文保存</small>}
-                    {composeTemplates.slice(0, 6).map((template) => (
-                      <span className="composer-template-row" key={template.id}>
-                        <button type="button" onClick={() => applyComposeTemplate(template)}>
-                          <Wand2 size={13} />
-                          {template.name}
-                        </button>
-                        <button type="button" aria-label={`删除模板 ${template.name}`} onClick={() => deleteComposeTemplate(template)}>
-                          删除
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="composer-template-save">
-                    <input
-                      value={templateName}
-                      onChange={(event) => setTemplateName(event.target.value)}
-                      placeholder="模板名称"
-                    />
-                    <button type="button" onClick={saveDraftAsTemplate}>保存当前</button>
-                  </div>
-                </section>
-
-                <section className="composer-tool-card">
-                  <strong>富文本与签名</strong>
-                  <div className="composer-rich-toggle">
-                    <label className="checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={isRichComposer}
-                        onChange={(event) => setRichComposer(event.target.checked)}
-                      />
-                      富文本 HTML
-                    </label>
-                    {isRichComposer && (
-                      <div className="rich-toolbar">
-                        <button type="button" onClick={() => setDraft({ ...draft, html_body: `${draft.html_body}<strong>加粗文字</strong>`, body: `${draft.body}加粗文字` })}>B</button>
-                        <button type="button" onClick={() => setDraft({ ...draft, html_body: `${draft.html_body}<em>斜体文字</em>`, body: `${draft.body}斜体文字` })}>I</button>
-                        <button type="button" onClick={() => setDraft({ ...draft, html_body: `${draft.html_body}<ul><li>列表项</li></ul>`, body: `${draft.body}\n- 列表项` })}>列表</button>
-                      </div>
-                    )}
-                  </div>
-                  {isRichComposer && (
-                    <textarea
-                      className="composer-html-source"
-                      value={draft.html_body}
-                      onChange={(event) => setDraft({ ...draft, html_body: event.target.value })}
-                      placeholder="HTML 正文，将在保存和发送前清洗"
-                    />
-                  )}
-                  <div className="composer-signature">
-                    <span>{identityForDraft()?.signature.trim() ? `签名：${identityForDraft()?.signature.trim()}` : '当前发件身份未设置签名'}</span>
-                    <button type="button" onClick={insertSignatureIntoDraft}>插入签名</button>
-                  </div>
-                </section>
-
-                <section className="composer-tool-card">
-                  <strong>稍后与附件</strong>
-                  <label className="composer-schedule">
-                    稍后发送
-                    <input
-                      type="datetime-local"
-                      value={draft.send_at}
-                      onChange={(event) => setDraft({ ...draft, send_at: event.target.value })}
-                    />
-                  </label>
-                  <div
-                    className={`composer-attachments${isComposerDropActive ? ' drop-active' : ''}`}
-                    onDrop={handleComposerAttachmentDrop}
-                    onDragEnter={handleComposerAttachmentDragEnter}
-                    onDragLeave={handleComposerAttachmentDragLeave}
-                    onDragOver={handleComposerAttachmentDragOver}
-                  >
-                    <div className="composer-attachment-controls">
-                      <button type="button" className="composer-attachment-button" onClick={pickDraftAttachments}>
-                        <Paperclip size={14} />
-                        添加附件
-                      </button>
-                      <span>
-                        {draft.attachments.length > 0
-                          ? `已添加 ${draft.attachments.length} 个附件`
-                          : '拖入文件，或点击添加附件'}
-                      </span>
-                    </div>
-                    {draft.attachments.length > 0 && (
-                      <div className="composer-attachment-list">
-                        {draft.attachments.map((attachment, index) => (
-                          <span className="composer-attachment-chip" key={`${attachment.filename}-${index}`}>
-                            <Paperclip size={12} />
-                            <strong>{attachment.filename}</strong>
-                            <em>{formatBytes(attachment.size_bytes)}</em>
-                            <button type="button" onClick={() => removeDraftAttachment(index)}>移除</button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </div>
-            </details>
-            <footer>
-              <span>
-                {status}
-                {composerAutosave && isComposerOpen && !isDraftEmpty(draft) ? ` · 自动保存 ${formatDate(composerAutosave.saved_at)}` : ''}
-              </span>
-              <div>
-                <button className="secondary" onClick={saveDraft}>保存草稿</button>
-                <button className="secondary" onClick={queueDraft}>{draft.send_at.trim() ? '稍后发送' : '发件箱'}</button>
-                <button onClick={sendDraft}>发送</button>
-              </div>
-            </footer>
-          </section>
-          )}
-        </div>
+        <ComposerWindow
+          minimized={isComposerMinimized}
+          draft={draft}
+          accounts={accounts}
+          identities={identities}
+          fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
+          contacts={managedContacts}
+          templates={composeTemplates}
+          templateName={templateName}
+          richComposer={isRichComposer}
+          dropActive={isComposerDropActive}
+          status={status}
+          autosave={composerAutosave}
+          onMinimize={() => setComposerMinimized(true)}
+          onRestore={() => setComposerMinimized(false)}
+          onClose={closeComposer}
+          onDraftChange={setDraft}
+          onAddContact={addContactToDraft}
+          onApplyTemplate={applyComposeTemplate}
+          onDeleteTemplate={deleteComposeTemplate}
+          onTemplateNameChange={setTemplateName}
+          onSaveTemplate={saveDraftAsTemplate}
+          onRichComposerChange={setRichComposer}
+          onInsertSignature={insertSignatureIntoDraft}
+          onPickAttachments={() => { pickDraftAttachments().catch((error) => setStatus(String(error))); }}
+          onRemoveAttachment={removeDraftAttachment}
+          onAttachmentDrop={handleComposerAttachmentDrop}
+          onAttachmentDragEnter={handleComposerAttachmentDragEnter}
+          onAttachmentDragLeave={handleComposerAttachmentDragLeave}
+          onAttachmentDragOver={handleComposerAttachmentDragOver}
+          onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
+          onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
+          onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}
+        />
       )}
 
       {isSettingsOpen && accountForm && (

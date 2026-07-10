@@ -1,10 +1,18 @@
 import React from 'react';
 import {
+  Archive,
+  FolderInput,
+  Mail,
+  MailOpen,
   MoreHorizontal,
   Paperclip,
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Star,
+  StarOff,
+  Tag,
+  Trash2,
   X,
 } from 'lucide-react';
 import { filters, movableFoldersForBulk, searchShortcuts } from '../app/appConfig';
@@ -18,8 +26,10 @@ import type {
   ThreadSummary,
 } from '../app/types';
 import { formatDate } from '../mailUtils';
+import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 
 type BulkAction = 'archive' | 'star' | 'trash' | 'read' | 'unread';
+export type MessageContextAction = 'archive' | 'trash' | 'read' | 'unread' | 'star' | 'unstar';
 
 export type MessageListPaneProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -50,6 +60,9 @@ export type MessageListPaneProps = {
   onRunBulkAction: (action: BulkAction) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onApplyBulkLabel: (label: Label) => void;
+  onRunMessageAction: (message: Message, action: MessageContextAction) => void;
+  onMoveMessageToFolder: (message: Message, folder: Folder) => void;
+  onToggleMessageLabel: (message: Message, label: Label) => void;
   onOpenThread: (thread: ThreadSummary) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
@@ -85,15 +98,88 @@ export default function MessageListPane({
   onRunBulkAction,
   onMoveBulkToFolder,
   onApplyBulkLabel,
+  onRunMessageAction,
+  onMoveMessageToFolder,
+  onToggleMessageLabel,
   onOpenThread,
   onSelectMessage,
   onToggleMessageSelection,
   onLoadMore,
 }: MessageListPaneProps) {
+  const [messageMenu, setMessageMenu] = React.useState<{
+    x: number;
+    y: number;
+    message: Message;
+  } | null>(null);
   const selectedMessageSet = new Set(selectedMessageIds);
   const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
   const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
+  const contextMessage = messageMenu?.message;
+  const contextItems: ContextMenuItem[] = contextMessage
+    ? [
+        {
+          id: 'open',
+          label: '打开邮件',
+          icon: <MailOpen size={15} />,
+          onSelect: () => onSelectMessage(contextMessage.id),
+        },
+        {
+          id: 'read-state',
+          label: contextMessage.is_read ? '标为未读' : '标为已读',
+          icon: contextMessage.is_read ? <Mail size={15} /> : <MailOpen size={15} />,
+          shortcut: 'M',
+          onSelect: () => onRunMessageAction(contextMessage, contextMessage.is_read ? 'unread' : 'read'),
+        },
+        {
+          id: 'star-state',
+          label: contextMessage.is_starred ? '取消星标' : '添加星标',
+          icon: contextMessage.is_starred ? <StarOff size={15} /> : <Star size={15} />,
+          shortcut: 'S',
+          onSelect: () => onRunMessageAction(contextMessage, contextMessage.is_starred ? 'unstar' : 'star'),
+        },
+        {
+          id: 'archive',
+          label: '归档',
+          icon: <Archive size={15} />,
+          shortcut: 'E',
+          disabled: contextMessage.folder_role === 'archive',
+          onSelect: () => onRunMessageAction(contextMessage, 'archive'),
+        },
+        {
+          id: 'move',
+          label: '移动到',
+          icon: <FolderInput size={15} />,
+          disabled: movableFoldersForBulk(folders, [contextMessage]).length === 0,
+          children: movableFoldersForBulk(folders, [contextMessage]).map((folder) => ({
+            id: `move-${folder.id}`,
+            label: folder.name,
+            onSelect: () => onMoveMessageToFolder(contextMessage, folder),
+          })),
+        },
+        {
+          id: 'labels',
+          label: '标签',
+          icon: <Tag size={15} />,
+          disabled: labels.length === 0,
+          children: labels.map((label) => ({
+            id: `label-${label.id}`,
+            label: label.name,
+            checked: contextMessage.labels.includes(label.name),
+            onSelect: () => onToggleMessageLabel(contextMessage, label),
+          })),
+        },
+        {
+          id: 'trash',
+          label: '移到废纸篓',
+          icon: <Trash2 size={15} />,
+          danger: true,
+          separatorBefore: true,
+          disabled: contextMessage.folder_role === 'trash',
+          onSelect: () => onRunMessageAction(contextMessage, 'trash'),
+        },
+      ]
+    : [];
 
   return (
     <section className="message-list-panel">
@@ -240,6 +326,15 @@ export default function MessageListPane({
               key={message.id}
               className={message.id === selectedId ? 'message-card selected' : 'message-card'}
               onClick={() => onSelectMessage(message.id)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                onSelectMessage(message.id);
+                setMessageMenu({
+                  x: event.clientX,
+                  y: event.clientY,
+                  message,
+                });
+              }}
             >
               <span
                 className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
@@ -306,6 +401,15 @@ export default function MessageListPane({
             </div>
           )}
         </div>
+      )}
+      {messageMenu && (
+        <ContextMenu
+          x={messageMenu.x}
+          y={messageMenu.y}
+          items={contextItems}
+          ariaLabel={`${messageMenu.message.subject || '邮件'}操作`}
+          onClose={() => setMessageMenu(null)}
+        />
       )}
     </section>
   );

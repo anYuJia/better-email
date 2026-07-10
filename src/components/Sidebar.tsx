@@ -1,5 +1,16 @@
 import React from 'react';
-import { Edit3, Keyboard, Search, Settings } from 'lucide-react';
+import {
+  Edit3,
+  FolderOpen,
+  Keyboard,
+  MailPlus,
+  Pencil,
+  Search,
+  Send,
+  Settings,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import { folderIconForRole, isCustomFolder, primaryFolderRoles } from '../app/appConfig';
 import type {
   Account,
@@ -10,6 +21,7 @@ import type {
   Label,
   SavedSearch,
 } from '../app/types';
+import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 
 type FolderItemsProps = {
   folders: Folder[];
@@ -22,6 +34,7 @@ type FolderItemsProps = {
   onCancelRename: () => void;
   onStartRename: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
+  onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => void;
 };
 
 function FolderItems({
@@ -35,11 +48,13 @@ function FolderItems({
   onCancelRename,
   onStartRename,
   onDeleteFolder,
+  onOpenContextMenu,
 }: FolderItemsProps) {
   return folders.map((folder) => (
     <div
       key={folder.id}
       className={folder.id === folderId ? 'folder active' : 'folder'}
+      onContextMenu={(event) => onOpenContextMenu(event, folder)}
     >
       {renamingFolderId === folder.id ? (
         <form
@@ -68,8 +83,12 @@ function FolderItems({
           </button>
           {isCustomFolder(folder) && (
             <span className="folder-actions">
-              <button type="button" title="重命名" onClick={() => onStartRename(folder)}>改</button>
-              <button type="button" title="删除" onClick={() => onDeleteFolder(folder)}>删</button>
+              <button type="button" title="重命名" aria-label={`重命名 ${folder.name}`} onClick={() => onStartRename(folder)}>
+                <Pencil size={12} />
+              </button>
+              <button type="button" title="删除" aria-label={`删除 ${folder.name}`} onClick={() => onDeleteFolder(folder)}>
+                <Trash2 size={12} />
+              </button>
             </span>
           )}
         </>
@@ -167,6 +186,12 @@ export default function Sidebar({
   onSync,
   onResetLayout,
 }: SidebarProps) {
+  const [contextMenu, setContextMenu] = React.useState<{
+    x: number;
+    y: number;
+    ariaLabel: string;
+    items: ContextMenuItem[];
+  } | null>(null);
   const primaryFolders = folders.filter((folder) => primaryFolderRoles.has(folder.role));
   const secondaryFolders = folders.filter((folder) => !primaryFolderRoles.has(folder.role));
   const customFolderCount = folders.filter(isCustomFolder).length;
@@ -180,6 +205,40 @@ export default function Sidebar({
     onCancelRename,
     onStartRename,
     onDeleteFolder,
+    onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => {
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        ariaLabel: `${folder.name} 文件夹操作`,
+        items: [
+          {
+            id: 'open-folder',
+            label: '打开文件夹',
+            icon: <FolderOpen size={15} />,
+            onSelect: () => onSelectFolder(folder.id),
+          },
+          ...(isCustomFolder(folder)
+            ? [
+                {
+                  id: 'rename-folder',
+                  label: '重命名',
+                  icon: <Pencil size={15} />,
+                  separatorBefore: true,
+                  onSelect: () => onStartRename(folder),
+                },
+                {
+                  id: 'delete-folder',
+                  label: '删除文件夹',
+                  icon: <Trash2 size={15} />,
+                  danger: true,
+                  onSelect: () => onDeleteFolder(folder),
+                },
+              ]
+            : []),
+        ],
+      });
+    },
   };
 
   return (
@@ -246,7 +305,34 @@ export default function Sidebar({
               </form>
               <div className="saved-search-list">
                 {savedSearches.map((savedSearch) => (
-                  <div className="saved-search-row" key={savedSearch.id}>
+                  <div
+                    className="saved-search-row"
+                    key={savedSearch.id}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setContextMenu({
+                        x: event.clientX,
+                        y: event.clientY,
+                        ariaLabel: `${savedSearch.name} 搜索操作`,
+                        items: [
+                          {
+                            id: 'run-search',
+                            label: '运行搜索',
+                            icon: <Search size={15} />,
+                            onSelect: () => onRunSavedSearch(savedSearch),
+                          },
+                          {
+                            id: 'delete-search',
+                            label: '删除保存搜索',
+                            icon: <Trash2 size={15} />,
+                            danger: true,
+                            separatorBefore: true,
+                            onSelect: () => onDeleteSavedSearch(savedSearch),
+                          },
+                        ],
+                      });
+                    }}
+                  >
                     <button type="button" onClick={() => onRunSavedSearch(savedSearch)}>
                       <strong>{savedSearch.name}</strong>
                       <span>{savedSearch.query}</span>
@@ -270,7 +356,40 @@ export default function Sidebar({
               />
               <div className="contact-list">
                 {filteredContacts.map((contact) => (
-                  <div className="contact-row" key={contact.id}>
+                  <div
+                    className="contact-row"
+                    key={contact.id}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setContextMenu({
+                        x: event.clientX,
+                        y: event.clientY,
+                        ariaLabel: `${contact.name || contact.email} 联系人操作`,
+                        items: [
+                          {
+                            id: 'compose-contact',
+                            label: '写邮件',
+                            icon: <Send size={15} />,
+                            onSelect: () => onComposeToContact(contact),
+                          },
+                          {
+                            id: 'add-contact-draft',
+                            label: '加入当前草稿',
+                            icon: <MailPlus size={15} />,
+                            onSelect: () => onAddContactToDraft(contact),
+                          },
+                          {
+                            id: 'toggle-contact-vip',
+                            label: contact.vip ? '取消 VIP' : '设为 VIP',
+                            icon: <Star size={15} />,
+                            separatorBefore: true,
+                            checked: contact.vip,
+                            onSelect: () => onToggleContactVip(contact),
+                          },
+                        ],
+                      });
+                    }}
+                  >
                     <button type="button" onClick={() => onComposeToContact(contact)}>
                       <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
                       <span>{contact.email}{contact.aliases.length ? ` · ${contact.aliases.length} 个别名` : ''}</span>
@@ -363,6 +482,15 @@ export default function Sidebar({
           </div>
         </details>
       </div>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          ariaLabel={contextMenu.ariaLabel}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </aside>
   );
 }

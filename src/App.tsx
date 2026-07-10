@@ -11,12 +11,17 @@ import {
 import './styles.css';
 import './ui-2026.css';
 import Sidebar from './components/Sidebar';
-import MessageListPane from './components/MessageListPane';
+import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import ComposerWindow from './components/ComposerWindow';
 import ExperienceSettings from './components/settings/ExperienceSettings';
 import SettingsFrame from './components/settings/SettingsFrame';
 import AccountConnectionSettings from './components/settings/AccountConnectionSettings';
+import DataSafetySettings from './components/settings/DataSafetySettings';
+import SyncOperationsSettings from './components/settings/SyncOperationsSettings';
+import ContactAutomationSettings from './components/settings/ContactAutomationSettings';
+import RuleAutomationSettings from './components/settings/RuleAutomationSettings';
+import SecurityPreviewSettings from './components/settings/SecurityPreviewSettings';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -94,8 +99,6 @@ import {
   normalizeCommandSearchText,
   emptyIdentityForm,
   emptyRuleForm,
-  ruleConditionFields,
-  ruleActionPresets,
   parseRuleCondition,
   buildRuleCondition,
   ruleActionParts,
@@ -926,6 +929,48 @@ export default function App() {
     await refreshAll();
     setStatus(`已批量添加标签 ${label.name}：${count} 封邮件`);
     queueUndoAction(`批量添加标签 ${label.name}`, undoSnapshots, `${count} 封邮件`);
+  }
+
+  async function runMessageAction(message: Message, action: MessageContextAction) {
+    if (action === 'read' || action === 'unread') {
+      const shouldRead = action === 'read';
+      if (message.is_read !== shouldRead) await toggleRead(message);
+      return;
+    }
+    if (action === 'star' || action === 'unstar') {
+      const shouldStar = action === 'star';
+      if (message.is_starred !== shouldStar) await toggleStar(message);
+      return;
+    }
+
+    const undoSnapshots = snapshotMessages([message]);
+    await invoke('move_message_to_role', { messageId: message.id, role: action });
+    setSelectedId(null);
+    await refreshAll();
+    const actionLabel = action === 'archive' ? '归档' : '移到废纸篓';
+    setStatus(`已${actionLabel}：${message.subject || '(无主题)'}`);
+    queueUndoAction(actionLabel, undoSnapshots);
+  }
+
+  async function moveMessageToFolder(message: Message, folder: Folder) {
+    const undoSnapshots = snapshotMessages([message]);
+    await invoke('move_message_to_role', { messageId: message.id, role: folder.role });
+    setSelectedId(null);
+    await refreshAll();
+    setStatus(`已移动到 ${folder.name}：${message.subject || '(无主题)'}`);
+    queueUndoAction(`移动到 ${folder.name}`, undoSnapshots);
+  }
+
+  async function toggleMessageLabel(message: Message, label: Label) {
+    const undoSnapshots = snapshotMessages([message]);
+    const hasLabel = message.labels.includes(label.name);
+    await invoke(hasLabel ? 'remove_label_from_message' : 'apply_label_to_message', {
+      messageId: message.id,
+      labelId: label.id,
+    });
+    await refreshAll();
+    setStatus(`${hasLabel ? '已移除' : '已添加'}标签 ${label.name}`);
+    queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
   }
 
   async function toggleRead(message: Message) {
@@ -2635,6 +2680,9 @@ export default function App() {
         onRunBulkAction={runBulkAction}
         onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder.role as FolderRole, folder.name).catch((error) => setStatus(String(error))); }}
         onApplyBulkLabel={applyBulkLabel}
+        onRunMessageAction={(message, action) => { runMessageAction(message, action).catch((error) => setStatus(String(error))); }}
+        onMoveMessageToFolder={(message, folder) => { moveMessageToFolder(message, folder).catch((error) => setStatus(String(error))); }}
+        onToggleMessageLabel={(message, label) => { toggleMessageLabel(message, label).catch((error) => setStatus(String(error))); }}
         onOpenThread={openThread}
         onSelectMessage={setSelectedId}
         onToggleMessageSelection={toggleMessageSelection}
@@ -2784,472 +2832,84 @@ export default function App() {
               onDeleteIdentity={deleteIdentity}
               onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
             />
-            <div className="settings-action-bar">
-              <span>凭据后续接入系统 Keychain，本地数据库只保存非敏感配置。</span>
-              <div>
-                <button className="secondary" onClick={testConnection}>连接测试</button>
-                <button className="secondary" onClick={exportDiagnostics}>导出诊断</button>
-                <button onClick={saveSettings}>保存设置</button>
-              </div>
-            </div>
-            <details className="settings-disclosure" data-settings-section="backup">
-              <summary>
-                <span>
-                  <strong>备份、诊断与连接报告</strong>
-                  <em>导入导出、脱敏 JSON、连接测试详情</em>
-                </span>
-                <b>{localBackupSummary ? `${localBackupSummary.messages} 封` : '未备份'}</b>
-              </summary>
-              {diagnosticExport && (
-                <section className="tool-panel">
-                  <header className="tool-header">
-                    <strong>脱敏诊断</strong>
-                    <span>{Math.round(diagnosticExport.length / 1024)} KB JSON</span>
-                  </header>
-                  <textarea readOnly value={diagnosticExport.slice(0, 2500)} />
-                </section>
-              )}
-              <section className="tool-panel">
-                <header className="tool-header">
-                  <strong>本地备份与恢复</strong>
-                  <span>{localBackupSummary ? `${localBackupSummary.messages} 封邮件` : '不包含系统凭据'}</span>
-                </header>
-                <p>备份包含账号配置、文件夹、邮件、标签、附件元数据、规则、发件箱和同步记录；密码与 OAuth token 仍保留在系统 Keychain。</p>
-                <div className="tool-actions">
-                  <button className="secondary" onClick={importEmlFile}>导入 EML</button>
-                  <button className="secondary" onClick={previewLocalBackup}>预览备份</button>
-                  <button className="secondary" onClick={importLocalBackup}>恢复备份</button>
-                  <button onClick={exportLocalBackup}>导出本地备份</button>
-                </div>
-                <small>单个 EML 上限 25 MB；正文会安全清洗，内嵌附件将保存到本地应用数据目录。</small>
-                {localBackupSummary && (
-                  <div className="tool-row ok">
-                    <span>v{localBackupSummary.schema_version}</span>
-                    <em>{localBackupSummary.path || 'mock://swiftmail-backup.json'}</em>
-                    <small>{Math.max(1, Math.round(localBackupSummary.size_bytes / 1024))} KB</small>
-                    <p>
-                      账号 {localBackupSummary.accounts} · 邮件 {localBackupSummary.messages} · 标签 {localBackupSummary.labels} · 规则 {localBackupSummary.rules} · 凭据
-                      {localBackupSummary.credentials_included ? '已包含' : '未包含'}
-                    </p>
-                  </div>
-                )}
-              </section>
-              {connectionReport && (
-                <section className="tool-panel">
-                  <strong>连接测试</strong>
-                  {connectionReport.endpoints.map((endpoint) => (
-                    <div className={endpoint.reachable ? 'tool-row ok' : 'tool-row warn'} key={endpoint.name}>
-                      <span>{endpoint.name}</span>
-                      <em>{endpoint.address}</em>
-                      <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
-                      <p>{endpoint.message}</p>
-                    </div>
-                  ))}
-                </section>
-              )}
-            </details>
-            <details className="settings-disclosure" data-settings-section="sync">
-              <summary>
-                <span>
-                  <strong>同步与发信高级工具</strong>
-                  <em>IMAP 发现、同步演练、发件箱队列</em>
-                </span>
-                <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
-              </summary>
-            <section className="tool-panel">
-              <header className="tool-header">
-                <strong>IMAP 文件夹发现</strong>
-                <button onClick={discoverImapFolders}>发现文件夹</button>
-              </header>
-              {!imapProbe ? (
-                <p>保存系统凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
-              ) : (
-                <>
-                  <div className={imapProbe.status === 'ok' ? 'tool-row ok' : 'tool-row warn'}>
-                    <span>{imapProbe.status}</span>
-                    <em>{imapProbe.account_email}</em>
-                    <small>{imapProbe.folder_count} 个</small>
-                    <p>{imapProbe.message}</p>
-                  </div>
-                  {imapProbe.folders.slice(0, 12).map((folder) => (
-                    <div className="tool-row" key={folder.name}>
-                      <span>{folder.name}</span>
-                      <em>{folder.delimiter || 'flat'}</em>
-                      <small>{folder.attributes.join(', ')}</small>
-                    </div>
-                  ))}
-                </>
-              )}
-            </section>
-            <section className="tool-panel" data-settings-section="auth">
-              <header className="tool-header">
-                <strong>系统凭据库</strong>
-                <span>{accountForm.email}</span>
-              </header>
-              <label>
-                {accountForm.auth_type === 'oauth2' ? 'OAuth2 Token' : '应用专用密码 / 授权码'}
-                <input
-                  type="password"
-                  value={credentialSecret}
-                  autoComplete="new-password"
-                  onChange={(event) => setCredentialSecret(event.target.value)}
-                  placeholder="只写入系统 Keychain，不进入本地数据库"
-                />
-              </label>
-              <div className="credential-actions">
-                <button className="secondary" onClick={checkCredential}>检查</button>
-                <button className="secondary" onClick={deleteCredential}>删除</button>
-                <button onClick={storeCredential}>保存凭据</button>
-              </div>
-              {credentialStatus && (
-                <div className={credentialStatus.exists ? 'tool-row ok' : 'tool-row warn'}>
-                  <span>{credentialStatus.exists ? '已存在' : '未保存'}</span>
-                  <em>{credentialStatus.account_email}</em>
-                  <p>{credentialStatus.message}</p>
-                </div>
-              )}
-            </section>
-            <section className="tool-panel">
-              <header className="tool-header">
-                <strong>同步演练</strong>
-                <div className="tool-actions">
-                  <button className="secondary" onClick={runSyncDryRun}>演练</button>
-                  <button onClick={() => enqueueBackgroundTask('sync', 'manual')}>同步邮件头</button>
-                </div>
-              </header>
-              {syncSchedulePlan && (
-                <div className="sync-schedule-card">
-                  <div>
-                    <span>同步调度与限流</span>
-                    <strong>
-                      本轮 {syncSchedulePlan.batch_accounts.length}/{syncSchedulePlan.total_accounts || 0} 个账号
-                    </strong>
-                  </div>
-                  <div className="sync-schedule-metrics">
-                    <span>每轮最多 {syncSchedulePlan.max_accounts_per_batch} 个账号</span>
-                    <span>
-                      下一批 {syncSchedulePlan.delayed_accounts.length
-                        ? `${syncSchedulePlan.delayed_accounts.length} 个账号`
-                        : '无等待'}
-                    </span>
-                  </div>
-                  <p>{syncSchedulePlan.strategy}</p>
-                  <div className="sync-account-strip">
-                    {syncSchedulePlan.batch_accounts.map((syncAccount) => (
-                      <span className="active" key={syncAccount.id}>
-                        {syncAccount.display_name || syncAccount.email}
-                      </span>
-                    ))}
-                    {syncSchedulePlan.delayed_accounts.slice(0, 3).map((syncAccount) => (
-                      <span key={syncAccount.id}>
-                        下轮 · {syncAccount.display_name || syncAccount.email}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {imapMailboxes.length > 0 && (
-                <div className="mailbox-grid">
-                  {imapMailboxes.slice(0, 8).map((mailbox) => (
-                    <div key={mailbox.id}>
-                      <strong>{mailbox.remote_name}</strong>
-                      <span>{mailbox.local_role} · UID {mailbox.highest_uid || 0}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {syncRuns.length === 0 ? (
-                <p>还没有同步运行记录。</p>
-              ) : (
-                syncRuns.map((run) => (
-                  <div className={run.imported_messages > 0 ? 'tool-row ok' : 'tool-row'} key={run.id}>
-                    <span>{run.status}</span>
-                    <em>扫描 {run.scanned_folders} 个文件夹 · 新增 {run.imported_messages} 封</em>
-                    <small>{formatDate(run.started_at)}</small>
-                    <p>{run.message}</p>
-                  </div>
-                ))
-              )}
-            </section>
-            <section className="tool-panel">
-              <header className="tool-header">
-                <strong>发件箱队列</strong>
-                <div className="tool-actions">
-                  <button className="secondary" onClick={() => enqueueBackgroundTask('outbox-dry-run', 'manual')}>发送演练</button>
-                  <button onClick={() => enqueueBackgroundTask('outbox-smtp', 'manual')}>真实发送</button>
-                </div>
-              </header>
-              {outbox.length === 0 ? (
-                <p>发件箱当前为空。</p>
-              ) : (
-                outbox.map((item) => (
-                  <div className="tool-row" key={item.id}>
-                    <span>{outboxStatusLabel(item.status)}</span>
-                    <em>{item.recipients}</em>
-                    <small>{item.attempts} 次</small>
-                    <p>
-                      {item.subject || '(无主题)'}
-                      {outboxTimingLabel(item) ? ` · ${outboxTimingLabel(item)}` : ''}
-                      {item.last_error ? ` · ${item.last_error}` : ''}
-                    </p>
-                    {canCancelOutboxItem(item.status) && (
-                      <button className="inline-action" onClick={() => cancelOutboxItem(item)}>
-                        撤回
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </section>
-            </details>
-            <section className="tool-panel grid-tools" data-settings-section="rules">
-              <div>
-                <strong>联系人</strong>
-                {contactMergeSuggestions.length > 0 && (
-                  <section className="contact-suggestion-panel">
-                    <header>
-                      <span>
-                        <strong>重复联系人建议</strong>
-                        <em>{contactMergeSuggestions.length} 组待处理</em>
-                      </span>
-                    </header>
-                    {contactMergeSuggestions.slice(0, 3).map((suggestion) => (
-                      <div className="contact-suggestion" key={`${suggestion.target.id}-${suggestion.source.id}`}>
-                        <span>
-                          <strong>{suggestion.source.name || suggestion.source.email}</strong>
-                          <em>合并到 {suggestion.target.name || suggestion.target.email}</em>
-                          <small>{suggestion.reason} · {suggestion.shared_keys.join(', ')}</small>
-                        </span>
-                        <button type="button" onClick={() => mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error)))}>
-                          一键合并
-                        </button>
-                      </div>
-                    ))}
-                  </section>
-                )}
-                <div className="contact-create-form">
-                  <input
-                    value={contactForm.name}
-                    onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })}
-                    placeholder="联系人名称"
-                  />
-                  <input
-                    value={contactForm.email}
-                    onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })}
-                    placeholder="邮箱地址"
-                  />
-                  <textarea
-                    value={contactFormAliases}
-                    onChange={(event) => setContactFormAliases(event.target.value)}
-                    placeholder="别名邮箱，逗号或换行分隔"
-                  />
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={contactForm.vip}
-                      onChange={(event) => setContactForm({ ...contactForm, vip: event.target.checked })}
-                    />
-                    设为 VIP
-                  </label>
-                  <button type="button" onClick={() => createManagedContact().catch((error) => setStatus(String(error)))}>
-                    新增联系人
-                  </button>
-                </div>
-                {managedContacts.slice(0, 6).map((contact) => (
-                  <div className="tool-row contact-tool-row" key={contact.id}>
-                    {editingContactId === contact.id ? (
-                      <div className="contact-edit-form">
-                        <input
-                          value={contactEditName}
-                          onChange={(event) => setContactEditName(event.target.value)}
-                          placeholder="联系人名称"
-                        />
-                        <textarea
-                          value={contactEditAliases}
-                          onChange={(event) => setContactEditAliases(event.target.value)}
-                          placeholder="别名邮箱，逗号或换行分隔"
-                        />
-                        <div>
-                          <button type="button" onClick={() => saveContactOverride(contact).catch((error) => setStatus(String(error)))}>保存</button>
-                          <button type="button" className="secondary" onClick={() => setEditingContactId(null)}>取消</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <button type="button" onClick={() => composeToContact(contact)}>
-                          <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                          <em>{contact.email}{contact.aliases.length ? ` · 别名 ${contact.aliases.length}` : ''}</em>
-                          <small>{contact.message_count} 封往来</small>
-                        </button>
-                        <div className="contact-tool-actions">
-                          <button type="button" onClick={() => startEditContact(contact)}>编辑</button>
-                          <button type="button" onClick={() => toggleContactVip(contact).catch((error) => setStatus(String(error)))}>{contact.vip ? '取消 VIP' : '设为 VIP'}</button>
-                          <button type="button" onClick={() => mergeManagedContact(contact).catch((error) => setStatus(String(error)))}>合并</button>
-                          <button type="button" className="danger" onClick={() => deleteManagedContact(contact).catch((error) => setStatus(String(error)))}>删除</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-                <label className="contact-merge-picker">
-                  合并来源
-                  <select
-                    value={mergeSourceContactId ?? ''}
-                    onChange={(event) => setMergeSourceContactId(event.target.value ? Number(event.target.value) : null)}
-                  >
-                    <option value="">选择一个联系人</option>
-                    {managedContacts.map((contact) => (
-                      <option key={contact.id} value={contact.id}>
-                        {contact.name || contact.email} · {contact.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div>
-                <strong>规则</strong>
-                <div className="rule-editor">
-                  <input
-                    value={ruleForm.name}
-                    onChange={(event) => setRuleForm({ ...ruleForm, name: event.target.value })}
-                    placeholder="规则名称"
-                  />
-                  <div className="rule-builder">
-                    <label>
-                      <span>如果</span>
-                      <select
-                        value={ruleBuilderField}
-                        onChange={(event) => updateRuleConditionField(event.target.value as RuleConditionField)}
-                      >
-                        {ruleConditionFields.map((field) => (
-                          <option key={field.id} value={field.id}>{field.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>包含</span>
-                      <input
-                        value={ruleBuilderNeedle}
-                        onChange={(event) => updateRuleConditionValue(event.target.value)}
-                        placeholder="关键词或邮箱"
-                      />
-                    </label>
-                    <label>
-                      <span>打标签</span>
-                      <select
-                        value={
-                          ruleActionParts(ruleForm.action)
-                            .find((part) => part.toLowerCase().startsWith('apply label '))
-                            ?.slice('apply label '.length) ?? ''
-                        }
-                        onChange={(event) => updateRuleLabelAction(event.target.value)}
-                      >
-                        <option value="">不打标签</option>
-                        {labels.map((label) => (
-                          <option key={label.id} value={label.name}>{label.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className="rule-action-chips">
-                      {ruleActionPresets.map((item) => (
-                        <button
-                          type="button"
-                          key={item.id}
-                          className={ruleActionParts(ruleForm.action).some((part) => part.toLowerCase() === item.id) ? 'active' : ''}
-                          onClick={() => toggleRuleAction(item.id)}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <details className="rule-advanced">
-                    <summary>高级语法</summary>
-                    <small>可手动组合多个动作，用分号分隔。</small>
-                    <input
-                      value={ruleForm.condition}
-                      onChange={(event) => setRuleForm({ ...ruleForm, condition: event.target.value })}
-                      placeholder="条件，如 from contains customer"
-                      aria-label="规则条件语法"
-                    />
-                    <input
-                      value={ruleForm.action}
-                      onChange={(event) => setRuleForm({ ...ruleForm, action: event.target.value })}
-                      placeholder="动作，如 apply label 重要客户; mark read; star; stop processing"
-                      aria-label="规则动作语法"
-                    />
-                  </details>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={ruleForm.enabled}
-                      onChange={(event) => setRuleForm({ ...ruleForm, enabled: event.target.checked })}
-                    />
-                    启用
-                  </label>
-                  <button onClick={saveRule}>{editingRuleId ? '更新规则' : '新增规则'}</button>
-                </div>
-                {rules.map((rule) => (
-                  <div className="rule-item" key={rule.id}>
-                    <p>{rule.enabled ? '启用' : '停用'} · {rule.name}</p>
-                    <small>{rule.condition} → {rule.action}</small>
-                    <div>
-                      <button onClick={() => toggleRule(rule)}>{rule.enabled ? '停用' : '启用'}</button>
-                      <button onClick={() => editRule(rule)}>编辑</button>
-                      <button onClick={() => removeRule(rule)}>删除</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <strong>线程</strong>
-                {threads.slice(0, 6).map((thread) => (
-                  <p key={thread.thread_key}>{thread.subject} · {thread.message_count} 封 · 未读 {thread.unread_count}</p>
-                ))}
-              </div>
-            </section>
-            <details className="settings-disclosure" data-settings-section="security-preview">
-              <summary>
-                <span>
-                  <strong>原始邮件安全预览</strong>
-                  <em>调试 HTML 清洗、附件和安全警告</em>
-                </span>
-                <b>{parsedPreview ? `${parsedPreview.attachment_count} 附件` : '调试'}</b>
-              </summary>
-              <section className="tool-panel raw-preview">
-                <header className="tool-header">
-                  <strong>原始邮件安全预览</strong>
-                  <button onClick={parseRawMessage}>解析</button>
-                </header>
-                <textarea value={rawMessage} onChange={(event) => setRawMessage(event.target.value)} />
-                {parsedPreview && (
-                  <div className="preview-result">
-                    <strong>{parsedPreview.subject}</strong>
-                    <span>{parsedPreview.from} → {parsedPreview.to}</span>
-                    <pre>{parsedPreview.body_preview}</pre>
-                    {parsedPreview.sanitized_html && (
-                      <>
-                        <div
-                          className="sanitized-html-preview"
-                          dangerouslySetInnerHTML={{ __html: parsedPreview.sanitized_html }}
-                        />
-                        <details>
-                          <summary>清洗后的 HTML 源码</summary>
-                          <pre>{parsedPreview.sanitized_html}</pre>
-                        </details>
-                      </>
-                    )}
-                    {parsedPreview.attachment_count > 0 && (
-                      <div className="preview-metadata">
-                        <span>附件 {parsedPreview.attachment_count}</span>
-                        {parsedPreview.attachment_names.map((name) => <em key={name}>{name}</em>)}
-                      </div>
-                    )}
-                    {parsedPreview.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-                  </div>
-                )}
-              </section>
-            </details>
+            <DataSafetySettings
+              diagnosticExport={diagnosticExport}
+              localBackupSummary={localBackupSummary}
+              connectionReport={connectionReport}
+              onSaveSettings={() => { saveSettings().catch((error) => setStatus(String(error))); }}
+              onTestConnection={() => { testConnection().catch((error) => setStatus(String(error))); }}
+              onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
+              onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
+              onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
+              onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
+              onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
+            />
+            <SyncOperationsSettings
+              accountForm={accountForm}
+              credentialSecret={credentialSecret}
+              credentialStatus={credentialStatus}
+              imapProbe={imapProbe}
+              syncSchedulePlan={syncSchedulePlan}
+              imapMailboxes={imapMailboxes}
+              syncRuns={syncRuns}
+              outbox={outbox}
+              onCredentialSecretChange={setCredentialSecret}
+              onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
+              onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
+              onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
+              onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
+              onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
+              onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
+              onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
+            />
+            <ContactAutomationSettings
+              mergeSuggestions={contactMergeSuggestions}
+              contactForm={contactForm}
+              contactFormAliases={contactFormAliases}
+              contacts={managedContacts}
+              editingContactId={editingContactId}
+              editName={contactEditName}
+              editAliases={contactEditAliases}
+              mergeSourceContactId={mergeSourceContactId}
+              onContactFormChange={setContactForm}
+              onContactFormAliasesChange={setContactFormAliases}
+              onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
+              onMergeSuggested={(suggestion) => { mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error))); }}
+              onEditNameChange={setContactEditName}
+              onEditAliasesChange={setContactEditAliases}
+              onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}
+              onCancelEdit={() => setEditingContactId(null)}
+              onComposeToContact={composeToContact}
+              onStartEditContact={startEditContact}
+              onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
+              onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
+              onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
+              onMergeSourceChange={setMergeSourceContactId}
+            />
+            <RuleAutomationSettings
+              ruleForm={ruleForm}
+              ruleBuilderField={ruleBuilderField}
+              ruleBuilderNeedle={ruleBuilderNeedle}
+              editingRuleId={editingRuleId}
+              labels={labels}
+              rules={rules}
+              threads={threads}
+              onRuleFormChange={setRuleForm}
+              onRuleConditionFieldChange={updateRuleConditionField}
+              onRuleConditionValueChange={updateRuleConditionValue}
+              onRuleLabelActionChange={updateRuleLabelAction}
+              onToggleRuleAction={toggleRuleAction}
+              onSaveRule={() => { saveRule().catch((error) => setStatus(String(error))); }}
+              onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
+              onEditRule={editRule}
+              onRemoveRule={(rule) => { removeRule(rule).catch((error) => setStatus(String(error))); }}
+            />
+            <SecurityPreviewSettings
+              rawMessage={rawMessage}
+              parsedPreview={parsedPreview}
+              onRawMessageChange={setRawMessage}
+              onParseRawMessage={parseRawMessage}
+            />
         </SettingsFrame>
       )}
       {isShortcutsOpen && (

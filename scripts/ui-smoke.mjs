@@ -464,6 +464,18 @@ async function main() {
     await clickButton(cdp, '发件箱', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.body.innerText.includes('邮件已加入发件箱队列')");
 
+    await evalInPage(
+      cdp,
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); if (!card) throw new Error('Context menu target message not found'); window.__contextTargetWasUnread = Boolean(card.querySelector('.sender.unread')); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('移动到') && document.querySelector('.context-menu').innerText.includes('标签')");
+    await evalInPage(
+      cdp,
+      "(() => { const button = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('标为已读') || item.textContent.includes('标为未读')); if (!button) throw new Error('Read-state context action not found'); button.click(); })()",
+    );
+    await waitForExpression(cdp, "!document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); return card && Boolean(card.querySelector('.sender.unread')) !== window.__contextTargetWasUnread; })()");
+
     await evalInPage(cdp, "(() => { const cards = [...document.querySelectorAll('.message-card')].filter((card) => card.textContent.includes('Low memory digest')); cards.slice(0, 2).forEach((card) => card.querySelector('input[type=\"checkbox\"]').click()); })()");
     await waitForExpression(cdp, "document.body.innerText.includes('已选 2')");
     await openDetails(cdp, '.bulk-more-menu');
@@ -489,7 +501,12 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已创建文件夹：客户跟进')");
     await openDetails(cdp, '.more-mailboxes');
     await waitForExpression(cdp, "document.querySelector('.more-mailboxes').innerText.includes('客户跟进')");
-    await clickButton(cdp, '改', "[...document.querySelectorAll('.folder')].find((item) => item.textContent.includes('客户跟进'))");
+    await evalInPage(
+      cdp,
+      "(() => { const folder = [...document.querySelectorAll('.folder')].find((item) => item.textContent.includes('客户跟进')); if (!folder) throw new Error('Folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 420, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('删除文件夹')");
+    await clickButton(cdp, '重命名', "document.querySelector('.context-menu')");
     await fillInput(cdp, '.folder-rename input', '重点客户');
     await clickButton(cdp, '保存', "document.querySelector('.folder-rename')");
     await waitForExpression(cdp, "document.body.innerText.includes('已重命名文件夹：重点客户') && document.body.innerText.includes('重点客户')");

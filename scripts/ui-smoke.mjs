@@ -842,6 +842,11 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.composer')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-header-actions')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
+    await openDetails(cdp, '.settings-write-validation');
+    await waitForExpression(cdp, "(() => { const stored = JSON.parse(localStorage.getItem('better-email.providerWriteValidationIds.v1') || '{}'); const panel = document.querySelector('.write-validation-status'); return Boolean(stored['2']) && panel?.dataset.writeValidationId === stored['2'] && panel.querySelectorAll('[data-validation-stage]').length === 5 && document.querySelector('.settings-write-validation > summary')?.innerText.includes('0/3 核心步骤') && ![...document.querySelectorAll('.settings-write-validation-actions button')].find((button) => button.textContent.includes('刷新状态'))?.disabled && [...document.querySelectorAll('.settings-write-validation-actions button')].filter((button) => button.textContent.includes('定位')).every((button) => button.disabled); })()");
+    await clickButton(cdp, '刷新状态', "document.querySelector('.settings-write-validation-actions')");
+    await waitForExpression(cdp, "document.body.innerText.includes('暂未找到已发送或收件副本') && document.querySelector('[data-validation-stage=\"smtp\"]')?.innerText.includes('真实发送仍需手动确认')");
 
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
@@ -1018,6 +1023,7 @@ async function main() {
         'provider-aware credential diagnostics guide recovery and fold technical details',
         'read-only provider validation runs connection login folder and header checks',
         'write validation prepares a self-addressed draft without automatic sending',
+        'write validation tracker persists id and refreshes five-stage status',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',
         'mapped custom mailbox resolves as a remote move target',

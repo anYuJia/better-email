@@ -267,7 +267,7 @@
 .settings-write-validation ol {
   margin: 0;
   color: var(--ui-text-tertiary);
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.5;
 }
 
@@ -277,9 +277,15 @@
   padding-left: 18px;
 }
 
-.settings-write-validation > div > button {
+.settings-write-validation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.settings-write-validation-actions > button {
   min-height: 32px;
-  justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -293,8 +299,144 @@
   font-weight: 680;
 }
 
-.settings-write-validation > div > button:hover {
+.settings-write-validation-actions > button:hover {
   background: var(--ui-accent-hover);
+}
+
+.settings-write-validation-actions > button.secondary {
+  border: 1px solid #dce3ea;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+}
+
+.settings-write-validation-actions > button.secondary:hover:not(:disabled) {
+  border-color: #c6d4e0;
+  color: var(--ui-text);
+  background: #f7fafc;
+}
+
+.settings-write-validation-actions > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.write-validation-status {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #dce5ed;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.write-validation-status > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.write-validation-status > header > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.write-validation-status > header strong {
+  color: var(--ui-text);
+  font-size: 11px;
+}
+
+.write-validation-status > header code {
+  overflow: hidden;
+  color: #286184;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+}
+
+.write-validation-status > header em {
+  max-width: 48%;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.write-validation-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.write-validation-stage {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 6px;
+  padding: 8px;
+  border: 1px solid #e2e7ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.write-validation-stage > span {
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.write-validation-stage > b {
+  color: #7b8791;
+  font-size: 9px;
+}
+
+.write-validation-stage > p {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.write-validation-stage.passed {
+  border-color: #cce5d6;
+  background: #f6fbf8;
+}
+
+.write-validation-stage.passed > b {
+  color: #287a4c;
+}
+
+.write-validation-stage.active {
+  border-color: #cddff0;
+  background: #f5f9fd;
+}
+
+.write-validation-stage.active > b {
+  color: #226a9d;
+}
+
+.write-validation-stage.warning {
+  border-color: #ead9b8;
+  background: #fffaf1;
+}
+
+.write-validation-stage.warning > b {
+  color: #9a5b08;
+}
+
+.write-validation-stage.failed {
+  border-color: #efcaca;
+  background: #fff7f7;
+}
+
+.write-validation-stage.failed > b {
+  color: #b43c3c;
 }
 
 .settings-credential-panel > label {
@@ -518,8 +660,33 @@
     align-items: center;
   }
 
-  .settings-write-validation > div > button {
+  .write-validation-status > header {
+    display: grid;
+  }
+
+  .write-validation-status > header em {
+    max-width: none;
+    text-align: left;
+  }
+
+  .write-validation-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .write-validation-stage > p {
+    min-height: 0;
+  }
+
+  .settings-write-validation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-write-validation-actions > button {
     width: 100%;
-    justify-self: stretch;
+  }
+
+  .settings-write-validation-actions > button:last-child {
+    grid-column: 1 / -1;
   }
 }

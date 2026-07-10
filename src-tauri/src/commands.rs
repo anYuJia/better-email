@@ -124,6 +124,15 @@ pub fn list_messages(
 }
 
 #[tauri::command]
+pub fn list_provider_write_validation_messages(
+    store: State<'_, MailStore>,
+    account_id: i64,
+    validation_id: String,
+) -> MailResult<Vec<Message>> {
+    store.list_provider_write_validation_messages(account_id, validation_id)
+}
+
+#[tauri::command]
 pub fn list_thread_messages(
     store: State<'_, MailStore>,
     account_id: Option<i64>,

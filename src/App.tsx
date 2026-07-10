@@ -31,6 +31,7 @@ import useContactManagement from './hooks/useContactManagement';
 import useMailboxData from './hooks/useMailboxData';
 import useMessageCollectionActions from './hooks/useMessageCollectionActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
+import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
 import {
   defaultNotificationPolicy,
@@ -141,7 +142,6 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
-import { buildProviderWriteValidationDraft } from './app/providerWriteValidation';
 import './ui-2026.css';
 
 export default function App() {
@@ -379,6 +379,17 @@ export default function App() {
     loadMeta,
     loadMessages,
   });
+  const {
+    activeValidationId,
+    validationStatus: providerWriteValidationStatus,
+    validationLoading: providerWriteValidationLoading,
+    createValidationDraft,
+    refreshValidation: refreshProviderWriteValidation,
+  } = useProviderWriteValidation({
+    account: accountForm,
+    outbox,
+    setStatus,
+  });
 
   function accountIdForScope(scope: AccountScope): number | null {
     return scope === 'all' ? null : scope;
@@ -404,12 +415,52 @@ export default function App() {
   }
 
   function prepareProviderWriteValidation() {
-    if (!accountForm) return;
-    const validationDraft = buildProviderWriteValidationDraft(accountForm);
+    const validationDraft = createValidationDraft();
+    if (!validationDraft) return;
     setSettingsOpen(false);
     setRichComposer(false);
     openComposer(validationDraft);
     setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
+  }
+
+  async function locateProviderWriteValidation(role: 'sent' | 'inbox') {
+    if (!accountForm || !activeValidationId) return;
+    const targetAccountId = accountForm.id;
+    setAccountScope(targetAccountId);
+    setQuery(activeValidationId);
+    setFilter('all');
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    setSettingsOpen(false);
+    const meta = await loadMeta(null, targetAccountId);
+    const targetFolder =
+      meta.folders.find((folder) => folder.account_id === targetAccountId && folder.role === role) ??
+      meta.folders.find((folder) => folder.role === role);
+    if (!targetFolder) {
+      setStatus(`当前账号没有可用的${role === 'sent' ? '已发送' : '收件箱'}目录`);
+      return;
+    }
+    setFolderId(targetFolder.id);
+    const nextMessages = await loadMessages(
+      targetFolder.id,
+      activeValidationId,
+      'all',
+      targetAccountId,
+      mailboxRefreshRef.current,
+      messagePageSize,
+    );
+    const preferredMessageId = role === 'sent'
+      ? providerWriteValidationStatus?.sentMessageId
+      : providerWriteValidationStatus?.receivedMessageId;
+    if (preferredMessageId && nextMessages.some((message) => message.id === preferredMessageId)) {
+      setSelectedId(preferredMessageId);
+    }
+    setStatus(
+      nextMessages.length
+        ? `已定位验证 ${activeValidationId} 的${role === 'sent' ? '已发送' : '收件'}邮件`
+        : `已打开${role === 'sent' ? '已发送' : '收件箱'}，暂未找到验证 ${activeValidationId}`,
+    );
   }
 
   function composeToContact(contact: Contact) {
@@ -2274,6 +2325,8 @@ export default function App() {
               folders={folders}
               syncRuns={syncRuns}
               outbox={outbox}
+              writeValidationStatus={providerWriteValidationStatus}
+              writeValidationLoading={providerWriteValidationLoading}
               onCredentialSecretChange={setCredentialSecret}
               onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
               onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
@@ -2282,6 +2335,12 @@ export default function App() {
                 runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
               }}
               onPrepareWriteValidation={prepareProviderWriteValidation}
+              onRefreshWriteValidation={() => {
+                refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
+              }}
+              onLocateWriteValidation={(role) => {
+                locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
+              }}
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}

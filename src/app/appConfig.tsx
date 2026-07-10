@@ -429,6 +429,7 @@ export const folderIcon: Record<SystemFolderRole, React.ReactNode> = {
   inbox: <Inbox size={17} />,
   sent: <Send size={17} />,
   drafts: <Edit3 size={17} />,
+  outbox: <Send size={17} />,
   archive: <Archive size={17} />,
   trash: <Trash2 size={17} />,
   spam: <Mail size={17} />,

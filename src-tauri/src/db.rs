@@ -1191,6 +1191,36 @@ impl MailStore {
         })
     }
 
+    pub fn list_provider_write_validation_messages(
+        &self,
+        account_id: i64,
+        validation_id: String,
+    ) -> MailResult<Vec<Message>> {
+        self.with_conn(|conn| {
+            let validation_id = validation_id.trim();
+            if validation_id.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut stmt = conn.prepare(
+                "
+                SELECT id
+                FROM messages
+                WHERE account_id = ?1
+                  AND instr(lower(subject), lower(?2)) > 0
+                ORDER BY received_at DESC, id DESC
+                LIMIT 20
+                ",
+            )?;
+            let message_ids = stmt
+                .query_map(params![account_id, validation_id], |row| row.get(0))?
+                .collect::<Result<Vec<i64>, _>>()?;
+            message_ids
+                .into_iter()
+                .map(|message_id| message_for_conn(conn, message_id))
+                .collect()
+        })
+    }
+
     pub fn list_thread_messages(
         &self,
         account_id: Option<i64>,
@@ -8483,6 +8513,104 @@ mod tests {
             })
             .unwrap();
         assert_eq!(remote_ref, ("Sent".to_string(), 42));
+    }
+
+    #[test]
+    fn provider_write_validation_messages_span_outbox_sent_and_inbox() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        let validation_id = "validation-db-001";
+        let subject = format!("[Better Email 验收] {validation_id}");
+        let item = store
+            .queue_outbox_message(DraftInput {
+                draft_id: 0,
+                account_id: account.id,
+                identity_id: 0,
+                to: account.email.clone(),
+                cc: String::new(),
+                bcc: String::new(),
+                subject: subject.clone(),
+                body: "validation body".to_string(),
+                html_body: String::new(),
+                send_at: String::new(),
+                attachments: Vec::new(),
+            })
+            .unwrap();
+
+        let queued = store
+            .list_provider_write_validation_messages(account.id, validation_id.to_string())
+            .unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].id, item.message_id);
+        assert_eq!(queued[0].folder_role, "outbox");
+
+        store
+            .mark_outbox_smtp_sent_pending_archive(
+                item.message_id,
+                "<validation-db-001@better-email.local>",
+            )
+            .unwrap();
+        store
+            .mark_outbox_remote_archived(item.message_id, "Sent", 4201)
+            .unwrap();
+        store
+            .with_conn(|conn| {
+                let inbox_id: i64 = conn.query_row(
+                    "SELECT id FROM folders WHERE account_id = ?1 AND role = 'inbox'",
+                    params![account.id],
+                    |row| row.get(0),
+                )?;
+                conn.execute(
+                    "
+                    INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at, has_attachments,
+                        remote_mailbox, remote_uid, message_id_header
+                    ) VALUES (
+                        ?1, ?2, ?3, ?4, ?4, ?5, 'validation receipt', 'validation receipt',
+                        ?6, 1, 'INBOX', 4202, '<validation-db-001@better-email.local>'
+                    )
+                    ",
+                    params![
+                        account.id,
+                        inbox_id,
+                        account.display_name,
+                        account.email,
+                        subject,
+                        Utc::now().to_rfc3339(),
+                    ],
+                )?;
+                let received_id = conn.last_insert_rowid();
+                conn.execute(
+                    "
+                    INSERT INTO attachments(message_id, filename, mime_type, size_bytes)
+                    VALUES (?1, 'validation.txt', 'text/plain', 12)
+                    ",
+                    params![received_id],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let tracked = store
+            .list_provider_write_validation_messages(account.id, validation_id.to_string())
+            .unwrap();
+        assert_eq!(tracked.len(), 2);
+        assert!(tracked.iter().any(|message| {
+            message.folder_role == "sent"
+                && message.remote_mailbox == "Sent"
+                && message.remote_uid == 4201
+        }));
+        assert!(tracked.iter().any(|message| {
+            message.folder_role == "inbox"
+                && message.remote_mailbox == "INBOX"
+                && message.remote_uid == 4202
+                && message.attachment_count == 1
+        }));
+        assert!(store
+            .list_provider_write_validation_messages(account.id, "missing-id".to_string())
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

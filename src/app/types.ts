@@ -1,4 +1,4 @@
-export type SystemFolderRole = 'inbox' | 'sent' | 'drafts' | 'archive' | 'trash' | 'spam' | 'snoozed' | 'custom';
+export type SystemFolderRole = 'inbox' | 'sent' | 'drafts' | 'outbox' | 'archive' | 'trash' | 'spam' | 'snoozed' | 'custom';
 export type FolderRole = SystemFolderRole | `custom:${string}`;
 export type FilterMode = 'all' | 'unread' | 'starred' | 'attachments';
 export type ListMode = 'messages' | 'threads';

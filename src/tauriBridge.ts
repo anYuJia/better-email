@@ -1191,6 +1191,16 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return remoteImageTrusts as T;
     case 'list_messages':
       return listMessages(args) as T;
+    case 'list_provider_write_validation_messages': {
+      const accountId = Number(args?.accountId ?? 0);
+      const validationId = String(args?.validationId ?? '').trim().toLowerCase();
+      return messages
+        .filter((message) => accountId <= 0 || message.account_id === accountId)
+        .filter((message) => validationId && message.subject.toLowerCase().includes(validationId))
+        .sort((left, right) =>
+          right.received_at.localeCompare(left.received_at) || right.id - left.id)
+        .slice(0, 20) as T;
+    }
     case 'list_thread_messages':
       return listThreadMessages(args) as T;
     case 'mark_frontend_ready':

@@ -3,6 +3,7 @@ import {
   FileCheck2,
   FolderPlus,
   History,
+  Inbox,
   KeyRound,
   RefreshCw,
   Search,
@@ -15,6 +16,7 @@ import {
   outboxTimingLabel,
 } from '../../app/appConfig';
 import type { ProviderValidationReport } from '../../app/providerValidation';
+import type { ProviderWriteValidationStatus } from '../../app/providerWriteValidation';
 import type {
   Account,
   BackgroundTaskKind,
@@ -46,12 +48,16 @@ type SyncOperationsSettingsProps = {
   folders: Folder[];
   syncRuns: SyncRun[];
   outbox: OutboxItem[];
+  writeValidationStatus: ProviderWriteValidationStatus | null;
+  writeValidationLoading: boolean;
   onCredentialSecretChange: (value: string) => void;
   onDiscoverImapFolders: () => void;
   onCheckCredential: () => void;
   onVerifyCredential: () => void;
   onRunProviderValidation: () => void;
   onPrepareWriteValidation: () => void;
+  onRefreshWriteValidation: () => void;
+  onLocateWriteValidation: (role: 'sent' | 'inbox') => void;
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
@@ -76,12 +82,16 @@ export default function SyncOperationsSettings({
   folders,
   syncRuns,
   outbox,
+  writeValidationStatus,
+  writeValidationLoading,
   onCredentialSecretChange,
   onDiscoverImapFolders,
   onCheckCredential,
   onVerifyCredential,
   onRunProviderValidation,
   onPrepareWriteValidation,
+  onRefreshWriteValidation,
+  onLocateWriteValidation,
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
@@ -320,7 +330,13 @@ export default function SyncOperationsSettings({
             <strong>发送与回写验收</strong>
             <small>生成发给自己的验证草稿，真实发送前仍需在撰写器中确认</small>
           </span>
-          <b>需手动确认</b>
+          <b>
+            {writeValidationStatus
+              ? writeValidationStatus.complete
+                ? '核心闭环完成'
+                : `${writeValidationStatus.passedCoreStages}/${writeValidationStatus.coreStageCount} 核心步骤`
+              : '需手动确认'}
+          </b>
         </summary>
         <div>
           <p>
@@ -332,10 +348,80 @@ export default function SyncOperationsSettings({
             <li>主题包含唯一验证编号，便于在已发送和收件箱中定位。</li>
             <li>不要在草稿或附件中放入密码、授权码或 Token。</li>
           </ol>
-          <button type="button" onClick={onPrepareWriteValidation}>
-            <FileCheck2 size={14} />
-            生成验证草稿
-          </button>
+          {writeValidationStatus && (
+            <section
+              className="write-validation-status"
+              data-write-validation-id={writeValidationStatus.validationId}
+            >
+              <header>
+                <span>
+                  <strong>当前验证</strong>
+                  <code>{writeValidationStatus.validationId}</code>
+                </span>
+                <em>
+                  {writeValidationStatus.complete
+                    ? 'SMTP、Sent 留档和自发自收均已确认'
+                    : '刷新邮件头后继续检查后续状态'}
+                </em>
+              </header>
+              <div className="write-validation-stage-grid">
+                {writeValidationStatus.stages.map((stage) => (
+                  <article
+                    className={`write-validation-stage ${stage.tone}`}
+                    data-validation-stage={stage.id}
+                    key={stage.id}
+                  >
+                    <span>{stage.title}</span>
+                    <b>
+                      {stage.tone === 'passed'
+                        ? '通过'
+                        : stage.tone === 'active'
+                          ? '可继续'
+                          : stage.tone === 'warning'
+                            ? '待处理'
+                            : stage.tone === 'failed'
+                              ? '失败'
+                              : '等待'}
+                    </b>
+                    <p>{stage.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+          <div className="settings-write-validation-actions">
+            <button
+              className="secondary"
+              disabled={!writeValidationStatus || writeValidationLoading}
+              type="button"
+              onClick={onRefreshWriteValidation}
+            >
+              <RefreshCw size={14} />
+              {writeValidationLoading ? '刷新中' : '刷新状态'}
+            </button>
+            <button
+              className="secondary"
+              disabled={!writeValidationStatus?.sentMessageId}
+              type="button"
+              onClick={() => onLocateWriteValidation('sent')}
+            >
+              <Send size={14} />
+              定位已发送
+            </button>
+            <button
+              className="secondary"
+              disabled={!writeValidationStatus?.receivedMessageId}
+              type="button"
+              onClick={() => onLocateWriteValidation('inbox')}
+            >
+              <Inbox size={14} />
+              定位收件
+            </button>
+            <button type="button" onClick={onPrepareWriteValidation}>
+              <FileCheck2 size={14} />
+              {writeValidationStatus ? '生成新验证草稿' : '生成验证草稿'}
+            </button>
+          </div>
         </div>
       </details>
 

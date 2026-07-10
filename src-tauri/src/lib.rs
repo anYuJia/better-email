@@ -33,6 +33,7 @@ pub fn run() {
             commands::delete_custom_folder,
             commands::list_labels,
             commands::list_messages,
+            commands::list_provider_write_validation_messages,
             commands::list_thread_messages,
             commands::list_attachments,
             commands::pick_outbound_attachments,

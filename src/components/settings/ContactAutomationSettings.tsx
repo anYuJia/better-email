@@ -1,4 +1,14 @@
-import { Merge, Pencil, Send, Star, Trash2, UserPlus } from 'lucide-react';
+import {
+  FileDown,
+  FileUp,
+  LoaderCircle,
+  Merge,
+  Pencil,
+  Send,
+  Star,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import type {
   Contact,
   ContactCreateInput,
@@ -15,6 +25,7 @@ type ContactAutomationSettingsProps = {
   editName: string;
   editAliases: string;
   mergeSourceContactId: number | null;
+  transferBusy: boolean;
   onContactFormChange: (contact: ContactCreateInput) => void;
   onContactFormAliasesChange: (value: string) => void;
   onCreateContact: () => void;
@@ -29,6 +40,8 @@ type ContactAutomationSettingsProps = {
   onMergeContact: (contact: Contact) => void;
   onDeleteContact: (contact: Contact) => void;
   onMergeSourceChange: (contactId: number | null) => void;
+  onImportContacts: () => void;
+  onExportContacts: () => void;
 };
 
 export default function ContactAutomationSettings({
@@ -40,6 +53,7 @@ export default function ContactAutomationSettings({
   editName,
   editAliases,
   mergeSourceContactId,
+  transferBusy,
   onContactFormChange,
   onContactFormAliasesChange,
   onCreateContact,
@@ -54,6 +68,8 @@ export default function ContactAutomationSettings({
   onMergeContact,
   onDeleteContact,
   onMergeSourceChange,
+  onImportContacts,
+  onExportContacts,
 }: ContactAutomationSettingsProps) {
   return (
     <section className="tool-panel settings-contact-panel" data-settings-section="contacts">
@@ -62,7 +78,17 @@ export default function ContactAutomationSettings({
           <strong>联系人管理</strong>
           <small>别名、VIP、重复合并和快捷写信</small>
         </span>
-        <em>{contacts.length} 位联系人</em>
+        <div className="contact-transfer-actions">
+          <em>{contacts.length} 位联系人</em>
+          <button type="button" onClick={onImportContacts} disabled={transferBusy}>
+            {transferBusy ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
+            导入 vCard
+          </button>
+          <button type="button" onClick={onExportContacts} disabled={transferBusy || contacts.length === 0}>
+            <FileUp size={14} />
+            导出 vCard
+          </button>
+        </div>
       </header>
 
       {mergeSuggestions.length > 0 && (
@@ -153,21 +179,42 @@ export default function ContactAutomationSettings({
                   </span>
                 </button>
                 <div className="contact-tool-actions">
-                  <button type="button" onClick={() => onStartEditContact(contact)}>
+                  <button
+                    type="button"
+                    aria-label={`编辑 ${contact.name || contact.email}`}
+                    title="编辑联系人"
+                    onClick={() => onStartEditContact(contact)}
+                  >
                     <Pencil size={13} />
-                    编辑
+                    <span className="contact-action-label">编辑</span>
                   </button>
-                  <button type="button" onClick={() => onToggleContactVip(contact)}>
+                  <button
+                    type="button"
+                    aria-label={`${contact.vip ? '取消 VIP' : '设为 VIP'} ${contact.name || contact.email}`}
+                    title={contact.vip ? '取消 VIP' : '设为 VIP'}
+                    onClick={() => onToggleContactVip(contact)}
+                  >
                     <Star size={13} />
-                    {contact.vip ? '取消 VIP' : '设为 VIP'}
+                    <span className="contact-action-label">{contact.vip ? '取消 VIP' : '设为 VIP'}</span>
                   </button>
-                  <button type="button" onClick={() => onMergeContact(contact)}>
+                  <button
+                    type="button"
+                    aria-label={`合并 ${contact.name || contact.email}`}
+                    title="合并联系人"
+                    onClick={() => onMergeContact(contact)}
+                  >
                     <Merge size={13} />
-                    合并
+                    <span className="contact-action-label">合并</span>
                   </button>
-                  <button type="button" className="danger" onClick={() => onDeleteContact(contact)}>
+                  <button
+                    type="button"
+                    className="danger"
+                    aria-label={`删除 ${contact.name || contact.email}`}
+                    title="删除联系人"
+                    onClick={() => onDeleteContact(contact)}
+                  >
                     <Trash2 size={13} />
-                    删除
+                    <span className="contact-action-label">删除</span>
                   </button>
                 </div>
               </>

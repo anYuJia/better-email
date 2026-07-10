@@ -656,6 +656,35 @@
   background: #f2faf5;
 }
 
+.settings-credential-panel .credential-panel-title {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-credential-panel .credential-panel-title strong,
+.settings-credential-panel .credential-panel-title small {
+  display: block;
+  min-width: 0;
+}
+
+.settings-credential-panel .credential-panel-title small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-credential-panel .tool-header > em {
+  flex: 0 0 auto;
+  max-width: min(42%, 180px);
+  text-align: right;
+  white-space: normal;
+}
+
 .credential-guide-card {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;

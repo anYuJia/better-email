@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Archive,
   Clock,
@@ -14,8 +14,11 @@ import {
   Star,
   Tag,
   Trash2,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
+import { canSnoozeRole } from '../app/snooze';
 import type {
   AccountScope,
   Attachment,
@@ -49,6 +52,7 @@ export type ReaderPaneProps = {
   onRunThreadAction: (action: BulkMessageAction) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
   onToggleThreadLabel: (label: Label) => void;
+  onToggleThreadMute: () => void;
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
   onRestoreFromTrash: () => void;
@@ -68,7 +72,7 @@ export type ReaderPaneProps = {
   onMoveToFolder: (folder: Folder) => void;
   onToggleLabel: (label: Label) => void;
   onOpenAttachment: (attachment: Attachment) => void;
-  onDownloadAttachment: (attachment: Attachment) => void;
+  onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
   onSaveAttachmentAs: (attachment: Attachment) => void;
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
@@ -76,6 +80,11 @@ export type ReaderPaneProps = {
 
 function senderInitial(message: Message) {
   return (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
+}
+
+function attachmentErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/^Error:\s*/i, '').trim() || '附件下载失败，请重试。';
 }
 
 function SenderIdentity({ message }: { message: Message }) {
@@ -114,6 +123,7 @@ export default function ReaderPane({
   onRunThreadAction,
   onMoveThreadToFolder,
   onToggleThreadLabel,
+  onToggleThreadMute,
   onToggleStar,
   onEditDraft,
   onRestoreFromTrash,
@@ -138,6 +148,44 @@ export default function ReaderPane({
   onQuickReplyChange,
   onSendQuickReply,
 }: ReaderPaneProps) {
+  const [downloadingAttachmentIds, setDownloadingAttachmentIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    setDownloadingAttachmentIds(new Set());
+    setAttachmentErrors({});
+  }, [selectedId]);
+
+  async function handleAttachmentDownload(attachment: Attachment) {
+    if (downloadingAttachmentIds.has(attachment.id)) return;
+    setAttachmentErrors((current) => {
+      const next = { ...current };
+      delete next[attachment.id];
+      return next;
+    });
+    setDownloadingAttachmentIds((current) => {
+      const next = new Set(current);
+      next.add(attachment.id);
+      return next;
+    });
+    try {
+      await onDownloadAttachment(attachment);
+    } catch (error) {
+      setAttachmentErrors((current) => ({
+        ...current,
+        [attachment.id]: attachmentErrorMessage(error),
+      }));
+    } finally {
+      setDownloadingAttachmentIds((current) => {
+        const next = new Set(current);
+        next.delete(attachment.id);
+        return next;
+      });
+    }
+  }
+
   if (activeThread && threadMessages.length > 0) {
     const allThreadRead = threadMessages.every((message) => message.is_read);
     const allThreadStarred = threadMessages.every((message) => message.is_starred);
@@ -224,6 +272,11 @@ export default function ReaderPane({
                   <MoreHorizontal size={17} />
                 </summary>
                 <div>
+                  <span className="menu-section-title">会话</span>
+                  <button type="button" onClick={onToggleThreadMute}>
+                    {activeThread.is_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    {activeThread.is_muted ? '取消静音会话' : '静音会话'}
+                  </button>
                   <span className="menu-section-title">标签</span>
                   {labels.map((label) => (
                     <button
@@ -372,7 +425,7 @@ export default function ReaderPane({
                 <span className="menu-section-title">整理</span>
                 {selected.folder_role === 'snoozed' ? (
                   <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
-                ) : !isTrash && (
+                ) : canSnoozeRole(selected.folder_role) && (
                   <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
                 )}
                 <button onClick={onExportMessage}>导出 EML</button>
@@ -454,8 +507,11 @@ export default function ReaderPane({
 
         {attachments.length > 0 && (
           <div className="attachments">
-            {attachments.map((attachment) => (
-              <div key={attachment.id}>
+            {attachments.map((attachment) => {
+              const downloading = downloadingAttachmentIds.has(attachment.id);
+              const transferError = attachmentErrors[attachment.id] ?? '';
+              return (
+              <div className={transferError ? 'attachment-download-failed' : ''} key={attachment.id}>
                 <span className="attachment-icon"><Paperclip size={15} /></span>
                 <strong>{attachment.filename}</strong>
                 <span>{attachment.mime_type}</span>
@@ -463,19 +519,29 @@ export default function ReaderPane({
                 <button
                   type="button"
                   title={attachment.local_path || attachment.filename}
+                  disabled={downloading}
+                  aria-busy={downloading}
                   onClick={() => attachment.is_downloaded
                     ? onOpenAttachment(attachment)
-                    : onDownloadAttachment(attachment)}
+                    : handleAttachmentDownload(attachment)}
                 >
-                  {attachment.is_downloaded ? '打开' : '下载'}
+                  {attachment.is_downloaded
+                    ? '打开'
+                    : downloading ? '下载中…' : transferError ? '重试' : '下载'}
                 </button>
                 {attachment.is_downloaded && (
                   <button type="button" title={`另存为 ${attachment.filename}`} onClick={() => onSaveAttachmentAs(attachment)}>
                     另存为
                   </button>
                 )}
+                {transferError && (
+                  <small className="attachment-transfer-status" role="status">
+                    {transferError}
+                  </small>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

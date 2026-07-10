@@ -139,6 +139,57 @@
   grid-column: 1 / -1;
 }
 
+.settings-contact-panel .contact-transfer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-contact-panel .contact-transfer-actions > em {
+  margin-right: 2px;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  font-style: normal;
+}
+
+.settings-contact-panel .contact-transfer-actions button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  color: var(--ui-text-secondary);
+  background: #fff;
+  box-shadow: none;
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.settings-contact-panel .contact-transfer-actions button:hover:not(:disabled) {
+  border-color: #bdd4ed;
+  color: #0b67c2;
+  background: #f6faff;
+}
+
+.settings-contact-panel .contact-transfer-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.settings-contact-panel .contact-transfer-actions .spinning {
+  animation: contact-transfer-spin 900ms linear infinite;
+}
+
+@keyframes contact-transfer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .settings-contact-create > button {
   justify-self: end;
   grid-column: 1 / -1;
@@ -250,7 +301,7 @@
   border-top: 0;
 }
 
-.settings-contact-main {
+.settings-contact-list .contact-tool-row > .settings-contact-main {
   min-width: 0;
   display: flex;
   flex: 1;
@@ -307,6 +358,31 @@
   background: #ffffff;
   box-shadow: none;
   font-size: 9.5px;
+}
+
+.settings-contact-panel .contact-tool-actions button {
+  justify-content: center;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.settings-contact-panel .contact-tool-actions button:hover {
+  border-color: #bdd4ed;
+  color: #0b67c2;
+  background: #f5f9fe;
+}
+
+.settings-contact-panel .contact-tool-actions button:active {
+  transform: translateY(1px);
+}
+
+.settings-contact-panel .contact-tool-actions button.danger:hover {
+  border-color: #efc7c7;
+  color: #b42318;
+  background: #fff6f5;
 }
 
 .settings-contact-panel button.danger,
@@ -649,6 +725,10 @@
     flex-direction: column;
   }
 
+  .settings-contact-panel .contact-transfer-actions {
+    justify-content: flex-start;
+  }
+
   .settings-rule-footer .checkbox-row {
     min-width: 0;
   }
@@ -663,5 +743,54 @@
 
   .settings-rule-list .rule-item > :is(em, div) {
     justify-self: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .settings-contact-list .contact-tool-row {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 0;
+  }
+
+  .settings-contact-panel .contact-tool-actions {
+    width: auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .settings-contact-panel .contact-tool-actions button {
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 8px;
+  }
+
+  .settings-contact-panel .contact-tool-actions .contact-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .settings-contact-list .contact-tool-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .settings-contact-panel .contact-tool-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

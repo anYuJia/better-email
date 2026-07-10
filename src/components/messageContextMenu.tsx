@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { movableFoldersForBulk } from '../app/appConfig';
+import { canSnoozeRole } from '../app/snooze';
 import type { Folder, Label, Message } from '../app/types';
 import type { ContextMenuItem } from './ContextMenu';
 
@@ -45,6 +46,7 @@ type BulkContextOptions = {
   folders: Folder[];
   labels: Label[];
   onRunBulkAction: (action: BulkMessageAction) => void;
+  onRequestSnooze: (messages: Message[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
 };
@@ -55,12 +57,14 @@ export function buildBulkMessageContextItems({
   folders,
   labels,
   onRunBulkAction,
+  onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
 }: BulkContextOptions): ContextMenuItem[] {
   const allRead = selectedMessages.every((message) => message.is_read);
   const allStarred = selectedMessages.every((message) => message.is_starred);
   const movableFolders = movableFoldersForBulk(folders, movableMessages);
+  const snoozableMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
 
   return [
     {
@@ -76,6 +80,17 @@ export function buildBulkMessageContextItems({
       icon: allStarred ? <StarOff size={15} /> : <Star size={15} />,
       shortcut: 'S',
       onSelect: () => onRunBulkAction(allStarred ? 'unstar' : 'star'),
+    },
+    {
+      id: 'bulk-snooze',
+      label: '批量稍后处理',
+      detail: snoozableMessages.length === selectedMessages.length
+        ? `${snoozableMessages.length} 封邮件`
+        : `${snoozableMessages.length} 封可处理`,
+      icon: <Clock size={15} />,
+      disabled: snoozableMessages.length === 0,
+      separatorBefore: true,
+      onSelect: () => onRequestSnooze(snoozableMessages),
     },
     {
       id: 'bulk-archive',
@@ -208,7 +223,7 @@ export function buildSingleMessageContextItems({
               onSelect: () => onRunMessageAction(message, 'unsnooze'),
             },
           ]
-        : message.folder_role !== 'drafts'
+        : canSnoozeRole(message.folder_role)
           ? [
               {
                 id: 'snooze',

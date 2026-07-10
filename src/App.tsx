@@ -56,6 +56,7 @@ import type {
   FolderReadReport,
   Label,
   SavedSearch,
+  SearchScope,
   Attachment,
   OutboundAttachmentInput,
   DroppedFile,
@@ -142,9 +143,11 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
+import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
+const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 const SettingsFrame = lazy(() => import('./components/settings/SettingsFrame'));
 const ExperienceSettings = lazy(() => import('./components/settings/ExperienceSettings'));
 const AccountConnectionSettings = lazy(() => import('./components/settings/AccountConnectionSettings'));
@@ -209,6 +212,7 @@ export default function App() {
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('folder');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const [savedSearchName, setSavedSearchName] = useState('');
@@ -223,6 +227,10 @@ export default function App() {
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
+  const [snoozeTarget, setSnoozeTarget] = useState<{
+    messages: Message[];
+    label: string;
+  } | null>(null);
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(false);
@@ -259,6 +267,7 @@ export default function App() {
     setMergeSourceContactId,
     contactQuery,
     setContactQuery,
+    contactTransferBusy,
     filteredContacts,
     managedContacts,
     startEditContact,
@@ -268,6 +277,8 @@ export default function App() {
     deleteManagedContact,
     mergeManagedContact,
     mergeSuggestedContact,
+    importContactsVcard,
+    exportContactsVcard,
   } = useContactManagement({ setStatus, setNotificationPolicy });
   const {
     oauthClientId,
@@ -318,7 +329,9 @@ export default function App() {
     refreshMailbox,
   } = useMailboxData({
     accountScope,
+    currentAccountId: account?.id ?? null,
     folderId,
+    searchScope,
     query,
     filter,
     listSort,
@@ -875,10 +888,12 @@ export default function App() {
     moveThreadToFolder,
     toggleBulkLabel,
     toggleThreadLabel,
+    toggleThreadMuted,
   } = useMessageCollectionActions({
     folders,
     selectedMessages,
     refreshAll,
+    setActiveThread,
     setSelectedMessageIds,
     setStatus,
     snapshotMessages,
@@ -954,6 +969,57 @@ export default function App() {
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, `${messagesToMove.length} 封邮件`);
   }
 
+  function requestSnooze(items: Message[]) {
+    const targetMessages = [...new Map(
+      items
+        .filter((message) => canSnoozeRole(message.folder_role))
+        .map((message) => [message.id, message]),
+    ).values()];
+    if (targetMessages.length === 0) {
+      setStatus('所选邮件无法稍后处理');
+      return;
+    }
+    setCommandPaletteOpen(false);
+    setSnoozeTarget({
+      messages: targetMessages,
+      label: targetMessages.length === 1
+        ? targetMessages[0].subject || '(无主题)'
+        : `${targetMessages.length} 封邮件`,
+    });
+  }
+
+  async function confirmSnooze(snoozedUntil: string) {
+    const target = snoozeTarget;
+    const timestamp = Date.parse(snoozedUntil);
+    if (!target || Number.isNaN(timestamp) || timestamp <= Date.now()) {
+      setStatus('请选择一个晚于当前时间的稍后处理时间');
+      return;
+    }
+
+    const undoSnapshots = snapshotMessages(target.messages);
+    for (const message of target.messages) {
+      await invoke<Message>('snooze_message', { messageId: message.id, snoozedUntil });
+    }
+
+    const targetIds = new Set(target.messages.map((message) => message.id));
+    setSnoozeTarget(null);
+    setSelectedMessageIds((current) => current.filter((messageId) => !targetIds.has(messageId)));
+    if (selectedId !== null && targetIds.has(selectedId)) setSelectedId(null);
+    if (threadMessages.some((message) => targetIds.has(message.id))) {
+      setActiveThread(null);
+      setThreadMessages([]);
+    }
+    await refreshAll();
+
+    const count = target.messages.length;
+    setStatus(
+      count === 1
+        ? `已稍后处理到 ${formatDate(snoozedUntil)}`
+        : `已将 ${count} 封邮件稍后处理到 ${formatDate(snoozedUntil)}`,
+    );
+    queueUndoAction('稍后处理', undoSnapshots, count > 1 ? `${count} 封邮件` : undefined);
+  }
+
   async function runMessageAction(message: Message, action: MessageContextAction) {
     if (action === 'copy-sender' || action === 'copy-subject') {
       const copySender = action === 'copy-sender';
@@ -974,6 +1040,11 @@ export default function App() {
       return;
     }
 
+    if (action === 'snooze') {
+      requestSnooze([message]);
+      return;
+    }
+
     const undoSnapshots = snapshotMessages([message]);
     if (action === 'permanent-delete') {
       const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
@@ -990,16 +1061,6 @@ export default function App() {
       const actionLabel = action === 'restore' ? '恢复到收件箱' : '标记为不是垃圾邮件';
       setStatus(action === 'restore' ? result.remote.message : `已${actionLabel}：${message.subject || '(无主题)'}`);
       queueUndoAction(actionLabel, undoSnapshots, result.remote.message);
-      return;
-    }
-
-    if (action === 'snooze') {
-      const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await invoke<Message>('snooze_message', { messageId: message.id, snoozedUntil });
-      setSelectedId(null);
-      await refreshAll();
-      setStatus(`已稍后处理到 ${formatDate(snoozedUntil)}`);
-      queueUndoAction('稍后处理', undoSnapshots);
       return;
     }
 
@@ -1195,18 +1256,7 @@ export default function App() {
 
   async function snoozeSelected() {
     if (!selected) return;
-    const undoSnapshots = snapshotMessages([selected]);
-    const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const updated = await invoke<Message>('snooze_message', {
-      messageId: selected.id,
-      snoozedUntil,
-    });
-    const snoozedFolderId = visibleFolderIdForRole('snoozed', selected.account_id) ?? folderId;
-    await loadMeta(snoozedFolderId);
-    await loadMessages(snoozedFolderId);
-    setSelectedId(updated.id);
-    setStatus(`已稍后处理到 ${formatDate(updated.snoozed_until)}`);
-    queueUndoAction('稍后处理', undoSnapshots);
+    requestSnooze([selected]);
   }
 
   async function unsnoozeSelected() {
@@ -1674,11 +1724,17 @@ export default function App() {
   }
 
   async function downloadAttachment(attachment: Attachment) {
-    const result = await invoke<AttachmentDownload>('download_attachment', { attachmentId: attachment.id });
-    setAttachments((current) =>
-      current.map((item) => (item.id === result.attachment.id ? result.attachment : item)),
-    );
-    setStatus(result.message);
+    try {
+      const result = await invoke<AttachmentDownload>('download_attachment', { attachmentId: attachment.id });
+      setAttachments((current) =>
+        current.map((item) => (item.id === result.attachment.id ? result.attachment : item)),
+      );
+      setStatus(result.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`附件下载失败：${message.replace(/^Error:\s*/i, '')}`);
+      throw error;
+    }
   }
 
   async function openAttachment(attachment: Attachment) {
@@ -1847,8 +1903,36 @@ export default function App() {
 
   async function runSearch(event: React.FormEvent) {
     event.preventDefault();
-    await loadMessagesWithVisibleFallback(folderId, query, filter, accountScope, mailboxRefreshRef.current, folders, messagePageSize);
-    setStatus(query.trim() ? `已搜索：${query.trim()}` : '已清除搜索');
+    await loadMessagesWithVisibleFallback(
+      folderId,
+      query,
+      filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      messagePageSize,
+      searchScope,
+    );
+    setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
+  }
+
+  async function changeSearchScope(nextScope: SearchScope) {
+    setSearchScope(nextScope);
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    await loadMessagesWithVisibleFallback(
+      folderId,
+      query,
+      filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      messagePageSize,
+      nextScope,
+    );
+    const label = nextScope === 'folder' ? '当前文件夹' : nextScope === 'account' ? '当前账号' : '全部账号';
+    setStatus(`搜索范围已切换为：${label}`);
   }
 
   async function applySearchShortcut(shortcutQuery: string) {
@@ -1859,7 +1943,16 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(folderId, nextQuery, filter, accountScope, mailboxRefreshRef.current, folders, messagePageSize);
+    await loadMessagesWithVisibleFallback(
+      folderId,
+      nextQuery,
+      filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      messagePageSize,
+      searchScope,
+    );
     searchInputRef.current?.focus();
     if (shortcutQuery.endsWith(':')) {
       searchInputRef.current?.setSelectionRange(nextQuery.length, nextQuery.length);
@@ -1872,10 +1965,20 @@ export default function App() {
   async function clearSearchAndFilter() {
     setQuery('');
     setFilter('all');
+    setSearchScope('folder');
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(folderId, '', 'all', accountScope, mailboxRefreshRef.current, folders, messagePageSize);
+    await loadMessagesWithVisibleFallback(
+      folderId,
+      '',
+      'all',
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      messagePageSize,
+      'folder',
+    );
     setStatus('已清空搜索和筛选');
   }
 
@@ -1889,6 +1992,7 @@ export default function App() {
       mailboxRefreshRef.current,
       folders,
       nextLimit,
+      searchScope,
     );
     setStatus(`已加载 ${nextMessages.length} 封邮件`);
   }
@@ -1896,10 +2000,19 @@ export default function App() {
   async function runSavedSearch(savedSearch: SavedSearch) {
     setQuery(savedSearch.query);
     setFilter(savedSearch.filter);
+    setSearchScope(savedSearch.scope);
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessages(folderId, savedSearch.query, savedSearch.filter, accountScope, mailboxRefreshRef.current, messagePageSize);
+    await loadMessages(
+      folderId,
+      savedSearch.query,
+      savedSearch.filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      messagePageSize,
+      savedSearch.scope,
+    );
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
 
@@ -1907,10 +2020,19 @@ export default function App() {
     const nextQuery = `label:${label.name}`;
     setQuery(nextQuery);
     setFilter('all');
+    setSearchScope('folder');
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    await loadMessages(folderId, nextQuery, 'all', accountScope, mailboxRefreshRef.current, messagePageSize);
+    await loadMessages(
+      folderId,
+      nextQuery,
+      'all',
+      accountScope,
+      mailboxRefreshRef.current,
+      messagePageSize,
+      'folder',
+    );
     setStatus(`正在查看标签：${label.name}`);
   }
 
@@ -1923,7 +2045,8 @@ export default function App() {
     }
     setSavedSearches((current) => {
       const withoutDuplicate = current.filter(
-        (item) => item.name !== trimmedName && !(item.query === trimmedQuery && item.filter === filter),
+        (item) => item.name !== trimmedName
+          && !(item.query === trimmedQuery && item.filter === filter && item.scope === searchScope),
       );
       return [
         ...withoutDuplicate,
@@ -1932,6 +2055,7 @@ export default function App() {
           name: trimmedName,
           query: trimmedQuery,
           filter,
+          scope: searchScope,
         },
       ];
     });
@@ -1947,6 +2071,7 @@ export default function App() {
   function changeAccountScope(value: string) {
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
+    setSearchScope('folder');
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);
@@ -1955,6 +2080,11 @@ export default function App() {
     setThreadMessages([]);
     setAttachments([]);
     setStatus(nextScope === 'all' ? '正在切换到统一邮箱视图...' : '正在切换到单账号视图...');
+  }
+
+  function selectFolder(nextFolderId: number) {
+    setSearchScope('folder');
+    setFolderId(nextFolderId);
   }
 
   async function runCommandPaletteItem(item: CommandPaletteItem) {
@@ -2080,7 +2210,7 @@ export default function App() {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
         onCompose={() => openComposer()}
-        onSelectFolder={setFolderId}
+        onSelectFolder={selectFolder}
         onDropMessagesToFolder={(folder, messageIds) => {
           moveMessagesToFolderByIds(folder, messageIds).catch((error) => setStatus(String(error)));
         }}
@@ -2129,6 +2259,7 @@ export default function App() {
       <MessageListPane
         searchInputRef={searchInputRef}
         query={query}
+        searchScope={searchScope}
         filter={filter}
         listMode={listMode}
         listSort={listSort}
@@ -2146,6 +2277,9 @@ export default function App() {
         messageListSummary={messageListSummary}
         onSearchSubmit={runSearch}
         onQueryChange={setQuery}
+        onSearchScopeChange={(nextScope) => {
+          changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
+        }}
         onClearSearchAndFilter={() => { clearSearchAndFilter().catch((error) => setStatus(String(error))); }}
         onApplySearchShortcut={(nextQuery) => { applySearchShortcut(nextQuery).catch((error) => setStatus(String(error))); }}
         onRefresh={refreshAll}
@@ -2159,6 +2293,7 @@ export default function App() {
         onSortChange={setListSort}
         onToggleAllVisible={toggleAllVisibleMessages}
         onRunBulkAction={runBulkAction}
+        onRequestSnooze={requestSnooze}
         onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error))); }}
         onToggleBulkLabel={(label) => { toggleBulkLabel(label).catch((error) => setStatus(String(error))); }}
         onRunMessageAction={(message, action) => { runMessageAction(message, action).catch((error) => setStatus(String(error))); }}
@@ -2174,6 +2309,9 @@ export default function App() {
         }}
         onToggleThreadLabel={(thread, items, label) => {
           toggleThreadLabel(thread, items, label).catch((error) => setStatus(String(error)));
+        }}
+        onToggleThreadMute={(thread, items) => {
+          toggleThreadMuted(thread, items).catch((error) => setStatus(String(error)));
         }}
         onSelectMessage={setSelectedId}
         onToggleMessageSelection={toggleMessageSelection}
@@ -2216,6 +2354,10 @@ export default function App() {
         onToggleThreadLabel={(label) => {
           if (!activeThread) return;
           toggleThreadLabel(activeThread, threadMessages, label).catch((error) => setStatus(String(error)));
+        }}
+        onToggleThreadMute={() => {
+          if (!activeThread) return;
+          toggleThreadMuted(activeThread, threadMessages).catch((error) => setStatus(String(error)));
         }}
         onToggleStar={toggleStar}
         onEditDraft={editDraftMessage}
@@ -2277,6 +2419,17 @@ export default function App() {
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
           onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}
+          />
+        </Suspense>
+      )}
+
+      {snoozeTarget && (
+        <Suspense fallback={<DeferredSurface label="正在打开稍后处理" />}>
+          <SnoozePicker
+            targetCount={snoozeTarget.messages.length}
+            targetLabel={snoozeTarget.label}
+            onConfirm={confirmSnooze}
+            onClose={() => setSnoozeTarget(null)}
           />
         </Suspense>
       )}
@@ -2443,6 +2596,7 @@ export default function App() {
               editName={contactEditName}
               editAliases={contactEditAliases}
               mergeSourceContactId={mergeSourceContactId}
+              transferBusy={contactTransferBusy}
               onContactFormChange={setContactForm}
               onContactFormAliasesChange={setContactFormAliases}
               onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
@@ -2457,6 +2611,8 @@ export default function App() {
               onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
               onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
               onMergeSourceChange={setMergeSourceContactId}
+              onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
+              onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
             />
             )}
             {activeSettingsSection === 'rules' && (

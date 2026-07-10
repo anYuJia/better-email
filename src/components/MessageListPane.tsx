@@ -1,11 +1,14 @@
 import React from 'react';
 import {
   ArrowDownUp,
+  ChevronDown,
   MoreHorizontal,
   Paperclip,
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import {
@@ -13,7 +16,9 @@ import {
   listSortOptions,
   movableFoldersForBulk,
   searchShortcuts,
+  searchScopeOptions,
 } from '../app/appConfig';
+import { canSnoozeRole } from '../app/snooze';
 import type {
   AccountScope,
   FilterMode,
@@ -22,6 +27,7 @@ import type {
   ListMode,
   ListSort,
   Message,
+  SearchScope,
   ThreadSummary,
 } from '../app/types';
 import { formatDate } from '../mailUtils';
@@ -40,6 +46,7 @@ export type { BulkMessageAction, MessageContextAction } from './messageContextMe
 export type MessageListPaneProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
   query: string;
+  searchScope: SearchScope;
   filter: FilterMode;
   listMode: ListMode;
   listSort: ListSort;
@@ -57,6 +64,7 @@ export type MessageListPaneProps = {
   messageListSummary: string;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
+  onSearchScopeChange: (scope: SearchScope) => void;
   onClearSearchAndFilter: () => void;
   onApplySearchShortcut: (query: string) => void;
   onRefresh: () => void;
@@ -66,6 +74,7 @@ export type MessageListPaneProps = {
   onSortChange: (sort: ListSort) => void;
   onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
+  onRequestSnooze: (messages: Message[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
   onRunMessageAction: (message: Message, action: MessageContextAction) => void;
@@ -76,6 +85,7 @@ export type MessageListPaneProps = {
   onRunThreadAction: (thread: ThreadSummary, messages: Message[], action: BulkMessageAction) => void;
   onMoveThreadToFolder: (thread: ThreadSummary, messages: Message[], folder: Folder) => void;
   onToggleThreadLabel: (thread: ThreadSummary, messages: Message[], label: Label) => void;
+  onToggleThreadMute: (thread: ThreadSummary, messages: Message[]) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => void;
@@ -84,6 +94,7 @@ export type MessageListPaneProps = {
 export default function MessageListPane({
   searchInputRef,
   query,
+  searchScope,
   filter,
   listMode,
   listSort,
@@ -101,6 +112,7 @@ export default function MessageListPane({
   messageListSummary,
   onSearchSubmit,
   onQueryChange,
+  onSearchScopeChange,
   onClearSearchAndFilter,
   onApplySearchShortcut,
   onRefresh,
@@ -110,6 +122,7 @@ export default function MessageListPane({
   onSortChange,
   onToggleAllVisible,
   onRunBulkAction,
+  onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
   onRunMessageAction,
@@ -120,6 +133,7 @@ export default function MessageListPane({
   onRunThreadAction,
   onMoveThreadToFolder,
   onToggleThreadLabel,
+  onToggleThreadMute,
   onSelectMessage,
   onToggleMessageSelection,
   onLoadMore,
@@ -140,6 +154,7 @@ export default function MessageListPane({
   const selectedMessageSet = new Set(selectedMessageIds);
   const draggingMessageSet = new Set(draggingMessageIds);
   const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
+  const snoozableSelectedMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
   const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
@@ -151,6 +166,7 @@ export default function MessageListPane({
         folders,
         labels,
         onRunBulkAction,
+        onRequestSnooze,
         onMoveBulkToFolder,
         onToggleBulkLabel,
       })
@@ -171,16 +187,29 @@ export default function MessageListPane({
     (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
   );
   const threadContextItems = threadMenu
-    ? buildBulkMessageContextItems({
+    ? (() => {
+      const items = buildBulkMessageContextItems({
         selectedMessages: threadContextMessages,
         movableMessages: threadMovableMessages,
         folders,
         labels,
         onRunBulkAction: (action) => onRunThreadAction(threadMenu.thread, threadContextMessages, action),
+        onRequestSnooze,
         onMoveBulkToFolder: (folder) => onMoveThreadToFolder(threadMenu.thread, threadContextMessages, folder),
         onToggleBulkLabel: (label) => onToggleThreadLabel(threadMenu.thread, threadContextMessages, label),
-      })
+      });
+      items.splice(2, 0, {
+        id: 'thread-mute',
+        label: threadMenu.thread.is_muted ? '取消静音会话' : '静音会话',
+        icon: threadMenu.thread.is_muted ? <Volume2 size={15} /> : <VolumeX size={15} />,
+        separatorBefore: true,
+        onSelect: () => onToggleThreadMute(threadMenu.thread, threadContextMessages),
+      });
+      return items;
+    })()
     : [];
+  const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
+    ?? searchScopeOptions[0];
 
   return (
     <section className="message-list-panel">
@@ -200,6 +229,31 @@ export default function MessageListPane({
               </button>
             )}
           </form>
+          <details className="compact-menu search-scope-menu">
+            <summary
+              title={`搜索范围：${activeSearchScope.label}`}
+              aria-label={`搜索范围：${activeSearchScope.label}`}
+            >
+              <span>{activeSearchScope.shortLabel}</span>
+              <ChevronDown size={13} />
+            </summary>
+            <div>
+              <span className="menu-section-title">搜索范围</span>
+              {searchScopeOptions.map((item) => (
+                <button
+                  type="button"
+                  className={item.id === searchScope ? 'active' : ''}
+                  key={item.id}
+                  onClick={(event) => {
+                    onSearchScopeChange(item.id);
+                    event.currentTarget.closest('details')?.removeAttribute('open');
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
         <details className="compact-menu search-options-menu">
           <summary title="搜索条件" aria-label="搜索条件">
@@ -222,6 +276,7 @@ export default function MessageListPane({
         <div className="list-summary">
           <strong>{currentViewLabel}</strong>
           <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
+          {searchScope !== 'folder' && <em className="search-scope-indicator">{activeSearchScope.label}</em>}
           {filter !== 'all' && <em>{activeFilterLabel}</em>}
         </div>
         <div className="list-control-actions">
@@ -299,6 +354,13 @@ export default function MessageListPane({
               <button type="button" onClick={() => onRunBulkAction('trash')}>删除</button>
               <button type="button" onClick={() => onRunBulkAction('read')}>标为已读</button>
               <button type="button" onClick={() => onRunBulkAction('unread')}>标为未读</button>
+              <button
+                type="button"
+                disabled={snoozableSelectedMessages.length === 0}
+                onClick={() => onRequestSnooze(snoozableSelectedMessages)}
+              >
+                稍后处理
+              </button>
               <span className="menu-section-title">移动到</span>
               {movableFoldersForBulk(folders, selectedMessages).map((folder) => (
                 <button
@@ -345,7 +407,15 @@ export default function MessageListPane({
                 <time>{formatDate(thread.latest_at)}</time>
               </div>
               <p>{thread.participants}</p>
-              <span>{thread.message_count} 封 · 未读 {thread.unread_count}</span>
+              <span>
+                {thread.message_count} 封 · 未读 {thread.unread_count}
+                {thread.is_muted && (
+                  <em className="thread-muted-indicator">
+                    <VolumeX size={12} />
+                    静音
+                  </em>
+                )}
+              </span>
             </button>
           ))}
           {threads.length === 0 && <div className="empty-state">没有会话线程</div>}

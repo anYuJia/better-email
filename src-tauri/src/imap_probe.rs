@@ -16,6 +16,22 @@ use std::io::Write;
 const HEADER_FETCH_LIMIT: usize = 25;
 const FLAG_RECONCILE_LIMIT: u32 = 50;
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
+const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
+
+fn retry_attachment_fetch<T>(
+    mut operation: impl FnMut() -> Result<T, MailError>,
+) -> Result<T, MailError> {
+    let mut last_error = String::new();
+    for _ in 0..ATTACHMENT_FETCH_ATTEMPTS {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error) => last_error = error.to_string(),
+        }
+    }
+    Err(MailError::Imap(format!(
+        "附件 IMAP 请求在 {ATTACHMENT_FETCH_ATTEMPTS} 次尝试后仍失败：{last_error}"
+    )))
+}
 
 fn select_recent_uid_page(mut uids: Vec<i64>, initial_sync: bool) -> Vec<i64> {
     uids.sort_unstable();
@@ -335,6 +351,15 @@ pub struct RemoteAttachmentWrite {
     pub size_bytes: i64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct AttachmentDownloadOptions<'a> {
+    pub remote_name: &'a str,
+    pub remote_uid: i64,
+    pub filename: &'a str,
+    pub max_bytes: i64,
+    pub start_offset: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteAppendResult {
     pub remote_uid: i64,
@@ -447,37 +472,51 @@ fn single_appended_uid(uids: Option<&[UidSetMember]>) -> Option<i64> {
 pub fn download_attachment_to_writer(
     account: &Account,
     secret: &AccountSecret,
-    remote_name: &str,
-    remote_uid: i64,
-    filename: &str,
-    max_bytes: i64,
+    options: AttachmentDownloadOptions<'_>,
     writer: &mut impl Write,
 ) -> Result<RemoteAttachmentWrite, MailError> {
+    if options.start_offset as i64 > options.max_bytes {
+        return Err(MailError::Imap(format!(
+            "附件断点超过当前下载上限（{} MB）。",
+            options.max_bytes / 1024 / 1024
+        )));
+    }
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = imap::ClientBuilder::new(host.as_str(), port)
         .connect()
         .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
     let mut session = login_imap(client, account, secret)?;
     session
-        .select(remote_name)
+        .select(options.remote_name)
         .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
 
-    let result = match find_attachment_part_path(&mut session, remote_uid, filename) {
+    let result = match retry_attachment_fetch(|| {
+        find_attachment_part_path(&mut session, options.remote_uid, options.filename)
+    }) {
         Ok(part_path) => download_attachment_part_to_writer(
             &mut session,
-            remote_uid,
-            filename,
-            max_bytes,
+            options.remote_uid,
+            options.filename,
+            options.max_bytes,
+            options.start_offset,
             writer,
             part_path,
         ),
         Err(part_error) => {
-            let payload =
-                fetch_attachment_payload_from_selected(&mut session, remote_uid, filename)?;
-            if payload.bytes.len() as i64 > max_bytes {
+            if options.start_offset > 0 {
+                return Err(MailError::Imap(format!(
+                    "服务器本次未提供可续传的附件分段信息：{part_error}"
+                )));
+            }
+            let payload = fetch_attachment_payload_from_selected(
+                &mut session,
+                options.remote_uid,
+                options.filename,
+            )?;
+            if payload.bytes.len() as i64 > options.max_bytes {
                 Err(MailError::Imap(format!(
                     "附件超过当前下载上限（{} MB），且 IMAP 分段下载不可用：{part_error}",
-                    max_bytes / 1024 / 1024
+                    options.max_bytes / 1024 / 1024
                 )))
             } else {
                 writer.write_all(&payload.bytes)?;
@@ -762,14 +801,16 @@ fn fetch_attachment_payload_from_selected(
     remote_uid: i64,
     filename: &str,
 ) -> Result<RemoteAttachmentPayload, MailError> {
-    let fetches = session
-        .uid_fetch(remote_uid.to_string(), "RFC822")
-        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
-    let raw = fetches
-        .iter()
-        .find_map(|fetch| fetch.body())
-        .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
-        .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
+    let raw = retry_attachment_fetch(|| {
+        let fetches = session
+            .uid_fetch(remote_uid.to_string(), "RFC822")
+            .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
+        fetches
+            .iter()
+            .find_map(|fetch| fetch.body())
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))
+    })?;
     parse_attachment_payload_from_raw(&raw, filename)
         .ok_or_else(|| MailError::Imap(format!("IMAP 正文中未找到附件：{}", filename.trim())))
 }
@@ -796,6 +837,7 @@ fn download_attachment_part_to_writer(
     remote_uid: i64,
     filename: &str,
     max_bytes: i64,
+    start_offset: usize,
     writer: &mut impl Write,
     part_path: Vec<u32>,
 ) -> Result<RemoteAttachmentWrite, MailError> {
@@ -807,20 +849,23 @@ fn download_attachment_part_to_writer(
         .collect::<Vec<_>>()
         .join(".");
 
-    let mut offset = 0usize;
-    let mut written = 0usize;
+    let mut offset = start_offset;
+    let mut written = start_offset;
     loop {
         let query = format!(
             "BODY.PEEK[{section}]<{}.{}>",
             offset, ATTACHMENT_CHUNK_BYTES
         );
-        let fetches = session
-            .uid_fetch(remote_uid.to_string(), query)
-            .map_err(|error| MailError::Imap(format!("IMAP 分段拉取附件失败：{error}")))?;
-        let chunk = fetches
-            .iter()
-            .find_map(|fetch| fetch.section(&section_path))
-            .ok_or_else(|| MailError::Imap("IMAP 未返回附件分段数据。".to_string()))?;
+        let chunk = retry_attachment_fetch(|| {
+            let fetches = session
+                .uid_fetch(remote_uid.to_string(), query.as_str())
+                .map_err(|error| MailError::Imap(format!("IMAP 分段拉取附件失败：{error}")))?;
+            fetches
+                .iter()
+                .find_map(|fetch| fetch.section(&section_path))
+                .map(ToOwned::to_owned)
+                .ok_or_else(|| MailError::Imap("IMAP 未返回附件分段数据。".to_string()))
+        })?;
         if chunk.is_empty() {
             break;
         }
@@ -831,7 +876,7 @@ fn download_attachment_part_to_writer(
                 max_bytes / 1024 / 1024
             )));
         }
-        writer.write_all(chunk)?;
+        writer.write_all(&chunk)?;
         if chunk.len() < ATTACHMENT_CHUNK_BYTES {
             break;
         }
@@ -1174,6 +1219,37 @@ fn parse_attachment_payload_from_raw(raw: &str, filename: &str) -> Option<Remote
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn attachment_fetch_retries_transient_failures() {
+        let mut attempts = 0;
+        let value = retry_attachment_fetch(|| {
+            attempts += 1;
+            if attempts < ATTACHMENT_FETCH_ATTEMPTS {
+                Err(MailError::Imap("temporary failure".to_string()))
+            } else {
+                Ok(42)
+            }
+        })
+        .expect("third attachment fetch attempt should succeed");
+
+        assert_eq!(value, 42);
+        assert_eq!(attempts, ATTACHMENT_FETCH_ATTEMPTS);
+    }
+
+    #[test]
+    fn attachment_fetch_reports_exhausted_retries() {
+        let mut attempts = 0;
+        let error = retry_attachment_fetch::<()>(|| {
+            attempts += 1;
+            Err(MailError::Imap("connection reset".to_string()))
+        })
+        .expect_err("attachment fetch should fail after retries");
+
+        assert_eq!(attempts, ATTACHMENT_FETCH_ATTEMPTS);
+        assert!(error.to_string().contains("3 次尝试"));
+        assert!(error.to_string().contains("connection reset"));
+    }
 
     #[test]
     fn parses_imap_endpoint_defaults_to_tls_port() {

@@ -14,6 +14,7 @@ type MessageCollectionActionOptions = {
   folders: Folder[];
   selectedMessages: Message[];
   refreshAll: () => Promise<void>;
+  setActiveThread: React.Dispatch<React.SetStateAction<ThreadSummary | null>>;
   setSelectedMessageIds: React.Dispatch<React.SetStateAction<number[]>>;
   setStatus: React.Dispatch<React.SetStateAction<string>>;
   snapshotMessages: (messages: Message[]) => UndoMessageSnapshot[];
@@ -52,6 +53,7 @@ export default function useMessageCollectionActions({
   folders,
   selectedMessages,
   refreshAll,
+  setActiveThread,
   setSelectedMessageIds,
   setStatus,
   snapshotMessages,
@@ -250,6 +252,34 @@ export default function useMessageCollectionActions({
       await toggleMessageCollectionLabel(items, label, 'thread', thread.subject);
     }
 
+    async function toggleThreadMuted(thread: ThreadSummary, items: Message[]) {
+      const targetMessages = uniqueMessages(items);
+      if (targetMessages.length === 0) {
+        setStatus('会话中没有可静音的邮件');
+        return;
+      }
+      const muted = !thread.is_muted;
+      const updatedScopes = await invoke<number>('set_threads_muted', {
+        messageIds: targetMessages.map((message) => message.id),
+        muted,
+      });
+      if (updatedScopes <= 0) {
+        setStatus('会话缺少可持久化的线程标识');
+        return;
+      }
+      await refreshAll();
+      setActiveThread((current) => (
+        current?.thread_key === thread.thread_key
+          ? { ...current, is_muted: muted }
+          : current
+      ));
+      setStatus(
+        muted
+          ? `已静音会话：${thread.subject || '(无主题)'}`
+          : `已取消静音会话：${thread.subject || '(无主题)'}`,
+      );
+    }
+
     return {
       runBulkAction,
       runThreadAction,
@@ -257,12 +287,14 @@ export default function useMessageCollectionActions({
       moveThreadToFolder,
       toggleBulkLabel,
       toggleThreadLabel,
+      toggleThreadMuted,
     };
   }, [
     folders,
     queueUndoAction,
     refreshAll,
     selectedMessages,
+    setActiveThread,
     setSelectedMessageIds,
     setStatus,
     snapshotMessages,

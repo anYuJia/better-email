@@ -83,6 +83,7 @@ export type SyncRunSummary = {
 export type NewMailMessageSummary = {
   account_id?: number;
   account_email?: string;
+  thread_key?: string;
   sender_email: string;
   sender_name: string;
   subject: string;
@@ -100,10 +101,11 @@ export type NotificationPolicy = {
 
 export type NewMailNotificationDecision = {
   body: string | null;
-  reason: 'send' | 'no-new-mail' | 'quiet-hours' | 'vip-only-no-match' | 'account-muted';
+  reason: 'send' | 'no-new-mail' | 'quiet-hours' | 'vip-only-no-match' | 'account-muted' | 'thread-muted';
   vipMatches: number;
   priorityMatches: number;
   mutedMatches: number;
+  threadMutedMatches: number;
 };
 
 export const defaultNotificationPolicy: NotificationPolicy = {
@@ -130,25 +132,71 @@ export function newMailNotificationDecision(
   policy: NotificationPolicy = defaultNotificationPolicy,
   messages: NewMailMessageSummary[] = [],
   now = new Date(),
+  mutedThreadScopes: Iterable<string> = [],
 ): NewMailNotificationDecision {
   const defaultBody = newMailNotificationBody(run);
-  if (!defaultBody) return { body: null, reason: 'no-new-mail', vipMatches: 0, priorityMatches: 0, mutedMatches: 0 };
+  if (!defaultBody) {
+    return {
+      body: null,
+      reason: 'no-new-mail',
+      vipMatches: 0,
+      priorityMatches: 0,
+      mutedMatches: 0,
+      threadMutedMatches: 0,
+    };
+  }
 
   const candidates = messages.slice(0, Math.max(0, run.imported_messages));
-  const activeMessages = candidates.filter((message) => !isAccountListed(message, policy.mutedAccounts));
-  const mutedMatches = candidates.length - activeMessages.length;
-  if (activeMessages.length === 0 && candidates.length > 0) {
-    return { body: null, reason: 'account-muted', vipMatches: 0, priorityMatches: 0, mutedMatches };
+  const mutedScopeSet = new Set(mutedThreadScopes);
+  const accountActiveMessages = candidates.filter((message) => !isAccountListed(message, policy.mutedAccounts));
+  const mutedMatches = candidates.length - accountActiveMessages.length;
+  if (accountActiveMessages.length === 0 && candidates.length > 0) {
+    return {
+      body: null,
+      reason: 'account-muted',
+      vipMatches: 0,
+      priorityMatches: 0,
+      mutedMatches,
+      threadMutedMatches: 0,
+    };
+  }
+  const activeMessages = accountActiveMessages.filter((message) => (
+    !mutedScopeSet.has(notificationThreadScopeKey(message))
+  ));
+  const threadMutedMatches = accountActiveMessages.length - activeMessages.length;
+  if (activeMessages.length === 0 && accountActiveMessages.length > 0) {
+    return {
+      body: null,
+      reason: 'thread-muted',
+      vipMatches: 0,
+      priorityMatches: 0,
+      mutedMatches,
+      threadMutedMatches,
+    };
   }
   const priorityMessages = activeMessages.filter((message) => isAccountListed(message, policy.priorityAccounts));
   const vipMessages = activeMessages.filter((message) => isVipSender(message, policy.vipSenders));
   const quietActive = policy.quietHoursEnabled && isQuietHoursActive(policy, now);
 
   if (policy.vipOnly && vipMessages.length === 0) {
-    return { body: null, reason: 'vip-only-no-match', vipMatches: 0, priorityMatches: priorityMessages.length, mutedMatches };
+    return {
+      body: null,
+      reason: 'vip-only-no-match',
+      vipMatches: 0,
+      priorityMatches: priorityMessages.length,
+      mutedMatches,
+      threadMutedMatches,
+    };
   }
   if (quietActive && vipMessages.length === 0 && priorityMessages.length === 0) {
-    return { body: null, reason: 'quiet-hours', vipMatches: 0, priorityMatches: 0, mutedMatches };
+    return {
+      body: null,
+      reason: 'quiet-hours',
+      vipMatches: 0,
+      priorityMatches: 0,
+      mutedMatches,
+      threadMutedMatches,
+    };
   }
   if (vipMessages.length > 0) {
     const first = vipMessages[0];
@@ -157,7 +205,14 @@ export function newMailNotificationDecision(
     const prefix = policy.vipOnly || quietActive
       ? `VIP 新邮件 ${vipMessages.length} 封`
       : `已同步 ${run.imported_messages} 封新邮件，含 VIP ${vipMessages.length} 封`;
-    return { body: `${prefix}：${sender} · ${subject}`, reason: 'send', vipMatches: vipMessages.length, priorityMatches: priorityMessages.length, mutedMatches };
+    return {
+      body: `${prefix}：${sender} · ${subject}`,
+      reason: 'send',
+      vipMatches: vipMessages.length,
+      priorityMatches: priorityMessages.length,
+      mutedMatches,
+      threadMutedMatches,
+    };
   }
   if (priorityMessages.length > 0) {
     const first = priorityMessages[0];
@@ -169,10 +224,24 @@ export function newMailNotificationDecision(
       vipMatches: 0,
       priorityMatches: priorityMessages.length,
       mutedMatches,
+      threadMutedMatches,
     };
   }
 
-  return { body: defaultBody, reason: 'send', vipMatches: 0, priorityMatches: 0, mutedMatches };
+  return {
+    body: defaultBody,
+    reason: 'send',
+    vipMatches: 0,
+    priorityMatches: 0,
+    mutedMatches,
+    threadMutedMatches,
+  };
+}
+
+export function notificationThreadScopeKey(message: NewMailMessageSummary): string {
+  const accountId = message.account_id ? String(message.account_id) : '';
+  const threadKey = message.thread_key?.trim() ?? '';
+  return accountId && threadKey ? `${accountId}:${threadKey}` : '';
 }
 
 export function senderDomain(senderEmail: string): string {

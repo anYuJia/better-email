@@ -6,6 +6,7 @@ import type {
   Folder,
   ListSort,
   Message,
+  SearchScope,
   ThreadSummary,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
@@ -17,7 +18,7 @@ type LoadMetaResult = {
 
 type MailboxRequestArgs = {
   accountId: number | null;
-  folderId: number;
+  folderId: number | null;
   query: string | null;
   filter: FilterMode;
   sort: ListSort;
@@ -26,7 +27,9 @@ type MailboxRequestArgs = {
 
 type UseMailboxDataOptions = {
   accountScope: AccountScope;
+  currentAccountId: number | null;
   folderId: number | null;
+  searchScope: SearchScope;
   query: string;
   filter: FilterMode;
   listSort: ListSort;
@@ -53,15 +56,25 @@ type MailboxRequests = {
 
 export function buildMailboxRequests(
   scope: AccountScope,
+  currentAccountId: number | null,
   folderId: number,
+  searchScope: SearchScope,
   query: string,
   filter: FilterMode,
   sort: ListSort,
   limit: number,
 ): MailboxRequests {
+  const accountId = searchScope === 'all'
+    ? null
+    : searchScope === 'account'
+      ? currentAccountId
+      : scope === 'all'
+        ? null
+        : scope;
+  const scopedFolderId = searchScope === 'folder' ? folderId : null;
   const common = {
-    accountId: scope === 'all' ? null : scope,
-    folderId,
+    accountId,
+    folderId: scopedFolderId,
     query: query.trim() || null,
     filter,
     sort,
@@ -87,6 +100,7 @@ export type MailboxDataController = {
     nextScope?: AccountScope,
     refreshId?: number,
     nextLimit?: number,
+    nextSearchScope?: SearchScope,
   ) => Promise<Message[]>;
   loadMessagesWithVisibleFallback: (
     nextFolderId?: number | null,
@@ -96,6 +110,7 @@ export type MailboxDataController = {
     refreshId?: number,
     visibleFolders?: Folder[],
     nextLimit?: number,
+    nextSearchScope?: SearchScope,
   ) => Promise<Message[]>;
   refreshMailbox: (
     nextScope?: AccountScope,
@@ -107,7 +122,9 @@ export type MailboxDataController = {
 
 export default function useMailboxData({
   accountScope,
+  currentAccountId,
   folderId,
+  searchScope,
   query,
   filter,
   listSort,
@@ -133,8 +150,9 @@ export default function useMailboxData({
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
     nextLimit = messagePageSize,
+    nextSearchScope = searchScope,
   ) {
-    if (!nextFolderId) {
+    if (nextSearchScope === 'folder' && !nextFolderId) {
       setMessages([]);
       setThreads([]);
       setHasMoreMessages(false);
@@ -144,7 +162,9 @@ export default function useMailboxData({
     }
     const requests = buildMailboxRequests(
       nextScope,
-      nextFolderId,
+      currentAccountId,
+      nextFolderId ?? 0,
+      nextSearchScope,
       nextQuery,
       nextFilter,
       listSort,
@@ -185,6 +205,7 @@ export default function useMailboxData({
     refreshId = mailboxRefreshRef.current,
     visibleFolders = folders,
     nextLimit = messagePageSize,
+    nextSearchScope = searchScope,
   ) {
     const nextMessages = await loadMessages(
       nextFolderId,
@@ -193,9 +214,11 @@ export default function useMailboxData({
       nextScope,
       refreshId,
       nextLimit,
+      nextSearchScope,
     );
     if (
       nextMessages.length > 0
+      || nextSearchScope !== 'folder'
       || !nextFolderId
       || nextQuery.trim()
       || nextFilter !== 'all'
@@ -247,6 +270,7 @@ export default function useMailboxData({
       refreshId,
       meta.folders,
       messagePageSize,
+      searchScope,
     );
     return nextFolderId;
   }

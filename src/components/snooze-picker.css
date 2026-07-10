@@ -1,0 +1,227 @@
+.snooze-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(22, 28, 36, 0.3);
+  backdrop-filter: blur(16px) saturate(1.05);
+}
+
+.snooze-dialog {
+  width: min(440px, calc(100vw - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(208, 214, 221, 0.96);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow:
+    0 30px 90px rgba(15, 23, 42, 0.24),
+    0 7px 22px rgba(15, 23, 42, 0.1);
+}
+
+.snooze-dialog > header {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid #e3e7eb;
+}
+
+.snooze-dialog-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #176fd0;
+  background: #edf6ff;
+}
+
+.snooze-dialog > header > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.snooze-dialog > header strong,
+.snooze-dialog > header small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snooze-dialog > header strong {
+  color: #20252c;
+  font-size: 14px;
+  font-weight: 710;
+}
+
+.snooze-dialog > header small {
+  color: #858f9a;
+  font-size: 10px;
+}
+
+.snooze-dialog > header button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #6e7883;
+  background: transparent;
+}
+
+.snooze-dialog > header button:hover {
+  color: #20252c;
+  background: #f0f2f4;
+}
+
+.snooze-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 16px;
+}
+
+.snooze-preset-grid > button {
+  min-width: 0;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-content: center;
+  gap: 3px 9px;
+  padding: 10px;
+  border: 1px solid #dfe4e9;
+  border-radius: 10px;
+  color: #56616d;
+  background: #fafbfc;
+  box-shadow: none;
+  text-align: left;
+}
+
+.snooze-preset-grid > button:hover,
+.snooze-preset-grid > button:focus-visible {
+  border-color: #b8d3f0;
+  color: #1168c0;
+  background: #f4f9ff;
+  outline: none;
+}
+
+.snooze-preset-grid > button > span {
+  width: 30px;
+  height: 30px;
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #176fd0;
+  background: #eaf4ff;
+}
+
+.snooze-preset-grid strong,
+.snooze-preset-grid small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snooze-preset-grid strong {
+  color: #252a31;
+  font-size: 11.5px;
+  font-weight: 680;
+}
+
+.snooze-preset-grid small {
+  color: #88919c;
+  font-size: 9.5px;
+}
+
+.snooze-custom {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid #e7eaee;
+  background: #fafbfc;
+}
+
+.snooze-custom > span {
+  display: grid;
+  gap: 2px;
+}
+
+.snooze-custom > span strong {
+  color: #252a31;
+  font-size: 11.5px;
+}
+
+.snooze-custom > span small {
+  color: #88919c;
+  font-size: 9.5px;
+}
+
+.snooze-custom > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.snooze-custom input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d7dde3;
+  border-radius: 8px;
+  color: #252a31;
+  background: #fff;
+}
+
+.snooze-custom input:focus {
+  border-color: rgba(22, 119, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+  outline: none;
+}
+
+.snooze-custom button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #1677ff;
+  border-radius: 8px;
+  color: #fff;
+  background: #1677ff;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.snooze-custom button:hover {
+  background: #0869e3;
+}
+
+.snooze-custom p {
+  margin: -3px 0 0;
+  color: #c2413b;
+  font-size: 9.5px;
+}
+
+@media (max-width: 520px) {
+  .snooze-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .snooze-dialog {
+    width: 100%;
+    border-radius: 14px;
+  }
+
+  .snooze-preset-grid {
+    grid-template-columns: 1fr;
+    max-height: 310px;
+    overflow-y: auto;
+  }
+}

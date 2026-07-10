@@ -549,6 +549,23 @@ pub struct ContactCreateInput {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ContactImportSummary {
+    pub path: String,
+    pub total_cards: i64,
+    pub created: i64,
+    pub updated: i64,
+    pub skipped: i64,
+    pub size_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactExportSummary {
+    pub path: String,
+    pub contacts: i64,
+    pub size_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct MailRule {
     pub id: i64,
     pub name: String,
@@ -573,6 +590,7 @@ pub struct ThreadSummary {
     pub unread_count: i64,
     pub latest_at: String,
     pub participants: String,
+    pub is_muted: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

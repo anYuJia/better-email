@@ -18,6 +18,7 @@ import type {
   CredentialVerificationReport,
 } from '../../app/types';
 import ConnectionDiagnosticsPanel from './ConnectionDiagnosticsPanel';
+import './data-settings.css';
 
 type CredentialSecuritySettingsProps = {
   account: Account;
@@ -77,7 +78,7 @@ export default function CredentialSecuritySettings({
       data-settings-section="auth"
     >
       <header className="tool-header">
-        <span>
+        <span className="credential-panel-title">
           <strong>系统凭据库</strong>
           <small>{account.email}</small>
         </span>

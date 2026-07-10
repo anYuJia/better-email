@@ -6,6 +6,8 @@ import {
 import type {
   Contact,
   ContactCreateInput,
+  ContactExportSummary,
+  ContactImportSummary,
   ContactMergeSuggestion,
 } from '../app/types';
 import type { NotificationPolicy } from '../mailUtils';
@@ -29,6 +31,7 @@ export default function useContactManagement({
   const [contactFormAliases, setContactFormAliases] = useState('');
   const [mergeSourceContactId, setMergeSourceContactId] = useState<number | null>(null);
   const [contactQuery, setContactQuery] = useState('');
+  const [contactTransferBusy, setContactTransferBusy] = useState(false);
 
   const filteredContacts = useMemo(() => {
     const term = contactQuery.trim().toLowerCase();
@@ -54,6 +57,56 @@ export default function useContactManagement({
   async function refreshContactMergeSuggestions() {
     const suggestions = await invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions');
     setContactMergeSuggestions(suggestions);
+  }
+
+  async function refreshManagedContacts() {
+    const refreshed = await invoke<Contact[]>('list_contacts');
+    setContacts(refreshed);
+    await refreshContactMergeSuggestions();
+    return refreshed;
+  }
+
+  async function importContactsVcard() {
+    setContactTransferBusy(true);
+    try {
+      const summary = await invoke<ContactImportSummary | null>('import_contacts_vcard');
+      if (!summary) {
+        setStatus('已取消联系人 vCard 导入');
+        return;
+      }
+      const refreshed = await refreshManagedContacts();
+      const importedVipSenders = refreshed
+        .filter((contact) => contact.vip)
+        .flatMap((contact) => [contact.email, ...contact.aliases])
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+      setNotificationPolicy((current) => ({
+        ...current,
+        vipSenders: [...new Set([
+          ...normalizeContactAliases(current.vipSenders),
+          ...importedVipSenders,
+        ])].join('\n'),
+      }));
+      setStatus(
+        `联系人 vCard 已导入：新增 ${summary.created}、合并 ${summary.updated}、跳过 ${summary.skipped}`,
+      );
+    } finally {
+      setContactTransferBusy(false);
+    }
+  }
+
+  async function exportContactsVcard() {
+    setContactTransferBusy(true);
+    try {
+      const summary = await invoke<ContactExportSummary | null>('export_contacts_vcard');
+      if (!summary) {
+        setStatus('已取消联系人 vCard 导出');
+        return;
+      }
+      setStatus(`已导出 ${summary.contacts} 位联系人：${summary.path}`);
+    } finally {
+      setContactTransferBusy(false);
+    }
   }
 
   async function createManagedContact() {
@@ -202,6 +255,7 @@ export default function useContactManagement({
     setMergeSourceContactId,
     contactQuery,
     setContactQuery,
+    contactTransferBusy,
     filteredContacts,
     managedContacts: contacts,
     startEditContact,
@@ -211,5 +265,7 @@ export default function useContactManagement({
     deleteManagedContact,
     mergeManagedContact,
     mergeSuggestedContact,
+    importContactsVcard,
+    exportContactsVcard,
   };
 }

@@ -4,6 +4,7 @@ export type FilterMode = 'all' | 'unread' | 'starred' | 'attachments';
 export type ListMode = 'messages' | 'threads';
 export type ListSort = 'newest' | 'oldest' | 'sender' | 'subject';
 export type AccountScope = number | 'all';
+export type SearchScope = 'folder' | 'account' | 'all';
 export type ProviderVerificationStatus = 'untested' | 'passed' | 'partial' | 'failed';
 export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
 export type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed';
@@ -45,6 +46,7 @@ export type SavedSearch = {
   name: string;
   query: string;
   filter: FilterMode;
+  scope: SearchScope;
 };
 
 export type Attachment = {
@@ -368,6 +370,21 @@ export type ContactCreateInput = {
   vip: boolean;
 };
 
+export type ContactImportSummary = {
+  path: string;
+  total_cards: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  size_bytes: number;
+};
+
+export type ContactExportSummary = {
+  path: string;
+  contacts: number;
+  size_bytes: number;
+};
+
 export type MailRule = {
   id: number;
   name: string;
@@ -390,6 +407,7 @@ export type ThreadSummary = {
   unread_count: number;
   latest_at: string;
   participants: string;
+  is_muted: boolean;
 };
 
 export type OutboxItem = {

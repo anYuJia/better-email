@@ -6,6 +6,7 @@ mod models;
 mod oauth;
 mod protocol;
 mod smtp;
+mod vcard;
 
 use db::MailStore;
 use tauri::Manager;
@@ -35,6 +36,8 @@ pub fn run() {
             commands::list_messages,
             commands::list_provider_write_validation_messages,
             commands::list_thread_messages,
+            commands::set_threads_muted,
+            commands::list_muted_thread_keys,
             commands::list_attachments,
             commands::pick_outbound_attachments,
             commands::mark_frontend_ready,
@@ -100,6 +103,8 @@ pub fn run() {
             commands::update_contact,
             commands::delete_contact,
             commands::merge_contacts,
+            commands::export_contacts_vcard,
+            commands::import_contacts_vcard,
             commands::list_rules,
             commands::upsert_rule,
             commands::set_rule_enabled,

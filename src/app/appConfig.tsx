@@ -20,6 +20,7 @@ import type {
   ProviderVerificationRecord,
   ProviderVerificationStatus,
   SavedSearch,
+  SearchScope,
   SystemFolderRole,
 } from './types';
 
@@ -263,6 +264,10 @@ export function isFilterMode(value: unknown): value is FilterMode {
   return typeof value === 'string' && filterModes.includes(value as FilterMode);
 }
 
+export function isSearchScope(value: unknown): value is SearchScope {
+  return value === 'folder' || value === 'account' || value === 'all';
+}
+
 export function loadSavedSearches(): SavedSearch[] {
   try {
     const stored = readAppStorage(savedSearchesStorageKey);
@@ -276,6 +281,7 @@ export function loadSavedSearches(): SavedSearch[] {
         name: item.name,
         query: item.query,
         filter: isFilterMode(item.filter) ? item.filter : 'all',
+        scope: isSearchScope(item.scope) ? item.scope : 'folder',
       }))
       .filter((item) => item.name.trim() && item.query.trim());
   } catch {
@@ -513,6 +519,12 @@ export const searchShortcuts = [
   { label: '附件名', query: 'filename:' },
   { label: '发件人', query: 'from:' },
   { label: '邮箱', query: 'account:' },
+];
+
+export const searchScopeOptions: { id: SearchScope; label: string; shortLabel: string }[] = [
+  { id: 'folder', label: '当前文件夹', shortLabel: '文件夹' },
+  { id: 'account', label: '当前账号', shortLabel: '账号' },
+  { id: 'all', label: '全部账号', shortLabel: '全部' },
 ];
 
 export const emptyAccountCreateForm: AccountCreateInput = {

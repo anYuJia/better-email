@@ -288,6 +288,64 @@ let messages: MockMessage[] = [
     remote_mailbox: 'Trash',
     remote_uid: 5001,
   },
+  {
+    id: 52,
+    account_id: 2,
+    account_email: mockAccounts[1].email,
+    folder_id: folderIdForRole('sent', 2),
+    folder_role: 'sent',
+    sender_name: 'Second Account',
+    sender_email: mockAccounts[1].email,
+    recipients: 'external@example.com',
+    cc: '',
+    bcc: '',
+    subject: 'Global account search sample',
+    snippet: '用于验证全部账号跨文件夹搜索范围。',
+    body: '这封邮件只存在于第二账号的已发送目录。',
+    sanitized_html: '',
+    security_warnings: [],
+    received_at: '2026-07-06T10:30:00+08:00',
+    is_read: true,
+    is_starred: false,
+    has_attachments: false,
+    snoozed_until: '',
+    labels: [],
+    attachment_count: 0,
+    remote_mailbox: 'Sent',
+    remote_uid: 6001,
+    message_id_header: '<mock-global-search@better-email.local>',
+    in_reply_to_header: '',
+    references_header: '',
+  },
+  {
+    id: 53,
+    account_id: 1,
+    account_email: account.email,
+    folder_id: folderIdForRole('archive', 1),
+    folder_role: 'archive',
+    sender_name: 'Archive Search',
+    sender_email: 'archive@example.com',
+    recipients: account.email,
+    cc: '',
+    bcc: '',
+    subject: 'Current account archive search sample',
+    snippet: '用于验证当前账号跨文件夹搜索范围。',
+    body: '这封邮件只存在于当前账号的归档目录，不受废纸篓清理流程影响。',
+    sanitized_html: '',
+    security_warnings: [],
+    received_at: '2026-07-05T09:30:00+08:00',
+    is_read: true,
+    is_starred: false,
+    has_attachments: false,
+    snoozed_until: '',
+    labels: [],
+    attachment_count: 0,
+    remote_mailbox: 'Archive',
+    remote_uid: 5002,
+    message_id_header: '<mock-account-search@better-email.local>',
+    in_reply_to_header: '',
+    references_header: '',
+  },
 ];
 
 messages = [
@@ -341,6 +399,12 @@ type MockThreadingInput = {
   in_reply_to?: string;
   references?: string;
 };
+
+const mutedThreadScopes = new Set<string>();
+
+function mutedThreadScopeKey(accountId: number, threadKey: string) {
+  return `${accountId}:${threadKey}`;
+}
 
 type MockOutboundAttachmentInput = {
   filename?: string;
@@ -452,6 +516,7 @@ let attachments = [
     local_path: '',
   },
 ];
+const attachmentDownloadAttempts = new Map<number, number>();
 
 let rules = [
   { id: 1, name: '客户邮件标记', condition: 'from contains customer', action: 'apply label 重要客户', enabled: true },
@@ -773,6 +838,9 @@ function listThreads(args?: InvokeArgs) {
         unread_count: items.filter((message) => !message.is_read).length,
         latest_at: latestMessage?.received_at ?? now,
         participants: [...new Set(items.map((message) => message.sender_name))].join(', '),
+        is_muted: items.some((message) => (
+          mutedThreadScopes.has(mutedThreadScopeKey(message.account_id, thread_key))
+        )),
       };
     })
     .sort((left, right) => {
@@ -1090,10 +1158,79 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       contacts = [merged, ...contacts.filter((contact) => contact.id !== targetContactId && contact.id !== sourceContactId)];
       return merged as T;
     }
+    case 'import_contacts_vcard': {
+      const importedEmail = 'vcard.person@example.com';
+      const existingImported = contacts.find((contact) => contact.email === importedEmail);
+      const importedContact = existingImported ?? {
+        id: nextContactId++,
+        name: 'vCard Person',
+        email: importedEmail,
+        aliases: ['vcard.alias@example.com'],
+        vip: true,
+        message_count: 0,
+        last_seen_at: now,
+      };
+      const ada = contacts.find((contact) => contact.email === 'ada@example.com');
+      contacts = [
+        importedContact,
+        ...contacts
+          .filter((contact) => contact.id !== importedContact.id)
+          .map((contact) => (
+            contact.id === ada?.id
+              ? {
+                  ...contact,
+                  aliases: [...new Set([...contact.aliases, 'ada.vcard@example.com'])],
+                  vip: true,
+                }
+              : contact
+          )),
+      ];
+      return {
+        path: '/tmp/imported-contacts.vcf',
+        total_cards: 2,
+        created: existingImported ? 0 : 1,
+        updated: 1,
+        skipped: 0,
+        size_bytes: 428,
+      } as T;
+    }
+    case 'export_contacts_vcard':
+      return {
+        path: '/tmp/better-email-contacts.vcf',
+        contacts: contacts.length,
+        size_bytes: contacts.length * 180,
+      } as T;
     case 'list_rules':
       return rules as T;
     case 'list_threads':
       return listThreads(args) as T;
+    case 'set_threads_muted': {
+      const messageIds = Array.isArray(args?.messageIds ?? args?.message_ids)
+        ? (args?.messageIds ?? args?.message_ids) as number[]
+        : [];
+      const muted = Boolean(args?.muted);
+      const scopes = new Set(
+        messages
+          .filter((message) => messageIds.includes(message.id))
+          .map((message) => mutedThreadScopeKey(message.account_id, messageThreadKey(message))),
+      );
+      for (const scope of scopes) {
+        if (muted) mutedThreadScopes.add(scope);
+        else mutedThreadScopes.delete(scope);
+      }
+      return scopes.size as T;
+    }
+    case 'list_muted_thread_keys': {
+      const accountId = Number(args?.accountId ?? args?.account_id ?? 0);
+      return [...new Set(
+        messages
+          .filter((message) => (
+            message.account_id === accountId
+            && mutedThreadScopes.has(mutedThreadScopeKey(accountId, messageThreadKey(message)))
+          ))
+          .map(messageThreadKey),
+      )] as T;
+    }
     case 'list_outbox':
       return outbox as T;
     case 'list_imap_mailboxes':
@@ -1787,12 +1924,19 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const id = Number(args?.attachmentId);
       const attachment = attachments.find((item) => item.id === id);
       if (!attachment) throw new Error('attachment not found');
+      const attempt = (attachmentDownloadAttempts.get(id) ?? 0) + 1;
+      attachmentDownloadAttempts.set(id, attempt);
+      if (id === 1 && attempt === 1) {
+        throw new Error('附件 IMAP 请求在 3 次尝试后仍失败：模拟网络中断；已保留 64 KB 下载进度，点击重试将继续。');
+      }
       const updated = { ...attachment, is_downloaded: true, local_path: `/tmp/better-email/${attachment.filename}` };
       attachments = attachments.map((item) => (item.id === id ? updated : item));
       return {
         attachment: updated,
         local_path: updated.local_path,
-        message: `附件已下载：${updated.filename}`,
+        message: attempt > 1
+          ? `附件已从 64 KB 继续下载：${updated.filename}`
+          : `附件已下载：${updated.filename}`,
       } as T;
     }
     case 'open_attachment': {

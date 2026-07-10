@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
   newMailNotificationDecision,
+  notificationThreadScopeKey,
   syncIntervalMs,
   syncStatusLabel,
   type NotificationPolicy,
@@ -156,10 +157,31 @@ export default function useBackgroundTaskCoordinator({
 
   const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: Message[]) => {
     const current = currentRef.current;
+    const candidates = (latestMessages ?? current.messages)
+      .slice(0, Math.max(0, run.imported_messages));
+    const accountIds = [...new Set(
+      candidates
+        .map((message) => message.account_id)
+        .filter((accountId) => accountId > 0),
+    )];
+    const mutedThreadScopes = (
+      await Promise.all(accountIds.map(async (accountId) => {
+        const threadKeys = await invoke<string[]>('list_muted_thread_keys', { accountId });
+        return threadKeys.map((threadKey) => notificationThreadScopeKey({
+          account_id: accountId,
+          thread_key: threadKey,
+          sender_email: '',
+          sender_name: '',
+          subject: '',
+        }));
+      }))
+    ).flat();
     const decision = newMailNotificationDecision(
       run,
       current.notificationPolicy,
       latestMessages ?? current.messages,
+      new Date(),
+      mutedThreadScopes,
     );
     const body = decision.body;
     setLastNewMailNotice(body);
@@ -167,6 +189,7 @@ export default function useBackgroundTaskCoordinator({
       if (decision.reason === 'quiet-hours') setNotificationStatus('免打扰时段已静音');
       if (decision.reason === 'vip-only-no-match') setNotificationStatus('VIP 策略已过滤');
       if (decision.reason === 'account-muted') setNotificationStatus('账号静音已过滤');
+      if (decision.reason === 'thread-muted') setNotificationStatus('静音会话已过滤');
       return;
     }
 

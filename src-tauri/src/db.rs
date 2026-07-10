@@ -85,6 +85,7 @@ const LOCAL_BACKUP_TABLES: &[&str] = &[
     "accounts",
     "folders",
     "messages",
+    "muted_threads",
     "labels",
     "message_labels",
     "mail_identities",
@@ -221,6 +222,13 @@ impl MailStore {
                     PRIMARY KEY (message_id, label_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS muted_threads (
+                    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    thread_key TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (account_id, thread_key)
+                );
+
                 CREATE TABLE IF NOT EXISTS attachments (
                     id INTEGER PRIMARY KEY,
                     message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -327,6 +335,7 @@ impl MailStore {
 
                 CREATE INDEX IF NOT EXISTS idx_messages_folder_time ON messages(folder_id, received_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(folder_id, is_read);
+                CREATE INDEX IF NOT EXISTS idx_muted_threads_key ON muted_threads(thread_key);
                 CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
                 CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
                 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
@@ -2407,6 +2416,109 @@ impl MailStore {
         Ok(detect_contact_merge_suggestions(contacts))
     }
 
+    pub fn list_all_contacts(&self) -> MailResult<Vec<Contact>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, name, email, aliases, vip, message_count, last_seen_at
+                 FROM contacts ORDER BY name COLLATE NOCASE, email COLLATE NOCASE",
+            )?;
+            let contacts = stmt
+                .query_map([], |row| {
+                    Ok(Contact {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        email: row.get(2)?,
+                        aliases: contact_aliases_from_text(row.get(3)?),
+                        vip: row.get::<_, i64>(4)? != 0,
+                        message_count: row.get(5)?,
+                        last_seen_at: row.get(6)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(contacts)
+        })
+    }
+
+    pub fn import_contacts(&self, inputs: Vec<ContactCreateInput>) -> MailResult<(i64, i64)> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let now = Utc::now().to_rfc3339();
+            let mut created = 0_i64;
+            let mut updated = 0_i64;
+
+            for input in inputs {
+                let email = normalize_email(&input.email);
+                if email.is_empty() {
+                    continue;
+                }
+                let existing = transaction
+                    .query_row(
+                        "SELECT id, name, email, aliases, vip, message_count, last_seen_at
+                         FROM contacts WHERE lower(email) = lower(?1)",
+                        params![email],
+                        |row| {
+                            Ok(Contact {
+                                id: row.get(0)?,
+                                name: row.get(1)?,
+                                email: row.get(2)?,
+                                aliases: contact_aliases_from_text(row.get(3)?),
+                                vip: row.get::<_, i64>(4)? != 0,
+                                message_count: row.get(5)?,
+                                last_seen_at: row.get(6)?,
+                            })
+                        },
+                    )
+                    .optional()?;
+                let imported_name = input.name.trim();
+
+                if let Some(existing) = existing {
+                    let mut aliases = existing.aliases.clone();
+                    aliases.extend(input.aliases);
+                    let aliases = normalize_contact_aliases(aliases, &existing.email);
+                    let name = if (existing.name.trim().is_empty() || existing.name == existing.email)
+                        && !imported_name.is_empty()
+                    {
+                        imported_name
+                    } else {
+                        existing.name.as_str()
+                    };
+                    transaction.execute(
+                        "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1",
+                        params![
+                            existing.id,
+                            name,
+                            contact_aliases_to_text(&aliases),
+                            if existing.vip || input.vip { 1 } else { 0 },
+                        ],
+                    )?;
+                    updated += 1;
+                } else {
+                    let display_name = if imported_name.is_empty() {
+                        email.as_str()
+                    } else {
+                        imported_name
+                    };
+                    let aliases = normalize_contact_aliases(input.aliases, &email);
+                    transaction.execute(
+                        "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
+                         VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                        params![
+                            display_name,
+                            email,
+                            contact_aliases_to_text(&aliases),
+                            if input.vip { 1 } else { 0 },
+                            now,
+                        ],
+                    )?;
+                    created += 1;
+                }
+            }
+
+            transaction.commit()?;
+            Ok((created, updated))
+        })
+    }
+
     pub fn create_contact(&self, input: ContactCreateInput) -> MailResult<Contact> {
         self.with_conn(|conn| {
             let email = normalize_email(&input.email);
@@ -2652,7 +2764,7 @@ impl MailStore {
             let sql = format!(
                 "
                 WITH scoped_messages AS (
-                    SELECT m.id, m.thread_key, m.subject, m.sender_name,
+                    SELECT m.id, m.account_id, m.thread_key, m.subject, m.sender_name,
                            m.received_at, m.is_read
                     FROM messages m
                     JOIN accounts a ON a.id = m.account_id
@@ -2673,7 +2785,15 @@ impl MailStore {
                        COUNT(*) AS message_count,
                        SUM(CASE WHEN scoped.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
                        MAX(scoped.received_at) AS latest_at,
-                       GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants
+                       GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants,
+                       MAX(
+                           CASE WHEN EXISTS (
+                               SELECT 1
+                               FROM muted_threads muted
+                               WHERE muted.account_id = scoped.account_id
+                                 AND muted.thread_key = scoped.thread_key
+                           ) THEN 1 ELSE 0 END
+                       ) AS is_muted
                 FROM scoped_messages scoped
                 GROUP BY scoped.thread_key
                 ORDER BY {order_clause}
@@ -2692,10 +2812,83 @@ impl MailStore {
                         unread_count: row.get(3)?,
                         latest_at: row.get(4)?,
                         participants: row.get(5)?,
+                        is_muted: row.get::<_, i64>(6)? != 0,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(threads)
+        })
+    }
+
+    pub fn set_threads_muted_for_messages(
+        &self,
+        message_ids: &[i64],
+        muted: bool,
+    ) -> MailResult<i64> {
+        if message_ids.is_empty() {
+            return Ok(0);
+        }
+        self.with_conn(|conn| {
+            let placeholders = std::iter::repeat_n("?", message_ids.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "
+                SELECT DISTINCT account_id, thread_key
+                FROM messages
+                WHERE id IN ({placeholders})
+                  AND TRIM(thread_key) <> ''
+                "
+            );
+            let values = message_ids
+                .iter()
+                .copied()
+                .map(Value::Integer)
+                .collect::<Vec<_>>();
+            let scopes = {
+                let mut stmt = conn.prepare(&sql)?;
+                let rows = stmt.query_map(params_from_iter(values), |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                })?;
+                rows.collect::<Result<Vec<_>, _>>()?
+            };
+            let transaction = conn.unchecked_transaction()?;
+            for (account_id, thread_key) in &scopes {
+                if muted {
+                    transaction.execute(
+                        "
+                        INSERT INTO muted_threads(account_id, thread_key, created_at)
+                        VALUES (?1, ?2, ?3)
+                        ON CONFLICT(account_id, thread_key) DO NOTHING
+                        ",
+                        params![account_id, thread_key, Utc::now().to_rfc3339()],
+                    )?;
+                } else {
+                    transaction.execute(
+                        "DELETE FROM muted_threads WHERE account_id = ?1 AND thread_key = ?2",
+                        params![account_id, thread_key],
+                    )?;
+                }
+            }
+            transaction.commit()?;
+            Ok(scopes.len() as i64)
+        })
+    }
+
+    pub fn list_muted_thread_keys(&self, account_id: i64) -> MailResult<Vec<String>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT thread_key
+                FROM muted_threads
+                WHERE account_id = ?1
+                ORDER BY thread_key ASC
+                ",
+            )?;
+            let keys = stmt
+                .query_map(params![account_id], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(keys)
         })
     }
 
@@ -8532,6 +8725,48 @@ mod tests {
             .shared_keys
             .contains(&"ada@example.com".to_string()));
         assert_eq!(suggestion.reason, "邮箱或别名重叠");
+    }
+
+    #[test]
+    fn contact_import_creates_and_merges_by_primary_email() {
+        let store = test_store();
+        let (created, updated) = store
+            .import_contacts(vec![
+                ContactCreateInput {
+                    name: "Imported Person".to_string(),
+                    email: "imported@example.com".to_string(),
+                    aliases: vec!["imported.alias@example.com".to_string()],
+                    vip: true,
+                },
+                ContactCreateInput {
+                    name: "Ada Imported".to_string(),
+                    email: "ADA@EXAMPLE.COM".to_string(),
+                    aliases: vec!["ada.vcard@example.com".to_string()],
+                    vip: true,
+                },
+            ])
+            .unwrap();
+
+        assert_eq!(created, 1);
+        assert_eq!(updated, 1);
+        let contacts = store.list_all_contacts().unwrap();
+        let imported = contacts
+            .iter()
+            .find(|contact| contact.email == "imported@example.com")
+            .unwrap();
+        assert_eq!(imported.name, "Imported Person");
+        assert_eq!(
+            imported.aliases,
+            vec!["imported.alias@example.com".to_string()]
+        );
+        assert!(imported.vip);
+
+        let ada = contacts
+            .iter()
+            .find(|contact| contact.email == "ada@example.com")
+            .unwrap();
+        assert!(ada.aliases.contains(&"ada.vcard@example.com".to_string()));
+        assert!(ada.vip);
     }
 
     #[test]

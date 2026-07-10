@@ -4,24 +4,25 @@ use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
     BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
-    ContactInput, ContactMergeSuggestion, CredentialInput, CredentialProtocolCheck,
-    CredentialStatus, CredentialVerificationReport, DiagnosticAccount, DiagnosticExport,
-    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder,
-    FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
-    MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput,
-    OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport,
-    OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage,
-    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
-    RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary,
-    TrashActionReport,
+    ContactExportSummary, ContactImportSummary, ContactInput, ContactMergeSuggestion,
+    CredentialInput, CredentialProtocolCheck, CredentialStatus, CredentialVerificationReport,
+    DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput,
+    DraftSaveReport, Folder, FolderReadReport, ImapMailboxState, ImapProbeReport, Label,
+    LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
+    MailStats, Message, MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport,
+    OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput,
+    OAuthStartReport, OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput,
+    OutboundMessage, OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport,
+    RemoteImageTrust, RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan,
+    ThreadSummary, TrashActionReport,
 };
 use crate::oauth;
 use crate::protocol;
 use crate::smtp;
+use crate::vcard;
 use chrono::Utc;
 use std::collections::BTreeMap;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
@@ -29,8 +30,28 @@ use tauri_plugin_shell::ShellExt;
 
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: i64 = 25 * 1024 * 1024;
 const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
+const MAX_VCARD_IMPORT_BYTES: usize = 5 * 1024 * 1024;
 const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 const SYNCABLE_IMAP_ROLES: [&str; 6] = ["inbox", "sent", "drafts", "archive", "trash", "spam"];
+
+fn attachment_resume_offset(bytes: u64) -> Option<usize> {
+    if bytes > MAX_ATTACHMENT_DOWNLOAD_BYTES as u64 {
+        return None;
+    }
+    usize::try_from(bytes).ok()
+}
+
+fn format_attachment_progress(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{} KB", bytes.div_ceil(KB))
+    } else {
+        format!("{bytes} B")
+    }
+}
 
 fn benchmark_env(primary: &str, legacy: &str) -> Option<String> {
     std::env::var(primary)
@@ -115,13 +136,20 @@ pub fn list_labels(store: State<'_, MailStore>) -> MailResult<Vec<Label>> {
 pub fn list_messages(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
-    folder_id: i64,
+    folder_id: Option<i64>,
     query: Option<String>,
     filter: Option<String>,
     sort: Option<String>,
     limit: i64,
 ) -> MailResult<Vec<Message>> {
-    store.list_messages_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
+    store.list_messages_for_scope_sorted(
+        account_id,
+        folder_id.unwrap_or_default(),
+        query,
+        filter,
+        sort,
+        limit,
+    )
 }
 
 #[tauri::command]
@@ -141,6 +169,23 @@ pub fn list_thread_messages(
     limit: i64,
 ) -> MailResult<Vec<Message>> {
     store.list_thread_messages(account_id, thread_key, limit)
+}
+
+#[tauri::command]
+pub fn set_threads_muted(
+    store: State<'_, MailStore>,
+    message_ids: Vec<i64>,
+    muted: bool,
+) -> MailResult<i64> {
+    store.set_threads_muted_for_messages(&message_ids, muted)
+}
+
+#[tauri::command]
+pub fn list_muted_thread_keys(
+    store: State<'_, MailStore>,
+    account_id: i64,
+) -> MailResult<Vec<String>> {
+    store.list_muted_thread_keys(account_id)
 }
 
 #[tauri::command]
@@ -292,22 +337,40 @@ pub fn download_attachment(
     let dir = store.attachment_dir(attachment.message_id);
     fs::create_dir_all(&dir)?;
     let temp_path = dir.join(format!("{}.download", attachment.id));
-    let mut output = fs::File::create(&temp_path)?;
+    let resume_offset = fs::metadata(&temp_path)
+        .ok()
+        .and_then(|metadata| attachment_resume_offset(metadata.len()))
+        .unwrap_or_else(|| {
+            let _ = fs::remove_file(&temp_path);
+            0
+        });
+    let mut output = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&temp_path)?;
     let download_result = imap_probe::download_attachment_to_writer(
         &account,
         &secret,
-        &remote_mailbox,
-        remote_uid,
-        &attachment.filename,
-        MAX_ATTACHMENT_DOWNLOAD_BYTES,
+        imap_probe::AttachmentDownloadOptions {
+            remote_name: &remote_mailbox,
+            remote_uid,
+            filename: &attachment.filename,
+            max_bytes: MAX_ATTACHMENT_DOWNLOAD_BYTES,
+            start_offset: resume_offset,
+        },
         &mut output,
     );
     drop(output);
     let downloaded = match download_result {
         Ok(downloaded) => downloaded,
         Err(error) => {
-            let _ = fs::remove_file(&temp_path);
-            return Err(error);
+            let partial_bytes = fs::metadata(&temp_path)
+                .map(|metadata| metadata.len())
+                .unwrap_or_default();
+            let progress = format_attachment_progress(partial_bytes);
+            return Err(crate::db::MailError::Imap(format!(
+                "{error}；已保留 {progress} 下载进度，点击重试将继续。"
+            )));
         }
     };
     if let Err(error) = validate_attachment_download_size(downloaded.size_bytes) {
@@ -334,7 +397,14 @@ pub fn download_attachment(
     Ok(AttachmentDownload {
         attachment: updated,
         local_path: local_path_string.clone(),
-        message: format!("附件已下载到 {local_path_string}"),
+        message: if resume_offset > 0 {
+            format!(
+                "附件已从 {} 继续下载到 {local_path_string}",
+                format_attachment_progress(resume_offset as u64)
+            )
+        } else {
+            format!("附件已下载到 {local_path_string}")
+        },
     })
 }
 
@@ -2059,9 +2129,10 @@ fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64
 #[cfg(test)]
 mod tests {
     use super::{
-        credential_error_report, credential_verification_report, mask_email, mask_recipient_list,
-        render_eml_message, sanitize_filename, syncable_mailboxes,
-        validate_attachment_download_size, MAX_ATTACHMENT_DOWNLOAD_BYTES,
+        attachment_resume_offset, credential_error_report, credential_verification_report,
+        format_attachment_progress, mask_email, mask_recipient_list, render_eml_message,
+        sanitize_filename, syncable_mailboxes, validate_attachment_download_size,
+        MAX_ATTACHMENT_DOWNLOAD_BYTES,
     };
     use crate::models::{Account, Attachment, ImapMailboxState, Message};
 
@@ -2165,6 +2236,21 @@ mod tests {
         let error = validate_attachment_download_size(MAX_ATTACHMENT_DOWNLOAD_BYTES + 1)
             .expect_err("oversized attachment should be rejected");
         assert!(error.to_string().contains("安全下载上限"));
+    }
+
+    #[test]
+    fn attachment_resume_offset_keeps_only_safe_partial_files() {
+        assert_eq!(attachment_resume_offset(64 * 1024), Some(64 * 1024));
+        assert_eq!(
+            attachment_resume_offset(MAX_ATTACHMENT_DOWNLOAD_BYTES as u64),
+            Some(MAX_ATTACHMENT_DOWNLOAD_BYTES as usize)
+        );
+        assert_eq!(
+            attachment_resume_offset(MAX_ATTACHMENT_DOWNLOAD_BYTES as u64 + 1),
+            None
+        );
+        assert_eq!(format_attachment_progress(64 * 1024), "64 KB");
+        assert_eq!(format_attachment_progress(3 * 1024 * 1024 / 2), "1.5 MB");
     }
 
     #[test]
@@ -2274,6 +2360,86 @@ pub fn merge_contacts(
     source_contact_id: i64,
 ) -> MailResult<Contact> {
     store.merge_contacts(target_contact_id, source_contact_id)
+}
+
+#[tauri::command]
+pub fn export_contacts_vcard(
+    app: AppHandle,
+    store: State<'_, MailStore>,
+) -> MailResult<Option<ContactExportSummary>> {
+    let contacts = store.list_all_contacts()?;
+    let payload = vcard::render_contacts(&contacts);
+    let Some(target_path) = app
+        .dialog()
+        .file()
+        .set_title("导出联系人 vCard")
+        .set_file_name(format!(
+            "better-email-contacts-{}.vcf",
+            Utc::now().format("%Y%m%d-%H%M%S")
+        ))
+        .blocking_save_file()
+    else {
+        return Ok(None);
+    };
+    let target_path = target_path
+        .into_path()
+        .map_err(|error| crate::db::MailError::Imap(format!("无法解析联系人导出路径：{error}")))?;
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&target_path, payload.as_bytes())?;
+    Ok(Some(ContactExportSummary {
+        path: target_path.to_string_lossy().into_owned(),
+        contacts: contacts.len().min(i64::MAX as usize) as i64,
+        size_bytes: payload.len().min(i64::MAX as usize) as i64,
+    }))
+}
+
+#[tauri::command]
+pub fn import_contacts_vcard(
+    app: AppHandle,
+    store: State<'_, MailStore>,
+) -> MailResult<Option<ContactImportSummary>> {
+    let Some(source_path) = app
+        .dialog()
+        .file()
+        .set_title("导入联系人 vCard")
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    let source_path = source_path
+        .into_path()
+        .map_err(|error| crate::db::MailError::Imap(format!("无法解析联系人导入路径：{error}")))?;
+    let payload = fs::read(&source_path)?;
+    if payload.is_empty() {
+        return Err(crate::db::MailError::Imap(
+            "vCard 文件为空，无法导入。".to_string(),
+        ));
+    }
+    if payload.len() > MAX_VCARD_IMPORT_BYTES {
+        return Err(crate::db::MailError::Imap(format!(
+            "vCard 文件超过 {} MB 导入上限。",
+            MAX_VCARD_IMPORT_BYTES / 1024 / 1024
+        )));
+    }
+    let raw = String::from_utf8(payload.clone())
+        .map_err(|_| crate::db::MailError::Imap("vCard 文件不是有效的 UTF-8 文本。".to_string()))?;
+    let parsed = vcard::parse_contacts(&raw);
+    if parsed.contacts.is_empty() {
+        return Err(crate::db::MailError::Imap(
+            "vCard 中没有可导入的有效邮箱联系人。".to_string(),
+        ));
+    }
+    let (created, updated) = store.import_contacts(parsed.contacts)?;
+    Ok(Some(ContactImportSummary {
+        path: source_path.to_string_lossy().into_owned(),
+        total_cards: parsed.total_cards,
+        created,
+        updated,
+        skipped: parsed.skipped,
+        size_bytes: payload.len().min(i64::MAX as usize) as i64,
+    }))
 }
 
 #[tauri::command]

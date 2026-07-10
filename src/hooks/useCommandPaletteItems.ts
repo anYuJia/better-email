@@ -215,7 +215,7 @@ export default function useCommandPaletteItems({
           id: 'snooze',
           title: selected.folder_role === 'snoozed' ? '取消稍后处理' : '稍后处理',
           section: '当前邮件',
-          hint: selected.folder_role === 'snoozed' ? '恢复到收件箱' : '24 小时后提醒',
+          hint: selected.folder_role === 'snoozed' ? '恢复到收件箱' : '选择提醒时间',
           disabled: selected.folder_role === 'trash',
           run: () => (selected.folder_role === 'snoozed' ? unsnoozeSelected() : snoozeSelected()),
         },

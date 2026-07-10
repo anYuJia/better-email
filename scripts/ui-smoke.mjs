@@ -531,9 +531,37 @@ async function main() {
 
     await evalInPage(
       cdp,
+      "Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { window.__copiedText = value; } } })",
+    );
+    await evalInPage(
+      cdp,
       "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); if (!card) throw new Error('Context menu target message not found'); window.__contextTargetWasUnread = Boolean(card.querySelector('.sender.unread')); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 })); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('回复') && document.querySelector('.context-menu').innerText.includes('转发') && document.querySelector('.context-menu').innerText.includes('稍后处理') && document.querySelector('.context-menu').innerText.includes('移动到') && document.querySelector('.context-menu').innerText.includes('标签')");
+    await waitForExpression(cdp, "(() => { const menu = document.querySelector('.context-menu'); return menu && menu.innerText.includes('回复') && menu.innerText.includes('转发') && menu.innerText.includes('稍后处理') && menu.innerText.includes('移动到') && menu.innerText.includes('标签') && menu.innerText.includes('复制信息') && menu.textContent.includes('发件人邮箱') && menu.textContent.includes('邮件主题'); })()");
+    await evalInPage(
+      cdp,
+      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+    );
+    await waitForExpression(cdp, "document.activeElement?.getAttribute('data-context-item') === 'copy-sender'");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-sender\"]').click()");
+    await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制发件人邮箱') && window.__copiedText?.includes('@')");
+    await evalInPage(
+      cdp,
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); if (!card) throw new Error('Context copy target message not found'); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.textContent.includes('邮件主题')");
+    await evalInPage(
+      cdp,
+      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+    );
+    await waitForExpression(cdp, "document.activeElement?.getAttribute('data-context-item') === 'copy-sender'");
+    await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-subject\"]').click()");
+    await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制邮件主题') && window.__copiedText?.includes('Low memory digest')");
+    await evalInPage(
+      cdp,
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); if (!card) throw new Error('Context read-state target message not found'); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')");
     await evalInPage(
       cdp,
       "(() => { const button = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('标为已读') || item.textContent.includes('标为未读')); if (!button) throw new Error('Read-state context action not found'); button.click(); })()",
@@ -912,6 +940,7 @@ async function main() {
         'command palette opens and runs commands',
         'message list loaded',
         'single-message star syncs remote flagged state',
+        'message context menu copies sender and subject',
         'reader warning displayed',
         'search works',
         'saved search shortcuts work',

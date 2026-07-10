@@ -1,6 +1,9 @@
 import {
   Archive,
+  AtSign,
   Clock,
+  Copy,
+  FileText,
   FolderInput,
   Forward,
   Mail,
@@ -32,6 +35,8 @@ export type MessageContextAction =
   | 'restore'
   | 'snooze'
   | 'unsnooze'
+  | 'copy-sender'
+  | 'copy-subject'
   | 'permanent-delete';
 
 type BulkContextOptions = {
@@ -247,6 +252,28 @@ export function buildSingleMessageContextItems({
         checked: message.labels.includes(label.name),
         onSelect: () => onToggleMessageLabel(message, label),
       })),
+    },
+    {
+      id: 'copy-message-info',
+      label: '复制信息',
+      icon: <Copy size={15} />,
+      separatorBefore: true,
+      children: [
+        {
+          id: 'copy-sender',
+          label: '发件人邮箱',
+          icon: <AtSign size={15} />,
+          disabled: !message.sender_email.trim(),
+          onSelect: () => onRunMessageAction(message, 'copy-sender'),
+        },
+        {
+          id: 'copy-subject',
+          label: '邮件主题',
+          icon: <FileText size={15} />,
+          disabled: !message.subject.trim(),
+          onSelect: () => onRunMessageAction(message, 'copy-subject'),
+        },
+      ],
     },
     ...(message.folder_role === 'spam'
       ? [

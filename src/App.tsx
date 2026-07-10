@@ -141,6 +141,7 @@ import type {
   RuleConditionField,
   SendUndoDelaySeconds,
 } from './app/appConfig';
+import { copyTextToClipboard } from './app/clipboard';
 import './ui-2026.css';
 
 export default function App() {
@@ -964,6 +965,14 @@ export default function App() {
   }
 
   async function runMessageAction(message: Message, action: MessageContextAction) {
+    if (action === 'copy-sender' || action === 'copy-subject') {
+      const copySender = action === 'copy-sender';
+      const value = copySender ? message.sender_email : message.subject;
+      await copyTextToClipboard(value);
+      setStatus(copySender ? `已复制发件人邮箱：${value}` : `已复制邮件主题：${value}`);
+      return;
+    }
+
     if (action === 'read' || action === 'unread') {
       const shouldRead = action === 'read';
       if (message.is_read !== shouldRead) await toggleRead(message);

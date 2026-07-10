@@ -4,6 +4,7 @@ import {
   formatDate,
   newMailNotificationDecision,
   newMailNotificationBody,
+  notificationThreadScopeKey,
   prefixedSubject,
   quoteMessage,
   replyThreadingHeaders,
@@ -197,6 +198,61 @@ describe('mail UI utilities', () => {
         messages,
       ),
     ).toMatchObject({ body: null, reason: 'account-muted', mutedMatches: 1 });
+  });
+
+  it('filters muted threads by account and reports only active notification mail', () => {
+    const run = {
+      imported_messages: 2,
+      finished_at: 'not-a-date',
+      message: '统一同步完成',
+    };
+    const messages = [
+      {
+        account_id: 1,
+        account_email: 'work@example.com',
+        thread_key: 'msgid:<shared@example.com>',
+        sender_name: 'Work Robot',
+        sender_email: 'robot@example.com',
+        subject: 'Muted work digest',
+      },
+      {
+        account_id: 2,
+        account_email: 'personal@example.com',
+        thread_key: 'msgid:<shared@example.com>',
+        sender_name: 'Personal Robot',
+        sender_email: 'robot@example.com',
+        subject: 'Visible personal digest',
+      },
+    ];
+    const mutedScope = notificationThreadScopeKey(messages[0]);
+
+    expect(mutedScope).toBe('1:msgid:<shared@example.com>');
+    expect(
+      newMailNotificationDecision(
+        run,
+        undefined,
+        messages,
+        new Date('2026-07-11T10:00:00'),
+        [mutedScope],
+      ),
+    ).toMatchObject({
+      body: '已同步 1 封新邮件',
+      reason: 'send',
+      threadMutedMatches: 1,
+    });
+    expect(
+      newMailNotificationDecision(
+        { ...run, imported_messages: 1 },
+        undefined,
+        messages,
+        new Date('2026-07-11T10:00:00'),
+        [mutedScope],
+      ),
+    ).toMatchObject({
+      body: null,
+      reason: 'thread-muted',
+      threadMutedMatches: 1,
+    });
   });
 
   it('keeps provider presets aligned with the compatibility matrix', () => {

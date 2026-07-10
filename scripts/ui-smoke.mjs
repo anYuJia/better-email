@@ -664,6 +664,16 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('会话操作') && document.querySelector('[data-context-item=\"bulk-read-state\"]')");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"bulk-read-state\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已对会话') && document.querySelector('.status-line')?.innerText.includes('标为')");
+    await evalInPage(
+      cdp,
+      "document.querySelector('.thread-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 360, button: 2 }))",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('静音会话')");
+    await clickButton(cdp, '静音会话', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已静音会话') && document.querySelector('.thread-card .thread-muted-indicator')?.innerText.includes('静音')");
+    await openDetails(cdp, '.reader-more-menu');
+    await clickButton(cdp, '取消静音会话', "document.querySelector('.reader-more-menu')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已取消静音会话') && !document.querySelector('.thread-card .thread-muted-indicator')");
     await fillInput(cdp, '.search-box input', '安全检查清单');
     await evalInPage(cdp, "document.querySelector('.search-box').requestSubmit()");
     await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length === 1 && document.querySelector('.thread-card')?.innerText.includes('安全检查清单')");
@@ -1124,6 +1134,7 @@ async function main() {
         'keyboard select all bulk action and escape clear work',
         'thread view opens conversations',
         'thread actions and context menu work',
+        'thread mute persists and remains available from reader actions',
         'thread scope follows search and active account',
         'message drag drop move and undo works',
         'custom folder create rename and move works',

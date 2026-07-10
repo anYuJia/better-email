@@ -7310,6 +7310,129 @@ mod tests {
     }
 
     #[test]
+    fn muted_threads_persist_per_account_and_update_thread_summaries() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = store
+            .create_account(AccountCreateInput {
+                email: "thread-mute@better-email.local".to_string(),
+                display_name: "Thread Mute".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.thread-mute.test:993".to_string(),
+                smtp_host: "smtp.thread-mute.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+            })
+            .unwrap();
+        let first_inbox = store
+            .list_folders_for_account(Some(first_account.id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let second_inbox = store
+            .list_folders_for_account(Some(second_account.id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let thread_key = "msgid:<shared-muted-thread@example.com>";
+        let (first_message_id, second_message_id) = store
+            .with_conn(|conn| {
+                conn.execute(
+                    "
+                    INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at, is_read, thread_key
+                    ) VALUES (?1, ?2, 'Mute Sender', 'mute@example.com', 'reader@example.com',
+                              'First muted thread', 'First muted thread', 'First muted thread',
+                              '2026-07-11T08:00:00Z', 0, ?3)
+                    ",
+                    params![first_account.id, first_inbox.id, thread_key],
+                )?;
+                let first_message_id = conn.last_insert_rowid();
+                conn.execute(
+                    "
+                    INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at, is_read, thread_key
+                    ) VALUES (?1, ?2, 'Mute Sender', 'mute@example.com', 'reader@example.com',
+                              'Second visible thread', 'Second visible thread', 'Second visible thread',
+                              '2026-07-11T08:05:00Z', 0, ?3)
+                    ",
+                    params![second_account.id, second_inbox.id, thread_key],
+                )?;
+                Ok((first_message_id, conn.last_insert_rowid()))
+            })
+            .unwrap();
+
+        assert_eq!(
+            store
+                .set_threads_muted_for_messages(&[first_message_id], true)
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            store.list_muted_thread_keys(first_account.id).unwrap(),
+            vec![thread_key.to_string()]
+        );
+        assert!(store
+            .list_muted_thread_keys(second_account.id)
+            .unwrap()
+            .is_empty());
+
+        let first_thread = store
+            .list_threads_for_scope(
+                Some(first_account.id),
+                Some(first_inbox.id),
+                None,
+                None,
+                50,
+            )
+            .unwrap()
+            .into_iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        let second_thread = store
+            .list_threads_for_scope(
+                Some(second_account.id),
+                Some(second_inbox.id),
+                None,
+                None,
+                50,
+            )
+            .unwrap()
+            .into_iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+        assert!(first_thread.is_muted);
+        assert!(!second_thread.is_muted);
+
+        assert_eq!(
+            store
+                .set_threads_muted_for_messages(&[second_message_id], false)
+                .unwrap(),
+            1
+        );
+        assert!(store
+            .list_muted_thread_keys(second_account.id)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            store
+                .set_threads_muted_for_messages(&[first_message_id], false)
+                .unwrap(),
+            1
+        );
+        assert!(store
+            .list_muted_thread_keys(first_account.id)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
     fn default_account_can_be_changed_and_remains_unique() {
         let store = test_store();
         let first_account = store.get_account().unwrap();

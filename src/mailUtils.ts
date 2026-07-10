@@ -181,6 +181,7 @@ export function newMailNotificationDecision(
   const priorityMessages = activeMessages.filter((message) => isAccountListed(message, policy.priorityAccounts));
   const vipMessages = activeMessages.filter((message) => isVipSender(message, policy.vipSenders));
   const quietActive = policy.quietHoursEnabled && isQuietHoursActive(policy, now);
+  const activeBody = `已同步 ${activeMessages.length} 封新邮件`;
 
   if (policy.vipOnly && vipMessages.length === 0) {
     return {
@@ -208,7 +209,7 @@ export function newMailNotificationDecision(
     const sender = first.sender_name.trim() || first.sender_email;
     const prefix = policy.vipOnly || quietActive
       ? `VIP 新邮件 ${vipMessages.length} 封`
-      : `已同步 ${run.imported_messages} 封新邮件，含 VIP ${vipMessages.length} 封`;
+      : `${activeBody}，含 VIP ${vipMessages.length} 封`;
     return {
       body: `${prefix}：${sender} · ${subject}`,
       reason: 'send',
@@ -233,7 +234,7 @@ export function newMailNotificationDecision(
   }
 
   return {
-    body: defaultBody,
+    body: activeBody,
     reason: 'send',
     vipMatches: 0,
     priorityMatches: 0,

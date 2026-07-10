@@ -756,8 +756,20 @@ async function main() {
 
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
+    await clickButton(cdp, '设置');
+    await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.body.innerText.includes('添加邮箱账号')");
+    await openDetails(cdp, '.add-account-disclosure');
+    await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"name@example.com\"]', 'qa-new@better-email.local');
+    await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"留空则使用邮箱地址\"]', 'QA New');
+    await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-add-account-panel')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'smtp.qq.com:587')");
+    await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
+    await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('[data-context-item^=\"account-scope-\"]')].some((item) => item.innerText.includes('qa-new@better-email.local'))");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"all\"]')?.innerText.includes('统一邮箱')");
 
@@ -873,6 +885,8 @@ async function main() {
         'settings modal opens',
         'settings primary actions stay visible in header',
         'settings header save completes update flow',
+        'new account preset creation and scope switch work',
+        'new account default folders and identity are available',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'undo send delay settings persist',

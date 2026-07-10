@@ -51,6 +51,7 @@ export default function AccountSwitcher({
     {
       id: 'account-scope-all',
       label: '统一邮箱',
+      detail: `${accounts.length || 1} 个账号汇总`,
       icon: <Mails size={15} />,
       checked: accountScope === 'all',
       onSelect: () => onChange('all'),
@@ -58,6 +59,7 @@ export default function AccountSwitcher({
     ...accounts.map((account, index) => ({
       id: `account-scope-${account.id}`,
       label: account.display_name.trim() || account.email,
+      detail: `${providerLabel(account.provider)} · ${account.email}`,
       icon: <Mail size={15} />,
       checked: accountScope === account.id,
       separatorBefore: index === 0,
@@ -104,6 +106,7 @@ export default function AccountSwitcher({
           x={menu.x}
           y={menu.y}
           items={items}
+          className="account-switcher-menu"
           title="切换邮箱范围"
           detail={selectedAccount?.email ?? '查看全部账号的统一收件箱'}
           ariaLabel="邮箱范围选择"

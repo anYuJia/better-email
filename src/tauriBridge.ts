@@ -271,6 +271,7 @@ let nextOutboxId = 1;
 let nextRuleId = 4;
 let nextIdentityId = 3;
 let nextContactId = 4;
+let nextAccountId = Math.max(...mockAccounts.map((item) => item.id)) + 1;
 
 let labels = [
   { id: 1, name: '重要', color: '#c2410c', message_count: 1 },
@@ -697,6 +698,51 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return (Number(args?.accountId ?? 0) > 0
         ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
         : account) as T;
+    case 'create_account': {
+      const input = (args?.input ?? {}) as Partial<typeof account>;
+      const email = String(input.email ?? '').trim().toLowerCase();
+      if (!email.includes('@')) throw new Error('请输入有效邮箱地址。');
+      if (mockAccounts.some((item) => item.email.toLowerCase() === email)) {
+        throw new Error('该邮箱账号已存在。');
+      }
+      const created = {
+        id: nextAccountId++,
+        email,
+        display_name: String(input.display_name ?? '').trim() || email,
+        provider: String(input.provider ?? '').trim() || 'Custom',
+        imap_host: String(input.imap_host ?? '').trim(),
+        smtp_host: String(input.smtp_host ?? '').trim(),
+        auth_type: String(input.auth_type ?? '').trim() || 'password',
+        sync_mode: String(input.sync_mode ?? '').trim() || 'manual',
+        remote_images_allowed: Boolean(input.remote_images_allowed),
+        signature: String(input.signature ?? ''),
+      };
+      mockAccounts = [...mockAccounts, created];
+      folders = [
+        ...folders,
+        ...mockSystemFolders.map((folder) => ({
+          id: nextFolderId++,
+          account_id: created.id,
+          name: folder.name,
+          role: folder.role,
+          unread_count: 0,
+          is_virtual: false,
+        })),
+      ];
+      identities = [
+        ...identities,
+        {
+          id: nextIdentityId++,
+          account_id: created.id,
+          name: created.display_name,
+          email: created.email,
+          reply_to: '',
+          signature: created.signature,
+          is_default: true,
+        },
+      ];
+      return created as T;
+    }
     case 'update_account_settings': {
       const accountId = Number(args?.accountId ?? 0);
       const existing = mockAccounts.find((item) => item.id === accountId);

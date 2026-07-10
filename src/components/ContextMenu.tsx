@@ -6,6 +6,7 @@ import './context-menu.css';
 export type ContextMenuItem = {
   id: string;
   label: string;
+  detail?: string;
   icon?: React.ReactNode;
   shortcut?: string;
   danger?: boolean;
@@ -21,6 +22,7 @@ type ContextMenuProps = {
   y: number;
   items: ContextMenuItem[];
   onClose: () => void;
+  className?: string;
   ariaLabel?: string;
   title?: string;
   detail?: string;
@@ -41,7 +43,10 @@ function MenuItems({
           type="button"
           role="menuitem"
           data-context-item={item.id}
-          className={item.danger ? 'danger' : undefined}
+          className={[
+            item.danger ? 'danger' : '',
+            item.detail ? 'has-detail' : '',
+          ].filter(Boolean).join(' ') || undefined}
           disabled={item.disabled}
           aria-haspopup={item.children?.length ? 'menu' : undefined}
           onClick={() => {
@@ -53,7 +58,10 @@ function MenuItems({
           <span className="context-menu-icon" aria-hidden="true">
             {item.checked ? <Check size={14} /> : item.icon}
           </span>
-          <span className="context-menu-label">{item.label}</span>
+          <span className="context-menu-copy">
+            <span className="context-menu-label">{item.label}</span>
+            {item.detail && <small>{item.detail}</small>}
+          </span>
           {item.shortcut && <kbd>{item.shortcut}</kbd>}
           {item.children?.length ? <ChevronRight className="context-menu-chevron" size={14} /> : null}
         </button>
@@ -72,6 +80,7 @@ export default function ContextMenu({
   y,
   items,
   onClose,
+  className,
   ariaLabel = '快捷操作',
   title,
   detail,
@@ -189,7 +198,11 @@ export default function ContextMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className={alignSubmenuLeft ? 'context-menu align-submenu-left' : 'context-menu'}
+      className={[
+        'context-menu',
+        alignSubmenuLeft ? 'align-submenu-left' : '',
+        className ?? '',
+      ].filter(Boolean).join(' ')}
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => event.preventDefault()}
     >

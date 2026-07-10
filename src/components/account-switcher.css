@@ -117,3 +117,6 @@
 .account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
   transform: rotate(180deg);
 }
+.context-menu.account-switcher-menu {
+  width: min(272px, calc(100vw - 16px));
+}

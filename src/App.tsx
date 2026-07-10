@@ -2812,6 +2812,9 @@ export default function App() {
         onDropMessagesToFolder={(folder, messageIds) => {
           moveMessagesToFolderByIds(folder, messageIds).catch((error) => setStatus(String(error)));
         }}
+        onFolderFavoriteChange={(folder, isFavorite) => {
+          setStatus(isFavorite ? `已固定到常用邮箱：${folder.name}` : `已从常用邮箱移除：${folder.name}`);
+        }}
         onRenamingFolderNameChange={setRenamingFolderName}
         onRenameFolder={(folder) => { renameCustomFolder(folder).catch((error) => setStatus(String(error))); }}
         onCancelRename={() => setRenamingFolderId(null)}

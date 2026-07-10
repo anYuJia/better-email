@@ -1,23 +1,16 @@
 import React from 'react';
 import {
   Edit3,
-  FolderOpen,
   Keyboard,
   MailPlus,
   MoreHorizontal,
-  Pencil,
   Search,
   Send,
   Settings,
   Star,
   Trash2,
 } from 'lucide-react';
-import {
-  folderIconForRole,
-  isCustomFolder,
-  isMovableMessageFolder,
-  primaryFolderRoles,
-} from '../app/appConfig';
+import { isCustomFolder } from '../app/appConfig';
 import type {
   Account,
   AccountScope,
@@ -28,99 +21,7 @@ import type {
   SavedSearch,
 } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
-import {
-  hasMessageDragPayload,
-  readMessageDragPayload,
-} from './messageDrag';
-
-type FolderItemsProps = {
-  folders: Folder[];
-  folderId: number | null;
-  renamingFolderId: number | null;
-  renamingFolderName: string;
-  dropTargetFolderId: number | null;
-  onSelectFolder: (folderId: number) => void;
-  onRenamingFolderNameChange: (value: string) => void;
-  onRenameFolder: (folder: Folder) => void;
-  onCancelRename: () => void;
-  onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => void;
-  onDragOverFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
-  onDragLeaveFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
-  onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
-};
-
-function FolderItems({
-  folders,
-  folderId,
-  renamingFolderId,
-  renamingFolderName,
-  dropTargetFolderId,
-  onSelectFolder,
-  onRenamingFolderNameChange,
-  onRenameFolder,
-  onCancelRename,
-  onOpenContextMenu,
-  onDragOverFolder,
-  onDragLeaveFolder,
-  onDropOnFolder,
-}: FolderItemsProps) {
-  return folders.map((folder) => (
-    <div
-      key={folder.id}
-      className={[
-        'folder',
-        folder.id === folderId ? 'active' : '',
-        folder.id === dropTargetFolderId ? 'message-drop-target' : '',
-      ].filter(Boolean).join(' ')}
-      data-folder-id={folder.id}
-      data-folder-role={folder.role}
-      onDragOver={(event) => onDragOverFolder(event, folder)}
-      onDragLeave={(event) => onDragLeaveFolder(event, folder)}
-      onDrop={(event) => onDropOnFolder(event, folder)}
-      onContextMenu={(event) => onOpenContextMenu(event, folder)}
-    >
-      {renamingFolderId === folder.id ? (
-        <form
-          className="folder-rename"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onRenameFolder(folder);
-          }}
-        >
-          <input
-            value={renamingFolderName}
-            onChange={(event) => onRenamingFolderNameChange(event.target.value)}
-            autoFocus
-          />
-          <button type="submit">保存</button>
-          <button type="button" onClick={onCancelRename}>取消</button>
-        </form>
-      ) : (
-        <>
-          <button type="button" className="folder-main" onClick={() => onSelectFolder(folder.id)}>
-            <span className="folder-name">
-              {folderIconForRole(folder.role)}
-              {folder.name}
-            </span>
-            {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
-          </button>
-          {isCustomFolder(folder) && (
-            <span className="folder-actions">
-              <button
-                type="button"
-                title="更多文件夹操作"
-                aria-label={`${folder.name} 更多操作`}
-                onClick={(event) => onOpenContextMenu(event, folder)}
-              >
-                <MoreHorizontal size={14} />
-              </button>
-            </span>
-          )}
-        </>
-      )}
-    </div>
-  ));
-}
+import SidebarFolderNavigation from './SidebarFolderNavigation';
 
 export type SidebarProps = {
   accountScope: AccountScope;
@@ -146,6 +47,7 @@ export type SidebarProps = {
   onCompose: () => void;
   onSelectFolder: (folderId: number) => void;
   onDropMessagesToFolder: (folder: Folder, messageIds: number[]) => void;
+  onFolderFavoriteChange: (folder: Folder, isFavorite: boolean) => void;
   onRenamingFolderNameChange: (value: string) => void;
   onRenameFolder: (folder: Folder) => void;
   onCancelRename: () => void;
@@ -193,6 +95,7 @@ export default function Sidebar({
   onCompose,
   onSelectFolder,
   onDropMessagesToFolder,
+  onFolderFavoriteChange,
   onRenamingFolderNameChange,
   onRenameFolder,
   onCancelRename,
@@ -223,82 +126,12 @@ export default function Sidebar({
     detail?: string;
     items: ContextMenuItem[];
   } | null>(null);
-  const [dropTargetFolderId, setDropTargetFolderId] = React.useState<number | null>(null);
-  const primaryFolders = folders.filter((folder) => primaryFolderRoles.has(folder.role));
-  const secondaryFolders = folders.filter((folder) => !primaryFolderRoles.has(folder.role));
   const customFolderCount = folders.filter(isCustomFolder).length;
-  const folderItemProps = {
-    folderId,
-    renamingFolderId,
-    renamingFolderName,
-    dropTargetFolderId,
-    onSelectFolder,
-    onRenamingFolderNameChange,
-    onRenameFolder,
-    onCancelRename,
-    onDragOverFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
-      if (!isMovableMessageFolder(folder) || !hasMessageDragPayload(event.dataTransfer)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      setDropTargetFolderId(folder.id);
-    },
-    onDragLeaveFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
-      const nextTarget = event.relatedTarget as Node | null;
-      if (nextTarget && event.currentTarget.contains(nextTarget)) return;
-      setDropTargetFolderId((current) => current === folder.id ? null : current);
-    },
-    onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => {
-      if (!isMovableMessageFolder(folder) || !hasMessageDragPayload(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const messageIds = readMessageDragPayload(event.dataTransfer);
-      setDropTargetFolderId(null);
-      if (messageIds.length > 0) onDropMessagesToFolder(folder, messageIds);
-    },
-    onOpenContextMenu: (event: React.MouseEvent, folder: Folder) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const bounds = event.currentTarget.getBoundingClientRect();
-      setContextMenu({
-        x: event.clientX || bounds.right,
-        y: event.clientY || bounds.bottom,
-        ariaLabel: `${folder.name} 文件夹操作`,
-        title: folder.name,
-        detail: isCustomFolder(folder) ? '自定义文件夹' : '邮箱文件夹',
-        items: [
-          {
-            id: 'open-folder',
-            label: '打开文件夹',
-            icon: <FolderOpen size={15} />,
-            onSelect: () => onSelectFolder(folder.id),
-          },
-          ...(isCustomFolder(folder)
-            ? [
-                {
-                  id: 'rename-folder',
-                  label: '重命名',
-                  icon: <Pencil size={15} />,
-                  separatorBefore: true,
-                  onSelect: () => onStartRename(folder),
-                },
-                {
-                  id: 'delete-folder',
-                  label: '删除文件夹',
-                  icon: <Trash2 size={15} />,
-                  danger: true,
-                  onSelect: () => onDeleteFolder(folder),
-                },
-              ]
-            : []),
-        ],
-      });
-    },
-  };
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">S</div>
+        <div className="brand-mark">B</div>
         <div>
           <strong>Better Email</strong>
           <span>{accountScope === 'all' ? `统一邮箱 · ${accounts.length || 1} 个账号` : account?.email ?? '低内存邮箱客户端'}</span>
@@ -316,22 +149,20 @@ export default function Sidebar({
       <button className="compose-button" onClick={onCompose}>
         <Edit3 size={17} /> 写邮件
       </button>
-      <div className="sidebar-label">邮箱</div>
-      <nav className="folder-list">
-        <FolderItems folders={primaryFolders} {...folderItemProps} />
-      </nav>
-
-      <div className="sidebar-secondary sidebar-quick-menus">
-        <details className="sidebar-disclosure more-mailboxes">
-          <summary>
-            <span>更多邮箱</span>
-            <em>{secondaryFolders.length}</em>
-          </summary>
-          <nav className="folder-list folded-folder-list">
-            <FolderItems folders={secondaryFolders} {...folderItemProps} />
-          </nav>
-        </details>
-
+      <SidebarFolderNavigation
+        folders={folders}
+        folderId={folderId}
+        renamingFolderId={renamingFolderId}
+        renamingFolderName={renamingFolderName}
+        onSelectFolder={onSelectFolder}
+        onDropMessagesToFolder={onDropMessagesToFolder}
+        onRenamingFolderNameChange={onRenamingFolderNameChange}
+        onRenameFolder={onRenameFolder}
+        onCancelRename={onCancelRename}
+        onStartRename={onStartRename}
+        onDeleteFolder={onDeleteFolder}
+        onFavoriteChange={onFolderFavoriteChange}
+      >
         <details className="sidebar-disclosure sidebar-tools">
           <summary>
             <span>工具</span>
@@ -594,7 +425,7 @@ export default function Sidebar({
             </section>
           </div>
         </details>
-      </div>
+      </SidebarFolderNavigation>
 
       <div className="sidebar-footer">
         <div className="sidebar-footer-actions">

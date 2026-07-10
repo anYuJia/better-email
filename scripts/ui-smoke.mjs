@@ -354,6 +354,25 @@ async function main() {
       cdp,
       `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === ${initialLayout.sidebar} && JSON.parse(localStorage.getItem('better-email.appLayout.v2')).list === ${initialLayout.list}`,
     );
+    await waitForExpression(cdp, "document.querySelector('.brand-mark')?.textContent.trim() === 'B'");
+    await openDetails(cdp, '.more-mailboxes');
+    await waitForExpression(cdp, "(() => { const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect(); const list = document.querySelector('.more-mailboxes[open] > .folded-folder-list')?.getBoundingClientRect(); return sidebar && list && list.left >= sidebar.left && list.right <= sidebar.right + 1; })()");
+    await evalInPage(
+      cdp,
+      "(() => { const folder = document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]'); if (!folder) throw new Error('Spam folder favorite target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 350, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('固定到常用邮箱')");
+    await clickButton(cdp, '固定到常用邮箱', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已固定到常用邮箱：垃圾邮件') && document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"][data-favorite=\"true\"]') && JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
+    await cdp.send('Page.reload', { ignoreCache: true });
+    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"][data-favorite=\"true\"]')");
+    await evalInPage(
+      cdp,
+      "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"]'); if (!folder) throw new Error('Pinned spam folder not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 350, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('从常用邮箱移除')");
+    await clickButton(cdp, '从常用邮箱移除', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
 
     await clickButton(cdp, '快捷键');
     await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索')");
@@ -737,8 +756,11 @@ async function main() {
       url,
       assertions: [
         'main shell rendered',
+        'Better Email brand mark rendered',
         'legacy SwiftMail settings migrate to better-email keys',
         'resizable panes persist and reset',
+        'more mailbox list stays inside sidebar',
+        'favorite mailbox pin persists and can be removed',
         'shortcut help opens from button and keyboard',
         'command palette opens and runs commands',
         'message list loaded',

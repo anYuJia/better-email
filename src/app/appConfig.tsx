@@ -105,6 +105,7 @@ export const composeTemplatesStorageKey = 'better-email.composeTemplates';
 export const composerAutosaveStorageKey = 'better-email.composerAutosave';
 export const appLayoutStorageKey = 'better-email.appLayout.v2';
 export const sendUndoDelayStorageKey = 'better-email.sendUndoDelaySeconds';
+export const favoriteFolderKeysStorageKey = 'better-email.favoriteFolderKeys.v1';
 const legacyStorageKeyByCurrent: Record<string, string> = {
   [notificationPolicyStorageKey]: 'swiftmail.notificationPolicy',
   [providerVerificationStorageKey]: 'swiftmail.providerVerifications',
@@ -113,6 +114,7 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
   [composerAutosaveStorageKey]: 'swiftmail.composerAutosave',
   [appLayoutStorageKey]: 'swiftmail.appLayout.v2',
   [sendUndoDelayStorageKey]: 'swiftmail.sendUndoDelaySeconds',
+  [favoriteFolderKeysStorageKey]: 'swiftmail.favoriteFolderKeys.v1',
 };
 export const defaultAppLayout: AppLayout = { sidebar: 244, list: 388 };
 export const filterModes: FilterMode[] = ['all', 'unread', 'starred', 'attachments'];
@@ -172,6 +174,19 @@ export function loadSendUndoDelaySeconds(): SendUndoDelaySeconds {
       : 10;
   } catch {
     return 10;
+  }
+}
+
+export function loadFavoriteFolderKeys(): string[] {
+  try {
+    const raw = readAppStorage(favoriteFolderKeysStorageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.filter((item): item is string => typeof item === 'string' && item.length > 0))]
+      : [];
+  } catch {
+    return [];
   }
 }
 
@@ -354,6 +369,10 @@ export function canCancelOutboxItem(status: string): boolean {
 
 export function isCustomFolder(folder: Folder): boolean {
   return folder.role.startsWith('custom:');
+}
+
+export function folderPreferenceKey(folder: Folder): string {
+  return `${folder.account_id ?? 'virtual'}:${folder.role}`;
 }
 
 export function isMovableMessageFolder(folder: Folder): boolean {

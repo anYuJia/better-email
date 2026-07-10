@@ -22,6 +22,7 @@ import SyncOperationsSettings from './components/settings/SyncOperationsSettings
 import ContactAutomationSettings from './components/settings/ContactAutomationSettings';
 import RuleAutomationSettings from './components/settings/RuleAutomationSettings';
 import SecurityPreviewSettings from './components/settings/SecurityPreviewSettings';
+import useUndoQueue from './hooks/useUndoQueue';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -58,7 +59,6 @@ import type {
   AttachmentDownload,
   Message,
   UndoMessageSnapshot,
-  UndoAction,
   CommandPaletteItem,
   RemoteImageTrust,
   MailIdentity,
@@ -244,11 +244,15 @@ export default function App() {
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
   const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const {
+    undoAction,
+    clearUndoAction,
+    consumeUndoAction,
+    queueUndoAction,
+  } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const layoutResizeRef = useRef<{ pane: 'sidebar' | 'list'; startX: number; origin: AppLayout } | null>(null);
-  const undoTimerRef = useRef<number | null>(null);
   const outboxScheduleTimerRef = useRef<number | null>(null);
   const backgroundSyncRef = useRef(false);
   const backgroundTaskWorkerRef = useRef(false);
@@ -869,30 +873,9 @@ export default function App() {
     }));
   }
 
-  function queueUndoAction(title: string, snapshots: UndoMessageSnapshot[], detail?: string) {
-    if (snapshots.length === 0) return;
-    if (undoTimerRef.current) {
-      window.clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
-    setUndoAction({
-      id: `${Date.now()}-${snapshots.map((item) => item.id).join('-')}`,
-      title,
-      detail: detail ?? (snapshots.length === 1 ? snapshots[0].subject : `${snapshots.length} 封邮件`),
-      snapshots,
-    });
-    undoTimerRef.current = window.setTimeout(() => {
-      setUndoAction(null);
-      undoTimerRef.current = null;
-    }, 7000);
-  }
-
-  async function restoreUndoAction(action = undoAction) {
+  async function restoreUndoAction() {
+    const action = consumeUndoAction();
     if (!action) return;
-    if (undoTimerRef.current) {
-      window.clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
     for (const snapshot of action.snapshots) {
       if (snapshot.folder_role === 'snoozed' && snapshot.snoozed_until) {
         await invoke('snooze_message', { messageId: snapshot.id, snoozedUntil: snapshot.snoozed_until });
@@ -909,7 +892,6 @@ export default function App() {
         });
       }
     }
-    setUndoAction(null);
     setSelectedMessageIds([]);
     const firstSnapshot = action.snapshots[0];
     const restoredFolderId = firstSnapshot
@@ -2692,6 +2674,12 @@ export default function App() {
       }
       if (editable) return;
 
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && key === 'z' && undoAction) {
+        event.preventDefault();
+        restoreUndoAction().catch((error) => setStatus(String(error)));
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault();
         setCommandPaletteOpen(true);
@@ -2760,7 +2748,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, messages, selected, selectedId]);
+  }, [folderId, folders, isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, labels, messages, selected, selectedId, undoAction]);
 
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
@@ -3213,7 +3201,7 @@ export default function App() {
               <button type="button" onClick={() => restoreUndoAction().catch((error) => setStatus(String(error)))}>
                 撤销
               </button>
-              <button type="button" aria-label="关闭撤销提示" onClick={() => setUndoAction(null)}>
+              <button type="button" aria-label="关闭撤销提示" onClick={clearUndoAction}>
                 <X size={15} />
               </button>
             </section>

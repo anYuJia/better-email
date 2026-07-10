@@ -445,6 +445,7 @@ export const shortcutGroups = [
   {
     title: '处理邮件',
     items: [
+      { keys: ['⌘/Ctrl', 'Z'], label: '撤销上一步邮件操作' },
       { keys: ['S'], label: '星标' },
       { keys: ['M'], label: '已读/未读' },
       { keys: ['E'], label: '归档' },

@@ -375,7 +375,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
 
     await clickButton(cdp, '快捷键');
-    await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索')");
+    await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('撤销上一步邮件操作')");
     await clickButton(cdp, '关闭', "document.querySelector('.shortcut-modal')");
     await waitForExpression(cdp, "!document.querySelector('.shortcut-modal')");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: '?', shiftKey: true, bubbles: true }))");
@@ -712,7 +712,10 @@ async function main() {
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"归档\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar') && document.body.innerText.includes('归档') && document.body.innerText.includes('撤销')");
-    await clickButton(cdp, '撤销', "document.querySelector('.undo-snackbar')");
+    await evalInPage(
+      cdp,
+      "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true, cancelable: true }))",
+    );
     await waitForExpression(cdp, "document.body.innerText.includes('已撤销：归档') && document.body.innerText.includes('安全检查清单')");
     await fillInput(cdp, '.quick-reply textarea', '收到，我会继续跟进。');
     await clickButton(cdp, '发送回复', "document.querySelector('.quick-reply')");
@@ -797,7 +800,7 @@ async function main() {
         'rules create flow works',
         'raw MIME preview works',
         'snooze and unsnooze flow works',
-        'undo snackbar restores archived message',
+        'global keyboard undo restores archived message',
         'inline quick reply sends from reader',
         'message EML export works',
         'label toggle works',

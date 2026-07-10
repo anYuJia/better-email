@@ -107,6 +107,7 @@ SQLite local store + OS keychain
 - `src-tauri/src/imap_probe.rs` / `smtp.rs`：复用真实登录与发信传输配置执行凭据验证；SMTP 验证只完成 TLS、认证与 `NOOP`，不会发送邮件。
 - `src-tauri/src/credentials.rs`：系统 Keychain 凭据读写边界，保存应用专用密码、授权码或 OAuth2 token，并在 access token 临近过期时触发 refresh token 自动刷新。
 - `src-tauri/src/oauth.rs`：OAuth2 PKCE 授权 URL 生成、授权码 token 交换和 refresh token 刷新，支持 Gmail/Outlook 授权页启动与 token 端点请求。
+- `src-tauri/src/provider_probe.rs` + `src-tauri/examples/provider_probe.rs`：只读服务商验收内核与命令行入口；数据库以 SQLite 只读模式打开，按账号 ID 从 Keychain 读取凭据，只执行 IMAP/SMTP 登录、SMTP `NOOP`、文件夹发现和收件箱邮件头样本，报告只保留脱敏账号、阶段状态、耗时与数量。
 - `src-tauri/src/smtp.rs`：基于 `lettre` 的真实 SMTP 发件箱发送路径，支持密码/授权码、XOAUTH2 认证、纯文本/HTML `multipart/alternative` 和带附件的 `multipart/mixed`；发送时生成稳定 Message-ID，并在成功后返回同一份原始 MIME 供远端留档。
 - `src-tauri/src/imap_probe.rs`：基于 `imap` 的真实登录、远端文件夹发现、已发送邮件 `APPEND` 留档和远端草稿版本替换，支持密码/授权码和 XOAUTH2 认证；已发送留档前按 Message-ID 查重，优先读取 UIDPLUS 的 `APPENDUID`，缺失时再次搜索定位；保存草稿时在同一 Drafts 会话按旧/新 Message-ID 清理历史版本，再以 `\Draft` 标记追加最新 MIME。
 - `src-tauri/capabilities/default.json`：桌面能力声明，开放 shell/dialog/notification 与应用角标的最小默认权限。

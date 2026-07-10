@@ -43,12 +43,16 @@ npm run bench
 npm run bench:release
 npm run bench:app
 npm run bench:sync
+npm run probe:provider -- --list
+npm run probe:provider -- --account-id 2
 npm test
 npm run test:ui
 cd src-tauri && cargo test
 cd src-tauri && cargo clippy --all-targets -- -D warnings
 npm run tauri:dev
 ```
+
+`probe:provider` 以只读方式打开现有数据库，并按账号 ID 从系统 Keychain 读取凭据；它只执行 IMAP 登录、SMTP 认证 + `NOOP`、文件夹发现和收件箱邮件头抓取，不发送邮件、不下载正文、不修改远端邮件状态。账号列表和 JSON 报告只输出脱敏邮箱、域名、服务商、阶段状态、耗时和数量；先在应用设置中保存账号与凭据，再用 `--list` 获取账号 ID。
 
 ## 下一步
 

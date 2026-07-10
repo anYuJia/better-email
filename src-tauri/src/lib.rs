@@ -5,10 +5,12 @@ mod imap_probe;
 mod models;
 mod oauth;
 mod protocol;
+mod provider_probe;
 mod smtp;
 mod vcard;
 
 use db::MailStore;
+pub use provider_probe::{list_provider_probe_accounts, run_provider_probe};
 use tauri::Manager;
 
 pub fn run() {

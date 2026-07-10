@@ -10,6 +10,7 @@
     "bench:release": "tauri build --no-bundle && npm run bench",
     "bench:app": "tauri build --no-bundle && node scripts/benchmark.mjs --sample-app",
     "bench:sync": "tauri build --no-bundle && node scripts/benchmark.mjs --sample-app --sample-sync",
+    "probe:provider": "cargo run --manifest-path src-tauri/Cargo.toml --example provider_probe --",
     "test:ui": "node scripts/ui-smoke.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

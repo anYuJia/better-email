@@ -407,8 +407,20 @@ type MockBackgroundTask = {
   finished_at: string;
 };
 
+type MockSyncRun = {
+  id: number;
+  started_at: string;
+  finished_at: string;
+  status: string;
+  scanned_folders: number;
+  imported_messages: number;
+  message: string;
+};
+
 let backgroundTasks: MockBackgroundTask[] = [];
+let syncRuns: MockSyncRun[] = [];
 let nextFolderId = 1001;
+let nextSyncRunId = 1;
 
 function folderIdForRole(role: string, accountId: number = account.id) {
   return (
@@ -723,7 +735,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'get_stats':
       return stats(args) as T;
     case 'list_sync_runs':
-      return [] as T;
+      return syncRuns as T;
     case 'get_sync_schedule_plan':
       return mockSyncSchedulePlan(args?.accountId) as T;
     case 'list_contacts':
@@ -1072,16 +1084,33 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       );
       return outbox as T;
     }
-    case 'test_connection':
+    case 'test_connection': {
+      const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
       return {
-        account_email: account.email,
+        account_email: targetAccount.email,
         checked_at: now,
         ready_for_credentials: true,
         endpoints: [
-          { name: 'IMAP', address: account.imap_host, reachable: true, latency_ms: 12, message: 'mock ok' },
-          { name: 'SMTP', address: account.smtp_host, reachable: true, latency_ms: 14, message: 'mock ok' },
+          { name: 'IMAP', address: targetAccount.imap_host, reachable: true, latency_ms: 12, message: 'mock ok' },
+          { name: 'SMTP', address: targetAccount.smtp_host, reachable: true, latency_ms: 14, message: 'mock ok' },
         ],
       } as T;
+    }
+    case 'discover_imap_folders': {
+      const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
+      return {
+        account_email: targetAccount.email,
+        checked_at: now,
+        folder_count: 3,
+        folders: [
+          { name: 'INBOX', delimiter: '/', attributes: ['Inbox'] },
+          { name: 'Sent', delimiter: '/', attributes: ['Sent'] },
+          { name: 'Archive', delimiter: '/', attributes: ['Archive'] },
+        ],
+        status: 'ok',
+        message: `UI smoke mock 已发现 ${targetAccount.email} 的 3 个 IMAP 文件夹。`,
+      } as T;
+    }
     case 'export_diagnostics':
       return JSON.stringify({ app_version: '0.1.0', accounts: [{ email_masked: 'd***@better-email.local' }] }, null, 2) as T;
     case 'export_local_backup':
@@ -1105,17 +1134,20 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const accountId = Number(args?.accountId ?? 0);
       const plan = mockSyncSchedulePlan(accountId);
       const scopedAccountCount = plan.batch_accounts.length;
-      return {
-        id: 1,
+      const targetAccount = mockAccounts.find((item) => item.id === accountId) ?? account;
+      const run = {
+        id: nextSyncRunId++,
         started_at: now,
         finished_at: now,
         status: plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
         scanned_folders: scopedAccountCount,
         imported_messages: 1,
         message: args?.accountId
-          ? 'UI smoke mock 同步完成：新增 1 封。'
+          ? `UI smoke mock 同步完成（${targetAccount.email}）：新增 1 封。`
           : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
-      } as T;
+      };
+      syncRuns = [run, ...syncRuns].slice(0, 10);
+      return run as T;
     }
     case 'download_attachment': {
       const id = Number(args?.attachmentId);

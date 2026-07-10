@@ -643,8 +643,13 @@ async function main() {
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
+    await selectValue(cdp, '.account-switcher select', '2');
+    await waitForExpression(cdp, "document.querySelector('.brand')?.innerText.includes('design@better-email.local')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
+    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
+    await clickButton(cdp, '连接测试', "document.querySelector('.settings-action-bar')");
+    await waitForExpression(cdp, "document.querySelector('.settings-connection-report')?.innerText.includes('imap.mail.me.com:993') && document.querySelector('.settings-connection-report')?.innerText.includes('smtp.mail.me.com:587')");
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
@@ -652,6 +657,10 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await clickButton(cdp, '发现文件夹', "document.querySelector('.settings-imap-discovery')");
+    await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('3 个')");
+    await clickButton(cdp, '演练', "document.querySelector('.settings-sync-panel')");
+    await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('design@better-email.local')");
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导入 EML');
@@ -705,6 +714,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await selectValue(cdp, '.account-switcher select', 'all');
+    await waitForExpression(cdp, "document.querySelector('.brand')?.innerText.includes('统一邮箱')");
 
     await clickButton(cdp, '写邮件');
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
@@ -813,6 +824,7 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'multi-account diagnostics target selected account',
         'undo send delay settings persist',
         'undo send returns message to drafts',
         'scheduled send automatically flushes to sent',

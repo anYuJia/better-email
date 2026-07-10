@@ -1757,21 +1757,38 @@ impl MailStore {
         })
     }
 
-    pub fn run_sync_dry_run(&self) -> MailResult<SyncRun> {
+    pub fn run_sync_dry_run(&self, account_id: Option<i64>) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
+            let account = account_for_conn(conn, account_id)?;
             let started_at = Utc::now().to_rfc3339();
-            let scanned_folders = scalar_count(
-                conn,
-                "SELECT CASE WHEN COUNT(*) > 0 THEN COUNT(*) ELSE (SELECT COUNT(*) FROM folders) END
-                 FROM imap_mailboxes",
+            let scanned_folders = conn.query_row(
+                "
+                SELECT CASE
+                    WHEN COUNT(*) > 0 THEN COUNT(*)
+                    ELSE (SELECT COUNT(*) FROM folders WHERE account_id = ?1)
+                END
+                FROM imap_mailboxes
+                WHERE account_id = ?1
+                ",
+                params![account.id],
+                |row| row.get(0),
             )?;
             let imported_messages = 0;
             let finished_at = Utc::now().to_rfc3339();
-            let message = "同步演练完成：已验证本地调度、远端文件夹映射和 UID 游标存储；正文增量拉取将在下一阶段接入。";
+            let message = format!(
+                "同步演练完成（{}）：已验证本地调度、远端文件夹映射和 UID 游标存储。",
+                account.email
+            );
             conn.execute(
                 "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, message)
                  VALUES (?1, ?2, 'dry_run', ?3, ?4, ?5)",
-                params![started_at, finished_at, scanned_folders, imported_messages, message],
+                params![
+                    started_at,
+                    finished_at,
+                    scanned_folders,
+                    imported_messages,
+                    message
+                ],
             )?;
             let id = conn.last_insert_rowid();
             Ok(SyncRun {
@@ -1781,7 +1798,7 @@ impl MailStore {
                 status: "dry_run".to_string(),
                 scanned_folders,
                 imported_messages,
-                message: message.to_string(),
+                message,
             })
         })
     }
@@ -4685,11 +4702,6 @@ fn attachment_for_conn(conn: &Connection, attachment_id: i64) -> MailResult<Atta
     .map_err(Into::into)
 }
 
-fn scalar_count(conn: &Connection, sql: &str) -> MailResult<i64> {
-    conn.query_row(sql, [], |row| row.get(0))
-        .map_err(Into::into)
-}
-
 fn scalar_count_values(conn: &Connection, sql: &str, values: Vec<Value>) -> MailResult<i64> {
     conn.query_row(sql, params_from_iter(values), |row| row.get(0))
         .map_err(Into::into)
@@ -5810,9 +5822,11 @@ mod tests {
     #[test]
     fn sync_dry_run_is_recorded() {
         let store = test_store();
-        let run = store.run_sync_dry_run().unwrap();
+        let account = store.get_account().unwrap();
+        let run = store.run_sync_dry_run(Some(account.id)).unwrap();
         assert_eq!(run.status, "dry_run");
         assert!(run.scanned_folders >= 6);
+        assert!(run.message.contains(&account.email));
         let runs = store.list_sync_runs().unwrap();
         assert!(runs.iter().any(|item| item.id == run.id));
     }

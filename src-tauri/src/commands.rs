@@ -847,14 +847,20 @@ pub fn import_local_backup(
 }
 
 #[tauri::command]
-pub fn test_connection(store: State<'_, MailStore>) -> MailResult<ConnectionReport> {
-    let account = store.get_account()?;
+pub fn test_connection(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<ConnectionReport> {
+    let account = store.get_account_by_id(account_id)?;
     protocol::test_endpoints(&account.email, &account.imap_host, &account.smtp_host)
 }
 
 #[tauri::command]
-pub fn discover_imap_folders(store: State<'_, MailStore>) -> MailResult<ImapProbeReport> {
-    let account = store.get_account()?;
+pub fn discover_imap_folders(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<ImapProbeReport> {
+    let account = store.get_account_by_id(account_id)?;
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => return Ok(imap_probe::failed_report(&account.email, error)),
@@ -877,8 +883,11 @@ pub fn list_imap_mailboxes(store: State<'_, MailStore>) -> MailResult<Vec<ImapMa
 }
 
 #[tauri::command]
-pub fn run_sync_dry_run(store: State<'_, MailStore>) -> MailResult<SyncRun> {
-    store.run_sync_dry_run()
+pub fn run_sync_dry_run(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<SyncRun> {
+    store.run_sync_dry_run(account_id)
 }
 
 #[tauri::command]

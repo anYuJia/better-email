@@ -1721,13 +1721,13 @@ export default function App() {
   }
 
   async function testConnection() {
-    const report = await invoke<ConnectionReport>('test_connection');
+    const report = await invoke<ConnectionReport>('test_connection', { accountId: accountForm?.id });
     setConnectionReport(report);
     setStatus(report.ready_for_credentials ? '服务器连接成功，可以进入凭据验证' : '连接测试完成，请查看服务器结果');
   }
 
   async function discoverImapFolders() {
-    const report = await invoke<ImapProbeReport>('discover_imap_folders');
+    const report = await invoke<ImapProbeReport>('discover_imap_folders', { accountId: accountForm?.id });
     setImapProbe(report);
     const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
     setImapMailboxes(mailboxes);
@@ -1735,7 +1735,7 @@ export default function App() {
   }
 
   async function runSyncDryRun() {
-    const run = await invoke<SyncRun>('run_sync_dry_run');
+    const run = await invoke<SyncRun>('run_sync_dry_run', { accountId: accountForm?.id });
     setSyncRuns((current) => [run, ...current].slice(0, 10));
     await loadMeta(folderId);
     setStatus('同步演练已完成并记录');

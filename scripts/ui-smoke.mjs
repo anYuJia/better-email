@@ -835,6 +835,14 @@ async function main() {
     await clickButton(cdp, '撤回');
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
+    await openDetails(cdp, '.settings-write-validation');
+    await clickButton(cdp, '生成验证草稿', "document.querySelector('.settings-write-validation')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.querySelector('.composer input[placeholder=\"收件人\"]')?.value === 'design@better-email.local' && document.querySelector('.composer input[placeholder=\"主题\"]')?.value.startsWith('[Better Email 验收]') && document.querySelector('.composer textarea[placeholder=\"正文\"]')?.value.includes('此草稿不会自动发送') && document.querySelector('.composer textarea[placeholder=\"正文\"]')?.value.includes('不要在主题、正文或附件中粘贴密码、授权码或 Token')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]') ?? [...document.querySelectorAll('.composer header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()");
+    await waitForExpression(cdp, "!document.querySelector('.composer')");
+    await clickButton(cdp, '设置');
+    await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-header-actions')");
+
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
@@ -1009,6 +1017,7 @@ async function main() {
         'multi-account diagnostics target selected account',
         'provider-aware credential diagnostics guide recovery and fold technical details',
         'read-only provider validation runs connection login folder and header checks',
+        'write validation prepares a self-addressed draft without automatic sending',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',
         'mapped custom mailbox resolves as a remote move target',

@@ -1,4 +1,14 @@
-import { BadgeCheck, FolderPlus, History, KeyRound, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import {
+  BadgeCheck,
+  FileCheck2,
+  FolderPlus,
+  History,
+  KeyRound,
+  RefreshCw,
+  Search,
+  Send,
+  Trash2,
+} from 'lucide-react';
 import {
   canCancelOutboxItem,
   outboxStatusLabel,
@@ -41,6 +51,7 @@ type SyncOperationsSettingsProps = {
   onCheckCredential: () => void;
   onVerifyCredential: () => void;
   onRunProviderValidation: () => void;
+  onPrepareWriteValidation: () => void;
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
@@ -70,6 +81,7 @@ export default function SyncOperationsSettings({
   onCheckCredential,
   onVerifyCredential,
   onRunProviderValidation,
+  onPrepareWriteValidation,
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
@@ -301,6 +313,31 @@ export default function SyncOperationsSettings({
           </div>
         )}
       </section>
+
+      <details className="tool-panel settings-write-validation">
+        <summary>
+          <span>
+            <strong>发送与回写验收</strong>
+            <small>生成发给自己的验证草稿，真实发送前仍需在撰写器中确认</small>
+          </span>
+          <b>需手动确认</b>
+        </summary>
+        <div>
+          <p>
+            草稿不会自动发送，也不会自动添加附件。请检查收件人，按需添加不含敏感信息的小文件，
+            再手动发送并验证已发送留档、自发自收、附件读取和远端状态回写。
+          </p>
+          <ol>
+            <li>默认收件人为当前账号，避免向第三方发送测试邮件。</li>
+            <li>主题包含唯一验证编号，便于在已发送和收件箱中定位。</li>
+            <li>不要在草稿或附件中放入密码、授权码或 Token。</li>
+          </ol>
+          <button type="button" onClick={onPrepareWriteValidation}>
+            <FileCheck2 size={14} />
+            生成验证草稿
+          </button>
+        </div>
+      </details>
 
       <section className="tool-panel settings-outbox-panel">
         <header className="tool-header">

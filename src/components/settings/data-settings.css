@@ -209,6 +209,94 @@
   margin: 12px;
 }
 
+.settings-disclosure[data-settings-section="sync"] > .settings-write-validation {
+  margin: 12px;
+}
+
+.settings-write-validation > summary {
+  min-height: 42px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-write-validation > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-write-validation > summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-write-validation > summary strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 720;
+}
+
+.settings-write-validation > summary small {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.settings-write-validation > summary b {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid #ead9b8;
+  border-radius: 6px;
+  color: #9a5b08;
+  background: #fff9ed;
+  font-size: 9.5px;
+}
+
+.settings-write-validation > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e9ed;
+}
+
+.settings-write-validation p,
+.settings-write-validation ol {
+  margin: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.settings-write-validation ol {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
+.settings-write-validation > div > button {
+  min-height: 32px;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--ui-accent);
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-write-validation > div > button:hover {
+  background: var(--ui-accent-hover);
+}
+
 .settings-credential-panel > label {
   display: grid;
   gap: 6px;
@@ -424,5 +512,14 @@
   .settings-data-safety .tool-header > em,
   .settings-disclosure[data-settings-section="sync"] .tool-header > em {
     align-self: flex-start;
+  }
+
+  .settings-write-validation > summary {
+    align-items: center;
+  }
+
+  .settings-write-validation > div > button {
+    width: 100%;
+    justify-self: stretch;
   }
 }

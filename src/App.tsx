@@ -141,6 +141,7 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
+import { buildProviderWriteValidationDraft } from './app/providerWriteValidation';
 import './ui-2026.css';
 
 export default function App() {
@@ -400,6 +401,15 @@ export default function App() {
     }
     setComposerMinimized(false);
     setComposerOpen(true);
+  }
+
+  function prepareProviderWriteValidation() {
+    if (!accountForm) return;
+    const validationDraft = buildProviderWriteValidationDraft(accountForm);
+    setSettingsOpen(false);
+    setRichComposer(false);
+    openComposer(validationDraft);
+    setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
   }
 
   function composeToContact(contact: Contact) {
@@ -2271,6 +2281,7 @@ export default function App() {
               onRunProviderValidation={() => {
                 runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
               }}
+              onPrepareWriteValidation={prepareProviderWriteValidation}
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}

@@ -182,7 +182,7 @@
 
 .settings-provider-matrix {
   gap: 7px;
-  margin: 10px 12px;
+  margin: 0;
 }
 
 .settings-provider-matrix > header {
@@ -215,6 +215,92 @@
 
 .settings-provider-verification .checkbox-row {
   min-height: 62px;
+}
+
+.settings-provider-advanced {
+  overflow: hidden;
+}
+
+.settings-provider-advanced > summary {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.settings-provider-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-provider-advanced > summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-provider-advanced > summary strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 710;
+}
+
+.settings-provider-advanced > summary em {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-advanced > summary > b {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 7px;
+  border: 1px solid #d8e5f4;
+  border-radius: 6px;
+  color: #1767ae;
+  background: #f3f8fd;
+  font-size: 9.5px;
+  font-weight: 680;
+}
+
+.settings-provider-advanced > summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid #7e8792;
+  border-bottom: 1.5px solid #7e8792;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 150ms ease;
+}
+
+.settings-provider-advanced[open] > summary {
+  border-bottom: 1px solid #e7ebef;
+  background: #fbfcfd;
+}
+
+.settings-provider-advanced[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.settings-provider-advanced-content {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.settings-provider-advanced:not([open]) > .settings-provider-advanced-content {
+  display: none;
+}
+
+.settings-provider-advanced-content > .tool-panel {
+  margin: 0;
 }
 
 .settings-primary-action {

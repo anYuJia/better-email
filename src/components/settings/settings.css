@@ -409,63 +409,6 @@
   padding: 12px 14px;
 }
 
-.settings-page-pagination {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-  padding: 0 30px 34px;
-}
-
-.settings-page-pagination button {
-  min-width: 0;
-  min-height: 50px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid #dde3e9;
-  border-radius: 8px;
-  color: var(--ui-text-secondary);
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(20, 30, 43, 0.035);
-  text-align: left;
-}
-
-.settings-page-pagination button.next {
-  justify-content: flex-end;
-  text-align: right;
-}
-
-.settings-page-pagination button:hover {
-  color: var(--ui-accent);
-  border-color: #bfd7ef;
-  background: #f7fbff;
-}
-
-.settings-page-pagination button > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-page-pagination button :is(small, strong) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-page-pagination button small {
-  color: var(--ui-text-tertiary);
-  font-size: 9.5px;
-  font-weight: 560;
-}
-
-.settings-page-pagination button strong {
-  color: inherit;
-  font-size: 11.5px;
-  font-weight: 680;
-}
-
 .settings-page-content .settings-disclosure[open] > summary {
   background: #fbfcfd;
 }
@@ -1039,10 +982,6 @@
     padding: 14px 12px 30px;
   }
 
-  .settings-page-pagination {
-    padding: 0 12px 24px;
-  }
-
   .settings-toggle-grid,
   .settings-inline-fields {
     grid-template-columns: 1fr;
@@ -1175,36 +1114,6 @@
   box-shadow: none;
 }
 
-.settings-modal .settings-page-pagination {
-  position: static;
-  bottom: auto;
-  z-index: auto;
-  min-height: 0;
-  margin: 0;
-  padding: 13px 30px 22px;
-  border-top: 1px solid #e4e8ed;
-  background: transparent;
-  backdrop-filter: none;
-}
-
-.settings-modal .settings-page-pagination > button {
-  min-width: 0;
-  min-height: 40px;
-  padding: 5px 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: none;
-}
-
-.settings-modal .settings-page-pagination > button:hover {
-  color: var(--ui-accent);
-  border-color: #d4e5f6;
-  background: #f5faff;
-  box-shadow: none;
-}
-
 .settings-backdrop ~ .snackbar-stack,
 .settings-backdrop ~ .status-line {
   visibility: hidden;
@@ -1220,15 +1129,6 @@
 
   .settings-modal .settings-page-header > strong {
     font-size: 18px;
-  }
-
-  .settings-modal .settings-page-pagination {
-    padding: 10px 12px 16px;
-  }
-
-  .settings-modal .settings-page-pagination > button {
-    min-height: 38px;
-    padding-inline: 6px;
   }
 
   .add-account-summary-copy small {

@@ -781,9 +781,9 @@ async function main() {
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav button').length === 12");
-    await clickButton(cdp, '下一页', "document.querySelector('.settings-page-pagination')");
+    await clickButton(cdp, '服务商', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'providers' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '服务商'");
-    await clickButton(cdp, '上一页', "document.querySelector('.settings-page-pagination')");
+    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号'");
     await openSettingsSection(cdp, '认证', 'auth', '.settings-oauth-panel');
     await fillInput(cdp, '.settings-oauth-panel input[placeholder*="Client ID"]', 'smoke-client-id');
@@ -844,8 +844,12 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
-    await openSettingsSection(cdp, '服务商', 'providers', '.settings-provider-matrix');
-    await waitForExpression(cdp, "document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证') && document.body.innerText.includes('兼容性矩阵')");
+    await openSettingsSection(cdp, '服务商', 'providers', '.settings-provider-advanced');
+    await waitForExpression(cdp, "!document.querySelector('.settings-provider-advanced')?.open && !document.querySelector('.settings-page-pagination')");
+    await waitForSettingsPageStable(cdp);
+    await captureScreenshot(cdp, 'settings-providers-closed-desktop');
+    await openDetails(cdp, '.settings-provider-advanced');
+    await waitForExpression(cdp, "document.querySelector('.settings-provider-advanced')?.open && document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证') && document.body.innerText.includes('兼容性矩阵')");
     await waitForExpression(cdp, "(() => { const header = document.querySelector('.settings-page-header')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return header && content && header.bottom <= content.top + 1; })()");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-desktop');
@@ -1144,7 +1148,7 @@ async function main() {
         'outbox queue and cancel works',
         'settings modal opens',
         'settings navigation renders one page at a time',
-        'settings previous and next pagination works',
+        'settings desktop sidebar switches standalone pages',
         'settings narrow layout uses grouped page selector',
         'settings page hierarchy stays isolated from legacy header and footer styles',
         'settings low-frequency account creation stays folded and background feedback stays hidden',

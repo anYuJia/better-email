@@ -24,6 +24,7 @@ import CommandPalette from './components/CommandPalette';
 import ShortcutHelpModal from './components/ShortcutHelpModal';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
+import useContactManagement from './hooks/useContactManagement';
 import useUndoQueue from './hooks/useUndoQueue';
 import {
   defaultNotificationPolicy,
@@ -82,7 +83,6 @@ import type {
   ParsedMessagePreview,
   Contact,
   ContactMergeSuggestion,
-  ContactCreateInput,
   MailRule,
   MailRuleInput,
   ThreadSummary,
@@ -105,7 +105,6 @@ import {
   buildRuleCondition,
   ruleActionParts,
   setRuleActionPart,
-  emptyContactForm,
   notificationPolicyStorageKey,
   providerVerificationStorageKey,
   savedSearchesStorageKey,
@@ -116,7 +115,6 @@ import {
   backgroundTaskTitle,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
-  normalizeContactAliases,
   removeAppStorage,
   loadProviderVerifications,
   isFilterMode,
@@ -158,14 +156,6 @@ export default function App() {
   const [stats, setStats] = useState<MailStats | null>(null);
   const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactMergeSuggestions, setContactMergeSuggestions] = useState<ContactMergeSuggestion[]>([]);
-  const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactEditName, setContactEditName] = useState('');
-  const [contactEditAliases, setContactEditAliases] = useState('');
-  const [contactForm, setContactForm] = useState<ContactCreateInput>(emptyContactForm);
-  const [contactFormAliases, setContactFormAliases] = useState('');
-  const [mergeSourceContactId, setMergeSourceContactId] = useState<number | null>(null);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
   const [identityForm, setIdentityForm] = useState<MailIdentityInput>(emptyIdentityForm);
   const [rules, setRules] = useState<MailRule[]>([]);
@@ -204,7 +194,6 @@ export default function App() {
   const [filter, setFilter] = useState<FilterMode>('all');
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const [savedSearchName, setSavedSearchName] = useState('');
-  const [contactQuery, setContactQuery] = useState('');
   const [composeTemplates, setComposeTemplates] = useState<ComposeTemplate[]>(loadComposeTemplates);
   const [templateName, setTemplateName] = useState('');
   const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
@@ -233,6 +222,35 @@ export default function App() {
   const [appBadgeStatus, setAppBadgeStatus] = useState('应用角标未同步');
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
+  const {
+    contacts,
+    setContacts,
+    contactMergeSuggestions,
+    setContactMergeSuggestions,
+    editingContactId,
+    setEditingContactId,
+    contactEditName,
+    setContactEditName,
+    contactEditAliases,
+    setContactEditAliases,
+    contactForm,
+    setContactForm,
+    contactFormAliases,
+    setContactFormAliases,
+    mergeSourceContactId,
+    setMergeSourceContactId,
+    contactQuery,
+    setContactQuery,
+    filteredContacts,
+    managedContacts,
+    startEditContact,
+    createManagedContact,
+    saveContactOverride,
+    toggleContactVip,
+    deleteManagedContact,
+    mergeManagedContact,
+    mergeSuggestedContact,
+  } = useContactManagement({ setStatus, setNotificationPolicy });
   const {
     appLayout,
     beginLayoutResize,
@@ -691,21 +709,6 @@ export default function App() {
     () => messages.filter((message) => selectedMessageSet.has(message.id)),
     [messages, selectedMessageSet],
   );
-  const managedContacts = contacts;
-  const filteredContacts = useMemo(() => {
-    const term = contactQuery.trim().toLowerCase();
-    const sortedContacts = [...managedContacts].sort((left, right) => {
-      const byCount = right.message_count - left.message_count;
-      if (byCount !== 0) return byCount;
-      return right.last_seen_at.localeCompare(left.last_seen_at);
-    });
-    if (!term) return sortedContacts.slice(0, 6);
-    return sortedContacts
-      .filter((contact) =>
-        [contact.name, contact.email, contact.aliases.join(' ')].join(' ').toLowerCase().includes(term),
-      )
-      .slice(0, 8);
-  }, [contactQuery, managedContacts]);
   const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const unreadTotal = stats?.unread_messages ?? 0;
@@ -1486,12 +1489,6 @@ export default function App() {
     setStatus('已打开草稿继续编辑');
   }
 
-  function startEditContact(contact: Contact) {
-    setEditingContactId(contact.id);
-    setContactEditName(contact.name);
-    setContactEditAliases(contact.aliases.join(', '));
-  }
-
   function openContactEditor(contact: Contact) {
     startEditContact(contact);
     setActiveSettingsSection('rules');
@@ -1501,122 +1498,6 @@ export default function App() {
         document.querySelector('.settings-contact-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
-  }
-
-  async function refreshContactMergeSuggestions() {
-    const suggestions = await invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions');
-    setContactMergeSuggestions(suggestions);
-  }
-
-  async function createManagedContact() {
-    const email = contactForm.email.trim().toLowerCase();
-    if (!email) {
-      setStatus('请输入联系人邮箱');
-      return;
-    }
-    const created = await invoke<Contact>('create_contact', {
-      input: {
-        ...contactForm,
-        email,
-        aliases: normalizeContactAliases(contactFormAliases).filter((alias) => alias !== email),
-      },
-    });
-    setContacts((current) => [created, ...current.filter((item) => item.id !== created.id)]);
-    setContactForm(emptyContactForm);
-    setContactFormAliases('');
-    await refreshContactMergeSuggestions();
-    setStatus(`联系人已新增：${created.name || created.email}`);
-  }
-
-  async function saveContactOverride(contact: Contact) {
-    const aliases = normalizeContactAliases(contactEditAliases).filter((alias) => alias !== contact.email.trim().toLowerCase());
-    const updated = await invoke<Contact>('update_contact', {
-      contactId: contact.id,
-      input: {
-        name: contactEditName.trim() || contact.name,
-        aliases,
-        vip: contact.vip,
-      },
-    });
-    setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    setEditingContactId(null);
-    await refreshContactMergeSuggestions();
-    setStatus(`联系人已更新：${updated.name}`);
-  }
-
-  async function toggleContactVip(contact: Contact) {
-    const nextVip = !contact.vip;
-    const aliases = contact.aliases ?? [];
-    const updated = await invoke<Contact>('update_contact', {
-      contactId: contact.id,
-      input: {
-        name: contact.name,
-        aliases,
-        vip: nextVip,
-      },
-    });
-    setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    await refreshContactMergeSuggestions();
-    setNotificationPolicy((current) => {
-      const vipSenders = normalizeContactAliases(current.vipSenders);
-      const contactEmails = [contact.email, ...aliases].map((item) => item.trim().toLowerCase()).filter(Boolean);
-      const nextSenders = nextVip
-        ? [...new Set([...vipSenders, ...contactEmails])]
-        : vipSenders.filter((sender) => !contactEmails.includes(sender));
-      return { ...current, vipSenders: nextSenders.join('\n') };
-    });
-    setStatus(nextVip ? `已设为 VIP：${updated.name || updated.email}` : `已取消 VIP：${updated.name || updated.email}`);
-  }
-
-  async function deleteManagedContact(contact: Contact) {
-    await invoke('delete_contact', { contactId: contact.id });
-    setContacts((current) => current.filter((item) => item.id !== contact.id));
-    if (editingContactId === contact.id) {
-      setEditingContactId(null);
-    }
-    if (mergeSourceContactId === contact.id) {
-      setMergeSourceContactId(null);
-    }
-    await refreshContactMergeSuggestions();
-    setStatus(`联系人已删除：${contact.name || contact.email}`);
-  }
-
-  async function mergeManagedContact(target: Contact) {
-    if (!mergeSourceContactId || mergeSourceContactId === target.id) {
-      setStatus('请选择要合并进来的联系人');
-      return;
-    }
-    const source = contacts.find((contact) => contact.id === mergeSourceContactId);
-    const merged = await invoke<Contact>('merge_contacts', {
-      targetContactId: target.id,
-      sourceContactId: mergeSourceContactId,
-    });
-    setContacts((current) => [merged, ...current.filter((item) => item.id !== target.id && item.id !== mergeSourceContactId)]);
-    setMergeSourceContactId(null);
-    await refreshContactMergeSuggestions();
-    setStatus(`已合并联系人：${source?.name || source?.email || '来源联系人'} → ${merged.name || merged.email}`);
-  }
-
-  async function mergeSuggestedContact(suggestion: ContactMergeSuggestion) {
-    const merged = await invoke<Contact>('merge_contacts', {
-      targetContactId: suggestion.target.id,
-      sourceContactId: suggestion.source.id,
-    });
-    setContacts((current) => [merged, ...current.filter((item) => item.id !== suggestion.target.id && item.id !== suggestion.source.id)]);
-    setContactMergeSuggestions((current) =>
-      current.filter(
-        (item) =>
-          item.target.id !== suggestion.target.id &&
-          item.source.id !== suggestion.target.id &&
-          item.target.id !== suggestion.source.id &&
-          item.source.id !== suggestion.source.id,
-      ),
-    );
-    if (mergeSourceContactId === suggestion.source.id || mergeSourceContactId === suggestion.target.id) {
-      setMergeSourceContactId(null);
-    }
-    await refreshContactMergeSuggestions();
-    setStatus(`已按建议合并：${suggestion.source.name || suggestion.source.email} → ${merged.name || merged.email}`);
   }
 
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {

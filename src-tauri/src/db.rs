@@ -77,6 +77,7 @@ pub struct MessageRemoteRef {
 }
 
 const LOCAL_BACKUP_SCHEMA_VERSION: i64 = 1;
+const THREAD_KEY_SCHEMA_VERSION: i64 = 1;
 const DATABASE_FILENAME: &str = "better-email.sqlite3";
 const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
 const LEGACY_APP_IDENTIFIER: &str = "app.swiftmail.client";
@@ -488,6 +489,7 @@ impl MailStore {
                 ",
                 [],
             )?;
+            migrate_thread_keys_if_needed(conn)?;
             ensure_default_identities_for_conn(conn)?;
             Ok(())
         })
@@ -646,7 +648,7 @@ impl MailStore {
                         is_read,
                         is_starred,
                         has_attachments,
-                        subject.to_lowercase()
+                        thread_key_for_message(subject, "", "", "")
                     ],
                 )?;
                 let message_id = conn.last_insert_rowid();
@@ -717,7 +719,8 @@ impl MailStore {
                 let _ = conn.execute_batch("ROLLBACK;");
             }
             let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
-            result
+            result?;
+            rebuild_thread_keys_for_conn(conn)
         })
     }
 
@@ -1294,19 +1297,32 @@ impl MailStore {
         message_id_header: &str,
     ) -> MailResult<()> {
         self.with_conn(|conn| {
+            let (subject, in_reply_to, references): (String, String, String) = conn.query_row(
+                "
+                SELECT subject, in_reply_to_header, references_header
+                FROM messages
+                WHERE id = ?1
+                ",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?;
+            let thread_key =
+                thread_key_for_message(&subject, message_id_header, &in_reply_to, &references);
             conn.execute(
                 "
                 UPDATE messages
                 SET remote_mailbox = ?2,
                     remote_uid = ?3,
-                    message_id_header = ?4
+                    message_id_header = ?4,
+                    thread_key = ?5
                 WHERE id = ?1
                 ",
                 params![
                     message_id,
                     remote_mailbox.trim(),
                     remote_uid.max(0),
-                    message_id_header.trim()
+                    message_id_header.trim(),
+                    thread_key
                 ],
             )?;
             Ok(())
@@ -1324,14 +1340,22 @@ impl MailStore {
         let in_reply_to = normalize_thread_header_value(&threading.in_reply_to);
         let references = normalize_thread_header_value(&threading.references);
         self.with_conn(|conn| {
+            let (subject, message_id_header): (String, String) = conn.query_row(
+                "SELECT subject, message_id_header FROM messages WHERE id = ?1",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
+            let thread_key =
+                thread_key_for_message(&subject, &message_id_header, &in_reply_to, &references);
             conn.execute(
                 "
                 UPDATE messages
                 SET in_reply_to_header = ?2,
-                    references_header = ?3
+                    references_header = ?3,
+                    thread_key = ?4
                 WHERE id = ?1
                 ",
-                params![message_id, in_reply_to, references],
+                params![message_id, in_reply_to, references, thread_key],
             )?;
             Ok(())
         })
@@ -1499,6 +1523,12 @@ impl MailStore {
             let account = account_for_conn(conn, account_id)?;
             let folder_id = folder_id_for_account_role(conn, account.id, "inbox")?;
             let subject = normalized_subject(&imported.subject);
+            let thread_key = thread_key_for_message(
+                &subject,
+                &imported.message_id_header,
+                &imported.in_reply_to_header,
+                &imported.references_header,
+            );
             conn.execute(
                 "
                 INSERT INTO messages(
@@ -1524,7 +1554,7 @@ impl MailStore {
                     warning_lines_to_text(&imported.security_warnings),
                     imported.received_at,
                     bool_to_int(!imported.attachments.is_empty()),
-                    subject.to_lowercase(),
+                    thread_key,
                     imported.message_id_header,
                     imported.in_reply_to_header,
                     imported.references_header
@@ -2521,12 +2551,23 @@ impl MailStore {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "
-                SELECT thread_key, MIN(subject) AS subject, COUNT(*) AS message_count,
-                       SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
-                       MAX(received_at) AS latest_at,
-                       GROUP_CONCAT(DISTINCT sender_name) AS participants
-                FROM messages
-                GROUP BY thread_key
+                SELECT m.thread_key,
+                       COALESCE(
+                           (
+                               SELECT latest.subject
+                               FROM messages latest
+                               WHERE latest.thread_key = m.thread_key
+                               ORDER BY latest.received_at DESC, latest.id DESC
+                               LIMIT 1
+                           ),
+                           '(无主题)'
+                       ) AS subject,
+                       COUNT(*) AS message_count,
+                       SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
+                       MAX(m.received_at) AS latest_at,
+                       GROUP_CONCAT(DISTINCT m.sender_name) AS participants
+                FROM messages m
+                GROUP BY m.thread_key
                 ORDER BY latest_at DESC
                 LIMIT 50
                 ",
@@ -3041,6 +3082,17 @@ impl MailStore {
     ) -> MailResult<()> {
         self.with_conn(|conn| {
             let sent_id = folder_id_for_message_role(conn, message_id, "sent")?;
+            let (subject, in_reply_to, references): (String, String, String) = conn.query_row(
+                "
+                SELECT subject, in_reply_to_header, references_header
+                FROM messages
+                WHERE id = ?1
+                ",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )?;
+            let thread_key =
+                thread_key_for_message(&subject, message_id_header, &in_reply_to, &references);
             conn.execute(
                 "
                 UPDATE outbox_queue
@@ -3056,10 +3108,11 @@ impl MailStore {
                 "
                 UPDATE messages
                 SET folder_id = ?1,
-                    message_id_header = ?2
+                    message_id_header = ?2,
+                    thread_key = ?4
                 WHERE id = ?3
                 ",
-                params![sent_id, message_id_header.trim(), message_id],
+                params![sent_id, message_id_header.trim(), message_id, thread_key],
             )?;
             Ok(())
         })
@@ -3277,7 +3330,7 @@ fn create_outbound_message_for_conn(
             sanitized_html,
             now,
             bool_to_int(!outbound_attachments.is_empty()),
-            subject.to_lowercase()
+            thread_key_for_message(&subject, "", "", "")
         ],
     )?;
     let message_id = conn.last_insert_rowid();
@@ -3351,7 +3404,7 @@ fn update_draft_message_for_conn(conn: &Connection, input: DraftInput) -> MailRe
             sanitized_html,
             now,
             bool_to_int(!outbound_attachments.is_empty()),
-            subject.to_lowercase(),
+            thread_key_for_message(&subject, "", "", ""),
             input.draft_id
         ],
     )?;
@@ -3460,6 +3513,56 @@ fn add_column_if_missing(
             "ALTER TABLE {table} ADD COLUMN {column} {definition}"
         ))?;
     }
+    Ok(())
+}
+
+fn migrate_thread_keys_if_needed(conn: &Connection) -> MailResult<()> {
+    let current_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if current_version >= THREAD_KEY_SCHEMA_VERSION {
+        return Ok(());
+    }
+    rebuild_thread_keys_for_conn(conn)?;
+    conn.pragma_update(None, "user_version", THREAD_KEY_SCHEMA_VERSION)?;
+    Ok(())
+}
+
+fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> {
+    let messages = {
+        let mut stmt = conn.prepare(
+            "
+            SELECT id, subject, message_id_header, in_reply_to_header, references_header, thread_key
+            FROM messages
+            ",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    conn.execute_batch("BEGIN IMMEDIATE TRANSACTION")?;
+    let migration_result = (|| -> MailResult<()> {
+        let mut update = conn.prepare("UPDATE messages SET thread_key = ?2 WHERE id = ?1")?;
+        for (id, subject, message_id, in_reply_to, references, current_key) in messages {
+            let next_key = thread_key_for_message(&subject, &message_id, &in_reply_to, &references);
+            if next_key != current_key {
+                update.execute(params![id, next_key])?;
+            }
+        }
+        Ok(())
+    })();
+    if let Err(error) = migration_result {
+        let _ = conn.execute_batch("ROLLBACK");
+        return Err(error);
+    }
+    conn.execute_batch("COMMIT")?;
     Ok(())
 }
 
@@ -4979,6 +5082,12 @@ fn import_imap_headers_for_conn(
     }
 
     for header in &batch.headers {
+        let thread_key = thread_key_for_message(
+            &header.subject,
+            &header.message_id,
+            &header.in_reply_to,
+            &header.references,
+        );
         if !header.message_id.trim().is_empty() {
             let rebound = conn.execute(
                 "
@@ -4989,6 +5098,7 @@ fn import_imap_headers_for_conn(
                     message_id_header = ?5,
                     in_reply_to_header = ?8,
                     references_header = ?9,
+                    thread_key = ?10,
                     is_read = ?6,
                     is_starred = ?7
                 WHERE id = (
@@ -5011,7 +5121,8 @@ fn import_imap_headers_for_conn(
                     bool_to_int(header.is_read),
                     bool_to_int(header.is_starred),
                     header.in_reply_to,
-                    header.references
+                    header.references,
+                    thread_key
                 ],
             )?;
             if rebound > 0 {
@@ -5027,7 +5138,8 @@ fn import_imap_headers_for_conn(
                 is_starred = ?3,
                 message_id_header = ?7,
                 in_reply_to_header = ?8,
-                references_header = ?9
+                references_header = ?9,
+                thread_key = ?10
             WHERE account_id = ?4
               AND remote_mailbox = ?5
               AND remote_uid = ?6
@@ -5041,7 +5153,8 @@ fn import_imap_headers_for_conn(
                 header.remote_uid,
                 header.message_id,
                 header.in_reply_to,
-                header.references
+                header.references,
+                thread_key
             ],
         )?;
         if updated > 0 {
@@ -5069,7 +5182,7 @@ fn import_imap_headers_for_conn(
                 header.received_at,
                 bool_to_int(header.is_read),
                 bool_to_int(header.is_starred),
-                header.subject.to_lowercase(),
+                thread_key,
                 batch.remote_name,
                 header.remote_uid,
                 header.message_id,
@@ -5475,6 +5588,66 @@ fn normalized_subject(subject: &str) -> String {
     } else {
         subject.trim().to_string()
     }
+}
+
+fn normalized_thread_subject(subject: &str) -> String {
+    let mut normalized = normalized_subject(subject);
+    loop {
+        let lower = normalized.to_lowercase();
+        let prefix = [
+            "re:",
+            "re：",
+            "fwd:",
+            "fwd：",
+            "fw:",
+            "fw：",
+            "回复:",
+            "回复：",
+            "转发:",
+            "转发：",
+        ]
+        .into_iter()
+        .find(|prefix| lower.starts_with(prefix));
+        let Some(prefix) = prefix else {
+            break;
+        };
+        normalized = normalized[prefix.len()..].trim_start().to_string();
+        if normalized.is_empty() {
+            return "(无主题)".to_string();
+        }
+    }
+    normalized
+}
+
+fn first_message_id(value: &str) -> Option<String> {
+    value
+        .split_whitespace()
+        .map(|token| token.trim_matches([',', ';']))
+        .find(|token| {
+            token.len() > 2
+                && token.starts_with('<')
+                && token.ends_with('>')
+                && !token.contains(['\r', '\n'])
+        })
+        .map(|token| token.to_ascii_lowercase())
+}
+
+fn thread_key_for_message(
+    subject: &str,
+    message_id_header: &str,
+    in_reply_to_header: &str,
+    references_header: &str,
+) -> String {
+    first_message_id(references_header)
+        .or_else(|| first_message_id(in_reply_to_header))
+        .or_else(|| first_message_id(message_id_header))
+        .map(|message_id| format!("msgid:{message_id}"))
+        .unwrap_or_else(|| {
+            format!(
+                "subject:{}",
+                normalized_thread_subject(subject).to_lowercase()
+            )
+        })
 }
 
 fn normalize_thread_header_value(value: &str) -> String {
@@ -6914,6 +7087,81 @@ mod tests {
                 .highest_uid,
             7
         );
+    }
+
+    #[test]
+    fn imap_replies_with_different_subjects_share_reference_thread() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let root_message_id = "<reference-root@example.com>";
+        let batch = ImapHeaderBatch {
+            remote_name: "INBOX".to_string(),
+            uid_validity: "thread-reference-1".to_string(),
+            highest_uid: 12,
+            lowest_uid: 11,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: vec![
+                crate::models::RemoteMessageHeader {
+                    remote_uid: 11,
+                    message_id: root_message_id.to_string(),
+                    in_reply_to: String::new(),
+                    references: String::new(),
+                    subject: "Quarterly planning".to_string(),
+                    sender_name: "Alice".to_string(),
+                    sender_email: "alice@example.com".to_string(),
+                    recipients: "demo@better-email.local".to_string(),
+                    snippet: "Root message".to_string(),
+                    received_at: "2026-07-10T08:00:00Z".to_string(),
+                    is_read: true,
+                    is_starred: false,
+                },
+                crate::models::RemoteMessageHeader {
+                    remote_uid: 12,
+                    message_id: "<reference-reply@example.com>".to_string(),
+                    in_reply_to: root_message_id.to_string(),
+                    references: root_message_id.to_string(),
+                    subject: "Completely renamed discussion".to_string(),
+                    sender_name: "Bob".to_string(),
+                    sender_email: "bob@example.com".to_string(),
+                    recipients: "demo@better-email.local".to_string(),
+                    snippet: "Reply with a different subject".to_string(),
+                    received_at: "2026-07-10T08:05:00Z".to_string(),
+                    is_read: false,
+                    is_starred: false,
+                },
+            ],
+        };
+
+        assert_eq!(
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            2
+        );
+
+        let thread_key = format!("msgid:{}", root_message_id.to_ascii_lowercase());
+        let thread = store
+            .list_threads()
+            .unwrap()
+            .into_iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .expect("reference thread exists");
+        assert_eq!(thread.message_count, 2);
+        assert_eq!(thread.unread_count, 1);
+        assert_eq!(thread.subject, "Completely renamed discussion");
+
+        let messages = store
+            .list_thread_messages(None, thread.thread_key, 10)
+            .unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_ne!(messages[0].subject, messages[1].subject);
     }
 
     #[test]

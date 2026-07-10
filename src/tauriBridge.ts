@@ -691,15 +691,37 @@ function listMessages(args: InvokeArgs) {
   }).slice(0, limit);
 }
 
-function normalizedThreadKey(subject: string) {
-  return subject.replace(/^(re|fwd):\s*/i, '').trim() || '(无主题)';
+function normalizedThreadSubject(subject: string) {
+  let normalized = subject.trim() || '(无主题)';
+  while (/^(re|fwd|fw|回复|转发)\s*[:：]\s*/i.test(normalized)) {
+    normalized = normalized.replace(/^(re|fwd|fw|回复|转发)\s*[:：]\s*/i, '').trim() || '(无主题)';
+  }
+  return normalized;
+}
+
+function firstMessageId(value: string | undefined) {
+  return (value ?? '')
+    .split(/\s+/)
+    .map((token) => token.replace(/^[,;]+|[,;]+$/g, ''))
+    .find((token) => /^<[^<>\s]+>$/.test(token))
+    ?.toLowerCase();
+}
+
+function messageThreadKey(message: MockMessage) {
+  const messageId =
+    firstMessageId(message.references_header)
+    ?? firstMessageId(message.in_reply_to_header)
+    ?? firstMessageId(message.message_id_header);
+  return messageId
+    ? `msgid:${messageId}`
+    : `subject:${normalizedThreadSubject(message.subject).toLowerCase()}`;
 }
 
 function listThreadMessages(args: InvokeArgs) {
   const threadKey = String(args?.threadKey ?? args?.thread_key ?? '').trim();
   const accountId = Number(args?.accountId ?? 0);
   return messages
-    .filter((message) => normalizedThreadKey(message.subject) === threadKey)
+    .filter((message) => messageThreadKey(message) === threadKey)
     .filter((message) => accountId <= 0 || message.account_id === accountId)
     .sort((left, right) => left.received_at.localeCompare(right.received_at));
 }
@@ -711,21 +733,22 @@ function listThreads(args?: InvokeArgs) {
     : messages;
   const grouped = new Map<string, typeof messages>();
   for (const message of scopedMessages) {
-    const key = normalizedThreadKey(message.subject);
+    const key = messageThreadKey(message);
     grouped.set(key, [...(grouped.get(key) ?? []), message]);
   }
   return [...grouped.entries()]
-    .map(([thread_key, items]) => ({
-      thread_key,
-      subject: thread_key,
-      message_count: items.length,
-      unread_count: items.filter((message) => !message.is_read).length,
-      latest_at: items
-        .map((message) => message.received_at)
-        .sort()
-        .slice(-1)[0] ?? now,
-      participants: [...new Set(items.map((message) => message.sender_name))].join(', '),
-    }))
+    .map(([thread_key, items]) => {
+      const orderedItems = [...items].sort((left, right) => left.received_at.localeCompare(right.received_at));
+      const latestMessage = orderedItems[orderedItems.length - 1];
+      return {
+        thread_key,
+        subject: latestMessage?.subject ?? '(无主题)',
+        message_count: items.length,
+        unread_count: items.filter((message) => !message.is_read).length,
+        latest_at: latestMessage?.received_at ?? now,
+        participants: [...new Set(items.map((message) => message.sender_name))].join(', '),
+      };
+    })
     .sort((left, right) => right.latest_at.localeCompare(left.latest_at));
 }
 

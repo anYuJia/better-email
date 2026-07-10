@@ -188,6 +188,18 @@ async function clickButton(cdp, text, scope = 'document') {
   );
 }
 
+async function openSettingsSection(cdp, label, section, expectedSelector) {
+  await clickButton(cdp, label, "document.querySelector('.settings-nav')");
+  await waitForExpression(
+    cdp,
+    `document.querySelector('.settings-page-header strong')?.textContent.trim() === ${JSON.stringify(label)}
+      && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(label)})
+      && document.querySelector(${JSON.stringify(expectedSelector)})
+      && [...document.querySelectorAll('[data-settings-section]')]
+        .every((item) => item.dataset.settingsSection === ${JSON.stringify(section)})`,
+  );
+}
+
 async function openDetails(cdp, selector) {
   await evalInPage(
     cdp,
@@ -724,8 +736,8 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('OAuth2 向导')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"auth\"]');
+    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
+    await openSettingsSection(cdp, '认证', 'auth', '.settings-oauth-panel');
     await fillInput(cdp, '.settings-oauth-panel input[placeholder*="Client ID"]', 'smoke-client-id');
     await clickButton(cdp, '打开 OAuth2 授权页', "document.querySelector('.settings-oauth-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('outlook · Session #1') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('authorization_pending')");
@@ -754,18 +766,18 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')?.innerText.includes('默认发件') && document.querySelector('[data-context-item=\"set-default-account\"]').disabled");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证') && document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证')");
+    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号' && document.querySelector('.settings-account-page-accounts') && [...document.querySelectorAll('[data-settings-section]')].every((item) => item.dataset.settingsSection === 'accounts')");
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('服务器测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '服务器测试', "document.querySelector('.settings-header-actions')");
+    await openSettingsSection(cdp, '备份', 'backup', '.settings-backup-panel');
     await waitForExpression(cdp, "document.querySelector('.settings-connection-report')?.innerText.includes('imap.mail.me.com:993') && document.querySelector('.settings-connection-report')?.innerText.includes('smtp.mail.me.com:587')");
+    await openSettingsSection(cdp, '发送', 'sending', '.settings-send-panel');
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"providers\"]');
-    await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
-    await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
+    await openSettingsSection(cdp, '服务商', 'providers', '.settings-provider-matrix');
+    await waitForExpression(cdp, "document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证') && document.body.innerText.includes('兼容性矩阵')");
+    await openSettingsSection(cdp, '认证', 'auth', '.settings-credential-panel');
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel[data-credential-provider=\"icloud\"]')?.innerText.includes('自定义邮箱') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后立即清空输入框') && document.querySelector('[data-credential-primary-action]')?.innerText.includes('验证登录')");
     await fillInput(cdp, '.credential-input-shell input', 'local-smoke-app-password');
     await waitForExpression(cdp, "document.querySelector('[data-credential-primary-action]')?.innerText.includes('保存并验证') && document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]')");
@@ -779,6 +791,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-provider-validation-status=\"success\"]') && [...document.querySelectorAll('[data-provider-validation-stage]')].length === 4 && [...document.querySelectorAll('[data-provider-validation-stage]')].every((stage) => stage.classList.contains('success')) && document.querySelector('[data-provider-validation]')?.innerText.includes('未发送邮件或修改远端邮件状态')");
     await evalInPage(cdp, "document.querySelector('.connection-technical-details > summary').click()");
     await waitForExpression(cdp, "document.querySelector('.connection-technical-details')?.open && document.querySelector('.connection-technical-details')?.textContent.includes('未发送任何邮件') && document.querySelector('.connection-technical-details')?.textContent.includes('不显示或导出授权码与 Token')");
+    await openSettingsSection(cdp, '同步', 'sync', '.settings-sync-panel');
+    await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
     await clickButton(cdp, '发现文件夹', "document.querySelector('.settings-imap-discovery')");
     await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('4 个')");
     await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未映射')");
@@ -790,13 +804,16 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('design@better-email.local')");
     await clickButton(cdp, '同步邮件头', "document.querySelector('.settings-sync-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('扫描 4 个文件夹') && document.querySelector('.settings-sync-panel')?.innerText.includes('4 个已映射文件夹')");
+    await openSettingsSection(cdp, '通知', 'notifications', '.settings-policy-panel');
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
+    await openSettingsSection(cdp, '隐私', 'privacy', '.settings-privacy-panel');
+    await openSettingsSection(cdp, '备份', 'backup', '.settings-backup-panel');
     await clickButton(cdp, '导入 EML');
     await waitForExpression(cdp, "document.body.innerText.includes('已导入 EML：Imported EML Sample') && document.body.innerText.includes('Imported EML Sample')");
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/better-email-backup.json') && document.body.innerText.includes('凭据未包含')");
 
+    await openSettingsSection(cdp, '联系人', 'contacts', '.settings-contact-panel');
     await clickButton(cdp, '编辑', "document.querySelector('.contact-tool-row')");
     await fillInput(cdp, '.contact-edit-form input[placeholder=\"联系人名称\"]', 'Ada Lovelace');
     await fillInput(cdp, '.contact-edit-form textarea[placeholder^=\"别名邮箱\"]', 'ada@work.example.com');
@@ -826,6 +843,7 @@ async function main() {
     await clickButton(cdp, '删除', "[...document.querySelectorAll('.contact-tool-row')].find((row) => row.innerText.includes('delete-me@example.com'))");
     await waitForExpression(cdp, "document.body.innerText.includes('联系人已删除：Delete Me') && !document.querySelector('.settings-modal').innerText.includes('delete-me@example.com')");
 
+    await openSettingsSection(cdp, '规则', 'rules', '.settings-rule-panel');
     await fillInput(cdp, '.rule-editor input[placeholder=\"规则名称\"]', 'Smoke Rule');
     await selectValue(cdp, '.rule-builder select', 'subject');
     await fillInput(cdp, '.rule-builder input[placeholder=\"关键词或邮箱\"]', 'Smoke');
@@ -835,10 +853,11 @@ async function main() {
     await clickButton(cdp, '新增规则', "document.querySelector('.rule-editor')");
     await waitForExpression(cdp, "document.body.innerText.includes('规则已保存：Smoke Rule') && document.body.innerText.includes('Smoke Rule')");
 
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"security-preview\"]');
+    await openSettingsSection(cdp, '安全预览', 'security-preview', '.settings-security-preview');
     await clickButton(cdp, '解析', "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('HTML 正文包含 script 标签')");
 
+    await openSettingsSection(cdp, '同步', 'sync', '.settings-sync-panel');
     await clickButton(cdp, '撤回');
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
@@ -849,11 +868,12 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.composer')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-header-actions')");
-    await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
+    await openSettingsSection(cdp, '同步', 'sync', '.settings-sync-panel');
     await openDetails(cdp, '.settings-write-validation');
     await waitForExpression(cdp, "(() => { const stored = JSON.parse(localStorage.getItem('better-email.providerWriteValidationIds.v1') || '{}'); const panel = document.querySelector('.write-validation-status'); return Boolean(stored['2']) && panel?.dataset.writeValidationId === stored['2'] && panel.querySelectorAll('[data-validation-stage]').length === 5 && document.querySelector('.settings-write-validation > summary')?.innerText.includes('0/3 核心步骤') && ![...document.querySelectorAll('.settings-write-validation-actions button')].find((button) => button.textContent.includes('刷新状态'))?.disabled && [...document.querySelectorAll('.settings-write-validation-actions button')].filter((button) => button.textContent.includes('定位')).every((button) => button.disabled); })()");
     await clickButton(cdp, '刷新状态', "document.querySelector('.settings-write-validation-actions')");
     await waitForExpression(cdp, "document.body.innerText.includes('暂未找到已发送或收件副本') && document.querySelector('[data-validation-stage=\"smtp\"]')?.innerText.includes('真实发送仍需手动确认')");
+    await waitForExpression(cdp, "document.querySelector('.writeback-validation-panel')?.innerText.includes('等待自发自收邮件') && document.querySelectorAll('[data-writeback-step]').length === 4 && [...document.querySelectorAll('[data-writeback-step-action]')].every((button) => button.disabled)");
 
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
@@ -868,15 +888,20 @@ async function main() {
     await clickButton(cdp, 'Alpha', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar')?.innerText.includes('远端邮件已移动到 Projects/Alpha')");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.body.innerText.includes('添加邮箱账号')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal')");
+    await openSettingsSection(cdp, '账号', 'accounts', '.settings-account-page-accounts');
+    await waitForExpression(cdp, "document.body.innerText.includes('添加邮箱账号')");
     await openDetails(cdp, '.add-account-disclosure');
     await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"name@example.com\"]', 'qa-new@better-email.local');
     await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"留空则使用邮箱地址\"]', 'QA New');
     await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-add-account-panel')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'smtp.qq.com:587')");
     await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
-    await waitForExpression(cdp, "document.body.innerText.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
+    await openSettingsSection(cdp, '身份', 'identities', '.settings-identity-panel');
+    await waitForExpression(cdp, "document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
+    await openSettingsSection(cdp, '账号', 'accounts', '.settings-account-page-accounts');
     await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
@@ -1017,6 +1042,7 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'settings navigation renders one page at a time',
         'settings primary actions stay visible in header',
         'settings header save completes update flow',
         'new account preset creation and scope switch work',
@@ -1032,6 +1058,7 @@ async function main() {
         'read-only provider validation runs connection login folder and header checks',
         'write validation prepares a self-addressed draft without automatic sending',
         'write validation tracker persists id and refreshes five-stage status',
+        'writeback validation guide gates read star archive and restore safely',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',
         'mapped custom mailbox resolves as a remote move target',

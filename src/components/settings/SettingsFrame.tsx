@@ -2,6 +2,7 @@ import type React from 'react';
 import {
   BadgeCheck,
   Bell,
+  ContactRound,
   DatabaseBackup,
   EyeOff,
   FlaskConical,
@@ -27,13 +28,14 @@ export type SettingsSectionId =
   | 'identities'
   | 'backup'
   | 'sync'
+  | 'contacts'
   | 'rules'
   | 'security-preview';
 
 type SettingsFrameProps = {
   title: string;
   subtitle: string;
-  activeSection: string;
+  activeSection: SettingsSectionId;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
@@ -45,27 +47,88 @@ const navigationGroups = [
   {
     label: '账号与连接',
     items: [
-      { id: 'accounts' as const, label: '账号', icon: UserRound },
-      { id: 'providers' as const, label: '服务商', icon: Server },
-      { id: 'auth' as const, label: '认证', icon: ShieldCheck },
+      {
+        id: 'accounts' as const,
+        label: '账号',
+        description: '管理账号资料、同步策略和本机账号生命周期。',
+        icon: UserRound,
+      },
+      {
+        id: 'providers' as const,
+        label: '服务商',
+        description: '选择服务商预设，配置 IMAP、SMTP 与兼容性记录。',
+        icon: Server,
+      },
+      {
+        id: 'auth' as const,
+        label: '认证',
+        description: '管理授权码、OAuth2 流程和安全凭据验证。',
+        icon: ShieldCheck,
+      },
     ],
   },
   {
     label: '体验与隐私',
     items: [
-      { id: 'sending' as const, label: '发送', icon: TimerReset },
-      { id: 'notifications' as const, label: '通知', icon: Bell },
-      { id: 'privacy' as const, label: '隐私', icon: EyeOff },
-      { id: 'identities' as const, label: '身份', icon: BadgeCheck },
+      {
+        id: 'sending' as const,
+        label: '发送',
+        description: '设置撤销发送窗口与发件队列体验。',
+        icon: TimerReset,
+      },
+      {
+        id: 'notifications' as const,
+        label: '通知',
+        description: '配置免打扰、VIP 和账号级提醒优先级。',
+        icon: Bell,
+      },
+      {
+        id: 'privacy' as const,
+        label: '隐私',
+        description: '控制远程图片、追踪防护与发件人信任规则。',
+        icon: EyeOff,
+      },
+      {
+        id: 'identities' as const,
+        label: '身份',
+        description: '维护发件身份、别名、Reply-To 与签名。',
+        icon: BadgeCheck,
+      },
     ],
   },
   {
     label: '数据与自动化',
     items: [
-      { id: 'backup' as const, label: '备份', icon: DatabaseBackup },
-      { id: 'sync' as const, label: '同步', icon: RefreshCw },
-      { id: 'rules' as const, label: '规则', icon: Workflow },
-      { id: 'security-preview' as const, label: '安全预览', icon: ScanSearch },
+      {
+        id: 'backup' as const,
+        label: '备份',
+        description: '导入导出本地数据、诊断报告和连接状态。',
+        icon: DatabaseBackup,
+      },
+      {
+        id: 'sync' as const,
+        label: '同步',
+        description: '管理 IMAP 发现、凭据验证、同步和远端回写验收。',
+        icon: RefreshCw,
+      },
+      {
+        id: 'contacts' as const,
+        label: '联系人',
+        description: '维护联系人、别名、VIP 与重复项合并。',
+        icon: ContactRound,
+      },
+      {
+        id: 'rules' as const,
+        label: '规则',
+        description: '按发件人、主题和内容自动处理新邮件。',
+        icon: Workflow,
+      },
+      {
+        id: 'security-preview' as const,
+        label: '安全预览',
+        description: '解析 MIME、清洗 HTML 并检查附件与远程资源。',
+        icon: ScanSearch,
+      },
     ],
   },
 ];
@@ -80,6 +143,11 @@ export default function SettingsFrame({
   onSave,
   onClose,
 }: SettingsFrameProps) {
+  const activeGroup = navigationGroups.find((group) => (
+    group.items.some((item) => item.id === activeSection)
+  )) ?? navigationGroups[0];
+  const activeItem = activeGroup.items.find((item) => item.id === activeSection) ?? activeGroup.items[0];
+
   return (
     <div className="composer-backdrop settings-backdrop">
       <section className="settings-modal" role="dialog" aria-modal="true" aria-label={title}>
@@ -148,7 +216,16 @@ export default function SettingsFrame({
               </div>
             ))}
           </nav>
-          <div className="settings-content">{children}</div>
+          <div className="settings-content">
+            <section className="settings-page" aria-labelledby={`settings-page-${activeSection}`}>
+              <header className="settings-page-header">
+                <span>{activeGroup.label}</span>
+                <strong id={`settings-page-${activeSection}`}>{activeItem.label}</strong>
+                <p>{activeItem.description}</p>
+              </header>
+              <div className="settings-page-content">{children}</div>
+            </section>
+          </div>
         </div>
       </section>
     </div>

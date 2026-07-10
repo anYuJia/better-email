@@ -1212,15 +1212,21 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'list_attachments':
       return attachments.filter((attachment) => attachment.message_id === args?.messageId) as T;
     case 'set_message_read':
+      {
+      const target = messages.find((message) => message.id === args?.messageId);
       messages = messages.map((message) =>
         message.id === args?.messageId ? { ...message, is_read: Boolean(args?.isRead) } : message,
       );
+      const remoteApplied = Boolean(target?.remote_mailbox && target.remote_uid > 0);
       return {
         local_applied: true,
-        remote_attempted: false,
-        remote_applied: false,
-        message: '本地已更新；UI smoke mock 跳过远端回写。',
+        remote_attempted: remoteApplied,
+        remote_applied: remoteApplied,
+        message: remoteApplied
+          ? `本地已标为${args?.isRead ? '已读' : '未读'}，远端 \\Seen 状态已同步。`
+          : '本地已更新；该邮件没有远端 UID，跳过远端已读回写。',
       } as T;
+      }
     case 'mark_folder_read': {
       const folderId = Number(args?.folderId);
       const role = String(args?.role ?? '');

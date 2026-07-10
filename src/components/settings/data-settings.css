@@ -439,6 +439,217 @@
   color: #b43c3c;
 }
 
+.writeback-validation-panel {
+  display: grid;
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid #e1e7ec;
+}
+
+.writeback-validation-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.writeback-validation-panel > header > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.writeback-validation-panel > header strong {
+  color: var(--ui-text);
+  font-size: 11px;
+}
+
+.writeback-validation-panel > header small {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.writeback-validation-panel > header > div {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.writeback-validation-panel > header b {
+  min-width: 34px;
+  color: #286184;
+  font-size: 10px;
+  text-align: center;
+}
+
+.writeback-validation-panel > header button {
+  min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid #dce3ea;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+  font-size: 9.5px;
+}
+
+.writeback-validation-panel > header button:hover:not(:disabled) {
+  border-color: #c5d4e0;
+  color: var(--ui-text);
+  background: #f7fafc;
+}
+
+.writeback-validation-panel > header button:disabled {
+  opacity: 0.45;
+}
+
+.writeback-validation-blocked {
+  padding: 7px 8px;
+  border: 1px dashed #d8e0e7;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.writeback-validation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.writeback-validation-step {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid #e1e6ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.writeback-validation-step > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.writeback-validation-step > header > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.writeback-validation-step > header i {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 6px;
+  color: #5f6d7a;
+  background: #eef2f5;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.writeback-validation-step > header svg {
+  flex: 0 0 auto;
+  color: #527187;
+}
+
+.writeback-validation-step > header strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.writeback-validation-step > header b {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-size: 9px;
+}
+
+.writeback-validation-step > p {
+  min-height: 30px;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.writeback-validation-step > button {
+  min-height: 29px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #cddfeb;
+  border-radius: 7px;
+  color: #17699f;
+  background: #f4f9fd;
+  font-size: 9.5px;
+  font-weight: 680;
+}
+
+.writeback-validation-step > button:hover:not(:disabled) {
+  border-color: #9fc6df;
+  background: #eaf5fc;
+}
+
+.writeback-validation-step > button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.writeback-validation-step.passed {
+  border-color: #cce4d6;
+  background: #f6fbf8;
+}
+
+.writeback-validation-step.passed > header b,
+.writeback-validation-step.passed > header svg {
+  color: #287a4c;
+}
+
+.writeback-validation-step.warning {
+  border-color: #ead9b8;
+  background: #fffaf1;
+}
+
+.writeback-validation-step.warning > header b {
+  color: #9a5b08;
+}
+
+.writeback-validation-step.failed {
+  border-color: #efcaca;
+  background: #fff7f7;
+}
+
+.writeback-validation-step.failed > header b {
+  color: #b43c3c;
+}
+
+.writeback-validation-step.running {
+  border-color: #cddff0;
+  background: #f5f9fd;
+}
+
+.writeback-validation-step .spin {
+  animation: writeback-spin 0.9s linear infinite;
+}
+
+@keyframes writeback-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .settings-credential-panel .tool-header > em.stored {
   color: #287a4c;
   border-color: #cce4d6;
@@ -805,6 +1016,19 @@
   }
 
   .write-validation-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .writeback-validation-panel > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .writeback-validation-panel > header > div {
+    justify-content: space-between;
+  }
+
+  .writeback-validation-grid {
     grid-template-columns: 1fr;
   }
 

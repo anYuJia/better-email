@@ -14,6 +14,7 @@ import { formatDate, type NotificationPolicy } from '../../mailUtils';
 import './settings.css';
 
 type ExperienceSettingsProps = {
+  section: 'sending' | 'notifications' | 'privacy' | 'identities';
   accountForm: Account;
   accounts: Account[];
   notificationPolicy: NotificationPolicy;
@@ -32,6 +33,7 @@ type ExperienceSettingsProps = {
 };
 
 export default function ExperienceSettings({
+  section,
   accountForm,
   accounts,
   notificationPolicy,
@@ -53,6 +55,7 @@ export default function ExperienceSettings({
 
   return (
     <div className="settings-experience-stack">
+      {section === 'sending' && (
       <section className="tool-panel settings-send-panel" data-settings-section="sending">
         <header className="tool-header">
           <span>
@@ -83,7 +86,9 @@ export default function ExperienceSettings({
           “发件箱”按钮仍用于手动排队或指定稍后发送；“发送”按钮使用这里的撤销延迟。
         </p>
       </section>
+      )}
 
+      {section === 'notifications' && (
       <section className="tool-panel settings-policy-panel" data-settings-section="notifications">
         <header className="tool-header">
           <span>
@@ -229,7 +234,9 @@ export default function ExperienceSettings({
           })}
         </div>
       </section>
+      )}
 
+      {section === 'privacy' && (
       <section className="tool-panel settings-privacy-panel" data-settings-section="privacy">
         <header className="tool-header">
           <span>
@@ -267,7 +274,9 @@ export default function ExperienceSettings({
           </div>
         )}
       </section>
+      )}
 
+      {section === 'identities' && (
       <section className="tool-panel identity-panel settings-identity-panel" data-settings-section="identities">
         <header className="tool-header">
           <span>
@@ -344,6 +353,7 @@ export default function ExperienceSettings({
           </div>
         </div>
       </section>
+      )}
     </div>
   );
 }

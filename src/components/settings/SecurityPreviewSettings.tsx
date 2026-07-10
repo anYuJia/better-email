@@ -16,7 +16,7 @@ export default function SecurityPreviewSettings({
   onParseRawMessage,
 }: SecurityPreviewSettingsProps) {
   return (
-    <details className="settings-disclosure" data-settings-section="security-preview">
+    <details className="settings-disclosure" data-settings-section="security-preview" open>
       <summary>
         <span>
           <strong>原始邮件安全预览</strong>

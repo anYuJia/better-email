@@ -192,6 +192,26 @@
   box-shadow: none;
 }
 
+.settings-modal .settings-contact-panel .settings-contact-create label.checkbox-row {
+  display: flex;
+  align-items: center;
+}
+
+.settings-modal .settings-contact-panel .settings-contact-create label.checkbox-row > input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  height: 16px;
+  padding: 0;
+}
+
+.settings-modal .settings-contact-panel .settings-contact-create label.checkbox-row > span {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
 .settings-contact-create .checkbox-row input:checked,
 .settings-rule-footer .checkbox-row input:checked {
   border-color: var(--ui-accent);
@@ -598,7 +618,7 @@
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 780px) {
   .settings-contact-create,
   .settings-contact-panel .contact-edit-form {
     grid-template-columns: 1fr;
@@ -606,6 +626,10 @@
 
   .settings-contact-create > :is(textarea, .checkbox-row, button) {
     grid-column: auto;
+  }
+
+  .settings-contact-create .checkbox-row {
+    width: 100%;
   }
 
   .settings-contact-create > button {

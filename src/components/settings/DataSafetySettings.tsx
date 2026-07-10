@@ -35,7 +35,7 @@ export default function DataSafetySettings({
         </div>
       </div>
 
-      <details className="settings-disclosure" data-settings-section="backup">
+      <details className="settings-disclosure" data-settings-section="backup" open>
         <summary>
           <span>
             <strong>备份、诊断与连接报告</strong>

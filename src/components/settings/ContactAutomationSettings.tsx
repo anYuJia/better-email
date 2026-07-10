@@ -56,7 +56,7 @@ export default function ContactAutomationSettings({
   onMergeSourceChange,
 }: ContactAutomationSettingsProps) {
   return (
-    <section className="tool-panel settings-contact-panel" data-settings-section="rules">
+    <section className="tool-panel settings-contact-panel" data-settings-section="contacts">
       <header className="tool-header">
         <span>
           <strong>联系人管理</strong>

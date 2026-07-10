@@ -1,7 +1,14 @@
 import { emptyDraft } from './appConfig';
-import type { Account, DraftInput, Message, OutboxItem } from './types';
+import type {
+  Account,
+  DraftInput,
+  Message,
+  OutboxItem,
+  RemoteActionReport,
+} from './types';
 
 export const providerWriteValidationStorageKey = 'better-email.providerWriteValidationIds.v1';
+export const providerWritebackValidationStorageKey = 'better-email.providerWritebackValidation.v1';
 
 export type ProviderWriteValidationStageTone =
   | 'pending'
@@ -24,8 +31,46 @@ export type ProviderWriteValidationStatus = {
   passedCoreStages: number;
   coreStageCount: number;
   complete: boolean;
+  writebackComplete: boolean;
   sentMessageId: number | null;
   receivedMessageId: number | null;
+};
+
+export type ProviderWritebackValidationStepId = 'read' | 'star' | 'archive' | 'restore';
+export type ProviderWritebackValidationState =
+  | 'pending'
+  | 'running'
+  | 'passed'
+  | 'warning'
+  | 'failed';
+
+export type ProviderWritebackValidationResult = {
+  state: 'passed' | 'warning' | 'failed';
+  detail: string;
+  checkedAt: string;
+};
+
+export type ProviderWritebackValidationRecord = {
+  validationId: string;
+  results: Partial<Record<ProviderWritebackValidationStepId, ProviderWritebackValidationResult>>;
+};
+
+export type ProviderWritebackValidationStep = {
+  id: ProviderWritebackValidationStepId;
+  title: string;
+  state: ProviderWritebackValidationState;
+  detail: string;
+  enabled: boolean;
+};
+
+export type ProviderWritebackValidationProgress = {
+  validationId: string;
+  ready: boolean;
+  blockedReason: string;
+  steps: ProviderWritebackValidationStep[];
+  passedSteps: number;
+  totalSteps: number;
+  complete: boolean;
 };
 
 export function createProviderWriteValidationId(now: Date = new Date()): string {
@@ -95,6 +140,89 @@ export function saveProviderWriteValidationId(
   return next;
 }
 
+export function loadProviderWritebackValidationRecords(): Record<
+  string,
+  ProviderWritebackValidationRecord
+> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(providerWritebackValidationStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, ProviderWritebackValidationRecord>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, record]) =>
+        Boolean(record?.validationId?.trim()) && Boolean(record?.results)),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function saveProviderWritebackValidationResult(
+  current: Record<string, ProviderWritebackValidationRecord>,
+  accountId: number,
+  validationId: string,
+  stepId: ProviderWritebackValidationStepId,
+  result: ProviderWritebackValidationResult,
+): Record<string, ProviderWritebackValidationRecord> {
+  const accountKey = String(accountId);
+  const normalizedId = validationId.trim();
+  const previous = current[accountKey];
+  const next = {
+    ...current,
+    [accountKey]: {
+      validationId: normalizedId,
+      results: {
+        ...(previous?.validationId === normalizedId ? previous.results : {}),
+        [stepId]: result,
+      },
+    },
+  };
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(providerWritebackValidationStorageKey, JSON.stringify(next));
+  }
+  return next;
+}
+
+export function resetProviderWritebackValidation(
+  current: Record<string, ProviderWritebackValidationRecord>,
+  accountId: number,
+  validationId: string,
+): Record<string, ProviderWritebackValidationRecord> {
+  const next = {
+    ...current,
+    [String(accountId)]: {
+      validationId: validationId.trim(),
+      results: {},
+    },
+  };
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(providerWritebackValidationStorageKey, JSON.stringify(next));
+  }
+  return next;
+}
+
+export function providerWritebackResultFromReport(
+  report: RemoteActionReport,
+  checkedAt: string = new Date().toISOString(),
+): ProviderWritebackValidationResult {
+  if (report.remote_applied) {
+    return { state: 'passed', detail: report.message, checkedAt };
+  }
+  if (report.remote_attempted) {
+    return {
+      state: 'failed',
+      detail: '远端回写已尝试但未成功，请检查连接或服务商限制后重试。',
+      checkedAt,
+    };
+  }
+  return {
+    state: 'warning',
+    detail: '本地操作已完成，但远端未执行；请检查凭据、远端 UID 和文件夹映射。',
+    checkedAt,
+  };
+}
+
 export function matchesProviderWriteValidation(
   subject: string,
   validationId: string,
@@ -108,6 +236,116 @@ function newestMessage(messages: Message[]): Message | null {
     const dateOrder = right.received_at.localeCompare(left.received_at);
     return dateOrder || right.id - left.id;
   })[0] ?? null;
+}
+
+export function selectProviderWriteValidationMessages(
+  validationId: string,
+  messages: Message[],
+): { sentMessage: Message | null; receivedMessage: Message | null } {
+  const normalizedId = validationId.trim();
+  const matchedMessages = messages.filter((message) =>
+    matchesProviderWriteValidation(message.subject, normalizedId));
+  return {
+    sentMessage: newestMessage(
+      matchedMessages.filter((message) => message.folder_role === 'sent'),
+    ),
+    receivedMessage: newestMessage(
+      matchedMessages.filter(
+        (message) =>
+          message.folder_role !== 'sent'
+          && message.folder_role !== 'drafts'
+          && message.folder_role !== 'outbox',
+      ),
+    ),
+  };
+}
+
+const writebackStepDefinitions: Array<{
+  id: ProviderWritebackValidationStepId;
+  title: string;
+  pendingDetail: string;
+  runningDetail: string;
+}> = [
+  {
+    id: 'read',
+    title: '已读回写',
+    pendingDetail: '把收件副本标为已读，并确认远端 \\Seen 状态。',
+    runningDetail: '正在写入远端 \\Seen 状态。',
+  },
+  {
+    id: 'star',
+    title: '星标回写',
+    pendingDetail: '添加星标，并确认远端 \\Flagged 状态。',
+    runningDetail: '正在写入远端 \\Flagged 状态。',
+  },
+  {
+    id: 'archive',
+    title: '归档回写',
+    pendingDetail: '移动到远端归档目录，并确认目标 mailbox 与 UID。',
+    runningDetail: '正在把验证邮件移动到远端归档目录。',
+  },
+  {
+    id: 'restore',
+    title: '恢复回写',
+    pendingDetail: '恢复到收件箱，并确认远端目标 UID 已重新绑定。',
+    runningDetail: '正在把验证邮件恢复到远端收件箱。',
+  },
+];
+
+export function buildProviderWritebackValidationProgress(
+  validationId: string,
+  receivedMessage: Message | null,
+  record: ProviderWritebackValidationRecord | null,
+  runningStep: ProviderWritebackValidationStepId | null = null,
+): ProviderWritebackValidationProgress | null {
+  const normalizedId = validationId.trim();
+  if (!normalizedId) return null;
+  const activeResults = record?.validationId === normalizedId ? record.results : {};
+  const hasRemoteMailbox = Boolean(receivedMessage?.remote_mailbox.trim());
+  const hasRemoteUid = (receivedMessage?.remote_uid ?? 0) > 0;
+  const canRestoreByMessageId = Boolean(
+    activeResults.archive?.state === 'passed'
+    && receivedMessage?.message_id_header?.trim(),
+  );
+  const ready = hasRemoteMailbox && (hasRemoteUid || canRestoreByMessageId);
+  const blockedReason = !receivedMessage
+    ? '等待自发自收邮件进入本地列表后开始回写验收。'
+    : !ready
+      ? '收件副本缺少远端 mailbox 或 UID，暂不能安全执行回写验收。'
+      : '';
+  let previousPassed = true;
+  const steps = writebackStepDefinitions.map((definition) => {
+    const result = activeResults[definition.id];
+    const state: ProviderWritebackValidationState = runningStep === definition.id
+      ? 'running'
+      : result?.state ?? 'pending';
+    const enabled =
+      ready
+      && runningStep === null
+      && previousPassed
+      && state !== 'passed';
+    const detail = state === 'running'
+      ? definition.runningDetail
+      : result?.detail ?? definition.pendingDetail;
+    previousPassed = previousPassed && state === 'passed';
+    return {
+      id: definition.id,
+      title: definition.title,
+      state,
+      detail,
+      enabled,
+    };
+  });
+  const passedSteps = steps.filter((step) => step.state === 'passed').length;
+  return {
+    validationId: normalizedId,
+    ready,
+    blockedReason,
+    steps,
+    passedSteps,
+    totalSteps: steps.length,
+    complete: passedSteps === steps.length,
+  };
 }
 
 function smtpStage(item: OutboxItem | null, sentMessage: Message | null): ProviderWriteValidationStage {
@@ -251,7 +489,10 @@ function attachmentStage(
   };
 }
 
-function remoteStage(receivedMessage: Message | null): ProviderWriteValidationStage {
+function remoteStage(
+  receivedMessage: Message | null,
+  writebackProgress: ProviderWritebackValidationProgress | null,
+): ProviderWriteValidationStage {
   if (!receivedMessage) {
     return {
       id: 'remote',
@@ -268,6 +509,40 @@ function remoteStage(receivedMessage: Message | null): ProviderWriteValidationSt
       detail: '收件副本缺少远端 mailbox 或 UID，暂不能安全回写。',
     };
   }
+  if (writebackProgress?.complete) {
+    return {
+      id: 'remote',
+      title: '远端回写',
+      tone: 'passed',
+      detail: '已读、星标、归档与恢复均已确认远端回写成功。',
+    };
+  }
+  const failedStep = writebackProgress?.steps.find((step) => step.state === 'failed');
+  if (failedStep) {
+    return {
+      id: 'remote',
+      title: '远端回写',
+      tone: 'failed',
+      detail: `${failedStep.title}失败，可修复连接后从当前步骤重试。`,
+    };
+  }
+  const warningStep = writebackProgress?.steps.find((step) => step.state === 'warning');
+  if (warningStep) {
+    return {
+      id: 'remote',
+      title: '远端回写',
+      tone: 'warning',
+      detail: `${warningStep.title}只完成本地操作，尚未确认远端结果。`,
+    };
+  }
+  if ((writebackProgress?.passedSteps ?? 0) > 0) {
+    return {
+      id: 'remote',
+      title: '远端回写',
+      tone: 'active',
+      detail: `已通过 ${writebackProgress?.passedSteps}/${writebackProgress?.totalSteps} 步，继续完成剩余回写验收。`,
+    };
+  }
   return {
     id: 'remote',
     title: '远端回写',
@@ -282,31 +557,23 @@ export function buildProviderWriteValidationStatus(
   validationId: string,
   messages: Message[],
   outbox: OutboxItem[],
+  writebackProgress: ProviderWritebackValidationProgress | null = null,
 ): ProviderWriteValidationStatus | null {
   const normalizedId = validationId.trim();
   if (!normalizedId) return null;
-  const matchedMessages = messages.filter((message) =>
-    matchesProviderWriteValidation(message.subject, normalizedId));
   const matchedOutbox = outbox
     .filter((item) => matchesProviderWriteValidation(item.subject, normalizedId))
     .sort((left, right) => right.id - left.id)[0] ?? null;
-  const sentMessage = newestMessage(
-    matchedMessages.filter((message) => message.folder_role === 'sent'),
-  );
-  const receivedMessage = newestMessage(
-    matchedMessages.filter(
-      (message) =>
-        message.folder_role !== 'sent'
-        && message.folder_role !== 'drafts'
-        && message.folder_role !== 'outbox',
-    ),
+  const { sentMessage, receivedMessage } = selectProviderWriteValidationMessages(
+    normalizedId,
+    messages,
   );
   const stages = [
     smtpStage(matchedOutbox, sentMessage),
     archiveStage(matchedOutbox, sentMessage),
     receiptStage(receivedMessage),
     attachmentStage(sentMessage, receivedMessage),
-    remoteStage(receivedMessage),
+    remoteStage(receivedMessage, writebackProgress),
   ];
   const coreStageIds = new Set(['smtp', 'archive', 'receipt']);
   const passedCoreStages = stages.filter(
@@ -320,6 +587,7 @@ export function buildProviderWriteValidationStatus(
     passedCoreStages,
     coreStageCount: coreStageIds.size,
     complete: passedCoreStages === coreStageIds.size,
+    writebackComplete: writebackProgress?.complete ?? false,
     sentMessageId: sentMessage?.id ?? null,
     receivedMessageId: receivedMessage?.id ?? null,
   };

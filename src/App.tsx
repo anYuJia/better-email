@@ -12,8 +12,9 @@ import MessageListPane, { type MessageContextAction } from './components/Message
 import ReaderPane from './components/ReaderPane';
 import ComposerWindow from './components/ComposerWindow';
 import ExperienceSettings from './components/settings/ExperienceSettings';
-import SettingsFrame from './components/settings/SettingsFrame';
+import SettingsFrame, { type SettingsSectionId } from './components/settings/SettingsFrame';
 import AccountConnectionSettings from './components/settings/AccountConnectionSettings';
+import CredentialSecuritySettings from './components/settings/CredentialSecuritySettings';
 import DataSafetySettings from './components/settings/DataSafetySettings';
 import SyncOperationsSettings from './components/settings/SyncOperationsSettings';
 import ContactAutomationSettings from './components/settings/ContactAutomationSettings';
@@ -197,7 +198,7 @@ export default function App() {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
-  const [activeSettingsSection, setActiveSettingsSection] = useState('accounts');
+  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(false);
@@ -383,6 +384,9 @@ export default function App() {
     activeValidationId,
     validationStatus: providerWriteValidationStatus,
     validationLoading: providerWriteValidationLoading,
+    writebackProgress: providerWritebackValidationProgress,
+    runWritebackStep: runProviderWritebackValidationStep,
+    resetWritebackProgress: resetProviderWritebackValidation,
     createValidationDraft,
     refreshValidation: refreshProviderWriteValidation,
   } = useProviderWriteValidation({
@@ -395,11 +399,16 @@ export default function App() {
     return scope === 'all' ? null : scope;
   }
 
-  function scrollSettingsSection(section: string) {
+  function scrollSettingsSection(section: SettingsSectionId) {
     setActiveSettingsSection(section);
-    document
-      .querySelector(`[data-settings-section="${section}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.requestAnimationFrame(() => {
+      document.querySelector('.settings-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  function openSettingsHome() {
+    setActiveSettingsSection('accounts');
+    setSettingsOpen(true);
   }
 
   function openComposer(nextDraft?: DraftInput) {
@@ -1484,13 +1493,8 @@ export default function App() {
 
   function openContactEditor(contact: Contact) {
     startEditContact(contact);
-    setActiveSettingsSection('rules');
+    setActiveSettingsSection('contacts');
     setSettingsOpen(true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        document.querySelector('.settings-contact-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
   }
 
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
@@ -1949,7 +1953,7 @@ export default function App() {
       setActiveThread(null);
       setThreadMessages([]);
     },
-    openSettings: () => setSettingsOpen(true),
+    openSettings: openSettingsHome,
     openShortcuts: () => setShortcutsOpen(true),
     setFilter,
     applyComposeTemplate,
@@ -2074,7 +2078,7 @@ export default function App() {
         onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
         onCustomFolderNameChange={setCustomFolderName}
         onCreateCustomFolder={() => { createCustomFolder().catch((error) => setStatus(String(error))); }}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onSync={() => enqueueBackgroundTask('sync', 'manual')}
@@ -2254,7 +2258,12 @@ export default function App() {
           onSave={() => { saveSettings().catch((error) => setStatus(String(error))); }}
           onClose={() => setSettingsOpen(false)}
         >
+            {(activeSettingsSection === 'accounts'
+              || activeSettingsSection === 'providers'
+              || activeSettingsSection === 'auth') && (
+            <>
             <AccountConnectionSettings
+              section={activeSettingsSection}
               accountForm={accountForm}
               accountCount={accounts.length}
               newAccountForm={newAccountForm}
@@ -2289,7 +2298,42 @@ export default function App() {
               onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
               onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
             />
+            {activeSettingsSection === 'auth' && (
+              <CredentialSecuritySettings
+                account={accountForm}
+                credentialSecret={credentialSecret}
+                credentialStatus={credentialStatus}
+                connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
+                credentialVerification={
+                  credentialVerification?.account_email === accountForm.email ? credentialVerification : null
+                }
+                providerValidationReport={
+                  providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null
+                }
+                providerValidationRunning={
+                  providerValidationRunning && providerValidationReport?.account_email === accountForm.email
+                }
+                onCredentialSecretChange={setCredentialSecret}
+                onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
+                onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
+                onRunProviderValidation={() => {
+                  runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
+                }}
+                onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
+                onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
+                onStoreAndVerifyCredential={() => {
+                  storeAndVerifyCredential().catch((error) => setStatus(String(error)));
+                }}
+              />
+            )}
+            </>
+            )}
+            {(activeSettingsSection === 'sending'
+              || activeSettingsSection === 'notifications'
+              || activeSettingsSection === 'privacy'
+              || activeSettingsSection === 'identities') && (
             <ExperienceSettings
+              section={activeSettingsSection}
               accountForm={accountForm}
               accounts={accounts}
               notificationPolicy={notificationPolicy}
@@ -2306,6 +2350,8 @@ export default function App() {
               onDeleteIdentity={deleteIdentity}
               onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
             />
+            )}
+            {activeSettingsSection === 'backup' && (
             <DataSafetySettings
               diagnosticExport={diagnosticExport}
               localBackupSummary={localBackupSummary}
@@ -2316,16 +2362,10 @@ export default function App() {
               onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
               onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
             />
+            )}
+            {activeSettingsSection === 'sync' && (
             <SyncOperationsSettings
               accountForm={accountForm}
-              credentialSecret={credentialSecret}
-              credentialStatus={credentialStatus}
-              connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
-              credentialVerification={credentialVerification?.account_email === accountForm.email ? credentialVerification : null}
-              providerValidationReport={providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null}
-              providerValidationRunning={
-                providerValidationRunning && providerValidationReport?.account_email === accountForm.email
-              }
               imapProbe={imapProbe}
               syncSchedulePlan={syncSchedulePlan}
               imapMailboxes={imapMailboxes}
@@ -2334,13 +2374,8 @@ export default function App() {
               outbox={outbox}
               writeValidationStatus={providerWriteValidationStatus}
               writeValidationLoading={providerWriteValidationLoading}
-              onCredentialSecretChange={setCredentialSecret}
+              writebackValidationProgress={providerWritebackValidationProgress}
               onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
-              onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
-              onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
-              onRunProviderValidation={() => {
-                runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
-              }}
               onPrepareWriteValidation={prepareProviderWriteValidation}
               onRefreshWriteValidation={() => {
                 refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
@@ -2348,11 +2383,10 @@ export default function App() {
               onLocateWriteValidation={(role) => {
                 locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
               }}
-              onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
-              onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
-              onStoreAndVerifyCredential={() => {
-                storeAndVerifyCredential().catch((error) => setStatus(String(error)));
+              onRunWritebackValidationStep={(step) => {
+                runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
               }}
+              onResetWritebackValidation={resetProviderWritebackValidation}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
               onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
               onMapImapMailbox={(mailbox, targetFolderId) => {
@@ -2364,6 +2398,8 @@ export default function App() {
               onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
               onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
             />
+            )}
+            {activeSettingsSection === 'contacts' && (
             <ContactAutomationSettings
               mergeSuggestions={contactMergeSuggestions}
               contactForm={contactForm}
@@ -2388,6 +2424,8 @@ export default function App() {
               onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
               onMergeSourceChange={setMergeSourceContactId}
             />
+            )}
+            {activeSettingsSection === 'rules' && (
             <RuleAutomationSettings
               ruleForm={ruleForm}
               ruleBuilderField={ruleBuilderField}
@@ -2406,12 +2444,15 @@ export default function App() {
               onEditRule={editRule}
               onRemoveRule={(rule) => { removeRule(rule).catch((error) => setStatus(String(error))); }}
             />
+            )}
+            {activeSettingsSection === 'security-preview' && (
             <SecurityPreviewSettings
               rawMessage={rawMessage}
               parsedPreview={parsedPreview}
               onRawMessageChange={setRawMessage}
               onParseRawMessage={parseRawMessage}
             />
+            )}
         </SettingsFrame>
       )}
       <ShortcutHelpModal

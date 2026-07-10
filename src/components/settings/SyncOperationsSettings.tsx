@@ -1,8 +1,6 @@
 import {
-  FileCheck2,
   FolderPlus,
   History,
-  Inbox,
   RefreshCw,
   Search,
   Send,
@@ -12,14 +10,14 @@ import {
   outboxStatusLabel,
   outboxTimingLabel,
 } from '../../app/appConfig';
-import type { ProviderValidationReport } from '../../app/providerValidation';
-import type { ProviderWriteValidationStatus } from '../../app/providerWriteValidation';
+import type {
+  ProviderWritebackValidationProgress,
+  ProviderWritebackValidationStepId,
+  ProviderWriteValidationStatus,
+} from '../../app/providerWriteValidation';
 import type {
   Account,
   BackgroundTaskKind,
-  ConnectionReport,
-  CredentialStatus,
-  CredentialVerificationReport,
   Folder,
   ImapMailboxState,
   ImapProbeReport,
@@ -28,17 +26,11 @@ import type {
   SyncSchedulePlan,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
-import CredentialSecuritySettings from './CredentialSecuritySettings';
+import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
 import './data-settings.css';
 
 type SyncOperationsSettingsProps = {
   accountForm: Account;
-  credentialSecret: string;
-  credentialStatus: CredentialStatus | null;
-  connectionReport: ConnectionReport | null;
-  credentialVerification: CredentialVerificationReport | null;
-  providerValidationReport: ProviderValidationReport | null;
-  providerValidationRunning: boolean;
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
@@ -47,17 +39,13 @@ type SyncOperationsSettingsProps = {
   outbox: OutboxItem[];
   writeValidationStatus: ProviderWriteValidationStatus | null;
   writeValidationLoading: boolean;
-  onCredentialSecretChange: (value: string) => void;
+  writebackValidationProgress: ProviderWritebackValidationProgress | null;
   onDiscoverImapFolders: () => void;
-  onCheckCredential: () => void;
-  onVerifyCredential: () => void;
-  onRunProviderValidation: () => void;
   onPrepareWriteValidation: () => void;
   onRefreshWriteValidation: () => void;
   onLocateWriteValidation: (role: 'sent' | 'inbox') => void;
-  onDeleteCredential: () => void;
-  onStoreCredential: () => void;
-  onStoreAndVerifyCredential: () => void;
+  onRunWritebackValidationStep: (step: ProviderWritebackValidationStepId) => void;
+  onResetWritebackValidation: () => void;
   onRunSyncDryRun: () => void;
   onSyncHistory: () => void;
   onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
@@ -68,12 +56,6 @@ type SyncOperationsSettingsProps = {
 
 export default function SyncOperationsSettings({
   accountForm,
-  credentialSecret,
-  credentialStatus,
-  connectionReport,
-  credentialVerification,
-  providerValidationReport,
-  providerValidationRunning,
   imapProbe,
   syncSchedulePlan,
   imapMailboxes,
@@ -82,17 +64,13 @@ export default function SyncOperationsSettings({
   outbox,
   writeValidationStatus,
   writeValidationLoading,
-  onCredentialSecretChange,
+  writebackValidationProgress,
   onDiscoverImapFolders,
-  onCheckCredential,
-  onVerifyCredential,
-  onRunProviderValidation,
   onPrepareWriteValidation,
   onRefreshWriteValidation,
   onLocateWriteValidation,
-  onDeleteCredential,
-  onStoreCredential,
-  onStoreAndVerifyCredential,
+  onRunWritebackValidationStep,
+  onResetWritebackValidation,
   onRunSyncDryRun,
   onSyncHistory,
   onMapImapMailbox,
@@ -109,14 +87,25 @@ export default function SyncOperationsSettings({
   ).length;
 
   return (
-    <details className="settings-disclosure" data-settings-section="sync">
+    <details className="settings-disclosure" data-settings-section="sync" open>
       <summary>
         <span>
           <strong>同步与发信高级工具</strong>
-          <em>IMAP 发现、同步演练、凭据和发件箱队列</em>
+          <em>回写验收、IMAP 发现、同步演练和发件箱队列</em>
         </span>
         <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
       </summary>
+
+      <ProviderWriteValidationSettings
+        status={writeValidationStatus}
+        loading={writeValidationLoading}
+        writebackProgress={writebackValidationProgress}
+        onPrepare={onPrepareWriteValidation}
+        onRefresh={onRefreshWriteValidation}
+        onLocate={onLocateWriteValidation}
+        onRunWritebackStep={onRunWritebackValidationStep}
+        onResetWriteback={onResetWritebackValidation}
+      />
 
       <section className="tool-panel settings-imap-discovery">
         <header className="tool-header">
@@ -151,23 +140,6 @@ export default function SyncOperationsSettings({
           </>
         )}
       </section>
-
-      <CredentialSecuritySettings
-        account={accountForm}
-        credentialSecret={credentialSecret}
-        credentialStatus={credentialStatus}
-        connectionReport={connectionReport}
-        credentialVerification={credentialVerification}
-        providerValidationReport={providerValidationReport}
-        providerValidationRunning={providerValidationRunning}
-        onCredentialSecretChange={onCredentialSecretChange}
-        onCheckCredential={onCheckCredential}
-        onVerifyCredential={onVerifyCredential}
-        onRunProviderValidation={onRunProviderValidation}
-        onDeleteCredential={onDeleteCredential}
-        onStoreCredential={onStoreCredential}
-        onStoreAndVerifyCredential={onStoreAndVerifyCredential}
-      />
 
       <section className="tool-panel settings-sync-panel">
         <header className="tool-header">
@@ -295,107 +267,6 @@ export default function SyncOperationsSettings({
           </div>
         )}
       </section>
-
-      <details className="tool-panel settings-write-validation">
-        <summary>
-          <span>
-            <strong>发送与回写验收</strong>
-            <small>生成发给自己的验证草稿，真实发送前仍需在撰写器中确认</small>
-          </span>
-          <b>
-            {writeValidationStatus
-              ? writeValidationStatus.complete
-                ? '核心闭环完成'
-                : `${writeValidationStatus.passedCoreStages}/${writeValidationStatus.coreStageCount} 核心步骤`
-              : '需手动确认'}
-          </b>
-        </summary>
-        <div>
-          <p>
-            草稿不会自动发送，也不会自动添加附件。请检查收件人，按需添加不含敏感信息的小文件，
-            再手动发送并验证已发送留档、自发自收、附件读取和远端状态回写。
-          </p>
-          <ol>
-            <li>默认收件人为当前账号，避免向第三方发送测试邮件。</li>
-            <li>主题包含唯一验证编号，便于在已发送和收件箱中定位。</li>
-            <li>不要在草稿或附件中放入密码、授权码或 Token。</li>
-          </ol>
-          {writeValidationStatus && (
-            <section
-              className="write-validation-status"
-              data-write-validation-id={writeValidationStatus.validationId}
-            >
-              <header>
-                <span>
-                  <strong>当前验证</strong>
-                  <code>{writeValidationStatus.validationId}</code>
-                </span>
-                <em>
-                  {writeValidationStatus.complete
-                    ? 'SMTP、Sent 留档和自发自收均已确认'
-                    : '刷新邮件头后继续检查后续状态'}
-                </em>
-              </header>
-              <div className="write-validation-stage-grid">
-                {writeValidationStatus.stages.map((stage) => (
-                  <article
-                    className={`write-validation-stage ${stage.tone}`}
-                    data-validation-stage={stage.id}
-                    key={stage.id}
-                  >
-                    <span>{stage.title}</span>
-                    <b>
-                      {stage.tone === 'passed'
-                        ? '通过'
-                        : stage.tone === 'active'
-                          ? '可继续'
-                          : stage.tone === 'warning'
-                            ? '待处理'
-                            : stage.tone === 'failed'
-                              ? '失败'
-                              : '等待'}
-                    </b>
-                    <p>{stage.detail}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-          <div className="settings-write-validation-actions">
-            <button
-              className="secondary"
-              disabled={!writeValidationStatus || writeValidationLoading}
-              type="button"
-              onClick={onRefreshWriteValidation}
-            >
-              <RefreshCw size={14} />
-              {writeValidationLoading ? '刷新中' : '刷新状态'}
-            </button>
-            <button
-              className="secondary"
-              disabled={!writeValidationStatus?.sentMessageId}
-              type="button"
-              onClick={() => onLocateWriteValidation('sent')}
-            >
-              <Send size={14} />
-              定位已发送
-            </button>
-            <button
-              className="secondary"
-              disabled={!writeValidationStatus?.receivedMessageId}
-              type="button"
-              onClick={() => onLocateWriteValidation('inbox')}
-            >
-              <Inbox size={14} />
-              定位收件
-            </button>
-            <button type="button" onClick={onPrepareWriteValidation}>
-              <FileCheck2 size={14} />
-              {writeValidationStatus ? '生成新验证草稿' : '生成验证草稿'}
-            </button>
-          </div>
-        </div>
-      </details>
 
       <section className="tool-panel settings-outbox-panel">
         <header className="tool-header">

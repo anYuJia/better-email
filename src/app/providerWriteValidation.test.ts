@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildProviderWritebackValidationProgress,
   buildProviderWriteValidationStatus,
   buildProviderWriteValidationDraft,
   createProviderWriteValidationId,
   matchesProviderWriteValidation,
+  providerWritebackResultFromReport,
+  resetProviderWritebackValidation,
+  saveProviderWritebackValidationResult,
 } from './providerWriteValidation';
 import type { Account, Message, OutboxItem } from './types';
 
@@ -148,5 +152,135 @@ describe('provider write validation draft', () => {
     expect(status?.stages.find((stage) => stage.id === 'receipt')?.tone).toBe('pending');
     expect(status?.receivedMessageId).toBeNull();
     expect(status?.complete).toBe(false);
+  });
+
+  it('enables remote writeback verification in strict sequence', () => {
+    const receivedMessage = validationMessage({
+      id: 11,
+      folder_id: 1,
+      folder_role: 'inbox',
+      remote_mailbox: 'INBOX',
+      remote_uid: 42,
+    });
+    const initial = buildProviderWritebackValidationProgress(
+      'validation-001',
+      receivedMessage,
+      null,
+    );
+
+    expect(initial?.steps.map((step) => step.enabled)).toEqual([true, false, false, false]);
+
+    const record = {
+      validationId: 'validation-001',
+      results: {
+        read: {
+          state: 'passed' as const,
+          detail: 'seen synced',
+          checkedAt: '2026-07-10T13:16:00Z',
+        },
+        star: {
+          state: 'passed' as const,
+          detail: 'flagged synced',
+          checkedAt: '2026-07-10T13:17:00Z',
+        },
+      },
+    };
+    const progressed = buildProviderWritebackValidationProgress(
+      'validation-001',
+      receivedMessage,
+      record,
+    );
+
+    expect(progressed?.passedSteps).toBe(2);
+    expect(progressed?.steps.map((step) => step.enabled)).toEqual([false, false, true, false]);
+  });
+
+  it('maps remote action reports into passed warning and failed results', () => {
+    expect(providerWritebackResultFromReport({
+      local_applied: true,
+      remote_attempted: true,
+      remote_applied: true,
+      message: 'remote ok',
+    }, '2026-07-10T13:16:00Z')).toEqual({
+      state: 'passed',
+      detail: 'remote ok',
+      checkedAt: '2026-07-10T13:16:00Z',
+    });
+    expect(providerWritebackResultFromReport({
+      local_applied: true,
+      remote_attempted: false,
+      remote_applied: false,
+      message: 'local only',
+    }).state).toBe('warning');
+    expect(providerWritebackResultFromReport({
+      local_applied: true,
+      remote_attempted: true,
+      remote_applied: false,
+      message: 'remote failed',
+    }).state).toBe('failed');
+  });
+
+  it('persists per-account results and resets only the active validation record', () => {
+    const saved = saveProviderWritebackValidationResult(
+      {},
+      account.id,
+      'validation-001',
+      'read',
+      {
+        state: 'passed',
+        detail: 'seen synced',
+        checkedAt: '2026-07-10T13:16:00Z',
+      },
+    );
+    expect(saved[String(account.id)]?.results.read?.state).toBe('passed');
+
+    const reset = resetProviderWritebackValidation(
+      saved,
+      account.id,
+      'validation-002',
+    );
+    expect(reset[String(account.id)]).toEqual({
+      validationId: 'validation-002',
+      results: {},
+    });
+  });
+
+  it('marks the remote stage passed after all writeback steps succeed', () => {
+    const sentMessage = validationMessage();
+    const receivedMessage = validationMessage({
+      id: 11,
+      folder_id: 1,
+      folder_role: 'inbox',
+      remote_mailbox: 'INBOX',
+      remote_uid: 42,
+    });
+    const result = {
+      state: 'passed' as const,
+      detail: 'remote ok',
+      checkedAt: '2026-07-10T13:16:00Z',
+    };
+    const progress = buildProviderWritebackValidationProgress(
+      'validation-001',
+      receivedMessage,
+      {
+        validationId: 'validation-001',
+        results: {
+          read: result,
+          star: result,
+          archive: result,
+          restore: result,
+        },
+      },
+    );
+    const status = buildProviderWriteValidationStatus(
+      'validation-001',
+      [sentMessage, receivedMessage],
+      [],
+      progress,
+    );
+
+    expect(progress?.complete).toBe(true);
+    expect(status?.writebackComplete).toBe(true);
+    expect(status?.stages.find((stage) => stage.id === 'remote')?.tone).toBe('passed');
   });
 });

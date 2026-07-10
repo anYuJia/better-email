@@ -25,6 +25,7 @@ import OAuthSettingsPanel from './OAuthSettingsPanel';
 import './account-settings.css';
 
 type AccountConnectionSettingsProps = {
+  section: 'accounts' | 'providers' | 'auth';
   accountForm: Account;
   accountCount: number;
   newAccountForm: AccountCreateInput;
@@ -98,6 +99,7 @@ function ProviderPresetGrid({
 }
 
 export default function AccountConnectionSettings({
+  section,
   accountForm,
   accountCount,
   newAccountForm,
@@ -133,7 +135,9 @@ export default function AccountConnectionSettings({
   onExchangeOAuth2Token,
 }: AccountConnectionSettingsProps) {
   return (
-    <div className="settings-account-stack">
+    <div className={`settings-account-stack settings-account-page settings-account-page-${section}`}>
+      {section === 'accounts' && (
+      <>
       <details className="settings-disclosure add-account-disclosure" data-settings-section="accounts">
         <summary>
           <span>
@@ -224,43 +228,6 @@ export default function AccountConnectionSettings({
             />
           </label>
           <label>
-            服务商
-            <input
-              value={accountForm.provider}
-              onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
-            />
-          </label>
-        </div>
-        <ProviderPresetGrid
-          activeProvider={accountForm.provider}
-          onSelect={onApplyProviderPreset}
-        />
-        <div className="settings-account-form-grid">
-          <label>
-            IMAP
-            <input
-              value={accountForm.imap_host}
-              onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
-            />
-          </label>
-          <label>
-            SMTP
-            <input
-              value={accountForm.smtp_host}
-              onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
-            />
-          </label>
-          <label data-settings-section="auth">
-            认证方式
-            <select
-              value={accountForm.auth_type}
-              onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
-            >
-              <option value="password">应用专用密码 / 授权码</option>
-              <option value="oauth2">OAuth2 Token</option>
-            </select>
-          </label>
-          <label>
             同步策略
             <select
               value={accountForm.sync_mode}
@@ -279,8 +246,49 @@ export default function AccountConnectionSettings({
         accountCount={accountCount}
         onRemove={onRemoveAccount}
       />
+      </>
+      )}
 
-      <details className="settings-disclosure" data-settings-section="providers">
+      {section === 'providers' && (
+      <>
+      <section className="tool-panel settings-current-account-panel settings-provider-config-panel">
+        <header className="tool-header">
+          <span>
+            <strong>服务器与服务商</strong>
+            <small>{accountForm.email}</small>
+          </span>
+          <em>{accountForm.provider}</em>
+        </header>
+        <label>
+          服务商标识
+          <input
+            value={accountForm.provider}
+            onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
+          />
+        </label>
+        <ProviderPresetGrid
+          activeProvider={accountForm.provider}
+          onSelect={onApplyProviderPreset}
+        />
+        <div className="settings-account-form-grid">
+          <label>
+            IMAP 服务器
+            <input
+              value={accountForm.imap_host}
+              onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
+            />
+          </label>
+          <label>
+            SMTP 服务器
+            <input
+              value={accountForm.smtp_host}
+              onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <details className="settings-disclosure" data-settings-section="providers" open>
         <summary>
           <span>
             <strong>服务商兼容性与真实验证</strong>
@@ -402,6 +410,30 @@ export default function AccountConnectionSettings({
           </section>
         )}
       </details>
+      </>
+      )}
+
+      {section === 'auth' && (
+      <>
+      <section className="tool-panel settings-auth-method-panel" data-settings-section="auth">
+        <header className="tool-header">
+          <span>
+            <strong>认证方式</strong>
+            <small>选择当前账号的登录方式，敏感凭据由系统安全存储管理</small>
+          </span>
+          <em>{accountForm.auth_type === 'oauth2' ? 'OAuth2' : '授权码'}</em>
+        </header>
+        <label>
+          登录方式
+          <select
+            value={accountForm.auth_type}
+            onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
+          >
+            <option value="password">应用专用密码 / 授权码</option>
+            <option value="oauth2">OAuth2 Token</option>
+          </select>
+        </label>
+      </section>
 
       <OAuthSettingsPanel
         authType={accountForm.auth_type}
@@ -426,7 +458,8 @@ export default function AccountConnectionSettings({
         onWaitForCallback={onWaitForOAuth2Callback}
         onExchange={onExchangeOAuth2Token}
       />
-
+      </>
+      )}
     </div>
   );
 }

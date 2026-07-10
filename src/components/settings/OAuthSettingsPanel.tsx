@@ -72,7 +72,7 @@ export default function OAuthSettingsPanel({
       </section>
 
       {authType === 'oauth2' && (
-        <details className="settings-disclosure" data-settings-section="auth">
+        <details className="settings-disclosure" data-settings-section="auth" open>
           <summary>
             <span>
               <strong>OAuth2 高级流程</strong>

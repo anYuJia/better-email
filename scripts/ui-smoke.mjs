@@ -447,11 +447,11 @@ async function main() {
     await clickButton(cdp, '编辑联系人', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-contact-panel .contact-edit-form')");
     await clickButton(cdp, '取消', "document.querySelector('.settings-contact-panel .contact-edit-form')");
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
     await clickButton(cdp, 'Security Team', "document.querySelector('.contact-list')");
     await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('security@example.com') && document.body.innerText.includes('正在给 Security Team 写邮件')");
-    await evalInPage(cdp, "document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]')?.click() || [...document.querySelectorAll('.composer header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]') ?? [...document.querySelectorAll('.composer header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.composer')");
     await fillInput(cdp, '.search-box input', '');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
@@ -461,7 +461,7 @@ async function main() {
     await fillInput(cdp, '.command-palette input', '写给 Ada');
     await evalInPage(cdp, "document.querySelector('.command-palette input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.command-palette') && document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('ada@example.com')");
-    await evalInPage(cdp, "document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]')?.click() || [...document.querySelectorAll('.composer header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]') ?? [...document.querySelectorAll('.composer header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.composer')");
 
     await clickButton(cdp, '写邮件');
@@ -694,7 +694,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('token_stored')");
     await clickButton(cdp, '刷新已保存 Token', "document.querySelector('.settings-oauth-actions')");
     await waitForExpression(cdp, "document.querySelector('.settings-oauth-panel')?.innerText.includes('refreshed') && document.body.innerText.includes('OAuth2 Token 已刷新')");
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
 
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')");

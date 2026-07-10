@@ -22,8 +22,10 @@
   --ui-danger: #d92d20;
   --ui-warning: #a15c00;
   --ui-warning-bg: #fff8e8;
+  --ui-control-height: 34px;
   --ui-radius-control: 9px;
   --ui-shadow-popover: 0 18px 50px rgba(24, 33, 45, 0.16), 0 2px 8px rgba(24, 33, 45, 0.08);
+  --ui-shadow-float: 0 12px 36px rgba(24, 33, 45, 0.18), 0 2px 8px rgba(24, 33, 45, 0.08);
 }
 
 html,
@@ -50,6 +52,20 @@ textarea {
 }
 
 button,
+input,
+select,
+textarea,
+summary {
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+button,
 summary,
 select,
 input[type="checkbox"] {
@@ -66,7 +82,25 @@ textarea:focus-visible {
 }
 
 input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
   accent-color: var(--ui-accent);
+}
+
+select {
+  min-height: var(--ui-control-height);
+  color: var(--ui-text);
+  background-color: var(--ui-surface);
+  font-weight: 560;
+}
+
+select:disabled,
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 * {
@@ -1154,17 +1188,17 @@ input[type="checkbox"] {
 }
 
 .compact-menu > div {
-  min-width: 184px;
+  min-width: 196px;
   padding: 6px;
   border: 1px solid var(--ui-border);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: var(--ui-shadow-popover);
   backdrop-filter: blur(14px);
 }
 
 .compact-menu > div button {
-  min-height: 32px;
+  min-height: 34px;
   border-radius: 7px;
   color: var(--ui-text-secondary);
 }
@@ -1177,8 +1211,8 @@ input[type="checkbox"] {
 
 .composer-backdrop {
   padding: 22px;
-  background: rgba(18, 26, 36, 0.28);
-  backdrop-filter: blur(10px);
+  background: rgba(18, 26, 36, 0.34);
+  backdrop-filter: blur(12px) saturate(0.92);
 }
 
 .settings-modal,
@@ -1186,7 +1220,7 @@ input[type="checkbox"] {
 .command-palette,
 .composer {
   border: 1px solid rgba(207, 213, 220, 0.92);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 28px 80px rgba(18, 26, 36, 0.24), 0 3px 12px rgba(18, 26, 36, 0.12);
   backdrop-filter: blur(18px);
@@ -1210,15 +1244,17 @@ input[type="checkbox"] {
   background: #f1f3f6;
 }
 
-.settings-nav > strong {
-  color: var(--ui-text);
-  font-size: 14px;
+.settings-nav-intro {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 5px;
 }
 
-.settings-nav > span:not(.settings-nav-group) {
-  margin-bottom: 8px;
-  color: var(--ui-text-tertiary);
-  font-size: 11px;
+.settings-nav-intro strong {
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 720;
 }
 
 .settings-nav .settings-nav-group {
@@ -1253,7 +1289,7 @@ input[type="checkbox"] {
   color: #075eae;
   border-color: transparent;
   background: var(--ui-accent-soft);
-  box-shadow: inset 3px 0 0 var(--ui-accent);
+  box-shadow: inset 2px 0 0 var(--ui-accent);
 }
 
 .settings-content {
@@ -1412,13 +1448,77 @@ input[type="checkbox"] {
 .settings-card,
 .composer-tool-card {
   border-color: var(--ui-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
   box-shadow: none;
 }
 
 .danger-menu-item {
   color: var(--ui-danger) !important;
+}
+
+.settings-close-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0 !important;
+}
+
+.context-menu,
+.context-submenu {
+  border-color: rgba(24, 33, 45, 0.11);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.985);
+  box-shadow: var(--ui-shadow-float);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.context-menu button {
+  min-height: 34px;
+  border-radius: 7px;
+  color: var(--ui-text);
+  font-weight: 540;
+}
+
+.context-menu button:hover,
+.context-menu button:focus-visible,
+.context-menu-branch:focus-within > button {
+  color: var(--ui-text);
+  background: #f0f3f6;
+}
+
+.context-menu-heading {
+  padding-top: 6px;
+  padding-bottom: 7px;
+}
+
+.context-menu-heading strong {
+  color: var(--ui-text);
+  font-weight: 680;
+}
+
+.context-menu-separator {
+  background: var(--ui-border);
+}
+
+.status-line {
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  left: auto;
+  z-index: 80;
+  width: fit-content;
+  max-width: min(440px, calc(100vw - 36px));
+  overflow: hidden;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9px;
+  color: #ffffff;
+  background: rgba(29, 36, 45, 0.88);
+  box-shadow: var(--ui-shadow-float);
+  backdrop-filter: blur(16px) saturate(1.08);
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (min-width: 1440px) {

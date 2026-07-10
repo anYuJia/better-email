@@ -109,9 +109,14 @@ export default function SettingsFrame({
               <Save size={14} />
               <span>保存设置</span>
             </button>
-            <button type="button" className="settings-close-button" onClick={onClose}>
+            <button
+              type="button"
+              className="settings-close-button"
+              aria-label="关闭设置"
+              title="关闭设置"
+              onClick={onClose}
+            >
               <X size={15} />
-              <span>关闭</span>
             </button>
           </div>
         </header>
@@ -119,7 +124,6 @@ export default function SettingsFrame({
           <nav className="settings-nav" aria-label="设置分类">
             <div className="settings-nav-intro">
               <strong>设置</strong>
-              <span>常用项优先，专业项按需展开</span>
             </div>
             {navigationGroups.map((group) => (
               <div className="settings-nav-section" key={group.label}>

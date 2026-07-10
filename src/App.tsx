@@ -7,7 +7,6 @@ import {
   Settings,
 } from 'lucide-react';
 import './styles.css';
-import './ui-2026.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
@@ -24,6 +23,8 @@ import CommandPalette from './components/CommandPalette';
 import ShortcutHelpModal from './components/ShortcutHelpModal';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
+import useAppShortcuts from './hooks/useAppShortcuts';
+import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useUndoQueue from './hooks/useUndoQueue';
@@ -98,7 +99,6 @@ import type {
 } from './app/types';
 import {
   emptyDraft,
-  normalizeCommandSearchText,
   emptyIdentityForm,
   emptyRuleForm,
   parseRuleCondition,
@@ -141,6 +141,7 @@ import type {
   RuleConditionField,
   SendUndoDelaySeconds,
 } from './app/appConfig';
+import './ui-2026.css';
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -2322,351 +2323,86 @@ export default function App() {
     await item.run();
   }
 
-  const commandPaletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const items: CommandPaletteItem[] = [
-      {
-        id: 'compose',
-        title: '写邮件',
-        section: '常用',
-        hint: '新建一封邮件',
-        run: () => openComposer(),
-      },
-      {
-        id: 'refresh',
-        title: '刷新邮箱',
-        section: '常用',
-        hint: '重新加载本地和同步状态',
-        run: refreshAll,
-      },
-      {
-        id: 'focus-search',
-        title: '聚焦搜索',
-        section: '导航',
-        hint: '快速查找邮件',
-        run: () => {
-          searchInputRef.current?.focus();
-          searchInputRef.current?.select();
-        },
-      },
-      {
-        id: 'messages-view',
-        title: '显示邮件列表',
-        section: '导航',
-        hint: '切回单封邮件列表',
-        run: () => {
-          setListMode('messages');
-          setActiveThread(null);
-          setThreadMessages([]);
-        },
-      },
-      {
-        id: 'threads-view',
-        title: '显示会话线程',
-        section: '导航',
-        hint: '按会话聚合查看',
-        run: () => setListMode('threads'),
-      },
-      {
-        id: 'settings',
-        title: '打开设置',
-        section: '窗口',
-        hint: '账号、安全、同步和规则',
-        run: () => setSettingsOpen(true),
-      },
-      {
-        id: 'shortcuts',
-        title: '查看快捷键',
-        section: '窗口',
-        hint: '查看键盘操作',
-        run: () => setShortcutsOpen(true),
-      },
-      ...filters.map((item) => ({
-        id: `filter-${item.id}`,
-        title: `筛选：${item.label}`,
-        section: '筛选',
-        hint: item.id === 'all' ? '显示所有邮件' : `只显示${item.label}邮件`,
-        run: () => setFilter(item.id),
-      })),
-      ...composeTemplates.map((template) => ({
-        id: `compose-template-${template.id}`,
-        title: `模板：${template.name}`,
-        section: '写信',
-        hint: template.subject || '插入模板正文',
-        run: () => {
-          if (!isComposerOpen) openComposer();
-          applyComposeTemplate(template);
-        },
-      })),
-      ...managedContacts.slice(0, 8).map((contact) => ({
-        id: `contact-${contact.id}`,
-        title: `写给：${contact.name || contact.email}`,
-        section: '联系人',
-        hint: `${contact.email} · ${contact.message_count} 封往来`,
-        run: () => composeToContact(contact),
-      })),
-    ];
+  const filteredCommandItems = useCommandPaletteItems({
+    commandQuery,
+    composeTemplates,
+    managedContacts,
+    selected,
+    labels,
+    folders,
+    filter,
+    query,
+    isComposerOpen,
+    searchInputRef,
+    openComposer: () => openComposer(),
+    refreshAll,
+    setListMode,
+    clearActiveThread: () => {
+      setActiveThread(null);
+      setThreadMessages([]);
+    },
+    openSettings: () => setSettingsOpen(true),
+    openShortcuts: () => setShortcutsOpen(true),
+    setFilter,
+    applyComposeTemplate,
+    composeToContact,
+    composeFromMessage,
+    toggleRead,
+    toggleStar,
+    moveSelected,
+    unsnoozeSelected,
+    snoozeSelected,
+    toggleLabel,
+    openFolder: async (folder, nextQuery, nextFilter) => {
+      setFolderId(folder.id);
+      setActiveThread(null);
+      setThreadMessages([]);
+      await loadMessages(folder.id, nextQuery, nextFilter);
+      setStatus(`已打开：${folder.name}`);
+    },
+  });
 
-    if (selected) {
-      items.push(
-        {
-          id: 'reply',
-          title: '回复当前邮件',
-          section: '当前邮件',
-          hint: selected.subject || '(无主题)',
-          disabled: selected.folder_role === 'drafts',
-          run: () => composeFromMessage(selected, 'reply'),
-        },
-        {
-          id: 'reply-all',
-          title: '回复全部',
-          section: '当前邮件',
-          hint: selected.subject || '(无主题)',
-          disabled: selected.folder_role === 'drafts',
-          run: () => composeFromMessage(selected, 'replyAll'),
-        },
-        {
-          id: 'forward',
-          title: '转发当前邮件',
-          section: '当前邮件',
-          hint: selected.subject || '(无主题)',
-          disabled: selected.folder_role === 'drafts',
-          run: () => composeFromMessage(selected, 'forward'),
-        },
-        {
-          id: 'toggle-read',
-          title: selected.is_read ? '标为未读' : '标为已读',
-          section: '当前邮件',
-          hint: '切换阅读状态',
-          run: () => toggleRead(selected),
-        },
-        {
-          id: 'toggle-star',
-          title: selected.is_starred ? '取消星标' : '添加星标',
-          section: '当前邮件',
-          hint: '切换星标',
-          run: () => toggleStar(selected),
-        },
-        {
-          id: 'archive',
-          title: '归档当前邮件',
-          section: '当前邮件',
-          hint: '移到归档',
-          disabled: selected.folder_role === 'trash',
-          run: () => moveSelected('archive'),
-        },
-        {
-          id: 'trash',
-          title: '移到废纸篓',
-          section: '当前邮件',
-          hint: '删除但可恢复',
-          disabled: selected.folder_role === 'trash',
-          run: () => moveSelected('trash'),
-        },
-        {
-          id: 'snooze',
-          title: selected.folder_role === 'snoozed' ? '取消稍后处理' : '稍后处理',
-          section: '当前邮件',
-          hint: selected.folder_role === 'snoozed' ? '恢复到收件箱' : '24 小时后提醒',
-          disabled: selected.folder_role === 'trash',
-          run: () => (selected.folder_role === 'snoozed' ? unsnoozeSelected() : snoozeSelected()),
-        },
-      );
-
-      labels.forEach((label) => {
-        items.push({
-          id: `label-${label.id}`,
-          title: selected.labels.includes(label.name) ? `移除标签：${label.name}` : `添加标签：${label.name}`,
-          section: '标签',
-          hint: `${label.message_count} 封邮件`,
-          run: () => toggleLabel(label),
-        });
-      });
-    }
-
-    folders.forEach((folder) => {
-      items.push({
-        id: `folder-${folder.id}`,
-        title: `打开：${folder.name}`,
-        section: '邮箱',
-        hint: folder.unread_count > 0 ? `${folder.unread_count} 未读` : '切换文件夹',
-        run: async () => {
-          setFolderId(folder.id);
-          setActiveThread(null);
-          setThreadMessages([]);
-          await loadMessages(folder.id, query, filter);
-          setStatus(`已打开：${folder.name}`);
-        },
-      });
-    });
-
-    return items;
-  }, [composeTemplates, filter, folderId, folders, isComposerOpen, labels, managedContacts, query, selected, selectedId]);
-
-  const filteredCommandItems = useMemo(() => {
-    const normalized = normalizeCommandSearchText(commandQuery);
-    const items = normalized
-      ? commandPaletteItems.filter((item) =>
-          normalizeCommandSearchText(`${item.title} ${item.section} ${item.hint}`).includes(normalized),
-        )
-      : commandPaletteItems;
-    return items.slice(0, 12);
-  }, [commandPaletteItems, commandQuery]);
-
-  useEffect(() => {
-    function isEditableTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
-    }
-
-    function selectRelativeMessage(offset: number) {
-      if (messages.length === 0) return;
-      const currentIndex = selectedId ? messages.findIndex((message) => message.id === selectedId) : -1;
-      const nextIndex = Math.min(Math.max(currentIndex + offset, 0), messages.length - 1);
-      setSelectedId(messages[nextIndex].id);
-    }
-
-    function handleShortcut(event: KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      const editable = isEditableTarget(event.target);
-      const commandModifier = event.metaKey || event.ctrlKey;
-
-      if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen || isCommandPaletteOpen)) {
-        event.preventDefault();
-        closeComposer();
-        setSettingsOpen(false);
-        setShortcutsOpen(false);
-        setCommandPaletteOpen(false);
-        return;
-      }
-      if (editable) return;
-
-      const hasBlockingOverlay = isSettingsOpen
-        || isShortcutsOpen
-        || isCommandPaletteOpen
-        || (isComposerOpen && !isComposerMinimized);
-      if (hasBlockingOverlay) return;
-
-      if (key === 'escape' && document.querySelector('.context-menu')) {
-        return;
-      }
-
-      if (key === 'escape' && selectedMessageIds.length > 0) {
-        event.preventDefault();
-        setSelectedMessageIds([]);
-        setStatus('已取消邮件选择');
-        return;
-      }
-
-      if (commandModifier && !event.shiftKey && key === 'z' && undoAction) {
-        event.preventDefault();
-        restoreUndoAction().catch((error) => setStatus(String(error)));
-        return;
-      }
-
-      if (commandModifier && !event.shiftKey && key === 'a' && listMode === 'messages' && messages.length > 0) {
-        event.preventDefault();
-        toggleAllVisibleMessages(true);
-        setStatus(`已选择当前列表 ${messages.length} 封邮件`);
-        return;
-      }
-
-      if (commandModifier && key === 'k') {
-        event.preventDefault();
-        setCommandPaletteOpen(true);
-        setCommandQuery('');
-        return;
-      }
-
-      if (commandModifier && key === '/') {
-        event.preventDefault();
-        setShortcutsOpen(true);
-        return;
-      }
-
-      if (commandModifier || event.altKey) return;
-
-      if (key === '?' || (event.shiftKey && key === '/')) {
-        event.preventDefault();
-        setShortcutsOpen(true);
-        return;
-      }
-
-      if (key === '/') {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-        return;
-      }
-      if (key === 'c') {
-        event.preventDefault();
-        setDraft(emptyDraft);
-        openComposer();
-        setStatus('已打开新邮件');
-        return;
-      }
-      if (key === 'j' || key === 'arrowdown') {
-        event.preventDefault();
-        selectRelativeMessage(1);
-        return;
-      }
-      if (key === 'k' || key === 'arrowup') {
-        event.preventDefault();
-        selectRelativeMessage(-1);
-        return;
-      }
-
-      if (selectedMessages.length > 0) {
-        if (key === 's') {
-          event.preventDefault();
-          const action = selectedMessages.every((message) => message.is_starred) ? 'unstar' : 'star';
-          runBulkAction(action).catch((error) => setStatus(String(error)));
-          return;
-        }
-        if (key === 'm') {
-          event.preventDefault();
-          const action = selectedMessages.every((message) => message.is_read) ? 'unread' : 'read';
-          runBulkAction(action).catch((error) => setStatus(String(error)));
-          return;
-        }
-        if (key === 'e') {
-          event.preventDefault();
-          runBulkAction('archive').catch((error) => setStatus(String(error)));
-          return;
-        }
-        if (key === 'delete' || key === 'backspace') {
-          event.preventDefault();
-          runBulkAction('trash').catch((error) => setStatus(String(error)));
-          return;
-        }
-      }
-
-      if (!selected) return;
-      if (key === 'r' && event.shiftKey) {
-        event.preventDefault();
-        composeFromMessage(selected, 'replyAll');
-      } else if (key === 'r') {
-        event.preventDefault();
-        composeFromMessage(selected, 'reply');
-      } else if (key === 'f') {
-        event.preventDefault();
-        composeFromMessage(selected, 'forward');
-      } else if (key === 's') {
-        event.preventDefault();
-        toggleStar(selected).catch((error) => setStatus(String(error)));
-      } else if (key === 'm') {
-        event.preventDefault();
-        toggleRead(selected).catch((error) => setStatus(String(error)));
-      } else if (key === 'e') {
-        event.preventDefault();
-        moveSelected('archive').catch((error) => setStatus(String(error)));
-      } else if (key === 'delete' || key === 'backspace') {
-        event.preventDefault();
-        moveSelected('trash').catch((error) => setStatus(String(error)));
-      }
-    }
-
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, [folderId, folders, isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, labels, listMode, messages, selected, selectedId, selectedMessageIds, selectedMessages, undoAction]);
+  useAppShortcuts({
+    searchInputRef,
+    messages,
+    selected,
+    selectedId,
+    selectedMessages,
+    selectedMessageIds,
+    listMode,
+    undoAction,
+    isComposerOpen,
+    isComposerMinimized,
+    isSettingsOpen,
+    isShortcutsOpen,
+    isCommandPaletteOpen,
+    closeOverlays: () => {
+      closeComposer();
+      setSettingsOpen(false);
+      setShortcutsOpen(false);
+      setCommandPaletteOpen(false);
+    },
+    clearSelection: () => setSelectedMessageIds([]),
+    setStatus,
+    restoreUndoAction,
+    toggleAllVisibleMessages,
+    openCommandPalette: () => {
+      setCommandPaletteOpen(true);
+      setCommandQuery('');
+    },
+    openShortcuts: () => setShortcutsOpen(true),
+    composeNew: () => {
+      setDraft(emptyDraft);
+      openComposer();
+      setStatus('已打开新邮件');
+    },
+    setSelectedId,
+    runBulkAction,
+    composeFromMessage,
+    toggleStar,
+    toggleRead,
+    moveSelected,
+  });
 
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
@@ -3068,7 +2804,7 @@ export default function App() {
         }}
         onDismissAction={clearUndoAction}
       />
-      <div className="status-line">{status}</div>
+      <div className="status-line" role="status" aria-live="polite">{status}</div>
     </main>
   );
 }

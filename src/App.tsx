@@ -1492,6 +1492,17 @@ export default function App() {
     setContactEditAliases(contact.aliases.join(', '));
   }
 
+  function openContactEditor(contact: Contact) {
+    startEditContact(contact);
+    setActiveSettingsSection('rules');
+    setSettingsOpen(true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector('.settings-contact-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
   async function refreshContactMergeSuggestions() {
     const suggestions = await invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions');
     setContactMergeSuggestions(suggestions);
@@ -2801,6 +2812,7 @@ export default function App() {
         onStartRename={startRenameCustomFolder}
         onDeleteFolder={(folder) => { deleteCustomFolder(folder).catch((error) => setStatus(String(error))); }}
         onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
+        onEmptyTrash={() => { emptyCurrentTrash().catch((error) => setStatus(String(error))); }}
         onSavedSearchNameChange={setSavedSearchName}
         onSaveCurrentSearch={saveCurrentSearch}
         onRunSavedSearch={(savedSearch) => { runSavedSearch(savedSearch).catch((error) => setStatus(String(error))); }}
@@ -2809,7 +2821,9 @@ export default function App() {
         onContactQueryChange={setContactQuery}
         onComposeToContact={composeToContact}
         onAddContactToDraft={addContactToDraft}
+        onEditContact={openContactEditor}
         onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
+        onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
         onCustomFolderNameChange={setCustomFolderName}
         onCreateCustomFolder={() => { createCustomFolder().catch((error) => setStatus(String(error))); }}
         onOpenSettings={() => setSettingsOpen(true)}

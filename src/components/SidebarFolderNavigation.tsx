@@ -135,6 +135,7 @@ export type SidebarFolderNavigationProps = {
   onStartRename: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onMarkFolderRead: (folder: Folder) => void;
+  onEmptyTrash: () => void;
   onFavoriteChange: (folder: Folder, isFavorite: boolean) => void;
 };
 
@@ -152,6 +153,7 @@ export default function SidebarFolderNavigation({
   onStartRename,
   onDeleteFolder,
   onMarkFolderRead,
+  onEmptyTrash,
   onFavoriteChange,
 }: SidebarFolderNavigationProps) {
   const [contextMenu, setContextMenu] = React.useState<{
@@ -243,6 +245,16 @@ export default function SidebarFolderNavigation({
             disabled: folder.unread_count <= 0,
             onSelect: () => onMarkFolderRead(folder),
           },
+          ...(folder.role === 'trash'
+            ? [{
+                id: 'empty-trash',
+                label: '清空废纸篓',
+                icon: <Trash2 size={15} />,
+                danger: true,
+                separatorBefore: true,
+                onSelect: onEmptyTrash,
+              }]
+            : []),
           ...(canToggleFavorite
             ? [{
                 id: isFavorite ? 'unfavorite-folder' : 'favorite-folder',

@@ -4,6 +4,7 @@ import {
   Keyboard,
   MailPlus,
   MoreHorizontal,
+  Pencil,
   Search,
   Send,
   Settings,
@@ -54,6 +55,7 @@ export type SidebarProps = {
   onStartRename: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
   onMarkFolderRead: (folder: Folder) => void;
+  onEmptyTrash: () => void;
   onSavedSearchNameChange: (value: string) => void;
   onSaveCurrentSearch: () => void;
   onRunSavedSearch: (savedSearch: SavedSearch) => void;
@@ -62,7 +64,9 @@ export type SidebarProps = {
   onContactQueryChange: (value: string) => void;
   onComposeToContact: (contact: Contact) => void;
   onAddContactToDraft: (contact: Contact) => void;
+  onEditContact: (contact: Contact) => void;
   onToggleContactVip: (contact: Contact) => void;
+  onDeleteContact: (contact: Contact) => void;
   onCustomFolderNameChange: (value: string) => void;
   onCreateCustomFolder: () => void;
   onOpenSettings: () => void;
@@ -103,6 +107,7 @@ export default function Sidebar({
   onStartRename,
   onDeleteFolder,
   onMarkFolderRead,
+  onEmptyTrash,
   onSavedSearchNameChange,
   onSaveCurrentSearch,
   onRunSavedSearch,
@@ -111,7 +116,9 @@ export default function Sidebar({
   onContactQueryChange,
   onComposeToContact,
   onAddContactToDraft,
+  onEditContact,
   onToggleContactVip,
+  onDeleteContact,
   onCustomFolderNameChange,
   onCreateCustomFolder,
   onOpenSettings,
@@ -129,6 +136,52 @@ export default function Sidebar({
     items: ContextMenuItem[];
   } | null>(null);
   const customFolderCount = folders.filter(isCustomFolder).length;
+
+  function openContactContextMenu(contact: Contact, x: number, y: number) {
+    setContextMenu({
+      x,
+      y,
+      ariaLabel: `${contact.name || contact.email} 联系人操作`,
+      title: contact.name || contact.email,
+      detail: contact.email,
+      items: [
+        {
+          id: 'compose-contact',
+          label: '写邮件',
+          icon: <Send size={15} />,
+          onSelect: () => onComposeToContact(contact),
+        },
+        {
+          id: 'add-contact-draft',
+          label: '加入当前草稿',
+          icon: <MailPlus size={15} />,
+          onSelect: () => onAddContactToDraft(contact),
+        },
+        {
+          id: 'edit-contact',
+          label: '编辑联系人',
+          icon: <Pencil size={15} />,
+          separatorBefore: true,
+          onSelect: () => onEditContact(contact),
+        },
+        {
+          id: 'toggle-contact-vip',
+          label: contact.vip ? '取消 VIP' : '设为 VIP',
+          icon: <Star size={15} />,
+          checked: contact.vip,
+          onSelect: () => onToggleContactVip(contact),
+        },
+        {
+          id: 'delete-contact',
+          label: '删除联系人',
+          icon: <Trash2 size={15} />,
+          danger: true,
+          separatorBefore: true,
+          onSelect: () => onDeleteContact(contact),
+        },
+      ],
+    });
+  }
 
   return (
     <aside className="sidebar">
@@ -164,6 +217,7 @@ export default function Sidebar({
         onStartRename={onStartRename}
         onDeleteFolder={onDeleteFolder}
         onMarkFolderRead={onMarkFolderRead}
+        onEmptyTrash={onEmptyTrash}
         onFavoriteChange={onFolderFavoriteChange}
       >
         <details className="sidebar-disclosure sidebar-tools">
@@ -286,35 +340,7 @@ export default function Sidebar({
                     onContextMenu={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      setContextMenu({
-                        x: event.clientX,
-                        y: event.clientY,
-                        ariaLabel: `${contact.name || contact.email} 联系人操作`,
-                        title: contact.name || contact.email,
-                        detail: contact.email,
-                        items: [
-                          {
-                            id: 'compose-contact',
-                            label: '写邮件',
-                            icon: <Send size={15} />,
-                            onSelect: () => onComposeToContact(contact),
-                          },
-                          {
-                            id: 'add-contact-draft',
-                            label: '加入当前草稿',
-                            icon: <MailPlus size={15} />,
-                            onSelect: () => onAddContactToDraft(contact),
-                          },
-                          {
-                            id: 'toggle-contact-vip',
-                            label: contact.vip ? '取消 VIP' : '设为 VIP',
-                            icon: <Star size={15} />,
-                            separatorBefore: true,
-                            checked: contact.vip,
-                            onSelect: () => onToggleContactVip(contact),
-                          },
-                        ],
-                      });
+                      openContactContextMenu(contact, event.clientX, event.clientY);
                     }}
                   >
                     <button type="button" onClick={() => onComposeToContact(contact)}>
@@ -328,35 +354,7 @@ export default function Sidebar({
                       aria-label={`${contact.name || contact.email} 更多操作`}
                       onClick={(event) => {
                         const bounds = event.currentTarget.getBoundingClientRect();
-                        setContextMenu({
-                          x: bounds.right,
-                          y: bounds.bottom,
-                          ariaLabel: `${contact.name || contact.email} 联系人操作`,
-                          title: contact.name || contact.email,
-                          detail: contact.email,
-                          items: [
-                            {
-                              id: 'compose-contact',
-                              label: '写邮件',
-                              icon: <Send size={15} />,
-                              onSelect: () => onComposeToContact(contact),
-                            },
-                            {
-                              id: 'add-contact-draft',
-                              label: '加入当前草稿',
-                              icon: <MailPlus size={15} />,
-                              onSelect: () => onAddContactToDraft(contact),
-                            },
-                            {
-                              id: 'toggle-contact-vip',
-                              label: contact.vip ? '取消 VIP' : '设为 VIP',
-                              icon: <Star size={15} />,
-                              separatorBefore: true,
-                              checked: contact.vip,
-                              onSelect: () => onToggleContactVip(contact),
-                            },
-                          ],
-                        });
+                        openContactContextMenu(contact, bounds.right, bounds.bottom);
                       }}
                     >
                       <MoreHorizontal size={14} />

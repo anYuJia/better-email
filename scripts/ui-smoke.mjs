@@ -381,6 +381,13 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('全部标为已读')");
     await clickButton(cdp, '全部标为已读', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
+    await evalInPage(
+      cdp,
+      "(() => { const folder = document.querySelector('.more-mailboxes .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('清空废纸篓')");
+    await clickButton(cdp, '清空废纸篓', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已清空废纸篓：永久删除')");
 
     await clickButton(cdp, '快捷键');
     await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('选择当前列表全部邮件') && document.body.innerText.includes('撤销上一步邮件操作')");
@@ -427,6 +434,16 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.search-box input').value === 'Quarterly' && document.body.innerText.includes('Quarterly update') && document.body.innerText.includes('已运行保存搜索：季度更新')");
     await fillInput(cdp, '.contact-center > input', 'security');
     await waitForExpression(cdp, "document.querySelector('.contact-list').innerText.includes('security@example.com') && !document.querySelector('.contact-list').innerText.includes('ada@example.com')");
+    await evalInPage(
+      cdp,
+      "(() => { const contact = [...document.querySelectorAll('.contact-list .contact-row')].find((item) => item.textContent.includes('security@example.com')); if (!contact) throw new Error('Contact context target not found'); contact.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 520, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('编辑联系人') && document.querySelector('.context-menu')?.innerText.includes('删除联系人')");
+    await clickButton(cdp, '编辑联系人', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-contact-panel .contact-edit-form')");
+    await clickButton(cdp, '取消', "document.querySelector('.settings-contact-panel .contact-edit-form')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
     await clickButton(cdp, 'Security Team', "document.querySelector('.contact-list')");
     await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('security@example.com') && document.body.innerText.includes('正在给 Security Team 写邮件')");
     await evalInPage(cdp, "document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]')?.click() || [...document.querySelectorAll('.composer header button')].find((button) => button.textContent.includes('关闭')).click()");
@@ -796,6 +813,7 @@ async function main() {
         'more mailbox list stays inside sidebar',
         'favorite mailbox pin persists and can be removed',
         'folder context menu marks all messages read',
+        'folder context menu empties trash',
         'shortcut help opens from button and keyboard',
         'command palette opens and runs commands',
         'message list loaded',
@@ -803,6 +821,7 @@ async function main() {
         'search works',
         'saved search shortcuts work',
         'contact center search and compose works',
+        'contact context menu opens editor',
         'contact command palette compose works',
         'recipient autocomplete works',
         'composer advanced tools stay folded by default',

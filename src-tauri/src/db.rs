@@ -1927,20 +1927,6 @@ impl MailStore {
         self.with_conn(|conn| list_imap_mailboxes_for_conn(conn, account_id))
     }
 
-    pub fn next_mailbox_for_header_sync(
-        &self,
-        account_id: Option<i64>,
-    ) -> MailResult<Option<ImapMailboxState>> {
-        self.with_conn(|conn| {
-            let mut mailboxes = list_imap_mailboxes_for_conn(conn, account_id)?;
-            let inbox = mailboxes
-                .iter()
-                .position(|mailbox| mailbox.local_role == "inbox")
-                .map(|index| mailboxes.remove(index));
-            Ok(inbox.or_else(|| mailboxes.into_iter().next()))
-        })
-    }
-
     pub fn accounts_for_header_sync(&self, account_id: Option<i64>) -> MailResult<Vec<Account>> {
         self.with_conn(|conn| {
             if account_id.is_some() {
@@ -2001,6 +1987,7 @@ impl MailStore {
         })
     }
 
+    #[cfg(test)]
     pub fn import_imap_headers(
         &self,
         mailbox_id: i64,
@@ -2008,59 +1995,8 @@ impl MailStore {
     ) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
             let started_at = Utc::now().to_rfc3339();
-            let (account_id, local_role): (i64, String) = conn.query_row(
-                "SELECT account_id, local_role FROM imap_mailboxes WHERE id = ?1",
-                params![mailbox_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )?;
-            let folder_role = if local_role == "custom" { "inbox" } else { &local_role };
-            let folder_id = folder_id_for_account_role(conn, account_id, folder_role)?;
-            let mut imported_messages = 0;
-
-            for header in &batch.headers {
-                let changed = conn.execute(
-                    "
-                    INSERT OR IGNORE INTO messages(
-                        account_id, folder_id, sender_name, sender_email, recipients, subject,
-                        snippet, body, received_at, is_read, is_starred, has_attachments,
-                        thread_key, remote_mailbox, remote_uid, message_id_header
-                    )
-                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, 0, 0, ?10, ?11, ?12, ?13)
-                    ",
-                    params![
-                        account_id,
-                        folder_id,
-                        header.sender_name,
-                        header.sender_email,
-                        header.recipients,
-                        header.subject,
-                        header.snippet,
-                        header.received_at,
-                        bool_to_int(header.is_read),
-                        header.subject.to_lowercase(),
-                        batch.remote_name,
-                        header.remote_uid,
-                        header.message_id
-                    ],
-                )?;
-                if changed > 0 {
-                    let message_id = conn.last_insert_rowid();
-                    apply_enabled_rules_for_message(conn, message_id)?;
-                }
-                imported_messages += changed as i64;
-            }
-
+            let imported_messages = import_imap_headers_for_conn(conn, mailbox_id, batch)?;
             let finished_at = Utc::now().to_rfc3339();
-            conn.execute(
-                "
-                UPDATE imap_mailboxes
-                SET uid_validity = ?2,
-                    highest_uid = MAX(highest_uid, ?3),
-                    last_sync_at = ?4
-                WHERE id = ?1
-                ",
-                params![mailbox_id, batch.uid_validity, batch.highest_uid, finished_at],
-            )?;
             let message = format!(
                 "IMAP 邮件头同步完成：{} 扫描 {} 封，新增 {} 封。",
                 batch.remote_name,
@@ -2083,6 +2019,14 @@ impl MailStore {
                 message,
             })
         })
+    }
+
+    pub fn import_imap_headers_batch(
+        &self,
+        mailbox_id: i64,
+        batch: &ImapHeaderBatch,
+    ) -> MailResult<i64> {
+        self.with_conn(|conn| import_imap_headers_for_conn(conn, mailbox_id, batch))
     }
 
     pub fn list_sync_runs(&self) -> MailResult<Vec<SyncRun>> {
@@ -4547,6 +4491,75 @@ fn list_imap_mailboxes_for_conn(
     Ok(rows)
 }
 
+fn import_imap_headers_for_conn(
+    conn: &Connection,
+    mailbox_id: i64,
+    batch: &ImapHeaderBatch,
+) -> MailResult<i64> {
+    let (account_id, local_role): (i64, String) = conn.query_row(
+        "SELECT account_id, local_role FROM imap_mailboxes WHERE id = ?1",
+        params![mailbox_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    if local_role == "custom" {
+        return Err(MailError::Imap(
+            "远端自定义目录尚未建立本地映射，已跳过导入以避免误归入收件箱。".to_string(),
+        ));
+    }
+    let folder_id = folder_id_for_account_role(conn, account_id, &local_role)?;
+    let mut imported_messages = 0;
+
+    for header in &batch.headers {
+        let changed = conn.execute(
+            "
+            INSERT OR IGNORE INTO messages(
+                account_id, folder_id, sender_name, sender_email, recipients, subject,
+                snippet, body, received_at, is_read, is_starred, has_attachments,
+                thread_key, remote_mailbox, remote_uid, message_id_header
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, 0, 0, ?10, ?11, ?12, ?13)
+            ",
+            params![
+                account_id,
+                folder_id,
+                header.sender_name,
+                header.sender_email,
+                header.recipients,
+                header.subject,
+                header.snippet,
+                header.received_at,
+                bool_to_int(header.is_read),
+                header.subject.to_lowercase(),
+                batch.remote_name,
+                header.remote_uid,
+                header.message_id
+            ],
+        )?;
+        if changed > 0 {
+            let message_id = conn.last_insert_rowid();
+            apply_enabled_rules_for_message(conn, message_id)?;
+        }
+        imported_messages += changed as i64;
+    }
+
+    conn.execute(
+        "
+        UPDATE imap_mailboxes
+        SET uid_validity = ?2,
+            highest_uid = MAX(highest_uid, ?3),
+            last_sync_at = ?4
+        WHERE id = ?1
+        ",
+        params![
+            mailbox_id,
+            batch.uid_validity,
+            batch.highest_uid,
+            Utc::now().to_rfc3339()
+        ],
+    )?;
+    Ok(imported_messages)
+}
+
 fn infer_local_role(remote_name: &str, attributes: &[String]) -> String {
     let normalized = remote_name.to_ascii_lowercase();
     let joined_attributes = attributes.join(" ").to_ascii_lowercase();
@@ -5954,12 +5967,16 @@ mod tests {
             .iter()
             .all(|mailbox| mailbox.account_id == second_account.id));
 
-        let scoped_mailbox = store
-            .next_mailbox_for_header_sync(Some(second_account.id))
-            .unwrap()
-            .expect("second account mailbox exists");
-        assert_eq!(scoped_mailbox.account_id, second_account.id);
-        assert_eq!(scoped_mailbox.account_email, second_account.email);
+        let scoped_mailboxes = store
+            .list_imap_mailboxes_for_account(Some(second_account.id))
+            .unwrap();
+        assert!(!scoped_mailboxes.is_empty());
+        assert!(scoped_mailboxes
+            .iter()
+            .all(|mailbox| mailbox.account_id == second_account.id));
+        assert!(scoped_mailboxes
+            .iter()
+            .all(|mailbox| mailbox.account_email == second_account.email));
     }
 
     #[test]
@@ -6148,6 +6165,100 @@ mod tests {
                 .highest_uid,
             7
         );
+    }
+
+    #[test]
+    fn imap_header_batch_import_does_not_create_sync_runs() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .into_iter()
+            .find(|item| item.remote_name == "INBOX")
+            .unwrap();
+        let batch = ImapHeaderBatch {
+            remote_name: "INBOX".to_string(),
+            uid_validity: "batch-1".to_string(),
+            highest_uid: 41,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 41,
+                message_id: "<batch-no-log@example.com>".to_string(),
+                subject: "Batch import without sync log".to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: "demo@better-email.local".to_string(),
+                snippet: "batch header".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+            }],
+        };
+        let initial_sync_runs = store.list_sync_runs().unwrap().len();
+
+        assert_eq!(
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            1
+        );
+        assert_eq!(store.list_sync_runs().unwrap().len(), initial_sync_runs);
+    }
+
+    #[test]
+    fn custom_imap_mailbox_is_not_imported_into_inbox() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "Projects/Alpha".to_string(),
+                delimiter: "/".to_string(),
+                attributes: Vec::new(),
+            }])
+            .unwrap()
+            .into_iter()
+            .find(|item| item.remote_name == "Projects/Alpha")
+            .unwrap();
+        assert_eq!(mailbox.local_role, "custom");
+
+        let error = store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: mailbox.remote_name.clone(),
+                    uid_validity: "custom-1".to_string(),
+                    highest_uid: 51,
+                    headers: vec![crate::models::RemoteMessageHeader {
+                        remote_uid: 51,
+                        message_id: "<custom-folder@example.com>".to_string(),
+                        subject: "Must stay in custom folder".to_string(),
+                        sender_name: "Remote".to_string(),
+                        sender_email: "remote@example.com".to_string(),
+                        recipients: "demo@better-email.local".to_string(),
+                        snippet: "custom header".to_string(),
+                        received_at: Utc::now().to_rfc3339(),
+                        is_read: false,
+                    }],
+                },
+            )
+            .expect_err("custom mailbox import should be rejected");
+        assert!(error.to_string().contains("尚未建立本地映射"));
+
+        let inbox = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        assert!(store
+            .list_messages_for_scope(
+                None,
+                inbox.id,
+                Some("Must stay in custom folder".to_string()),
+                None,
+                10,
+            )
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

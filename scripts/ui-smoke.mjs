@@ -714,6 +714,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('3 个')");
     await clickButton(cdp, '演练', "document.querySelector('.settings-sync-panel')");
     await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('design@better-email.local')");
+    await clickButton(cdp, '同步邮件头', "document.querySelector('.settings-sync-panel')");
+    await waitForExpression(cdp, "document.querySelector('.settings-sync-panel')?.innerText.includes('扫描 4 个文件夹') && document.querySelector('.settings-sync-panel')?.innerText.includes('4 个核心文件夹')");
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '导入 EML');
@@ -916,6 +918,7 @@ async function main() {
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'credential login verification separates IMAP and SMTP authentication',
+        'manual sync scans multiple mapped core folders',
         'undo send delay settings persist',
         'undo send returns message to drafts',
         'scheduled send automatically flushes to sent',

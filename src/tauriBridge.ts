@@ -1370,16 +1370,18 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const plan = mockSyncSchedulePlan(accountId);
       const scopedAccountCount = plan.batch_accounts.length;
       const targetAccount = mockAccounts.find((item) => item.id === accountId) ?? account;
+      const foldersPerAccount = command === 'sync_imap_headers' ? 4 : 1;
+      const scannedFolderCount = scopedAccountCount * foldersPerAccount;
       const run = {
         id: nextSyncRunId++,
         started_at: now,
         finished_at: now,
         status: plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
-        scanned_folders: scopedAccountCount,
+        scanned_folders: scannedFolderCount,
         imported_messages: 1,
         message: args?.accountId
-          ? `UI smoke mock 同步完成（${targetAccount.email}）：新增 1 封。`
-          : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
+          ? `UI smoke mock 同步完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个核心文件夹，新增 1 封。`
+          : `UI smoke mock 统一限流同步完成：本轮 ${scopedAccountCount} / ${plan.total_accounts} 个账号，扫描 ${scannedFolderCount} 个核心文件夹，新增 1 封；${plan.delayed_accounts.length} 个账号留到下一轮。`,
       };
       syncRuns = [run, ...syncRuns].slice(0, 10);
       return run as T;

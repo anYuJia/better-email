@@ -4,7 +4,10 @@ type TauriWindow = typeof import('@tauri-apps/api/window');
 type TauriNotification = typeof import('@tauri-apps/plugin-notification');
 
 const hasTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-const mockMode = import.meta.env.VITE_SWIFTMAIL_UI_MOCK === '1' || !hasTauriRuntime;
+const mockMode =
+  import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1'
+  || import.meta.env.VITE_SWIFTMAIL_UI_MOCK === '1'
+  || !hasTauriRuntime;
 const now = new Date('2026-07-09T10:00:00+08:00').toISOString();
 let coreModule: Promise<TauriCore> | null = null;
 let windowModule: Promise<TauriWindow> | null = null;
@@ -27,7 +30,7 @@ function loadNotification() {
 
 const account = {
   id: 1,
-  email: 'demo@swiftmail.local',
+  email: 'demo@better-email.local',
   display_name: 'Demo User',
   provider: 'gmail',
   imap_host: 'imap.gmail.com:993',
@@ -35,7 +38,7 @@ const account = {
   auth_type: 'oauth2',
   sync_mode: 'manual',
   remote_images_allowed: false,
-  signature: 'Sent from SwiftMail',
+  signature: 'Sent from Better Email',
 };
 
 const mockAccounts = [
@@ -43,26 +46,26 @@ const mockAccounts = [
   {
     ...account,
     id: 2,
-    email: 'design@swiftmail.local',
+    email: 'design@better-email.local',
     display_name: 'Design Studio',
     provider: 'icloud',
     imap_host: 'imap.mail.me.com:993',
     smtp_host: 'smtp.mail.me.com:587',
     auth_type: 'password',
     sync_mode: '15min',
-    signature: 'Sent from SwiftMail Studio',
+    signature: 'Sent from Better Email Studio',
   },
   {
     ...account,
     id: 3,
-    email: 'archive@swiftmail.local',
+    email: 'archive@better-email.local',
     display_name: 'Archive Desk',
     provider: 'outlook',
     imap_host: 'outlook.office365.com:993',
     smtp_host: 'smtp.office365.com:587',
     auth_type: 'oauth2',
     sync_mode: 'manual',
-    signature: 'Sent from SwiftMail Archive',
+    signature: 'Sent from Better Email Archive',
   },
 ];
 
@@ -97,18 +100,18 @@ let identities: MockIdentity[] = [
     id: 1,
     account_id: 1,
     name: 'Demo User',
-    email: 'demo@swiftmail.local',
+    email: 'demo@better-email.local',
     reply_to: '',
-    signature: 'Sent from SwiftMail',
+    signature: 'Sent from Better Email',
     is_default: true,
   },
   {
     id: 2,
     account_id: 1,
     name: 'Demo Support',
-    email: 'support@swiftmail.local',
-    reply_to: 'demo@swiftmail.local',
-    signature: 'SwiftMail Support',
+    email: 'support@better-email.local',
+    reply_to: 'demo@better-email.local',
+    signature: 'Better Email Support',
     is_default: false,
   },
 ];
@@ -165,9 +168,9 @@ let messages = [
     cc: '',
     bcc: '',
     subject: '安全检查清单',
-    snippet: 'SwiftMail 的 HTML 安全预览、附件和规则都可以验证。',
-    body: '<p>SwiftMail 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
-    sanitized_html: '<p>SwiftMail 的 HTML 安全预览已就绪。</p><img>',
+    snippet: 'Better Email 的 HTML 安全预览、附件和规则都可以验证。',
+    body: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
+    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img>',
     security_warnings: ['检测到远程图片，默认已阻止自动加载。'],
     received_at: now,
     is_read: false,
@@ -392,7 +395,19 @@ let remoteImageTrusts: Array<{
   created_at: string;
 }> = [];
 
-let backgroundTasks: unknown[] = [];
+type MockBackgroundTask = {
+  id: number;
+  kind: string;
+  title: string;
+  source: string;
+  status: string;
+  message: string;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+};
+
+let backgroundTasks: MockBackgroundTask[] = [];
 let nextFolderId = 1001;
 
 function folderIdForRole(role: string, accountId: number = account.id) {
@@ -619,7 +634,7 @@ function renderMessageWithPolicy(messageId: number) {
   if (!trusted) return message;
   const updated = {
     ...message,
-    sanitized_html: '<p>SwiftMail 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
+    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
     security_warnings: message.security_warnings.filter((warning) => !warning.includes('远程图片')),
   };
   messages = messages.map((item) => (item.id === messageId ? updated : item));
@@ -1011,13 +1026,28 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           : item,
       );
       return outbox as T;
-    case 'flush_outbox_smtp':
+    case 'flush_outbox_smtp': {
+      const sentMessageIds = new Set(
+        outbox
+          .filter(
+            (item) =>
+              ['queued', 'retry', 'failed', 'scheduled'].includes(item.status)
+              && (!item.next_attempt_at || Date.parse(item.next_attempt_at) <= Date.now()),
+          )
+          .map((item) => item.message_id),
+      );
       outbox = outbox.map((item) =>
-        ['queued', 'retry', 'failed', 'scheduled'].includes(item.status) && (!item.next_attempt_at || Date.parse(item.next_attempt_at) <= Date.now())
+        sentMessageIds.has(item.message_id)
           ? { ...item, status: 'sent', attempts: item.attempts + 1, last_error: '', next_attempt_at: '' }
           : item,
       );
+      messages = messages.map((message) =>
+        sentMessageIds.has(message.id)
+          ? { ...message, folder_role: 'sent', folder_id: folderIdForRole('sent', message.account_id) }
+          : message,
+      );
       return outbox as T;
+    }
     case 'test_connection':
       return {
         account_email: account.email,
@@ -1029,12 +1059,12 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         ],
       } as T;
     case 'export_diagnostics':
-      return JSON.stringify({ app_version: '0.1.0', accounts: [{ email_masked: 'd***@swiftmail.local' }] }, null, 2) as T;
+      return JSON.stringify({ app_version: '0.1.0', accounts: [{ email_masked: 'd***@better-email.local' }] }, null, 2) as T;
     case 'export_local_backup':
     case 'preview_local_backup':
     case 'import_local_backup':
       return {
-        path: '/tmp/swiftmail-backup.json',
+        path: '/tmp/better-email-backup.json',
         exported_at: now,
         app_version: '0.1.0',
         schema_version: 1,
@@ -1067,7 +1097,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const id = Number(args?.attachmentId);
       const attachment = attachments.find((item) => item.id === id);
       if (!attachment) throw new Error('attachment not found');
-      const updated = { ...attachment, is_downloaded: true, local_path: `/tmp/swiftmail/${attachment.filename}` };
+      const updated = { ...attachment, is_downloaded: true, local_path: `/tmp/better-email/${attachment.filename}` };
       attachments = attachments.map((item) => (item.id === id ? updated : item));
       return {
         attachment: updated,
@@ -1085,7 +1115,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     }
     case 'export_message_as_eml': {
       const message = messages.find((item) => item.id === args?.messageId);
-      return `邮件已导出为 /tmp/${message?.subject || 'swiftmail-message'}.eml` as T;
+      return `邮件已导出为 /tmp/${message?.subject || 'better-email-message'}.eml` as T;
     }
     case 'import_eml_file': {
       const accountId = Number(args?.accountId ?? account.id);
@@ -1124,7 +1154,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           mime_type: 'text/plain',
           size_bytes: 24,
           is_downloaded: true,
-          local_path: '/tmp/swiftmail/imported-note.txt',
+          local_path: '/tmp/better-email/imported-note.txt',
         },
         ...attachments,
       ];
@@ -1137,14 +1167,14 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           filename: 'smoke-brief.txt',
           mime_type: 'text/plain',
           size_bytes: 16,
-          local_path: '/tmp/swiftmail/smoke-brief.txt',
+          local_path: '/tmp/better-email/smoke-brief.txt',
         },
       ] as T;
     case 'parse_raw_message':
       return {
         subject: '安全预览样例',
         from: 'sender@example.com',
-        to: 'demo@swiftmail.local',
+        to: 'demo@better-email.local',
         body_preview: '这是一封用于验证 MIME/HTML 安全预览的原始邮件。',
         sanitized_html: '<img><p>这是一封用于验证 MIME/HTML 安全预览的原始邮件。</p>',
         attachment_count: 0,
@@ -1171,29 +1201,79 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'render_message_with_remote_image_policy':
       return renderMessageWithPolicy(Number(args?.messageId)) as T;
     case 'enqueue_background_task': {
+      const input = args?.input as { kind?: string; source?: string } | undefined;
+      const kind = String(input?.kind ?? 'sync');
+      const source = String(input?.source ?? 'manual');
+      const active = backgroundTasks.find(
+        (task) => task.kind === kind && ['queued', 'running'].includes(task.status),
+      );
+      if (active) return active as T;
       const task = {
-        id: backgroundTasks.length + 1,
-        kind: String(args?.kind ?? 'sync'),
-        title: String(args?.title ?? '同步邮件头'),
-        source: 'manual',
+        id: Math.max(0, ...backgroundTasks.map((item) => item.id)) + 1,
+        kind,
+        title:
+          kind === 'outbox-smtp'
+            ? '真实发送发件箱'
+            : kind === 'outbox-dry-run'
+              ? '发件箱发送演练'
+              : source === 'timer'
+                ? '定时同步邮件头'
+                : '同步邮件头',
+        source,
         status: 'queued',
-        message: '',
+        message: '等待执行',
         created_at: now,
         started_at: '',
         finished_at: '',
       };
-      backgroundTasks = [task];
+      backgroundTasks = [task, ...backgroundTasks];
       return task as T;
     }
     case 'next_background_task':
-      return null as T;
+      return (backgroundTasks
+        .filter((task) => task.status === 'queued')
+        .sort((left, right) => left.created_at.localeCompare(right.created_at))[0] ?? null) as T;
+    case 'mark_background_task_running': {
+      const taskId = Number(args?.taskId);
+      const task = backgroundTasks.find((item) => item.id === taskId);
+      if (!task) throw new Error('background task not found');
+      const updated = { ...task, status: 'running', message: '执行中', started_at: now };
+      backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+      return updated as T;
+    }
+    case 'complete_background_task': {
+      const taskId = Number(args?.taskId);
+      const task = backgroundTasks.find((item) => item.id === taskId);
+      if (!task) throw new Error('background task not found');
+      const updated = {
+        ...task,
+        status: 'done',
+        message: String(args?.message ?? '完成'),
+        finished_at: now,
+      };
+      backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+      return updated as T;
+    }
+    case 'fail_background_task': {
+      const taskId = Number(args?.taskId);
+      const task = backgroundTasks.find((item) => item.id === taskId);
+      if (!task) throw new Error('background task not found');
+      const updated = {
+        ...task,
+        status: 'failed',
+        message: String(args?.message ?? '失败'),
+        finished_at: now,
+      };
+      backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+      return updated as T;
+    }
     case 'upsert_rule': {
       const input = args?.input as { name?: string; condition?: string; action?: string; enabled?: boolean };
       const ruleId = args?.ruleId == null ? null : Number(args.ruleId);
       const rule = {
         id: ruleId ?? nextRuleId++,
         name: input.name?.trim() || '未命名规则',
-        condition: input.condition?.trim() || 'subject contains SwiftMail',
+        condition: input.condition?.trim() || 'subject contains Better Email',
         action: input.action?.trim() || 'apply label 重要',
         enabled: Boolean(input.enabled),
       };

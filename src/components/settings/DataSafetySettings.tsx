@@ -95,7 +95,7 @@ export default function DataSafetySettings({
           {localBackupSummary && (
             <div className="tool-row ok settings-backup-summary">
               <span>v{localBackupSummary.schema_version}</span>
-              <em>{localBackupSummary.path || 'mock://swiftmail-backup.json'}</em>
+              <em>{localBackupSummary.path || 'mock://better-email-backup.json'}</em>
               <small>{Math.max(1, Math.round(localBackupSummary.size_bytes / 1024))} KB</small>
               <p>
                 账号 {localBackupSummary.accounts} · 邮件 {localBackupSummary.messages} · 标签 {localBackupSummary.labels}

@@ -3874,13 +3874,21 @@ h1 {
   backdrop-filter: blur(14px) saturate(1.12);
 }
 
-.undo-snackbar {
+.snackbar-stack {
   position: fixed;
   left: 50%;
   bottom: 22px;
   z-index: 90;
+  width: min(440px, calc(100vw - 32px));
+  display: grid;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+
+.undo-snackbar {
+  position: relative;
   min-width: min(420px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
+  max-width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
@@ -3892,7 +3900,29 @@ h1 {
   color: #fff;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
   backdrop-filter: blur(24px) saturate(1.18);
-  transform: translateX(-50%);
+}
+
+.send-undo-snackbar {
+  overflow: hidden;
+  border-color: rgba(121, 190, 255, 0.52);
+}
+
+.send-undo-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #5eb4ff;
+  transform-origin: left;
+  animation-name: send-undo-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes send-undo-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .undo-snackbar div {
@@ -4006,12 +4036,16 @@ h1 {
     max-width: calc(100vw - 116px);
   }
 
-  .undo-snackbar {
+  .snackbar-stack {
     left: 10px;
     right: 10px;
     bottom: 50px;
-    min-width: 0;
+    width: auto;
     transform: none;
+  }
+
+  .undo-snackbar {
+    min-width: 0;
   }
 }
 
@@ -5884,5 +5918,98 @@ h1 {
 
   .reader-actions button:not(.primary-action):not(.icon-only-action) {
     padding-inline: 9px;
+  }
+}
+
+/* Context-first sidebar actions keep primary navigation visible without button clutter. */
+.saved-search-row,
+.contact-row {
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+}
+
+.saved-search-row > .row-more-button,
+.contact-row > .row-more-button,
+.folder-actions button {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.saved-search-row:hover > .row-more-button,
+.saved-search-row:focus-within > .row-more-button,
+.contact-row:hover > .row-more-button,
+.contact-row:focus-within > .row-more-button,
+.folder:hover .folder-actions button,
+.folder:focus-within .folder-actions button {
+  opacity: 1;
+}
+
+.saved-search-row > .row-more-button:hover,
+.contact-row > .row-more-button:hover,
+.folder-actions button:hover {
+  color: var(--ink-1);
+  background: rgba(31, 41, 55, 0.07);
+}
+
+.folder-actions {
+  padding-right: 4px;
+}
+
+.label-row {
+  display: block;
+}
+
+.label-row .label-row-main {
+  width: 100%;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.label-row .label-row-main:hover,
+.label-row .label-row-main:focus-visible {
+  background: rgba(31, 41, 55, 0.055);
+  outline: none;
+}
+
+.label-row .label-row-main strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-row .label-row-main em {
+  font-style: normal;
+}
+
+@media (hover: none) {
+  .saved-search-row > .row-more-button,
+  .contact-row > .row-more-button,
+  .folder-actions button {
+    opacity: 1;
   }
 }

@@ -110,12 +110,15 @@ import {
   composeTemplatesStorageKey,
   composerAutosaveStorageKey,
   appLayoutStorageKey,
+  sendUndoDelayStorageKey,
   defaultAppLayout,
   filterModes,
   clampNumber,
   backgroundTaskTitle,
   loadNotificationPolicy,
+  loadSendUndoDelaySeconds,
   normalizeContactAliases,
+  removeAppStorage,
   loadProviderVerifications,
   isFilterMode,
   loadSavedSearches,
@@ -141,7 +144,16 @@ import {
 } from './app/appConfig';
 import type {
   RuleConditionField,
+  SendUndoDelaySeconds,
 } from './app/appConfig';
+
+type PendingSendUndo = {
+  outboxId: number;
+  subject: string;
+  expiresAt: string;
+  delaySeconds: SendUndoDelaySeconds;
+};
+
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -230,11 +242,14 @@ export default function App() {
   const [notificationStatus, setNotificationStatus] = useState('系统提醒未检查');
   const [appBadgeStatus, setAppBadgeStatus] = useState('应用角标未同步');
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
+  const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
   const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const layoutResizeRef = useRef<{ pane: 'sidebar' | 'list'; startX: number; origin: AppLayout } | null>(null);
   const undoTimerRef = useRef<number | null>(null);
+  const outboxScheduleTimerRef = useRef<number | null>(null);
   const backgroundSyncRef = useRef(false);
   const backgroundTaskWorkerRef = useRef(false);
   const frontendReadyRef = useRef(false);
@@ -344,7 +359,7 @@ export default function App() {
   }
 
   function clearComposerAutosave() {
-    window.localStorage.removeItem(composerAutosaveStorageKey);
+    removeAppStorage(composerAutosaveStorageKey);
     setComposerAutosave(null);
   }
 
@@ -652,6 +667,10 @@ export default function App() {
   }, [notificationPolicy]);
 
   useEffect(() => {
+    window.localStorage.setItem(sendUndoDelayStorageKey, String(sendUndoDelaySeconds));
+  }, [sendUndoDelaySeconds]);
+
+  useEffect(() => {
     window.localStorage.setItem(providerVerificationStorageKey, JSON.stringify(providerVerifications));
   }, [providerVerifications]);
 
@@ -677,6 +696,45 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(appLayoutStorageKey, JSON.stringify(appLayout));
   }, [appLayout]);
+
+  useEffect(() => {
+    if (outboxScheduleTimerRef.current) {
+      window.clearTimeout(outboxScheduleTimerRef.current);
+      outboxScheduleTimerRef.current = null;
+    }
+
+    const nextScheduledItem = outbox
+      .filter(
+        (item) =>
+          ['scheduled', 'retry', 'failed'].includes(item.status)
+          && item.next_attempt_at
+          && Number.isFinite(Date.parse(item.next_attempt_at)),
+      )
+      .sort((left, right) => Date.parse(left.next_attempt_at) - Date.parse(right.next_attempt_at))[0];
+    if (!nextScheduledItem) return;
+
+    const maxTimerDelay = 2_147_000_000;
+    const dueAt = Date.parse(nextScheduledItem.next_attempt_at);
+    const timerDelay = Math.min(Math.max(dueAt - Date.now(), 0), maxTimerDelay);
+    outboxScheduleTimerRef.current = window.setTimeout(() => {
+      outboxScheduleTimerRef.current = null;
+      if (dueAt > Date.now()) {
+        setOutbox((current) => [...current]);
+        return;
+      }
+      setPendingSendUndo((current) => (
+        current?.outboxId === nextScheduledItem.id ? null : current
+      ));
+      enqueueBackgroundTask('outbox-smtp', 'timer').catch((error) => setStatus(String(error)));
+    }, timerDelay);
+
+    return () => {
+      if (outboxScheduleTimerRef.current) {
+        window.clearTimeout(outboxScheduleTimerRef.current);
+        outboxScheduleTimerRef.current = null;
+      }
+    };
+  }, [outbox]);
 
   useEffect(() => {
     refreshMailbox(accountScope, null).catch((error) => setStatus(String(error)));
@@ -913,22 +971,28 @@ export default function App() {
     queueUndoAction(`批量移动到 ${folderName}`, undoSnapshots, `${count} 封邮件`);
   }
 
-  async function applyBulkLabel(label: Label) {
+  async function toggleBulkLabel(label: Label) {
     if (selectedMessages.length === 0) {
       setStatus('请先选择邮件');
       return;
     }
     const undoSnapshots = snapshotMessages(selectedMessages);
+    const shouldRemove = selectedMessages.every((message) => message.labels.includes(label.name));
     for (const message of selectedMessages) {
-      if (!message.labels.includes(label.name)) {
-        await invoke('apply_label_to_message', { messageId: message.id, labelId: label.id });
+      const hasLabel = message.labels.includes(label.name);
+      if (shouldRemove ? hasLabel : !hasLabel) {
+        await invoke(shouldRemove ? 'remove_label_from_message' : 'apply_label_to_message', {
+          messageId: message.id,
+          labelId: label.id,
+        });
       }
     }
     const count = selectedMessages.length;
     setSelectedMessageIds([]);
     await refreshAll();
-    setStatus(`已批量添加标签 ${label.name}：${count} 封邮件`);
-    queueUndoAction(`批量添加标签 ${label.name}`, undoSnapshots, `${count} 封邮件`);
+    const actionLabel = shouldRemove ? '移除' : '添加';
+    setStatus(`已批量${actionLabel}标签 ${label.name}：${count} 封邮件`);
+    queueUndoAction(`批量${actionLabel}标签 ${label.name}`, undoSnapshots, `${count} 封邮件`);
   }
 
   async function runMessageAction(message: Message, action: MessageContextAction) {
@@ -944,10 +1008,53 @@ export default function App() {
     }
 
     const undoSnapshots = snapshotMessages([message]);
-    await invoke('move_message_to_role', { messageId: message.id, role: action });
+    if (action === 'permanent-delete') {
+      await invoke('delete_message_permanently', { messageId: message.id });
+      setSelectedId(null);
+      await refreshAll();
+      setStatus(`已永久删除：${message.subject || '(无主题)'}`);
+      return;
+    }
+
+    if (action === 'restore' || action === 'not-spam') {
+      await invoke<Message>('restore_message_to_inbox', { messageId: message.id });
+      setSelectedId(null);
+      await refreshAll();
+      const actionLabel = action === 'restore' ? '恢复到收件箱' : '标记为不是垃圾邮件';
+      setStatus(`已${actionLabel}：${message.subject || '(无主题)'}`);
+      queueUndoAction(actionLabel, undoSnapshots);
+      return;
+    }
+
+    if (action === 'snooze') {
+      const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await invoke<Message>('snooze_message', { messageId: message.id, snoozedUntil });
+      setSelectedId(null);
+      await refreshAll();
+      setStatus(`已稍后处理到 ${formatDate(snoozedUntil)}`);
+      queueUndoAction('稍后处理', undoSnapshots);
+      return;
+    }
+
+    if (action === 'unsnooze') {
+      await invoke<Message>('unsnooze_message', { messageId: message.id });
+      setSelectedId(null);
+      await refreshAll();
+      setStatus(`已取消稍后处理：${message.subject || '(无主题)'}`);
+      queueUndoAction('取消稍后处理', undoSnapshots);
+      return;
+    }
+
+    const targetRole = action === 'spam' ? 'spam' : action;
+    await invoke('move_message_to_role', { messageId: message.id, role: targetRole });
     setSelectedId(null);
     await refreshAll();
-    const actionLabel = action === 'archive' ? '归档' : '移到废纸篓';
+    const actionLabel =
+      action === 'archive'
+        ? '归档'
+        : action === 'spam'
+          ? '标为垃圾邮件'
+          : '移到废纸篓';
     setStatus(`已${actionLabel}：${message.subject || '(无主题)'}`);
     queueUndoAction(actionLabel, undoSnapshots);
   }
@@ -1274,12 +1381,37 @@ export default function App() {
       setStatus('请先填写收件人');
       return;
     }
-    await invoke('send_message', { input: { ...draftInputForCurrentAccount(draft), draft_id: 0 } });
+    const subject = draft.subject.trim() || '(无主题)';
+    if (sendUndoDelaySeconds === 0) {
+      await invoke('send_message', { input: { ...draftInputForCurrentAccount(draft), draft_id: 0 } });
+      setDraft(emptyDraft);
+      clearComposerAutosave();
+      closeComposer();
+      await refreshAll();
+      setStatus('邮件已进入已发送，本地发送流转验证通过');
+      return;
+    }
+
+    const expiresAt = new Date(Date.now() + sendUndoDelaySeconds * 1000).toISOString();
+    const item = await invoke<OutboxItem>('queue_outbox_message', {
+      input: {
+        ...draftInputForCurrentAccount(draft),
+        draft_id: 0,
+        send_at: expiresAt,
+      },
+    });
+    setOutbox((current) => [item, ...current.filter((entry) => entry.id !== item.id)]);
+    setPendingSendUndo({
+      outboxId: item.id,
+      subject,
+      expiresAt,
+      delaySeconds: sendUndoDelaySeconds,
+    });
     setDraft(emptyDraft);
     clearComposerAutosave();
     closeComposer();
     await refreshAll();
-    setStatus('邮件已进入已发送，本地发送流转验证通过');
+    setStatus(`邮件将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回`);
   }
 
   async function sendQuickReply(message: Message) {
@@ -1330,8 +1462,19 @@ export default function App() {
   async function cancelOutboxItem(item: OutboxItem) {
     const updated = await invoke<OutboxItem>('cancel_outbox_item', { outboxId: item.id });
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+    setPendingSendUndo((current) => (current?.outboxId === item.id ? null : current));
     await loadMeta(folderId);
     setStatus('已撤回到草稿箱');
+  }
+
+  async function undoPendingSend() {
+    const pending = pendingSendUndo;
+    if (!pending) return;
+    setPendingSendUndo(null);
+    const updated = await invoke<OutboxItem>('cancel_outbox_item', { outboxId: pending.outboxId });
+    setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+    await refreshAll();
+    setStatus(`已撤回发送：${pending.subject}`);
   }
 
   function composeFromMessage(message: Message, mode: 'reply' | 'replyAll' | 'forward') {
@@ -1822,7 +1965,7 @@ export default function App() {
         setNotificationStatus('系统提醒未授权');
         return;
       }
-      sendNotification({ title: 'SwiftMail', body });
+      sendNotification({ title: 'Better Email', body });
       setNotificationStatus(
         decision.vipMatches > 0
           ? 'VIP 系统提醒已发送'
@@ -2232,6 +2375,17 @@ export default function App() {
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
 
+  async function runLabelSearch(label: Label) {
+    const nextQuery = `label:${label.name}`;
+    setQuery(nextQuery);
+    setFilter('all');
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    await loadMessages(folderId, nextQuery, 'all', accountScope, mailboxRefreshRef.current, messagePageSize);
+    setStatus(`正在查看标签：${label.name}`);
+  }
+
   function saveCurrentSearch() {
     const trimmedQuery = query.trim();
     const trimmedName = savedSearchName.trim() || trimmedQuery;
@@ -2625,6 +2779,7 @@ export default function App() {
         onSaveCurrentSearch={saveCurrentSearch}
         onRunSavedSearch={(savedSearch) => { runSavedSearch(savedSearch).catch((error) => setStatus(String(error))); }}
         onDeleteSavedSearch={deleteSavedSearch}
+        onRunLabelSearch={(label) => { runLabelSearch(label).catch((error) => setStatus(String(error))); }}
         onContactQueryChange={setContactQuery}
         onComposeToContact={composeToContact}
         onAddContactToDraft={addContactToDraft}
@@ -2679,10 +2834,11 @@ export default function App() {
         onToggleAllVisible={toggleAllVisibleMessages}
         onRunBulkAction={runBulkAction}
         onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder.role as FolderRole, folder.name).catch((error) => setStatus(String(error))); }}
-        onApplyBulkLabel={applyBulkLabel}
+        onToggleBulkLabel={(label) => { toggleBulkLabel(label).catch((error) => setStatus(String(error))); }}
         onRunMessageAction={(message, action) => { runMessageAction(message, action).catch((error) => setStatus(String(error))); }}
         onMoveMessageToFolder={(message, folder) => { moveMessageToFolder(message, folder).catch((error) => setStatus(String(error))); }}
         onToggleMessageLabel={(message, label) => { toggleMessageLabel(message, label).catch((error) => setStatus(String(error))); }}
+        onComposeFromMessage={composeFromMessage}
         onOpenThread={openThread}
         onSelectMessage={setSelectedId}
         onToggleMessageSelection={toggleMessageSelection}
@@ -2821,11 +2977,13 @@ export default function App() {
               accountForm={accountForm}
               accounts={accounts}
               notificationPolicy={notificationPolicy}
+              sendUndoDelaySeconds={sendUndoDelaySeconds}
               remoteImageTrusts={remoteImageTrusts}
               identities={identities}
               identityForm={identityForm}
               onAccountFormChange={setAccountForm}
               onNotificationPolicyChange={setNotificationPolicy}
+              onSendUndoDelayChange={setSendUndoDelaySeconds}
               onDeleteRemoteImageTrust={deleteRemoteImageTrust}
               onIdentityFormChange={setIdentityForm}
               onEditIdentity={editIdentity}
@@ -2980,19 +3138,42 @@ export default function App() {
           </section>
         </div>
       )}
-      {undoAction && (
-        <section className="undo-snackbar" role="status" aria-live="polite">
-          <div>
-            <strong>{undoAction.title}</strong>
-            <span>{undoAction.detail}</span>
-          </div>
-          <button type="button" onClick={() => restoreUndoAction().catch((error) => setStatus(String(error)))}>
-            撤销
-          </button>
-          <button type="button" aria-label="关闭撤销提示" onClick={() => setUndoAction(null)}>
-            <X size={15} />
-          </button>
-        </section>
+      {(pendingSendUndo || undoAction) && (
+        <div className="snackbar-stack">
+          {pendingSendUndo && (
+            <section className="undo-snackbar send-undo-snackbar" role="status" aria-live="polite">
+              <div>
+                <strong>邮件将在 {pendingSendUndo.delaySeconds} 秒后发送</strong>
+                <span>{pendingSendUndo.subject} · 预计 {formatDate(pendingSendUndo.expiresAt)}</span>
+              </div>
+              <button type="button" onClick={() => undoPendingSend().catch((error) => setStatus(String(error)))}>
+                撤回发送
+              </button>
+              <button type="button" aria-label="关闭发送提示" onClick={() => setPendingSendUndo(null)}>
+                <X size={15} />
+              </button>
+              <span
+                className="send-undo-progress"
+                style={{ animationDuration: `${pendingSendUndo.delaySeconds}s` }}
+                aria-hidden="true"
+              />
+            </section>
+          )}
+          {undoAction && (
+            <section className="undo-snackbar" role="status" aria-live="polite">
+              <div>
+                <strong>{undoAction.title}</strong>
+                <span>{undoAction.detail}</span>
+              </div>
+              <button type="button" onClick={() => restoreUndoAction().catch((error) => setStatus(String(error)))}>
+                撤销
+              </button>
+              <button type="button" aria-label="关闭撤销提示" onClick={() => setUndoAction(null)}>
+                <X size={15} />
+              </button>
+            </section>
+          )}
+        </div>
       )}
       <div className="status-line">{status}</div>
     </main>

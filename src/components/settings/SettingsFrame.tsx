@@ -8,6 +8,7 @@ import {
   ScanSearch,
   Server,
   ShieldCheck,
+  TimerReset,
   UserRound,
   Workflow,
   X,
@@ -18,6 +19,7 @@ export type SettingsSectionId =
   | 'accounts'
   | 'providers'
   | 'auth'
+  | 'sending'
   | 'notifications'
   | 'privacy'
   | 'identities'
@@ -47,6 +49,7 @@ const navigationGroups = [
   {
     label: '体验与隐私',
     items: [
+      { id: 'sending' as const, label: '发送', icon: TimerReset },
       { id: 'notifications' as const, label: '通知', icon: Bell },
       { id: 'privacy' as const, label: '隐私', icon: EyeOff },
       { id: 'identities' as const, label: '身份', icon: BadgeCheck },

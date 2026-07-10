@@ -22,6 +22,8 @@ type ContextMenuProps = {
   items: ContextMenuItem[];
   onClose: () => void;
   ariaLabel?: string;
+  title?: string;
+  detail?: string;
 };
 
 function MenuItems({
@@ -38,6 +40,7 @@ function MenuItems({
         <button
           type="button"
           role="menuitem"
+          data-context-item={item.id}
           className={item.danger ? 'danger' : undefined}
           disabled={item.disabled}
           aria-haspopup={item.children?.length ? 'menu' : undefined}
@@ -70,6 +73,8 @@ export default function ContextMenu({
   items,
   onClose,
   ariaLabel = '快捷操作',
+  title,
+  detail,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
@@ -89,7 +94,11 @@ export default function ContextMenu({
 
   useEffect(() => {
     const menu = menuRef.current;
-    menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    menu
+      ?.querySelector<HTMLButtonElement>(
+        '.context-menu-items > button:not(:disabled), .context-menu-items > .context-menu-branch > button:not(:disabled)',
+      )
+      ?.focus();
 
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node)) onClose();
@@ -102,18 +111,61 @@ export default function ContextMenu({
         return;
       }
 
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-      const buttons = Array.from(
-        menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
-      );
+      if (event.key === 'Tab') {
+        onClose();
+        return;
+      }
+
+      const eventButton = event.target instanceof HTMLButtonElement ? event.target : null;
+      const activeButton = eventButton
+        ?? (document.activeElement instanceof HTMLButtonElement ? document.activeElement : null);
+      const activeMenu = activeButton?.closest<HTMLElement>('[role="menu"]')
+        ?? menuRef.current?.querySelector<HTMLElement>('.context-menu-items')
+        ?? null;
+      const buttons = Array.from(activeMenu?.querySelectorAll<HTMLButtonElement>(
+        ':scope > button:not(:disabled), :scope > .context-menu-branch > button:not(:disabled)',
+      ) ?? []);
       if (!buttons.length) return;
-      event.preventDefault();
-      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const direction = event.key === 'ArrowDown' ? 1 : -1;
-      const nextIndex = currentIndex < 0
-        ? 0
-        : (currentIndex + direction + buttons.length) % buttons.length;
-      buttons[nextIndex]?.focus();
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const currentIndex = buttons.indexOf(activeButton as HTMLButtonElement);
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = currentIndex < 0
+          ? 0
+          : (currentIndex + direction + buttons.length) % buttons.length;
+        buttons[nextIndex]?.focus();
+        return;
+      }
+
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        buttons[event.key === 'Home' ? 0 : buttons.length - 1]?.focus();
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        const branch = activeButton?.parentElement?.classList.contains('context-menu-branch')
+          ? activeButton.parentElement
+          : null;
+        const submenu = branch?.querySelector<HTMLElement>(':scope > .context-submenu') ?? null;
+        const firstChild = submenu?.querySelector<HTMLButtonElement>(
+          'button:not(:disabled)',
+        );
+        if (firstChild) {
+          event.preventDefault();
+          firstChild.focus();
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowLeft' && activeMenu?.classList.contains('context-submenu')) {
+        const parentButton = activeMenu.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
+        if (parentButton) {
+          event.preventDefault();
+          parentButton.focus();
+        }
+      }
     }
 
     function handleViewportChange() {
@@ -138,12 +190,18 @@ export default function ContextMenu({
     <div
       ref={menuRef}
       className={alignSubmenuLeft ? 'context-menu align-submenu-left' : 'context-menu'}
-      role="menu"
-      aria-label={ariaLabel}
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <MenuItems items={items} onClose={onClose} />
+      {(title || detail) && (
+        <div className="context-menu-heading">
+          {title && <strong>{title}</strong>}
+          {detail && <span>{detail}</span>}
+        </div>
+      )}
+      <div className="context-menu-items" role="menu" aria-label={ariaLabel}>
+        <MenuItems items={items} onClose={onClose} />
+      </div>
     </div>,
     document.body,
   );

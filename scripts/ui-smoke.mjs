@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const root = new URL('..', import.meta.url).pathname;
-const port = Number(process.env.SWIFTMAIL_UI_SMOKE_PORT ?? 1430);
+const port = Number(
+  process.env.BETTER_EMAIL_UI_SMOKE_PORT
+  ?? process.env.SWIFTMAIL_UI_SMOKE_PORT
+  ?? 1430,
+);
 const url = `http://127.0.0.1:${port}`;
 const chromeCandidates = [
   process.env.CHROME_PATH,
@@ -275,9 +279,9 @@ async function dragElement(cdp, selector, deltaX) {
 
 async function main() {
   const vite = spawnLogged('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
-    env: { ...process.env, VITE_SWIFTMAIL_UI_MOCK: '1' },
+    env: { ...process.env, VITE_BETTER_EMAIL_UI_MOCK: '1' },
   });
-  const profileDir = mkdtempSync(join(tmpdir(), 'swiftmail-ui-smoke-'));
+  const profileDir = mkdtempSync(join(tmpdir(), 'better-email-ui-smoke-'));
   let chrome;
   let cdp;
   try {
@@ -303,7 +307,19 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('SwiftMail')");
+    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
+
+    await evalInPage(
+      cdp,
+      "localStorage.removeItem('better-email.appLayout.v2'); localStorage.setItem('swiftmail.appLayout.v2', JSON.stringify({ sidebar: 278, list: 422 })); location.reload()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('278px') && document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('422px')");
+    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === 278 && localStorage.getItem('swiftmail.appLayout.v2') === null");
+    await evalInPage(
+      cdp,
+      "localStorage.setItem('better-email.appLayout.v2', JSON.stringify({ sidebar: 244, list: 388 })); location.reload()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('244px') && document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('388px')");
 
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length === 40 && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
@@ -324,10 +340,10 @@ async function main() {
 
     await dragElement(cdp, '.sidebar-resizer', 34);
     await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedSidebar}px')`);
-    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).sidebar === ${expectedSidebar}`);
+    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === ${expectedSidebar}`);
     await dragElement(cdp, '.list-resizer', -44);
     await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedList}px')`);
-    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).list === ${expectedList}`);
+    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).list === ${expectedList}`);
     await openDetails(cdp, '.background-sync-card');
     await clickButton(cdp, '重置布局', "document.querySelector('.background-sync-card')");
     await waitForExpression(
@@ -336,7 +352,7 @@ async function main() {
     );
     await waitForExpression(
       cdp,
-      `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).sidebar === ${initialLayout.sidebar} && JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).list === ${initialLayout.list}`,
+      `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === ${initialLayout.sidebar} && JSON.parse(localStorage.getItem('better-email.appLayout.v2')).list === ${initialLayout.list}`,
     );
 
     await clickButton(cdp, '快捷键');
@@ -412,9 +428,9 @@ async function main() {
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
     await fillInput(cdp, '.composer input[placeholder=\"主题\"]', 'Smoke Draft Flow');
     await fillInput(cdp, '.composer textarea[placeholder=\"正文\"]', '保存草稿路径验证');
-    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('swiftmail.composerAutosave')).draft.subject === 'Smoke Draft Flow' && document.body.innerText.includes('自动保存')");
+    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && document.body.innerText.includes('自动保存')");
     await cdp.send('Page.reload', { ignoreCache: true });
-    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('SwiftMail')");
+    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"主题\"]').value === 'Smoke Draft Flow' && document.querySelector('.composer textarea[placeholder=\"正文\"]').value === '保存草稿路径验证' && document.body.innerText.includes('已恢复自动保存草稿')");
@@ -450,10 +466,10 @@ async function main() {
     await clickButton(cdp, '列表', "document.querySelector('.rich-toolbar')");
     await waitForExpression(cdp, "document.querySelector('.composer-html-source').value.includes('<strong>加粗文字</strong>') && document.querySelector('.composer-html-source').value.includes('<ul><li>列表项</li></ul>')");
     await evalInPage(cdp, "(() => { const select = document.querySelector('.composer select[aria-label=\"发件身份\"]'); const option = [...select.options].find((item) => item.textContent.includes('Demo Support')); if (!option) throw new Error('Sender identity option not ready'); select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
-    await waitForExpression(cdp, "document.body.innerText.includes('SwiftMail Support')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Better Email Support')");
     await clickButton(cdp, '插入签名', "document.querySelector('.composer-signature')");
-    await waitForExpression(cdp, "document.querySelector('.composer textarea').value.includes('SwiftMail Support')");
-    await waitForExpression(cdp, "document.querySelector('.composer-html-source').value.includes('SwiftMail Support')");
+    await waitForExpression(cdp, "document.querySelector('.composer textarea').value.includes('Better Email Support')");
+    await waitForExpression(cdp, "document.querySelector('.composer-html-source').value.includes('Better Email Support')");
     await clickButton(cdp, '保存草稿', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.body.innerText.includes('草稿已保存') || document.body.innerText.includes('1 草稿')");
 
@@ -468,7 +484,7 @@ async function main() {
       cdp,
       "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest')); if (!card) throw new Error('Context menu target message not found'); window.__contextTargetWasUnread = Boolean(card.querySelector('.sender.unread')); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 })); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('移动到') && document.querySelector('.context-menu').innerText.includes('标签')");
+    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('回复') && document.querySelector('.context-menu').innerText.includes('转发') && document.querySelector('.context-menu').innerText.includes('稍后处理') && document.querySelector('.context-menu').innerText.includes('移动到') && document.querySelector('.context-menu').innerText.includes('标签')");
     await evalInPage(
       cdp,
       "(() => { const button = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('标为已读') || item.textContent.includes('标为未读')); if (!button) throw new Error('Read-state context action not found'); button.click(); })()",
@@ -478,6 +494,18 @@ async function main() {
 
     await evalInPage(cdp, "(() => { const cards = [...document.querySelectorAll('.message-card')].filter((card) => card.textContent.includes('Low memory digest')); cards.slice(0, 2).forEach((card) => card.querySelector('input[type=\"checkbox\"]').click()); })()");
     await waitForExpression(cdp, "document.body.innerText.includes('已选 2')");
+    await evalInPage(
+      cdp,
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.querySelector('input[type=\"checkbox\"]:checked')); if (!card) throw new Error('Bulk context target not found'); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 540, clientY: 350, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu-heading')?.innerText.includes('已选择 2 封邮件') && document.querySelector('.context-menu')?.innerText.includes('批量归档') && document.querySelector('.context-menu')?.innerText.includes('批量移动到')");
+    await evalInPage(
+      cdp,
+      "(() => { const labels = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('批量标签')); if (!labels) throw new Error('Bulk labels submenu not found'); labels.focus(); labels.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+    );
+    await waitForExpression(cdp, "document.activeElement?.closest('.context-submenu') && document.activeElement?.textContent?.trim().length > 0");
+    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
+    await waitForExpression(cdp, "!document.querySelector('.context-menu')");
     await openDetails(cdp, '.bulk-more-menu');
     await clickButton(cdp, '星标', "document.querySelector('.bulk-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已批量添加星标 2 封邮件')");
@@ -545,6 +573,9 @@ async function main() {
 
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
+    await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
+    await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
+    await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"providers\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('兼容性矩阵')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
@@ -554,7 +585,7 @@ async function main() {
     await clickButton(cdp, '导入 EML');
     await waitForExpression(cdp, "document.body.innerText.includes('已导入 EML：Imported EML Sample') && document.body.innerText.includes('Imported EML Sample')");
     await clickButton(cdp, '导出本地备份');
-    await waitForExpression(cdp, "document.body.innerText.includes('/tmp/swiftmail-backup.json') && document.body.innerText.includes('凭据未包含')");
+    await waitForExpression(cdp, "document.body.innerText.includes('/tmp/better-email-backup.json') && document.body.innerText.includes('凭据未包含')");
 
     await clickButton(cdp, '编辑', "document.querySelector('.contact-tool-row')");
     await fillInput(cdp, '.contact-edit-form input[placeholder=\"联系人名称\"]', 'Ada Lovelace');
@@ -562,7 +593,7 @@ async function main() {
     await clickButton(cdp, '保存', "document.querySelector('.contact-edit-form')");
     await waitForExpression(cdp, "document.body.innerText.includes('联系人已更新：Ada Lovelace') && document.body.innerText.includes('Ada Lovelace') && document.body.innerText.includes('别名 1')");
     await clickButton(cdp, '设为 VIP', "document.querySelector('.contact-tool-row')");
-    await waitForExpression(cdp, "document.body.innerText.includes('已设为 VIP：Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('★ Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('别名 1') && JSON.parse(localStorage.getItem('swiftmail.notificationPolicy')).vipSenders.includes('ada@work.example.com')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已设为 VIP：Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('★ Ada Lovelace') && document.querySelector('.contact-tool-row').innerText.includes('别名 1') && JSON.parse(localStorage.getItem('better-email.notificationPolicy')).vipSenders.includes('ada@work.example.com')");
     await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Ada Duplicate');
     await fillInput(cdp, '.contact-create-form input[placeholder="邮箱地址"]', 'ada.duplicate@example.com');
     await fillInput(cdp, '.contact-create-form textarea[placeholder^="别名邮箱"]', 'ada@example.com');
@@ -602,6 +633,29 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+
+    await clickButton(cdp, '写邮件');
+    await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
+    await fillInput(cdp, '.composer input[placeholder=\"主题\"]', 'Smoke Undo Send');
+    await fillInput(cdp, '.composer textarea[placeholder=\"正文\"]', '撤销发送路径验证');
+    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.send-undo-snackbar')?.innerText.includes('5 秒后发送') && document.querySelector('.send-undo-snackbar')?.innerText.includes('Smoke Undo Send')");
+    await clickButton(cdp, '撤回发送', "document.querySelector('.send-undo-snackbar')");
+    await waitForExpression(cdp, "!document.querySelector('.send-undo-snackbar') && document.body.innerText.includes('已撤回发送：Smoke Undo Send')");
+    await clickButton(cdp, '草稿', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Smoke Undo Send')");
+
+    await clickButton(cdp, '写邮件');
+    await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
+    await fillInput(cdp, '.composer input[placeholder=\"主题\"]', 'Smoke Auto Send');
+    await fillInput(cdp, '.composer textarea[placeholder=\"正文\"]', '延迟发送到期路径验证');
+    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.send-undo-snackbar')?.innerText.includes('Smoke Auto Send')");
+    await waitForExpression(cdp, "!document.querySelector('.send-undo-snackbar') && document.body.innerText.includes('SMTP 发件箱发送完成')", 12_000);
+    await clickButton(cdp, '已发送', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Smoke Auto Send')");
+    await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"归档\"]').click()");
@@ -650,6 +704,7 @@ async function main() {
       url,
       assertions: [
         'main shell rendered',
+        'legacy SwiftMail settings migrate to better-email keys',
         'resizable panes persist and reset',
         'shortcut help opens from button and keyboard',
         'command palette opens and runs commands',
@@ -677,6 +732,9 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'undo send delay settings persist',
+        'undo send returns message to drafts',
+        'scheduled send automatically flushes to sent',
         'local EML import works',
         'local backup export works',
         'contact create edit suggested merge manual merge delete and VIP sync works',

@@ -227,6 +227,52 @@
   margin-top: 8px;
 }
 
+.settings-send-control {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 12px;
+  border: 1px solid #e0e5ea;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.settings-send-control > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-send-control > span strong {
+  color: var(--ui-text);
+  font-size: 11px;
+}
+
+.settings-send-control > span small,
+.settings-send-control label > span,
+.settings-send-note {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.settings-send-control label {
+  flex: 0 0 170px;
+  display: grid;
+  gap: 5px;
+}
+
+.settings-send-control select {
+  min-height: 36px;
+  padding: 0 32px 0 10px;
+}
+
+.settings-send-note {
+  margin: 8px 2px 0;
+}
+
 .settings-experience-stack .checkbox-row {
   min-height: 58px;
   display: grid;
@@ -578,6 +624,15 @@
   .settings-toggle-grid,
   .settings-inline-fields {
     grid-template-columns: 1fr;
+  }
+
+  .settings-send-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-send-control label {
+    flex-basis: auto;
   }
 
   .settings-experience-stack .tool-header {

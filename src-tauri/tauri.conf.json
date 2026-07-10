@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SwiftMail",
+  "productName": "Better Email",
   "version": "0.1.0",
-  "identifier": "app.swiftmail.client",
+  "identifier": "app.betteremail.client",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "SwiftMail",
+        "title": "Better Email",
         "width": 1180,
         "height": 760,
         "minWidth": 960,

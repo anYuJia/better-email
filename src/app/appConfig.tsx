@@ -98,14 +98,32 @@ export const emptyContactForm: ContactCreateInput = {
   vip: false,
 };
 
-export const notificationPolicyStorageKey = 'swiftmail.notificationPolicy';
-export const providerVerificationStorageKey = 'swiftmail.providerVerifications';
-export const savedSearchesStorageKey = 'swiftmail.savedSearches';
-export const composeTemplatesStorageKey = 'swiftmail.composeTemplates';
-export const composerAutosaveStorageKey = 'swiftmail.composerAutosave';
-export const appLayoutStorageKey = 'swiftmail.appLayout.v2';
+export const notificationPolicyStorageKey = 'better-email.notificationPolicy';
+export const providerVerificationStorageKey = 'better-email.providerVerifications';
+export const savedSearchesStorageKey = 'better-email.savedSearches';
+export const composeTemplatesStorageKey = 'better-email.composeTemplates';
+export const composerAutosaveStorageKey = 'better-email.composerAutosave';
+export const appLayoutStorageKey = 'better-email.appLayout.v2';
+export const sendUndoDelayStorageKey = 'better-email.sendUndoDelaySeconds';
+const legacyStorageKeyByCurrent: Record<string, string> = {
+  [notificationPolicyStorageKey]: 'swiftmail.notificationPolicy',
+  [providerVerificationStorageKey]: 'swiftmail.providerVerifications',
+  [savedSearchesStorageKey]: 'swiftmail.savedSearches',
+  [composeTemplatesStorageKey]: 'swiftmail.composeTemplates',
+  [composerAutosaveStorageKey]: 'swiftmail.composerAutosave',
+  [appLayoutStorageKey]: 'swiftmail.appLayout.v2',
+  [sendUndoDelayStorageKey]: 'swiftmail.sendUndoDelaySeconds',
+};
 export const defaultAppLayout: AppLayout = { sidebar: 244, list: 388 };
 export const filterModes: FilterMode[] = ['all', 'unread', 'starred', 'attachments'];
+export type SendUndoDelaySeconds = 0 | 5 | 10 | 20 | 30;
+export const sendUndoDelayOptions: { value: SendUndoDelaySeconds; label: string }[] = [
+  { value: 0, label: '关闭，立即发送' },
+  { value: 5, label: '5 秒' },
+  { value: 10, label: '10 秒（推荐）' },
+  { value: 20, label: '20 秒' },
+  { value: 30, label: '30 秒' },
+];
 
 export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -117,12 +135,43 @@ export function backgroundTaskTitle(kind: BackgroundTaskKind, source: 'manual' |
   return '发件箱发送演练';
 }
 
+function readAppStorage(key: string): string | null {
+  const current = window.localStorage.getItem(key);
+  if (current != null) return current;
+  const legacyKey = legacyStorageKeyByCurrent[key];
+  if (!legacyKey) return null;
+  const legacy = window.localStorage.getItem(legacyKey);
+  if (legacy == null) return null;
+  window.localStorage.setItem(key, legacy);
+  window.localStorage.removeItem(legacyKey);
+  return legacy;
+}
+
+export function removeAppStorage(key: string): void {
+  window.localStorage.removeItem(key);
+  const legacyKey = legacyStorageKeyByCurrent[key];
+  if (legacyKey) window.localStorage.removeItem(legacyKey);
+}
+
 export function loadNotificationPolicy(): NotificationPolicy {
   try {
-    const stored = window.localStorage.getItem(notificationPolicyStorageKey);
+    const stored = readAppStorage(notificationPolicyStorageKey);
     return stored ? { ...defaultNotificationPolicy, ...JSON.parse(stored) } : { ...defaultNotificationPolicy };
   } catch {
     return { ...defaultNotificationPolicy };
+  }
+}
+
+export function loadSendUndoDelaySeconds(): SendUndoDelaySeconds {
+  try {
+    const raw = readAppStorage(sendUndoDelayStorageKey);
+    if (raw == null) return 10;
+    const stored = Number(raw);
+    return sendUndoDelayOptions.some((option) => option.value === stored)
+      ? stored as SendUndoDelaySeconds
+      : 10;
+  } catch {
+    return 10;
   }
 }
 
@@ -151,7 +200,7 @@ export function toggleAccountNotificationList(
 
 export function loadProviderVerifications(): Record<string, ProviderVerificationRecord> {
   try {
-    const stored = window.localStorage.getItem(providerVerificationStorageKey);
+    const stored = readAppStorage(providerVerificationStorageKey);
     return stored ? JSON.parse(stored) : {};
   } catch {
     return {};
@@ -164,7 +213,7 @@ export function isFilterMode(value: unknown): value is FilterMode {
 
 export function loadSavedSearches(): SavedSearch[] {
   try {
-    const stored = window.localStorage.getItem(savedSearchesStorageKey);
+    const stored = readAppStorage(savedSearchesStorageKey);
     if (!stored) return [];
     const parsed = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
@@ -184,7 +233,7 @@ export function loadSavedSearches(): SavedSearch[] {
 
 export function loadComposeTemplates(): ComposeTemplate[] {
   try {
-    const stored = window.localStorage.getItem(composeTemplatesStorageKey);
+    const stored = readAppStorage(composeTemplatesStorageKey);
     const parsed = stored ? JSON.parse(stored) : [];
     if (!Array.isArray(parsed)) return [];
     return parsed
@@ -244,7 +293,7 @@ export function normalizeDraftInput(value: unknown): DraftInput | null {
 
 export function loadComposerAutosave(): ComposerAutosave | null {
   try {
-    const stored = window.localStorage.getItem(composerAutosaveStorageKey);
+    const stored = readAppStorage(composerAutosaveStorageKey);
     if (!stored) return null;
     const parsed = JSON.parse(stored);
     const draft = normalizeDraftInput(parsed?.draft);
@@ -261,7 +310,7 @@ export function loadComposerAutosave(): ComposerAutosave | null {
 
 export function loadAppLayout(): AppLayout {
   try {
-    const stored = window.localStorage.getItem(appLayoutStorageKey);
+    const stored = readAppStorage(appLayoutStorageKey);
     if (!stored) return defaultAppLayout;
     const parsed = JSON.parse(stored);
     return {
@@ -329,7 +378,7 @@ export function movableFoldersForBulk(folders: Folder[], selectedMessages: Messa
 
 export const sampleRawMessage = `Subject: 安全预览样例
 From: sender@example.com
-To: demo@swiftmail.local
+To: demo@better-email.local
 
 <img src="http://tracking.example.com/open.png">
 <script>alert('xss')</script>

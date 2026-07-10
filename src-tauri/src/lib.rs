@@ -109,5 +109,5 @@ pub fn run() {
             commands::flush_outbox_smtp,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running SwiftMail");
+        .expect("error while running Better Email");
 }

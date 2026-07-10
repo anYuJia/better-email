@@ -7,11 +7,15 @@ import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
-const platformBinaryName = process.platform === 'win32' ? 'swiftmail.exe' : 'swiftmail';
+const platformBinaryName = process.platform === 'win32' ? 'better-email.exe' : 'better-email';
 const execFileAsync = promisify(execFile);
 const sampleApp = process.argv.includes('--sample-app');
 const sampleSync = process.argv.includes('--sample-sync');
-const appSampleMs = Number(process.env.SWIFTMAIL_BENCH_SAMPLE_MS ?? 5000);
+const appSampleMs = Number(
+  process.env.BETTER_EMAIL_BENCH_SAMPLE_MS
+  ?? process.env.SWIFTMAIL_BENCH_SAMPLE_MS
+  ?? 5000,
+);
 
 function bytes(value) {
   if (value < 1024) return `${value} B`;
@@ -190,7 +194,7 @@ async function sampleReleaseApp(binaryPath, sampleMs, options = {}) {
   }
 
   const launchStart = performance.now();
-  const readyDir = mkdtempSync(join(tmpdir(), 'swiftmail-bench-ready-'));
+  const readyDir = mkdtempSync(join(tmpdir(), 'better-email-bench-ready-'));
   const readyFile = join(readyDir, 'frontend-ready.json');
   const syncFile = join(readyDir, 'sync-complete.json');
   const child = spawn(binaryPath, [], {
@@ -199,9 +203,9 @@ async function sampleReleaseApp(binaryPath, sampleMs, options = {}) {
     detached: process.platform !== 'win32',
     env: {
       ...process.env,
-      SWIFTMAIL_BENCH_READY_FILE: readyFile,
-      SWIFTMAIL_BENCH_SYNC_FILE: syncFile,
-      SWIFTMAIL_BENCH_SYNC: options.sampleSync ? '1' : '',
+      BETTER_EMAIL_BENCH_READY_FILE: readyFile,
+      BETTER_EMAIL_BENCH_SYNC_FILE: syncFile,
+      BETTER_EMAIL_BENCH_SYNC: options.sampleSync ? '1' : '',
     },
   });
   const exitPromise = waitForExit(child);
@@ -295,7 +299,7 @@ const targetDebugBinaryPath = join(root, 'src-tauri', 'target', 'debug', platfor
 const targetReleasePath = join(root, 'src-tauri', 'target', 'release');
 const targetReleaseBinaryPath = join(targetReleasePath, platformBinaryName);
 const targetReleaseBundlePath = join(targetReleasePath, 'bundle');
-const sqlitePath = join(root, 'src-tauri', 'target', 'debug', 'swiftmail-test.sqlite3');
+const sqlitePath = join(root, 'src-tauri', 'target', 'debug', 'better-email-test.sqlite3');
 const releaseBinaryExists = existsSync(targetReleaseBinaryPath);
 const bundlePathExists = existsSync(targetReleaseBundlePath);
 const gaps = [];

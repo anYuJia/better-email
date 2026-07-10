@@ -6,7 +6,9 @@ import type {
 } from '../../app/types';
 import {
   emptyIdentityForm,
+  sendUndoDelayOptions,
   toggleAccountNotificationList,
+  type SendUndoDelaySeconds,
 } from '../../app/appConfig';
 import { formatDate, type NotificationPolicy } from '../../mailUtils';
 import './settings.css';
@@ -15,11 +17,13 @@ type ExperienceSettingsProps = {
   accountForm: Account;
   accounts: Account[];
   notificationPolicy: NotificationPolicy;
+  sendUndoDelaySeconds: SendUndoDelaySeconds;
   remoteImageTrusts: RemoteImageTrust[];
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
   onAccountFormChange: (account: Account) => void;
   onNotificationPolicyChange: (policy: NotificationPolicy) => void;
+  onSendUndoDelayChange: (seconds: SendUndoDelaySeconds) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onIdentityFormChange: (identity: MailIdentityInput) => void;
   onEditIdentity: (identity: MailIdentity) => void;
@@ -31,11 +35,13 @@ export default function ExperienceSettings({
   accountForm,
   accounts,
   notificationPolicy,
+  sendUndoDelaySeconds,
   remoteImageTrusts,
   identities,
   identityForm,
   onAccountFormChange,
   onNotificationPolicyChange,
+  onSendUndoDelayChange,
   onDeleteRemoteImageTrust,
   onIdentityFormChange,
   onEditIdentity,
@@ -47,6 +53,37 @@ export default function ExperienceSettings({
 
   return (
     <div className="settings-experience-stack">
+      <section className="tool-panel settings-send-panel" data-settings-section="sending">
+        <header className="tool-header">
+          <span>
+            <strong>发送与撤回</strong>
+            <small>发送后短暂保留在发件箱，误发时可立即撤回到草稿箱</small>
+          </span>
+          <em>{sendUndoDelaySeconds > 0 ? `${sendUndoDelaySeconds} 秒` : '已关闭'}</em>
+        </header>
+        <div className="settings-send-control">
+          <span>
+            <strong>撤销发送延迟</strong>
+            <small>倒计时结束后自动进入现有 SMTP 后台发送任务，重启应用后仍会继续。</small>
+          </span>
+          <label>
+            <span>延迟时间</span>
+            <select
+              aria-label="撤销发送延迟"
+              value={sendUndoDelaySeconds}
+              onChange={(event) => onSendUndoDelayChange(Number(event.target.value) as SendUndoDelaySeconds)}
+            >
+              {sendUndoDelayOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="settings-send-note">
+          “发件箱”按钮仍用于手动排队或指定稍后发送；“发送”按钮使用这里的撤销延迟。
+        </p>
+      </section>
+
       <section className="tool-panel settings-policy-panel" data-settings-section="notifications">
         <header className="tool-header">
           <span>

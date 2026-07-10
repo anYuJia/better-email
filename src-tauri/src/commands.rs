@@ -28,6 +28,12 @@ const MAX_ATTACHMENT_DOWNLOAD_BYTES: i64 = 25 * 1024 * 1024;
 const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 
+fn benchmark_env(primary: &str, legacy: &str) -> Option<String> {
+    std::env::var(primary)
+        .ok()
+        .or_else(|| std::env::var(legacy).ok())
+}
+
 #[tauri::command]
 pub fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
     store.list_accounts()
@@ -159,7 +165,10 @@ pub fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttac
 
 #[tauri::command]
 pub fn mark_frontend_ready(message: String) -> MailResult<()> {
-    let Ok(path) = std::env::var("SWIFTMAIL_BENCH_READY_FILE") else {
+    let Some(path) = benchmark_env(
+        "BETTER_EMAIL_BENCH_READY_FILE",
+        "SWIFTMAIL_BENCH_READY_FILE",
+    ) else {
         return Ok(());
     };
     if path.trim().is_empty() {
@@ -182,7 +191,8 @@ pub fn mark_frontend_ready(message: String) -> MailResult<()> {
 
 #[tauri::command]
 pub fn mark_benchmark_sync_complete(message: String) -> MailResult<()> {
-    let Ok(path) = std::env::var("SWIFTMAIL_BENCH_SYNC_FILE") else {
+    let Some(path) = benchmark_env("BETTER_EMAIL_BENCH_SYNC_FILE", "SWIFTMAIL_BENCH_SYNC_FILE")
+    else {
         return Ok(());
     };
     if path.trim().is_empty() {
@@ -205,7 +215,7 @@ pub fn mark_benchmark_sync_complete(message: String) -> MailResult<()> {
 
 #[tauri::command]
 pub fn benchmark_sync_requested() -> bool {
-    std::env::var("SWIFTMAIL_BENCH_SYNC")
+    benchmark_env("BETTER_EMAIL_BENCH_SYNC", "SWIFTMAIL_BENCH_SYNC")
         .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
 }
@@ -381,7 +391,7 @@ pub fn export_message_as_eml(
     let filename = sanitize_filename(&format!(
         "{}.eml",
         if message.subject.trim().is_empty() {
-            "swiftmail-message"
+            "better-email-message"
         } else {
             message.subject.trim()
         }
@@ -451,7 +461,7 @@ fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {
         String::new()
     } else {
         format!(
-            "\r\n\r\n-- SwiftMail attachment metadata --\r\n{}",
+            "\r\n\r\n-- Better Email attachment metadata --\r\n{}",
             attachments
                 .iter()
                 .map(|attachment| format!(
@@ -470,7 +480,7 @@ fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {
         )
     };
     format!(
-        "From: {} <{}>\r\nTo: {}\r\n{}{}Subject: {}\r\nDate: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nX-SwiftMail-Account: {}\r\n\r\n{}{}",
+        "From: {} <{}>\r\nTo: {}\r\n{}{}Subject: {}\r\nDate: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Better Email-Account: {}\r\n\r\n{}{}",
         message.sender_name.trim(),
         message.sender_email.trim(),
         message.recipients.trim(),
@@ -701,9 +711,9 @@ pub fn export_local_backup(
     let target_path = app
         .dialog()
         .file()
-        .set_title("导出 SwiftMail 本地备份")
+        .set_title("导出 Better Email 本地备份")
         .set_file_name(format!(
-            "swiftmail-backup-{}.json",
+            "better-email-backup-{}.json",
             Utc::now().format("%Y%m%d-%H%M%S")
         ))
         .blocking_save_file()
@@ -1245,7 +1255,7 @@ fn read_backup_from_dialog(app: AppHandle) -> MailResult<Option<(LocalBackup, St
     let Some(path) = app
         .dialog()
         .file()
-        .set_title("选择 SwiftMail 本地备份")
+        .set_title("选择 Better Email 本地备份")
         .blocking_pick_file()
     else {
         return Ok(None);

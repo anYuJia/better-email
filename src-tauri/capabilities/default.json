@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default app permissions for SwiftMail desktop features.",
+  "description": "Default app permissions for Better Email desktop features.",
   "windows": ["main"],
   "permissions": [
     "core:default",

@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn builds_multipart_email_with_local_attachments() {
         let path = std::env::temp_dir().join(format!(
-            "swiftmail-smtp-attachment-{}-{}.txt",
+            "better-email-smtp-attachment-{}-{}.txt",
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ));
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn wraps_html_alternative_inside_mixed_when_attachments_exist() {
         let path = std::env::temp_dir().join(format!(
-            "swiftmail-smtp-rich-attachment-{}-{}.txt",
+            "better-email-smtp-rich-attachment-{}-{}.txt",
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ));

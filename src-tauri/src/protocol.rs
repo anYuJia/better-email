@@ -544,7 +544,7 @@ mod tests {
         let raw = concat!(
             "Subject: Imported sample\r\n",
             "From: \"Ada Lovelace\" <ada@example.com>\r\n",
-            "To: demo@swiftmail.local\r\n",
+            "To: demo@better-email.local\r\n",
             "Cc: team@example.com\r\n",
             "Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n",
             "Message-ID: <imported-1@example.com>\r\n",
@@ -575,7 +575,7 @@ mod tests {
         assert_eq!(imported.subject, "Imported sample");
         assert_eq!(imported.sender_name, "Ada Lovelace");
         assert_eq!(imported.sender_email, "ada@example.com");
-        assert_eq!(imported.recipients, "demo@swiftmail.local");
+        assert_eq!(imported.recipients, "demo@better-email.local");
         assert_eq!(imported.cc, "team@example.com");
         assert_eq!(imported.received_at, "2026-07-09T02:00:00+00:00");
         assert_eq!(imported.message_id_header, "<imported-1@example.com>");

@@ -17,7 +17,7 @@ use rusqlite::{
 };
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 use thiserror::Error;
@@ -62,6 +62,9 @@ pub struct OAuthTokenExchangeSession {
 }
 
 const LOCAL_BACKUP_SCHEMA_VERSION: i64 = 1;
+const DATABASE_FILENAME: &str = "better-email.sqlite3";
+const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
+const LEGACY_APP_IDENTIFIER: &str = "app.swiftmail.client";
 const LOCAL_BACKUP_TABLES: &[&str] = &[
     "accounts",
     "folders",
@@ -92,7 +95,11 @@ impl MailStore {
             .app_data_dir()
             .map_err(|_| MailError::MissingDataDir)?;
         fs::create_dir_all(&data_dir)?;
-        Self::open_at(data_dir.join("swiftmail.sqlite3"))
+        let database_path = data_dir.join(DATABASE_FILENAME);
+        if !database_path.exists() {
+            migrate_legacy_database(&data_dir, &database_path)?;
+        }
+        Self::open_at(database_path)
     }
 
     pub fn open_at(path: PathBuf) -> MailResult<Self> {
@@ -411,14 +418,14 @@ impl MailStore {
                 "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9)",
                 params![
-                    "demo@swiftmail.local",
-                    "SwiftMail Demo",
+                    "demo@better-email.local",
+                    "Better Email Demo",
                     "Local",
                     "imap.example.com:993",
                     "smtp.example.com:465",
                     "password",
                     "manual",
-                    "Sent from SwiftMail",
+                    "Sent from Better Email",
                     now.to_rfc3339()
                 ],
             )?;
@@ -426,9 +433,9 @@ impl MailStore {
             ensure_default_identity_for_account_conn(
                 conn,
                 account_id,
-                "SwiftMail Demo",
-                "demo@swiftmail.local",
-                "Sent from SwiftMail",
+                "Better Email Demo",
+                "demo@better-email.local",
+                "Sent from Better Email",
             )?;
 
             create_default_folders_for_account(conn, account_id)?;
@@ -467,10 +474,10 @@ impl MailStore {
                     inbox_id,
                     "Ada Chen",
                     "ada@example.com",
-                    "demo@swiftmail.local",
-                    "欢迎来到 SwiftMail",
+                    "demo@better-email.local",
+                    "欢迎来到 Better Email",
                     "这封邮件用于验证列表、阅读、搜索和状态切换。",
-                    "你好！\n\nSwiftMail 的第一版本地原型已经准备好：三栏布局、SQLite 本地存储、搜索、标星、已读未读、归档、删除、标签、附件元数据和草稿/发送都可以先跑通。\n\n下一步会接入 IMAP/SMTP 和真实账号同步。",
+                    "你好！\n\nBetter Email 的第一版本地原型已经准备好：三栏布局、SQLite 本地存储、搜索、标星、已读未读、归档、删除、标签、附件元数据和草稿/发送都可以先跑通。\n\n下一步会接入 IMAP/SMTP 和真实账号同步。",
                     0,
                     1,
                     0,
@@ -481,7 +488,7 @@ impl MailStore {
                     inbox_id,
                     "Product Robot",
                     "updates@example.com",
-                    "demo@swiftmail.local",
+                    "demo@better-email.local",
                     "低内存设计检查清单",
                     "分页加载、懒加载正文、附件按需下载、HTML 安全渲染。",
                     "低内存路线：\n\n1. 邮件列表只查头信息和摘要。\n2. 正文按需加载，附件仅保存元数据。\n3. SQLite FTS5 负责本地搜索。\n4. 同步队列限流，避免一次性解析大量邮件。",
@@ -495,7 +502,7 @@ impl MailStore {
                     inbox_id,
                     "Security Team",
                     "security@example.com",
-                    "demo@swiftmail.local",
+                    "demo@better-email.local",
                     "HTML 邮件安全策略",
                     "默认阻止远程图片，后续接入 HTML 清洗和钓鱼提示。",
                     "安全默认值很重要：凭据进入系统 Keychain，HTML 邮件必须清洗，远程图片默认阻止，日志自动脱敏。",
@@ -507,8 +514,8 @@ impl MailStore {
                 ),
                 (
                     sent_id,
-                    "SwiftMail Demo",
-                    "demo@swiftmail.local",
+                    "Better Email Demo",
+                    "demo@better-email.local",
                     "team@example.com",
                     "项目启动计划",
                     "先完成本地闭环，再接入真实同步协议。",
@@ -2232,23 +2239,21 @@ impl MailStore {
         self.with_conn(|conn| {
             let kind = normalize_background_task_kind(&input.kind);
             let source = normalize_background_task_source(&input.source);
-            if kind == "sync" {
-                let active_task = conn
-                    .query_row(
-                        "
-                        SELECT id, kind, title, source, status, message, created_at, started_at, finished_at
-                        FROM background_tasks
-                        WHERE kind = 'sync' AND status IN ('queued', 'running')
-                        ORDER BY created_at ASC
-                        LIMIT 1
-                        ",
-                        [],
-                        map_background_task,
-                    )
-                    .optional()?;
-                if let Some(task) = active_task {
-                    return Ok(task);
-                }
+            let active_task = conn
+                .query_row(
+                    "
+                    SELECT id, kind, title, source, status, message, created_at, started_at, finished_at
+                    FROM background_tasks
+                    WHERE kind = ?1 AND status IN ('queued', 'running')
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                    ",
+                    params![kind],
+                    map_background_task,
+                )
+                .optional()?;
+            if let Some(task) = active_task {
+                return Ok(task);
             }
 
             let created_at = Utc::now().to_rfc3339();
@@ -2736,6 +2741,46 @@ impl MailStore {
     fn create_outbound_message(&self, input: DraftInput, role: &str) -> MailResult<i64> {
         self.with_conn(|conn| create_outbound_message_for_conn(conn, input, role))
     }
+}
+
+fn migrate_legacy_database(data_dir: &Path, database_path: &Path) -> MailResult<()> {
+    let mut candidates = vec![data_dir.join(LEGACY_DATABASE_FILENAME)];
+    if let Some(base_dir) = data_dir.parent() {
+        candidates.push(
+            base_dir
+                .join(LEGACY_APP_IDENTIFIER)
+                .join(LEGACY_DATABASE_FILENAME),
+        );
+    }
+
+    for legacy_path in candidates {
+        if !legacy_path.exists() {
+            continue;
+        }
+        copy_database_file(&legacy_path, database_path)?;
+        for suffix in ["-wal", "-shm"] {
+            let legacy_sidecar = path_with_suffix(&legacy_path, suffix);
+            if legacy_sidecar.exists() {
+                fs::copy(legacy_sidecar, path_with_suffix(database_path, suffix))?;
+            }
+        }
+        break;
+    }
+    Ok(())
+}
+
+fn copy_database_file(source: &Path, destination: &Path) -> MailResult<()> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source, destination)?;
+    Ok(())
+}
+
+fn path_with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut value = path.as_os_str().to_os_string();
+    value.push(suffix);
+    PathBuf::from(value)
 }
 
 fn create_outbound_message_for_conn(
@@ -4599,12 +4644,40 @@ mod tests {
     fn test_store() -> MailStore {
         let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "swiftmail-test-{}-{}-{}.sqlite3",
+            "better-email-test-{}-{}-{}.sqlite3",
             std::process::id(),
             Utc::now().timestamp_nanos_opt().unwrap(),
             unique
         ));
         MailStore::open_at(path).expect("test store opens")
+    }
+
+    #[test]
+    fn legacy_database_files_migrate_to_better_email_name() {
+        let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let data_dir = std::env::temp_dir().join(format!(
+            "better-email-migration-{}-{}",
+            std::process::id(),
+            unique
+        ));
+        fs::create_dir_all(&data_dir).expect("migration dir created");
+        let legacy_path = data_dir.join(LEGACY_DATABASE_FILENAME);
+        let database_path = data_dir.join(DATABASE_FILENAME);
+        fs::write(&legacy_path, b"legacy database").expect("legacy database written");
+        fs::write(path_with_suffix(&legacy_path, "-wal"), b"legacy wal")
+            .expect("legacy wal written");
+
+        migrate_legacy_database(&data_dir, &database_path).expect("database migrated");
+
+        assert_eq!(
+            fs::read(&database_path).expect("new database read"),
+            b"legacy database"
+        );
+        assert_eq!(
+            fs::read(path_with_suffix(&database_path, "-wal")).expect("new wal read"),
+            b"legacy wal"
+        );
+        fs::remove_dir_all(data_dir).expect("migration dir removed");
     }
 
     #[test]
@@ -4655,14 +4728,14 @@ mod tests {
             .list_messages_for_scope(
                 None,
                 inbox.id,
-                Some("to:demo@swiftmail.local".to_string()),
+                Some("to:demo@better-email.local".to_string()),
                 None,
                 50,
             )
             .unwrap();
         assert!(to_matches
             .iter()
-            .all(|message| message.recipients.contains("demo@swiftmail.local")));
+            .all(|message| message.recipients.contains("demo@better-email.local")));
         let account_matches = store
             .list_messages_for_scope(None, inbox.id, Some("account:demo".to_string()), None, 50)
             .unwrap();
@@ -5056,8 +5129,8 @@ mod tests {
                 id: 0,
                 account_id: account.id,
                 name: "Demo Support".to_string(),
-                email: "support@swiftmail.local".to_string(),
-                reply_to: "demo@swiftmail.local".to_string(),
+                email: "support@better-email.local".to_string(),
+                reply_to: "demo@better-email.local".to_string(),
                 signature: "Support signature".to_string(),
                 is_default: false,
             })
@@ -5096,7 +5169,7 @@ mod tests {
             .find(|message| message.id == queued.message_id)
             .unwrap();
         assert_eq!(outbox_message.sender_name, "Demo Support");
-        assert_eq!(outbox_message.sender_email, "support@swiftmail.local");
+        assert_eq!(outbox_message.sender_email, "support@better-email.local");
         assert!(outbox_message.body.contains("Support signature"));
 
         let outbound = store
@@ -5106,8 +5179,8 @@ mod tests {
             .find(|message| message.id == queued.message_id)
             .unwrap();
         assert_eq!(outbound.sender_name, "Demo Support");
-        assert_eq!(outbound.sender_email, "support@swiftmail.local");
-        assert_eq!(outbound.reply_to, "demo@swiftmail.local");
+        assert_eq!(outbound.sender_email, "support@better-email.local");
+        assert_eq!(outbound.reply_to, "demo@better-email.local");
 
         store.delete_identity(alias.id).unwrap();
         assert!(store
@@ -5357,7 +5430,7 @@ mod tests {
         let first_account = store.get_account().unwrap();
         let second_account = store
             .create_account(AccountCreateInput {
-                email: "Second@SwiftMail.Local".to_string(),
+                email: "Second@Better-Email.Local".to_string(),
                 display_name: "Second Account".to_string(),
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
@@ -5369,7 +5442,7 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(second_account.email, "second@swiftmail.local");
+        assert_eq!(second_account.email, "second@better-email.local");
         assert_eq!(store.list_accounts().unwrap().len(), 2);
 
         let second_folders = store
@@ -5429,7 +5502,7 @@ mod tests {
         let first_account = store.get_account().unwrap();
         let second_account = store
             .create_account(AccountCreateInput {
-                email: "sync-second@swiftmail.local".to_string(),
+                email: "sync-second@better-email.local".to_string(),
                 display_name: "Sync Second".to_string(),
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
@@ -5494,7 +5567,7 @@ mod tests {
 
         let second_account = store
             .create_account(AccountCreateInput {
-                email: "schedule-second@swiftmail.local".to_string(),
+                email: "schedule-second@better-email.local".to_string(),
                 display_name: "Schedule Second".to_string(),
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
@@ -5507,7 +5580,7 @@ mod tests {
             .unwrap();
         let third_account = store
             .create_account(AccountCreateInput {
-                email: "schedule-third@swiftmail.local".to_string(),
+                email: "schedule-third@better-email.local".to_string(),
                 display_name: "Schedule Third".to_string(),
                 provider: "Custom".to_string(),
                 imap_host: "imap.third.test:993".to_string(),
@@ -5641,7 +5714,7 @@ mod tests {
                 subject: "Remote hello".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
-                recipients: "demo@swiftmail.local".to_string(),
+                recipients: "demo@better-email.local".to_string(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -5684,7 +5757,7 @@ mod tests {
                 subject: "Customer contract".to_string(),
                 sender_name: "Customer Team".to_string(),
                 sender_email: "customer@example.com".to_string(),
-                recipients: "demo@swiftmail.local".to_string(),
+                recipients: "demo@better-email.local".to_string(),
                 snippet: "Please review".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -5731,7 +5804,7 @@ mod tests {
                 subject: "Needs body".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
-                recipients: "demo@swiftmail.local".to_string(),
+                recipients: "demo@better-email.local".to_string(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -5790,7 +5863,7 @@ mod tests {
                 subject: "Remote attachment".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
-                recipients: "demo@swiftmail.local".to_string(),
+                recipients: "demo@better-email.local".to_string(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -5841,10 +5914,10 @@ mod tests {
         assert!(attachments[0].local_path.is_empty());
 
         let downloaded = store
-            .mark_attachment_downloaded(attachments[0].id, "/tmp/swiftmail/remote.pdf", 84)
+            .mark_attachment_downloaded(attachments[0].id, "/tmp/better-email/remote.pdf", 84)
             .unwrap();
         assert!(downloaded.is_downloaded);
-        assert_eq!(downloaded.local_path, "/tmp/swiftmail/remote.pdf");
+        assert_eq!(downloaded.local_path, "/tmp/better-email/remote.pdf");
         assert_eq!(downloaded.size_bytes, 84);
     }
 
@@ -6197,6 +6270,13 @@ mod tests {
             })
             .unwrap();
         assert_ne!(first_sync.id, outbox_task.id);
+        let duplicate_outbox = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "outbox-smtp".to_string(),
+                source: "timer".to_string(),
+            })
+            .unwrap();
+        assert_eq!(outbox_task.id, duplicate_outbox.id);
 
         let next = store.next_background_task().unwrap().unwrap();
         assert_eq!(next.id, first_sync.id);
@@ -6392,7 +6472,7 @@ mod tests {
         let raw = concat!(
             "Subject: Local migration sample\r\n",
             "From: \"Migration Sender\" <migration@example.com>\r\n",
-            "To: demo@swiftmail.local\r\n",
+            "To: demo@better-email.local\r\n",
             "Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n",
             "Message-ID: <migration-1@example.com>\r\n",
             "Content-Type: multipart/mixed; boundary=\"mix\"\r\n",

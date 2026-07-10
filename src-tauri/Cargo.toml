@@ -1,12 +1,12 @@
 [package]
-name = "swiftmail"
+name = "better-email"
 version = "0.1.0"
 description = "A small cross-platform email client focused on low memory usage."
-authors = ["SwiftMail contributors"]
+authors = ["Better Email contributors"]
 edition = "2021"
 
 [lib]
-name = "swiftmail_lib"
+name = "better_email_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

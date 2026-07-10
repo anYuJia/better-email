@@ -2,12 +2,22 @@ use crate::models::{Account, CredentialStatus};
 use crate::oauth::{self, OAuthTokenBundle};
 use keyring::Entry;
 
-const SERVICE: &str = "SwiftMail";
+const SERVICE: &str = "Better Email";
+const LEGACY_SERVICE: &str = "SwiftMail";
 
 pub fn get_secret(account_email: &str) -> Result<String, String> {
-    Entry::new(SERVICE, account_email)
+    let current = Entry::new(SERVICE, account_email)
         .and_then(|entry| entry.get_password())
-        .map_err(|error| format!("未读取到系统凭据：{error}"))
+        .ok();
+    if let Some(secret) = current {
+        return Ok(secret);
+    }
+
+    let legacy = Entry::new(LEGACY_SERVICE, account_email)
+        .and_then(|entry| entry.get_password())
+        .map_err(|error| format!("未读取到系统凭据：{error}"))?;
+    let _ = Entry::new(SERVICE, account_email).and_then(|entry| entry.set_password(&legacy));
+    Ok(legacy)
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +78,7 @@ pub fn store_secret(account_email: &str, secret: &str) -> CredentialStatus {
 }
 
 pub fn check_secret(account_email: &str) -> CredentialStatus {
-    match Entry::new(SERVICE, account_email).and_then(|entry| entry.get_password()) {
+    match get_secret(account_email) {
         Ok(secret) => CredentialStatus {
             account_email: account_email.to_string(),
             exists: !secret.is_empty(),
@@ -83,16 +93,22 @@ pub fn check_secret(account_email: &str) -> CredentialStatus {
 }
 
 pub fn delete_secret(account_email: &str) -> CredentialStatus {
-    match Entry::new(SERVICE, account_email).and_then(|entry| entry.delete_credential()) {
-        Ok(()) => CredentialStatus {
+    let current = Entry::new(SERVICE, account_email)
+        .and_then(|entry| entry.delete_credential())
+        .map_err(|error| error.to_string());
+    let legacy = Entry::new(LEGACY_SERVICE, account_email)
+        .and_then(|entry| entry.delete_credential())
+        .map_err(|error| error.to_string());
+    match (current, legacy) {
+        (Ok(()), _) | (_, Ok(())) => CredentialStatus {
             account_email: account_email.to_string(),
             exists: false,
             message: "系统凭据已删除。".to_string(),
         },
-        Err(error) => CredentialStatus {
+        (Err(current_error), Err(legacy_error)) => CredentialStatus {
             account_email: account_email.to_string(),
             exists: false,
-            message: format!("系统凭据删除失败或不存在：{error}"),
+            message: format!("系统凭据删除失败或不存在：{current_error}；旧凭据：{legacy_error}"),
         },
     }
 }

@@ -510,7 +510,7 @@ fn handle_callback_stream(
         .nth(1)
         .ok_or_else(|| "OAuth2 本地回调请求格式无效。".to_string())?;
     if !target.starts_with(&endpoint.path) {
-        write_callback_response(stream, 404, "SwiftMail OAuth2 回调路径不匹配。");
+        write_callback_response(stream, 404, "Better Email OAuth2 回调路径不匹配。");
         return Err("OAuth2 本地回调路径不匹配。".to_string());
     }
     match parse_local_callback_url(target) {
@@ -518,7 +518,7 @@ fn handle_callback_stream(
             write_callback_response(
                 stream,
                 200,
-                "SwiftMail OAuth2 授权已接收，可以回到应用继续交换 Token。",
+                "Better Email OAuth2 授权已接收，可以回到应用继续交换 Token。",
             );
             Ok(payload)
         }
@@ -547,7 +547,7 @@ fn parse_query(query: &str) -> Result<HashMap<String, String>, String> {
 fn write_callback_response(stream: &mut TcpStream, status: u16, message: &str) {
     let status_text = if status == 200 { "OK" } else { "Bad Request" };
     let body = format!(
-        "<!doctype html><meta charset=\"utf-8\"><title>SwiftMail OAuth2</title><body><h1>{}</h1><p>{}</p></body>",
+        "<!doctype html><meta charset=\"utf-8\"><title>Better Email OAuth2</title><body><h1>{}</h1><p>{}</p></body>",
         if status == 200 { "授权已接收" } else { "授权未完成" },
         message
     );

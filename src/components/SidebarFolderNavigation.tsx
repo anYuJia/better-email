@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   FolderOpen,
+  MailOpen,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -133,6 +134,7 @@ export type SidebarFolderNavigationProps = {
   onCancelRename: () => void;
   onStartRename: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
+  onMarkFolderRead: (folder: Folder) => void;
   onFavoriteChange: (folder: Folder, isFavorite: boolean) => void;
 };
 
@@ -149,6 +151,7 @@ export default function SidebarFolderNavigation({
   onCancelRename,
   onStartRename,
   onDeleteFolder,
+  onMarkFolderRead,
   onFavoriteChange,
 }: SidebarFolderNavigationProps) {
   const [contextMenu, setContextMenu] = React.useState<{
@@ -232,6 +235,13 @@ export default function SidebarFolderNavigation({
             label: '打开文件夹',
             icon: <FolderOpen size={15} />,
             onSelect: () => onSelectFolder(folder.id),
+          },
+          {
+            id: 'mark-folder-read',
+            label: '全部标为已读',
+            icon: <MailOpen size={15} />,
+            disabled: folder.unread_count <= 0,
+            onSelect: () => onMarkFolderRead(folder),
           },
           ...(canToggleFavorite
             ? [{

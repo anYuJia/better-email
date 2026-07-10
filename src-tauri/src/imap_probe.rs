@@ -9,6 +9,7 @@ use chrono::Utc;
 use imap_proto::parser::bodystructure::BodyStructParser;
 use imap_proto::types::{BodyStructure, ContentDisposition, SectionPath};
 use mail_parser::{MessageParser, MimeHeaders};
+use std::collections::BTreeSet;
 use std::io::Write;
 
 const HEADER_FETCH_LIMIT: usize = 25;
@@ -218,6 +219,17 @@ pub fn set_remote_seen(
     remote_uid: i64,
     is_read: bool,
 ) -> Result<(), MailError> {
+    set_remote_seen_batch(account, secret, remote_name, &[remote_uid], is_read)
+}
+
+pub fn set_remote_seen_batch(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    remote_uids: &[i64],
+    is_read: bool,
+) -> Result<(), MailError> {
+    let uid_set = remote_uid_set(remote_uids)?;
     with_selected_mailbox(account, secret, remote_name, |session| {
         let query = if is_read {
             "+FLAGS.SILENT (\\Seen)"
@@ -225,10 +237,28 @@ pub fn set_remote_seen(
             "-FLAGS.SILENT (\\Seen)"
         };
         session
-            .uid_store(remote_uid.to_string(), query)
+            .uid_store(uid_set.as_str(), query)
             .map(|_| ())
             .map_err(|error| MailError::Imap(format!("IMAP 回写已读状态失败：{error}")))
     })
+}
+
+fn remote_uid_set(remote_uids: &[i64]) -> Result<String, MailError> {
+    let uid_set = remote_uids
+        .iter()
+        .copied()
+        .filter(|uid| *uid > 0)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|uid| uid.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    if uid_set.is_empty() {
+        return Err(MailError::Imap(
+            "远端 UID 列表为空，无法回写已读状态。".to_string(),
+        ));
+    }
+    Ok(uid_set)
 }
 
 pub fn move_remote_message(
@@ -730,6 +760,12 @@ mod tests {
             imap_xoauth2_response("me@example.com", "access-123"),
             "user=me@example.com\x01auth=Bearer access-123\x01\x01"
         );
+    }
+
+    #[test]
+    fn builds_deduplicated_remote_uid_set() {
+        assert_eq!(remote_uid_set(&[3, 1, 3, 0, -1]).unwrap(), "1,3");
+        assert!(remote_uid_set(&[0, -1]).is_err());
     }
 
     #[test]

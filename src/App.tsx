@@ -53,6 +53,7 @@ import type {
   Account,
   AccountCreateInput,
   Folder,
+  FolderReadReport,
   Label,
   SavedSearch,
   Attachment,
@@ -1161,6 +1162,16 @@ export default function App() {
     const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
     await loadMessages(nextFolderId);
     setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
+  }
+
+  async function markFolderRead(folder: Folder) {
+    const report = await invoke<FolderReadReport>('mark_folder_read', {
+      folderId: folder.id,
+      role: folder.role,
+      isVirtual: folder.is_virtual,
+    });
+    await refreshAll();
+    setStatus(report.message);
   }
 
   async function snoozeSelected() {
@@ -2789,6 +2800,7 @@ export default function App() {
         onCancelRename={() => setRenamingFolderId(null)}
         onStartRename={startRenameCustomFolder}
         onDeleteFolder={(folder) => { deleteCustomFolder(folder).catch((error) => setStatus(String(error))); }}
+        onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
         onSavedSearchNameChange={setSavedSearchName}
         onSaveCurrentSearch={saveCurrentSearch}
         onRunSavedSearch={(savedSearch) => { runSavedSearch(savedSearch).catch((error) => setStatus(String(error))); }}

@@ -374,6 +374,14 @@ async function main() {
     await clickButton(cdp, '从常用邮箱移除', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
 
+    await evalInPage(
+      cdp,
+      "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (!folder || !badge || Number(badge.textContent) <= 0) throw new Error('Inbox unread folder target not found'); window.__folderUnreadBefore = Number(badge.textContent); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 180, button: 2 })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('全部标为已读')");
+    await clickButton(cdp, '全部标为已读', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
+
     await clickButton(cdp, '快捷键');
     await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('选择当前列表全部邮件') && document.body.innerText.includes('撤销上一步邮件操作')");
     await clickButton(cdp, '关闭', "document.querySelector('.shortcut-modal')");
@@ -776,6 +784,7 @@ async function main() {
         'resizable panes persist and reset',
         'more mailbox list stays inside sidebar',
         'favorite mailbox pin persists and can be removed',
+        'folder context menu marks all messages read',
         'shortcut help opens from button and keyboard',
         'command palette opens and runs commands',
         'message list loaded',

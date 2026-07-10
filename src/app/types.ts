@@ -272,6 +272,15 @@ export type RemoteActionReport = {
   message: string;
 };
 
+export type FolderReadReport = {
+  updated_count: number;
+  remote_attempted_count: number;
+  remote_applied_count: number;
+  remote_skipped_count: number;
+  remote_failed_count: number;
+  message: string;
+};
+
 export type ParsedMessagePreview = {
   subject: string;
   from: string;

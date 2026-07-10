@@ -830,6 +830,30 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         remote_applied: false,
         message: '本地已更新；UI smoke mock 跳过远端回写。',
       } as T;
+    case 'mark_folder_read': {
+      const folderId = Number(args?.folderId);
+      const role = String(args?.role ?? '');
+      const isVirtual = Boolean(args?.isVirtual);
+      let updatedCount = 0;
+      messages = messages.map((message) => {
+        const matchesFolder = isVirtual
+          ? message.folder_role === role
+          : message.folder_id === folderId;
+        if (!matchesFolder || message.is_read) return message;
+        updatedCount += 1;
+        return { ...message, is_read: true };
+      });
+      return {
+        updated_count: updatedCount,
+        remote_attempted_count: 0,
+        remote_applied_count: 0,
+        remote_skipped_count: updatedCount,
+        remote_failed_count: 0,
+        message: updatedCount > 0
+          ? `已将 ${updatedCount} 封邮件标为已读；${updatedCount} 封没有可用远端状态，已保留本地结果。`
+          : '该文件夹没有未读邮件。',
+      } as T;
+    }
     case 'set_message_starred':
       messages = messages.map((message) =>
         message.id === args?.messageId ? { ...message, is_starred: Boolean(args?.isStarred) } : message,

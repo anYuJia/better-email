@@ -53,6 +53,7 @@ export type SidebarProps = {
   onCancelRename: () => void;
   onStartRename: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
+  onMarkFolderRead: (folder: Folder) => void;
   onSavedSearchNameChange: (value: string) => void;
   onSaveCurrentSearch: () => void;
   onRunSavedSearch: (savedSearch: SavedSearch) => void;
@@ -101,6 +102,7 @@ export default function Sidebar({
   onCancelRename,
   onStartRename,
   onDeleteFolder,
+  onMarkFolderRead,
   onSavedSearchNameChange,
   onSaveCurrentSearch,
   onRunSavedSearch,
@@ -161,6 +163,7 @@ export default function Sidebar({
         onCancelRename={onCancelRename}
         onStartRename={onStartRename}
         onDeleteFolder={onDeleteFolder}
+        onMarkFolderRead={onMarkFolderRead}
         onFavoriteChange={onFolderFavoriteChange}
       >
         <details className="sidebar-disclosure sidebar-tools">

@@ -61,6 +61,13 @@ pub struct OAuthTokenExchangeSession {
     pub status: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct UnreadMessageRemoteRef {
+    pub account_id: i64,
+    pub remote_mailbox: String,
+    pub remote_uid: i64,
+}
+
 const LOCAL_BACKUP_SCHEMA_VERSION: i64 = 1;
 const DATABASE_FILENAME: &str = "better-email.sqlite3";
 const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
@@ -1410,6 +1417,85 @@ impl MailStore {
                 params![bool_to_int(is_read), message_id],
             )?;
             Ok(())
+        })
+    }
+
+    pub fn mark_folder_read(
+        &self,
+        folder_id: i64,
+        role: &str,
+        is_virtual: bool,
+    ) -> MailResult<Vec<UnreadMessageRemoteRef>> {
+        self.with_conn(|conn| {
+            if is_virtual && role.trim().is_empty() {
+                return Err(MailError::Imap(
+                    "虚拟文件夹缺少角色，无法批量标为已读。".to_string(),
+                ));
+            }
+
+            let unread_messages = if is_virtual {
+                let mut stmt = conn.prepare(
+                    "
+                    SELECT m.account_id, m.remote_mailbox, m.remote_uid
+                    FROM messages m
+                    JOIN folders f ON f.id = m.folder_id
+                    WHERE m.is_read = 0 AND f.role = ?1
+                    ORDER BY m.account_id ASC, m.remote_mailbox ASC, m.remote_uid ASC
+                    ",
+                )?;
+                let rows = stmt
+                    .query_map(params![role], |row| {
+                        Ok(UnreadMessageRemoteRef {
+                            account_id: row.get(0)?,
+                            remote_mailbox: row.get(1)?,
+                            remote_uid: row.get(2)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            } else {
+                let mut stmt = conn.prepare(
+                    "
+                    SELECT account_id, remote_mailbox, remote_uid
+                    FROM messages
+                    WHERE is_read = 0 AND folder_id = ?1
+                    ORDER BY remote_mailbox ASC, remote_uid ASC
+                    ",
+                )?;
+                let rows = stmt
+                    .query_map(params![folder_id], |row| {
+                        Ok(UnreadMessageRemoteRef {
+                            account_id: row.get(0)?,
+                            remote_mailbox: row.get(1)?,
+                            remote_uid: row.get(2)?,
+                        })
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            };
+
+            if unread_messages.is_empty() {
+                return Ok(unread_messages);
+            }
+
+            if is_virtual {
+                conn.execute(
+                    "
+                    UPDATE messages
+                    SET is_read = 1
+                    WHERE is_read = 0
+                      AND folder_id IN (SELECT id FROM folders WHERE role = ?1)
+                    ",
+                    params![role],
+                )?;
+            } else {
+                conn.execute(
+                    "UPDATE messages SET is_read = 1 WHERE is_read = 0 AND folder_id = ?1",
+                    params![folder_id],
+                )?;
+            }
+
+            Ok(unread_messages)
         })
     }
 
@@ -4833,6 +4919,66 @@ mod tests {
         store
             .remove_label_from_message(message.id, label_id)
             .unwrap();
+    }
+
+    #[test]
+    fn folder_mark_read_updates_real_and_virtual_scopes() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+        let inbox = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let unread_before = store
+            .list_messages_for_scope(
+                Some(account_id),
+                inbox.id,
+                None,
+                Some("unread".to_string()),
+                100,
+            )
+            .unwrap();
+        assert!(!unread_before.is_empty());
+
+        let updated = store
+            .mark_folder_read(inbox.id, &inbox.role, false)
+            .unwrap();
+        assert_eq!(updated.len(), unread_before.len());
+        let unread_after = store
+            .list_messages_for_scope(
+                Some(account_id),
+                inbox.id,
+                None,
+                Some("unread".to_string()),
+                100,
+            )
+            .unwrap();
+        assert!(unread_after.is_empty());
+
+        let message = store
+            .list_messages_for_scope(Some(account_id), inbox.id, None, None, 1)
+            .unwrap()
+            .remove(0);
+        store.set_message_read(message.id, false).unwrap();
+        let virtual_inbox = store
+            .list_folders_for_account(None)
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let virtual_updated = store
+            .mark_folder_read(virtual_inbox.id, &virtual_inbox.role, true)
+            .unwrap();
+        assert_eq!(virtual_updated.len(), 1);
+        let refreshed_virtual_inbox = store
+            .list_folders_for_account(None)
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        assert_eq!(refreshed_virtual_inbox.unread_count, 0);
     }
 
     #[test]

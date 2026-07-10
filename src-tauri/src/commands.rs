@@ -6,10 +6,10 @@ use crate::models::{
     BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
     ContactInput, ContactMergeSuggestion, CredentialInput, CredentialStatus, DiagnosticAccount,
     DiagnosticExport, DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, Folder,
-    ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity,
-    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackInput,
-    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
-    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
+    FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
+    OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput,
+    OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
     RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, SyncRun,
     SyncSchedulePlan, ThreadSummary,
@@ -18,6 +18,7 @@ use crate::oauth;
 use crate::protocol;
 use crate::smtp;
 use chrono::Utc;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
@@ -510,6 +511,95 @@ pub fn set_message_read(
 ) -> MailResult<RemoteActionReport> {
     store.set_message_read(message_id, is_read)?;
     sync_remote_seen(&store, message_id, is_read)
+}
+
+#[tauri::command]
+pub fn mark_folder_read(
+    store: State<'_, MailStore>,
+    folder_id: i64,
+    role: String,
+    is_virtual: bool,
+) -> MailResult<FolderReadReport> {
+    let unread_messages = store.mark_folder_read(folder_id, &role, is_virtual)?;
+    let updated_count = unread_messages.len() as i64;
+    if unread_messages.is_empty() {
+        return Ok(FolderReadReport {
+            updated_count: 0,
+            remote_attempted_count: 0,
+            remote_applied_count: 0,
+            remote_skipped_count: 0,
+            remote_failed_count: 0,
+            message: "该文件夹没有未读邮件。".to_string(),
+        });
+    }
+
+    let mut groups = BTreeMap::<(i64, String), Vec<i64>>::new();
+    let mut remote_skipped_count = 0_i64;
+    for reference in unread_messages {
+        if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
+            remote_skipped_count += 1;
+            continue;
+        }
+        groups
+            .entry((reference.account_id, reference.remote_mailbox))
+            .or_default()
+            .push(reference.remote_uid);
+    }
+
+    let mut remote_attempted_count = 0_i64;
+    let mut remote_applied_count = 0_i64;
+    let mut remote_failed_count = 0_i64;
+    for ((account_id, remote_mailbox), remote_uids) in groups {
+        let account = match store.get_account_by_id(Some(account_id)) {
+            Ok(account) => account,
+            Err(_) => {
+                remote_skipped_count += remote_uids.len() as i64;
+                continue;
+            }
+        };
+        let secret = match credentials::get_account_secret(&account) {
+            Ok(secret) => secret,
+            Err(_) => {
+                remote_skipped_count += remote_uids.len() as i64;
+                continue;
+            }
+        };
+        let group_count = remote_uids.len() as i64;
+        remote_attempted_count += group_count;
+        match imap_probe::set_remote_seen_batch(
+            &account,
+            &secret,
+            &remote_mailbox,
+            &remote_uids,
+            true,
+        ) {
+            Ok(()) => remote_applied_count += group_count,
+            Err(_) => remote_failed_count += group_count,
+        }
+    }
+
+    let message = if remote_failed_count > 0 {
+        format!(
+            "已将 {updated_count} 封邮件标为已读；远端同步成功 {remote_applied_count} 封，失败 {remote_failed_count} 封，跳过 {remote_skipped_count} 封。"
+        )
+    } else if remote_attempted_count > 0 {
+        format!(
+            "已将 {updated_count} 封邮件标为已读；远端同步成功 {remote_applied_count} 封，跳过 {remote_skipped_count} 封。"
+        )
+    } else {
+        format!(
+            "已将 {updated_count} 封邮件标为已读；{remote_skipped_count} 封没有可用远端状态，已保留本地结果。"
+        )
+    };
+
+    Ok(FolderReadReport {
+        updated_count,
+        remote_attempted_count,
+        remote_applied_count,
+        remote_skipped_count,
+        remote_failed_count,
+        message,
+    })
 }
 
 #[tauri::command]

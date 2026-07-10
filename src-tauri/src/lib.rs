@@ -47,6 +47,7 @@ pub fn run() {
             commands::export_message_as_eml,
             commands::import_eml_file,
             commands::set_message_read,
+            commands::mark_folder_read,
             commands::set_message_starred,
             commands::move_message_to_role,
             commands::restore_message_to_inbox,

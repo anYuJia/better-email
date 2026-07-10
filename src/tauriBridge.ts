@@ -122,6 +122,16 @@ type MockFolder = {
   is_virtual: boolean;
 };
 
+const mockSystemFolders = [
+  { name: '收件箱', role: 'inbox' },
+  { name: '已发送', role: 'sent' },
+  { name: '草稿箱', role: 'drafts' },
+  { name: '归档', role: 'archive' },
+  { name: '废纸篓', role: 'trash' },
+  { name: '垃圾邮件', role: 'spam' },
+  { name: '稍后处理', role: 'snoozed' },
+] as const;
+
 let folders: MockFolder[] = [
   { id: -1, account_id: null, name: '收件箱', role: 'inbox', unread_count: 1, is_virtual: true },
   { id: -2, account_id: null, name: '已发送', role: 'sent', unread_count: 0, is_virtual: true },
@@ -130,6 +140,16 @@ let folders: MockFolder[] = [
   { id: -5, account_id: null, name: '废纸篓', role: 'trash', unread_count: 0, is_virtual: true },
   { id: -6, account_id: null, name: '垃圾邮件', role: 'spam', unread_count: 0, is_virtual: true },
   { id: -9, account_id: null, name: '稍后处理', role: 'snoozed', unread_count: 0, is_virtual: true },
+  ...mockAccounts.flatMap((mockAccount, accountIndex) =>
+    mockSystemFolders.map((folder, folderIndex) => ({
+      id: (accountIndex + 1) * 100 + folderIndex + 1,
+      account_id: mockAccount.id,
+      name: folder.name,
+      role: folder.role,
+      unread_count: folder.role === 'inbox' && mockAccount.id === account.id ? 1 : 0,
+      is_virtual: false,
+    })),
+  ),
 ];
 
 let messages = [
@@ -242,7 +262,7 @@ type MockOutboundAttachmentInput = {
   local_path?: string;
 };
 
-let nextMessageId = 3;
+let nextMessageId = Math.max(...messages.map((message) => message.id)) + 1;
 let nextAttachmentId = 2;
 let nextOutboxId = 1;
 let nextRuleId = 4;
@@ -373,10 +393,14 @@ let remoteImageTrusts: Array<{
 }> = [];
 
 let backgroundTasks: unknown[] = [];
-let nextFolderId = 201;
+let nextFolderId = 1001;
 
-function folderIdForRole(role: string) {
-  return folders.find((folder) => folder.role === role)?.id ?? 101;
+function folderIdForRole(role: string, accountId: number = account.id) {
+  return (
+    folders.find((folder) => !folder.is_virtual && folder.account_id === accountId && folder.role === role)?.id ??
+    folders.find((folder) => folder.is_virtual && folder.role === role)?.id ??
+    101
+  );
 }
 
 function normalizeCustomFolderName(name: unknown, currentFolderId?: number) {
@@ -402,7 +426,7 @@ function accountMessageFromDraft(input: MockDraftInput, role: string, messageId?
   const body = input.body?.trim() || '';
   const htmlBody = input.html_body?.trim() || '';
   const draftAttachments = (input.attachments ?? []).filter((attachment) => attachment.filename?.trim());
-  const senderAccount = input.account_id === account.id ? account : account;
+  const senderAccount = mockAccounts.find((item) => item.id === Number(input.account_id)) ?? account;
   const identity =
     identities.find((item) => item.id === input.identity_id && item.account_id === senderAccount.id) ??
     identities.find((item) => item.account_id === senderAccount.id && item.is_default) ??
@@ -411,7 +435,7 @@ function accountMessageFromDraft(input: MockDraftInput, role: string, messageId?
     id,
     account_id: senderAccount.id,
     account_email: senderAccount.email,
-    folder_id: folderIdForRole(role),
+    folder_id: folderIdForRole(role, senderAccount.id),
     folder_role: role,
     sender_name: identity?.name ?? senderAccount.display_name,
     sender_email: identity?.email ?? senderAccount.email,
@@ -635,7 +659,15 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         const accountId = Number(args?.accountId ?? 0);
         if (accountId <= 0) return folder.is_virtual || String(folder.role).startsWith('custom:');
         return !folder.is_virtual && folder.account_id === accountId;
-      }) as T;
+      }).map((folder) => ({
+        ...folder,
+        unread_count: messages.filter((message) => {
+          if (message.is_read) return false;
+          return folder.is_virtual
+            ? message.folder_role === folder.role
+            : message.folder_id === folder.id;
+        }).length,
+      })) as T;
     case 'create_custom_folder': {
       const name = normalizeCustomFolderName(args?.name);
       const folder = {
@@ -664,7 +696,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       if (!folder || !String(folder.role).startsWith('custom:')) throw new Error('只能删除自定义文件夹。');
       messages = messages.map((message) =>
         message.folder_id === folderId
-          ? { ...message, folder_role: 'inbox', folder_id: folderIdForRole('inbox'), snoozed_until: '' }
+          ? { ...message, folder_role: 'inbox', folder_id: folderIdForRole('inbox', message.account_id), snoozed_until: '' }
           : message,
       );
       folders = folders.filter((entry) => entry.id !== folderId);
@@ -794,7 +826,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           ? {
               ...message,
               folder_role: String(args?.role ?? message.folder_role),
-              folder_id: folderIdForRole(String(args?.role ?? message.folder_role)),
+              folder_id: folderIdForRole(String(args?.role ?? message.folder_role), message.account_id),
               snoozed_until: '',
             }
           : message,
@@ -813,7 +845,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         restored = {
           ...message,
           folder_role: 'inbox',
-          folder_id: folderIdForRole('inbox'),
+          folder_id: folderIdForRole('inbox', message.account_id),
           snoozed_until: '',
         };
         return restored;
@@ -844,7 +876,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         updated = {
           ...message,
           folder_role: 'snoozed',
-          folder_id: folderIdForRole('snoozed'),
+          folder_id: folderIdForRole('snoozed', message.account_id),
           snoozed_until: snoozedUntil,
           is_read: true,
         };
@@ -861,7 +893,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         updated = {
           ...message,
           folder_role: 'inbox',
-          folder_id: folderIdForRole('inbox'),
+          folder_id: folderIdForRole('inbox', message.account_id),
           snoozed_until: '',
         };
         return updated;
@@ -964,7 +996,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       if (!item) throw new Error('outbox item not found');
       messages = messages.map((message) =>
         message.id === item.message_id
-          ? { ...message, folder_role: 'drafts', folder_id: folderIdForRole('drafts') }
+          ? { ...message, folder_role: 'drafts', folder_id: folderIdForRole('drafts', message.account_id) }
           : message,
       );
       const updated = { ...item, status: 'cancelled', last_error: '已撤回到草稿箱', next_attempt_at: '' };
@@ -1054,6 +1086,50 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'export_message_as_eml': {
       const message = messages.find((item) => item.id === args?.messageId);
       return `邮件已导出为 /tmp/${message?.subject || 'swiftmail-message'}.eml` as T;
+    }
+    case 'import_eml_file': {
+      const accountId = Number(args?.accountId ?? account.id);
+      const targetAccount = mockAccounts.find((item) => item.id === accountId) ?? account;
+      const message: MockMessage = {
+        id: nextMessageId++,
+        account_id: targetAccount.id,
+        account_email: targetAccount.email,
+        folder_id: folderIdForRole('inbox', targetAccount.id),
+        folder_role: 'inbox',
+        sender_name: 'Archive Import',
+        sender_email: 'archive-import@example.com',
+        recipients: targetAccount.email,
+        cc: '',
+        bcc: '',
+        subject: 'Imported EML Sample',
+        snippet: '本地 EML 已安全解析，附件可以直接打开。',
+        body: '<p>本地 EML 已安全解析，附件可以直接打开。</p>',
+        sanitized_html: '<p>本地 EML 已安全解析，附件可以直接打开。</p>',
+        security_warnings: [],
+        received_at: new Date().toISOString(),
+        is_read: true,
+        is_starred: false,
+        has_attachments: true,
+        snoozed_until: '',
+        labels: [],
+        attachment_count: 1,
+        remote_mailbox: '',
+        remote_uid: 0,
+      };
+      attachments = [
+        {
+          id: nextAttachmentId++,
+          message_id: message.id,
+          filename: 'imported-note.txt',
+          mime_type: 'text/plain',
+          size_bytes: 24,
+          is_downloaded: true,
+          local_path: '/tmp/swiftmail/imported-note.txt',
+        },
+        ...attachments,
+      ];
+      messages = [message, ...messages];
+      return message as T;
     }
     case 'pick_outbound_attachments':
       return [

@@ -1260,6 +1260,90 @@ impl MailStore {
         })
     }
 
+    pub fn import_eml_message(&self, account_id: Option<i64>, raw: &str) -> MailResult<Message> {
+        let imported = protocol::parse_imported_eml(raw);
+        let (message_id, attachments) = self.with_conn(move |conn| {
+            let account = account_for_conn(conn, account_id)?;
+            let folder_id = folder_id_for_account_role(conn, account.id, "inbox")?;
+            let subject = normalized_subject(&imported.subject);
+            conn.execute(
+                "
+                INSERT INTO messages(
+                    account_id, folder_id, sender_name, sender_email, recipients, cc, bcc,
+                    subject, snippet, body, sanitized_html, security_warnings, received_at,
+                    is_read, is_starred, has_attachments, thread_key, message_id_header
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 1, 0, ?14, ?15, ?16)
+                ",
+                params![
+                    account.id,
+                    folder_id,
+                    imported.sender_name,
+                    imported.sender_email,
+                    imported.recipients,
+                    imported.cc,
+                    imported.bcc,
+                    subject,
+                    imported.snippet,
+                    imported.body,
+                    imported.sanitized_html,
+                    warning_lines_to_text(&imported.security_warnings),
+                    imported.received_at,
+                    bool_to_int(!imported.attachments.is_empty()),
+                    subject.to_lowercase(),
+                    imported.message_id_header
+                ],
+            )?;
+            let message_id = conn.last_insert_rowid();
+            let mut attachment_rows = Vec::with_capacity(imported.attachments.len());
+            for attachment in imported.attachments {
+                conn.execute(
+                    "INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path)
+                     VALUES (?1, ?2, ?3, ?4, 0, '')",
+                    params![
+                        message_id,
+                        &attachment.filename,
+                        fallback_mime_type(&attachment.mime_type),
+                        attachment.bytes.len().min(i64::MAX as usize) as i64
+                    ],
+                )?;
+                attachment_rows.push((conn.last_insert_rowid(), attachment));
+            }
+            upsert_contact(
+                conn,
+                &imported.sender_name,
+                &imported.sender_email,
+                &imported.received_at,
+            )?;
+            Ok((message_id, attachment_rows))
+        })?;
+
+        if !attachments.is_empty() {
+            let dir = self.attachment_dir(message_id);
+            let persist_result = (|| -> MailResult<()> {
+                fs::create_dir_all(&dir)?;
+                for (attachment_id, attachment) in attachments {
+                    let filename = safe_attachment_filename(&attachment.filename);
+                    let local_path = dir.join(format!("{attachment_id}-{filename}"));
+                    fs::write(&local_path, &attachment.bytes)?;
+                    self.mark_attachment_downloaded(
+                        attachment_id,
+                        &local_path.to_string_lossy(),
+                        attachment.bytes.len().min(i64::MAX as usize) as i64,
+                    )?;
+                }
+                Ok(())
+            })();
+            if let Err(error) = persist_result {
+                let _ = fs::remove_dir_all(&dir);
+                let _ = self.delete_message_permanently(message_id);
+                return Err(error);
+            }
+        }
+
+        self.get_message(message_id)
+    }
+
     pub fn list_attachments(&self, message_id: i64) -> MailResult<Vec<Attachment>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
@@ -2841,6 +2925,26 @@ fn fallback_mime_type(mime_type: &str) -> &str {
         "application/octet-stream"
     } else {
         trimmed
+    }
+}
+
+fn safe_attachment_filename(filename: &str) -> String {
+    let normalized = filename
+        .trim()
+        .chars()
+        .map(|character| {
+            if character.is_control() || matches!(character, '/' | '\\' | ':') {
+                '_'
+            } else {
+                character
+            }
+        })
+        .take(120)
+        .collect::<String>();
+    if normalized.trim_matches(['.', ' ']).is_empty() {
+        "attachment".to_string()
+    } else {
+        normalized
     }
 }
 
@@ -6280,5 +6384,58 @@ mod tests {
             .unwrap()
             .iter()
             .all(|message| message.id != item.message_id));
+    }
+
+    #[test]
+    fn local_eml_import_persists_safe_body_contact_and_attachment_file() {
+        let store = test_store();
+        let raw = concat!(
+            "Subject: Local migration sample\r\n",
+            "From: \"Migration Sender\" <migration@example.com>\r\n",
+            "To: demo@swiftmail.local\r\n",
+            "Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n",
+            "Message-ID: <migration-1@example.com>\r\n",
+            "Content-Type: multipart/mixed; boundary=\"mix\"\r\n",
+            "\r\n",
+            "--mix\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p onclick=\"bad()\">Imported safely.</p><img src=\"http://tracker.example/open.png\"><script>bad()</script>\r\n",
+            "--mix\r\n",
+            "Content-Type: text/plain; name=\"migration-note.txt\"\r\n",
+            "Content-Disposition: attachment; filename=\"migration-note.txt\"\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "bG9jYWwgYXR0YWNobWVudA==\r\n",
+            "--mix--\r\n",
+        );
+
+        let imported = store.import_eml_message(None, raw).unwrap();
+        assert_eq!(imported.folder_role, "inbox");
+        assert_eq!(imported.subject, "Local migration sample");
+        assert_eq!(imported.sender_email, "migration@example.com");
+        assert!(imported.is_read);
+        assert!(imported.has_attachments);
+        assert!(!imported.sanitized_html.contains("<script"));
+        assert!(!imported.sanitized_html.contains("onclick"));
+        assert!(!imported.sanitized_html.contains("src=\"http"));
+        assert!(imported
+            .security_warnings
+            .iter()
+            .any(|warning| warning.contains("远程图片")));
+
+        let attachments = store.list_attachments(imported.id).unwrap();
+        assert_eq!(attachments.len(), 1);
+        assert!(attachments[0].is_downloaded);
+        assert!(!attachments[0].local_path.is_empty());
+        assert_eq!(
+            fs::read(&attachments[0].local_path).unwrap(),
+            b"local attachment"
+        );
+        assert!(store
+            .list_contacts()
+            .unwrap()
+            .iter()
+            .any(|contact| contact.email == "migration@example.com"));
     }
 }

@@ -25,6 +25,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
 const MAX_ATTACHMENT_DOWNLOAD_BYTES: i64 = 25 * 1024 * 1024;
+const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 
 #[tauri::command]
@@ -400,6 +401,39 @@ pub fn export_message_as_eml(
     }
     fs::write(&target_path, payload)?;
     Ok(format!("邮件已导出为 {}", target_path.to_string_lossy()))
+}
+
+#[tauri::command]
+pub fn import_eml_file(
+    app: AppHandle,
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<Option<Message>> {
+    let Some(path) = app
+        .dialog()
+        .file()
+        .set_title("导入 EML 邮件")
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    let path = path
+        .into_path()
+        .map_err(|error| crate::db::MailError::Imap(format!("无法解析 EML 路径：{error}")))?;
+    let payload = fs::read(&path)?;
+    if payload.is_empty() {
+        return Err(crate::db::MailError::Imap(
+            "EML 文件为空，无法导入。".to_string(),
+        ));
+    }
+    if payload.len() > MAX_EML_IMPORT_BYTES {
+        return Err(crate::db::MailError::Imap(format!(
+            "EML 文件超过 {} MB 导入上限。",
+            MAX_EML_IMPORT_BYTES / 1024 / 1024
+        )));
+    }
+    let raw = String::from_utf8_lossy(&payload);
+    store.import_eml_message(account_id, &raw).map(Some)
 }
 
 fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {

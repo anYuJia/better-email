@@ -179,6 +179,30 @@ pub struct RemoteAttachmentMetadata {
 }
 
 #[derive(Debug, Clone)]
+pub struct ImportedEmlAttachment {
+    pub filename: String,
+    pub mime_type: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportedEmlMessage {
+    pub sender_name: String,
+    pub sender_email: String,
+    pub recipients: String,
+    pub cc: String,
+    pub bcc: String,
+    pub subject: String,
+    pub body: String,
+    pub sanitized_html: String,
+    pub security_warnings: Vec<String>,
+    pub snippet: String,
+    pub received_at: String,
+    pub message_id_header: String,
+    pub attachments: Vec<ImportedEmlAttachment>,
+}
+
+#[derive(Debug, Clone)]
 pub struct RemoteAttachmentPayload {
     pub filename: String,
     pub bytes: Vec<u8>,

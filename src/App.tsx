@@ -1,28 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Archive,
-  Clock,
   Edit3,
   Inbox,
   Keyboard,
   Mail,
   Maximize2,
   Minus,
-  MoreHorizontal,
   Paperclip,
   RefreshCw,
-  Reply,
   Search,
   Send,
   Settings,
-  SlidersHorizontal,
-  Star,
-  Tag,
   Wand2,
-  Trash2,
   X,
 } from 'lucide-react';
 import './styles.css';
+import './ui-2026.css';
+import Sidebar from './components/Sidebar';
+import MessageListPane from './components/MessageListPane';
+import ReaderPane from './components/ReaderPane';
 import {
   defaultNotificationPolicy,
   formatBytes,
@@ -40,824 +36,114 @@ import {
 import { type AccountProviderPreset, providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 import { getCurrentWindow, invoke, isPermissionGranted, requestPermission, sendNotification } from './tauriBridge';
 
-type SystemFolderRole = 'inbox' | 'sent' | 'drafts' | 'archive' | 'trash' | 'spam' | 'snoozed' | 'custom';
-type FolderRole = SystemFolderRole | `custom:${string}`;
-type FilterMode = 'all' | 'unread' | 'starred' | 'attachments';
-type ListMode = 'messages' | 'threads';
-type AccountScope = number | 'all';
-type ProviderVerificationStatus = 'untested' | 'passed' | 'partial' | 'failed';
-type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
-type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed';
-
-type Account = {
-  id: number;
-  email: string;
-  display_name: string;
-  provider: string;
-  imap_host: string;
-  smtp_host: string;
-  auth_type: string;
-  sync_mode: string;
-  remote_images_allowed: boolean;
-  signature: string;
-};
-
-type AccountCreateInput = Omit<Account, 'id'>;
-
-type Folder = {
-  id: number;
-  account_id: number | null;
-  name: string;
-  role: FolderRole;
-  unread_count: number;
-  is_virtual: boolean;
-};
-
-type Label = {
-  id: number;
-  name: string;
-  color: string;
-  message_count: number;
-};
-
-type SavedSearch = {
-  id: string;
-  name: string;
-  query: string;
-  filter: FilterMode;
-};
-
-type Attachment = {
-  id: number;
-  message_id: number;
-  filename: string;
-  mime_type: string;
-  size_bytes: number;
-  is_downloaded: boolean;
-  local_path: string;
-};
-
-type OutboundAttachmentInput = {
-  filename: string;
-  mime_type: string;
-  size_bytes: number;
-  local_path: string;
-};
-
-type DroppedFile = File & { path?: string };
-
-type AttachmentDownload = {
-  attachment: Attachment;
-  local_path: string;
-  message: string;
-};
-
-type Message = {
-  id: number;
-  account_id: number;
-  account_email: string;
-  folder_id: number;
-  folder_role: FolderRole;
-  sender_name: string;
-  sender_email: string;
-  recipients: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  snippet: string;
-  body: string;
-  sanitized_html: string;
-  security_warnings: string[];
-  received_at: string;
-  is_read: boolean;
-  is_starred: boolean;
-  has_attachments: boolean;
-  snoozed_until: string;
-  labels: string[];
-  attachment_count: number;
-  remote_mailbox: string;
-  remote_uid: number;
-};
-
-type UndoMessageSnapshot = {
-  id: number;
-  subject: string;
-  account_id: number;
-  folder_role: FolderRole;
-  is_read: boolean;
-  is_starred: boolean;
-  snoozed_until: string;
-  labels: string[];
-};
-
-type UndoAction = {
-  id: string;
-  title: string;
-  detail: string;
-  snapshots: UndoMessageSnapshot[];
-};
-
-type CommandPaletteItem = {
-  id: string;
-  title: string;
-  section: string;
-  hint: string;
-  disabled?: boolean;
-  run: () => void | Promise<void>;
-};
-
-type RemoteImageTrust = {
-  id: number;
-  account_id: number;
-  account_email: string;
-  scope: 'sender' | 'domain';
-  value: string;
-  created_at: string;
-};
-
-type MailIdentity = {
-  id: number;
-  account_id: number;
-  name: string;
-  email: string;
-  reply_to: string;
-  signature: string;
-  is_default: boolean;
-};
-
-type MailIdentityInput = {
-  id: number;
-  account_id: number;
-  name: string;
-  email: string;
-  reply_to: string;
-  signature: string;
-  is_default: boolean;
-};
-
-type DraftInput = {
-  draft_id: number;
-  account_id: number;
-  identity_id: number;
-  to: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  body: string;
-  html_body: string;
-  send_at: string;
-  attachments: OutboundAttachmentInput[];
-};
-
-type ComposeTemplate = {
-  id: string;
-  name: string;
-  subject: string;
-  body: string;
-  html_body: string;
-};
-
-type ComposerAutosave = {
-  draft: DraftInput;
-  isRichComposer: boolean;
-  saved_at: string;
-};
-
-type MailStats = {
-  total_messages: number;
-  unread_messages: number;
-  starred_messages: number;
-  draft_messages: number;
-  attachment_messages: number;
-};
-
-type LocalBackupSummary = {
-  path: string;
-  exported_at: string;
-  app_version: string;
-  schema_version: number;
-  accounts: number;
-  messages: number;
-  labels: number;
-  rules: number;
-  outbox_items: number;
-  size_bytes: number;
-  credentials_included: boolean;
-};
-
-type EndpointCheck = {
-  name: string;
-  address: string;
-  reachable: boolean;
-  latency_ms: number | null;
-  message: string;
-};
-
-type ConnectionReport = {
-  account_email: string;
-  checked_at: string;
-  endpoints: EndpointCheck[];
-  ready_for_credentials: boolean;
-};
-
-type ImapFolderProbe = {
-  name: string;
-  delimiter: string;
-  attributes: string[];
-};
-
-type ImapProbeReport = {
-  account_email: string;
-  checked_at: string;
-  folder_count: number;
-  folders: ImapFolderProbe[];
-  status: string;
-  message: string;
-};
-
-type ImapMailboxState = {
-  id: number;
-  account_id: number;
-  account_email: string;
-  remote_name: string;
-  delimiter: string;
-  attributes: string;
-  local_role: string;
-  uid_validity: string;
-  highest_uid: number;
-  last_seen_at: string;
-  last_sync_at: string;
-};
-
-type SyncRun = {
-  id: number;
-  started_at: string;
-  finished_at: string;
-  status: string;
-  scanned_folders: number;
-  imported_messages: number;
-  message: string;
-};
-
-type SyncSchedulePlan = {
-  max_accounts_per_batch: number;
-  total_accounts: number;
-  batch_accounts: Account[];
-  delayed_accounts: Account[];
-  strategy: string;
-};
-
-type RemoteActionReport = {
-  local_applied: boolean;
-  remote_attempted: boolean;
-  remote_applied: boolean;
-  message: string;
-};
-
-type ParsedMessagePreview = {
-  subject: string;
-  from: string;
-  to: string;
-  body_preview: string;
-  sanitized_html: string;
-  attachment_count: number;
-  attachment_names: string[];
-  warning_count: number;
-  warnings: string[];
-};
-
-type Contact = {
-  id: number;
-  name: string;
-  email: string;
-  aliases: string[];
-  vip: boolean;
-  message_count: number;
-  last_seen_at: string;
-};
-
-type ContactMergeSuggestion = {
-  target: Contact;
-  source: Contact;
-  reason: string;
-  shared_keys: string[];
-};
-
-type ContactCreateInput = {
-  name: string;
-  email: string;
-  aliases: string[];
-  vip: boolean;
-};
-
-type MailRule = {
-  id: number;
-  name: string;
-  condition: string;
-  action: string;
-  enabled: boolean;
-};
-
-type MailRuleInput = {
-  name: string;
-  condition: string;
-  action: string;
-  enabled: boolean;
-};
-
-type ThreadSummary = {
-  thread_key: string;
-  subject: string;
-  message_count: number;
-  unread_count: number;
-  latest_at: string;
-  participants: string;
-};
-
-type OutboxItem = {
-  id: number;
-  message_id: number;
-  recipients: string;
-  subject: string;
-  status: string;
-  attempts: number;
-  last_error: string;
-  queued_at: string;
-  next_attempt_at: string;
-};
-
-type CredentialStatus = {
-  account_email: string;
-  exists: boolean;
-  message: string;
-};
-
-type OAuthStartReport = {
-  session_id: number;
-  provider: string;
-  authorization_url: string;
-  redirect_uri: string;
-  state: string;
-  code_challenge: string;
-  code_verifier_hint: string;
-  scopes: string[];
-  message: string;
-};
-
-type OAuthSession = {
-  id: number;
-  provider: string;
-  authorization_url: string;
-  redirect_uri: string;
-  state: string;
-  code_challenge: string;
-  scopes: string[];
-  status: string;
-  created_at: string;
-  completed_at: string;
-  message: string;
-};
-
-type OAuthCallbackReport = {
-  session_id: number;
-  provider: string;
-  status: string;
-  message: string;
-};
-
-type OAuthTokenExchangeReport = {
-  session_id: number;
-  provider: string;
-  status: string;
-  expires_at: string;
-  message: string;
-};
-
-type OAuthRefreshReport = {
-  provider: string;
-  status: string;
-  expires_at: string;
-  message: string;
-};
-
-type ProviderVerificationRecord = {
-  provider_key: string;
-  provider_label: string;
-  status: ProviderVerificationStatus;
-  imap_ok: boolean;
-  smtp_ok: boolean;
-  oauth_ok: boolean;
-  diagnostic_exported: boolean;
-  checked_at: string;
-  notes: string;
-};
-
-type BackgroundTask = {
-  id: number;
-  kind: BackgroundTaskKind;
-  title: string;
-  source: 'manual' | 'timer';
-  status: BackgroundTaskStatus;
-  message: string;
-  created_at: string;
-  started_at: string;
-  finished_at: string;
-};
-
-type AppLayout = {
-  sidebar: number;
-  list: number;
-};
-
-const emptyDraft: DraftInput = { draft_id: 0, account_id: 0, identity_id: 0, to: '', cc: '', bcc: '', subject: '', body: '', html_body: '', send_at: '', attachments: [] };
-
-function normalizeCommandSearchText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[：:·,，。.\s]+/g, '')
-    .trim();
-}
-const emptyIdentityForm: MailIdentityInput = {
-  id: 0,
-  account_id: 0,
-  name: '',
-  email: '',
-  reply_to: '',
-  signature: '',
-  is_default: false,
-};
-const emptyRuleForm: MailRuleInput = {
-  name: '',
-  condition: 'from contains ',
-  action: 'apply label ',
-  enabled: true,
-};
-
-type RuleConditionField = 'from' | 'subject' | 'body' | 'to';
-
-const ruleConditionFields: { id: RuleConditionField; label: string }[] = [
-  { id: 'from', label: '发件人' },
-  { id: 'subject', label: '主题' },
-  { id: 'body', label: '正文' },
-  { id: 'to', label: '收件人' },
-];
-
-const ruleActionPresets = [
-  { id: 'mark read', label: '标为已读' },
-  { id: 'star', label: '加星标' },
-  { id: 'move to archive', label: '归档' },
-  { id: 'move to trash', label: '移到废纸篓' },
-  { id: 'stop processing', label: '停止后续规则' },
-];
-
-function parseRuleCondition(condition: string): { field: RuleConditionField; value: string } {
-  const normalized = condition.trim();
-  const match = normalized.match(/^(from|subject|body|to|sender|recipients)\s+contains\s+(.*)$/i);
-  if (!match) return { field: 'from', value: '' };
-  const fieldAlias = match[1].toLowerCase();
-  const field: RuleConditionField =
-    fieldAlias === 'sender' ? 'from' : fieldAlias === 'recipients' ? 'to' : (fieldAlias as RuleConditionField);
-  return { field, value: match[2] ?? '' };
-}
-
-function buildRuleCondition(field: RuleConditionField, value: string): string {
-  return `${field} contains ${value}`;
-}
-
-function ruleActionParts(action: string): string[] {
-  return action
-    .split(';')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function setRuleActionPart(action: string, prefix: string, nextPart: string): string {
-  const parts = ruleActionParts(action).filter((part) => !part.toLowerCase().startsWith(prefix.toLowerCase()));
-  const trimmedPart = nextPart.trim();
-  if (trimmedPart) parts.unshift(trimmedPart);
-  return parts.join('; ');
-}
-
-const emptyContactForm: ContactCreateInput = {
-  name: '',
-  email: '',
-  aliases: [],
-  vip: false,
-};
-
-const notificationPolicyStorageKey = 'swiftmail.notificationPolicy';
-const providerVerificationStorageKey = 'swiftmail.providerVerifications';
-const savedSearchesStorageKey = 'swiftmail.savedSearches';
-const composeTemplatesStorageKey = 'swiftmail.composeTemplates';
-const composerAutosaveStorageKey = 'swiftmail.composerAutosave';
-const appLayoutStorageKey = 'swiftmail.appLayout';
-const defaultAppLayout: AppLayout = { sidebar: 268, list: 420 };
-const filterModes: FilterMode[] = ['all', 'unread', 'starred', 'attachments'];
-
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function backgroundTaskTitle(kind: BackgroundTaskKind, source: 'manual' | 'timer' = 'manual'): string {
-  if (kind === 'sync') return source === 'timer' ? '定时同步邮件头' : '同步邮件头';
-  if (kind === 'outbox-smtp') return '真实发送发件箱';
-  return '发件箱发送演练';
-}
-
-function loadNotificationPolicy(): NotificationPolicy {
-  try {
-    const stored = window.localStorage.getItem(notificationPolicyStorageKey);
-    return stored ? { ...defaultNotificationPolicy, ...JSON.parse(stored) } : { ...defaultNotificationPolicy };
-  } catch {
-    return { ...defaultNotificationPolicy };
-  }
-}
-
-function normalizeContactAliases(value: string): string[] {
-  return [...new Set(value
-    .split(/[;,\n]/)
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean))];
-}
-
-function toggleAccountNotificationList(
-  policy: NotificationPolicy,
-  key: 'mutedAccounts' | 'priorityAccounts',
-  email: string,
-): NotificationPolicy {
-  const normalizedEmail = email.trim().toLowerCase();
-  const current = policy[key]
-    .split(/[\n,;，；]/)
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-  const next = current.includes(normalizedEmail)
-    ? current.filter((item) => item !== normalizedEmail)
-    : [...current, normalizedEmail];
-  return { ...policy, [key]: next.join('\n') };
-}
-
-function loadProviderVerifications(): Record<string, ProviderVerificationRecord> {
-  try {
-    const stored = window.localStorage.getItem(providerVerificationStorageKey);
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-}
-
-function isFilterMode(value: unknown): value is FilterMode {
-  return typeof value === 'string' && filterModes.includes(value as FilterMode);
-}
-
-function loadSavedSearches(): SavedSearch[] {
-  try {
-    const stored = window.localStorage.getItem(savedSearchesStorageKey);
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((item) => item && typeof item.name === 'string' && typeof item.query === 'string')
-      .map((item) => ({
-        id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
-        name: item.name,
-        query: item.query,
-        filter: isFilterMode(item.filter) ? item.filter : 'all',
-      }))
-      .filter((item) => item.name.trim() && item.query.trim());
-  } catch {
-    return [];
-  }
-}
-
-function loadComposeTemplates(): ComposeTemplate[] {
-  try {
-    const stored = window.localStorage.getItem(composeTemplatesStorageKey);
-    const parsed = stored ? JSON.parse(stored) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((item) => item && typeof item.name === 'string')
-      .map((item) => ({
-        id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
-        name: item.name,
-        subject: typeof item.subject === 'string' ? item.subject : '',
-        body: typeof item.body === 'string' ? item.body : '',
-        html_body: typeof item.html_body === 'string' ? item.html_body : '',
-      }))
-      .filter((item) => item.name.trim() && (item.subject.trim() || item.body.trim() || item.html_body.trim()));
-  } catch {
-    return [];
-  }
-}
-
-function isDraftEmpty(input: DraftInput): boolean {
-  return (
-    !input.to.trim()
-    && !input.cc.trim()
-    && !input.bcc.trim()
-    && !input.subject.trim()
-    && !input.body.trim()
-    && !input.html_body.trim()
-    && input.attachments.length === 0
-  );
-}
-
-function normalizeDraftInput(value: unknown): DraftInput | null {
-  if (!value || typeof value !== 'object') return null;
-  const item = value as Partial<DraftInput>;
-  const attachments = Array.isArray(item.attachments)
-    ? item.attachments.filter(
-      (attachment) =>
-        attachment &&
-        typeof attachment.filename === 'string' &&
-        typeof attachment.mime_type === 'string' &&
-        typeof attachment.size_bytes === 'number' &&
-        typeof attachment.local_path === 'string',
-    )
-    : [];
-  return {
-    draft_id: Number(item.draft_id) || 0,
-    account_id: Number(item.account_id) || 0,
-    identity_id: Number(item.identity_id) || 0,
-    to: typeof item.to === 'string' ? item.to : '',
-    cc: typeof item.cc === 'string' ? item.cc : '',
-    bcc: typeof item.bcc === 'string' ? item.bcc : '',
-    subject: typeof item.subject === 'string' ? item.subject : '',
-    body: typeof item.body === 'string' ? item.body : '',
-    html_body: typeof item.html_body === 'string' ? item.html_body : '',
-    send_at: typeof item.send_at === 'string' ? item.send_at : '',
-    attachments,
-  };
-}
-
-function loadComposerAutosave(): ComposerAutosave | null {
-  try {
-    const stored = window.localStorage.getItem(composerAutosaveStorageKey);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    const draft = normalizeDraftInput(parsed?.draft);
-    if (!draft || isDraftEmpty(draft)) return null;
-    return {
-      draft,
-      isRichComposer: Boolean(parsed?.isRichComposer),
-      saved_at: typeof parsed?.saved_at === 'string' ? parsed.saved_at : new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function loadAppLayout(): AppLayout {
-  try {
-    const stored = window.localStorage.getItem(appLayoutStorageKey);
-    if (!stored) return defaultAppLayout;
-    const parsed = JSON.parse(stored);
-    return {
-      sidebar: clampNumber(Number(parsed.sidebar) || defaultAppLayout.sidebar, 220, 360),
-      list: clampNumber(Number(parsed.list) || defaultAppLayout.list, 320, 560),
-    };
-  } catch {
-    return defaultAppLayout;
-  }
-}
-
-function providerVerificationLabel(status: ProviderVerificationStatus): string {
-  if (status === 'passed') return '通过';
-  if (status === 'partial') return '部分通过';
-  if (status === 'failed') return '失败';
-  return '未验证';
-}
-
-function outboxStatusLabel(status: string): string {
-  if (status === 'scheduled') return '定时发送';
-  if (status === 'queued') return '排队中';
-  if (status === 'retry') return '等待重试';
-  if (status === 'failed') return '发送失败';
-  if (status === 'sent') return '已发送';
-  if (status === 'sent_dry_run') return '演练完成';
-  if (status === 'cancelled') return '已撤回';
-  return status;
-}
-
-function outboxTimingLabel(item: OutboxItem): string {
-  if (item.status === 'scheduled' && item.next_attempt_at) return `定时发送 ${formatDate(item.next_attempt_at)}`;
-  if (item.status === 'retry' && item.next_attempt_at) return `下次重试 ${formatDate(item.next_attempt_at)}`;
-  if (item.status === 'failed' && item.next_attempt_at) return `下次尝试 ${formatDate(item.next_attempt_at)}`;
-  if (item.queued_at) return `入队 ${formatDate(item.queued_at)}`;
-  return '';
-}
-
-function canCancelOutboxItem(status: string): boolean {
-  return ['queued', 'scheduled', 'retry', 'failed'].includes(status);
-}
-
-function isCustomFolder(folder: Folder): boolean {
-  return folder.role.startsWith('custom:');
-}
-
-function movableFoldersForMessage(folders: Folder[], message?: Message | null): Folder[] {
-  const blockedRoles = new Set<string>(['snoozed']);
-  return folders.filter((folder) => {
-    if (folder.is_virtual || blockedRoles.has(folder.role)) return false;
-    if (message && folder.account_id !== message.account_id) return false;
-    return true;
-  });
-}
-
-function movableFoldersForBulk(folders: Folder[], selectedMessages: Message[]): Folder[] {
-  if (selectedMessages.length === 0) return [];
-  const accountIds = new Set(selectedMessages.map((message) => message.account_id));
-  const blockedRoles = new Set<string>(['snoozed']);
-  if (accountIds.size !== 1) return [];
-  return folders.filter((folder) => {
-    if (folder.is_virtual || blockedRoles.has(folder.role)) return false;
-    return folder.account_id === selectedMessages[0].account_id;
-  });
-}
-
-const sampleRawMessage = `Subject: 安全预览样例
-From: sender@example.com
-To: demo@swiftmail.local
-
-<img src="http://tracking.example.com/open.png">
-<script>alert('xss')</script>
-这是一封用于验证 MIME/HTML 安全预览的原始邮件。`;
-
-const folderIcon: Record<SystemFolderRole, React.ReactNode> = {
-  inbox: <Inbox size={17} />,
-  sent: <Send size={17} />,
-  drafts: <Edit3 size={17} />,
-  archive: <Archive size={17} />,
-  trash: <Trash2 size={17} />,
-  spam: <Mail size={17} />,
-  snoozed: <Clock size={17} />,
-  custom: <Mail size={17} />,
-};
-
-function folderIconForRole(role: FolderRole): React.ReactNode {
-  return folderIcon[role as SystemFolderRole] ?? folderIcon.custom;
-}
-
-const primaryFolderRoles = new Set<FolderRole>(['inbox', 'sent', 'drafts', 'archive']);
-
-const shortcutGroups = [
-  {
-    title: '导航',
-    items: [
-      { keys: ['⌘/Ctrl', 'K'], label: '聚焦搜索' },
-      { keys: ['/'], label: '快速搜索' },
-      { keys: ['J', '↓'], label: '下一封' },
-      { keys: ['K', '↑'], label: '上一封' },
-      { keys: ['Esc'], label: '关闭弹窗' },
-    ],
-  },
-  {
-    title: '写信',
-    items: [
-      { keys: ['C'], label: '写邮件' },
-      { keys: ['R'], label: '回复' },
-      { keys: ['⇧', 'R'], label: '回复全部' },
-      { keys: ['F'], label: '转发' },
-    ],
-  },
-  {
-    title: '处理邮件',
-    items: [
-      { keys: ['S'], label: '星标' },
-      { keys: ['M'], label: '已读/未读' },
-      { keys: ['E'], label: '归档' },
-      { keys: ['Delete'], label: '移到废纸篓' },
-    ],
-  },
-];
-
-const filters: { id: FilterMode; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'unread', label: '未读' },
-  { id: 'starred', label: '星标' },
-  { id: 'attachments', label: '附件' },
-];
-
-const messagePageSize = 40;
-
-const searchShortcuts = [
-  { label: '未读', query: 'is:unread' },
-  { label: '附件名', query: 'filename:' },
-  { label: '发件人', query: 'from:' },
-  { label: '邮箱', query: 'account:' },
-];
-
-const emptyAccountCreateForm: AccountCreateInput = {
-  email: '',
-  display_name: '',
-  provider: 'Custom',
-  imap_host: '',
-  smtp_host: '',
-  auth_type: 'password',
-  sync_mode: 'manual',
-  remote_images_allowed: false,
-  signature: '',
-};
-
+import type {
+  SystemFolderRole,
+  FolderRole,
+  FilterMode,
+  ListMode,
+  AccountScope,
+  ProviderVerificationStatus,
+  BackgroundTaskKind,
+  BackgroundTaskStatus,
+  Account,
+  AccountCreateInput,
+  Folder,
+  Label,
+  SavedSearch,
+  Attachment,
+  OutboundAttachmentInput,
+  DroppedFile,
+  AttachmentDownload,
+  Message,
+  UndoMessageSnapshot,
+  UndoAction,
+  CommandPaletteItem,
+  RemoteImageTrust,
+  MailIdentity,
+  MailIdentityInput,
+  DraftInput,
+  ComposeTemplate,
+  ComposerAutosave,
+  MailStats,
+  LocalBackupSummary,
+  EndpointCheck,
+  ConnectionReport,
+  ImapFolderProbe,
+  ImapProbeReport,
+  ImapMailboxState,
+  SyncRun,
+  SyncSchedulePlan,
+  RemoteActionReport,
+  ParsedMessagePreview,
+  Contact,
+  ContactMergeSuggestion,
+  ContactCreateInput,
+  MailRule,
+  MailRuleInput,
+  ThreadSummary,
+  OutboxItem,
+  CredentialStatus,
+  OAuthStartReport,
+  OAuthSession,
+  OAuthCallbackReport,
+  OAuthTokenExchangeReport,
+  OAuthRefreshReport,
+  ProviderVerificationRecord,
+  BackgroundTask,
+  AppLayout,
+} from './app/types';
+import {
+  emptyDraft,
+  normalizeCommandSearchText,
+  emptyIdentityForm,
+  emptyRuleForm,
+  ruleConditionFields,
+  ruleActionPresets,
+  parseRuleCondition,
+  buildRuleCondition,
+  ruleActionParts,
+  setRuleActionPart,
+  emptyContactForm,
+  notificationPolicyStorageKey,
+  providerVerificationStorageKey,
+  savedSearchesStorageKey,
+  composeTemplatesStorageKey,
+  composerAutosaveStorageKey,
+  appLayoutStorageKey,
+  defaultAppLayout,
+  filterModes,
+  clampNumber,
+  backgroundTaskTitle,
+  loadNotificationPolicy,
+  normalizeContactAliases,
+  toggleAccountNotificationList,
+  loadProviderVerifications,
+  isFilterMode,
+  loadSavedSearches,
+  loadComposeTemplates,
+  isDraftEmpty,
+  normalizeDraftInput,
+  loadComposerAutosave,
+  loadAppLayout,
+  providerVerificationLabel,
+  outboxStatusLabel,
+  outboxTimingLabel,
+  canCancelOutboxItem,
+  isCustomFolder,
+  movableFoldersForBulk,
+  sampleRawMessage,
+  folderIcon,
+  folderIconForRole,
+  primaryFolderRoles,
+  shortcutGroups,
+  filters,
+  messagePageSize,
+  searchShortcuts,
+  emptyAccountCreateForm,
+} from './app/appConfig';
+import type {
+  RuleConditionField,
+} from './app/appConfig';
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -1002,13 +288,13 @@ export default function App() {
     if (resize.pane === 'sidebar') {
       setAppLayout({
         ...resize.origin,
-        sidebar: clampNumber(resize.origin.sidebar + delta, 220, 360),
+        sidebar: clampNumber(resize.origin.sidebar + delta, 228, 320),
       });
       return;
     }
     setAppLayout({
       ...resize.origin,
-      list: clampNumber(resize.origin.list + delta, 320, 560),
+      list: clampNumber(resize.origin.list + delta, 340, 500),
     });
   }
 
@@ -1473,7 +759,7 @@ export default function App() {
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
     : `${messages.length} 封`;
-  const visibleListSummary = `${messages.length} / ${stats?.total_messages ?? messages.length} 封`;
+  const visibleListSummary = hasMoreMessages ? `${messages.length}+ 封` : `${messages.length} 封`;
   const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
   const activeThreadSelected = activeThread
     ? threadMessages.find((message) => message.id === selectedId) ?? threadMessages[0] ?? selected
@@ -2388,6 +1674,35 @@ export default function App() {
     setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号`);
   }
 
+  async function importEmlFile() {
+    const imported = await invoke<Message | null>('import_eml_file', {
+      accountId: currentFolderAccountId(),
+    });
+    if (!imported) {
+      setStatus('已取消导入 EML');
+      return;
+    }
+    setQuery('');
+    setFilter('all');
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    const meta = await loadMeta(null);
+    const inboxFolderId =
+      meta.folders.find(
+        (folder) =>
+          folder.role === 'inbox' &&
+          (folder.is_virtual || folder.account_id === imported.account_id),
+      )?.id ?? meta.folderId;
+    const nextMessages = await loadMessages(inboxFolderId, '', 'all');
+    if (!nextMessages.some((message) => message.id === imported.id)) {
+      setMessages((current) => [imported, ...current.filter((message) => message.id !== imported.id)]);
+    }
+    setFolderId(inboxFolderId);
+    setSelectedId(imported.id);
+    setStatus(`已导入 EML：${imported.subject || '(无主题)'}`);
+  }
+
   async function refreshBackgroundTasks() {
     const tasks = await invoke<BackgroundTask[]>('list_background_tasks');
     setBackgroundTasks(tasks);
@@ -3266,7 +2581,7 @@ export default function App() {
   return (
     <main
       className="app-shell"
-      style={{ gridTemplateColumns: `${appLayout.sidebar}px 6px ${appLayout.list}px 6px minmax(520px, 1fr)` }}
+      style={{ gridTemplateColumns: `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(360px, 1fr)` }}
       onPointerMove={moveLayoutResize}
       onPointerUp={endLayoutResize}
       onPointerCancel={endLayoutResize}
@@ -3274,264 +2589,50 @@ export default function App() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">S</div>
-          <div>
-            <strong>SwiftMail</strong>
-            <span>{accountScope === 'all' ? `统一邮箱 · ${accounts.length || 1} 个账号` : account?.email ?? '低内存邮箱客户端'}</span>
-          </div>
-        </div>
-        <label className="account-switcher">
-          <span>邮箱范围</span>
-          <select value={accountScope} onChange={(event) => changeAccountScope(event.target.value)}>
-            <option value="all">统一邮箱</option>
-            {accounts.map((item) => (
-              <option key={item.id} value={item.id}>{item.email}</option>
-            ))}
-          </select>
-        </label>
-        <button className="compose-button" onClick={() => openComposer()}>
-          <Edit3 size={17} /> 写邮件
-        </button>
-        <nav className="folder-list">
-          {folders.filter((folder) => primaryFolderRoles.has(folder.role)).map((folder) => (
-            <div
-              key={folder.id}
-              className={folder.id === folderId ? 'folder active' : 'folder'}
-            >
-              {renamingFolderId === folder.id ? (
-                <form
-                  className="folder-rename"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    renameCustomFolder(folder).catch((error) => setStatus(String(error)));
-                  }}
-                >
-                  <input
-                    value={renamingFolderName}
-                    onChange={(event) => setRenamingFolderName(event.target.value)}
-                    autoFocus
-                  />
-                  <button type="submit">保存</button>
-                  <button type="button" onClick={() => setRenamingFolderId(null)}>取消</button>
-                </form>
-              ) : (
-                <>
-                  <button type="button" className="folder-main" onClick={() => setFolderId(folder.id)}>
-                    <span className="folder-name">
-                      {folderIconForRole(folder.role)}
-                      {folder.name}
-                    </span>
-                    {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
-                  </button>
-                  {isCustomFolder(folder) && (
-                    <span className="folder-actions">
-                      <button type="button" title="重命名" onClick={() => startRenameCustomFolder(folder)}>改</button>
-                      <button type="button" title="删除" onClick={() => deleteCustomFolder(folder).catch((error) => setStatus(String(error)))}>删</button>
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </nav>
-
-        <div className="sidebar-secondary sidebar-quick-menus">
-          <details className="sidebar-disclosure more-mailboxes">
-            <summary>
-              <span>更多邮箱</span>
-              <em>{folders.filter((folder) => !primaryFolderRoles.has(folder.role)).length}</em>
-            </summary>
-            <nav className="folder-list folded-folder-list">
-              {folders.filter((folder) => !primaryFolderRoles.has(folder.role)).map((folder) => (
-                <div
-                  key={folder.id}
-                  className={folder.id === folderId ? 'folder active' : 'folder'}
-                >
-                  {renamingFolderId === folder.id ? (
-                    <form
-                      className="folder-rename"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        renameCustomFolder(folder).catch((error) => setStatus(String(error)));
-                      }}
-                    >
-                      <input
-                        value={renamingFolderName}
-                        onChange={(event) => setRenamingFolderName(event.target.value)}
-                        autoFocus
-                      />
-                      <button type="submit">保存</button>
-                      <button type="button" onClick={() => setRenamingFolderId(null)}>取消</button>
-                    </form>
-                  ) : (
-                    <>
-                      <button type="button" className="folder-main" onClick={() => setFolderId(folder.id)}>
-                        <span className="folder-name">
-                          {folderIconForRole(folder.role)}
-                          {folder.name}
-                        </span>
-                        {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
-                      </button>
-                      {isCustomFolder(folder) && (
-                        <span className="folder-actions">
-                          <button type="button" title="重命名" onClick={() => startRenameCustomFolder(folder)}>改</button>
-                          <button type="button" title="删除" onClick={() => deleteCustomFolder(folder).catch((error) => setStatus(String(error)))}>删</button>
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </nav>
-          </details>
-
-          <details className="sidebar-disclosure sidebar-tools">
-            <summary>
-              <span>工具</span>
-              <em>{savedSearches.length + contacts.length + labels.length}</em>
-            </summary>
-            <div className="sidebar-tool-stack">
-              <section className="sidebar-tool-section saved-searches">
-                <div className="sidebar-tool-heading">
-                  <strong>保存搜索</strong>
-                  <span>{savedSearches.length ? `${savedSearches.length} 个` : '保存常用条件'}</span>
-                </div>
-                <form
-                  className="saved-search-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    saveCurrentSearch();
-                  }}
-                >
-                  <input
-                    value={savedSearchName}
-                    onChange={(event) => setSavedSearchName(event.target.value)}
-                    placeholder="搜索名称"
-                  />
-                  <button type="submit">保存</button>
-                </form>
-                <div className="saved-search-list">
-                  {savedSearches.map((savedSearch) => (
-                    <div className="saved-search-row" key={savedSearch.id}>
-                      <button type="button" onClick={() => runSavedSearch(savedSearch).catch((error) => setStatus(String(error)))}>
-                        <strong>{savedSearch.name}</strong>
-                        <span>{savedSearch.query}</span>
-                      </button>
-                      <button type="button" title="删除保存搜索" onClick={() => deleteSavedSearch(savedSearch)}>删</button>
-                    </div>
-                  ))}
-                  {savedSearches.length === 0 && <small>保存常用搜索条件</small>}
-                </div>
-              </section>
-
-              <section className="sidebar-tool-section contact-center">
-                <div className="sidebar-tool-heading">
-                  <strong>联系人</strong>
-                  <span>{contacts.length ? `${contacts.length} 位` : '自动收集'}</span>
-                </div>
-                <input
-                  value={contactQuery}
-                  onChange={(event) => setContactQuery(event.target.value)}
-                  placeholder="搜索联系人"
-                />
-                <div className="contact-list">
-                  {filteredContacts.map((contact) => (
-                    <div className="contact-row" key={contact.id}>
-                      <button type="button" onClick={() => composeToContact(contact)}>
-                        <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                        <span>{contact.email}{contact.aliases.length ? ` · ${contact.aliases.length} 个别名` : ''}</span>
-                      </button>
-                      <button type="button" title="加入当前草稿" onClick={() => addContactToDraft(contact)}>
-                        加入
-                      </button>
-                      <button type="button" title={contact.vip ? '取消 VIP' : '设为 VIP'} onClick={() => toggleContactVip(contact).catch((error) => setStatus(String(error)))}>
-                        {contact.vip ? 'VIP' : '星标'}
-                      </button>
-                    </div>
-                  ))}
-                  {filteredContacts.length === 0 && <small>没有匹配联系人</small>}
-                </div>
-              </section>
-
-              <section className="sidebar-tool-section label-section">
-                <div className="sidebar-tool-heading">
-                  <strong>标签</strong>
-                  <span>{labels.length} 个</span>
-                </div>
-                <div className="label-list">
-                  {labels.map((label) => (
-                    <div className="label-row" key={label.id}>
-                      <span style={{ background: label.color }} />
-                      <strong>{label.name}</strong>
-                      <em>{label.message_count}</em>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="sidebar-tool-section folder-manager">
-                <div className="sidebar-tool-heading">
-                  <strong>文件夹</strong>
-                  <span>{folders.filter(isCustomFolder).length ? `${folders.filter(isCustomFolder).length} 个自定义` : '新建文件夹'}</span>
-                </div>
-                <form
-                  className="custom-folder-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    createCustomFolder().catch((error) => setStatus(String(error)));
-                  }}
-                >
-                  <input
-                    value={customFolderName}
-                    onChange={(event) => setCustomFolderName(event.target.value)}
-                    placeholder="新建文件夹"
-                  />
-                  <button type="submit">添加</button>
-                </form>
-              </section>
-            </div>
-          </details>
-        </div>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-footer-actions">
-            <button className="settings-button" title="设置" onClick={() => setSettingsOpen(true)}>
-              <Settings size={17} /> <span>设置</span>
-            </button>
-            <button className="settings-button shortcut-help-button" title="快捷键" onClick={() => setShortcutsOpen(true)}>
-              <Keyboard size={17} /> <span>快捷键</span>
-            </button>
-            <button className="settings-button command-palette-button" title="命令" onClick={() => setCommandPaletteOpen(true)}>
-              <Search size={17} /> <span>命令</span>
-            </button>
-          </div>
-          <details className="sidebar-disclosure background-sync-card">
-            <summary>
-              <span>同步与布局</span>
-              <em>{backgroundTasks.some((task) => task.status === 'running') ? '同步中' : '就绪'}</em>
-            </summary>
-            <span>{backgroundSyncStatus}</span>
-            {lastNewMailNotice && <em>{lastNewMailNotice}</em>}
-            <small>{notificationStatus}</small>
-            <small>{appBadgeStatus}</small>
-            {backgroundTasks.length > 0 && (
-              <div className="task-stack">
-                {backgroundTasks.slice(0, 3).map((task) => (
-                  <small key={task.id}>
-                    {task.title} · {task.status === 'queued' ? '排队' : task.status === 'running' ? '执行中' : task.status === 'done' ? '完成' : '失败'}
-                  </small>
-                ))}
-              </div>
-            )}
-            <div className="sidebar-utility-actions">
-              <button type="button" onClick={() => enqueueBackgroundTask('sync', 'manual')}>立即同步</button>
-              <button className="layout-reset-button" type="button" onClick={resetAppLayout}>重置布局</button>
-            </div>
-          </details>
-        </div>
-      </aside>
+      <Sidebar
+        accountScope={accountScope}
+        account={account}
+        accounts={accounts}
+        folders={folders}
+        folderId={folderId}
+        renamingFolderId={renamingFolderId}
+        renamingFolderName={renamingFolderName}
+        savedSearches={savedSearches}
+        savedSearchName={savedSearchName}
+        contacts={contacts}
+        contactQuery={contactQuery}
+        filteredContacts={filteredContacts}
+        labels={labels}
+        customFolderName={customFolderName}
+        backgroundTasks={backgroundTasks}
+        backgroundSyncStatus={backgroundSyncStatus}
+        lastNewMailNotice={lastNewMailNotice}
+        notificationStatus={notificationStatus}
+        appBadgeStatus={appBadgeStatus}
+        onAccountScopeChange={changeAccountScope}
+        onCompose={() => openComposer()}
+        onSelectFolder={setFolderId}
+        onRenamingFolderNameChange={setRenamingFolderName}
+        onRenameFolder={(folder) => { renameCustomFolder(folder).catch((error) => setStatus(String(error))); }}
+        onCancelRename={() => setRenamingFolderId(null)}
+        onStartRename={startRenameCustomFolder}
+        onDeleteFolder={(folder) => { deleteCustomFolder(folder).catch((error) => setStatus(String(error))); }}
+        onSavedSearchNameChange={setSavedSearchName}
+        onSaveCurrentSearch={saveCurrentSearch}
+        onRunSavedSearch={(savedSearch) => { runSavedSearch(savedSearch).catch((error) => setStatus(String(error))); }}
+        onDeleteSavedSearch={deleteSavedSearch}
+        onContactQueryChange={setContactQuery}
+        onComposeToContact={composeToContact}
+        onAddContactToDraft={addContactToDraft}
+        onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
+        onCustomFolderNameChange={setCustomFolderName}
+        onCreateCustomFolder={() => { createCustomFolder().catch((error) => setStatus(String(error))); }}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onSync={() => enqueueBackgroundTask('sync', 'manual')}
+        onResetLayout={resetAppLayout}
+      />
 
       <button
         className="pane-resizer sidebar-resizer"
@@ -3542,210 +2643,44 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('sidebar', event)}
       />
 
-      <section className="message-list-panel">
-        <header className="toolbar">
-          <div className="search-cluster">
-            <form onSubmit={runSearch} className="search-box">
-              <Search size={17} />
-              <input
-                ref={searchInputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索主题、发件人、正文"
-              />
-              {(query.trim() || filter !== 'all') && (
-                <button type="button" className="search-clear-button" title="清空搜索和筛选" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
-                  <X size={14} />
-                </button>
-              )}
-            </form>
-            <div className="search-shortcuts" aria-label="高级搜索快捷条件">
-              {searchShortcuts.map((item) => (
-                <button type="button" key={item.label} onClick={() => applySearchShortcut(item.query).catch((error) => setStatus(String(error)))}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button className="icon-button" title="刷新" onClick={refreshAll}>
-            <RefreshCw size={17} />
-          </button>
-        </header>
-        <div className="list-control-strip">
-          <div className="list-summary">
-            <strong>{currentViewLabel}</strong>
-            <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
-            <em>{activeFilterLabel}</em>
-          </div>
-          <div className="list-control-actions">
-            <button
-              type="button"
-              className={listMode === 'messages' ? 'active' : ''}
-              onClick={() => {
-                setListMode('messages');
-                setActiveThread(null);
-                setThreadMessages([]);
-              }}
-            >
-              邮件
-            </button>
-            <button
-              type="button"
-              className={listMode === 'threads' ? 'active' : ''}
-              onClick={() => setListMode('threads')}
-            >
-              线程
-            </button>
-            <details className="compact-menu filter-menu">
-              <summary>
-                <SlidersHorizontal size={15} />
-                筛选
-              </summary>
-              <div>
-                {filters.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={filter === item.id ? 'active' : ''}
-                    onClick={() => setFilter(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </details>
-          </div>
-        </div>
-        {listMode === 'messages' && selectedMessageIds.length > 0 && (
-        <div className={selectedMessageIds.length > 0 ? 'bulk-toolbar active' : 'bulk-toolbar'}>
-          <label className="bulk-selection">
-            <input
-              type="checkbox"
-              checked={allVisibleSelected}
-              onChange={(event) => toggleAllVisibleMessages(event.target.checked)}
-            />
-            <span>{selectedMessageIds.length > 0 ? `已选 ${selectedMessageIds.length}` : '选择'}</span>
-          </label>
-          <button type="button" className="bulk-primary-action" onClick={() => runBulkAction('archive')}>归档</button>
-          <details className="compact-menu bulk-more-menu">
-            <summary>
-              <MoreHorizontal size={15} />
-              操作
-            </summary>
-            <div>
-              <button type="button" onClick={() => runBulkAction('star')}>星标</button>
-              <button type="button" onClick={() => runBulkAction('trash')}>删除</button>
-              <button type="button" onClick={() => runBulkAction('read')}>标为已读</button>
-              <button type="button" onClick={() => runBulkAction('unread')}>标为未读</button>
-              <span className="menu-section-title">移动到</span>
-              {movableFoldersForBulk(folders, selectedMessages).map((folder) => (
-                <button
-                  type="button"
-                  key={folder.id}
-                  disabled={selectedMessages.length === 0}
-                  onClick={() => moveSelectedMessagesToFolder(folder.role as FolderRole, folder.name).catch((error) => setStatus(String(error)))}
-                >
-                  {folder.name}
-                </button>
-              ))}
-              <span className="menu-section-title">打标签</span>
-              {labels.map((label) => (
-                <button type="button" key={label.id} onClick={() => applyBulkLabel(label)}>
-                  <span className="label-dot" style={{ background: label.color }} />
-                  {label.name}
-                </button>
-              ))}
-            </div>
-          </details>
-        </div>
-        )}
-        {listMode === 'threads' ? (
-        <div className="thread-list">
-          {threads.map((thread) => (
-            <button
-              key={thread.thread_key}
-              className={activeThread?.thread_key === thread.thread_key ? 'thread-card selected' : 'thread-card'}
-              onClick={() => openThread(thread)}
-            >
-              <div>
-                <strong>{thread.subject || '(无主题)'}</strong>
-                <time>{formatDate(thread.latest_at)}</time>
-              </div>
-              <p>{thread.participants}</p>
-              <span>{thread.message_count} 封 · 未读 {thread.unread_count}</span>
-            </button>
-          ))}
-          {threads.length === 0 && <div className="empty-state">没有会话线程</div>}
-        </div>
-        ) : (
-        <div className="message-list">
-          {messages.map((message) => (
-            <button
-              key={message.id}
-              className={message.id === selectedId ? 'message-card selected' : 'message-card'}
-              onClick={() => setSelectedId(message.id)}
-            >
-              <span className="message-select" onClick={(event) => event.stopPropagation()}>
-                <input
-                  aria-label={`选择 ${message.subject || '无主题'}`}
-                  checked={selectedMessageSet.has(message.id)}
-                  type="checkbox"
-                  onChange={(event) => toggleMessageSelection(message.id, event.target.checked)}
-                />
-              </span>
-              <div className="message-topline">
-                <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
-                <time>{formatDate(message.received_at)}</time>
-              </div>
-              <div className={message.is_read ? 'subject' : 'subject unread'}>
-                {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
-              </div>
-              <p>{message.snippet}</p>
-              <div className="message-chips">
-                {accountScope === 'all' && <span>{message.account_email}</span>}
-                {message.labels.map((label) => <span key={label}>{label}</span>)}
-                {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
-              </div>
-            </button>
-          ))}
-          {messages.length === 0 && (
-            <div className="empty-state mailbox-empty-state">
-              <div className="empty-state-mark">
-                <Search size={22} />
-              </div>
-              <strong>
-                {query.trim() || filter !== 'all' ? '没有匹配邮件' : '当前邮箱暂无可显示邮件'}
-              </strong>
-              <span>
-                {query.trim() || filter !== 'all'
-                  ? '可以清空搜索/筛选，或切回“全部”查看当前邮箱。'
-                  : '当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。'}
-              </span>
-              <div className="empty-state-actions">
-                {(query.trim() || filter !== 'all') && (
-                  <button type="button" onClick={() => clearSearchAndFilter().catch((error) => setStatus(String(error)))}>
-                    清空搜索和筛选
-                  </button>
-                )}
-                <button type="button" onClick={refreshAll}>
-                  刷新邮箱
-                </button>
-              </div>
-            </div>
-          )}
-          {messages.length > 0 && (
-            <div className="message-list-footer">
-              <span>已显示 {messages.length} 封{hasMoreMessages ? ' · 还有更多' : ' · 已到底'}</span>
-              {hasMoreMessages && (
-                <button type="button" onClick={() => loadMoreMessages().catch((error) => setStatus(String(error)))}>
-                  加载更多
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        )}
-      </section>
+      <MessageListPane
+        searchInputRef={searchInputRef}
+        query={query}
+        filter={filter}
+        listMode={listMode}
+        selectedMessageIds={selectedMessageIds}
+        folders={folders}
+        labels={labels}
+        threads={threads}
+        activeThread={activeThread}
+        messages={messages}
+        selectedId={selectedId}
+        accountScope={accountScope}
+        hasMoreMessages={hasMoreMessages}
+        currentViewLabel={currentViewLabel}
+        visibleListSummary={visibleListSummary}
+        messageListSummary={messageListSummary}
+        onSearchSubmit={runSearch}
+        onQueryChange={setQuery}
+        onClearSearchAndFilter={() => { clearSearchAndFilter().catch((error) => setStatus(String(error))); }}
+        onApplySearchShortcut={(nextQuery) => { applySearchShortcut(nextQuery).catch((error) => setStatus(String(error))); }}
+        onRefresh={refreshAll}
+        onShowMessages={() => {
+          setListMode('messages');
+          setActiveThread(null);
+          setThreadMessages([]);
+        }}
+        onShowThreads={() => setListMode('threads')}
+        onFilterChange={setFilter}
+        onToggleAllVisible={toggleAllVisibleMessages}
+        onRunBulkAction={runBulkAction}
+        onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder.role as FolderRole, folder.name).catch((error) => setStatus(String(error))); }}
+        onApplyBulkLabel={applyBulkLabel}
+        onOpenThread={openThread}
+        onSelectMessage={setSelectedId}
+        onToggleMessageSelection={toggleMessageSelection}
+        onLoadMore={() => { loadMoreMessages().catch((error) => setStatus(String(error))); }}
+      />
 
       <button
         className="pane-resizer list-resizer"
@@ -3756,292 +2691,46 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('list', event)}
       />
 
-      <section className="reader-panel">
-        {activeThread && threadMessages.length > 0 ? (
-          <article className="reader thread-reader">
-            <header className="reader-header">
-              <div>
-                <h1>{activeThread.subject || '(无主题)'}</h1>
-                <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
-              </div>
-              <div className="reader-actions">
-                <button className="primary-action" title="回复" aria-label="回复" onClick={() => activeThreadSelected && composeFromMessage(activeThreadSelected, 'reply')}>
-                  <Reply size={16} />
-                  回复
-                </button>
-                <details className="reader-more-menu compact-menu">
-                  <summary title="更多操作" aria-label="更多操作">
-                    <MoreHorizontal size={16} />
-                    更多
-                  </summary>
-                  <div>
-                    <button onClick={() => activeThreadSelected && composeFromMessage(activeThreadSelected, 'forward')}>转发</button>
-                  </div>
-                </details>
-              </div>
-            </header>
-            <div className="thread-stack">
-              {threadMessages.map((message) => (
-                <section
-                  className={message.id === selectedId ? 'thread-message active' : 'thread-message'}
-                  key={message.id}
-                  onClick={() => setSelectedId(message.id)}
-                >
-                  <header>
-                    <strong>{message.sender_name} &lt;{message.sender_email}&gt;</strong>
-                    <time>{formatDate(message.received_at)}</time>
-                  </header>
-                  <p>{message.snippet || message.body}</p>
-                  <div className="message-chips">
-                    <span>{message.folder_role}</span>
-                    {message.labels.map((label) => <span key={label}>{label}</span>)}
-                    {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </article>
-        ) : selected ? (
-          <article className="reader">
-            <header className="reader-header">
-              <div>
-                <h1>{selected.subject || '(无主题)'}</h1>
-                <p>
-                  {selected.sender_name} &lt;{selected.sender_email}&gt; 发给 {selected.recipients}
-                </p>
-              </div>
-              <div className="reader-actions">
-                <button className="icon-only-action" title="标星" aria-label={selected.is_starred ? '取消星标' : '添加星标'} onClick={() => toggleStar(selected)}>
-                  <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
-                </button>
-                {selected.folder_role === 'drafts' ? (
-                  <button title="继续编辑草稿" onClick={() => editDraftMessage(selected)}>继续编辑</button>
-                ) : (
-                  <button className="primary-action" title="回复" aria-label="回复" onClick={() => composeFromMessage(selected, 'reply')}>
-                    <Reply size={16} />
-                    回复
-                  </button>
-                )}
-                {selected.folder_role === 'trash' ? (
-                  <button type="button" title="恢复" onClick={restoreSelectedFromTrash}>恢复</button>
-                ) : selected.folder_role !== 'drafts' && (
-                  <button type="button" aria-label="归档" title="归档" onClick={() => moveSelected('archive')}>
-                    <Archive size={16} />
-                    归档
-                  </button>
-                )}
-                {selected.folder_role !== 'drafts' && (
-                  <button type="button" title={selected.is_read ? '标为未读' : '标为已读'} onClick={() => toggleRead(selected)}>
-                    {selected.is_read ? '标为未读' : '标为已读'}
-                  </button>
-                )}
-                <details className="reader-more-menu compact-menu">
-                  <summary title="更多操作" aria-label="更多操作">
-                    <MoreHorizontal size={16} />
-                    更多
-                  </summary>
-                  <div>
-                    {selected.folder_role !== 'drafts' && (
-                      <>
-                        <button type="button" title="回复全部" onClick={() => composeFromMessage(selected, 'replyAll')}>回复全部</button>
-                        <button type="button" title="转发" onClick={() => composeFromMessage(selected, 'forward')}>转发</button>
-                      </>
-                    )}
-                    <span className="menu-section-title">整理</span>
-                    {selected.folder_role === 'snoozed' ? (
-                      <button onClick={unsnoozeSelected}><Clock size={16} /> 取消稍后</button>
-                    ) : selected.folder_role !== 'trash' && (
-                      <button onClick={snoozeSelected}><Clock size={16} /> 稍后处理</button>
-                    )}
-                    <button onClick={exportSelectedMessage}>导出 EML</button>
-                    {selected.remote_uid > 0 && !selected.body.trim() && (
-                      <button onClick={fetchSelectedBody}>拉取正文</button>
-                    )}
-                    {selected.folder_role === 'spam' ? (
-                      <button onClick={markSelectedNotSpam}>不是垃圾邮件</button>
-                    ) : (
-                      <button onClick={markSelectedAsSpam}>标为垃圾邮件</button>
-                    )}
-                    {selected.folder_role !== 'drafts' && selected.sender_email.trim() && (
-                      <>
-                        <span className="menu-section-title">安全</span>
-                        {!selectedSenderTrusted && (
-                          <button onClick={() => trustRemoteImagesForSelected('sender')}>信任该发件人</button>
-                        )}
-                        {selectedSenderDomain && !selectedSenderTrusted && (
-                          <button onClick={() => trustRemoteImagesForSelected('domain')}>信任 {selectedSenderDomain}</button>
-                        )}
-                        <button onClick={blockSelectedSender}>阻止该发件人</button>
-                      </>
-                    )}
-                    {selected.folder_role === 'trash' ? (
-                      <>
-                        <button onClick={permanentlyDeleteSelected}><Trash2 size={16} /> 永久删除</button>
-                        <button onClick={emptyCurrentTrash}>清空废纸篓</button>
-                      </>
-                    ) : (
-                      <button className="danger-menu-item" onClick={() => moveSelected('trash')}><Trash2 size={16} /> 删除</button>
-                    )}
-                    <span className="menu-section-title">移动到</span>
-                    {movableFoldersForMessage(folders, selected).map((folder) => (
-                      <button
-                        type="button"
-                        key={folder.id}
-                        onClick={() => moveSelectedToFolder(folder).catch((error) => setStatus(String(error)))}
-                      >
-                        {folder.name}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            </header>
-            <div className="reader-meta">
-              <span>{formatDate(selected.received_at)}</span>
-              {accountScope === 'all' && <span>{selected.account_email}</span>}
-              {selected.snoozed_until && <span>稍后到 {formatDate(selected.snoozed_until)}</span>}
-              {selected.has_attachments && <span>含附件</span>}
-            </div>
-            <div className="label-tools">
-              {selected.labels.length === 0 && <span className="label-empty">无标签</span>}
-              {selected.labels.map((labelName) => {
-                const label = labels.find((item) => item.name === labelName);
-                return (
-                  <span className="active-label-chip" key={labelName}>
-                    <span className="label-dot" style={{ background: label?.color ?? '#8b95a1' }} />
-                    {labelName}
-                  </span>
-                );
-              })}
-              <details className="compact-menu label-menu">
-                <summary><Tag size={15} /> 标签</summary>
-                <div>
-                  {labels.map((label) => (
-                    <button
-                      type="button"
-                      key={label.id}
-                      className={selected.labels.includes(label.name) ? 'active' : ''}
-                      onClick={() => toggleLabel(label)}
-                    >
-                      <span className="label-dot" style={{ background: label.color }} />
-                      {label.name}
-                    </button>
-                  ))}
-                </div>
-              </details>
-            </div>
-            {attachments.length > 0 && (
-              <div className="attachments">
-                {attachments.map((attachment) => (
-                  <div key={attachment.id}>
-                    <Paperclip size={15} />
-                    <strong>{attachment.filename}</strong>
-                    <span>{attachment.mime_type}</span>
-                    <em>{formatBytes(attachment.size_bytes)}</em>
-                    <button
-                      type="button"
-                      title={attachment.local_path || attachment.filename}
-                      onClick={() =>
-                        attachment.is_downloaded ? openAttachment(attachment) : downloadAttachment(attachment)
-                      }
-                    >
-                      {attachment.is_downloaded ? '打开' : '下载'}
-                    </button>
-                    {attachment.is_downloaded && (
-                      <button
-                        type="button"
-                        title={`另存为 ${attachment.filename}`}
-                        onClick={() => saveAttachmentAs(attachment)}
-                      >
-                        另存为
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {selected.security_warnings.length > 0 && (
-              <div className="reader-warning-panel">
-                <div className="reader-warning-heading">
-                  <strong>安全提示</strong>
-                  {selectedHasRemoteImageWarning && (
-                    <span>{selectedSenderTrusted ? '当前发件人已信任' : '远程图片默认阻止'}</span>
-                  )}
-                </div>
-                {selected.security_warnings.map((warning) => (
-                  <p key={warning}>{warning}</p>
-                ))}
-                {selectedHasRemoteImageWarning && (
-                  <details className="compact-menu reader-warning-actions">
-                    <summary>
-                      <SlidersHorizontal size={15} />
-                      处理
-                    </summary>
-                    <div>
-                      <button type="button" onClick={() => trustRemoteImagesForSelected('sender')}>
-                        信任该发件人
-                      </button>
-                      {selectedSenderDomain && (
-                        <button type="button" onClick={() => trustRemoteImagesForSelected('domain')}>
-                          信任 {selectedSenderDomain}
-                        </button>
-                      )}
-                      <button type="button" onClick={blockSelectedSender}>
-                        阻止该发件人
-                      </button>
-                    </div>
-                  </details>
-                )}
-              </div>
-            )}
-            {selected.sanitized_html ? (
-              <div
-                className="reader-html"
-                dangerouslySetInnerHTML={{ __html: selected.sanitized_html }}
-              />
-            ) : (
-              <div className="body-text">{selected.body}</div>
-            )}
-            {selected.folder_role !== 'drafts' && selected.folder_role !== 'trash' && (
-              <section className="quick-reply" aria-label="快速回复">
-                <header>
-                  <div>
-                    <strong>快速回复</strong>
-                    <span>发给 {selected.sender_name || selected.sender_email}</span>
-                  </div>
-                  <Reply size={16} />
-                </header>
-                <textarea
-                  value={quickReplyBody}
-                  onChange={(event) => setQuickReplyBody(event.target.value)}
-                  placeholder="直接回复这封邮件，不打开完整写信窗口"
-                />
-                <footer>
-                  <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : 'Enter 换行，保留上下文引用'}</span>
-                  <div>
-                    <button type="button" onClick={() => setQuickReplyBody('')} disabled={!quickReplyBody.trim()}>
-                      清空
-                    </button>
-                    <button type="button" onClick={() => sendQuickReply(selected)} disabled={!quickReplyBody.trim()}>
-                      发送回复
-                    </button>
-                  </div>
-                </footer>
-              </section>
-            )}
-          </article>
-        ) : (
-          <div className="empty-reader">
-            <div className="empty-reader-card">
-              <div className="empty-state-mark">
-                <Mail size={24} />
-              </div>
-              <strong>选择一封邮件开始阅读</strong>
-              <span>左侧保持常用操作，更多整理和安全动作会在选中邮件后显示。</span>
-            </div>
-          </div>
-        )}
-      </section>
+      <ReaderPane
+        activeThread={activeThread}
+        threadMessages={threadMessages}
+        activeThreadSelected={activeThreadSelected}
+        selected={selected}
+        selectedId={selectedId}
+        accountScope={accountScope}
+        folders={folders}
+        labels={labels}
+        attachments={attachments}
+        selectedSenderTrusted={selectedSenderTrusted}
+        selectedSenderDomain={selectedSenderDomain}
+        selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
+        quickReplyBody={quickReplyBody}
+        onSelectMessage={setSelectedId}
+        onComposeFromMessage={composeFromMessage}
+        onToggleStar={toggleStar}
+        onEditDraft={editDraftMessage}
+        onRestoreFromTrash={restoreSelectedFromTrash}
+        onMoveArchive={() => { moveSelected('archive').catch((error) => setStatus(String(error))); }}
+        onMoveTrash={() => { moveSelected('trash').catch((error) => setStatus(String(error))); }}
+        onToggleRead={toggleRead}
+        onUnsnooze={unsnoozeSelected}
+        onSnooze={snoozeSelected}
+        onExportMessage={exportSelectedMessage}
+        onFetchBody={fetchSelectedBody}
+        onMarkNotSpam={markSelectedNotSpam}
+        onMarkAsSpam={markSelectedAsSpam}
+        onTrustRemoteImages={trustRemoteImagesForSelected}
+        onBlockSender={blockSelectedSender}
+        onPermanentlyDelete={permanentlyDeleteSelected}
+        onEmptyTrash={emptyCurrentTrash}
+        onMoveToFolder={(folder) => { moveSelectedToFolder(folder).catch((error) => setStatus(String(error))); }}
+        onToggleLabel={toggleLabel}
+        onOpenAttachment={openAttachment}
+        onDownloadAttachment={downloadAttachment}
+        onSaveAttachmentAs={saveAttachmentAs}
+        onQuickReplyChange={setQuickReplyBody}
+        onSendQuickReply={sendQuickReply}
+      />
 
       {isComposerOpen && (
         <div className={`composer-backdrop${isComposerMinimized ? ' composer-backdrop-minimized' : ''}`}>
@@ -4319,19 +3008,30 @@ export default function App() {
               <nav className="settings-nav" aria-label="设置分类">
                 <strong>设置</strong>
                 <span>常用项优先，专业项折叠</span>
+                <span className="settings-nav-group">账号与连接</span>
                 <button type="button" className={activeSettingsSection === 'accounts' ? 'active' : ''} onClick={() => scrollSettingsSection('accounts')}>账号</button>
                 <button type="button" className={activeSettingsSection === 'providers' ? 'active' : ''} onClick={() => scrollSettingsSection('providers')}>服务商</button>
                 <button type="button" className={activeSettingsSection === 'auth' ? 'active' : ''} onClick={() => scrollSettingsSection('auth')}>认证</button>
+                <span className="settings-nav-group">体验与隐私</span>
                 <button type="button" className={activeSettingsSection === 'notifications' ? 'active' : ''} onClick={() => scrollSettingsSection('notifications')}>通知</button>
                 <button type="button" className={activeSettingsSection === 'privacy' ? 'active' : ''} onClick={() => scrollSettingsSection('privacy')}>隐私</button>
                 <button type="button" className={activeSettingsSection === 'identities' ? 'active' : ''} onClick={() => scrollSettingsSection('identities')}>身份</button>
+                <span className="settings-nav-group">数据与自动化</span>
                 <button type="button" className={activeSettingsSection === 'backup' ? 'active' : ''} onClick={() => scrollSettingsSection('backup')}>备份</button>
                 <button type="button" className={activeSettingsSection === 'sync' ? 'active' : ''} onClick={() => scrollSettingsSection('sync')}>同步</button>
                 <button type="button" className={activeSettingsSection === 'rules' ? 'active' : ''} onClick={() => scrollSettingsSection('rules')}>规则</button>
                 <button type="button" className={activeSettingsSection === 'security-preview' ? 'active' : ''} onClick={() => scrollSettingsSection('security-preview')}>安全预览</button>
               </nav>
               <div className="settings-content">
-            <section className="tool-panel" data-settings-section="accounts">
+            <details className="settings-disclosure add-account-disclosure" data-settings-section="accounts">
+              <summary>
+                <span>
+                  <strong>添加邮箱账号</strong>
+                  <em>选择服务商预设并填写邮箱地址</em>
+                </span>
+                <b>添加</b>
+              </summary>
+              <section className="tool-panel">
               <header className="tool-header">
                 <strong>新增账号</strong>
                 <button onClick={createNewAccount}>创建账号</button>
@@ -4364,7 +3064,12 @@ export default function App() {
                 SMTP
                 <input value={newAccountForm.smtp_host} onChange={(event) => setNewAccountForm({ ...newAccountForm, smtp_host: event.target.value })} />
               </label>
-            </section>
+              </section>
+            </details>
+            <div className="settings-section-heading">
+              <strong>当前账号</strong>
+              <span>{accountForm.email}</span>
+            </div>
             <label>
               显示名称
               <input value={accountForm.display_name} onChange={(event) => setAccountForm({ ...accountForm, display_name: event.target.value })} />
@@ -4385,7 +3090,7 @@ export default function App() {
                 </button>
               ))}
             </section>
-            <details className="settings-disclosure" data-settings-section="providers" open>
+            <details className="settings-disclosure" data-settings-section="providers">
               <summary>
                 <span>
                   <strong>服务商兼容性与真实验证</strong>
@@ -4785,14 +3490,14 @@ export default function App() {
                 </div>
               </div>
             </section>
-            <footer>
+            <div className="settings-action-bar">
               <span>凭据后续接入系统 Keychain，本地数据库只保存非敏感配置。</span>
               <div>
                 <button className="secondary" onClick={testConnection}>连接测试</button>
                 <button className="secondary" onClick={exportDiagnostics}>导出诊断</button>
                 <button onClick={saveSettings}>保存设置</button>
               </div>
-            </footer>
+            </div>
             <details className="settings-disclosure" data-settings-section="backup">
               <summary>
                 <span>
@@ -4817,10 +3522,12 @@ export default function App() {
                 </header>
                 <p>备份包含账号配置、文件夹、邮件、标签、附件元数据、规则、发件箱和同步记录；密码与 OAuth token 仍保留在系统 Keychain。</p>
                 <div className="tool-actions">
+                  <button className="secondary" onClick={importEmlFile}>导入 EML</button>
                   <button className="secondary" onClick={previewLocalBackup}>预览备份</button>
                   <button className="secondary" onClick={importLocalBackup}>恢复备份</button>
                   <button onClick={exportLocalBackup}>导出本地备份</button>
                 </div>
+                <small>单个 EML 上限 25 MB；正文会安全清洗，内嵌附件将保存到本地应用数据目录。</small>
                 {localBackupSummary && (
                   <div className="tool-row ok">
                     <span>v{localBackupSummary.schema_version}</span>

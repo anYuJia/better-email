@@ -1,7 +1,10 @@
 use crate::db::MailResult;
-use crate::models::{ConnectionReport, EndpointCheck, ParsedMessagePreview};
+use crate::models::{
+    ConnectionReport, EndpointCheck, ImportedEmlAttachment, ImportedEmlMessage,
+    ParsedMessagePreview,
+};
 use ammonia::Builder;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use mail_parser::{MessageParser, MimeHeaders};
 use std::collections::HashSet;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -115,6 +118,98 @@ pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
     }
 }
 
+pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
+    let parsed = MessageParser::default().parse(raw.as_bytes());
+    let normalized = raw.replace("\r\n", "\n");
+    let (header_block, fallback_body) = normalized
+        .split_once("\n\n")
+        .unwrap_or((normalized.as_str(), ""));
+    let preview = parse_message_preview(raw);
+    let text_body = parsed
+        .as_ref()
+        .and_then(|message| message.body_text(0))
+        .map(|body| body.into_owned())
+        .unwrap_or_default();
+    let html_body = parsed
+        .as_ref()
+        .and_then(|message| message.body_html(0))
+        .map(|body| body.into_owned())
+        .unwrap_or_default();
+    let body = if !text_body.trim().is_empty() {
+        text_body
+    } else if looks_like_html(&html_body) {
+        html_body.clone()
+    } else {
+        fallback_body.to_string()
+    };
+    let from = header_value(header_block, "from").unwrap_or_default();
+    let received_at = header_value(header_block, "date")
+        .and_then(|value| {
+            DateTime::parse_from_rfc2822(&value)
+                .or_else(|_| DateTime::parse_from_rfc3339(&value))
+                .ok()
+        })
+        .map(|value| value.with_timezone(&Utc).to_rfc3339())
+        .unwrap_or_else(|| Utc::now().to_rfc3339());
+    let message_id_header = header_value(header_block, "message-id")
+        .unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
+    let attachments = parsed
+        .as_ref()
+        .map(|message| {
+            message
+                .attachments()
+                .enumerate()
+                .map(|(index, part)| {
+                    let mime_type = part
+                        .content_type()
+                        .map(|content_type| {
+                            content_type
+                                .c_subtype
+                                .as_ref()
+                                .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
+                                .unwrap_or_else(|| content_type.c_type.to_string())
+                        })
+                        .unwrap_or_else(|| "application/octet-stream".to_string());
+                    ImportedEmlAttachment {
+                        filename: part
+                            .attachment_name()
+                            .map(str::to_string)
+                            .unwrap_or_else(|| format!("attachment-{}", index + 1)),
+                        mime_type,
+                        bytes: part.contents().to_vec(),
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    ImportedEmlMessage {
+        sender_name: display_name_from_address(&from),
+        sender_email: email_from_address(&from),
+        recipients: header_value(header_block, "to").unwrap_or_default(),
+        cc: header_value(header_block, "cc").unwrap_or_default(),
+        bcc: header_value(header_block, "bcc").unwrap_or_default(),
+        subject: preview.subject,
+        snippet: body
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("")
+            .chars()
+            .take(120)
+            .collect(),
+        body,
+        sanitized_html: if looks_like_html(&html_body) {
+            sanitize_html(&html_body)
+        } else {
+            String::new()
+        },
+        security_warnings: preview.warnings,
+        received_at,
+        message_id_header,
+        attachments,
+    }
+}
+
 pub(crate) fn link_risk_warnings(html: &str) -> Vec<String> {
     let mut warnings = Vec::new();
     for (href, label) in extract_links(html) {
@@ -141,6 +236,32 @@ pub(crate) fn link_risk_warnings(html: &str) -> Vec<String> {
     warnings.sort();
     warnings.dedup();
     warnings
+}
+
+fn display_name_from_address(address: &str) -> String {
+    address
+        .split('<')
+        .next()
+        .map(|name| name.trim().trim_matches('"').to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| email_from_address(address))
+}
+
+fn email_from_address(address: &str) -> String {
+    if let Some((_, rest)) = address.split_once('<') {
+        rest.split('>').next().unwrap_or(address).trim().to_string()
+    } else {
+        address.trim().to_string()
+    }
+}
+
+fn looks_like_html(body: &str) -> bool {
+    let lower = body.to_ascii_lowercase();
+    [
+        "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
 }
 
 pub(crate) fn sanitize_html(html: &str) -> String {
@@ -416,6 +537,60 @@ mod tests {
         assert!(!parsed.sanitized_html.contains("onclick"));
         assert!(!parsed.sanitized_html.contains("src=\"http"));
         assert!(parsed.sanitized_html.contains("<p>Hi</p>"));
+    }
+
+    #[test]
+    fn parses_imported_eml_headers_html_and_attachment_payload() {
+        let raw = concat!(
+            "Subject: Imported sample\r\n",
+            "From: \"Ada Lovelace\" <ada@example.com>\r\n",
+            "To: demo@swiftmail.local\r\n",
+            "Cc: team@example.com\r\n",
+            "Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n",
+            "Message-ID: <imported-1@example.com>\r\n",
+            "Content-Type: multipart/mixed; boundary=\"mix\"\r\n",
+            "\r\n",
+            "--mix\r\n",
+            "Content-Type: multipart/alternative; boundary=\"alt\"\r\n",
+            "\r\n",
+            "--alt\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "\r\n",
+            "Hello from imported EML.\r\n",
+            "--alt\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p onclick=\"bad()\">Hello from imported EML.</p><img src=\"http://tracker.example/open.png\"><script>bad()</script>\r\n",
+            "--alt--\r\n",
+            "--mix\r\n",
+            "Content-Type: text/plain; name=\"note.txt\"\r\n",
+            "Content-Disposition: attachment; filename=\"note.txt\"\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "aW1wb3J0ZWQgYXR0YWNobWVudA==\r\n",
+            "--mix--\r\n",
+        );
+        let imported = parse_imported_eml(raw);
+
+        assert_eq!(imported.subject, "Imported sample");
+        assert_eq!(imported.sender_name, "Ada Lovelace");
+        assert_eq!(imported.sender_email, "ada@example.com");
+        assert_eq!(imported.recipients, "demo@swiftmail.local");
+        assert_eq!(imported.cc, "team@example.com");
+        assert_eq!(imported.received_at, "2026-07-09T02:00:00+00:00");
+        assert_eq!(imported.message_id_header, "<imported-1@example.com>");
+        assert!(imported.body.contains("Hello from imported EML."));
+        assert!(!imported.sanitized_html.contains("<script"));
+        assert!(!imported.sanitized_html.contains("onclick"));
+        assert!(!imported.sanitized_html.contains("src=\"http"));
+        assert!(imported
+            .security_warnings
+            .iter()
+            .any(|warning| warning.contains("远程图片")));
+        assert_eq!(imported.attachments.len(), 1);
+        assert_eq!(imported.attachments[0].filename, "note.txt");
+        assert_eq!(imported.attachments[0].mime_type, "text/plain");
+        assert_eq!(imported.attachments[0].bytes, b"imported attachment");
     }
 
     #[test]

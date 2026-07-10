@@ -1,0 +1,455 @@
+import React from 'react';
+import {
+  Archive,
+  Clock,
+  Forward,
+  Mail,
+  MailOpen,
+  MoreHorizontal,
+  Paperclip,
+  Reply,
+  ReplyAll,
+  RotateCcw,
+  SlidersHorizontal,
+  Star,
+  Tag,
+  Trash2,
+} from 'lucide-react';
+import { movableFoldersForMessage } from '../app/appConfig';
+import type {
+  AccountScope,
+  Attachment,
+  Folder,
+  Label,
+  Message,
+  ThreadSummary,
+} from '../app/types';
+import { formatBytes, formatDate } from '../mailUtils';
+
+type ComposeMode = 'reply' | 'replyAll' | 'forward';
+type TrustScope = 'sender' | 'domain';
+
+export type ReaderPaneProps = {
+  activeThread: ThreadSummary | null;
+  threadMessages: Message[];
+  activeThreadSelected: Message | null;
+  selected: Message | null;
+  selectedId: number | null;
+  accountScope: AccountScope;
+  folders: Folder[];
+  labels: Label[];
+  attachments: Attachment[];
+  selectedSenderTrusted: boolean;
+  selectedSenderDomain: string;
+  selectedHasRemoteImageWarning: boolean;
+  quickReplyBody: string;
+  onSelectMessage: (messageId: number) => void;
+  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
+  onToggleStar: (message: Message) => void;
+  onEditDraft: (message: Message) => void;
+  onRestoreFromTrash: () => void;
+  onMoveArchive: () => void;
+  onMoveTrash: () => void;
+  onToggleRead: (message: Message) => void;
+  onUnsnooze: () => void;
+  onSnooze: () => void;
+  onExportMessage: () => void;
+  onFetchBody: () => void;
+  onMarkNotSpam: () => void;
+  onMarkAsSpam: () => void;
+  onTrustRemoteImages: (scope: TrustScope) => void;
+  onBlockSender: () => void;
+  onPermanentlyDelete: () => void;
+  onEmptyTrash: () => void;
+  onMoveToFolder: (folder: Folder) => void;
+  onToggleLabel: (label: Label) => void;
+  onOpenAttachment: (attachment: Attachment) => void;
+  onDownloadAttachment: (attachment: Attachment) => void;
+  onSaveAttachmentAs: (attachment: Attachment) => void;
+  onQuickReplyChange: (value: string) => void;
+  onSendQuickReply: (message: Message) => void;
+};
+
+function senderInitial(message: Message) {
+  return (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
+}
+
+function SenderIdentity({ message }: { message: Message }) {
+  return (
+    <div className="reader-sender">
+      <span className={`reader-avatar avatar-tone-${Math.abs(message.id) % 6}`} aria-hidden="true">
+        {senderInitial(message)}
+      </span>
+      <span className="reader-sender-copy">
+        <strong>{message.sender_name || message.sender_email}</strong>
+        <span>
+          {message.sender_email}
+          {message.recipients ? ` 发给 ${message.recipients}` : ''}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+export default function ReaderPane({
+  activeThread,
+  threadMessages,
+  activeThreadSelected,
+  selected,
+  selectedId,
+  accountScope,
+  folders,
+  labels,
+  attachments,
+  selectedSenderTrusted,
+  selectedSenderDomain,
+  selectedHasRemoteImageWarning,
+  quickReplyBody,
+  onSelectMessage,
+  onComposeFromMessage,
+  onToggleStar,
+  onEditDraft,
+  onRestoreFromTrash,
+  onMoveArchive,
+  onMoveTrash,
+  onToggleRead,
+  onUnsnooze,
+  onSnooze,
+  onExportMessage,
+  onFetchBody,
+  onMarkNotSpam,
+  onMarkAsSpam,
+  onTrustRemoteImages,
+  onBlockSender,
+  onPermanentlyDelete,
+  onEmptyTrash,
+  onMoveToFolder,
+  onToggleLabel,
+  onOpenAttachment,
+  onDownloadAttachment,
+  onSaveAttachmentAs,
+  onQuickReplyChange,
+  onSendQuickReply,
+}: ReaderPaneProps) {
+  if (activeThread && threadMessages.length > 0) {
+    return (
+      <section className="reader-panel">
+        <article className="reader thread-reader">
+          <header className="reader-header">
+            <div className="reader-title-block">
+              <h1>{activeThread.subject || '(无主题)'}</h1>
+              <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
+            </div>
+            <div className="reader-actions">
+              <button
+                className="primary-action"
+                title="回复最新邮件"
+                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'reply')}
+              >
+                <Reply size={16} />
+                <span>回复</span>
+              </button>
+              <button
+                className="icon-only-action"
+                title="转发最新邮件"
+                aria-label="转发最新邮件"
+                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
+              >
+                <Forward size={17} />
+              </button>
+            </div>
+          </header>
+          <div className="thread-stack">
+            {threadMessages.map((message) => (
+              <section
+                className={message.id === selectedId ? 'thread-message active' : 'thread-message'}
+                key={message.id}
+                onClick={() => onSelectMessage(message.id)}
+              >
+                <header>
+                  <SenderIdentity message={message} />
+                  <time>{formatDate(message.received_at)}</time>
+                </header>
+                <p>{message.snippet || message.body}</p>
+                <div className="message-chips">
+                  <span>{message.folder_role}</span>
+                  {message.labels.map((label) => <span key={label}>{label}</span>)}
+                  {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
+                </div>
+              </section>
+            ))}
+          </div>
+        </article>
+      </section>
+    );
+  }
+
+  if (!selected) {
+    return (
+      <section className="reader-panel">
+        <div className="empty-reader">
+          <div className="empty-reader-card">
+            <div className="empty-state-mark">
+              <Mail size={24} />
+            </div>
+            <strong>选择一封邮件开始阅读</strong>
+            <span>常用动作会保持可见，整理与安全选项按需展开。</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const isDraft = selected.folder_role === 'drafts';
+  const isTrash = selected.folder_role === 'trash';
+
+  return (
+    <section className="reader-panel">
+      <article className="reader">
+        <header className="reader-header">
+          <div className="reader-title-block">
+            <h1>{selected.subject || '(无主题)'}</h1>
+            <SenderIdentity message={selected} />
+          </div>
+          <div className="reader-actions" aria-label="邮件操作">
+            <button
+              className="icon-only-action"
+              title={selected.is_starred ? '取消星标' : '添加星标'}
+              aria-label={selected.is_starred ? '取消星标' : '添加星标'}
+              onClick={() => onToggleStar(selected)}
+            >
+              <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
+            </button>
+            {isDraft ? (
+              <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
+                <MailOpen size={16} />
+                <span>继续编辑</span>
+              </button>
+            ) : (
+              <>
+                <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
+                  <Reply size={16} />
+                  <span>回复</span>
+                </button>
+                <button
+                  className="icon-only-action"
+                  title="回复全部"
+                  aria-label="回复全部"
+                  onClick={() => onComposeFromMessage(selected, 'replyAll')}
+                >
+                  <ReplyAll size={17} />
+                </button>
+                <button
+                  className="icon-only-action"
+                  title="转发"
+                  aria-label="转发"
+                  onClick={() => onComposeFromMessage(selected, 'forward')}
+                >
+                  <Forward size={17} />
+                </button>
+              </>
+            )}
+            {isTrash ? (
+              <button title="恢复邮件" onClick={onRestoreFromTrash}>
+                <RotateCcw size={16} />
+                <span>恢复</span>
+              </button>
+            ) : !isDraft && (
+              <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
+                <Archive size={16} />
+              </button>
+            )}
+            {!isDraft && (
+              <button
+                className="icon-only-action"
+                aria-label={selected.is_read ? '标为未读' : '标为已读'}
+                title={selected.is_read ? '标为未读' : '标为已读'}
+                onClick={() => onToggleRead(selected)}
+              >
+                <Mail size={16} />
+              </button>
+            )}
+            {!isTrash && (
+              <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
+                <Trash2 size={16} />
+              </button>
+            )}
+            <details className="reader-more-menu compact-menu">
+              <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
+                <MoreHorizontal size={17} />
+              </summary>
+              <div>
+                <span className="menu-section-title">整理</span>
+                {selected.folder_role === 'snoozed' ? (
+                  <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
+                ) : !isTrash && (
+                  <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
+                )}
+                <button onClick={onExportMessage}>导出 EML</button>
+                {selected.remote_uid > 0 && !selected.body.trim() && (
+                  <button onClick={onFetchBody}>拉取正文</button>
+                )}
+                {selected.folder_role === 'spam' ? (
+                  <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
+                ) : (
+                  <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
+                )}
+                {!isDraft && selected.sender_email.trim() && (
+                  <>
+                    <span className="menu-section-title">安全</span>
+                    {!selectedSenderTrusted && (
+                      <button onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
+                    )}
+                    {selectedSenderDomain && !selectedSenderTrusted && (
+                      <button onClick={() => onTrustRemoteImages('domain')}>信任 {selectedSenderDomain}</button>
+                    )}
+                    <button onClick={onBlockSender}>阻止该发件人</button>
+                  </>
+                )}
+                {isTrash && (
+                  <>
+                    <span className="menu-section-title">删除</span>
+                    <button className="danger-menu-item" onClick={onPermanentlyDelete}>
+                      <Trash2 size={16} /> 永久删除
+                    </button>
+                    <button className="danger-menu-item" onClick={onEmptyTrash}>清空废纸篓</button>
+                  </>
+                )}
+                <span className="menu-section-title">移动到</span>
+                {movableFoldersForMessage(folders, selected).map((folder) => (
+                  <button type="button" key={folder.id} onClick={() => onMoveToFolder(folder)}>
+                    {folder.name}
+                  </button>
+                ))}
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <div className="reader-meta">
+          <span>{formatDate(selected.received_at)}</span>
+          {accountScope === 'all' && <span>{selected.account_email}</span>}
+          {selected.snoozed_until && <span>稍后到 {formatDate(selected.snoozed_until)}</span>}
+          {selected.has_attachments && <span>含附件</span>}
+        </div>
+
+        <div className="label-tools">
+          {selected.labels.length === 0 && <span className="label-empty">无标签</span>}
+          {selected.labels.map((labelName) => {
+            const label = labels.find((item) => item.name === labelName);
+            return (
+              <span className="active-label-chip" key={labelName}>
+                <span className="label-dot" style={{ background: label?.color ?? '#8b95a1' }} />
+                {labelName}
+              </span>
+            );
+          })}
+          <details className="compact-menu label-menu">
+            <summary><Tag size={15} /> 标签</summary>
+            <div>
+              {labels.map((label) => (
+                <button
+                  type="button"
+                  key={label.id}
+                  className={selected.labels.includes(label.name) ? 'active' : ''}
+                  onClick={() => onToggleLabel(label)}
+                >
+                  <span className="label-dot" style={{ background: label.color }} />
+                  {label.name}
+                </button>
+              ))}
+            </div>
+          </details>
+        </div>
+
+        {attachments.length > 0 && (
+          <div className="attachments">
+            {attachments.map((attachment) => (
+              <div key={attachment.id}>
+                <span className="attachment-icon"><Paperclip size={15} /></span>
+                <strong>{attachment.filename}</strong>
+                <span>{attachment.mime_type}</span>
+                <em>{formatBytes(attachment.size_bytes)}</em>
+                <button
+                  type="button"
+                  title={attachment.local_path || attachment.filename}
+                  onClick={() => attachment.is_downloaded
+                    ? onOpenAttachment(attachment)
+                    : onDownloadAttachment(attachment)}
+                >
+                  {attachment.is_downloaded ? '打开' : '下载'}
+                </button>
+                {attachment.is_downloaded && (
+                  <button type="button" title={`另存为 ${attachment.filename}`} onClick={() => onSaveAttachmentAs(attachment)}>
+                    另存为
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selected.security_warnings.length > 0 && (
+          <div className="reader-warning-panel">
+            <div className="reader-warning-heading">
+              <strong>安全提示</strong>
+              {selectedHasRemoteImageWarning && (
+                <span>{selectedSenderTrusted ? '当前发件人已信任' : '远程图片默认阻止'}</span>
+              )}
+            </div>
+            {selected.security_warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            {selectedHasRemoteImageWarning && (
+              <details className="compact-menu reader-warning-actions">
+                <summary><SlidersHorizontal size={15} /> 处理</summary>
+                <div>
+                  <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
+                  {selectedSenderDomain && (
+                    <button type="button" onClick={() => onTrustRemoteImages('domain')}>
+                      信任 {selectedSenderDomain}
+                    </button>
+                  )}
+                  <button type="button" onClick={onBlockSender}>阻止该发件人</button>
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+
+        {selected.sanitized_html ? (
+          <div className="reader-html" dangerouslySetInnerHTML={{ __html: selected.sanitized_html }} />
+        ) : (
+          <div className="body-text">{selected.body}</div>
+        )}
+
+        {!isDraft && !isTrash && (
+          <section className="quick-reply" aria-label="快速回复">
+            <header>
+              <div>
+                <strong>快速回复</strong>
+                <span>发给 {selected.sender_name || selected.sender_email}</span>
+              </div>
+              <Reply size={16} />
+            </header>
+            <textarea
+              value={quickReplyBody}
+              onChange={(event) => onQuickReplyChange(event.target.value)}
+              placeholder="直接回复这封邮件"
+            />
+            <footer>
+              <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : 'Enter 换行，发送时保留上下文'}</span>
+              <div>
+                <button type="button" onClick={() => onComposeFromMessage(selected, 'reply')}>完整写信</button>
+                <button type="button" onClick={() => onQuickReplyChange('')} disabled={!quickReplyBody.trim()}>
+                  清空
+                </button>
+                <button className="quick-reply-send" type="button" onClick={() => onSendQuickReply(selected)} disabled={!quickReplyBody.trim()}>
+                  发送回复
+                </button>
+              </div>
+            </footer>
+          </section>
+        )}
+      </article>
+    </section>
+  );
+}

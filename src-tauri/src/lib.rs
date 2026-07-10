@@ -45,6 +45,7 @@ pub fn run() {
             commands::open_attachment,
             commands::save_attachment_as,
             commands::export_message_as_eml,
+            commands::import_eml_file,
             commands::set_message_read,
             commands::set_message_starred,
             commands::move_message_to_role,

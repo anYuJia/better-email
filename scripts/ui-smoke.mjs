@@ -310,16 +310,34 @@ async function main() {
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
     await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
     const checks = [true, true, true];
+    const initialLayout = await evalInPage(
+      cdp,
+      `(() => {
+        const columns = document.querySelector('.app-shell')?.style.gridTemplateColumns ?? '';
+        const match = columns.match(/^(\\d+)px 5px (\\d+)px 5px/);
+        if (!match) throw new Error('Initial app layout was not rendered');
+        return { sidebar: Number(match[1]), list: Number(match[2]) };
+      })()`,
+    );
+    const expectedSidebar = Math.min(320, Math.max(228, initialLayout.sidebar + 34));
+    const expectedList = Math.min(500, Math.max(340, initialLayout.list - 44));
 
     await dragElement(cdp, '.sidebar-resizer', 34);
-    await waitForExpression(cdp, "document.querySelector('.app-shell').style.gridTemplateColumns.includes('302px')");
-    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('swiftmail.appLayout')).sidebar === 302");
+    await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedSidebar}px')`);
+    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).sidebar === ${expectedSidebar}`);
     await dragElement(cdp, '.list-resizer', -44);
-    await waitForExpression(cdp, "document.querySelector('.app-shell').style.gridTemplateColumns.includes('376px')");
-    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('swiftmail.appLayout')).list === 376");
+    await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedList}px')`);
+    await waitForExpression(cdp, `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).list === ${expectedList}`);
     await openDetails(cdp, '.background-sync-card');
     await clickButton(cdp, '重置布局', "document.querySelector('.background-sync-card')");
-    await waitForExpression(cdp, "document.querySelector('.app-shell').style.gridTemplateColumns.includes('268px') && document.querySelector('.app-shell').style.gridTemplateColumns.includes('420px')");
+    await waitForExpression(
+      cdp,
+      `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${initialLayout.sidebar}px') && document.querySelector('.app-shell').style.gridTemplateColumns.includes('${initialLayout.list}px')`,
+    );
+    await waitForExpression(
+      cdp,
+      `JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).sidebar === ${initialLayout.sidebar} && JSON.parse(localStorage.getItem('swiftmail.appLayout.v2')).list === ${initialLayout.list}`,
+    );
 
     await clickButton(cdp, '快捷键');
     await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索')");
@@ -343,8 +361,9 @@ async function main() {
     await fillInput(cdp, '.search-box input', 'Quarterly');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
-    await waitForExpression(cdp, "document.querySelector('.search-shortcuts') && document.body.innerText.includes('附件名') && document.body.innerText.includes('发件人')");
-    await clickButton(cdp, '附件名', "document.querySelector('.search-shortcuts')");
+    await openDetails(cdp, '.search-options-menu');
+    await waitForExpression(cdp, "document.querySelector('.search-options-menu[open]') && document.querySelector('.search-options-menu').innerText.includes('未读') && document.querySelector('.search-options-menu').innerText.includes('附件名') && document.querySelector('.search-options-menu').innerText.includes('发件人') && document.querySelector('.search-options-menu').innerText.includes('邮箱')");
+    await clickButton(cdp, '附件名', "document.querySelector('.search-options-menu')");
     await waitForExpression(cdp, "document.querySelector('.search-box input').value === 'Quarterly filename:' && document.body.innerText.includes('已插入搜索条件：filename:')");
     await fillInput(cdp, '.search-box input', 'filename:security-checklist.pdf');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
@@ -483,12 +502,14 @@ async function main() {
     await openDetails(cdp, '.more-mailboxes');
     await clickButton(cdp, '重点客户', "document.querySelector('.more-mailboxes')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
-    await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '删除', "document.querySelector('.reader-more-menu')");
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]').click()");
     await waitForExpression(cdp, "document.body.innerText.includes('本地已移动')");
     await openDetails(cdp, '.more-mailboxes');
     await clickButton(cdp, '废纸篓', "document.querySelector('.more-mailboxes')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.body.innerText.includes('永久删除')");
+    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.querySelector('.reader-actions').innerText.includes('恢复')");
+    await openDetails(cdp, '.reader-more-menu');
+    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.includes('永久删除'))");
+    await evalInPage(cdp, "document.querySelector('.reader-more-menu').open = false");
     await clickButton(cdp, '恢复', "document.querySelector('.reader-actions')");
     await waitForExpression(cdp, "document.body.innerText.includes('已恢复到收件箱')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
@@ -513,6 +534,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
+    await clickButton(cdp, '导入 EML');
+    await waitForExpression(cdp, "document.body.innerText.includes('已导入 EML：Imported EML Sample') && document.body.innerText.includes('Imported EML Sample')");
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/swiftmail-backup.json') && document.body.innerText.includes('凭据未包含')");
 
@@ -555,8 +578,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('规则已保存：Smoke Rule') && document.body.innerText.includes('Smoke Rule')");
 
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"security-preview\"]');
-    await clickButton(cdp, '解析');
-    await waitForExpression(cdp, "document.body.innerText.includes('安全预览样例') && document.body.innerText.includes('HTML 正文包含 script 标签')");
+    await clickButton(cdp, '解析', "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-disclosure[data-settings-section=\"security-preview\"] .preview-result')?.innerText.includes('HTML 正文包含 script 标签')");
 
     await clickButton(cdp, '撤回');
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
@@ -637,6 +660,7 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'local EML import works',
         'local backup export works',
         'contact create edit suggested merge manual merge delete and VIP sync works',
         'rules create flow works',

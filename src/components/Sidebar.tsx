@@ -1,0 +1,368 @@
+import React from 'react';
+import { Edit3, Keyboard, Search, Settings } from 'lucide-react';
+import { folderIconForRole, isCustomFolder, primaryFolderRoles } from '../app/appConfig';
+import type {
+  Account,
+  AccountScope,
+  BackgroundTask,
+  Contact,
+  Folder,
+  Label,
+  SavedSearch,
+} from '../app/types';
+
+type FolderItemsProps = {
+  folders: Folder[];
+  folderId: number | null;
+  renamingFolderId: number | null;
+  renamingFolderName: string;
+  onSelectFolder: (folderId: number) => void;
+  onRenamingFolderNameChange: (value: string) => void;
+  onRenameFolder: (folder: Folder) => void;
+  onCancelRename: () => void;
+  onStartRename: (folder: Folder) => void;
+  onDeleteFolder: (folder: Folder) => void;
+};
+
+function FolderItems({
+  folders,
+  folderId,
+  renamingFolderId,
+  renamingFolderName,
+  onSelectFolder,
+  onRenamingFolderNameChange,
+  onRenameFolder,
+  onCancelRename,
+  onStartRename,
+  onDeleteFolder,
+}: FolderItemsProps) {
+  return folders.map((folder) => (
+    <div
+      key={folder.id}
+      className={folder.id === folderId ? 'folder active' : 'folder'}
+    >
+      {renamingFolderId === folder.id ? (
+        <form
+          className="folder-rename"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onRenameFolder(folder);
+          }}
+        >
+          <input
+            value={renamingFolderName}
+            onChange={(event) => onRenamingFolderNameChange(event.target.value)}
+            autoFocus
+          />
+          <button type="submit">保存</button>
+          <button type="button" onClick={onCancelRename}>取消</button>
+        </form>
+      ) : (
+        <>
+          <button type="button" className="folder-main" onClick={() => onSelectFolder(folder.id)}>
+            <span className="folder-name">
+              {folderIconForRole(folder.role)}
+              {folder.name}
+            </span>
+            {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
+          </button>
+          {isCustomFolder(folder) && (
+            <span className="folder-actions">
+              <button type="button" title="重命名" onClick={() => onStartRename(folder)}>改</button>
+              <button type="button" title="删除" onClick={() => onDeleteFolder(folder)}>删</button>
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  ));
+}
+
+export type SidebarProps = {
+  accountScope: AccountScope;
+  account: Account | null;
+  accounts: Account[];
+  folders: Folder[];
+  folderId: number | null;
+  renamingFolderId: number | null;
+  renamingFolderName: string;
+  savedSearches: SavedSearch[];
+  savedSearchName: string;
+  contacts: Contact[];
+  contactQuery: string;
+  filteredContacts: Contact[];
+  labels: Label[];
+  customFolderName: string;
+  backgroundTasks: BackgroundTask[];
+  backgroundSyncStatus: string;
+  lastNewMailNotice: string | null;
+  notificationStatus: string;
+  appBadgeStatus: string;
+  onAccountScopeChange: (value: string) => void;
+  onCompose: () => void;
+  onSelectFolder: (folderId: number) => void;
+  onRenamingFolderNameChange: (value: string) => void;
+  onRenameFolder: (folder: Folder) => void;
+  onCancelRename: () => void;
+  onStartRename: (folder: Folder) => void;
+  onDeleteFolder: (folder: Folder) => void;
+  onSavedSearchNameChange: (value: string) => void;
+  onSaveCurrentSearch: () => void;
+  onRunSavedSearch: (savedSearch: SavedSearch) => void;
+  onDeleteSavedSearch: (savedSearch: SavedSearch) => void;
+  onContactQueryChange: (value: string) => void;
+  onComposeToContact: (contact: Contact) => void;
+  onAddContactToDraft: (contact: Contact) => void;
+  onToggleContactVip: (contact: Contact) => void;
+  onCustomFolderNameChange: (value: string) => void;
+  onCreateCustomFolder: () => void;
+  onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
+  onOpenCommandPalette: () => void;
+  onSync: () => void;
+  onResetLayout: () => void;
+};
+
+export default function Sidebar({
+  accountScope,
+  account,
+  accounts,
+  folders,
+  folderId,
+  renamingFolderId,
+  renamingFolderName,
+  savedSearches,
+  savedSearchName,
+  contacts,
+  contactQuery,
+  filteredContacts,
+  labels,
+  customFolderName,
+  backgroundTasks,
+  backgroundSyncStatus,
+  lastNewMailNotice,
+  notificationStatus,
+  appBadgeStatus,
+  onAccountScopeChange,
+  onCompose,
+  onSelectFolder,
+  onRenamingFolderNameChange,
+  onRenameFolder,
+  onCancelRename,
+  onStartRename,
+  onDeleteFolder,
+  onSavedSearchNameChange,
+  onSaveCurrentSearch,
+  onRunSavedSearch,
+  onDeleteSavedSearch,
+  onContactQueryChange,
+  onComposeToContact,
+  onAddContactToDraft,
+  onToggleContactVip,
+  onCustomFolderNameChange,
+  onCreateCustomFolder,
+  onOpenSettings,
+  onOpenShortcuts,
+  onOpenCommandPalette,
+  onSync,
+  onResetLayout,
+}: SidebarProps) {
+  const primaryFolders = folders.filter((folder) => primaryFolderRoles.has(folder.role));
+  const secondaryFolders = folders.filter((folder) => !primaryFolderRoles.has(folder.role));
+  const customFolderCount = folders.filter(isCustomFolder).length;
+  const folderItemProps = {
+    folderId,
+    renamingFolderId,
+    renamingFolderName,
+    onSelectFolder,
+    onRenamingFolderNameChange,
+    onRenameFolder,
+    onCancelRename,
+    onStartRename,
+    onDeleteFolder,
+  };
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">S</div>
+        <div>
+          <strong>SwiftMail</strong>
+          <span>{accountScope === 'all' ? `统一邮箱 · ${accounts.length || 1} 个账号` : account?.email ?? '低内存邮箱客户端'}</span>
+        </div>
+      </div>
+      <label className="account-switcher">
+        <span>邮箱范围</span>
+        <select value={accountScope} onChange={(event) => onAccountScopeChange(event.target.value)}>
+          <option value="all">统一邮箱</option>
+          {accounts.map((item) => (
+            <option key={item.id} value={item.id}>{item.email}</option>
+          ))}
+        </select>
+      </label>
+      <button className="compose-button" onClick={onCompose}>
+        <Edit3 size={17} /> 写邮件
+      </button>
+      <div className="sidebar-label">邮箱</div>
+      <nav className="folder-list">
+        <FolderItems folders={primaryFolders} {...folderItemProps} />
+      </nav>
+
+      <div className="sidebar-secondary sidebar-quick-menus">
+        <details className="sidebar-disclosure more-mailboxes">
+          <summary>
+            <span>更多邮箱</span>
+            <em>{secondaryFolders.length}</em>
+          </summary>
+          <nav className="folder-list folded-folder-list">
+            <FolderItems folders={secondaryFolders} {...folderItemProps} />
+          </nav>
+        </details>
+
+        <details className="sidebar-disclosure sidebar-tools">
+          <summary>
+            <span>工具</span>
+            <em>4 项</em>
+          </summary>
+          <div className="sidebar-tool-stack">
+            <section className="sidebar-tool-section saved-searches">
+              <div className="sidebar-tool-heading">
+                <strong>保存搜索</strong>
+                <span>{savedSearches.length ? `${savedSearches.length} 个` : '保存常用条件'}</span>
+              </div>
+              <form
+                className="saved-search-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSaveCurrentSearch();
+                }}
+              >
+                <input
+                  value={savedSearchName}
+                  onChange={(event) => onSavedSearchNameChange(event.target.value)}
+                  placeholder="搜索名称"
+                />
+                <button type="submit">保存</button>
+              </form>
+              <div className="saved-search-list">
+                {savedSearches.map((savedSearch) => (
+                  <div className="saved-search-row" key={savedSearch.id}>
+                    <button type="button" onClick={() => onRunSavedSearch(savedSearch)}>
+                      <strong>{savedSearch.name}</strong>
+                      <span>{savedSearch.query}</span>
+                    </button>
+                    <button type="button" title="删除保存搜索" onClick={() => onDeleteSavedSearch(savedSearch)}>删</button>
+                  </div>
+                ))}
+                {savedSearches.length === 0 && <small>保存常用搜索条件</small>}
+              </div>
+            </section>
+
+            <section className="sidebar-tool-section contact-center">
+              <div className="sidebar-tool-heading">
+                <strong>联系人</strong>
+                <span>{contacts.length ? `${contacts.length} 位` : '自动收集'}</span>
+              </div>
+              <input
+                value={contactQuery}
+                onChange={(event) => onContactQueryChange(event.target.value)}
+                placeholder="搜索联系人"
+              />
+              <div className="contact-list">
+                {filteredContacts.map((contact) => (
+                  <div className="contact-row" key={contact.id}>
+                    <button type="button" onClick={() => onComposeToContact(contact)}>
+                      <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
+                      <span>{contact.email}{contact.aliases.length ? ` · ${contact.aliases.length} 个别名` : ''}</span>
+                    </button>
+                    <button type="button" title="加入当前草稿" onClick={() => onAddContactToDraft(contact)}>
+                      加入
+                    </button>
+                    <button type="button" title={contact.vip ? '取消 VIP' : '设为 VIP'} onClick={() => onToggleContactVip(contact)}>
+                      {contact.vip ? 'VIP' : '星标'}
+                    </button>
+                  </div>
+                ))}
+                {filteredContacts.length === 0 && <small>没有匹配联系人</small>}
+              </div>
+            </section>
+
+            <section className="sidebar-tool-section label-section">
+              <div className="sidebar-tool-heading">
+                <strong>标签</strong>
+                <span>{labels.length} 个</span>
+              </div>
+              <div className="label-list">
+                {labels.map((label) => (
+                  <div className="label-row" key={label.id}>
+                    <span style={{ background: label.color }} />
+                    <strong>{label.name}</strong>
+                    <em>{label.message_count}</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="sidebar-tool-section folder-manager">
+              <div className="sidebar-tool-heading">
+                <strong>文件夹</strong>
+                <span>{customFolderCount ? `${customFolderCount} 个自定义` : '新建文件夹'}</span>
+              </div>
+              <form
+                className="custom-folder-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onCreateCustomFolder();
+                }}
+              >
+                <input
+                  value={customFolderName}
+                  onChange={(event) => onCustomFolderNameChange(event.target.value)}
+                  placeholder="新建文件夹"
+                />
+                <button type="submit">添加</button>
+              </form>
+            </section>
+          </div>
+        </details>
+      </div>
+
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-actions">
+          <button className="settings-button" title="设置" onClick={onOpenSettings}>
+            <Settings size={17} /> <span>设置</span>
+          </button>
+          <button className="settings-button shortcut-help-button" title="快捷键" onClick={onOpenShortcuts}>
+            <Keyboard size={17} /> <span>快捷键</span>
+          </button>
+          <button className="settings-button command-palette-button" title="命令" onClick={onOpenCommandPalette}>
+            <Search size={17} /> <span>命令</span>
+          </button>
+        </div>
+        <details className="sidebar-disclosure background-sync-card">
+          <summary>
+            <span>同步与布局</span>
+            <em>{backgroundTasks.some((task) => task.status === 'running') ? '同步中' : '就绪'}</em>
+          </summary>
+          <span>{backgroundSyncStatus}</span>
+          {lastNewMailNotice && <em>{lastNewMailNotice}</em>}
+          <small>{notificationStatus}</small>
+          <small>{appBadgeStatus}</small>
+          {backgroundTasks.length > 0 && (
+            <div className="task-stack">
+              {backgroundTasks.slice(0, 3).map((task) => (
+                <small key={task.id}>
+                  {task.title} · {task.status === 'queued' ? '排队' : task.status === 'running' ? '执行中' : task.status === 'done' ? '完成' : '失败'}
+                </small>
+              ))}
+            </div>
+          )}
+          <div className="sidebar-utility-actions">
+            <button type="button" onClick={onSync}>立即同步</button>
+            <button className="layout-reset-button" type="button" onClick={onResetLayout}>重置布局</button>
+          </div>
+        </details>
+      </div>
+    </aside>
+  );
+}

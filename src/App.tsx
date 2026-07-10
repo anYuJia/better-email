@@ -28,6 +28,7 @@ import useAccountConnectionController from './hooks/useAccountConnectionControll
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
+import useMailboxData from './hooks/useMailboxData';
 import useMessageCollectionActions from './hooks/useMessageCollectionActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useUndoQueue from './hooks/useUndoQueue';
@@ -283,9 +284,29 @@ export default function App() {
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const frontendReadyRef = useRef(false);
   const benchmarkSyncRef = useRef(false);
-  const mailboxRefreshRef = useRef(0);
+  const {
+    mailboxRefreshRef,
+    loadMessages,
+    loadMessagesWithVisibleFallback,
+    refreshMailbox,
+  } = useMailboxData({
+    accountScope,
+    folderId,
+    query,
+    filter,
+    folders,
+    setMessages,
+    setThreads,
+    setMessageLimit,
+    setHasMoreMessages,
+    setSelectedId,
+    setSelectedMessageIds,
+    setFilter,
+    setStatus,
+    loadMeta,
+    maybeRunBenchmarkSync,
+  });
   const { enqueueBackgroundTask } = useBackgroundTaskCoordinator({
     account,
     accountScope,
@@ -582,112 +603,6 @@ export default function App() {
     } catch {
       setAppBadgeStatus('当前平台不支持应用角标');
     }
-  }
-
-  async function loadMessages(
-    nextFolderId = folderId,
-    nextQuery = query,
-    nextFilter = filter,
-    nextScope: AccountScope = accountScope,
-    refreshId = mailboxRefreshRef.current,
-    nextLimit = messagePageSize,
-  ) {
-    if (!nextFolderId) {
-      setMessages([]);
-      setThreads([]);
-      setHasMoreMessages(false);
-      setSelectedId(null);
-      setSelectedMessageIds([]);
-      return [];
-    }
-    const nextAccountId = accountIdForScope(nextScope);
-    const [nextMessages, nextThreads] = await Promise.all([
-      invoke<Message[]>('list_messages', {
-        accountId: nextAccountId,
-        folderId: nextFolderId,
-        query: nextQuery.trim() || null,
-        filter: nextFilter,
-        limit: nextLimit + 1,
-      }),
-      invoke<ThreadSummary[]>('list_threads', {
-        accountId: nextAccountId,
-        folderId: nextFolderId,
-        query: nextQuery.trim() || null,
-        filter: nextFilter,
-        limit: 80,
-      }),
-    ]);
-    if (refreshId !== mailboxRefreshRef.current) return nextMessages;
-    setThreads(nextThreads);
-    const visibleMessages = nextMessages.slice(0, nextLimit);
-    setMessageLimit(nextLimit);
-    setHasMoreMessages(nextMessages.length > nextLimit);
-    setMessages(visibleMessages);
-    setSelectedMessageIds((current) =>
-      current.filter((id) => visibleMessages.some((message) => message.id === id)),
-    );
-    setSelectedId((current) => {
-      if (current && visibleMessages.some((message) => message.id === current)) return current;
-      return visibleMessages[0]?.id ?? null;
-    });
-    if (!frontendReadyRef.current) {
-      frontendReadyRef.current = true;
-      void invoke('mark_frontend_ready', {
-        message: `folder=${nextFolderId};messages=${visibleMessages.length};scope=${nextScope}`,
-      });
-      void maybeRunBenchmarkSync();
-    }
-    return visibleMessages;
-  }
-
-  async function loadMessagesWithVisibleFallback(
-    nextFolderId = folderId,
-    nextQuery = query,
-    nextFilter = filter,
-    nextScope: AccountScope = accountScope,
-    refreshId = mailboxRefreshRef.current,
-    visibleFolders = folders,
-    nextLimit = messagePageSize,
-  ) {
-    const nextMessages = await loadMessages(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, nextLimit);
-    if (
-      nextMessages.length > 0 ||
-      !nextFolderId ||
-      nextQuery.trim() ||
-      nextFilter !== 'all' ||
-      refreshId !== mailboxRefreshRef.current
-    ) {
-      return nextMessages;
-    }
-
-    const selectedFolder = visibleFolders.find((folder) => folder.id === nextFolderId);
-    if (!selectedFolder || selectedFolder.unread_count <= 0) return nextMessages;
-    const unreadMessages = await loadMessages(nextFolderId, '', 'unread', nextScope, refreshId, nextLimit);
-    if (unreadMessages.length === 0 || refreshId !== mailboxRefreshRef.current) return nextMessages;
-    setFilter('unread');
-    setStatus('当前文件夹暂无全部邮件，已切到未读视图显示可见邮件。');
-    return unreadMessages;
-  }
-
-  async function refreshMailbox(
-    nextScope: AccountScope = accountScope,
-    preferredFolderId: number | null = null,
-    nextQuery = query,
-    nextFilter = filter,
-  ) {
-    const refreshId = mailboxRefreshRef.current + 1;
-    mailboxRefreshRef.current = refreshId;
-    setMessageLimit(messagePageSize);
-    setHasMoreMessages(false);
-    setMessages([]);
-    setThreads([]);
-    setSelectedId(null);
-    setSelectedMessageIds([]);
-    const meta = await loadMeta(preferredFolderId, nextScope);
-    const nextFolderId = meta.folderId;
-    if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
-    await loadMessagesWithVisibleFallback(nextFolderId, nextQuery, nextFilter, nextScope, refreshId, meta.folders, messagePageSize);
-    return nextFolderId;
   }
 
   async function maybeRunBenchmarkSync() {

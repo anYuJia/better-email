@@ -27,14 +27,17 @@ export default function AccountSettingsPage({
 }: AccountSettingsPageProps) {
   return (
     <div className="settings-account-stack settings-account-page settings-account-page-accounts">
-      <section className="settings-static-section add-account-section" data-settings-section="accounts">
-        <header className="settings-static-header">
-          <span>
+      <details className="settings-disclosure add-account-disclosure" data-settings-section="accounts">
+        <summary>
+          <span className="add-account-summary-copy">
             <strong>添加邮箱账号</strong>
-            <em>选择服务商预设并填写邮箱地址</em>
+            <small>选择服务商预设并填写邮箱地址</small>
           </span>
-          <b>添加</b>
-        </header>
+          <span className="add-account-summary-action">
+            <Plus size={14} />
+            <span>添加账号</span>
+          </span>
+        </summary>
         <section className="tool-panel settings-add-account-panel">
           <header className="tool-header">
             <span>
@@ -95,7 +98,7 @@ export default function AccountSettingsPage({
             </label>
           </div>
         </section>
-      </section>
+      </details>
 
       <section className="tool-panel settings-current-account-panel">
         <header className="tool-header">

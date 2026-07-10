@@ -16,6 +16,10 @@
 
 .settings-main-header {
   min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 0 11px 0 17px;
   border-bottom: 1px solid var(--ui-border);
   background: rgba(250, 251, 252, 0.98);
@@ -44,6 +48,50 @@
 .settings-title span {
   color: var(--ui-text-tertiary);
   font-size: 10.5px;
+}
+
+.settings-header-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-header-button {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-header-button.secondary {
+  color: var(--ui-text-secondary);
+  border-color: #dce2e8;
+  background: #ffffff;
+}
+
+.settings-header-button.secondary:hover {
+  color: var(--ui-accent);
+  border-color: #bfd8f1;
+  background: #f5faff;
+}
+
+.settings-header-button.primary {
+  color: #ffffff;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+.settings-header-button.primary:hover {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
 }
 
 .settings-close-button {
@@ -601,6 +649,16 @@
 
   .settings-main-header {
     padding-left: 13px;
+  }
+
+  .settings-title span,
+  .settings-header-button span {
+    display: none;
+  }
+
+  .settings-header-button {
+    width: 32px;
+    padding: 0;
   }
 
   .settings-close-button {

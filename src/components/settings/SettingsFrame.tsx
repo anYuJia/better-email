@@ -4,7 +4,9 @@ import {
   Bell,
   DatabaseBackup,
   EyeOff,
+  FlaskConical,
   RefreshCw,
+  Save,
   ScanSearch,
   Server,
   ShieldCheck,
@@ -34,6 +36,8 @@ type SettingsFrameProps = {
   activeSection: string;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
+  onTestConnection: () => void;
+  onSave: () => void;
   onClose: () => void;
 };
 
@@ -72,6 +76,8 @@ export default function SettingsFrame({
   activeSection,
   children,
   onNavigate,
+  onTestConnection,
+  onSave,
   onClose,
 }: SettingsFrameProps) {
   return (
@@ -82,10 +88,32 @@ export default function SettingsFrame({
             <strong>{title}</strong>
             <span>{subtitle}</span>
           </div>
-          <button type="button" className="settings-close-button" onClick={onClose}>
-            <X size={15} />
-            <span>关闭</span>
-          </button>
+          <div className="settings-header-actions">
+            <button
+              type="button"
+              className="settings-header-button secondary"
+              aria-label="连接测试"
+              title="测试当前账号的 IMAP 与 SMTP 连接"
+              onClick={onTestConnection}
+            >
+              <FlaskConical size={14} />
+              <span>连接测试</span>
+            </button>
+            <button
+              type="button"
+              className="settings-header-button primary"
+              aria-label="保存设置"
+              title="保存当前账号设置"
+              onClick={onSave}
+            >
+              <Save size={14} />
+              <span>保存设置</span>
+            </button>
+            <button type="button" className="settings-close-button" onClick={onClose}>
+              <X size={15} />
+              <span>关闭</span>
+            </button>
+          </div>
         </header>
         <div className="settings-body">
           <nav className="settings-nav" aria-label="设置分类">

@@ -687,8 +687,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('design@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('iCloud')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
+    await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('连接测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
-    await clickButton(cdp, '连接测试', "document.querySelector('.settings-action-bar')");
+    await clickButton(cdp, '连接测试', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "document.querySelector('.settings-connection-report')?.innerText.includes('imap.mail.me.com:993') && document.querySelector('.settings-connection-report')?.innerText.includes('smtp.mail.me.com:587')");
     await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
@@ -753,7 +754,8 @@ async function main() {
     await clickButton(cdp, '撤回');
     await waitForExpression(cdp, "document.body.innerText.includes('已撤回到草稿箱') && document.body.innerText.includes('已撤回')");
 
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-modal header button')].find((button) => button.textContent.includes('关闭')).click()");
+    await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]')");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]').click()");
@@ -869,6 +871,8 @@ async function main() {
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',
+        'settings primary actions stay visible in header',
+        'settings header save completes update flow',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'undo send delay settings persist',

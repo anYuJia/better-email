@@ -1,4 +1,4 @@
-import { Download, FileInput, FlaskConical, Save, Upload } from 'lucide-react';
+import { Download, FileInput, Upload } from 'lucide-react';
 import type { ConnectionReport, LocalBackupSummary } from '../../app/types';
 import './data-settings.css';
 
@@ -6,8 +6,6 @@ type DataSafetySettingsProps = {
   diagnosticExport: string | null;
   localBackupSummary: LocalBackupSummary | null;
   connectionReport: ConnectionReport | null;
-  onSaveSettings: () => void;
-  onTestConnection: () => void;
   onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
@@ -19,8 +17,6 @@ export default function DataSafetySettings({
   diagnosticExport,
   localBackupSummary,
   connectionReport,
-  onSaveSettings,
-  onTestConnection,
   onExportDiagnostics,
   onImportEml,
   onPreviewBackup,
@@ -32,17 +28,9 @@ export default function DataSafetySettings({
       <div className="settings-action-bar">
         <span>敏感凭据只写入系统安全存储，本地数据库仅保存非敏感配置。</span>
         <div>
-          <button className="secondary" type="button" onClick={onTestConnection}>
-            <FlaskConical size={14} />
-            连接测试
-          </button>
           <button className="secondary" type="button" onClick={onExportDiagnostics}>
             <Download size={14} />
             导出诊断
-          </button>
-          <button type="button" onClick={onSaveSettings}>
-            <Save size={14} />
-            保存设置
           </button>
         </div>
       </div>

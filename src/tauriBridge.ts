@@ -28,7 +28,7 @@ function loadNotification() {
   return notificationModule;
 }
 
-const account = {
+let account = {
   id: 1,
   email: 'demo@better-email.local',
   display_name: 'Demo User',
@@ -41,7 +41,7 @@ const account = {
   signature: 'Sent from Better Email',
 };
 
-const mockAccounts = [
+let mockAccounts = [
   account,
   {
     ...account,
@@ -697,6 +697,20 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return (Number(args?.accountId ?? 0) > 0
         ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
         : account) as T;
+    case 'update_account_settings': {
+      const accountId = Number(args?.accountId ?? 0);
+      const existing = mockAccounts.find((item) => item.id === accountId);
+      if (!existing) throw new Error('account not found');
+      const input = (args?.input ?? {}) as Partial<typeof account>;
+      const updated = {
+        ...existing,
+        ...input,
+        id: accountId,
+      };
+      mockAccounts = mockAccounts.map((item) => (item.id === accountId ? updated : item));
+      if (account.id === accountId) account = updated;
+      return updated as T;
+    }
     case 'list_folders':
       return folders.filter((folder) => {
         const accountId = Number(args?.accountId ?? 0);

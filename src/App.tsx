@@ -2782,6 +2782,8 @@ export default function App() {
           subtitle={`${accountForm.email} · ${accountForm.provider}`}
           activeSection={activeSettingsSection}
           onNavigate={scrollSettingsSection}
+          onTestConnection={() => { testConnection().catch((error) => setStatus(String(error))); }}
+          onSave={() => { saveSettings().catch((error) => setStatus(String(error))); }}
           onClose={() => setSettingsOpen(false)}
         >
             <AccountConnectionSettings
@@ -2838,8 +2840,6 @@ export default function App() {
               diagnosticExport={diagnosticExport}
               localBackupSummary={localBackupSummary}
               connectionReport={connectionReport}
-              onSaveSettings={() => { saveSettings().catch((error) => setStatus(String(error))); }}
-              onTestConnection={() => { testConnection().catch((error) => setStatus(String(error))); }}
               onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
               onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
               onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}

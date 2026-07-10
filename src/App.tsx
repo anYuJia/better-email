@@ -2591,6 +2591,7 @@ export default function App() {
     function handleShortcut(event: KeyboardEvent) {
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
+      const commandModifier = event.metaKey || event.ctrlKey;
 
       if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen || isCommandPaletteOpen)) {
         event.preventDefault();
@@ -2602,24 +2603,50 @@ export default function App() {
       }
       if (editable) return;
 
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && key === 'z' && undoAction) {
+      const hasBlockingOverlay = isSettingsOpen
+        || isShortcutsOpen
+        || isCommandPaletteOpen
+        || (isComposerOpen && !isComposerMinimized);
+      if (hasBlockingOverlay) return;
+
+      if (key === 'escape' && document.querySelector('.context-menu')) {
+        return;
+      }
+
+      if (key === 'escape' && selectedMessageIds.length > 0) {
+        event.preventDefault();
+        setSelectedMessageIds([]);
+        setStatus('已取消邮件选择');
+        return;
+      }
+
+      if (commandModifier && !event.shiftKey && key === 'z' && undoAction) {
         event.preventDefault();
         restoreUndoAction().catch((error) => setStatus(String(error)));
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && key === 'k') {
+      if (commandModifier && !event.shiftKey && key === 'a' && listMode === 'messages' && messages.length > 0) {
+        event.preventDefault();
+        toggleAllVisibleMessages(true);
+        setStatus(`已选择当前列表 ${messages.length} 封邮件`);
+        return;
+      }
+
+      if (commandModifier && key === 'k') {
         event.preventDefault();
         setCommandPaletteOpen(true);
         setCommandQuery('');
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && key === '/') {
+      if (commandModifier && key === '/') {
         event.preventDefault();
         setShortcutsOpen(true);
         return;
       }
+
+      if (commandModifier || event.altKey) return;
 
       if (key === '?' || (event.shiftKey && key === '/')) {
         event.preventDefault();
@@ -2649,6 +2676,32 @@ export default function App() {
         selectRelativeMessage(-1);
         return;
       }
+
+      if (selectedMessages.length > 0) {
+        if (key === 's') {
+          event.preventDefault();
+          const action = selectedMessages.every((message) => message.is_starred) ? 'unstar' : 'star';
+          runBulkAction(action).catch((error) => setStatus(String(error)));
+          return;
+        }
+        if (key === 'm') {
+          event.preventDefault();
+          const action = selectedMessages.every((message) => message.is_read) ? 'unread' : 'read';
+          runBulkAction(action).catch((error) => setStatus(String(error)));
+          return;
+        }
+        if (key === 'e') {
+          event.preventDefault();
+          runBulkAction('archive').catch((error) => setStatus(String(error)));
+          return;
+        }
+        if (key === 'delete' || key === 'backspace') {
+          event.preventDefault();
+          runBulkAction('trash').catch((error) => setStatus(String(error)));
+          return;
+        }
+      }
+
       if (!selected) return;
       if (key === 'r' && event.shiftKey) {
         event.preventDefault();
@@ -2676,7 +2729,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [folderId, folders, isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, labels, messages, selected, selectedId, undoAction]);
+  }, [folderId, folders, isCommandPaletteOpen, isComposerMinimized, isComposerOpen, isSettingsOpen, isShortcutsOpen, labels, listMode, messages, selected, selectedId, selectedMessageIds, selectedMessages, undoAction]);
 
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');

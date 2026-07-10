@@ -428,9 +428,10 @@ export const shortcutGroups = [
     items: [
       { keys: ['⌘/Ctrl', 'K'], label: '聚焦搜索' },
       { keys: ['/'], label: '快速搜索' },
+      { keys: ['⌘/Ctrl', 'A'], label: '选择当前列表全部邮件' },
       { keys: ['J', '↓'], label: '下一封' },
       { keys: ['K', '↑'], label: '上一封' },
-      { keys: ['Esc'], label: '关闭弹窗' },
+      { keys: ['Esc'], label: '关闭弹窗 / 取消选择' },
     ],
   },
   {

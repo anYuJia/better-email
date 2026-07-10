@@ -375,7 +375,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
 
     await clickButton(cdp, '快捷键');
-    await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('撤销上一步邮件操作')");
+    await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('选择当前列表全部邮件') && document.body.innerText.includes('撤销上一步邮件操作')");
     await clickButton(cdp, '关闭', "document.querySelector('.shortcut-modal')");
     await waitForExpression(cdp, "!document.querySelector('.shortcut-modal')");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: '?', shiftKey: true, bubbles: true }))");
@@ -534,6 +534,18 @@ async function main() {
     await openDetails(cdp, '.bulk-more-menu');
     await clickButton(cdp, '工作', "document.querySelector('.bulk-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已批量添加标签 工作：2 封邮件')");
+
+    await evalInPage(
+      cdp,
+      "(() => { window.__bulkShortcutCount = document.querySelectorAll('.message-card').length; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
+    );
+    await waitForExpression(cdp, "document.querySelector('.bulk-selection span')?.innerText === `已选 ${window.__bulkShortcutCount}`");
+    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))");
+    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; return !document.querySelector('.bulk-toolbar') && status.includes(`${window.__bulkShortcutCount} 封邮件`) && (status.includes('已批量添加星标') || status.includes('已批量取消星标')); })()");
+    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true }))");
+    await waitForExpression(cdp, "document.querySelector('.bulk-selection span')?.innerText === `已选 ${window.__bulkShortcutCount}`");
+    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
+    await waitForExpression(cdp, "!document.querySelector('.bulk-toolbar') && document.body.innerText.includes('已取消邮件选择')");
 
     await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length >= 1 && document.body.innerText.includes('封 · 未读')");
@@ -784,6 +796,7 @@ async function main() {
         'composer signature insertion works',
         'composer draft save works',
         'bulk star and label actions work',
+        'keyboard select all bulk action and escape clear work',
         'thread view opens conversations',
         'message drag drop move and undo works',
         'custom folder create rename and move works',

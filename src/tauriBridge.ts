@@ -181,6 +181,21 @@ function discoveredImapMailboxesForAccount(accountId: number, accountEmail: stri
 
 let mockImapMailboxes = mockAccounts.flatMap((mockAccount) =>
   discoveredImapMailboxesForAccount(mockAccount.id, mockAccount.email));
+mockImapMailboxes.push({
+  id: 1005,
+  account_id: 1,
+  account_email: account.email,
+  remote_name: 'Trash',
+  delimiter: '/',
+  attributes: 'Trash',
+  local_role: 'trash',
+  local_folder_id: null,
+  local_folder_name: '',
+  uid_validity: '',
+  highest_uid: 0,
+  last_seen_at: now,
+  last_sync_at: '',
+});
 
 let messages = [
   {
@@ -234,6 +249,32 @@ let messages = [
     attachment_count: 0,
     remote_mailbox: 'INBOX',
     remote_uid: 43,
+  },
+  {
+    id: 51,
+    account_id: 1,
+    account_email: account.email,
+    folder_id: 105,
+    folder_role: 'trash',
+    sender_name: 'Remote Trash',
+    sender_email: 'trash@example.com',
+    recipients: account.email,
+    cc: '',
+    bcc: '',
+    subject: 'Remote trash cleanup sample',
+    snippet: '用于验证清空废纸篓的远端批量删除。',
+    body: '用于验证清空废纸篓的远端批量删除。',
+    sanitized_html: '',
+    security_warnings: [],
+    received_at: '2026-07-07T11:00:00+08:00',
+    is_read: true,
+    is_starred: false,
+    has_attachments: false,
+    snoozed_until: '',
+    labels: [],
+    attachment_count: 0,
+    remote_mailbox: 'Trash',
+    remote_uid: 5001,
   },
 ];
 
@@ -1146,6 +1187,9 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const messageId = Number(args?.messageId);
       const targetRole = String(args?.role ?? '');
       let targetRemoteMailbox = '';
+      let remoteAttempted = false;
+      let remoteApplied = false;
+      let remoteMessage = '本地已移动；该邮件没有可用远端状态，远端移动已跳过。';
       messages = messages.map((message) => {
         if (message.id !== messageId) return message;
         const targetFolderId = folderIdForRole(targetRole || message.folder_role, message.account_id);
@@ -1153,52 +1197,111 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           mailbox.account_id === message.account_id
           && (mailbox.local_role === targetRole || mailbox.local_folder_id === targetFolderId))
           ?.remote_name ?? '';
+        const hasRemoteSource = Boolean(message.remote_mailbox && message.remote_uid > 0);
+        let nextRemoteMailbox = message.remote_mailbox;
+        let nextRemoteUid = message.remote_uid;
+        if (hasRemoteSource && targetRemoteMailbox) {
+          remoteAttempted = true;
+          remoteApplied = true;
+          nextRemoteMailbox = targetRemoteMailbox;
+          nextRemoteUid += 1000;
+          remoteMessage = `本地已移动；远端邮件已移动到 ${targetRemoteMailbox}，UID 已重绑定。`;
+        } else if (hasRemoteSource && targetRole === 'trash') {
+          remoteAttempted = true;
+          remoteApplied = true;
+          nextRemoteMailbox = '';
+          nextRemoteUid = 0;
+          remoteMessage = '本地已移到废纸篓；远端没有废纸篓映射，邮件已直接删除并 expunge。';
+        } else if (hasRemoteSource) {
+          remoteMessage = `本地已移动；未发现角色 ${targetRole} 对应的远端文件夹，远端移动已跳过。`;
+        }
         return {
           ...message,
           folder_role: targetRole || message.folder_role,
           folder_id: targetFolderId,
-          remote_mailbox: targetRemoteMailbox || message.remote_mailbox,
+          remote_mailbox: nextRemoteMailbox,
+          remote_uid: nextRemoteUid,
           snoozed_until: '',
         };
       });
       return {
         local_applied: true,
-        remote_attempted: Boolean(targetRemoteMailbox),
-        remote_applied: Boolean(targetRemoteMailbox),
-        message: targetRemoteMailbox
-          ? `本地已移动；远端邮件已移动到 ${targetRemoteMailbox}。`
-          : '本地已移动；UI smoke mock 未找到远端目标目录。',
+        remote_attempted: remoteAttempted,
+        remote_applied: remoteApplied,
+        message: remoteMessage,
       } as T;
     }
     case 'restore_message_to_inbox': {
       const messageId = Number(args?.messageId);
       let restored: MockMessage | null = null;
+      let remoteAttempted = false;
+      let remoteApplied = false;
       messages = messages.map((message) => {
         if (message.id !== messageId) return message;
+        const inboxRemoteMailbox = mockImapMailboxes.find((mailbox) =>
+          mailbox.account_id === message.account_id && mailbox.local_role === 'inbox')
+          ?.remote_name ?? '';
+        const hasRemoteSource = Boolean(message.remote_mailbox && message.remote_uid > 0);
+        remoteAttempted = hasRemoteSource && Boolean(inboxRemoteMailbox);
+        remoteApplied = remoteAttempted;
         restored = {
           ...message,
           folder_role: 'inbox',
           folder_id: folderIdForRole('inbox', message.account_id),
+          remote_mailbox: remoteApplied ? inboxRemoteMailbox : message.remote_mailbox,
+          remote_uid: remoteApplied ? message.remote_uid + 1000 : message.remote_uid,
           snoozed_until: '',
         };
         return restored;
       });
       if (!restored) throw new Error('message not found');
-      return restored as T;
+      return {
+        restored,
+        remote: {
+          local_applied: true,
+          remote_attempted: remoteAttempted,
+          remote_applied: remoteApplied,
+          message: remoteApplied
+            ? '本地已恢复到收件箱；远端邮件已移动到 INBOX，UID 已重绑定。'
+            : '本地已恢复到收件箱；该邮件没有可用远端状态，远端移动已跳过。',
+        },
+      } as T;
     }
     case 'delete_message_permanently': {
       const messageId = Number(args?.messageId);
+      const message = messages.find((item) => item.id === messageId);
+      const remoteApplied = Boolean(message?.remote_mailbox && message.remote_uid > 0);
       messages = messages.filter((message) => message.id !== messageId);
       attachments = attachments.filter((attachment) => attachment.message_id !== messageId);
       outbox = outbox.filter((item) => item.message_id !== messageId);
-      return undefined as T;
+      return {
+        local_applied: true,
+        remote_attempted: remoteApplied,
+        remote_applied: remoteApplied,
+        message: remoteApplied
+          ? '本地已永久删除；远端邮件已标记删除并 expunge。'
+          : '本地已永久删除；该邮件没有可用远端状态，跳过远端删除。',
+      } as T;
     }
     case 'empty_trash': {
-      const trashIds = new Set(messages.filter((message) => message.folder_role === 'trash').map((message) => message.id));
+      const accountId = Number(args?.accountId ?? 0);
+      const trashMessages = messages.filter((message) =>
+        message.folder_role === 'trash' && (!accountId || message.account_id === accountId));
+      const trashIds = new Set(trashMessages.map((message) => message.id));
+      const remoteAppliedCount = trashMessages.filter((message) =>
+        Boolean(message.remote_mailbox && message.remote_uid > 0)).length;
+      const remoteSkippedCount = trashMessages.length - remoteAppliedCount;
       messages = messages.filter((message) => !trashIds.has(message.id));
       attachments = attachments.filter((attachment) => !trashIds.has(attachment.message_id));
       outbox = outbox.filter((item) => !trashIds.has(item.message_id));
-      return trashIds.size as T;
+      return {
+        local_deleted_count: trashIds.size,
+        remote_attempted_count: remoteAppliedCount,
+        remote_applied_count: remoteAppliedCount,
+        remote_skipped_count: remoteSkippedCount,
+        remote_failed_count: 0,
+        message: `已清空废纸篓：本地永久删除 ${trashIds.size} 封；远端成功 ${remoteAppliedCount} 封，跳过 ${remoteSkippedCount} 封。`,
+      } as T;
     }
     case 'snooze_message': {
       const messageId = Number(args?.messageId);
@@ -1447,6 +1550,41 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const plan = mockSyncSchedulePlan(accountId);
       const scopedAccountCount = plan.batch_accounts.length;
       const targetAccount = mockAccounts.find((item) => item.id === accountId) ?? account;
+      if (
+        command === 'sync_imap_headers'
+        && targetAccount.id === 2
+        && !messages.some((message) => message.subject === 'Design remote sync sample')
+      ) {
+        messages = [
+          {
+            id: nextMessageId++,
+            account_id: targetAccount.id,
+            account_email: targetAccount.email,
+            folder_id: folderIdForRole('inbox', targetAccount.id),
+            folder_role: 'inbox',
+            sender_name: 'Design Sync',
+            sender_email: 'design-sync@example.com',
+            recipients: targetAccount.email,
+            cc: '',
+            bcc: '',
+            subject: 'Design remote sync sample',
+            snippet: '用于验证已映射自定义目录的真实远端移动。',
+            body: '用于验证已映射自定义目录的真实远端移动。',
+            sanitized_html: '',
+            security_warnings: [],
+            received_at: '2026-07-09T10:00:00+08:00',
+            is_read: false,
+            is_starred: false,
+            has_attachments: false,
+            snoozed_until: '',
+            labels: [],
+            attachment_count: 0,
+            remote_mailbox: 'INBOX',
+            remote_uid: 6001,
+          },
+          ...messages,
+        ];
+      }
       const foldersPerAccount = command === 'sync_imap_headers' ? 4 : 1;
       const scannedFolderCount = scopedAccountCount * foldersPerAccount;
       const run = {

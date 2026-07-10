@@ -82,6 +82,8 @@ import type {
   SyncRun,
   SyncSchedulePlan,
   RemoteActionReport,
+  RestoreMessageReport,
+  TrashActionReport,
   ParsedMessagePreview,
   Contact,
   ContactMergeSuggestion,
@@ -974,20 +976,20 @@ export default function App() {
 
     const undoSnapshots = snapshotMessages([message]);
     if (action === 'permanent-delete') {
-      await invoke('delete_message_permanently', { messageId: message.id });
+      const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
       setSelectedId(null);
       await refreshAll();
-      setStatus(`已永久删除：${message.subject || '(无主题)'}`);
+      setStatus(report.message);
       return;
     }
 
     if (action === 'restore' || action === 'not-spam') {
-      await invoke<Message>('restore_message_to_inbox', { messageId: message.id });
+      const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: message.id });
       setSelectedId(null);
       await refreshAll();
       const actionLabel = action === 'restore' ? '恢复到收件箱' : '标记为不是垃圾邮件';
-      setStatus(`已${actionLabel}：${message.subject || '(无主题)'}`);
-      queueUndoAction(actionLabel, undoSnapshots);
+      setStatus(action === 'restore' ? result.remote.message : `已${actionLabel}：${message.subject || '(无主题)'}`);
+      queueUndoAction(actionLabel, undoSnapshots, result.remote.message);
       return;
     }
 
@@ -1099,39 +1101,38 @@ export default function App() {
   async function markSelectedNotSpam() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
-    const restored = await invoke<Message>('restore_message_to_inbox', { messageId: selected.id });
-    const inboxFolderId = visibleFolderIdForRole('inbox', restored.account_id) ?? folderId;
+    const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+    const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId);
     await loadMessages(inboxFolderId);
-    setSelectedId(restored.id);
+    setSelectedId(result.restored.id);
     setStatus('已移回收件箱，并标记为不是垃圾邮件');
-    queueUndoAction('不是垃圾邮件', undoSnapshots);
+    queueUndoAction('不是垃圾邮件', undoSnapshots, result.remote.message);
   }
 
   async function restoreSelectedFromTrash() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
-    const restored = await invoke<Message>('restore_message_to_inbox', { messageId: selected.id });
-    const inboxFolderId = visibleFolderIdForRole('inbox', restored.account_id) ?? folderId;
+    const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+    const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId);
     await loadMessages(inboxFolderId);
-    setSelectedId(restored.id);
-    setStatus('已恢复到收件箱');
-    queueUndoAction('恢复到收件箱', undoSnapshots);
+    setSelectedId(result.restored.id);
+    setStatus(result.remote.message);
+    queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
   }
 
   async function permanentlyDeleteSelected() {
     if (!selected) return;
-    const subject = selected.subject || '(无主题)';
-    await invoke('delete_message_permanently', { messageId: selected.id });
+    const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: selected.id });
     await refreshAll();
-    setStatus(`已永久删除：${subject}`);
+    setStatus(report.message);
   }
 
   async function emptyCurrentTrash() {
-    const deleted = await invoke<number>('empty_trash', { accountId: accountIdForScope(accountScope) });
+    const report = await invoke<TrashActionReport>('empty_trash', { accountId: accountIdForScope(accountScope) });
     await refreshAll();
-    setStatus(`已清空废纸篓：永久删除 ${deleted} 封邮件`);
+    setStatus(report.message);
   }
 
   async function createCustomFolder() {

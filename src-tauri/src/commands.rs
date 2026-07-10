@@ -1,5 +1,5 @@
 use crate::credentials;
-use crate::db::{MailResult, MailStore};
+use crate::db::{MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
@@ -12,8 +12,8 @@ use crate::models::{
     OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
     OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboxItem, ParsedMessagePreview,
-    RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, SyncRun,
-    SyncSchedulePlan, ThreadSummary,
+    RawMessageInput, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput,
+    RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary, TrashActionReport,
 };
 use crate::oauth;
 use crate::protocol;
@@ -637,18 +637,106 @@ pub fn move_message_to_role(
 pub fn restore_message_to_inbox(
     store: State<'_, MailStore>,
     message_id: i64,
-) -> MailResult<Message> {
-    store.restore_message_to_inbox(message_id)
+) -> MailResult<RestoreMessageReport> {
+    store.restore_message_to_inbox(message_id)?;
+    let mut remote = sync_remote_move(&store, message_id, "inbox")?;
+    remote.message = remote
+        .message
+        .replacen("本地已移动", "本地已恢复到收件箱", 1);
+    Ok(RestoreMessageReport {
+        restored: store.get_message(message_id)?,
+        remote,
+    })
 }
 
 #[tauri::command]
-pub fn delete_message_permanently(store: State<'_, MailStore>, message_id: i64) -> MailResult<()> {
-    store.delete_message_permanently(message_id)
+pub fn delete_message_permanently(
+    store: State<'_, MailStore>,
+    message_id: i64,
+) -> MailResult<RemoteActionReport> {
+    let reference = store.delete_message_permanently(message_id)?;
+    sync_remote_delete_reference(&store, &reference, "本地已永久删除")
 }
 
 #[tauri::command]
-pub fn empty_trash(store: State<'_, MailStore>, account_id: Option<i64>) -> MailResult<i64> {
-    store.empty_trash_for_account(account_id)
+pub fn empty_trash(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<TrashActionReport> {
+    let (local_deleted_count, references) = store.empty_trash_for_account(account_id)?;
+    let mut groups = BTreeMap::<(i64, String), Vec<MessageRemoteRef>>::new();
+    let mut remote_skipped_count = 0_i64;
+    for reference in references {
+        if reference.remote_mailbox.trim().is_empty() {
+            remote_skipped_count += 1;
+            continue;
+        }
+        groups
+            .entry((reference.account_id, reference.remote_mailbox.clone()))
+            .or_default()
+            .push(reference);
+    }
+
+    let mut remote_attempted_count = 0_i64;
+    let mut remote_applied_count = 0_i64;
+    let mut remote_failed_count = 0_i64;
+    for ((account_id, remote_mailbox), references) in groups {
+        let group_count = references.len() as i64;
+        let account = match store.get_account_by_id(Some(account_id)) {
+            Ok(account) => account,
+            Err(_) => {
+                remote_skipped_count += group_count;
+                continue;
+            }
+        };
+        let secret = match credentials::get_account_secret(&account) {
+            Ok(secret) => secret,
+            Err(_) => {
+                remote_skipped_count += group_count;
+                continue;
+            }
+        };
+        remote_attempted_count += group_count;
+        let candidates = references
+            .iter()
+            .map(|reference| imap_probe::RemoteDeleteCandidate {
+                remote_uid: reference.remote_uid,
+                message_id_header: reference.message_id_header.clone(),
+            })
+            .collect::<Vec<_>>();
+        match imap_probe::delete_remote_messages(&account, &secret, &remote_mailbox, &candidates) {
+            Ok(result) => {
+                remote_applied_count += result.deleted_count;
+                remote_skipped_count += result.skipped_count;
+            }
+            Err(_) => remote_failed_count += group_count,
+        }
+    }
+
+    let message = if local_deleted_count == 0 {
+        "废纸篓已经为空。".to_string()
+    } else if remote_failed_count > 0 {
+        format!(
+            "本地已永久删除 {local_deleted_count} 封；远端成功 {remote_applied_count} 封，失败 {remote_failed_count} 封，跳过 {remote_skipped_count} 封。"
+        )
+    } else if remote_attempted_count > 0 {
+        format!(
+            "本地已永久删除 {local_deleted_count} 封；远端成功 {remote_applied_count} 封，跳过 {remote_skipped_count} 封。"
+        )
+    } else {
+        format!(
+            "本地已永久删除 {local_deleted_count} 封；{remote_skipped_count} 封没有可用远端状态。"
+        )
+    };
+
+    Ok(TrashActionReport {
+        local_deleted_count,
+        remote_attempted_count,
+        remote_applied_count,
+        remote_skipped_count,
+        remote_failed_count,
+        message,
+    })
 }
 
 #[tauri::command]
@@ -1401,13 +1489,15 @@ fn sync_remote_move(
     message_id: i64,
     role: &str,
 ) -> MailResult<RemoteActionReport> {
-    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
-    if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
+    let reference = store.get_message_remote_reference(message_id)?;
+    if reference.remote_mailbox.trim().is_empty()
+        || (reference.remote_uid <= 0 && reference.message_id_header.trim().is_empty())
+    {
         return Ok(local_only_report(
             "本地已移动；该邮件没有远端 UID，跳过远端移动。",
         ));
     }
-    let account = store.get_message_account(message_id)?;
+    let account = store.get_account_by_id(Some(reference.account_id))?;
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
@@ -1421,22 +1511,48 @@ fn sync_remote_move(
         Some(target_mailbox) => match imap_probe::move_remote_message(
             &account,
             &secret,
-            &remote_mailbox,
-            remote_uid,
+            &reference.remote_mailbox,
+            reference.remote_uid,
             &target_mailbox,
+            &reference.message_id_header,
         ) {
-            Ok(()) => Ok(remote_ok_report(format!(
-                "本地已移动；远端邮件已移动到 {target_mailbox}。"
-            ))),
+            Ok(target_uid) => {
+                store.set_message_remote_ref(
+                    message_id,
+                    &target_mailbox,
+                    target_uid.unwrap_or(0),
+                )?;
+                Ok(remote_ok_report(if target_uid.is_some() {
+                    format!("本地已移动；远端邮件已移动到 {target_mailbox}，UID 已重绑定。")
+                } else {
+                    format!(
+                        "本地已移动；远端邮件已移动到 {target_mailbox}，目标 UID 将在下次同步时重绑定。"
+                    )
+                }))
+            }
             Err(error) => Ok(remote_failed_report(format!(
                 "本地已移动；远端移动失败：{error}"
             ))),
         },
         None if role == "trash" => {
-            match imap_probe::delete_remote_message(&account, &secret, &remote_mailbox, remote_uid)
-            {
-                Ok(()) => Ok(remote_ok_report(
-                    "本地已移到废纸篓；远端邮件已标记删除并 expunge。",
+            let candidates = [imap_probe::RemoteDeleteCandidate {
+                remote_uid: reference.remote_uid,
+                message_id_header: reference.message_id_header.clone(),
+            }];
+            match imap_probe::delete_remote_messages(
+                &account,
+                &secret,
+                &reference.remote_mailbox,
+                &candidates,
+            ) {
+                Ok(result) if result.deleted_count == 1 => {
+                    store.set_message_remote_ref(message_id, "", 0)?;
+                    Ok(remote_ok_report(
+                        "本地已移到废纸篓；远端没有废纸篓映射，邮件已直接删除并 expunge。",
+                    ))
+                }
+                Ok(_) => Ok(remote_skipped_report(
+                    "本地已移到废纸篓；远端邮件无法唯一定位，删除已跳过。",
                 )),
                 Err(error) => Ok(remote_failed_report(format!(
                     "本地已移到废纸篓；远端删除失败：{error}"
@@ -1445,6 +1561,49 @@ fn sync_remote_move(
         }
         None => Ok(remote_skipped_report(format!(
             "本地已移动；未发现角色 {role} 对应的远端文件夹，远端移动已跳过。"
+        ))),
+    }
+}
+
+fn sync_remote_delete_reference(
+    store: &MailStore,
+    reference: &MessageRemoteRef,
+    local_action: &str,
+) -> MailResult<RemoteActionReport> {
+    if reference.remote_mailbox.trim().is_empty()
+        || (reference.remote_uid <= 0 && reference.message_id_header.trim().is_empty())
+    {
+        return Ok(local_only_report(format!(
+            "{local_action}；该邮件没有可用远端状态，跳过远端删除。"
+        )));
+    }
+    let account = store.get_account_by_id(Some(reference.account_id))?;
+    let secret = match credentials::get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => {
+            return Ok(remote_skipped_report(format!(
+                "{local_action}；无法读取系统凭据，远端删除已跳过：{error}"
+            )));
+        }
+    };
+    let candidates = [imap_probe::RemoteDeleteCandidate {
+        remote_uid: reference.remote_uid,
+        message_id_header: reference.message_id_header.clone(),
+    }];
+    match imap_probe::delete_remote_messages(
+        &account,
+        &secret,
+        &reference.remote_mailbox,
+        &candidates,
+    ) {
+        Ok(result) if result.deleted_count == 1 => Ok(remote_ok_report(format!(
+            "{local_action}；远端邮件已标记删除并 expunge。"
+        ))),
+        Ok(_) => Ok(remote_skipped_report(format!(
+            "{local_action}；远端邮件无法唯一定位，删除已跳过。"
+        ))),
+        Err(error) => Ok(remote_failed_report(format!(
+            "{local_action}；远端删除失败：{error}"
         ))),
     }
 }

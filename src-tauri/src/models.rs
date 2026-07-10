@@ -400,6 +400,22 @@ pub struct RemoteActionReport {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RestoreMessageReport {
+    pub restored: Message,
+    pub remote: RemoteActionReport,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TrashActionReport {
+    pub local_deleted_count: i64,
+    pub remote_attempted_count: i64,
+    pub remote_applied_count: i64,
+    pub remote_skipped_count: i64,
+    pub remote_failed_count: i64,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct FolderReadReport {
     pub updated_count: i64,
     pub remote_attempted_count: i64,

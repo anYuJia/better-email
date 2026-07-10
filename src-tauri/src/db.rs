@@ -68,6 +68,14 @@ pub struct UnreadMessageRemoteRef {
     pub remote_uid: i64,
 }
 
+#[derive(Debug, Clone)]
+pub struct MessageRemoteRef {
+    pub account_id: i64,
+    pub remote_mailbox: String,
+    pub remote_uid: i64,
+    pub message_id_header: String,
+}
+
 const LOCAL_BACKUP_SCHEMA_VERSION: i64 = 1;
 const DATABASE_FILENAME: &str = "better-email.sqlite3";
 const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
@@ -1191,13 +1199,30 @@ impl MailStore {
     }
 
     pub fn get_message_remote_ref(&self, message_id: i64) -> MailResult<(String, i64)> {
+        let reference = self.get_message_remote_reference(message_id)?;
+        Ok((reference.remote_mailbox, reference.remote_uid))
+    }
+
+    pub fn get_message_remote_reference(&self, message_id: i64) -> MailResult<MessageRemoteRef> {
+        self.with_conn(|conn| message_remote_ref_for_conn(conn, message_id))
+    }
+
+    pub fn set_message_remote_ref(
+        &self,
+        message_id: i64,
+        remote_mailbox: &str,
+        remote_uid: i64,
+    ) -> MailResult<()> {
         self.with_conn(|conn| {
-            conn.query_row(
-                "SELECT remote_mailbox, remote_uid FROM messages WHERE id = ?1",
-                params![message_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .map_err(Into::into)
+            conn.execute(
+                "
+                UPDATE messages
+                SET remote_mailbox = ?2, remote_uid = ?3
+                WHERE id = ?1
+                ",
+                params![message_id, remote_mailbox.trim(), remote_uid.max(0)],
+            )?;
+            Ok(())
         })
     }
 
@@ -1610,15 +1635,20 @@ impl MailStore {
         })
     }
 
-    pub fn delete_message_permanently(&self, message_id: i64) -> MailResult<()> {
+    pub fn delete_message_permanently(&self, message_id: i64) -> MailResult<MessageRemoteRef> {
         self.with_conn(|conn| {
+            let reference = message_remote_ref_for_conn(conn, message_id)?;
             conn.execute("DELETE FROM messages WHERE id = ?1", params![message_id])?;
-            Ok(())
+            Ok(reference)
         })
     }
 
-    pub fn empty_trash_for_account(&self, account_id: Option<i64>) -> MailResult<i64> {
+    pub fn empty_trash_for_account(
+        &self,
+        account_id: Option<i64>,
+    ) -> MailResult<(i64, Vec<MessageRemoteRef>)> {
         self.with_conn(|conn| {
+            let references = trash_remote_refs_for_conn(conn, account_id)?;
             let deleted = if let Some(account) = account_id {
                 conn.execute(
                     "
@@ -1639,7 +1669,7 @@ impl MailStore {
                     [],
                 )?
             };
-            Ok(deleted as i64)
+            Ok((deleted as i64, references))
         })
     }
 
@@ -4162,6 +4192,75 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
     .map_err(Into::into)
 }
 
+fn message_remote_ref_for_conn(conn: &Connection, message_id: i64) -> MailResult<MessageRemoteRef> {
+    conn.query_row(
+        "
+        SELECT account_id, remote_mailbox, remote_uid, message_id_header
+        FROM messages
+        WHERE id = ?1
+        ",
+        params![message_id],
+        |row| {
+            Ok(MessageRemoteRef {
+                account_id: row.get(0)?,
+                remote_mailbox: row.get(1)?,
+                remote_uid: row.get(2)?,
+                message_id_header: row.get(3)?,
+            })
+        },
+    )
+    .map_err(Into::into)
+}
+
+fn trash_remote_refs_for_conn(
+    conn: &Connection,
+    account_id: Option<i64>,
+) -> MailResult<Vec<MessageRemoteRef>> {
+    if let Some(account_id) = account_id {
+        let mut stmt = conn.prepare(
+            "
+            SELECT m.account_id, m.remote_mailbox, m.remote_uid, m.message_id_header
+            FROM messages m
+            JOIN folders f ON f.id = m.folder_id
+            WHERE m.account_id = ?1 AND f.role = 'trash'
+            ORDER BY m.remote_mailbox ASC, m.remote_uid ASC, m.id ASC
+            ",
+        )?;
+        let rows = stmt
+            .query_map(params![account_id], |row| {
+                Ok(MessageRemoteRef {
+                    account_id: row.get(0)?,
+                    remote_mailbox: row.get(1)?,
+                    remote_uid: row.get(2)?,
+                    message_id_header: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    } else {
+        let mut stmt = conn.prepare(
+            "
+            SELECT m.account_id, m.remote_mailbox, m.remote_uid, m.message_id_header
+            FROM messages m
+            JOIN folders f ON f.id = m.folder_id
+            WHERE f.role = 'trash'
+            ORDER BY m.account_id ASC, m.remote_mailbox ASC, m.remote_uid ASC, m.id ASC
+            ",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(MessageRemoteRef {
+                    account_id: row.get(0)?,
+                    remote_mailbox: row.get(1)?,
+                    remote_uid: row.get(2)?,
+                    message_id_header: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+}
+
 fn due_snoozed_message_ids(now: &str, rows: Vec<(i64, String)>) -> Vec<i64> {
     let Ok(now) = DateTime::parse_from_rfc3339(now.trim()).map(|value| value.with_timezone(&Utc))
     else {
@@ -4583,6 +4682,37 @@ fn import_imap_headers_for_conn(
     let mut imported_messages = 0;
 
     for header in &batch.headers {
+        if !header.message_id.trim().is_empty() {
+            let rebound = conn.execute(
+                "
+                UPDATE messages
+                SET folder_id = ?1,
+                    remote_mailbox = ?2,
+                    remote_uid = ?3
+                WHERE id = (
+                    SELECT id
+                    FROM messages
+                    WHERE account_id = ?4
+                      AND remote_mailbox = ?2
+                      AND remote_uid = 0
+                      AND message_id_header = ?5
+                    ORDER BY id ASC
+                    LIMIT 1
+                )
+                ",
+                params![
+                    folder_id,
+                    batch.remote_name,
+                    header.remote_uid,
+                    account_id,
+                    header.message_id
+                ],
+            )?;
+            if rebound > 0 {
+                continue;
+            }
+        }
+
         let changed = conn.execute(
             "
             INSERT OR IGNORE INTO messages(
@@ -5256,7 +5386,8 @@ mod tests {
             .any(|message| message.id == first.id));
 
         store.move_message_to_role(first.id, "trash").unwrap();
-        store.delete_message_permanently(first.id).unwrap();
+        let deleted_reference = store.delete_message_permanently(first.id).unwrap();
+        assert_eq!(deleted_reference.account_id, account_id);
         assert!(!store
             .list_messages_for_scope(None, trash.id, None, None, 20)
             .unwrap()
@@ -5265,8 +5396,9 @@ mod tests {
         assert!(store.list_attachments(first.id).unwrap().is_empty());
 
         store.move_message_to_role(second.id, "trash").unwrap();
-        let deleted = store.empty_trash_for_account(Some(account_id)).unwrap();
+        let (deleted, references) = store.empty_trash_for_account(Some(account_id)).unwrap();
         assert!(deleted >= 1);
+        assert!(!references.is_empty());
         assert!(store
             .list_messages_for_scope(None, trash.id, None, None, 20)
             .unwrap()
@@ -6263,6 +6395,72 @@ mod tests {
                 .highest_uid,
             7
         );
+    }
+
+    #[test]
+    fn imap_header_sync_rebinds_pending_moved_message_uid() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "Archive".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Archive".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let batch = ImapHeaderBatch {
+            remote_name: "Archive".to_string(),
+            uid_validity: "archive-1".to_string(),
+            highest_uid: 77,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 77,
+                message_id: "<moved-rebind@example.com>".to_string(),
+                subject: "Moved remote message".to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: "demo@better-email.local".to_string(),
+                snippet: "moved header".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+            }],
+        };
+        assert_eq!(
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            1
+        );
+        let archive = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "archive")
+            .unwrap();
+        let message = store
+            .list_messages_for_scope(None, archive.id, None, None, 10)
+            .unwrap()
+            .into_iter()
+            .find(|message| message.subject == "Moved remote message")
+            .unwrap();
+        store
+            .set_message_remote_ref(message.id, "Archive", 0)
+            .unwrap();
+
+        let rebound_batch = ImapHeaderBatch {
+            highest_uid: 91,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 91,
+                ..batch.headers[0].clone()
+            }],
+            ..batch
+        };
+        assert_eq!(
+            store
+                .import_imap_headers_batch(mailbox.id, &rebound_batch)
+                .unwrap(),
+            0
+        );
+        let rebound = store.get_message(message.id).unwrap();
+        assert_eq!(rebound.remote_mailbox, "Archive");
+        assert_eq!(rebound.remote_uid, 91);
     }
 
     #[test]

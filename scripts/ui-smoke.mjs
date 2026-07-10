@@ -388,7 +388,7 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('清空废纸篓')");
     await clickButton(cdp, '清空废纸篓', "document.querySelector('.context-menu')");
-    await waitForExpression(cdp, "document.body.innerText.includes('已清空废纸篓：永久删除')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已清空废纸篓：本地永久删除 1 封') && document.body.innerText.includes('远端成功 1 封')");
 
     await clickButton(cdp, '快捷键');
     await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.body.innerText.includes('高频邮件操作') && document.body.innerText.includes('聚焦搜索') && document.body.innerText.includes('选择当前列表全部邮件') && document.body.innerText.includes('撤销上一步邮件操作')");
@@ -646,9 +646,20 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.includes('永久删除'))");
     await evalInPage(cdp, "document.querySelector('.reader-more-menu').open = false");
     await clickButton(cdp, '恢复', "document.querySelector('.reader-actions')");
-    await waitForExpression(cdp, "document.body.innerText.includes('已恢复到收件箱')");
+    await waitForExpression(cdp, "document.body.innerText.includes('本地已恢复到收件箱') && document.body.innerText.includes('远端邮件已移动到 INBOX')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Quarterly update')).click()");
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]').click()");
+    await waitForExpression(cdp, "document.body.innerText.includes('远端邮件已移动到 Trash')");
+    await openDetails(cdp, '.more-mailboxes');
+    await clickButton(cdp, '废纸篓', "document.querySelector('.more-mailboxes')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
+    await openDetails(cdp, '.reader-more-menu');
+    await clickButton(cdp, '永久删除', "document.querySelector('.reader-more-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('本地已永久删除') && document.body.innerText.includes('远端邮件已标记删除并 expunge')");
+    await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '标为垃圾邮件', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已标为垃圾邮件')");
@@ -774,10 +785,10 @@ async function main() {
     await clickButton(cdp, '保存设置', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('账号和同步设置已保存')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('Imported EML Sample')");
+    await waitForExpression(cdp, "document.body.innerText.includes('Design remote sync sample')");
     await evalInPage(
       cdp,
-      "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Imported EML Sample')).click()",
+      "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design remote sync sample')).click()",
     );
     await openDetails(cdp, '.reader-more-menu');
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.trim() === 'Alpha')");
@@ -916,7 +927,8 @@ async function main() {
         'thread view opens conversations',
         'message drag drop move and undo works',
         'custom folder create rename and move works',
-        'trash restore flow works',
+        'trash restore syncs the remote inbox',
+        'permanent delete syncs remote expunge',
         'manual spam and not-spam correction works',
         'outbox queue and cancel works',
         'settings modal opens',

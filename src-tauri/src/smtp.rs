@@ -43,6 +43,13 @@ fn build_outbound_email(message: &OutboundMessage) -> Result<Message, MailError>
         .from(mailbox(&message.sender_name, &message.sender_email)?)
         .subject(&message.subject)
         .message_id(Some(outbound_message_id(message)));
+    if let Some(in_reply_to) = normalized_thread_header(&message.in_reply_to_header, "In-Reply-To")?
+    {
+        builder = builder.in_reply_to(in_reply_to);
+    }
+    if let Some(references) = normalized_thread_header(&message.references_header, "References")? {
+        builder = builder.references(references);
+    }
     if !message.reply_to.trim().is_empty() {
         builder = builder.reply_to(mailbox("", &message.reply_to)?);
     }
@@ -175,6 +182,14 @@ fn split_recipients(value: &str) -> Vec<String> {
         .collect()
 }
 
+fn normalized_thread_header(value: &str, name: &str) -> Result<Option<String>, MailError> {
+    if value.contains(['\r', '\n']) {
+        return Err(MailError::Smtp(format!("{name} 邮件头包含非法换行。")));
+    }
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    Ok((!normalized.is_empty()).then_some(normalized))
+}
+
 fn parse_smtp_endpoint(configured: &str) -> Result<(String, u16), MailError> {
     let trimmed = configured.trim();
     if trimmed.is_empty() {
@@ -245,6 +260,8 @@ mod tests {
             subject: "Attachment".to_string(),
             body: "Body".to_string(),
             html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
             attachments: vec![Attachment {
                 id: 1,
                 message_id: 7,
@@ -285,6 +302,8 @@ mod tests {
             subject: "Rich text".to_string(),
             body: "Hello rich text".to_string(),
             html_body: "<p><strong>Hello rich text</strong></p>".to_string(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
             attachments: Vec::new(),
         };
         let email = build_email(
@@ -317,6 +336,8 @@ mod tests {
             subject: "Stable id".to_string(),
             body: "Body".to_string(),
             html_body: String::new(),
+            in_reply_to_header: "<parent@example.com>".to_string(),
+            references_header: "<root@example.com> <parent@example.com>".to_string(),
             attachments: Vec::new(),
         };
         let rendered = String::from_utf8(render_outbound(&message).unwrap()).unwrap();
@@ -326,6 +347,8 @@ mod tests {
             "<better-email-7-42@better-email.local>"
         );
         assert!(rendered.contains("Message-ID: <better-email-7-42@better-email.local>"));
+        assert!(rendered.contains("In-Reply-To: <parent@example.com>"));
+        assert!(rendered.contains("References: <root@example.com> <parent@example.com>"));
     }
 
     #[test]
@@ -349,6 +372,8 @@ mod tests {
             subject: "Rich attachment".to_string(),
             body: "Hello rich attachment".to_string(),
             html_body: "<p><em>Hello rich attachment</em></p>".to_string(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
             attachments: vec![Attachment {
                 id: 2,
                 message_id: 10,
@@ -390,6 +415,8 @@ mod tests {
             subject: "Missing attachment".to_string(),
             body: "Body".to_string(),
             html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
             attachments: vec![Attachment {
                 id: 1,
                 message_id: 8,

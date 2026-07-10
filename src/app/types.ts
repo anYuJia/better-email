@@ -96,6 +96,9 @@ export type Message = {
   attachment_count: number;
   remote_mailbox: string;
   remote_uid: number;
+  message_id_header?: string;
+  in_reply_to_header?: string;
+  references_header?: string;
 };
 
 export type UndoMessageSnapshot = {
@@ -166,6 +169,8 @@ export type DraftInput = {
   html_body: string;
   send_at: string;
   attachments: OutboundAttachmentInput[];
+  in_reply_to?: string;
+  references?: string;
 };
 
 export type DraftSaveReport = {

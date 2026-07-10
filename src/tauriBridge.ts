@@ -1,4 +1,7 @@
+import type { Message } from './app/types';
+
 type InvokeArgs = Record<string, unknown> | undefined;
+type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };
 type TauriCore = typeof import('@tauri-apps/api/core');
 type TauriWindow = typeof import('@tauri-apps/api/window');
 type TauriNotification = typeof import('@tauri-apps/plugin-notification');
@@ -203,7 +206,7 @@ mockImapMailboxes.push({
   last_sync_at: '',
 });
 
-let messages = [
+let messages: MockMessage[] = [
   {
     id: 1,
     account_id: 1,
@@ -229,6 +232,9 @@ let messages = [
     attachment_count: 1,
     remote_mailbox: 'INBOX',
     remote_uid: 42,
+    message_id_header: '<mock-1-1@better-email.local>',
+    in_reply_to_header: '',
+    references_header: '',
   },
   {
     id: 2,
@@ -317,7 +323,6 @@ messages = [
   }),
 ];
 
-type MockMessage = (typeof messages)[number];
 type MockDraftInput = {
   draft_id?: number;
   account_id?: number;
@@ -330,6 +335,11 @@ type MockDraftInput = {
   html_body?: string;
   send_at?: string;
   attachments?: MockOutboundAttachmentInput[];
+};
+
+type MockThreadingInput = {
+  in_reply_to?: string;
+  references?: string;
 };
 
 type MockOutboundAttachmentInput = {
@@ -539,7 +549,12 @@ function normalizeCustomFolderName(name: unknown, currentFolderId?: number) {
   return normalized;
 }
 
-function accountMessageFromDraft(input: MockDraftInput, role: string, messageId?: number): MockMessage {
+function accountMessageFromDraft(
+  input: MockDraftInput,
+  role: string,
+  messageId?: number,
+  threading?: MockThreadingInput,
+): MockMessage {
   const id = messageId ?? nextMessageId++;
   const subject = input.subject?.trim() || '(无主题)';
   const body = input.body?.trim() || '';
@@ -575,6 +590,9 @@ function accountMessageFromDraft(input: MockDraftInput, role: string, messageId?
     attachment_count: draftAttachments.length,
     remote_mailbox: role.toUpperCase(),
     remote_uid: 0,
+    message_id_header: `<mock-${senderAccount.id}-${id}@better-email.local>`,
+    in_reply_to_header: threading?.in_reply_to?.trim() || '',
+    references_header: threading?.references?.trim() || '',
   };
   attachments = [
     ...draftAttachments.map((attachment) => ({
@@ -766,6 +784,16 @@ function releaseDueSnoozedMessages(nowInput: string) {
 }
 
 async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
+  if (typeof window !== 'undefined') {
+    const mockWindow = window as Window & {
+      __betterEmailMockInvocations?: Array<{ command: string; args?: InvokeArgs }>;
+    };
+    mockWindow.__betterEmailMockInvocations ??= [];
+    mockWindow.__betterEmailMockInvocations.push({
+      command,
+      args: args ? JSON.parse(JSON.stringify(args)) as InvokeArgs : undefined,
+    });
+  }
   switch (command) {
     case 'list_accounts':
       return mockAccounts as T;
@@ -1408,10 +1436,11 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return undefined as T;
     case 'save_draft': {
       const input = args?.input as MockDraftInput;
+      const threading = args?.threading as MockThreadingInput | undefined;
       const draftId = Number(input?.draft_id ?? 0);
       if (draftId > 0 && messages.some((message) => message.id === draftId && message.folder_role === 'drafts')) {
         attachments = attachments.filter((attachment) => attachment.message_id !== draftId);
-        const message = accountMessageFromDraft(input, 'drafts', draftId);
+        const message = accountMessageFromDraft(input, 'drafts', draftId, threading);
         messages = messages.map((entry) => (entry.id === draftId ? message : entry));
         return {
           draft_id: draftId,
@@ -1422,7 +1451,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           message: '草稿已更新并同步到远端草稿箱。',
         } as T;
       }
-      const message = accountMessageFromDraft(input, 'drafts');
+      const message = accountMessageFromDraft(input, 'drafts', undefined, threading);
       messages = [message, ...messages];
       return {
         draft_id: message.id,
@@ -1434,14 +1463,24 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       } as T;
     }
     case 'send_message': {
-      const message = accountMessageFromDraft(args?.input as MockDraftInput, 'sent');
+      const message = accountMessageFromDraft(
+        args?.input as MockDraftInput,
+        'sent',
+        undefined,
+        args?.threading as MockThreadingInput | undefined,
+      );
       messages = [message, ...messages];
       return message.id as T;
     }
     case 'queue_outbox_message': {
       const input = args?.input as MockDraftInput;
       const sendAt = String(input?.send_at ?? '').trim();
-      const message = accountMessageFromDraft(input, 'outbox');
+      const message = accountMessageFromDraft(
+        input,
+        'outbox',
+        undefined,
+        args?.threading as MockThreadingInput | undefined,
+      );
       messages = [message, ...messages];
       const item = {
         id: nextOutboxId++,

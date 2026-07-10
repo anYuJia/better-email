@@ -7,6 +7,33 @@ export type QuotedMessage = {
   snippet: string;
 };
 
+export type ThreadedMessageHeaders = {
+  message_id_header?: string;
+  in_reply_to_header?: string;
+  references_header?: string;
+};
+
+export type MessageThreadingHeaders = {
+  in_reply_to: string;
+  references: string;
+};
+
+export function replyThreadingHeaders(
+  message: ThreadedMessageHeaders,
+): MessageThreadingHeaders | null {
+  const messageId = message.message_id_header?.trim() ?? '';
+  if (!/^<[^<>\s]+>$/.test(messageId)) return null;
+  const references = [
+    ...(message.references_header ?? '').split(/\s+/),
+    ...(message.in_reply_to_header ?? '').split(/\s+/),
+    messageId,
+  ].filter((value, index, values) => /^<[^<>\s]+>$/.test(value) && values.indexOf(value) === index);
+  return {
+    in_reply_to: messageId,
+    references: references.join(' '),
+  };
+}
+
 export function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;

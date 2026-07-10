@@ -3,10 +3,10 @@ use crate::models::{
     BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, ContactMergeSuggestion,
     DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch, ImapMailboxState,
     ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary, MailIdentity,
-    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, OAuthCallbackReport,
-    OAuthSession, OAuthStartReport, OAuthTokenExchangeReport, OutboundAttachmentInput,
-    OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody,
-    SyncRun, SyncSchedulePlan, ThreadSummary,
+    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageThreadingInput,
+    OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
+    OutboundAttachmentInput, OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput,
+    RemoteMessageBody, SyncRun, SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -191,7 +191,9 @@ impl MailStore {
                     thread_key TEXT NOT NULL DEFAULT '',
                     remote_mailbox TEXT NOT NULL DEFAULT '',
                     remote_uid INTEGER NOT NULL DEFAULT 0,
-                    message_id_header TEXT NOT NULL DEFAULT ''
+                    message_id_header TEXT NOT NULL DEFAULT '',
+                    in_reply_to_header TEXT NOT NULL DEFAULT '',
+                    references_header TEXT NOT NULL DEFAULT ''
                 );
 
                 CREATE TABLE IF NOT EXISTS mail_identities (
@@ -407,6 +409,18 @@ impl MailStore {
                 conn,
                 "messages",
                 "message_id_header",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "messages",
+                "in_reply_to_header",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "messages",
+                "references_header",
                 "TEXT NOT NULL DEFAULT ''",
             )?;
             add_column_if_missing(conn, "messages", "snoozed_until", "TEXT NOT NULL DEFAULT ''")?;
@@ -1164,6 +1178,9 @@ impl MailStore {
                         attachment_count: attachment_count_for_message(conn, message_id)?,
                         remote_mailbox: row.get(20)?,
                         remote_uid: row.get(21)?,
+                        message_id_header: row.get(22)?,
+                        in_reply_to_header: row.get(23)?,
+                        references_header: row.get(24)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -1191,7 +1208,8 @@ impl MailStore {
                 SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                        m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                        m.received_at, m.is_read, m.is_starred, m.has_attachments,
-                       m.snoozed_until, m.remote_mailbox, m.remote_uid
+                       m.snoozed_until, m.remote_mailbox, m.remote_uid,
+                       m.message_id_header, m.in_reply_to_header, m.references_header
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 JOIN folders f ON f.id = m.folder_id
@@ -1230,6 +1248,9 @@ impl MailStore {
                         attachment_count: attachment_count_for_message(conn, message_id)?,
                         remote_mailbox: row.get(20)?,
                         remote_uid: row.get(21)?,
+                        message_id_header: row.get(22)?,
+                        in_reply_to_header: row.get(23)?,
+                        references_header: row.get(24)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -1287,6 +1308,30 @@ impl MailStore {
                     remote_uid.max(0),
                     message_id_header.trim()
                 ],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn set_message_threading(
+        &self,
+        message_id: i64,
+        threading: Option<MessageThreadingInput>,
+    ) -> MailResult<()> {
+        let Some(threading) = threading else {
+            return Ok(());
+        };
+        let in_reply_to = normalize_thread_header_value(&threading.in_reply_to);
+        let references = normalize_thread_header_value(&threading.references);
+        self.with_conn(|conn| {
+            conn.execute(
+                "
+                UPDATE messages
+                SET in_reply_to_header = ?2,
+                    references_header = ?3
+                WHERE id = ?1
+                ",
+                params![message_id, in_reply_to, references],
             )?;
             Ok(())
         })
@@ -1459,9 +1504,10 @@ impl MailStore {
                 INSERT INTO messages(
                     account_id, folder_id, sender_name, sender_email, recipients, cc, bcc,
                     subject, snippet, body, sanitized_html, security_warnings, received_at,
-                    is_read, is_starred, has_attachments, thread_key, message_id_header
+                    is_read, is_starred, has_attachments, thread_key, message_id_header,
+                    in_reply_to_header, references_header
                 )
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 1, 0, ?14, ?15, ?16)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 1, 0, ?14, ?15, ?16, ?17, ?18)
                 ",
                 params![
                     account.id,
@@ -1479,7 +1525,9 @@ impl MailStore {
                     imported.received_at,
                     bool_to_int(!imported.attachments.is_empty()),
                     subject.to_lowercase(),
-                    imported.message_id_header
+                    imported.message_id_header,
+                    imported.in_reply_to_header,
+                    imported.references_header
                 ],
             )?;
             let message_id = conn.last_insert_rowid();
@@ -2871,7 +2919,7 @@ impl MailStore {
                 "
                 SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                        COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-                       m.sanitized_html
+                       m.sanitized_html, m.in_reply_to_header, m.references_header
                 FROM outbox_queue q
                 JOIN messages m ON m.id = q.message_id
                 LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
@@ -2896,6 +2944,8 @@ impl MailStore {
                         subject: row.get(8)?,
                         body: row.get(9)?,
                         html_body: row.get(10)?,
+                        in_reply_to_header: row.get(11)?,
+                        references_header: row.get(12)?,
                         attachments: attachments_for_message_conn(conn, message_id)?,
                     })
                 })?
@@ -2917,7 +2967,7 @@ impl MailStore {
                 "
                 SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                        COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-                       m.sanitized_html
+                       m.sanitized_html, m.in_reply_to_header, m.references_header
                 FROM outbox_queue q
                 JOIN messages m ON m.id = q.message_id
                 LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
@@ -2942,6 +2992,8 @@ impl MailStore {
                         subject: row.get(8)?,
                         body: row.get(9)?,
                         html_body: row.get(10)?,
+                        in_reply_to_header: row.get(11)?,
+                        references_header: row.get(12)?,
                         attachments: attachments_for_message_conn(conn, message_id)?,
                     })
                 })?
@@ -3695,7 +3747,8 @@ fn build_message_query(search: &SearchCriteria, filter: &str, scope_condition: &
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                        m.received_at, m.is_read, m.is_starred, m.has_attachments,
-                       m.snoozed_until, m.remote_mailbox, m.remote_uid
+                       m.snoozed_until, m.remote_mailbox, m.remote_uid,
+                       m.message_id_header, m.in_reply_to_header, m.references_header
         FROM messages m
         JOIN accounts a ON a.id = m.account_id
         JOIN folders f ON f.id = m.folder_id
@@ -4343,7 +4396,8 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                m.received_at, m.is_read, m.is_starred, m.has_attachments,
-               m.snoozed_until, m.remote_mailbox, m.remote_uid
+               m.snoozed_until, m.remote_mailbox, m.remote_uid,
+               m.message_id_header, m.in_reply_to_header, m.references_header
         FROM messages m
         JOIN accounts a ON a.id = m.account_id
         JOIN folders f ON f.id = m.folder_id
@@ -4376,6 +4430,9 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
                 attachment_count: attachment_count_for_message(conn, message_id)?,
                 remote_mailbox: row.get(20)?,
                 remote_uid: row.get(21)?,
+                message_id_header: row.get(22)?,
+                in_reply_to_header: row.get(23)?,
+                references_header: row.get(24)?,
             })
         },
     )
@@ -4407,7 +4464,7 @@ fn outbound_message_for_conn(conn: &Connection, message_id: i64) -> MailResult<O
         "
         SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-               m.sanitized_html
+               m.sanitized_html, m.in_reply_to_header, m.references_header
         FROM messages m
         LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
         WHERE m.id = ?1
@@ -4427,6 +4484,8 @@ fn outbound_message_for_conn(conn: &Connection, message_id: i64) -> MailResult<O
                 subject: row.get(8)?,
                 body: row.get(9)?,
                 html_body: row.get(10)?,
+                in_reply_to_header: row.get(11)?,
+                references_header: row.get(12)?,
                 attachments: attachments_for_message_conn(conn, id)?,
             })
         },
@@ -4927,6 +4986,9 @@ fn import_imap_headers_for_conn(
                 SET folder_id = ?1,
                     remote_mailbox = ?2,
                     remote_uid = ?3,
+                    message_id_header = ?5,
+                    in_reply_to_header = ?8,
+                    references_header = ?9,
                     is_read = ?6,
                     is_starred = ?7
                 WHERE id = (
@@ -4947,7 +5009,9 @@ fn import_imap_headers_for_conn(
                     account_id,
                     header.message_id,
                     bool_to_int(header.is_read),
-                    bool_to_int(header.is_starred)
+                    bool_to_int(header.is_starred),
+                    header.in_reply_to,
+                    header.references
                 ],
             )?;
             if rebound > 0 {
@@ -4960,7 +5024,10 @@ fn import_imap_headers_for_conn(
             UPDATE messages
             SET folder_id = ?1,
                 is_read = ?2,
-                is_starred = ?3
+                is_starred = ?3,
+                message_id_header = ?7,
+                in_reply_to_header = ?8,
+                references_header = ?9
             WHERE account_id = ?4
               AND remote_mailbox = ?5
               AND remote_uid = ?6
@@ -4971,7 +5038,10 @@ fn import_imap_headers_for_conn(
                 bool_to_int(header.is_starred),
                 account_id,
                 batch.remote_name,
-                header.remote_uid
+                header.remote_uid,
+                header.message_id,
+                header.in_reply_to,
+                header.references
             ],
         )?;
         if updated > 0 {
@@ -4983,9 +5053,10 @@ fn import_imap_headers_for_conn(
             INSERT OR IGNORE INTO messages(
                 account_id, folder_id, sender_name, sender_email, recipients, subject,
                 snippet, body, received_at, is_read, is_starred, has_attachments,
-                thread_key, remote_mailbox, remote_uid, message_id_header
+                thread_key, remote_mailbox, remote_uid, message_id_header,
+                in_reply_to_header, references_header
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14, ?15, ?16)
             ",
             params![
                 account_id,
@@ -5001,7 +5072,9 @@ fn import_imap_headers_for_conn(
                 header.subject.to_lowercase(),
                 batch.remote_name,
                 header.remote_uid,
-                header.message_id
+                header.message_id,
+                header.in_reply_to,
+                header.references
             ],
         )?;
         if changed > 0 {
@@ -5402,6 +5475,10 @@ fn normalized_subject(subject: &str) -> String {
     } else {
         subject.trim().to_string()
     }
+}
+
+fn normalize_thread_header_value(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn snippet_from_body(body: &str) -> String {
@@ -6000,11 +6077,27 @@ mod tests {
                 attachments: Vec::new(),
             })
             .unwrap();
+        store
+            .set_message_threading(
+                draft_id,
+                Some(MessageThreadingInput {
+                    in_reply_to: "<parent@example.com>".to_string(),
+                    references: "<root@example.com> <parent@example.com>".to_string(),
+                }),
+            )
+            .unwrap();
         let outbound = store.get_outbound_message(draft_id).unwrap();
+        assert_eq!(outbound.in_reply_to_header, "<parent@example.com>");
+        assert_eq!(
+            outbound.references_header,
+            "<root@example.com> <parent@example.com>"
+        );
         let message_id_header = crate::smtp::outbound_message_id(&outbound);
         let raw_message = crate::smtp::render_outbound(&outbound).unwrap();
         let rendered = String::from_utf8_lossy(&raw_message);
         assert!(rendered.contains(&format!("Message-ID: {message_id_header}")));
+        assert!(rendered.contains("In-Reply-To: <parent@example.com>"));
+        assert!(rendered.contains("References: <root@example.com> <parent@example.com>"));
         assert!(rendered.contains("Remote draft"));
 
         store
@@ -6784,6 +6877,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 7,
                 message_id: "<m1@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Remote hello".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -6835,6 +6930,8 @@ mod tests {
         let header = |remote_uid: i64| crate::models::RemoteMessageHeader {
             remote_uid,
             message_id: format!("<snapshot-{remote_uid}@example.com>"),
+            in_reply_to: String::new(),
+            references: String::new(),
             subject: format!("Snapshot {remote_uid}"),
             sender_name: "Remote".to_string(),
             sender_email: "remote@example.com".to_string(),
@@ -6917,6 +7014,8 @@ mod tests {
         let header = |remote_uid: i64, message_id: &str| crate::models::RemoteMessageHeader {
             remote_uid,
             message_id: message_id.to_string(),
+            in_reply_to: String::new(),
+            references: String::new(),
             subject: format!("History {remote_uid}"),
             sender_name: "Remote".to_string(),
             sender_email: "remote@example.com".to_string(),
@@ -7008,6 +7107,8 @@ mod tests {
                 headers: vec![crate::models::RemoteMessageHeader {
                     remote_uid: 7,
                     message_id: message_id.to_string(),
+                    in_reply_to: String::new(),
+                    references: String::new(),
                     subject: subject.to_string(),
                     sender_name: "Remote".to_string(),
                     sender_email: "remote@example.com".to_string(),
@@ -7075,6 +7176,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 77,
                 message_id: "<moved-rebind@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Moved remote message".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -7148,6 +7251,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 41,
                 message_id: "<batch-no-log@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Batch import without sync log".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -7196,6 +7301,8 @@ mod tests {
                     headers: vec![crate::models::RemoteMessageHeader {
                         remote_uid: 51,
                         message_id: "<custom-folder@example.com>".to_string(),
+                        in_reply_to: String::new(),
+                        references: String::new(),
                         subject: "Must stay in custom folder".to_string(),
                         sender_name: "Remote".to_string(),
                         sender_email: "remote@example.com".to_string(),
@@ -7280,6 +7387,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 71,
                 message_id: "<custom-mapped@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Mapped custom folder message".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -7351,6 +7460,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 21,
                 message_id: "<customer@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Customer contract".to_string(),
                 sender_name: "Customer Team".to_string(),
                 sender_email: "customer@example.com".to_string(),
@@ -7403,6 +7514,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 8,
                 message_id: "<m2@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Needs body".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -7467,6 +7580,8 @@ mod tests {
             headers: vec![crate::models::RemoteMessageHeader {
                 remote_uid: 9,
                 message_id: "<attachment@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
                 subject: "Remote attachment".to_string(),
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
@@ -8083,6 +8198,8 @@ mod tests {
                     headers: vec![crate::models::RemoteMessageHeader {
                         remote_uid: 9901,
                         message_id: "rule-stop-9901@example.com".to_string(),
+                        in_reply_to: String::new(),
+                        references: String::new(),
                         sender_name: "Workflow Customer".to_string(),
                         sender_email: "workflow-customer@example.com".to_string(),
                         recipients: account.email.clone(),

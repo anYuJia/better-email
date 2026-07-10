@@ -153,6 +153,8 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
         .unwrap_or_else(|| Utc::now().to_rfc3339());
     let message_id_header = header_value(header_block, "message-id")
         .unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
+    let in_reply_to_header = header_value(header_block, "in-reply-to").unwrap_or_default();
+    let references_header = header_value(header_block, "references").unwrap_or_default();
     let attachments = parsed
         .as_ref()
         .map(|message| {
@@ -206,6 +208,8 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
         security_warnings: preview.warnings,
         received_at,
         message_id_header,
+        in_reply_to_header,
+        references_header,
         attachments,
     }
 }
@@ -548,6 +552,8 @@ mod tests {
             "Cc: team@example.com\r\n",
             "Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n",
             "Message-ID: <imported-1@example.com>\r\n",
+            "In-Reply-To: <parent@example.com>\r\n",
+            "References: <root@example.com> <parent@example.com>\r\n",
             "Content-Type: multipart/mixed; boundary=\"mix\"\r\n",
             "\r\n",
             "--mix\r\n",
@@ -579,6 +585,11 @@ mod tests {
         assert_eq!(imported.cc, "team@example.com");
         assert_eq!(imported.received_at, "2026-07-09T02:00:00+00:00");
         assert_eq!(imported.message_id_header, "<imported-1@example.com>");
+        assert_eq!(imported.in_reply_to_header, "<parent@example.com>");
+        assert_eq!(
+            imported.references_header,
+            "<root@example.com> <parent@example.com>"
+        );
         assert!(imported.body.contains("Hello from imported EML."));
         assert!(!imported.sanitized_html.contains("<script"));
         assert!(!imported.sanitized_html.contains("onclick"));

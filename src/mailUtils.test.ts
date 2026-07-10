@@ -6,6 +6,7 @@ import {
   newMailNotificationBody,
   prefixedSubject,
   quoteMessage,
+  replyThreadingHeaders,
   remoteImageTrustInput,
   senderDomain,
   syncIntervalMs,
@@ -45,6 +46,20 @@ describe('mail UI utilities', () => {
     expect(quoted).toContain('时间：bad-date');
     expect(quoted).toContain('主题：(无主题)');
     expect(quoted).toContain('> Line one\n> Line two');
+  });
+
+  it('builds and deduplicates standards-compatible reply threading headers', () => {
+    expect(
+      replyThreadingHeaders({
+        message_id_header: '<latest@example.com>',
+        in_reply_to_header: '<parent@example.com>',
+        references_header: '<root@example.com> <parent@example.com>',
+      }),
+    ).toEqual({
+      in_reply_to: '<latest@example.com>',
+      references: '<root@example.com> <parent@example.com> <latest@example.com>',
+    });
+    expect(replyThreadingHeaders({ message_id_header: 'imap-42' })).toBeNull();
   });
 
   it('maps sync modes to conservative background intervals', () => {

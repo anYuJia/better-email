@@ -52,6 +52,9 @@ pub struct Message {
     pub attachment_count: i64,
     pub remote_mailbox: String,
     pub remote_uid: i64,
+    pub message_id_header: String,
+    pub in_reply_to_header: String,
+    pub references_header: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -117,6 +120,14 @@ pub struct DraftInput {
     pub send_at: String,
     #[serde(default)]
     pub attachments: Vec<OutboundAttachmentInput>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct MessageThreadingInput {
+    #[serde(default)]
+    pub in_reply_to: String,
+    #[serde(default)]
+    pub references: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -210,6 +221,8 @@ pub struct ImportedEmlMessage {
     pub snippet: String,
     pub received_at: String,
     pub message_id_header: String,
+    pub in_reply_to_header: String,
+    pub references_header: String,
     pub attachments: Vec<ImportedEmlAttachment>,
 }
 
@@ -387,6 +400,8 @@ pub struct ImapMailboxState {
 pub struct RemoteMessageHeader {
     pub remote_uid: i64,
     pub message_id: String,
+    pub in_reply_to: String,
+    pub references: String,
     pub subject: String,
     pub sender_name: String,
     pub sender_email: String,
@@ -605,6 +620,8 @@ pub struct OutboundMessage {
     pub subject: String,
     pub body: String,
     pub html_body: String,
+    pub in_reply_to_header: String,
+    pub references_header: String,
     pub attachments: Vec<Attachment>,
 }
 

@@ -944,6 +944,8 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
     let to = header_value(&raw_header, "to").unwrap_or_default();
     let message_id =
         header_value(&raw_header, "message-id").unwrap_or_else(|| format!("imap-{uid}"));
+    let in_reply_to = header_value(&raw_header, "in-reply-to").unwrap_or_default();
+    let references = header_value(&raw_header, "references").unwrap_or_default();
     let received_at = fetch
         .internal_date()
         .map(|date| date.to_rfc3339())
@@ -954,6 +956,8 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
     RemoteMessageHeader {
         remote_uid: uid,
         message_id,
+        in_reply_to,
+        references,
         subject: subject.trim().to_string(),
         sender_name: display_name_from_address(&from),
         sender_email: email_from_address(&from),

@@ -9,10 +9,10 @@ use crate::models::{
     DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder,
     FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
     MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
-    OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput,
-    OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
-    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput,
+    OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport,
+    OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage,
+    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
     RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan, ThreadSummary,
     TrashActionReport,
 };
@@ -803,7 +803,11 @@ pub fn delete_identity(store: State<'_, MailStore>, identity_id: i64) -> MailRes
 }
 
 #[tauri::command]
-pub fn save_draft(store: State<'_, MailStore>, input: DraftInput) -> MailResult<DraftSaveReport> {
+pub fn save_draft(
+    store: State<'_, MailStore>,
+    input: DraftInput,
+    threading: Option<MessageThreadingInput>,
+) -> MailResult<DraftSaveReport> {
     let was_update = input.draft_id > 0;
     let previous_reference = if was_update {
         Some(store.get_message_remote_reference(input.draft_id)?)
@@ -811,6 +815,7 @@ pub fn save_draft(store: State<'_, MailStore>, input: DraftInput) -> MailResult<
         None
     };
     let draft_id = store.save_draft(input)?;
+    store.set_message_threading(draft_id, threading)?;
     let message = store.get_outbound_message(draft_id)?;
     let message_id_header = smtp::outbound_message_id(&message);
     let account = store.get_account_by_id(Some(message.account_id))?;
@@ -950,16 +955,25 @@ pub fn save_draft(store: State<'_, MailStore>, input: DraftInput) -> MailResult<
 }
 
 #[tauri::command]
-pub fn send_message(store: State<'_, MailStore>, input: DraftInput) -> MailResult<i64> {
-    store.send_message(input)
+pub fn send_message(
+    store: State<'_, MailStore>,
+    input: DraftInput,
+    threading: Option<MessageThreadingInput>,
+) -> MailResult<i64> {
+    let message_id = store.send_message(input)?;
+    store.set_message_threading(message_id, threading)?;
+    Ok(message_id)
 }
 
 #[tauri::command]
 pub fn queue_outbox_message(
     store: State<'_, MailStore>,
     input: DraftInput,
+    threading: Option<MessageThreadingInput>,
 ) -> MailResult<OutboxItem> {
-    store.queue_outbox_message(input)
+    let item = store.queue_outbox_message(input)?;
+    store.set_message_threading(item.message_id, threading)?;
+    Ok(item)
 }
 
 #[tauri::command]
@@ -2111,6 +2125,9 @@ mod tests {
             attachment_count: 1,
             remote_mailbox: "INBOX".to_string(),
             remote_uid: 1,
+            message_id_header: "<export@example.com>".to_string(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
         };
         let eml = render_eml_message(
             &message,

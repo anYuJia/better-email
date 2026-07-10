@@ -22,7 +22,21 @@ import type {
   SystemFolderRole,
 } from './types';
 
-export const emptyDraft: DraftInput = { draft_id: 0, account_id: 0, identity_id: 0, to: '', cc: '', bcc: '', subject: '', body: '', html_body: '', send_at: '', attachments: [] };
+export const emptyDraft: DraftInput = {
+  draft_id: 0,
+  account_id: 0,
+  identity_id: 0,
+  to: '',
+  cc: '',
+  bcc: '',
+  subject: '',
+  body: '',
+  html_body: '',
+  send_at: '',
+  attachments: [],
+  in_reply_to: '',
+  references: '',
+};
 
 export function normalizeCommandSearchText(value: string): string {
   return value
@@ -303,6 +317,8 @@ export function normalizeDraftInput(value: unknown): DraftInput | null {
     html_body: typeof item.html_body === 'string' ? item.html_body : '',
     send_at: typeof item.send_at === 'string' ? item.send_at : '',
     attachments,
+    in_reply_to: typeof item.in_reply_to === 'string' ? item.in_reply_to : '',
+    references: typeof item.references === 'string' ? item.references : '',
   };
 }
 

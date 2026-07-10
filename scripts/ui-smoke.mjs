@@ -889,6 +889,10 @@ async function main() {
     await fillInput(cdp, '.quick-reply textarea', '收到，我会继续跟进。');
     await clickButton(cdp, '发送回复', "document.querySelector('.quick-reply')");
     await waitForExpression(cdp, "document.body.innerText.includes('已快速回复') && document.querySelector('.quick-reply textarea').value === ''");
+    await waitForExpression(
+      cdp,
+      "(() => { const calls = window.__betterEmailMockInvocations || []; const call = [...calls].reverse().find((entry) => entry.command === 'send_message' && entry.args?.input?.subject === 'Re: 安全检查清单'); return call?.args?.threading?.in_reply_to === '<mock-1-1@better-email.local>' && call.args.threading.references === '<mock-1-1@better-email.local>'; })()",
+    );
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '稍后处理', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已稍后处理到') && document.body.innerText.includes('取消稍后')");
@@ -993,6 +997,7 @@ async function main() {
         'snooze and unsnooze flow works',
         'global keyboard undo restores archived message',
         'inline quick reply sends from reader',
+        'inline quick reply preserves standard thread headers',
         'message EML export works',
         'label toggle works',
         'attachment download flow works',

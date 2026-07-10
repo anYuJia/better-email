@@ -37,6 +37,7 @@ import {
   type NotificationPolicy,
   prefixedSubject,
   quoteMessage,
+  replyThreadingHeaders,
   remoteImageTrustInput,
   senderDomain,
 } from './mailUtils';
@@ -403,6 +404,14 @@ export default function App() {
       account_id: resolvedAccountId,
       identity_id: input.identity_id || resolvedIdentity?.id || 0,
     };
+  }
+
+  function threadingForDraft(input: DraftInput) {
+    const inReplyTo = input.in_reply_to?.trim() ?? '';
+    const references = input.references?.trim() ?? '';
+    return inReplyTo || references
+      ? { in_reply_to: inReplyTo, references }
+      : null;
   }
 
   function accountForDraft(input: DraftInput = draft): Account | null {
@@ -1369,6 +1378,7 @@ export default function App() {
     }
     const report = await invoke<DraftSaveReport>('save_draft', {
       input: draftInputForCurrentAccount(draft),
+      threading: threadingForDraft(draft),
     });
     setDraft(emptyDraft);
     clearComposerAutosave();
@@ -1384,7 +1394,10 @@ export default function App() {
     }
     const subject = draft.subject.trim() || '(无主题)';
     if (sendUndoDelaySeconds === 0) {
-      await invoke('send_message', { input: { ...draftInputForCurrentAccount(draft), draft_id: 0 } });
+      await invoke('send_message', {
+        input: { ...draftInputForCurrentAccount(draft), draft_id: 0 },
+        threading: threadingForDraft(draft),
+      });
       setDraft(emptyDraft);
       clearComposerAutosave();
       closeComposer();
@@ -1400,6 +1413,7 @@ export default function App() {
         draft_id: 0,
         send_at: expiresAt,
       },
+      threading: threadingForDraft(draft),
     });
     setOutbox((current) => [item, ...current.filter((entry) => entry.id !== item.id)]);
     setPendingSendUndo({
@@ -1435,6 +1449,7 @@ export default function App() {
         send_at: '',
         attachments: [],
       },
+      threading: replyThreadingHeaders(message),
     });
     setQuickReplyBody('');
     await refreshAll();
@@ -1452,7 +1467,10 @@ export default function App() {
       draft_id: 0,
       send_at: sendAt ? new Date(sendAt).toISOString() : '',
     };
-    await invoke<OutboxItem>('queue_outbox_message', { input });
+    await invoke<OutboxItem>('queue_outbox_message', {
+      input,
+      threading: threadingForDraft(draft),
+    });
     setDraft(emptyDraft);
     clearComposerAutosave();
     closeComposer();
@@ -1479,6 +1497,7 @@ export default function App() {
   }
 
   function composeFromMessage(message: Message, mode: 'reply' | 'replyAll' | 'forward') {
+    const threading = mode === 'forward' ? null : replyThreadingHeaders(message);
     const replyRecipients = mode === 'forward' ? '' : message.sender_email;
     const includeOriginalRecipients =
       mode === 'replyAll'
@@ -1500,6 +1519,8 @@ export default function App() {
       html_body: '',
       send_at: '',
       attachments: [],
+      in_reply_to: threading?.in_reply_to ?? '',
+      references: threading?.references ?? '',
     });
     setStatus(mode === 'forward' ? '已创建转发草稿' : mode === 'replyAll' ? '已创建回复全部草稿' : '已创建回复草稿');
   }
@@ -1517,6 +1538,8 @@ export default function App() {
       body: message.body,
       html_body: message.sanitized_html,
       send_at: '',
+      in_reply_to: message.in_reply_to_header ?? '',
+      references: message.references_header ?? '',
       attachments: draftAttachments.map((attachment) => ({
         filename: attachment.filename,
         mime_type: attachment.mime_type,

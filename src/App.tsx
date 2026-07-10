@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Edit3,
   Inbox,
@@ -10,18 +17,7 @@ import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
-import ComposerWindow from './components/ComposerWindow';
-import ExperienceSettings from './components/settings/ExperienceSettings';
-import SettingsFrame, { type SettingsSectionId } from './components/settings/SettingsFrame';
-import AccountConnectionSettings from './components/settings/AccountConnectionSettings';
-import CredentialSecuritySettings from './components/settings/CredentialSecuritySettings';
-import DataSafetySettings from './components/settings/DataSafetySettings';
-import SyncOperationsSettings from './components/settings/SyncOperationsSettings';
-import ContactAutomationSettings from './components/settings/ContactAutomationSettings';
-import RuleAutomationSettings from './components/settings/RuleAutomationSettings';
-import SecurityPreviewSettings from './components/settings/SecurityPreviewSettings';
-import CommandPalette from './components/CommandPalette';
-import ShortcutHelpModal from './components/ShortcutHelpModal';
+import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
 import useAppShortcuts from './hooks/useAppShortcuts';
@@ -147,6 +143,30 @@ import type {
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
 import './ui-2026.css';
+
+const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
+const SettingsFrame = lazy(() => import('./components/settings/SettingsFrame'));
+const ExperienceSettings = lazy(() => import('./components/settings/ExperienceSettings'));
+const AccountConnectionSettings = lazy(() => import('./components/settings/AccountConnectionSettings'));
+const CredentialSecuritySettings = lazy(() => import('./components/settings/CredentialSecuritySettings'));
+const DataSafetySettings = lazy(() => import('./components/settings/DataSafetySettings'));
+const SyncOperationsSettings = lazy(() => import('./components/settings/SyncOperationsSettings'));
+const ContactAutomationSettings = lazy(() => import('./components/settings/ContactAutomationSettings'));
+const RuleAutomationSettings = lazy(() => import('./components/settings/RuleAutomationSettings'));
+const SecurityPreviewSettings = lazy(() => import('./components/settings/SecurityPreviewSettings'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
+
+function DeferredSurface({ label }: { label: string }) {
+  return (
+    <div className="deferred-overlay" role="status" aria-live="polite">
+      <div className="deferred-surface">
+        <span className="deferred-spinner" aria-hidden="true" />
+        <strong>{label}</strong>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -2223,7 +2243,8 @@ export default function App() {
       />
 
       {isComposerOpen && (
-        <ComposerWindow
+        <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
+          <ComposerWindow
           minimized={isComposerMinimized}
           draft={draft}
           accounts={accounts}
@@ -2256,11 +2277,13 @@ export default function App() {
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
           onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}
-        />
+          />
+        </Suspense>
       )}
 
       {isSettingsOpen && accountForm && (
-        <SettingsFrame
+        <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
+          <SettingsFrame
           title="设置"
           subtitle={`${accountForm.email} · ${accountForm.provider}`}
           activeSection={activeSettingsSection}
@@ -2464,22 +2487,31 @@ export default function App() {
               onParseRawMessage={parseRawMessage}
             />
             )}
-        </SettingsFrame>
+          </SettingsFrame>
+        </Suspense>
       )}
-      <ShortcutHelpModal
-        open={isShortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
-      <CommandPalette
-        open={isCommandPaletteOpen}
-        query={commandQuery}
-        items={filteredCommandItems}
-        onQueryChange={setCommandQuery}
-        onRun={(item) => {
-          runCommandPaletteItem(item).catch((error) => setStatus(String(error)));
-        }}
-        onClose={() => setCommandPaletteOpen(false)}
-      />
+      {isShortcutsOpen && (
+        <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>
+          <ShortcutHelpModal
+            open
+            onClose={() => setShortcutsOpen(false)}
+          />
+        </Suspense>
+      )}
+      {isCommandPaletteOpen && (
+        <Suspense fallback={<DeferredSurface label="正在打开命令面板" />}>
+          <CommandPalette
+            open
+            query={commandQuery}
+            items={filteredCommandItems}
+            onQueryChange={setCommandQuery}
+            onRun={(item) => {
+              runCommandPaletteItem(item).catch((error) => setStatus(String(error)));
+            }}
+            onClose={() => setCommandPaletteOpen(false)}
+          />
+        </Suspense>
+      )}
       <UndoSnackbarStack
         pendingSendUndo={pendingSendUndo}
         undoAction={undoAction}

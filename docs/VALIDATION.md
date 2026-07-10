@@ -36,7 +36,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 - Clippy 通过：`cargo clippy --all-targets -- -D warnings` 无警告。
 
 - 会话作用域回归已覆盖：后端测试验证线程摘要遵循账号、文件夹、搜索、筛选和排序条件；Chrome headless UI 冒烟验证搜索后线程结果同步收窄，切换到无邮件账号后线程列表为空。本轮 `npm run test:ui` 共通过 84 项核心断言。
-- 前端加载层已拆分：`useMailboxData` 集中管理邮件/会话共享作用域、排序、分页、刷新竞态、空状态和未读回退，`buildMailboxRequests` 覆盖共享排序参数；连接诊断模型与界面已独立为 `connectionDiagnostics.ts` 和 `ConnectionDiagnosticsPanel.tsx`，服务商凭据文案与安全输入分别位于 `providerCredentialGuidance.ts` 和 `CredentialSecuritySettings.tsx`，只读服务商验收编排位于 `providerValidation.ts`，写入验收草稿与五阶段状态机位于 `providerWriteValidation.ts`，写入验收界面与回写步骤分别位于 `ProviderWriteValidationSettings.tsx`、`ProviderWritebackValidationPanel.tsx`，账号级编号、跨文件夹刷新、定位和回写步骤持久化编排位于 `useProviderWriteValidation.ts`；账号、服务商、认证、发送、通知、隐私和身份设置页已拆为独立页面组件，`AccountConnectionSettings` 与 `ExperienceSettings` 仅负责轻量路由。当前验证总计为 41 项 Vitest、97 项 Rust 测试和 84 项 Chrome headless UI 断言。
+- 前端加载层已拆分：`useMailboxData` 集中管理邮件/会话共享作用域、排序、分页、刷新竞态、空状态和未读回退，`buildMailboxRequests` 覆盖共享排序参数；连接诊断模型与界面已独立为 `connectionDiagnostics.ts` 和 `ConnectionDiagnosticsPanel.tsx`，服务商凭据文案与安全输入分别位于 `providerCredentialGuidance.ts` 和 `CredentialSecuritySettings.tsx`，只读服务商验收编排位于 `providerValidation.ts`，写入验收草稿与五阶段状态机位于 `providerWriteValidation.ts`，写入验收界面与回写步骤分别位于 `ProviderWriteValidationSettings.tsx`、`ProviderWritebackValidationPanel.tsx`，账号级编号、跨文件夹刷新、定位和回写步骤持久化编排位于 `useProviderWriteValidation.ts`；账号、服务商、认证、发送、通知、隐私和身份设置页已拆为独立页面组件，`AccountConnectionSettings` 与 `ExperienceSettings` 仅负责轻量路由。写信窗口、设置中心、命令面板和快捷键帮助均已转为按需异步 chunk，完整 UI 回归覆盖首次打开路径。当前验证总计为 41 项 Vitest、97 项 Rust 测试和 84 项 Chrome headless UI 断言。
 
 ## 已覆盖功能
 
@@ -61,7 +61,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 | 发件箱 | 部分实现 | 本地队列、稍后发送、0/5/10/20/30 秒撤销发送、倒计时 snackbar、撤回到草稿箱、到期自动 SMTP 调度、发送演练、附件传递到 SMTP MIME 构建、SMTP 失败重试、`sent_remote_pending` 远端留档重试状态和下次尝试时间已实现；SMTP 成功后立即移入本地已发送且不可撤回，留档失败五分钟后只重试 IMAP APPEND；最早到期项使用单个前端定时器，同类 queued/running 后台任务在 SQLite 层统一去重 |
 | 联系人与规则 | 部分实现 | 联系人自动提取、联系人中心、联系人搜索、一键给联系人写信、加入当前草稿、侧栏联系人右键直达编辑表单/删除、命令面板联系人写信、联系人新建/编辑/删除、别名/VIP 后端持久化、手动合并、重复联系人建议合并、VIP 状态同步通知策略、IMAP 导入后自动执行规则打标/状态动作，支持可视化规则构建器、多动作规则、停止后续规则、规则新增/编辑/启停/删除，线程摘要和线程阅读视图已实现；真实账号联系人导入仍待补 |
 | 安全 | 部分实现 | 系统 Keychain 已接入；原始邮件预览和正式阅读面均使用 `ammonia` 做 HTML sanitizer，并展示清洗、远程图片、外链、域名不一致、IP 跳转和登录/验证路径风险提示；远程图片默认阻止，支持按发件人或域名加入持久化信任列表后安全重渲染，并可阻止发件人自动移入垃圾邮件 |
-| 性能基准 | 部分实现 | 已有 `npm run bench` 输出前端产物、Tauri 二进制/bundle 产物探测和当前进程内存采样，并明确缺口；2026-07-10 当前前端 dist 约 578.3 KB、最大脚本约 388.4 KB、基准 Node 进程 RSS 约 56.70 MB；`npm run bench:sync` 已可采样 release App 前端 ready 时间、同步演练完成标记、采样窗口 peak RSS 和窗口末尾 RSS，历史 release 样本约 769.76ms ready / 83.72 MB peak RSS |
+| 性能基准 | 部分实现 | `npm run bench` 已输出前端总产物、首屏静态依赖、按需异步资源、Tauri 二进制/bundle 产物探测和当前进程内存采样，并明确缺口；2026-07-11 当前前端 dist 约 653.8 KB，其中首屏直接加载 464.3 KB、按需资源 189.0 KB，入口脚本约 342.9 KB，基准 Node 进程 RSS 约 58.02 MB。相比懒加载前约 619.8 KB 的主 JS + CSS，首屏资源下降约 25%；`npm run bench:sync` 已可采样 release App 前端 ready 时间、同步演练完成标记、采样窗口 peak RSS 和窗口末尾 RSS，历史 release 样本约 769.76ms ready / 83.72 MB peak RSS |
 
 ## 关键测试点
 

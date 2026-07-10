@@ -142,6 +142,8 @@ SQLite local store + OS keychain
 - 显式保存草稿采用本地优先策略：SQLite 保存成功后重建同一稳定 Message-ID 的 MIME；若已映射远端 Drafts 且凭据可用，则在同一 IMAP 会话删除旧版本并以 `\Draft` 标记 APPEND 最新版本，再绑定 mailbox/UID。远端失败不会回滚或丢失本地草稿，UI 会明确显示仅本地保存原因，用户再次保存即可重试。
 - 撤销发送、用户指定稍后发送、SMTP 失败重试和远端留档重试共用 `outbox_queue.next_attempt_at`；前端只为最早到期项保留一个定时器，同类 queued/running 后台任务在 SQLite 层去重，避免重复协议执行和额外常驻轮询。
 - WebView 前端不使用大型 UI 框架，只用 React + CSS + 少量图标。
+- 首屏只同步加载三栏工作区、列表和阅读面板；`ComposerWindow`、设置框架与独立设置页、命令面板、快捷键帮助通过 `React.lazy` + `Suspense` 延迟加载，首次打开时显示统一轻量加载浮层。2026-07-11 构建样本中首屏直接加载 JS + CSS 为 464.3 KB，另有 189.0 KB 低频资源按需加载；拆分前主 JS + CSS 约 619.8 KB，首屏资源下降约 25%。
+- `npm run bench` 递归解析入口静态依赖，并分别输出 `frontend_initial_load` 与 `frontend_deferred_assets`；动态 `import()` 资源不会被误算进首屏负担。
 - 图片、HTML、附件渲染走安全开关和懒加载。
 
 ## 7. 安全策略

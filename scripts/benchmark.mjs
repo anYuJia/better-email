@@ -1,6 +1,13 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, extname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  extname,
+  join,
+  relative,
+  resolve,
+} from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { execFile } from 'node:child_process';
 import { spawn } from 'node:child_process';
@@ -93,6 +100,81 @@ function frontendAssets(path) {
     .sort((a, b) => b.size_bytes - a.size_bytes)
     .slice(0, 8)
     .map(({ size_bytes: _sizeBytes, ...asset }) => asset);
+}
+
+function frontendAssetInventory(path) {
+  return listFiles(
+    path,
+    (candidate) => statSync(candidate).isFile() && ['.js', '.css'].includes(extname(candidate).toLowerCase()),
+    500,
+  ).map((candidate) => ({
+    path: candidate,
+    name: relative(path, candidate).replaceAll('\\', '/'),
+    size_bytes: statSync(candidate).size,
+  }));
+}
+
+function assetGroupSummary(assets, limit = 12) {
+  const sorted = [...assets].sort((a, b) => b.size_bytes - a.size_bytes);
+  const sizeBytes = sorted.reduce((total, asset) => total + asset.size_bytes, 0);
+  return {
+    files: sorted.length,
+    size_bytes: sizeBytes,
+    size: bytes(sizeBytes),
+    largest: sorted.slice(0, limit).map((asset) => ({
+      name: asset.name,
+      size: bytes(asset.size_bytes),
+    })),
+  };
+}
+
+function frontendLoadGroups(path) {
+  const inventory = frontendAssetInventory(path);
+  const inventoryByPath = new Map(inventory.map((asset) => [asset.path, asset]));
+  const indexPath = join(path, 'index.html');
+  if (!existsSync(indexPath)) {
+    return {
+      initial: assetGroupSummary([]),
+      deferred: assetGroupSummary(inventory),
+    };
+  }
+
+  const html = readFileSync(indexPath, 'utf8');
+  const referencedAssets = [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/g)]
+    .map((match) => match[1].replace(/^\.?\//, ''))
+    .map((asset) => join(path, asset));
+  const initialPaths = new Set();
+  const pendingScripts = [];
+
+  for (const assetPath of referencedAssets) {
+    if (!inventoryByPath.has(assetPath)) continue;
+    initialPaths.add(assetPath);
+    if (extname(assetPath).toLowerCase() === '.js') pendingScripts.push(assetPath);
+  }
+
+  while (pendingScripts.length > 0) {
+    const scriptPath = pendingScripts.pop();
+    if (!scriptPath || !existsSync(scriptPath)) continue;
+    const source = readFileSync(scriptPath, 'utf8');
+    const staticImports = [
+      ...source.matchAll(/(?:^|[;\n])import(?!\s*\()[^;]*?(?:from\s*)?["']([^"']+)["']/g),
+    ];
+    for (const match of staticImports) {
+      const specifier = match[1];
+      if (!specifier.startsWith('.')) continue;
+      const importedPath = resolve(dirname(scriptPath), specifier);
+      if (!inventoryByPath.has(importedPath) || initialPaths.has(importedPath)) continue;
+      initialPaths.add(importedPath);
+      if (extname(importedPath).toLowerCase() === '.js') pendingScripts.push(importedPath);
+    }
+  }
+
+  const initial = inventory.filter((asset) => initialPaths.has(asset.path));
+  const deferred = inventory.filter((asset) => !initialPaths.has(asset.path));
+  return {
+    initial: assetGroupSummary(initial),
+    deferred: assetGroupSummary(deferred),
+  };
 }
 
 function memorySnapshot() {
@@ -303,6 +385,7 @@ const sqlitePath = join(root, 'src-tauri', 'target', 'debug', 'better-email-test
 const releaseBinaryExists = existsSync(targetReleaseBinaryPath);
 const bundlePathExists = existsSync(targetReleaseBundlePath);
 const gaps = [];
+const frontendLoad = frontendLoadGroups(distPath);
 
 if (!releaseBinaryExists) {
   gaps.push('release binary is missing; run `npm run bench:release` for a real app binary size sample');
@@ -328,6 +411,8 @@ const report = {
   elapsed_ms: Number((performance.now() - start).toFixed(2)),
   frontend_dist: artifactSummary(distPath),
   frontend_assets_largest: frontendAssets(distPath),
+  frontend_initial_load: frontendLoad.initial,
+  frontend_deferred_assets: frontendLoad.deferred,
   tauri_debug_binary: fileSummary(targetDebugBinaryPath),
   tauri_release_binary: fileSummary(targetReleaseBinaryPath),
   cargo_release_dir_cache: artifactSummary(targetReleasePath),

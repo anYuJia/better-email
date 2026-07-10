@@ -1602,3 +1602,56 @@ textarea:disabled {
     justify-content: flex-end;
   }
 }
+
+.deferred-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 26, 36, 0.22);
+  backdrop-filter: blur(10px) saturate(1.05);
+}
+
+.deferred-surface {
+  min-width: 178px;
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid rgba(210, 217, 225, 0.96);
+  border-radius: 10px;
+  color: var(--ui-text-secondary);
+  background: rgba(252, 253, 254, 0.98);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.16),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+  font-size: 11px;
+  font-weight: 670;
+}
+
+.deferred-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid #d6e4f2;
+  border-top-color: var(--ui-accent);
+  border-radius: 50%;
+  animation: deferred-spin 680ms linear infinite;
+}
+
+@keyframes deferred-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deferred-spinner {
+    animation: none;
+    border-color: var(--ui-accent);
+  }
+}

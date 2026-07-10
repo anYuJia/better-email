@@ -685,8 +685,18 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('design@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('iCloud')");
+    await evalInPage(
+      cdp,
+      "document.querySelector('.account-switcher-trigger').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 120, button: 2 }))",
+    );
+    await waitForExpression(cdp, "document.querySelector('[data-context-item=\"set-default-account\"]')?.innerText.includes('设为默认发件账号')");
+    await clickButton(cdp, '设为默认发件账号', "document.querySelector('.account-switcher-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('默认发件账号已设为：design@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('默认')");
+    await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
+    await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')?.innerText.includes('默认发件') && document.querySelector('[data-context-item=\"set-default-account\"]').disabled");
+    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证')");
+    await waitForExpression(cdp, "document.body.innerText.includes('账号设置') && document.body.innerText.includes('服务商兼容性与真实验证') && document.querySelector('[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证')");
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions')?.innerText.includes('连接测试') && document.querySelector('.settings-header-actions')?.innerText.includes('保存设置') && !document.querySelector('.settings-action-bar')?.innerText.includes('保存设置')");
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"backup\"]');
     await clickButton(cdp, '连接测试', "document.querySelector('.settings-header-actions')");
@@ -774,7 +784,7 @@ async function main() {
     await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'qa-new@better-email.local');
     await waitForExpression(cdp, "!document.querySelector('[data-account-remove-confirm]').disabled");
     await evalInPage(cdp, "document.querySelector('[data-account-remove-confirm]').click()");
-    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('已移除 qa-new@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"1\"]')?.innerText.includes('demo@better-email.local')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.body.innerText.includes('已移除 qa-new@better-email.local') && document.querySelector('.account-switcher[data-account-scope=\"2\"]')?.innerText.includes('design@better-email.local')");
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-all\"]')");
     await waitForExpression(cdp, "![...document.querySelectorAll('[data-context-item^=\"account-scope-\"]')].some((item) => item.innerText.includes('qa-new@better-email.local'))");
@@ -782,6 +792,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"all\"]')?.innerText.includes('统一邮箱')");
 
     await clickButton(cdp, '写邮件');
+    await openDetails(cdp, '.composer-advanced');
+    await waitForExpression(cdp, "document.querySelector('.composer-delivery-card select')?.value === '2'");
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');
     await fillInput(cdp, '.composer input[placeholder=\"主题\"]', 'Smoke Undo Send');
     await fillInput(cdp, '.composer textarea[placeholder=\"正文\"]', '撤销发送路径验证');
@@ -897,6 +909,8 @@ async function main() {
         'new account default folders and identity are available',
         'account removal requires exact email confirmation',
         'account removal clears scope and switches to a remaining account',
+        'account switcher right click sets and labels default sender account',
+        'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
         'undo send delay settings persist',

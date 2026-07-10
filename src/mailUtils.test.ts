@@ -186,6 +186,7 @@ describe('mail UI utilities', () => {
       'qq',
       'netease',
     ]);
+    expect(providerCompatibilityMatrix.find((provider) => provider.id === 'netease')?.tested_status).toBe('verified');
   });
 
   it('builds remote image trust inputs for senders and domains', () => {

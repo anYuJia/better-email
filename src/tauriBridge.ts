@@ -39,6 +39,7 @@ let account = {
   sync_mode: 'manual',
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
+  is_default: true,
 };
 
 let mockAccounts = [
@@ -54,6 +55,7 @@ let mockAccounts = [
     auth_type: 'password',
     sync_mode: '15min',
     signature: 'Sent from Better Email Studio',
+    is_default: false,
   },
   {
     ...account,
@@ -66,6 +68,7 @@ let mockAccounts = [
     auth_type: 'oauth2',
     sync_mode: 'manual',
     signature: 'Sent from Better Email Archive',
+    is_default: false,
   },
 ];
 
@@ -717,6 +720,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         sync_mode: String(input.sync_mode ?? '').trim() || 'manual',
         remote_images_allowed: Boolean(input.remote_images_allowed),
         signature: String(input.signature ?? ''),
+        is_default: false,
       };
       mockAccounts = [...mockAccounts, created];
       folders = [
@@ -744,6 +748,16 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       ];
       return created as T;
     }
+    case 'set_default_account': {
+      const accountId = Number(args?.accountId ?? 0);
+      const existing = mockAccounts.find((item) => item.id === accountId);
+      if (!existing) throw new Error('邮箱账号不存在或已被移除。');
+      mockAccounts = mockAccounts
+        .map((item) => ({ ...item, is_default: item.id === accountId }))
+        .sort((left, right) => Number(right.is_default) - Number(left.is_default) || left.id - right.id);
+      account = mockAccounts.find((item) => item.is_default) ?? mockAccounts[0];
+      return account as T;
+    }
     case 'delete_account': {
       const accountId = Number(args?.accountId ?? 0);
       const removedAccount = mockAccounts.find((item) => item.id === accountId);
@@ -762,7 +776,10 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       outbox = outbox.filter((item) => !removedMessageIds.has(item.message_id));
       remoteImageTrusts = remoteImageTrusts.filter((trust) => trust.account_id !== accountId);
       oauthSessions = oauthSessions.filter((session) => session.account_id !== accountId);
-      if (account.id === accountId) account = mockAccounts[0];
+      if (removedAccount.is_default) {
+        mockAccounts = mockAccounts.map((item, index) => ({ ...item, is_default: index === 0 }));
+      }
+      account = mockAccounts.find((item) => item.is_default) ?? mockAccounts[0];
       return account as T;
     }
     case 'update_account_settings': {

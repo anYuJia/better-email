@@ -24,6 +24,7 @@ pub fn run() {
             commands::list_accounts,
             commands::get_account,
             commands::create_account,
+            commands::set_default_account,
             commands::delete_account,
             commands::update_account_settings,
             commands::list_folders,

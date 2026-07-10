@@ -3,6 +3,7 @@ import {
   providerCompatibilityMatrix,
   providerPresets,
   type AccountProviderPreset,
+  type ProviderCompatibility,
 } from '../../providerCatalog';
 import {
   providerVerificationLabel,
@@ -64,6 +65,12 @@ type ProviderPresetGridProps = {
   compact?: boolean;
   onSelect: (preset: AccountProviderPreset) => void;
 };
+
+function providerPresetStatusLabel(status: ProviderCompatibility['tested_status']) {
+  if (status === 'verified') return '真实账号已验证';
+  if (status === 'needs-account') return '需真实账号验证';
+  return '预设可用';
+}
 
 function ProviderPresetGrid({
   activeProvider,
@@ -300,7 +307,7 @@ export default function AccountConnectionSettings({
               </span>
               <small>{provider.setup}</small>
               <em>
-                {provider.tested_status === 'needs-account' ? '需真实账号验证' : '预设可用'}
+                {providerPresetStatusLabel(provider.tested_status)}
                 {' · '}{provider.limitations}
               </em>
               {providerVerifications[provider.id] && (

@@ -148,6 +148,7 @@ impl MailStore {
                     sync_mode TEXT NOT NULL DEFAULT 'manual',
                     remote_images_allowed INTEGER NOT NULL DEFAULT 0,
                     signature TEXT NOT NULL DEFAULT '',
+                    is_default INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
 
@@ -357,6 +358,17 @@ impl MailStore {
                 "INTEGER NOT NULL DEFAULT 0",
             )?;
             add_column_if_missing(conn, "accounts", "signature", "TEXT NOT NULL DEFAULT ''")?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "is_default",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            ensure_default_account_for_conn(conn)?;
+            conn.execute_batch(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_single_default
+                 ON accounts(is_default) WHERE is_default = 1;",
+            )?;
             add_column_if_missing(conn, "messages", "cc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "messages", "bcc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(
@@ -422,8 +434,8 @@ impl MailStore {
 
             let now = Utc::now();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, 1, ?9)",
                 params![
                     "demo@better-email.local",
                     "Better Email Demo",
@@ -617,6 +629,7 @@ impl MailStore {
                         import_backup_table(conn, table, rows)?;
                     }
                 }
+                ensure_default_account_for_conn(conn)?;
                 let foreign_key_violations: i64 =
                     conn.query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
                         row.get(0)
@@ -663,8 +676,8 @@ impl MailStore {
     pub fn list_accounts(&self) -> MailResult<Vec<Account>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature
-                 FROM accounts ORDER BY id",
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
+                 FROM accounts ORDER BY is_default DESC, id",
             )?;
             let accounts = stmt
                 .query_map([], map_account)?
@@ -692,10 +705,12 @@ impl MailStore {
             } else {
                 input.display_name.trim().to_string()
             };
+            let is_default =
+                conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| row.get::<_, bool>(0))?;
             let now = Utc::now().to_rfc3339();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     email,
                     display_name,
@@ -706,6 +721,7 @@ impl MailStore {
                     normalize_sync_mode(&input.sync_mode),
                     bool_to_int(input.remote_images_allowed),
                     input.signature,
+                    bool_to_int(is_default),
                     now
                 ],
             )
@@ -726,6 +742,31 @@ impl MailStore {
                 &input.signature,
             )?;
             account_for_conn(conn, Some(account_id))
+        })
+    }
+
+    pub fn set_default_account(&self, account_id: i64) -> MailResult<Account> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let exists = transaction
+                .query_row(
+                    "SELECT 1 FROM accounts WHERE id = ?1",
+                    params![account_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .is_some();
+            if !exists {
+                return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
+            }
+            transaction.execute("UPDATE accounts SET is_default = 0", [])?;
+            transaction.execute(
+                "UPDATE accounts SET is_default = 1 WHERE id = ?1",
+                params![account_id],
+            )?;
+            let account = account_for_conn(&transaction, Some(account_id))?;
+            transaction.commit()?;
+            Ok(account)
         })
     }
 
@@ -753,6 +794,7 @@ impl MailStore {
             }
 
             transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
+            ensure_default_account_for_conn(&transaction)?;
             let next_account = account_for_conn(&transaction, None)?;
             transaction.commit()?;
             Ok(next_account)
@@ -1161,7 +1203,7 @@ impl MailStore {
             conn.query_row(
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature
+                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1
@@ -1907,11 +1949,11 @@ impl MailStore {
             let mut stmt = conn.prepare(
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature
+                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
                 FROM accounts a
                 LEFT JOIN imap_mailboxes m ON m.account_id = a.id
                 GROUP BY a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                         a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature
+                         a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
                 ORDER BY
                     CASE WHEN COUNT(m.id) = 0 THEN 0 ELSE 1 END,
                     MIN(CASE WHEN m.last_sync_at = '' THEN '0000-00-00T00:00:00Z' ELSE m.last_sync_at END) ASC,
@@ -3821,6 +3863,7 @@ fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         sync_mode: row.get(7)?,
         remote_images_allowed: row.get::<_, i64>(8)? != 0,
         signature: row.get(9)?,
+        is_default: row.get::<_, i64>(10)? != 0,
     })
 }
 
@@ -4135,7 +4178,7 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
     if let Some(account_id) = account_id {
         return conn
             .query_row(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
                  FROM accounts WHERE id = ?1",
                 params![account_id],
                 map_account,
@@ -4144,12 +4187,31 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
     }
 
     conn.query_row(
-        "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature
-         FROM accounts ORDER BY id LIMIT 1",
+        "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
+         FROM accounts ORDER BY is_default DESC, id LIMIT 1",
         [],
         map_account,
     )
     .map_err(Into::into)
+}
+
+fn ensure_default_account_for_conn(conn: &Connection) -> MailResult<()> {
+    let preferred_account_id = conn
+        .query_row(
+            "SELECT id FROM accounts ORDER BY is_default DESC, id LIMIT 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?;
+    let Some(preferred_account_id) = preferred_account_id else {
+        return Ok(());
+    };
+    conn.execute("UPDATE accounts SET is_default = 0", [])?;
+    conn.execute(
+        "UPDATE accounts SET is_default = 1 WHERE id = ?1",
+        params![preferred_account_id],
+    )?;
+    Ok(())
 }
 
 fn upsert_contact(conn: &Connection, name: &str, email: &str, seen_at: &str) -> MailResult<()> {
@@ -5631,6 +5693,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(second_account.email, "second@better-email.local");
+        assert!(first_account.is_default);
+        assert!(!second_account.is_default);
         assert_eq!(store.list_accounts().unwrap().len(), 2);
 
         let second_folders = store
@@ -5685,6 +5749,46 @@ mod tests {
     }
 
     #[test]
+    fn default_account_can_be_changed_and_remains_unique() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = store
+            .create_account(AccountCreateInput {
+                email: "default@better-email.local".to_string(),
+                display_name: "Default Account".to_string(),
+                provider: "Custom".to_string(),
+                imap_host: "imap.default.test:993".to_string(),
+                smtp_host: "smtp.default.test:465".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+            })
+            .unwrap();
+
+        let updated = store.set_default_account(second_account.id).unwrap();
+        assert!(updated.is_default);
+        assert_eq!(store.get_account().unwrap().id, second_account.id);
+
+        let accounts = store.list_accounts().unwrap();
+        assert_eq!(accounts[0].id, second_account.id);
+        assert_eq!(
+            accounts.iter().filter(|account| account.is_default).count(),
+            1
+        );
+        assert!(
+            !accounts
+                .iter()
+                .find(|account| account.id == first_account.id)
+                .unwrap()
+                .is_default
+        );
+
+        let error = store.set_default_account(999_999).unwrap_err().to_string();
+        assert!(error.contains("邮箱账号不存在"));
+    }
+
+    #[test]
     fn accounts_can_be_safely_deleted_with_related_data() {
         let store = test_store();
         let first_account = store.get_account().unwrap();
@@ -5701,6 +5805,7 @@ mod tests {
                 signature: "Remove signature".to_string(),
             })
             .unwrap();
+        store.set_default_account(second_account.id).unwrap();
 
         let (message_id, attachment_id) = store
             .with_conn(|conn| {
@@ -5761,6 +5866,7 @@ mod tests {
 
         let next_account = store.delete_account(second_account.id).unwrap();
         assert_eq!(next_account.id, first_account.id);
+        assert!(next_account.is_default);
         assert_eq!(store.list_accounts().unwrap().len(), 1);
 
         store

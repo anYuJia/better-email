@@ -12,7 +12,7 @@ export type AccountProviderPreset = {
 
 export type ProviderCompatibility = AccountProviderPreset & {
   setup: string;
-  tested_status: 'preset' | 'needs-account';
+  tested_status: 'preset' | 'needs-account' | 'verified';
   limitations: string;
 };
 
@@ -60,10 +60,10 @@ export const providerCompatibilityMatrix: ProviderCompatibility[] = [
     imap_host: 'imap.163.com:993',
     smtp_host: 'smtp.163.com:465',
     auth_type: 'password',
-    hint: '通常需要客户端授权码，465 端口使用 TLS。',
+    hint: '需开启 IMAP/SMTP 并使用客户端授权码，465 端口使用 TLS。',
     setup: '开启 IMAP/SMTP 服务，使用客户端授权码；SMTP 465 使用隐式 TLS。',
-    tested_status: 'needs-account',
-    limitations: '不同网易邮箱产品端口和授权码策略可能不同，需真实账号验证。',
+    tested_status: 'verified',
+    limitations: '已验证 IMAP 993、SMTP 465 的 TLS 与授权码认证；真实发送、附件和压力同步仍待扩展。',
   },
 ];
 

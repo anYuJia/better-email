@@ -45,6 +45,7 @@ export type SidebarProps = {
   notificationStatus: string;
   appBadgeStatus: string;
   onAccountScopeChange: (value: string) => void;
+  onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
   onSelectFolder: (folderId: number) => void;
   onDropMessagesToFolder: (folder: Folder, messageIds: number[]) => void;
@@ -96,6 +97,7 @@ export default function Sidebar({
   notificationStatus,
   appBadgeStatus,
   onAccountScopeChange,
+  onSetDefaultAccount,
   onCompose,
   onSelectFolder,
   onDropMessagesToFolder,
@@ -195,6 +197,7 @@ export default function Sidebar({
         accountScope={accountScope}
         accounts={accounts}
         onChange={onAccountScopeChange}
+        onSetDefault={onSetDefaultAccount}
       />
       <button className="compose-button" onClick={onCompose}>
         <Edit3 size={17} /> 写邮件

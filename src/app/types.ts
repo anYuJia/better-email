@@ -18,9 +18,10 @@ export type Account = {
   sync_mode: string;
   remote_images_allowed: boolean;
   signature: string;
+  is_default: boolean;
 };
 
-export type AccountCreateInput = Omit<Account, 'id'>;
+export type AccountCreateInput = Omit<Account, 'id' | 'is_default'>;
 
 export type Folder = {
   id: number;

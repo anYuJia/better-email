@@ -1584,6 +1584,22 @@ export default function App() {
     setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
   }
 
+  async function setDefaultAccount(accountId: number) {
+    const updated = await invoke<Account>('set_default_account', { accountId });
+    setAccounts((current) => current
+      .map((item) => ({ ...item, is_default: item.id === updated.id }))
+      .sort((left, right) => Number(right.is_default) - Number(left.is_default) || left.id - right.id));
+    setAccount((current) => {
+      if (!current) return current;
+      return current.id === updated.id ? updated : { ...current, is_default: false };
+    });
+    setAccountForm((current) => {
+      if (!current) return current;
+      return current.id === updated.id ? updated : { ...current, is_default: false };
+    });
+    setStatus(`默认发件账号已设为：${updated.email}`);
+  }
+
   function applyProviderPreset(preset: AccountProviderPreset) {
     if (!accountForm) return;
     setAccountForm({
@@ -2628,6 +2644,9 @@ export default function App() {
         notificationStatus={notificationStatus}
         appBadgeStatus={appBadgeStatus}
         onAccountScopeChange={changeAccountScope}
+        onSetDefaultAccount={(accountId) => {
+          setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
+        }}
         onCompose={() => openComposer()}
         onSelectFolder={setFolderId}
         onDropMessagesToFolder={(folder, messageIds) => {

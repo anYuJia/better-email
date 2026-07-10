@@ -54,6 +54,11 @@ pub fn create_account(
 }
 
 #[tauri::command]
+pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Account> {
+    store.set_default_account(account_id)
+}
+
+#[tauri::command]
 pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Account> {
     store.delete_account(account_id)
 }

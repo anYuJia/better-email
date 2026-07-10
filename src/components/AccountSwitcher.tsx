@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Mail, Mails } from 'lucide-react';
+import { ChevronDown, Mail, Mails, Star } from 'lucide-react';
 import type { Account, AccountScope } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import './account-switcher.css';
@@ -8,6 +8,7 @@ type AccountSwitcherProps = {
   accountScope: AccountScope;
   accounts: Account[];
   onChange: (value: string) => void;
+  onSetDefault: (accountId: number) => void;
 };
 
 function providerLabel(provider: string) {
@@ -31,17 +32,19 @@ export default function AccountSwitcher({
   accountScope,
   accounts,
   onChange,
+  onSetDefault,
 }: AccountSwitcherProps) {
   const [menu, setMenu] = React.useState<{ x: number; y: number } | null>(null);
   const selectedAccount = accountScope === 'all'
     ? null
     : accounts.find((account) => account.id === accountScope) ?? null;
+  const defaultAccount = accounts.find((account) => account.is_default) ?? accounts[0] ?? null;
   const primaryLabel = selectedAccount?.display_name.trim()
     || selectedAccount?.email
     || '统一邮箱';
   const secondaryLabel = selectedAccount
-    ? `${providerLabel(selectedAccount.provider)} · ${selectedAccount.email}`
-    : `${accounts.length || 1} 个账号汇总`;
+    ? `${providerLabel(selectedAccount.provider)} · ${selectedAccount.email}${selectedAccount.is_default ? ' · 默认' : ''}`
+    : `${accounts.length || 1} 个账号汇总${defaultAccount ? ` · 默认 ${defaultAccount.email}` : ''}`;
 
   function openMenu(x: number, y: number) {
     setMenu({ x, y });
@@ -59,13 +62,25 @@ export default function AccountSwitcher({
     ...accounts.map((account, index) => ({
       id: `account-scope-${account.id}`,
       label: account.display_name.trim() || account.email,
-      detail: `${providerLabel(account.provider)} · ${account.email}`,
+      detail: `${providerLabel(account.provider)} · ${account.email}${account.is_default ? ' · 默认发件' : ''}`,
       icon: <Mail size={15} />,
       checked: accountScope === account.id,
       separatorBefore: index === 0,
       onSelect: () => onChange(String(account.id)),
     })),
   ];
+  if (selectedAccount) {
+    items.push({
+      id: 'set-default-account',
+      label: selectedAccount.is_default ? '默认发件账号' : '设为默认发件账号',
+      detail: selectedAccount.is_default ? '统一邮箱写信优先使用此账号' : '统一邮箱写信时优先使用',
+      icon: <Star size={15} />,
+      checked: selectedAccount.is_default,
+      disabled: selectedAccount.is_default,
+      separatorBefore: true,
+      onSelect: () => onSetDefault(selectedAccount.id),
+    });
+  }
 
   return (
     <section
@@ -108,7 +123,7 @@ export default function AccountSwitcher({
           items={items}
           className="account-switcher-menu"
           title="切换邮箱范围"
-          detail={selectedAccount?.email ?? '查看全部账号的统一收件箱'}
+          detail={selectedAccount?.email ?? (defaultAccount ? `默认发件：${defaultAccount.email}` : '查看全部账号的统一收件箱')}
           ariaLabel="邮箱范围选择"
           onClose={() => setMenu(null)}
         />

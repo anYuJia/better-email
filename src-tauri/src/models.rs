@@ -13,6 +13,7 @@ pub struct Account {
     pub sync_mode: String,
     pub remote_images_allowed: bool,
     pub signature: String,
+    pub is_default: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -7,6 +7,7 @@ import {
 import type {
   Account,
   BackgroundTaskKind,
+  ConnectionReport,
   CredentialStatus,
   CredentialVerificationReport,
   Folder,
@@ -17,12 +18,14 @@ import type {
   SyncSchedulePlan,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
+import ConnectionDiagnosticsPanel from './ConnectionDiagnosticsPanel';
 import './data-settings.css';
 
 type SyncOperationsSettingsProps = {
   accountForm: Account;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
+  connectionReport: ConnectionReport | null;
   credentialVerification: CredentialVerificationReport | null;
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
@@ -48,6 +51,7 @@ export default function SyncOperationsSettings({
   accountForm,
   credentialSecret,
   credentialStatus,
+  connectionReport,
   credentialVerification,
   imapProbe,
   syncSchedulePlan,
@@ -153,41 +157,12 @@ export default function SyncOperationsSettings({
             验证登录
           </button>
         </div>
-        {credentialStatus && (
-          <div className={credentialStatus.exists ? 'tool-row ok' : 'tool-row warn'}>
-            <span>{credentialStatus.exists ? '已存在' : '未保存'}</span>
-            <em>{credentialStatus.account_email}</em>
-            <p>{credentialStatus.message}</p>
-          </div>
-        )}
-        {credentialVerification && (
-          <>
-            <div className={credentialVerification.authenticated ? 'tool-row ok settings-auth-summary' : 'tool-row warn settings-auth-summary'}>
-              <span>账号登录验证</span>
-              <em>
-                {credentialVerification.authenticated
-                  ? '全部通过'
-                  : credentialVerification.status === 'partial'
-                    ? '部分通过'
-                    : credentialVerification.status === 'credential_error'
-                      ? '凭据不可用'
-                      : '未通过'}
-              </em>
-              <small>{formatDate(credentialVerification.checked_at)}</small>
-              <p>{credentialVerification.message}</p>
-            </div>
-            <div className="settings-endpoint-grid settings-auth-checks" aria-label="账号登录验证结果">
-              {credentialVerification.checks.map((check) => (
-                <div className={check.authenticated ? 'tool-row ok' : 'tool-row warn'} key={check.name}>
-                  <span>{check.name}</span>
-                  <em>{check.address}</em>
-                  <small>{check.authenticated ? '登录成功' : '登录失败'}</small>
-                  <p>{check.message}</p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <ConnectionDiagnosticsPanel
+          account={accountForm}
+          credentialStatus={credentialStatus}
+          connectionReport={connectionReport}
+          credentialVerification={credentialVerification}
+        />
       </section>
 
       <section className="tool-panel settings-sync-panel">

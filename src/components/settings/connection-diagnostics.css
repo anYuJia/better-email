@@ -1,0 +1,245 @@
+.connection-diagnostics {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e7ec;
+}
+
+.connection-diagnostics > header {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.connection-diagnostics-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #1768ad;
+  background: #edf6ff;
+}
+
+.connection-diagnostics.success .connection-diagnostics-icon {
+  color: #18764a;
+  background: #edf8f2;
+}
+
+.connection-diagnostics.warning .connection-diagnostics-icon {
+  color: #9a5b08;
+  background: #fff7e8;
+}
+
+.connection-diagnostics.error .connection-diagnostics-icon {
+  color: #b13c36;
+  background: #fff0ef;
+}
+
+.connection-diagnostics > header > div {
+  min-width: 0;
+}
+
+.connection-diagnostics > header strong {
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.connection-diagnostics > header p {
+  margin: 3px 0 0;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.connection-diagnostics > header em {
+  padding: 4px 7px;
+  border: 1px solid #dce5ee;
+  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  background: #f8fafc;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 680;
+}
+
+.connection-diagnostic-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #e1e6eb;
+  border-radius: 9px;
+  background: #e1e6eb;
+}
+
+.connection-diagnostic-steps > div {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: #ffffff;
+}
+
+.connection-step-kind {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: #667788;
+  background: #f3f5f7;
+}
+
+.connection-diagnostic-steps > div.success .connection-step-kind,
+.connection-diagnostic-steps > div.success .connection-step-state {
+  color: #18764a;
+}
+
+.connection-diagnostic-steps > div.warning .connection-step-kind,
+.connection-diagnostic-steps > div.warning .connection-step-state {
+  color: #9a5b08;
+}
+
+.connection-diagnostic-steps > div.error .connection-step-kind,
+.connection-diagnostic-steps > div.error .connection-step-state {
+  color: #b13c36;
+}
+
+.connection-diagnostic-steps > div > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.connection-diagnostic-steps strong {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.connection-diagnostic-steps small {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.connection-step-state {
+  display: grid;
+  place-items: center;
+  color: #a1acb7;
+}
+
+.connection-recommendations {
+  display: grid;
+  gap: 6px;
+  padding: 10px 11px;
+  border-left: 3px solid #90bce5;
+  background: #f6f9fc;
+}
+
+.connection-recommendations > strong {
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+}
+
+.connection-recommendations ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.connection-technical-details {
+  border-top: 1px solid #e7ebef;
+}
+
+.connection-technical-details > summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 680;
+  list-style: none;
+}
+
+.connection-technical-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connection-technical-details > div {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #e2e7ec;
+  border-radius: 8px;
+  background: #e2e7ec;
+}
+
+.connection-technical-details p {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 6px 9px;
+  margin: 0;
+  padding: 8px 9px;
+  background: #ffffff;
+  font-size: 9.5px;
+}
+
+.connection-technical-details p strong {
+  font-size: 9.5px;
+}
+
+.connection-technical-details p span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-technical-details p em {
+  color: var(--ui-text-tertiary);
+  font-style: normal;
+}
+
+.connection-technical-details p small {
+  grid-column: 2 / -1;
+  color: var(--ui-text-tertiary);
+  line-height: 1.4;
+}
+
+.connection-technical-details footer {
+  padding: 7px 9px;
+  color: var(--ui-text-tertiary);
+  background: #f8fafb;
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .connection-diagnostic-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-diagnostics > header {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .connection-diagnostics > header em {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

@@ -2249,6 +2249,7 @@ export default function App() {
               accountForm={accountForm}
               credentialSecret={credentialSecret}
               credentialStatus={credentialStatus}
+              connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
               credentialVerification={credentialVerification?.account_email === accountForm.email ? credentialVerification : null}
               imapProbe={imapProbe}
               syncSchedulePlan={syncSchedulePlan}

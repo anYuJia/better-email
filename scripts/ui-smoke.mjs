@@ -767,7 +767,9 @@ async function main() {
     await openDetails(cdp, '.settings-disclosure[data-settings-section=\"sync\"]');
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
     await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
-    await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('账号登录验证') && document.querySelector('.settings-credential-panel')?.innerText.includes('全部通过') && document.querySelector('.settings-credential-panel')?.innerText.includes('IMAP') && document.querySelector('.settings-credential-panel')?.innerText.includes('SMTP') && document.body.innerText.includes('未发送任何邮件')");
+    await waitForExpression(cdp, "document.querySelector('[data-connection-diagnostics]')?.innerText.includes('账号连接已就绪') && [...document.querySelectorAll('[data-diagnostic-step]')].length === 4 && [...document.querySelectorAll('[data-diagnostic-step]')].every((step) => step.classList.contains('success')) && !document.querySelector('.connection-technical-details')?.open");
+    await evalInPage(cdp, "document.querySelector('.connection-technical-details > summary').click()");
+    await waitForExpression(cdp, "document.querySelector('.connection-technical-details')?.open && document.querySelector('.connection-technical-details')?.textContent.includes('未发送任何邮件') && document.querySelector('.connection-technical-details')?.textContent.includes('不显示或导出授权码与 Token')");
     await clickButton(cdp, '发现文件夹', "document.querySelector('.settings-imap-discovery')");
     await waitForExpression(cdp, "document.querySelector('.settings-imap-discovery')?.innerText.includes('design@better-email.local') && document.querySelector('.settings-imap-discovery')?.innerText.includes('4 个')");
     await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未映射')");
@@ -1003,7 +1005,7 @@ async function main() {
         'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
         'multi-account diagnostics target selected account',
-        'credential login verification separates IMAP and SMTP authentication',
+        'provider-aware credential diagnostics guide recovery and fold technical details',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',
         'mapped custom mailbox resolves as a remote move target',

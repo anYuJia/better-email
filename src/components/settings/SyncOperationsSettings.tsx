@@ -4,6 +4,7 @@ import {
   outboxStatusLabel,
   outboxTimingLabel,
 } from '../../app/appConfig';
+import type { ProviderValidationReport } from '../../app/providerValidation';
 import type {
   Account,
   BackgroundTaskKind,
@@ -27,6 +28,8 @@ type SyncOperationsSettingsProps = {
   credentialStatus: CredentialStatus | null;
   connectionReport: ConnectionReport | null;
   credentialVerification: CredentialVerificationReport | null;
+  providerValidationReport: ProviderValidationReport | null;
+  providerValidationRunning: boolean;
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
@@ -37,6 +40,7 @@ type SyncOperationsSettingsProps = {
   onDiscoverImapFolders: () => void;
   onCheckCredential: () => void;
   onVerifyCredential: () => void;
+  onRunProviderValidation: () => void;
   onDeleteCredential: () => void;
   onStoreCredential: () => void;
   onRunSyncDryRun: () => void;
@@ -53,6 +57,8 @@ export default function SyncOperationsSettings({
   credentialStatus,
   connectionReport,
   credentialVerification,
+  providerValidationReport,
+  providerValidationRunning,
   imapProbe,
   syncSchedulePlan,
   imapMailboxes,
@@ -63,6 +69,7 @@ export default function SyncOperationsSettings({
   onDiscoverImapFolders,
   onCheckCredential,
   onVerifyCredential,
+  onRunProviderValidation,
   onDeleteCredential,
   onStoreCredential,
   onRunSyncDryRun,
@@ -162,6 +169,9 @@ export default function SyncOperationsSettings({
           credentialStatus={credentialStatus}
           connectionReport={connectionReport}
           credentialVerification={credentialVerification}
+          providerValidationReport={providerValidationReport}
+          providerValidationRunning={providerValidationRunning}
+          onRunProviderValidation={onRunProviderValidation}
         />
       </section>
 

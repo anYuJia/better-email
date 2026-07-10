@@ -331,6 +331,8 @@ export default function App() {
   });
   const {
     activeProviderVerification,
+    providerValidationReport,
+    providerValidationRunning,
     updateProviderVerification,
     saveSettings,
     createNewAccount,
@@ -342,6 +344,7 @@ export default function App() {
     testConnection,
     verifyAccountCredentials,
     discoverImapFolders,
+    runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
     runSyncDryRun,
@@ -2251,6 +2254,10 @@ export default function App() {
               credentialStatus={credentialStatus}
               connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
               credentialVerification={credentialVerification?.account_email === accountForm.email ? credentialVerification : null}
+              providerValidationReport={providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null}
+              providerValidationRunning={
+                providerValidationRunning && providerValidationReport?.account_email === accountForm.email
+              }
               imapProbe={imapProbe}
               syncSchedulePlan={syncSchedulePlan}
               imapMailboxes={imapMailboxes}
@@ -2261,6 +2268,9 @@ export default function App() {
               onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
               onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
               onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
+              onRunProviderValidation={() => {
+                runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
+              }}
               onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
               onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
               onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}

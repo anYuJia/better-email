@@ -1,5 +1,9 @@
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { emptyAccountCreateForm } from '../app/appConfig';
+import {
+  runProviderValidation as executeProviderValidation,
+  type ProviderValidationReport,
+} from '../app/providerValidation';
 import type {
   Account,
   AccountCreateInput,
@@ -136,6 +140,9 @@ export default function useAccountConnectionController({
   loadMeta,
   loadMessages,
 }: UseAccountConnectionControllerOptions) {
+  const [providerValidationReport, setProviderValidationReport] = useState<ProviderValidationReport | null>(null);
+  const [providerValidationRunning, setProviderValidationRunning] = useState(false);
+  const providerValidationRunId = useRef(0);
   const providerVerificationFor = useCallback(
     (providerName: string) => providerVerificationRecordFor(providerName, providerVerifications),
     [providerVerifications],
@@ -321,6 +328,7 @@ export default function useAccountConnectionController({
         ? '服务器连接成功；账号是否可登录仍需点击“验证登录”'
         : '服务器测试完成，请查看网络结果',
     );
+    return report;
   }, [accountForm?.id, setConnectionReport, setStatus]);
 
   const verifyAccountCredentials = useCallback(async () => {
@@ -335,6 +343,7 @@ export default function useAccountConnectionController({
       );
     }
     setStatus(report.message);
+    return report;
   }, [
     accountForm,
     setCredentialVerification,
@@ -348,7 +357,85 @@ export default function useAccountConnectionController({
     const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
     setImapMailboxes(mailboxes);
     setStatus(report.message);
+    return report;
   }, [accountForm?.id, setImapMailboxes, setImapProbe, setStatus]);
+
+  const runReadOnlyProviderValidation = useCallback(async () => {
+    if (!accountForm || providerValidationRunning) return null;
+    const validationAccount = accountForm;
+    const runId = ++providerValidationRunId.current;
+    setProviderValidationRunning(true);
+    try {
+      const report = await executeProviderValidation(validationAccount.email, {
+        testConnection: async () => {
+          const result = await invoke<ConnectionReport>('test_connection', {
+            accountId: validationAccount.id,
+          });
+          setConnectionReport(result);
+          return result;
+        },
+        verifyCredentials: async () => {
+          const result = await invoke<CredentialVerificationReport>('verify_account_credentials', {
+            accountId: validationAccount.id,
+          });
+          setCredentialVerification(result);
+          if (result.status !== 'credential_error') {
+            updateProviderVerification(
+              validationAccount.provider,
+              credentialVerificationPatch(result, validationAccount.auth_type),
+            );
+          }
+          return result;
+        },
+        discoverFolders: async () => {
+          const result = await invoke<ImapProbeReport>('discover_imap_folders', {
+            accountId: validationAccount.id,
+          });
+          setImapProbe(result);
+          const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
+          setImapMailboxes(mailboxes);
+          return result;
+        },
+        syncHeaders: async () => {
+          const result = await invoke<SyncRun>('sync_imap_headers', {
+            accountId: validationAccount.id,
+          });
+          setSyncRuns((current) => [result, ...current].slice(0, 10));
+          await loadMeta(folderId, validationAccount.id);
+          await loadMessages(folderId, query, filter, validationAccount.id);
+          return result;
+        },
+        onUpdate: (nextReport) => {
+          if (providerValidationRunId.current === runId) {
+            setProviderValidationReport(nextReport);
+          }
+        },
+      });
+      if (providerValidationRunId.current === runId) {
+        setStatus(report.summary);
+      }
+      return report;
+    } finally {
+      if (providerValidationRunId.current === runId) {
+        setProviderValidationRunning(false);
+      }
+    }
+  }, [
+    accountForm,
+    filter,
+    folderId,
+    loadMessages,
+    loadMeta,
+    providerValidationRunning,
+    query,
+    setConnectionReport,
+    setCredentialVerification,
+    setImapMailboxes,
+    setImapProbe,
+    setStatus,
+    setSyncRuns,
+    updateProviderVerification,
+  ]);
 
   const mapImapMailbox = useCallback(async (
     mailbox: ImapMailboxState,
@@ -414,6 +501,8 @@ export default function useAccountConnectionController({
 
   return {
     activeProviderVerification,
+    providerValidationReport,
+    providerValidationRunning,
     updateProviderVerification,
     saveSettings,
     createNewAccount,
@@ -425,6 +514,7 @@ export default function useAccountConnectionController({
     testConnection,
     verifyAccountCredentials,
     discoverImapFolders,
+    runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
     runSyncDryRun,

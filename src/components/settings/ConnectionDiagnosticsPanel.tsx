@@ -3,12 +3,18 @@ import {
   CheckCircle2,
   Circle,
   KeyRound,
+  LoaderCircle,
   MailCheck,
+  PlayCircle,
   Send,
   Server,
   ShieldCheck,
 } from 'lucide-react';
 import { buildConnectionDiagnosticModel, type ConnectionDiagnosticStep } from '../../app/connectionDiagnostics';
+import type {
+  ProviderValidationReport,
+  ProviderValidationStage,
+} from '../../app/providerValidation';
 import type {
   Account,
   ConnectionReport,
@@ -23,6 +29,9 @@ type ConnectionDiagnosticsPanelProps = {
   credentialStatus: CredentialStatus | null;
   connectionReport: ConnectionReport | null;
   credentialVerification: CredentialVerificationReport | null;
+  providerValidationReport: ProviderValidationReport | null;
+  providerValidationRunning: boolean;
+  onRunProviderValidation: () => void;
 };
 
 const stepIcons = {
@@ -38,11 +47,21 @@ function StepStateIcon({ step }: { step: ConnectionDiagnosticStep }) {
   return <Circle size={15} />;
 }
 
+function ValidationStateIcon({ stage }: { stage: ProviderValidationStage }) {
+  if (stage.state === 'success') return <CheckCircle2 size={13} />;
+  if (stage.state === 'running') return <LoaderCircle className="connection-spinner" size={13} />;
+  if (stage.state === 'warning' || stage.state === 'error') return <AlertTriangle size={13} />;
+  return <Circle size={13} />;
+}
+
 export default function ConnectionDiagnosticsPanel({
   account,
   credentialStatus,
   connectionReport,
   credentialVerification,
+  providerValidationReport,
+  providerValidationRunning,
+  onRunProviderValidation,
 }: ConnectionDiagnosticsPanelProps) {
   const model = buildConnectionDiagnosticModel({
     account,
@@ -62,11 +81,24 @@ export default function ConnectionDiagnosticsPanel({
         <span className="connection-diagnostics-icon" aria-hidden="true">
           <ShieldCheck size={17} />
         </span>
-        <div>
+        <div className="connection-diagnostics-title">
           <strong>{model.title}</strong>
           <p>{model.summary}</p>
         </div>
-        <em>{model.providerLabel}</em>
+        <div className="connection-diagnostics-actions">
+          <em>{model.providerLabel}</em>
+          <button
+            type="button"
+            disabled={providerValidationRunning}
+            title="依次执行服务器、登录、文件夹发现和邮件头同步；不会发送邮件"
+            onClick={onRunProviderValidation}
+          >
+            {providerValidationRunning
+              ? <LoaderCircle className="connection-spinner" size={13} />
+              : <PlayCircle size={13} />}
+            {providerValidationRunning ? '验收中' : '一键验收'}
+          </button>
+        </div>
       </header>
 
       <div className="connection-diagnostic-steps" role="list">
@@ -96,6 +128,34 @@ export default function ConnectionDiagnosticsPanel({
             <li key={recommendation}>{recommendation}</li>
           ))}
         </ol>
+      </div>
+
+      <div
+        className={`provider-validation ${providerValidationReport?.status ?? 'idle'}`}
+        data-provider-validation
+        data-provider-validation-status={providerValidationReport?.status ?? 'idle'}
+      >
+        {providerValidationReport ? (
+          <>
+            <div className="provider-validation-stages" role="list">
+              {providerValidationReport.stages.map((stage) => (
+                <span
+                  className={stage.state}
+                  data-provider-validation-stage={stage.id}
+                  key={stage.id}
+                  role="listitem"
+                  title={stage.detail}
+                >
+                  <ValidationStateIcon stage={stage} />
+                  <b>{stage.label}</b>
+                </span>
+              ))}
+            </div>
+            <p>{providerValidationReport.summary}</p>
+          </>
+        ) : (
+          <p>一键验收按顺序检查服务器、登录、文件夹与邮件头同步，不发送邮件或修改远端状态。</p>
+        )}
       </div>
 
       {hasTechnicalDetails && (

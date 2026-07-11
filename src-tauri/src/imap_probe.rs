@@ -1326,7 +1326,7 @@ fn login_imap(
     account: &Account,
     secret: &AccountSecret,
 ) -> Result<imap::Session<imap::Connection>, MailError> {
-    match secret {
+    let mut session = match secret {
         AccountSecret::Password(password) => client
             .login(&account.email, password)
             .map_err(|error| MailError::Imap(format!("IMAP 登录失败：{}", error.0))),
@@ -1341,7 +1341,89 @@ fn login_imap(
                     MailError::Imap(format!("IMAP XOAUTH2 登录失败：{error}"))
                 })
         }
+    }?;
+    send_imap_client_id_if_needed(&mut session, account);
+    Ok(session)
+}
+
+fn send_imap_client_id_if_needed(
+    session: &mut imap::Session<imap::Connection>,
+    account: &Account,
+) {
+    if !needs_imap_client_id(account) {
+        return;
     }
+    let command = match imap_client_id_command() {
+        Ok(command) => command,
+        Err(error) => {
+            eprintln!(
+                "[better-email][imap] client id build failed email={} error={error}",
+                mask_imap_email(&account.email),
+            );
+            return;
+        }
+    };
+    match session.run_command_and_check_ok(&command) {
+        Ok(()) => eprintln!(
+            "[better-email][imap] client id sent email={} provider={} host={}",
+            mask_imap_email(&account.email),
+            account.provider,
+            account.imap_host,
+        ),
+        Err(error) => eprintln!(
+            "[better-email][imap] client id failed email={} provider={} host={} error={error}",
+            mask_imap_email(&account.email),
+            account.provider,
+            account.imap_host,
+        ),
+    }
+}
+
+fn needs_imap_client_id(account: &Account) -> bool {
+    let provider = account.provider.trim().to_ascii_lowercase();
+    let email = account.email.trim().to_ascii_lowercase();
+    let host = account.imap_host.trim().to_ascii_lowercase();
+    provider.contains("netease")
+        || provider == "163"
+        || provider == "126"
+        || provider == "yeah"
+        || provider == "188"
+        || email.ends_with("@163.com")
+        || email.ends_with("@126.com")
+        || email.ends_with("@yeah.net")
+        || email.ends_with("@188.com")
+        || host.contains("imap.163.com")
+        || host.contains("imap.126.com")
+        || host.contains("imap.yeah.net")
+        || host.contains("imap.188.com")
+}
+
+fn imap_client_id_command() -> Result<String, MailError> {
+    let fields = [
+        ("name", "Better Email"),
+        ("version", env!("CARGO_PKG_VERSION")),
+        ("vendor", "Better Email"),
+    ];
+    let parts = fields
+        .iter()
+        .map(|(key, value)| {
+            Ok(format!(
+                "{} {}",
+                quote_imap_string(key)?,
+                quote_imap_string(value)?
+            ))
+        })
+        .collect::<Result<Vec<_>, MailError>>()?;
+    Ok(format!("ID ({})", parts.join(" ")))
+}
+
+fn mask_imap_email(email: &str) -> String {
+    let trimmed = email.trim();
+    if let Some((local, domain)) = trimmed.split_once('@') {
+        let first = local.chars().next().unwrap_or('*');
+        return format!("{first}***@{domain}");
+    }
+    "***".to_string()
 }
 
 #[cfg(test)]
@@ -1765,6 +1847,41 @@ mod tests {
         assert_eq!(
             imap_xoauth2_response("me@example.com", "access-123"),
             "user=me@example.com\x01auth=Bearer access-123\x01\x01"
+        );
+    }
+
+    #[test]
+    fn detects_netease_accounts_that_need_imap_client_id() {
+        let mut account = Account {
+            id: 1,
+            email: "user@163.com".to_string(),
+            display_name: "User".to_string(),
+            provider: "netease".to_string(),
+            imap_host: "imap.163.com:993".to_string(),
+            smtp_host: "smtp.163.com:465".to_string(),
+            incoming_protocol: "imap".to_string(),
+            auth_type: "password".to_string(),
+            sync_mode: "manual".to_string(),
+            remote_images_allowed: false,
+            signature: String::new(),
+            is_default: true,
+        };
+        assert!(needs_imap_client_id(&account));
+
+        account.provider = "custom".to_string();
+        account.email = "user@example.com".to_string();
+        account.imap_host = "imap.example.com:993".to_string();
+        assert!(!needs_imap_client_id(&account));
+    }
+
+    #[test]
+    fn builds_rfc2971_imap_client_id_command() {
+        assert_eq!(
+            imap_client_id_command().unwrap(),
+            format!(
+                "ID (\"name\" \"Better Email\" \"version\" \"{}\" \"vendor\" \"Better Email\")",
+                env!("CARGO_PKG_VERSION")
+            )
         );
     }
 

@@ -20,6 +20,7 @@ use std::time::Duration;
 
 const HEADER_FETCH_LIMIT: usize = 25;
 const FLAG_RECONCILE_LIMIT: u32 = 50;
+const BODY_FETCH_QUERY_PRESERVE_SEEN: &str = "BODY.PEEK[]";
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
 const ATTACHMENT_RETRY_BASE_DELAY_MS: u64 = 150;
@@ -345,6 +346,10 @@ pub fn fetch_message_body(
     remote_name: &str,
     remote_uid: i64,
 ) -> Result<RemoteMessageBody, MailError> {
+    eprintln!(
+        "[better-email][imap] body fetch start account_id={} mailbox={} uid={} peek=true seen_unchanged=true",
+        account.id, remote_name, remote_uid
+    );
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = imap::ClientBuilder::new(host.as_str(), port)
         .connect()
@@ -354,7 +359,7 @@ pub fn fetch_message_body(
         .select(remote_name)
         .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
     let fetches = session
-        .uid_fetch(remote_uid.to_string(), "RFC822")
+        .uid_fetch(remote_uid.to_string(), BODY_FETCH_QUERY_PRESERVE_SEEN)
         .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
     let raw = fetches
         .iter()
@@ -363,6 +368,13 @@ pub fn fetch_message_body(
         .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
     let _ = session.logout();
 
+    eprintln!(
+        "[better-email][imap] body fetch ok account_id={} mailbox={} uid={} bytes={} seen_unchanged=true",
+        account.id,
+        remote_name,
+        remote_uid,
+        raw.len()
+    );
     Ok(parse_body_from_raw(&raw))
 }
 
@@ -1987,6 +1999,12 @@ mod tests {
             None
         );
         assert_eq!(single_appended_uid(None), None);
+    }
+
+    #[test]
+    fn body_fetch_query_does_not_mark_message_seen() {
+        assert_eq!(BODY_FETCH_QUERY_PRESERVE_SEEN, "BODY.PEEK[]");
+        assert!(!BODY_FETCH_QUERY_PRESERVE_SEEN.contains("RFC822"));
     }
 
     #[test]

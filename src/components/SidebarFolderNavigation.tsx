@@ -122,7 +122,7 @@ function FolderItems({
 }
 
 export type SidebarFolderNavigationProps = {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   folders: Folder[];
   folderId: number | null;
   renamingFolderId: number | null;

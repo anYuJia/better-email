@@ -3031,45 +3031,6 @@ body {
   font-size: 12px;
 }
 
-.sidebar-tools > .sidebar-tool-stack {
-  max-height: min(280px, 34vh);
-  padding: 2px 0 4px 8px;
-}
-
-.sidebar-tool-section {
-  gap: 6px;
-  padding: 8px 0;
-}
-
-.sidebar-tool-heading {
-  min-height: 22px;
-  margin-bottom: 4px;
-}
-
-.sidebar-tool-heading strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 620;
-}
-
-.saved-search-form input,
-.custom-folder-form input,
-.contact-center > input {
-  min-height: 32px;
-  font-size: 13px;
-}
-
-.saved-search-form button,
-.custom-folder-form button,
-.saved-search-row > button,
-.contact-row > button,
-.label-row .label-row-main {
-  min-height: 32px;
-  font-size: 13px;
-}
-
-.saved-search-list small,
-.contact-list small {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
+.sidebar-footer-actions {
+  padding-top: 9px;
 }

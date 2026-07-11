@@ -2309,13 +2309,6 @@ export default function App() {
         folderId={folderId}
         renamingFolderId={renamingFolderId}
         renamingFolderName={renamingFolderName}
-        savedSearches={savedSearches}
-        savedSearchName={savedSearchName}
-        contacts={contacts}
-        contactQuery={contactQuery}
-        filteredContacts={filteredContacts}
-        labels={labels}
-        customFolderName={customFolderName}
         backgroundTasks={backgroundTasks}
         backgroundSyncStatus={backgroundSyncStatus}
         lastNewMailNotice={lastNewMailNotice}
@@ -2340,19 +2333,6 @@ export default function App() {
         onDeleteFolder={(folder) => { deleteCustomFolder(folder).catch((error) => setStatus(String(error))); }}
         onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
         onEmptyTrash={() => { emptyCurrentTrash().catch((error) => setStatus(String(error))); }}
-        onSavedSearchNameChange={setSavedSearchName}
-        onSaveCurrentSearch={saveCurrentSearch}
-        onRunSavedSearch={(savedSearch) => { runSavedSearch(savedSearch).catch((error) => setStatus(String(error))); }}
-        onDeleteSavedSearch={deleteSavedSearch}
-        onRunLabelSearch={(label) => { runLabelSearch(label).catch((error) => setStatus(String(error))); }}
-        onContactQueryChange={setContactQuery}
-        onComposeToContact={composeToContact}
-        onAddContactToDraft={addContactToDraft}
-        onEditContact={openContactEditor}
-        onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
-        onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
-        onCustomFolderNameChange={setCustomFolderName}
-        onCreateCustomFolder={() => { createCustomFolder().catch((error) => setStatus(String(error))); }}
         onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}

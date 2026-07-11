@@ -101,7 +101,17 @@ export default function AccountSettingsPage({
     }
   }
 
+  function openAddDialog() {
+    setAccountDialogMode(null);
+    setAddDialogOpen(true);
+  }
+
+  function closeAddDialog() {
+    setAddDialogOpen(false);
+  }
+
   function openAccountDialog(account: Account, mode: AccountDialogMode) {
+    setAddDialogOpen(false);
     onAccountFormChange(account);
     setAccountDialogMode(mode);
   }
@@ -183,7 +193,7 @@ export default function AccountSettingsPage({
             <strong id="settings-account-list-title">邮箱账号</strong>
             <small>{accountCount} 个账号</small>
           </span>
-          <button type="button" onClick={() => setAddDialogOpen(true)}>
+          <button type="button" onClick={openAddDialog}>
             <Plus size={14} />
             添加账号
           </button>
@@ -245,7 +255,7 @@ export default function AccountSettingsPage({
           className="settings-account-add-overlay"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAddDialogOpen(false);
+            if (event.target === event.currentTarget) closeAddDialog();
           }}
         >
           <section
@@ -259,7 +269,7 @@ export default function AccountSettingsPage({
                 <strong id="settings-add-account-title">添加邮箱</strong>
                 <small>输入邮箱和授权码</small>
               </span>
-              <button type="button" aria-label="关闭" onClick={() => setAddDialogOpen(false)}>
+              <button type="button" aria-label="关闭" onClick={closeAddDialog}>
                 <X size={17} />
               </button>
             </header>
@@ -402,7 +412,7 @@ export default function AccountSettingsPage({
             )}
 
             <footer>
-              <button type="button" className="settings-account-add-cancel" onClick={() => setAddDialogOpen(false)}>
+              <button type="button" className="settings-account-add-cancel" onClick={closeAddDialog}>
                 取消
               </button>
               <button

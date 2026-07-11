@@ -18,6 +18,7 @@ import type {
   ImapProbeReport,
   Message,
   ProviderVerificationRecord,
+  SearchScope,
   SyncRun,
 } from '../app/types';
 import {
@@ -64,6 +65,9 @@ type UseAccountConnectionControllerOptions = {
     nextQuery?: string,
     nextFilter?: FilterMode,
     nextScope?: AccountScope,
+    refreshId?: number,
+    nextLimit?: number,
+    nextSearchScope?: SearchScope,
   ) => Promise<Message[]>;
 };
 
@@ -216,7 +220,7 @@ export default function useAccountConnectionController({
     setSelectedId(null);
     setAttachments([]);
     const { folderId: nextFolderId } = await loadMeta(null, created.id);
-    await loadMessages(nextFolderId, query, filter, created.id);
+    await loadMessages(nextFolderId, query, filter, created.id, undefined, undefined, 'all');
     setStatus(trimmedSecret ? `已创建账号并保存凭据：${created.email}` : `已创建账号：${created.email}`);
   }, [
     filter,

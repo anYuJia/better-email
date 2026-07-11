@@ -1187,7 +1187,7 @@ impl MailStore {
             if folder_id > 0 {
                 scope_conditions.push("m.folder_id = ?".to_string());
                 query_params.push(Value::Integer(folder_id));
-            } else {
+            } else if folder_id < 0 {
                 let role = role_for_virtual_folder_id(folder_id)
                     .ok_or_else(|| MailError::MissingFolderRole(folder_id.to_string()))?;
                 scope_conditions.push("f.role = ?".to_string());
@@ -3044,7 +3044,7 @@ impl MailStore {
                 if folder_id > 0 {
                     scope_conditions.push("m.folder_id = ?".to_string());
                     query_params.push(Value::Integer(folder_id));
-                } else {
+                } else if folder_id < 0 {
                     let role = role_for_virtual_folder_id(folder_id)
                         .ok_or_else(|| MailError::MissingFolderRole(folder_id.to_string()))?;
                     scope_conditions.push("f.role = ?".to_string());

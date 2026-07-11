@@ -2043,19 +2043,39 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 
 #[tauri::command]
 pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
+    eprintln!("[better-email][body] fetch command start message_id={message_id}");
     let account = store.get_message_account(message_id)?;
     if is_pop3_account(&account) {
+        eprintln!(
+            "[better-email][body] fetch command skipped pop3 message_id={} account_id={}",
+            message_id, account.id
+        );
         return store.get_message(message_id);
     }
     let secret = store.get_account_secret(&account)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
+        eprintln!(
+            "[better-email][body] fetch command missing remote ref message_id={} account_id={} mailbox={} uid={}",
+            message_id, account.id, remote_mailbox, remote_uid
+        );
         return Err(crate::db::MailError::Imap(
             "该邮件没有远端 UID，无法按需拉取正文。".to_string(),
         ));
     }
     let body = imap_probe::fetch_message_body(&account, &secret, &remote_mailbox, remote_uid)?;
-    store.update_message_body(message_id, &body)
+    let updated = store.update_message_body(message_id, &body)?;
+    eprintln!(
+        "[better-email][body] fetch command ok message_id={} account_id={} mailbox={} uid={} body_chars={} html_chars={} attachments={}",
+        message_id,
+        account.id,
+        remote_mailbox,
+        remote_uid,
+        updated.body.chars().count(),
+        updated.sanitized_html.chars().count(),
+        body.attachments.len()
+    );
+    Ok(updated)
 }
 
 #[tauri::command]

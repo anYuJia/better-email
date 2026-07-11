@@ -35,6 +35,34 @@ type MessageListViewProps = {
   onLoadMore: () => void;
 };
 
+const REMOTE_HEADER_ONLY_SNIPPET = '远端邮件头已同步';
+
+function stripHtmlPreview(value: string): string {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(?:p|div|li|tr|h[1-6])>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function messagePreview(message: Message): string {
+  const bodyPreview = stripHtmlPreview(message.body || message.sanitized_html || '');
+  if (bodyPreview) return bodyPreview;
+  if (!message.snippet.includes(REMOTE_HEADER_ONLY_SNIPPET)) {
+    return stripHtmlPreview(message.snippet);
+  }
+  return '';
+}
+
 export default function MessageListView({
   groups,
   messages,
@@ -65,68 +93,71 @@ export default function MessageListView({
             <span>{group.label}</span>
             <em>{group.messages.length} 封</em>
           </header>
-          {group.messages.map((message) => (
-            <button
-              key={message.id}
-              className={[
-                'message-card',
-                message.is_read ? 'is-read' : 'is-unread',
-                message.id === selectedId ? 'selected' : '',
-                draggingMessageSet.has(message.id) ? 'dragging' : '',
-              ].filter(Boolean).join(' ')}
-              draggable
-              onClick={() => onSelectMessage(message.id)}
-              onDragStart={(event) => {
-                const messageIds = selectedMessageSet.has(message.id) && selectedMessageIds.length > 0
-                  ? selectedMessageIds
-                  : [message.id];
-                const writtenIds = writeMessageDragPayload(event.dataTransfer, messageIds);
-                if (writtenIds.length === 0) {
+          {group.messages.map((message) => {
+            const preview = messagePreview(message);
+            return (
+              <button
+                key={message.id}
+                className={[
+                  'message-card',
+                  message.is_read ? 'is-read' : 'is-unread',
+                  message.id === selectedId ? 'selected' : '',
+                  draggingMessageSet.has(message.id) ? 'dragging' : '',
+                ].filter(Boolean).join(' ')}
+                draggable
+                onClick={() => onSelectMessage(message.id)}
+                onDragStart={(event) => {
+                  const messageIds = selectedMessageSet.has(message.id) && selectedMessageIds.length > 0
+                    ? selectedMessageIds
+                    : [message.id];
+                  const writtenIds = writeMessageDragPayload(event.dataTransfer, messageIds);
+                  if (writtenIds.length === 0) {
+                    event.preventDefault();
+                    return;
+                  }
+                  onCloseMessageMenu();
+                  onSetDraggingMessageIds(writtenIds);
+                }}
+                onDragEnd={() => onSetDraggingMessageIds([])}
+                onContextMenu={(event) => {
                   event.preventDefault();
-                  return;
-                }
-                onCloseMessageMenu();
-                onSetDraggingMessageIds(writtenIds);
-              }}
-              onDragEnd={() => onSetDraggingMessageIds([])}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                const useBulkContext = selectedMessageSet.has(message.id) && selectedMessageIds.length > 1;
-                if (!useBulkContext && selectedMessageIds.length > 0 && !selectedMessageSet.has(message.id)) {
-                  onToggleAllVisible(false);
-                }
-                onSelectMessage(message.id);
-                onOpenMessageMenu(message, event.clientX, event.clientY, useBulkContext);
-              }}
-            >
-              <span
-                className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
-                aria-hidden="true"
+                  const useBulkContext = selectedMessageSet.has(message.id) && selectedMessageIds.length > 1;
+                  if (!useBulkContext && selectedMessageIds.length > 0 && !selectedMessageSet.has(message.id)) {
+                    onToggleAllVisible(false);
+                  }
+                  onSelectMessage(message.id);
+                  onOpenMessageMenu(message, event.clientX, event.clientY, useBulkContext);
+                }}
               >
-                {(message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase()}
-              </span>
-              <span className="message-select" onClick={(event) => event.stopPropagation()}>
-                <input
-                  aria-label={`选择 ${message.subject || '无主题'}`}
-                  checked={selectedMessageSet.has(message.id)}
-                  type="checkbox"
-                  onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
-                />
-              </span>
-              <div className="message-topline">
-                <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
-                <time>{formatDate(message.received_at)}</time>
-              </div>
-              <div className={message.is_read ? 'subject' : 'subject unread'}>
-                {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
-              </div>
-              <p>{message.snippet}</p>
-              <div className="message-chips">
-                {message.labels.map((label) => <span key={label}>{label}</span>)}
-                {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
-              </div>
-            </button>
-          ))}
+                <span
+                  className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
+                  aria-hidden="true"
+                >
+                  {(message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase()}
+                </span>
+                <span className="message-select" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    aria-label={`选择 ${message.subject || '无主题'}`}
+                    checked={selectedMessageSet.has(message.id)}
+                    type="checkbox"
+                    onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
+                  />
+                </span>
+                <div className="message-topline">
+                  <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
+                  <time>{formatDate(message.received_at)}</time>
+                </div>
+                <div className={message.is_read ? 'subject' : 'subject unread'}>
+                  {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
+                </div>
+                {preview && <p title={preview}>{preview}</p>}
+                <div className="message-chips">
+                  {message.labels.map((label) => <span key={label}>{label}</span>)}
+                  {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
+                </div>
+              </button>
+            );
+          })}
         </section>
       ))}
       {messages.length === 0 && (

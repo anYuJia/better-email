@@ -223,6 +223,8 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
+  const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
+  const bodyFetchFailedRef = useRef<Set<number>>(new Set());
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
@@ -1003,6 +1005,56 @@ export default function App() {
       .then(setAttachments)
       .catch((error) => setStatus(String(error)));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const isHeaderOnlyRemoteMessage =
+      selected.remote_uid > 0 &&
+      !selected.body.trim() &&
+      selected.snippet.includes('远端邮件头已同步');
+    if (!isHeaderOnlyRemoteMessage) return;
+    if (bodyFetchInFlightRef.current.has(selected.id) || bodyFetchFailedRef.current.has(selected.id)) return;
+
+    bodyFetchInFlightRef.current.add(selected.id);
+    appFlowLog('autoFetchBody start', {
+      messageId: selected.id,
+      accountId: selected.account_id,
+      mailbox: selected.remote_mailbox,
+      uid: selected.remote_uid,
+    });
+    invoke<Message>('fetch_message_body', { messageId: selected.id })
+      .then((updated) => {
+        bodyFetchFailedRef.current.delete(updated.id);
+        setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+        if (activeThread) {
+          setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+        }
+        return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
+          if (selectedId === updated.id) setAttachments(items);
+          appFlowLog('autoFetchBody done', {
+            messageId: updated.id,
+            bodyLength: updated.body.length,
+            htmlLength: updated.sanitized_html.length,
+            attachments: items.length,
+          });
+        });
+      })
+      .catch((error) => {
+        bodyFetchFailedRef.current.add(selected.id);
+        const message = String(error).replace(/^Error:\s*/i, '');
+        appFlowWarn('autoFetchBody failed', {
+          messageId: selected.id,
+          accountId: selected.account_id,
+          mailbox: selected.remote_mailbox,
+          uid: selected.remote_uid,
+          error: message,
+        });
+        setStatus(`正文拉取失败：${message}`);
+      })
+      .finally(() => {
+        bodyFetchInFlightRef.current.delete(selected.id);
+      });
+  }, [selectedId, selected?.remote_uid, selected?.body, selected?.snippet, activeThread]);
 
   useEffect(() => {
     if (!isSettingsOpen || activeSettingsSection !== 'backup') return;
@@ -2019,11 +2071,44 @@ export default function App() {
 
   async function fetchSelectedBody() {
     if (!selected) return;
-    const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-    const refreshedAttachments = await invoke<Attachment[]>('list_attachments', { messageId: updated.id });
-    setAttachments(refreshedAttachments);
-    setStatus('远端正文已拉取并缓存到本地');
+    bodyFetchFailedRef.current.delete(selected.id);
+    bodyFetchInFlightRef.current.add(selected.id);
+    appFlowLog('manualFetchBody start', {
+      messageId: selected.id,
+      accountId: selected.account_id,
+      mailbox: selected.remote_mailbox,
+      uid: selected.remote_uid,
+    });
+    try {
+      const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
+      setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+      if (activeThread) {
+        setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+      }
+      const refreshedAttachments = await invoke<Attachment[]>('list_attachments', { messageId: updated.id });
+      setAttachments(refreshedAttachments);
+      appFlowLog('manualFetchBody done', {
+        messageId: updated.id,
+        bodyLength: updated.body.length,
+        htmlLength: updated.sanitized_html.length,
+        attachments: refreshedAttachments.length,
+      });
+      setStatus('远端正文已拉取并缓存到本地');
+    } catch (error) {
+      const message = String(error).replace(/^Error:\s*/i, '');
+      bodyFetchFailedRef.current.add(selected.id);
+      appFlowWarn('manualFetchBody failed', {
+        messageId: selected.id,
+        accountId: selected.account_id,
+        mailbox: selected.remote_mailbox,
+        uid: selected.remote_uid,
+        error: message,
+      });
+      setStatus(`正文拉取失败：${message}`);
+      throw error;
+    } finally {
+      bodyFetchInFlightRef.current.delete(selected.id);
+    }
   }
 
   async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {

@@ -448,7 +448,6 @@
   font-weight: 560;
 }
 
-.composer-delivery-card .composer-from select,
 .composer-inline-input input,
 .composer-template-save input,
 .composer-delivery-card .composer-schedule input {
@@ -458,6 +457,111 @@
   border-color: #dce2e8;
   background: #fff;
   font-size: 11px;
+}
+
+.composer-inline-select {
+  overflow: visible;
+}
+
+.composer-select {
+  position: relative;
+  min-width: 0;
+}
+
+.composer-select-trigger {
+  width: 100%;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  border: 1px solid #dce2e8;
+  border-radius: 7px;
+  color: #26313d;
+  background: #fff;
+  box-shadow: none;
+  text-align: left;
+}
+
+.composer-select-trigger:hover,
+.composer-select.is-open .composer-select-trigger {
+  border-color: #c7d1dc;
+  background: #fbfcfd;
+}
+
+.composer-select-trigger > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.composer-select-trigger strong,
+.composer-select-menu strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-select-trigger small,
+.composer-select-menu small {
+  overflow: hidden;
+  color: #8b95a1;
+  font-size: 9.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-select-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 5px);
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  max-height: 176px;
+  padding: 5px;
+  overflow: auto;
+  border: 1px solid #d9e0e7;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 14px 30px rgba(31, 35, 40, 0.13),
+    0 1px 4px rgba(31, 35, 40, 0.07);
+}
+
+.composer-select-menu button {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  color: #26313d;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.composer-select-menu button:hover {
+  background: #f3f6f9;
+}
+
+.composer-select-menu button.is-selected {
+  color: #1f5f94;
+  background: #eef6fd;
+}
+
+.composer-select-menu button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
 }
 
 .composer-delivery-card .composer-schedule > span {

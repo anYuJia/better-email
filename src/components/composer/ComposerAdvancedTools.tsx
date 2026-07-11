@@ -1,4 +1,5 @@
-import { Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown, Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -21,6 +22,90 @@ type ComposerAdvancedToolsProps = {
   onSaveTemplate: () => void;
 };
 
+type ComposerSelectOption = {
+  value: number;
+  label: string;
+  meta?: string;
+};
+
+type ComposerInlineSelectProps = {
+  label: string;
+  value: number;
+  options: ComposerSelectOption[];
+  onChange: (value: number) => void;
+};
+
+function ComposerInlineSelect({ label, value, options, onChange }: ComposerInlineSelectProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value) ?? options[0] ?? null;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function closeOnOutside(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node | null)) {
+        setOpen(false);
+      }
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className="composer-from composer-inline-select" ref={rootRef}>
+      <span>{label}</span>
+      <div className={`composer-select${open ? ' is-open' : ''}`}>
+        <button
+          type="button"
+          className="composer-select-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span>
+            <strong>{selected?.label ?? '未选择'}</strong>
+            {selected?.meta && <small>{selected.meta}</small>}
+          </span>
+          <ChevronDown size={14} />
+        </button>
+        {open && (
+          <div className="composer-select-menu" role="listbox" aria-label={label}>
+            {options.map((option) => {
+              const active = option.value === selected?.value;
+              return (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  className={active ? 'is-selected' : ''}
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span>
+                    <strong>{option.label}</strong>
+                    {option.meta && <small>{option.meta}</small>}
+                  </span>
+                  {active && <Check size={13} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ComposerAdvancedTools({
   draft,
   accounts,
@@ -35,6 +120,17 @@ export default function ComposerAdvancedTools({
   onTemplateNameChange,
   onSaveTemplate,
 }: ComposerAdvancedToolsProps) {
+  const accountOptions = accounts.map((entry) => ({
+    value: entry.id,
+    label: entry.display_name,
+    meta: entry.email,
+  }));
+  const identityOptions = identities.map((identity) => ({
+    value: identity.id,
+    label: identity.name,
+    meta: `${identity.email}${identity.is_default ? ' · 默认' : ''}`,
+  }));
+
   return (
     <details className="composer-advanced">
       <summary>
@@ -47,33 +143,18 @@ export default function ComposerAdvancedTools({
       <div className="composer-advanced-panel">
         <section className="composer-tool-card composer-delivery-card">
           <div className="composer-advanced-row composer-route-row">
-            <label className="composer-from">
-              <span>账号</span>
-              <select
-                value={accountId}
-                onChange={(event) => onPatchDraft({ account_id: Number(event.target.value), identity_id: 0 })}
-              >
-                {accounts.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.display_name} &lt;{entry.email}&gt;
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="composer-from">
-              <span>身份</span>
-              <select
-                aria-label="发件身份"
-                value={identityId}
-                onChange={(event) => onPatchDraft({ identity_id: Number(event.target.value) })}
-              >
-                {identities.map((identity) => (
-                  <option key={identity.id} value={identity.id}>
-                    {identity.name} &lt;{identity.email}&gt;{identity.is_default ? ' · 默认' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ComposerInlineSelect
+              label="账号"
+              value={accountId}
+              options={accountOptions}
+              onChange={(nextAccountId) => onPatchDraft({ account_id: nextAccountId, identity_id: 0 })}
+            />
+            <ComposerInlineSelect
+              label="身份"
+              value={identityId}
+              options={identityOptions}
+              onChange={(nextIdentityId) => onPatchDraft({ identity_id: nextIdentityId })}
+            />
           </div>
 
           <div className="composer-advanced-row composer-options-row">

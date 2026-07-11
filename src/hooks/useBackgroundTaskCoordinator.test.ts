@@ -42,4 +42,21 @@ describe('background task coordinator helpers', () => {
       ]),
     ).toBe('SMTP 发送完成，1 封仅等待远端已发送留档重试');
   });
+
+  it('does not wake blocked outbox items', () => {
+    const next = nextOutboxWakeItem([
+      outboxItem(1, 'failed', '2026-07-10T10:01:00.000Z'),
+      outboxItem(2, 'sent', ''),
+    ]);
+
+    expect(next).toBeNull();
+  });
+
+  it('reports blocked credential items as paused', () => {
+    expect(
+      outboxFlushMessage([
+        outboxItem(1, 'failed', ''),
+      ]),
+    ).toBe('SMTP 发送暂停，1 封需要重新保存账号授权码');
+  });
 });

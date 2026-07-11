@@ -826,7 +826,10 @@ impl MailStore {
         self.with_conn(|conn| account_for_conn(conn, account_id))
     }
 
-    pub fn get_account_by_id_optional(&self, account_id: Option<i64>) -> MailResult<Option<Account>> {
+    pub fn get_account_by_id_optional(
+        &self,
+        account_id: Option<i64>,
+    ) -> MailResult<Option<Account>> {
         self.with_conn(|conn| account_for_conn_optional(conn, account_id))
     }
 
@@ -952,7 +955,10 @@ impl MailStore {
             eprintln!(
                 "[better-email][db] delete_account ok removed_account_id={} next_account_id={}",
                 account_id,
-                next_account.as_ref().map(|account| account.id).unwrap_or_default(),
+                next_account
+                    .as_ref()
+                    .map(|account| account.id)
+                    .unwrap_or_default(),
             );
             Ok(next_account)
         })
@@ -3620,7 +3626,7 @@ impl MailStore {
                 FROM outbox_queue q
                 JOIN messages m ON m.id = q.message_id
                 LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
-                WHERE q.status IN ('queued', 'retry', 'failed', 'scheduled')
+                WHERE q.status IN ('queued', 'retry', 'scheduled')
                   AND (q.next_attempt_at = '' OR q.next_attempt_at <= ?1)
                 ORDER BY q.queued_at ASC
                 LIMIT 20
@@ -3855,6 +3861,23 @@ impl MailStore {
         })
     }
 
+    pub fn mark_outbox_blocked(&self, message_id: i64, error: &str) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "
+                UPDATE outbox_queue
+                SET status = 'failed',
+                    attempts = attempts + 1,
+                    last_error = ?2,
+                    next_attempt_at = ''
+                WHERE message_id = ?1
+                ",
+                params![message_id, error.chars().take(500).collect::<String>(),],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn flush_outbox_dry_run(&self) -> MailResult<Vec<OutboxItem>> {
         self.with_conn(|conn| {
             let now = Utc::now().to_rfc3339();
@@ -3862,7 +3885,7 @@ impl MailStore {
                 "
                 UPDATE outbox_queue
                 SET status = 'sent_dry_run', attempts = attempts + 1, last_error = '', next_attempt_at = ''
-                WHERE status IN ('queued', 'retry', 'failed', 'scheduled')
+                WHERE status IN ('queued', 'retry', 'scheduled')
                   AND (next_attempt_at = '' OR next_attempt_at <= ?1)
                 ",
                 params![now],
@@ -5396,7 +5419,10 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
         .ok_or_else(|| MailError::Imap("没有可用邮箱账号。".to_string()))
 }
 
-fn account_for_conn_optional(conn: &Connection, account_id: Option<i64>) -> MailResult<Option<Account>> {
+fn account_for_conn_optional(
+    conn: &Connection,
+    account_id: Option<i64>,
+) -> MailResult<Option<Account>> {
     if let Some(account_id) = account_id {
         return conn
             .query_row(
@@ -9569,6 +9595,48 @@ mod tests {
             })
             .unwrap();
         assert_eq!(remote_ref, ("Sent".to_string(), 42));
+    }
+
+    #[test]
+    fn blocked_outbox_items_do_not_retry_automatically() {
+        let store = test_store();
+        let item = store
+            .queue_outbox_message(DraftInput {
+                draft_id: 0,
+                account_id: 0,
+                identity_id: 0,
+                to: "blocked@example.com".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
+                subject: "Needs credential".to_string(),
+                body: "Pause until credential is saved".to_string(),
+                html_body: String::new(),
+                send_at: String::new(),
+                attachments: Vec::new(),
+            })
+            .unwrap();
+
+        store
+            .mark_outbox_blocked(
+                item.message_id,
+                "缺少账号授权码，请在账号设置中重新保存授权码；已暂停自动发送。",
+            )
+            .unwrap();
+
+        let blocked_item = store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == item.id)
+            .unwrap();
+        assert_eq!(blocked_item.status, "failed");
+        assert_eq!(blocked_item.attempts, 1);
+        assert!(blocked_item.next_attempt_at.is_empty());
+        assert!(store
+            .pending_outbox_messages()
+            .unwrap()
+            .iter()
+            .all(|message| message.id != item.message_id));
     }
 
     #[test]

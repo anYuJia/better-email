@@ -72,7 +72,7 @@ type CurrentCoordinatorState = Pick<
   | 'releaseDueSnoozedMessages'
 >;
 
-const scheduledOutboxStatuses = new Set(['scheduled', 'retry', 'failed', 'sent_remote_pending']);
+const scheduledOutboxStatuses = new Set(['scheduled', 'retry', 'sent_remote_pending']);
 
 export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
   return (
@@ -90,8 +90,12 @@ export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
 
 export function outboxFlushMessage(items: OutboxItem[]): string {
   const failed = items.filter((item) => item.status === 'retry').length;
+  const blocked = items.filter((item) => item.status === 'failed').length;
   const pendingRetry = items.filter((item) => item.status === 'retry' && item.next_attempt_at).length;
   const archivePending = items.filter((item) => item.status === 'sent_remote_pending').length;
+  if (blocked > 0) {
+    return `SMTP 发送暂停，${blocked} 封需要重新保存账号授权码`;
+  }
   if (failed > 0) {
     return `SMTP 发送完成，${failed} 封需重试${pendingRetry > 0 ? '，已安排下次尝试' : ''}`;
   }

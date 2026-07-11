@@ -353,6 +353,7 @@ mod tests {
                     provider TEXT NOT NULL,
                     imap_host TEXT NOT NULL,
                     smtp_host TEXT NOT NULL,
+                    incoming_protocol TEXT NOT NULL,
                     auth_type TEXT NOT NULL,
                     sync_mode TEXT NOT NULL,
                     remote_images_allowed INTEGER NOT NULL,
@@ -362,7 +363,7 @@ mod tests {
                 INSERT INTO accounts VALUES(
                     7, 'reader@example.com', 'Reader', 'custom',
                     'imap.example.com:993', 'smtp.example.com:465',
-                    'password', 'manual', 0, '', 1
+                    'imap', 'password', 'manual', 0, '', 1
                 );",
             )
             .unwrap();

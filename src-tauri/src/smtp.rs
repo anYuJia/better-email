@@ -161,15 +161,30 @@ fn smtp_transport(host: &str, port: u16) -> Result<SmtpTransportBuilder, MailErr
 }
 
 fn mailbox(name: &str, email: &str) -> Result<Mailbox, MailError> {
-    if name.trim().is_empty() {
-        email
-            .trim()
-            .parse()
-            .map_err(|error| MailError::Smtp(format!("邮箱地址无效 {email}：{error}")))
-    } else {
-        format!("{} <{}>", name.trim(), email.trim())
-            .parse()
-            .map_err(|error| MailError::Smtp(format!("邮箱地址无效 {email}：{error}")))
+    let trimmed_email = email.trim();
+    let bare_mailbox = || {
+        trimmed_email
+            .parse::<Mailbox>()
+            .map_err(|error| MailError::Smtp(format!("邮箱地址无效 {trimmed_email}：{error}")))
+    };
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() || trimmed_name.eq_ignore_ascii_case(trimmed_email) {
+        return bare_mailbox();
+    }
+
+    let safe_name = trimmed_name
+        .chars()
+        .filter(|character| !matches!(character, '\r' | '\n' | '<' | '>'))
+        .collect::<String>()
+        .trim()
+        .to_string();
+    if safe_name.is_empty() || safe_name.eq_ignore_ascii_case(trimmed_email) {
+        return bare_mailbox();
+    }
+
+    match format!("{safe_name} <{trimmed_email}>").parse::<Mailbox>() {
+        Ok(mailbox) => Ok(mailbox),
+        Err(_) => bare_mailbox(),
     }
 }
 
@@ -227,6 +242,21 @@ mod tests {
             parse_smtp_endpoint("smtp.example.com:587").unwrap(),
             ("smtp.example.com".to_string(), 587)
         );
+    }
+
+    #[test]
+    fn mailbox_uses_bare_address_when_name_matches_email() {
+        let parsed = mailbox("13658499022@163.com", "13658499022@163.com").unwrap();
+
+        assert_eq!(parsed.email.to_string(), "13658499022@163.com");
+        assert!(parsed.name.is_none());
+    }
+
+    #[test]
+    fn mailbox_falls_back_to_bare_address_for_unsafe_display_name() {
+        let parsed = mailbox("Me <old@example.com>", "me@example.com").unwrap();
+
+        assert_eq!(parsed.email.to_string(), "me@example.com");
     }
 
     #[test]

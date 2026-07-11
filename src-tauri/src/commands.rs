@@ -69,7 +69,10 @@ pub fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
 }
 
 #[tauri::command]
-pub fn get_account(store: State<'_, MailStore>, account_id: Option<i64>) -> MailResult<Option<Account>> {
+pub fn get_account(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<Option<Account>> {
     store.get_account_by_id_optional(account_id)
 }
 
@@ -276,7 +279,9 @@ pub fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttac
 }
 
 #[tauri::command]
-pub fn outbound_attachments_from_paths(paths: Vec<String>) -> MailResult<Vec<OutboundAttachmentInput>> {
+pub fn outbound_attachments_from_paths(
+    paths: Vec<String>,
+) -> MailResult<Vec<OutboundAttachmentInput>> {
     paths
         .into_iter()
         .filter(|path| !path.trim().is_empty())
@@ -1170,7 +1175,11 @@ pub fn queue_outbox_message(
         "[better-email][send] queue start account_id={} to={} send_at={} attachments={}",
         input.account_id,
         mask_recipient_list(&input.to),
-        if input.send_at.trim().is_empty() { "now" } else { "scheduled" },
+        if input.send_at.trim().is_empty() {
+            "now"
+        } else {
+            "scheduled"
+        },
         input.attachments.len(),
     );
     let item = store.queue_outbox_message(input)?;
@@ -1359,7 +1368,11 @@ pub fn verify_account_credentials(
 }
 
 fn incoming_protocol_name(account: &Account) -> &'static str {
-    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+    if account
+        .incoming_protocol
+        .trim()
+        .eq_ignore_ascii_case("pop3")
+    {
         "POP3"
     } else {
         "IMAP"
@@ -1367,14 +1380,21 @@ fn incoming_protocol_name(account: &Account) -> &'static str {
 }
 
 fn is_pop3_account(account: &Account) -> bool {
-    account.incoming_protocol.trim().eq_ignore_ascii_case("pop3")
+    account
+        .incoming_protocol
+        .trim()
+        .eq_ignore_ascii_case("pop3")
 }
 
 fn verify_incoming_credentials(
     account: &Account,
     secret: &credentials::AccountSecret,
 ) -> Result<(), String> {
-    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+    if account
+        .incoming_protocol
+        .trim()
+        .eq_ignore_ascii_case("pop3")
+    {
         pop3_probe::verify_credentials(account, secret).map_err(|error| error.to_string())
     } else {
         imap_probe::verify_credentials(account, secret).map_err(|error| error.to_string())
@@ -1419,7 +1439,10 @@ fn credential_verification_report(
     ];
     let passed = checks.iter().filter(|check| check.authenticated).count();
     let (status, message) = match passed {
-        2 => ("ok", format!("{incoming_name} 与 SMTP 登录验证通过，未发送任何邮件。")),
+        2 => (
+            "ok",
+            format!("{incoming_name} 与 SMTP 登录验证通过，未发送任何邮件。"),
+        ),
         1 => (
             "partial",
             "仅一个协议登录成功，请检查失败协议的服务器、授权码或 OAuth2 配置。".to_string(),
@@ -1624,7 +1647,11 @@ fn sync_headers_for_account(
     account: &Account,
     history_only: bool,
 ) -> MailResult<SyncRun> {
-    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+    if account
+        .incoming_protocol
+        .trim()
+        .eq_ignore_ascii_case("pop3")
+    {
         sync_pop3_headers_for_account(store, account, history_only)
     } else {
         sync_imap_headers_for_account(store, account, history_only)
@@ -1643,7 +1670,14 @@ fn sync_pop3_headers_for_account(
             "{} 使用 POP3 收信；POP3 无远端文件夹历史游标，本地收件箱同步已覆盖最近邮件。",
             account.email
         );
-        return store.record_sync_run(&started_at, &finished_at, "pop3_history_complete", 0, 0, &message);
+        return store.record_sync_run(
+            &started_at,
+            &finished_at,
+            "pop3_history_complete",
+            0,
+            0,
+            &message,
+        );
     }
 
     let secret = credentials::get_account_secret(account).map_err(crate::db::MailError::Imap)?;
@@ -2879,13 +2913,16 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
         let secret = match credentials::get_account_secret(&account) {
             Ok(secret) => secret,
             Err(error) => {
+                let blocked_error =
+                    "缺少账号授权码，请在账号设置中重新保存授权码；已暂停自动发送。".to_string();
                 eprintln!(
-                    "[better-email][send] smtp item credential failed message_id={} account_id={} error={}",
+                    "[better-email][send] smtp item credential blocked message_id={} account_id={} email={} error={}",
                     message.id,
                     message.account_id,
+                    mask_email(&account.email),
                     error,
                 );
-                store.mark_outbox_failed(message.id, &error)?;
+                store.mark_outbox_blocked(message.id, &blocked_error)?;
                 continue;
             }
         };
@@ -2896,16 +2933,13 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
                 archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
                 eprintln!(
                     "[better-email][send] smtp item ok message_id={} account_id={}",
-                    message.id,
-                    message.account_id,
+                    message.id, message.account_id,
                 );
             }
             Err(error) => {
                 eprintln!(
                     "[better-email][send] smtp item failed message_id={} account_id={} error={}",
-                    message.id,
-                    message.account_id,
-                    error,
+                    message.id, message.account_id, error,
                 );
                 store.mark_outbox_failed(message.id, &error.to_string())?;
             }

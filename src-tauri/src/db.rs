@@ -3251,22 +3251,7 @@ impl MailStore {
     }
 
     pub fn list_outbox(&self) -> MailResult<Vec<OutboxItem>> {
-        self.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "
-                SELECT q.id, q.message_id, m.recipients, m.subject, q.status, q.attempts,
-                       q.last_error, q.queued_at, q.next_attempt_at
-                FROM outbox_queue q
-                JOIN messages m ON m.id = q.message_id
-                ORDER BY q.queued_at DESC
-                LIMIT 50
-                ",
-            )?;
-            let items = stmt
-                .query_map([], map_outbox_item)?
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(items)
-        })
+        self.with_conn(list_outbox_for_conn)
     }
 
     pub fn enqueue_background_task(
@@ -3702,6 +3687,25 @@ impl MailStore {
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(messages)
+        })
+    }
+
+    pub fn release_due_outbox_items(&self) -> MailResult<Vec<OutboxItem>> {
+        self.with_conn(|conn| {
+            let now = Utc::now().to_rfc3339();
+            conn.execute(
+                "
+                UPDATE outbox_queue
+                SET status = 'queued',
+                    last_error = '已到发送时间，等待手动点击真实发送。',
+                    next_attempt_at = ''
+                WHERE status = 'scheduled'
+                  AND next_attempt_at != ''
+                  AND next_attempt_at <= ?1
+                ",
+                params![now],
+            )?;
+            list_outbox_for_conn(conn)
         })
     }
 
@@ -5495,6 +5499,23 @@ fn get_outbox_item_for_conn(conn: &Connection, id: i64) -> MailResult<OutboxItem
         map_outbox_item,
     )
     .map_err(Into::into)
+}
+
+fn list_outbox_for_conn(conn: &Connection) -> MailResult<Vec<OutboxItem>> {
+    let mut stmt = conn.prepare(
+        "
+        SELECT q.id, q.message_id, m.recipients, m.subject, q.status, q.attempts,
+               q.last_error, q.queued_at, q.next_attempt_at
+        FROM outbox_queue q
+        JOIN messages m ON m.id = q.message_id
+        ORDER BY q.queued_at DESC
+        LIMIT 50
+        ",
+    )?;
+    let items = stmt
+        .query_map([], map_outbox_item)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(items)
 }
 
 fn map_outbox_item(row: &rusqlite::Row<'_>) -> rusqlite::Result<OutboxItem> {
@@ -9637,6 +9658,40 @@ mod tests {
             .unwrap()
             .iter()
             .all(|message| message.id != item.message_id));
+    }
+
+    #[test]
+    fn due_scheduled_outbox_items_release_without_sending() {
+        let store = test_store();
+        let send_at = "2026-07-09T18:00:00+08:00".to_string();
+        let item = store
+            .queue_outbox_message(DraftInput {
+                draft_id: 0,
+                account_id: 0,
+                identity_id: 0,
+                to: "scheduled@example.com".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
+                subject: "Send later".to_string(),
+                body: "Wait for manual send".to_string(),
+                html_body: String::new(),
+                send_at,
+                attachments: Vec::new(),
+            })
+            .unwrap();
+
+        let released = store.release_due_outbox_items().unwrap();
+        let released_item = released
+            .into_iter()
+            .find(|entry| entry.id == item.id)
+            .unwrap();
+
+        assert_eq!(released_item.status, "queued");
+        assert_eq!(
+            released_item.last_error,
+            "已到发送时间，等待手动点击真实发送。"
+        );
+        assert!(released_item.next_attempt_at.is_empty());
     }
 
     #[test]

@@ -2835,6 +2835,17 @@ pub fn flush_outbox_dry_run(store: State<'_, MailStore>) -> MailResult<Vec<Outbo
     store.flush_outbox_dry_run()
 }
 
+#[tauri::command]
+pub fn release_due_outbox_items(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    eprintln!("[better-email][send] release due outbox start");
+    let outbox = store.release_due_outbox_items()?;
+    eprintln!(
+        "[better-email][send] release due outbox done outbox_items={}",
+        outbox.len(),
+    );
+    Ok(outbox)
+}
+
 fn archive_sent_message(
     store: &MailStore,
     account: &Account,

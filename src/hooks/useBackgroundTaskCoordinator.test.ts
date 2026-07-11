@@ -24,15 +24,15 @@ function outboxItem(
 }
 
 describe('background task coordinator helpers', () => {
-  it('wakes for the earliest SMTP or remote archive retry', () => {
+  it('wakes only for scheduled items that need a local release', () => {
     const next = nextOutboxWakeItem([
       outboxItem(1, 'sent', ''),
       outboxItem(2, 'retry', '2026-07-10T10:10:00.000Z'),
       outboxItem(3, 'sent_remote_pending', '2026-07-10T10:05:00.000Z'),
-      outboxItem(4, 'queued', '2026-07-10T10:01:00.000Z'),
+      outboxItem(4, 'scheduled', '2026-07-10T10:01:00.000Z'),
     ]);
 
-    expect(next?.id).toBe(3);
+    expect(next?.id).toBe(4);
   });
 
   it('reports remote archive retry without implying another SMTP send', () => {

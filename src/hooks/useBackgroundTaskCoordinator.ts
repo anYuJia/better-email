@@ -72,7 +72,7 @@ type CurrentCoordinatorState = Pick<
   | 'releaseDueSnoozedMessages'
 >;
 
-const scheduledOutboxStatuses = new Set(['scheduled', 'retry', 'sent_remote_pending']);
+const scheduledOutboxStatuses = new Set(['scheduled']);
 
 export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
   return (
@@ -242,6 +242,17 @@ export default function useBackgroundTaskCoordinator({
     return message;
   }, [setOutbox, setStatus]);
 
+  const releaseDueOutboxItems = useCallback(async (): Promise<string> => {
+    const items = await invoke<OutboxItem[]>('release_due_outbox_items');
+    setOutbox(items);
+    const current = currentRef.current;
+    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
+    const message = '发件时间已到，等待手动点击真实发送';
+    setStatus(message);
+    return message;
+  }, [setOutbox, setStatus]);
+
   const runBackgroundSync = useCallback(async (reason: 'manual' | 'timer'): Promise<string> => {
     if (backgroundSyncRef.current) return '同步任务已在运行';
     backgroundSyncRef.current = true;
@@ -296,9 +307,10 @@ export default function useBackgroundTaskCoordinator({
 
   const executeBackgroundTask = useCallback(async (task: BackgroundTask): Promise<string> => {
     if (task.kind === 'sync') return runBackgroundSync(task.source);
+    if (task.kind === 'outbox-smtp' && task.source === 'timer') return releaseDueOutboxItems();
     if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
     return flushOutboxDryRun();
-  }, [flushOutboxDryRun, flushOutboxSmtp, runBackgroundSync]);
+  }, [flushOutboxDryRun, flushOutboxSmtp, releaseDueOutboxItems, runBackgroundSync]);
 
   const drainBackgroundTaskQueue = useCallback(async () => {
     if (backgroundTaskWorkerRef.current) return;
@@ -379,7 +391,7 @@ export default function useBackgroundTaskCoordinator({
       setPendingSendUndo((current) => (
         current?.outboxId === nextScheduledItem.id ? null : current
       ));
-      enqueueBackgroundTask('outbox-smtp', 'timer').catch((error) => setStatus(String(error)));
+      releaseDueOutboxItems().catch((error) => setStatus(String(error)));
     }, timerDelay);
 
     return () => {
@@ -389,8 +401,8 @@ export default function useBackgroundTaskCoordinator({
       }
     };
   }, [
-    enqueueBackgroundTask,
     outbox,
+    releaseDueOutboxItems,
     setOutbox,
     setPendingSendUndo,
     setStatus,

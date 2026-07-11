@@ -320,26 +320,14 @@ export default function useAccountConnectionController({
       removedAccountId: removedAccount.id,
       nextAccountId: nextAccount?.id ?? null,
     });
-    try {
-      const credentialResult = await invoke<CredentialStatus>('delete_account_secret', {
-        accountEmail: removedAccount.email,
-      });
-      setCredentialStatus(credentialResult);
-      accountFlowLog('credential deleted', {
-        email: maskEmailForLog(removedAccount.email),
-        exists: credentialResult.exists,
-        message: credentialResult.message,
-      });
-    } catch {
-      accountFlowWarn('credential delete failed', {
-        email: maskEmailForLog(removedAccount.email),
-      });
-      setCredentialStatus({
-        account_email: removedAccount.email,
-        exists: false,
-        message: '账号已移除，但系统安全存储中的凭据需要手动检查。',
-      });
-    }
+    setCredentialStatus({
+      account_email: removedAccount.email,
+      exists: false,
+      message: '账号已移除；未自动读取或删除系统凭据。',
+    });
+    accountFlowLog('credential untouched after account removal', {
+      email: maskEmailForLog(removedAccount.email),
+    });
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));
     setAccountScope(nextAccount?.id ?? 'all');
     setAccount(nextAccount);

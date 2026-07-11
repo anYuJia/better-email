@@ -1826,6 +1826,13 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           : item,
       );
       return outbox as T;
+    case 'release_due_outbox_items':
+      outbox = outbox.map((item) =>
+        item.status === 'scheduled' && item.next_attempt_at && Date.parse(item.next_attempt_at) <= Date.now()
+          ? { ...item, status: 'queued', last_error: '已到发送时间，等待手动点击真实发送。', next_attempt_at: '' }
+          : item,
+      );
+      return outbox as T;
     case 'flush_outbox_smtp': {
       const sentMessageIds = new Set(
         outbox

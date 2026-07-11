@@ -629,6 +629,38 @@ textarea:disabled {
   background: var(--ui-list);
 }
 
+.message-date-section {
+  display: grid;
+}
+
+.message-date-section + .message-date-section {
+  border-top: 1px solid #edf0f3;
+}
+
+.message-date-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 5px;
+  color: var(--ui-text-tertiary);
+  background: rgba(247, 249, 251, 0.92);
+  backdrop-filter: blur(10px);
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.message-date-header em {
+  color: #9aa3ad;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 650;
+}
+
 .thread-muted-indicator {
   display: inline-flex;
   align-items: center;

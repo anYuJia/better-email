@@ -45,6 +45,31 @@ export function formatDate(value: string): string {
   }).format(date);
 }
 
+export type MessageDateGroup = {
+  id: 'today' | 'yesterday' | 'this-week' | 'earlier' | 'unknown';
+  label: string;
+};
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function messageDateGroup(value: string, now = new Date()): MessageDateGroup {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { id: 'unknown', label: '时间未知' };
+  }
+
+  const dayDiff = Math.floor(
+    (startOfLocalDay(now).getTime() - startOfLocalDay(date).getTime()) / (24 * 60 * 60 * 1000),
+  );
+
+  if (dayDiff === 0) return { id: 'today', label: '今天' };
+  if (dayDiff === 1) return { id: 'yesterday', label: '昨天' };
+  if (dayDiff >= 2 && dayDiff <= 6) return { id: 'this-week', label: '本周早些时候' };
+  return { id: 'earlier', label: '更早' };
+}
+
 export function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;

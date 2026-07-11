@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatBytes,
   formatDate,
+  messageDateGroup,
   newMailNotificationDecision,
   newMailNotificationBody,
   notificationThreadScopeKey,
@@ -18,6 +19,19 @@ import { providerCompatibilityMatrix, providerPresets } from './providerCatalog'
 describe('mail UI utilities', () => {
   it('formats invalid dates without destroying the source value', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+
+  it('groups message dates into stable mailbox sections', () => {
+    const now = new Date('2026-07-11T14:30:00+08:00');
+
+    expect(messageDateGroup('2026-07-11T01:00:00+08:00', now)).toEqual({ id: 'today', label: '今天' });
+    expect(messageDateGroup('2026-07-10T23:59:00+08:00', now)).toEqual({ id: 'yesterday', label: '昨天' });
+    expect(messageDateGroup('2026-07-08T12:00:00+08:00', now)).toEqual({
+      id: 'this-week',
+      label: '本周早些时候',
+    });
+    expect(messageDateGroup('2026-06-30T12:00:00+08:00', now)).toEqual({ id: 'earlier', label: '更早' });
+    expect(messageDateGroup('not-a-date', now)).toEqual({ id: 'unknown', label: '时间未知' });
   });
 
   it('formats attachment sizes for common mail UI ranges', () => {

@@ -4939,6 +4939,38 @@ body {
   background: rgba(255, 255, 255, 0.46);
 }
 
+.message-date-section {
+  display: grid;
+}
+
+.message-date-section + .message-date-section {
+  border-top: 1px solid rgba(18, 28, 45, 0.055);
+}
+
+.message-date-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  color: #7b8591;
+  background: rgba(248, 250, 252, 0.9);
+  backdrop-filter: blur(12px);
+  font-size: 10px;
+  font-weight: 730;
+}
+
+.message-date-header em {
+  color: #9aa3ad;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 650;
+}
+
 .message-card {
   margin: 7px 8px;
   padding: 14px 13px 14px 42px;

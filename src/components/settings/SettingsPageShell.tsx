@@ -30,6 +30,7 @@ export default function SettingsPageShell({
   const ActiveIcon = item.icon;
   const previousItem = settingsNavigationItems[pageIndex - 1];
   const nextItem = settingsNavigationItems[pageIndex + 1];
+  const pageProgress = `${Math.round(((pageIndex + 1) / settingsNavigationItems.length) * 100)}%`;
 
   return (
     <section
@@ -37,6 +38,7 @@ export default function SettingsPageShell({
       className="settings-page"
       data-settings-page={activeSection}
       aria-labelledby={`settings-page-${activeSection}`}
+      style={{ '--settings-page-progress': pageProgress } as React.CSSProperties}
     >
       <header className="settings-page-header">
         <div className="settings-page-heading">
@@ -52,6 +54,7 @@ export default function SettingsPageShell({
           {pageIndex + 1} / {settingsNavigationItems.length}
         </span>
         <p>{item.description}</p>
+        <span className="settings-page-progress-bar" aria-hidden="true" />
       </header>
       <div className="settings-page-content">{children}</div>
       <nav className="settings-page-pagination" aria-label="设置页面导航">

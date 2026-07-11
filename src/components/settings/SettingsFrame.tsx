@@ -19,6 +19,7 @@ import {
 import './settings.css';
 import './settings-shell.css';
 import './settings-pages.css';
+import './settings-design-language.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 

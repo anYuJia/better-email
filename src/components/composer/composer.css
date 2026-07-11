@@ -1346,6 +1346,28 @@
   transform-origin: center;
 }
 
+/* Composer focus: avoid heavy blue rings inside the mail editor. */
+.composer :is(input, textarea):focus,
+.composer :is(input, textarea):focus-visible {
+  outline: none !important;
+  border-color: var(--ui-border) !important;
+  box-shadow: none !important;
+}
+
+.composer .composer-field-row:focus-within,
+.composer-recipient-field .composer-field-row:focus-within {
+  background: #fbfcfd;
+  box-shadow: none;
+}
+
+.composer .composer-field-row:focus-within {
+  border-bottom-color: #d7dde4;
+}
+
+.composer .composer-body-field textarea:focus {
+  background: #fff;
+}
+
 .composer-backdrop-minimized {
   align-items: flex-end;
   justify-content: flex-end;

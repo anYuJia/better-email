@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { OutboxItem } from './types';
 import {
   canCancelOutboxItem,
+  getAccountNotificationMode,
   isListSort,
   outboxStatusLabel,
   outboxTimingLabel,
+  setAccountNotificationMode,
+  toggleAccountNotificationList,
 } from './appConfig';
 
 function archivePendingItem(): OutboxItem {
@@ -42,5 +45,49 @@ describe('message list sorting', () => {
     expect(isListSort('received_at desc')).toBe(false);
     expect(isListSort('')).toBe(false);
     expect(isListSort(null)).toBe(false);
+  });
+});
+
+describe('account notification routing helpers', () => {
+  it('sets one explicit notification mode per account', () => {
+    const base = {
+      quietHoursEnabled: false,
+      quietStart: '22:00',
+      quietEnd: '08:00',
+      vipOnly: false,
+      vipSenders: '',
+      mutedAccounts: 'archive@example.com',
+      priorityAccounts: 'work@example.com',
+    };
+
+    const muted = setAccountNotificationMode(base, 'WORK@example.com', 'muted');
+    expect(getAccountNotificationMode(muted, 'work@example.com')).toBe('muted');
+    expect(muted.priorityAccounts).toBe('');
+    expect(muted.mutedAccounts.split('\n')).toEqual(['archive@example.com', 'work@example.com']);
+
+    const priority = setAccountNotificationMode(muted, 'archive@example.com', 'priority');
+    expect(getAccountNotificationMode(priority, 'archive@example.com')).toBe('priority');
+    expect(priority.mutedAccounts).toBe('work@example.com');
+    expect(priority.priorityAccounts).toBe('archive@example.com');
+
+    const normal = setAccountNotificationMode(priority, 'work@example.com', 'normal');
+    expect(getAccountNotificationMode(normal, 'work@example.com')).toBe('normal');
+    expect(normal.mutedAccounts).toBe('');
+  });
+
+  it('keeps legacy toggle controls mutually exclusive', () => {
+    const policy = {
+      quietHoursEnabled: false,
+      quietStart: '22:00',
+      quietEnd: '08:00',
+      vipOnly: false,
+      vipSenders: '',
+      mutedAccounts: '',
+      priorityAccounts: 'work@example.com',
+    };
+
+    const next = toggleAccountNotificationList(policy, 'mutedAccounts', 'work@example.com');
+    expect(getAccountNotificationMode(next, 'work@example.com')).toBe('muted');
+    expect(next.priorityAccounts).toBe('');
   });
 });

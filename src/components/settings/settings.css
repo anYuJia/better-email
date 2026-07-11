@@ -706,6 +706,49 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e1e7ee;
+  border-radius: 11px;
+  background: #f9fafc;
+}
+
+.settings-policy-panel .notification-account-grid-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 1px 5px;
+}
+
+.settings-policy-panel .notification-account-grid-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-policy-panel .notification-account-grid-header strong {
+  color: var(--settings-text, var(--ui-text));
+  font-size: 11.5px;
+  font-weight: 720;
+}
+
+.settings-policy-panel .notification-account-grid-header small {
+  color: var(--settings-text-tertiary, var(--ui-text-tertiary));
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.settings-policy-panel .notification-account-grid-header em {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid #d9e7f6;
+  border-radius: 7px;
+  color: #1768ad;
+  background: #f2f8ff;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .settings-policy-panel .notification-account-grid > div {
@@ -746,26 +789,42 @@
 
 .settings-policy-panel .notification-account-grid > div > div {
   display: flex;
+  align-items: center;
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dde4ec;
+  border-radius: 9px;
+  background: #f3f5f8;
 }
 
 .settings-policy-panel .notification-account-grid button {
+  min-width: 42px;
   min-height: 28px;
   padding: 0 8px;
-  border: 1px solid #dce2e8;
+  border: 0;
   border-radius: 7px;
   color: var(--ui-text-secondary);
-  background: #ffffff;
+  background: transparent;
   box-shadow: none;
   font-size: 9.5px;
+  font-weight: 660;
 }
 
 .settings-policy-panel .notification-account-grid button:hover,
 .settings-policy-panel .notification-account-grid button.active {
-  color: var(--ui-accent);
-  border-color: #bcd7f2;
-  background: #f2f8fe;
+  color: #0767c8;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(18, 34, 52, 0.08);
+}
+
+.settings-policy-panel .notification-account-grid button.active[title*="静音"] {
+  color: #ad3a1c;
+  background: #fff3ef;
+}
+
+.settings-policy-panel .notification-advanced-lists textarea {
+  min-height: 76px;
 }
 
 .settings-primary-toggle {
@@ -886,6 +945,21 @@
 
   .settings-policy-panel .notification-account-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .settings-policy-panel .notification-account-grid-header,
+  .settings-policy-panel .notification-account-grid > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-policy-panel .notification-account-grid > div > div {
+    width: 100%;
+  }
+
+  .settings-policy-panel .notification-account-grid button {
+    flex: 1;
   }
 
   .settings-identity-form {

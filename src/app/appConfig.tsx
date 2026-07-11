@@ -235,20 +235,61 @@ export function normalizeContactAliases(value: string): string[] {
     .filter(Boolean))];
 }
 
+export type AccountNotificationMode = 'normal' | 'priority' | 'muted';
+
+export function notificationListEntries(value: string): string[] {
+  return [...new Set(value
+    .split(/[\n,;，；]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean))];
+}
+
+function updateNotificationList(value: string, email: string, include: boolean): string {
+  const normalizedEmail = email.trim().toLowerCase();
+  const current = notificationListEntries(value).filter((item) => item !== normalizedEmail);
+  return (include && normalizedEmail ? [...current, normalizedEmail] : current).join('\n');
+}
+
+export function getAccountNotificationMode(policy: NotificationPolicy, email: string): AccountNotificationMode {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return 'normal';
+  if (notificationListEntries(policy.mutedAccounts).includes(normalizedEmail)) return 'muted';
+  if (notificationListEntries(policy.priorityAccounts).includes(normalizedEmail)) return 'priority';
+  return 'normal';
+}
+
+export function setAccountNotificationMode(
+  policy: NotificationPolicy,
+  email: string,
+  mode: AccountNotificationMode,
+): NotificationPolicy {
+  return {
+    ...policy,
+    mutedAccounts: updateNotificationList(policy.mutedAccounts, email, mode === 'muted'),
+    priorityAccounts: updateNotificationList(policy.priorityAccounts, email, mode === 'priority'),
+  };
+}
+
 export function toggleAccountNotificationList(
   policy: NotificationPolicy,
   key: 'mutedAccounts' | 'priorityAccounts',
   email: string,
 ): NotificationPolicy {
   const normalizedEmail = email.trim().toLowerCase();
-  const current = policy[key]
-    .split(/[\n,;，；]/)
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
+  const current = notificationListEntries(policy[key]);
   const next = current.includes(normalizedEmail)
     ? current.filter((item) => item !== normalizedEmail)
     : [...current, normalizedEmail];
-  return { ...policy, [key]: next.join('\n') };
+  const nextPolicy = { ...policy, [key]: next.join('\n') };
+  if (current.includes(normalizedEmail)) return nextPolicy;
+  return {
+    ...nextPolicy,
+    [key === 'mutedAccounts' ? 'priorityAccounts' : 'mutedAccounts']: updateNotificationList(
+      policy[key === 'mutedAccounts' ? 'priorityAccounts' : 'mutedAccounts'],
+      normalizedEmail,
+      false,
+    ),
+  };
 }
 
 export function loadProviderVerifications(): Record<string, ProviderVerificationRecord> {

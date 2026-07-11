@@ -1,5 +1,9 @@
 import type { Account } from '../../../app/types';
-import { toggleAccountNotificationList } from '../../../app/appConfig';
+import {
+  getAccountNotificationMode,
+  setAccountNotificationMode,
+  type AccountNotificationMode,
+} from '../../../app/appConfig';
 import type { NotificationPolicy } from '../../../mailUtils';
 
 type NotificationSettingsPageProps = {
@@ -13,6 +17,22 @@ export default function NotificationSettingsPage({
   notificationPolicy,
   onNotificationPolicyChange,
 }: NotificationSettingsPageProps) {
+  const priorityCount = accounts.filter((item) => (
+    getAccountNotificationMode(notificationPolicy, item.email) === 'priority'
+  )).length;
+  const mutedCount = accounts.filter((item) => (
+    getAccountNotificationMode(notificationPolicy, item.email) === 'muted'
+  )).length;
+  const accountModeOptions: {
+    mode: AccountNotificationMode;
+    label: string;
+    description: string;
+  }[] = [
+    { mode: 'normal', label: '默认', description: '按全局策略提醒' },
+    { mode: 'priority', label: '重点', description: '免打扰内也提醒' },
+    { mode: 'muted', label: '静音', description: '不弹系统提醒' },
+  ];
+
   return (
     <div className="settings-experience-stack">
       <section className="tool-panel settings-policy-panel" data-settings-section="notifications">
@@ -88,7 +108,50 @@ export default function NotificationSettingsPage({
           </label>
         </div>
 
-        <div className="settings-textarea-grid">
+        <div className="notification-account-grid" aria-label="账号提醒模式">
+          <header className="notification-account-grid-header">
+            <span>
+              <strong>账号提醒模式</strong>
+              <small>常用账号直接点选，避免手写邮箱列表；重点账号会穿透免打扰。</small>
+            </span>
+            <em>{priorityCount} 个重点 · {mutedCount} 个静音</em>
+          </header>
+          {accounts.map((item) => {
+            const mode = getAccountNotificationMode(notificationPolicy, item.email);
+            return (
+              <div key={item.id} data-notification-account={item.email}>
+                <span>
+                  <strong>{item.display_name || item.email}</strong>
+                  <small>{item.email}</small>
+                </span>
+                <div className="notification-account-mode" role="group" aria-label={`${item.email} 提醒模式`}>
+                  {accountModeOptions.map((option) => {
+                    const active = mode === option.mode;
+                    return (
+                      <button
+                        type="button"
+                        className={active ? 'active' : ''}
+                        key={option.mode}
+                        aria-pressed={active}
+                        title={option.description}
+                        onClick={() => onNotificationPolicyChange(
+                          setAccountNotificationMode(notificationPolicy, item.email, option.mode),
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {accounts.length === 0 && (
+            <p className="settings-empty-state">还没有可配置的邮箱账号。</p>
+          )}
+        </div>
+
+        <div className="settings-textarea-grid notification-advanced-lists">
           <label>
             VIP 发件人
             <textarea
@@ -122,42 +185,6 @@ export default function NotificationSettingsPage({
               placeholder={'work@example.com\n@company.com'}
             />
           </label>
-        </div>
-
-        <div className="notification-account-grid">
-          {accounts.map((item) => {
-            const email = item.email.toLowerCase();
-            const muted = notificationPolicy.mutedAccounts.toLowerCase().includes(email);
-            const priority = notificationPolicy.priorityAccounts.toLowerCase().includes(email);
-            return (
-              <div key={item.id}>
-                <span>
-                  <strong>{item.display_name || item.email}</strong>
-                  <small>{item.email}</small>
-                </span>
-                <div>
-                  <button
-                    type="button"
-                    className={muted ? 'active' : ''}
-                    onClick={() => onNotificationPolicyChange(
-                      toggleAccountNotificationList(notificationPolicy, 'mutedAccounts', item.email),
-                    )}
-                  >
-                    {muted ? '取消静音' : '静音'}
-                  </button>
-                  <button
-                    type="button"
-                    className={priority ? 'active' : ''}
-                    onClick={() => onNotificationPolicyChange(
-                      toggleAccountNotificationList(notificationPolicy, 'priorityAccounts', item.email),
-                    )}
-                  >
-                    {priority ? '取消重点' : '重点'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
     </div>

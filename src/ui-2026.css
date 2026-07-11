@@ -3724,3 +3724,128 @@ body {
   color: #1f2a36;
   background: #f1f4f7;
 }
+
+/* Plain text mail: separate current text from quoted/original mail quietly. */
+.body-text {
+  display: grid;
+  gap: 14px;
+  white-space: normal;
+}
+
+.plain-body-copy {
+  white-space: pre-wrap;
+}
+
+.original-message-block {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e1e5ea;
+  border-left: 3px solid #c7d2de;
+  border-radius: 8px;
+  color: #46515d;
+  background: #f8f9fb;
+}
+
+.original-message-block + .original-message-block {
+  margin-top: 2px;
+}
+
+.original-message-block header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+}
+
+.original-message-block header span {
+  color: #596574;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.original-message-block header small {
+  color: #8b95a1;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.original-message-block dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 4px;
+  margin: 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid #e6e9ed;
+}
+
+.original-message-block dt {
+  color: #8a929d;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.original-message-block dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #3f4854;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.original-message-block pre {
+  margin: 0;
+  overflow: auto;
+  color: #4e5966;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.58;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reader-html blockquote {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #c7d2de;
+  border-radius: 0 7px 7px 0;
+  color: #58636f;
+  background: #f8f9fb;
+}
+
+.thread-stack {
+  gap: 0;
+  border-top: 1px solid #e2e6ea;
+}
+
+.thread-message {
+  position: relative;
+  padding: 13px 10px 13px 12px;
+}
+
+.thread-message + .thread-message {
+  border-top: 0;
+}
+
+.thread-message p {
+  display: -webkit-box;
+  margin: 4px 0 6px;
+  overflow: hidden;
+  color: #697582;
+  font-size: 12.5px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.thread-message.active {
+  background: #f3f7fb;
+  box-shadow: inset 2px 0 0 #6f9dcc;
+}

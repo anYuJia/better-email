@@ -1235,15 +1235,6 @@ impl MailStore {
             let search_criteria = SearchCriteria::parse(search.as_deref());
             let mut scope_conditions = Vec::new();
             let mut query_params = Vec::new();
-            if folder_id == 0 {
-                eprintln!(
-                    "[better-email][mailbox] list_messages unscoped folder_id=0 account_id={:?} filter={} sort={:?} limit={}",
-                    account_id,
-                    filter,
-                    sort,
-                    limit,
-                );
-            }
             if folder_id > 0 {
                 scope_conditions.push("m.folder_id = ?".to_string());
                 query_params.push(Value::Integer(folder_id));

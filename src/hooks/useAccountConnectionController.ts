@@ -258,7 +258,7 @@ export default function useAccountConnectionController({
         folderId: nextFolderId,
         folderCount: nextFolders.length,
       });
-      await loadMessages(nextFolderId, query, filter, created.id, undefined, undefined, 'all');
+      await loadMessages(nextFolderId, query, filter, created.id, undefined, undefined, 'account');
       accountFlowLog('messages loaded after create', {
         accountId: created.id,
         folderId: nextFolderId,
@@ -337,7 +337,7 @@ export default function useAccountConnectionController({
         nextAccountId: nextAccount.id,
         folderId: nextFolderId,
       });
-      await loadMessages(nextFolderId, query, filter, nextAccount.id);
+      await loadMessages(nextFolderId, query, filter, nextAccount.id, undefined, undefined, 'account');
       setSettingsOpen(false);
       setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
       return;

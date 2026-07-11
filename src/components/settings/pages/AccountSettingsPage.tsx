@@ -29,6 +29,7 @@ export default function AccountSettingsPage({
   onRemoveAccount,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [activeAccountMode, setActiveAccountMode] = useState<'details' | 'edit' | 'config' | null>(null);
 
   useEffect(() => {
     if (!addDialogOpen) return undefined;
@@ -44,6 +45,11 @@ export default function AccountSettingsPage({
   function handleCreateNewAccount() {
     onCreateNewAccount();
     setAddDialogOpen(false);
+  }
+
+  function openAccountMode(account: Account, mode: 'details' | 'edit' | 'config') {
+    onAccountFormChange(account);
+    setActiveAccountMode(mode);
   }
 
   return (
@@ -64,69 +70,154 @@ export default function AccountSettingsPage({
           {accounts.map((account) => {
             const active = account.id === accountForm.id;
             return (
-              <button
-                type="button"
+              <div
                 className={['settings-account-row', active ? 'active' : ''].filter(Boolean).join(' ')}
                 key={account.id}
                 role="option"
                 aria-selected={active}
-                onClick={() => onAccountFormChange(account)}
               >
-                <span className="settings-account-row-icon" aria-hidden="true">
-                  <Mail size={15} />
-                </span>
-                <span className="settings-account-row-copy">
-                  <strong>{account.display_name || account.email}</strong>
-                  <span>{account.email}</span>
-                </span>
+                <button
+                  type="button"
+                  className="settings-account-row-main"
+                  onClick={() => openAccountMode(account, 'details')}
+                >
+                  <span className="settings-account-row-icon" aria-hidden="true">
+                    <Mail size={15} />
+                  </span>
+                  <span className="settings-account-row-copy">
+                    <strong>{account.display_name || account.email}</strong>
+                    <span>{account.email}</span>
+                  </span>
+                </button>
                 <span className="settings-account-row-meta">
                   <span>{account.provider}</span>
                   {account.is_default && <em>默认</em>}
                 </span>
-              </button>
+                <span className="settings-account-row-actions" aria-label="账号操作">
+                  <button type="button" onClick={() => openAccountMode(account, 'details')}>
+                    详情
+                  </button>
+                  <button type="button" onClick={() => openAccountMode(account, 'edit')}>
+                    修改
+                  </button>
+                  <button type="button" onClick={() => openAccountMode(account, 'config')}>
+                    配置
+                  </button>
+                </span>
+              </div>
             );
           })}
         </div>
       </section>
 
-      <section className="tool-panel settings-current-account-panel">
-        <header className="tool-header">
-          <span>
-            <strong>账号信息</strong>
-            <small>{accountForm.email}</small>
-          </span>
-          <em>{accountForm.provider}</em>
-        </header>
-        <div className="settings-account-form-grid">
-          <label>
-            显示名称
-            <input
-              value={accountForm.display_name}
-              onChange={(event) => onAccountFormChange({
-                ...accountForm,
-                display_name: event.target.value,
-              })}
-            />
-          </label>
-          <label>
-            同步策略
-            <select
-              value={accountForm.sync_mode}
-              onChange={(event) => onAccountFormChange({ ...accountForm, sync_mode: event.target.value })}
-            >
-              <option value="manual">手动</option>
-              <option value="15min">每 15 分钟</option>
-              <option value="push">推送优先</option>
-            </select>
-          </label>
-        </div>
-      </section>
+      {activeAccountMode && (
+        <section className="tool-panel settings-current-account-panel">
+          <header className="tool-header">
+            <span>
+              <strong>
+                {activeAccountMode === 'details' && '账号详情'}
+                {activeAccountMode === 'edit' && '修改账号'}
+                {activeAccountMode === 'config' && '账号配置'}
+              </strong>
+              <small>{accountForm.email}</small>
+            </span>
+            <button type="button" className="settings-account-close-detail" onClick={() => setActiveAccountMode(null)}>
+              <X size={14} />
+              收起
+            </button>
+          </header>
 
-      <AccountRemovalPanel
-        account={accountForm}
-        accountCount={accountCount}
-        onRemove={onRemoveAccount}
-      />
+          {activeAccountMode === 'details' && (
+            <div className="settings-account-detail-list">
+              <span>
+                <small>显示名称</small>
+                <strong>{accountForm.display_name || accountForm.email}</strong>
+              </span>
+              <span>
+                <small>服务商</small>
+                <strong>{accountForm.provider}</strong>
+              </span>
+              <span>
+                <small>同步</small>
+                <strong>{accountForm.sync_mode === 'manual' ? '手动' : accountForm.sync_mode}</strong>
+              </span>
+              <span>
+                <small>状态</small>
+                <strong>{accountForm.is_default ? '默认账号' : '普通账号'}</strong>
+              </span>
+            </div>
+          )}
+
+          {activeAccountMode === 'edit' && (
+            <>
+              <div className="settings-account-form-grid">
+                <label>
+                  显示名称
+                  <input
+                    value={accountForm.display_name}
+                    onChange={(event) => onAccountFormChange({
+                      ...accountForm,
+                      display_name: event.target.value,
+                    })}
+                  />
+                </label>
+                <label>
+                  同步策略
+                  <select
+                    value={accountForm.sync_mode}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, sync_mode: event.target.value })}
+                  >
+                    <option value="manual">手动</option>
+                    <option value="15min">每 15 分钟</option>
+                    <option value="push">推送优先</option>
+                  </select>
+                </label>
+              </div>
+              <AccountRemovalPanel
+                account={accountForm}
+                accountCount={accountCount}
+                onRemove={onRemoveAccount}
+              />
+            </>
+          )}
+
+          {activeAccountMode === 'config' && (
+            <div className="settings-account-form-grid settings-account-config-grid">
+              <label>
+                服务商
+                <input
+                  value={accountForm.provider}
+                  onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
+                />
+              </label>
+              <label>
+                认证方式
+                <select
+                  value={accountForm.auth_type}
+                  onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
+                >
+                  <option value="password">密码</option>
+                  <option value="oauth2">OAuth2</option>
+                </select>
+              </label>
+              <label>
+                IMAP
+                <input
+                  value={accountForm.imap_host}
+                  onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
+                />
+              </label>
+              <label>
+                SMTP
+                <input
+                  value={accountForm.smtp_host}
+                  onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
+                />
+              </label>
+            </div>
+          )}
+        </section>
+      )}
 
       {addDialogOpen && (
         <div

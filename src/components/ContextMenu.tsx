@@ -36,10 +36,49 @@ function MenuItems({
   items: ContextMenuItem[];
   onClose: () => void;
 }) {
+  function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
+    const branch = event.currentTarget;
+    const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
+    const trigger = branch.querySelector<HTMLElement>(':scope > button');
+    if (!submenu || !trigger) return;
+
+    const margin = 8;
+    const gap = 6;
+    const triggerBounds = trigger.getBoundingClientRect();
+    const previousDisplay = submenu.style.display;
+    const previousVisibility = submenu.style.visibility;
+
+    submenu.style.display = 'block';
+    submenu.style.visibility = 'hidden';
+    const width = Math.min(submenu.offsetWidth || 226, window.innerWidth - margin * 2);
+    const height = Math.min(submenu.offsetHeight || submenu.scrollHeight || 0, window.innerHeight - margin * 2);
+
+    let left = triggerBounds.right + gap;
+    if (left + width > window.innerWidth - margin) {
+      left = triggerBounds.left - width - gap;
+    }
+    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+
+    let top = triggerBounds.top - 5;
+    if (top + height > window.innerHeight - margin) {
+      top = window.innerHeight - height - margin;
+    }
+    top = Math.max(margin, top);
+
+    submenu.style.setProperty('--context-submenu-left', `${left}px`);
+    submenu.style.setProperty('--context-submenu-top', `${top}px`);
+    submenu.style.setProperty('--context-submenu-max-height', `${Math.max(140, window.innerHeight - top - margin)}px`);
+    submenu.style.display = previousDisplay;
+    submenu.style.visibility = previousVisibility;
+  }
+
   return items.map((item) => (
     <React.Fragment key={item.id}>
       {item.separatorBefore && <div className="context-menu-separator" role="separator" />}
-      <div className={item.children?.length ? 'context-menu-branch' : undefined}>
+      <div
+        className={item.children?.length ? 'context-menu-branch' : undefined}
+        onPointerEnter={item.children?.length ? positionSubmenu : undefined}
+      >
         <button
           type="button"
           role="menuitem"
@@ -89,18 +128,18 @@ export default function ContextMenu({
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
-  const [alignSubmenuLeft, setAlignSubmenuLeft] = useState(false);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!menu) return;
-    const bounds = menu.getBoundingClientRect();
     const margin = 8;
+    const width = Math.min(menu.offsetWidth || menu.getBoundingClientRect().width, window.innerWidth - margin * 2);
+    const height = Math.min(menu.scrollHeight || menu.getBoundingClientRect().height, window.innerHeight - margin * 2);
+    menu.style.setProperty('--context-menu-max-height', `${window.innerHeight - margin * 2}px`);
     setPosition({
-      x: Math.max(margin, Math.min(x, window.innerWidth - bounds.width - margin)),
-      y: Math.max(margin, Math.min(y, window.innerHeight - bounds.height - margin)),
+      x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
+      y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
     });
-    setAlignSubmenuLeft(x > window.innerWidth - 500);
   }, [x, y]);
 
   useEffect(() => {
@@ -204,7 +243,6 @@ export default function ContextMenu({
       ref={menuRef}
       className={[
         'context-menu',
-        alignSubmenuLeft ? 'align-submenu-left' : '',
         className ?? '',
       ].filter(Boolean).join(' ')}
       style={{ left: position.x, top: position.y }}

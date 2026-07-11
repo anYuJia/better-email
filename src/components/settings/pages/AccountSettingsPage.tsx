@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Mail, Plus, X } from 'lucide-react';
-import type { Account, AccountCreateInput } from '../../../app/types';
+import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
+import { incomingHostForProtocol, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import AccountRemovalPanel from '../AccountRemovalPanel';
 import ProviderPresetGrid from '../ProviderPresetGrid';
 
 type AccountDialogMode = 'details' | 'edit' | 'config' | 'delete';
+
+function protocolLabel(protocol: string) {
+  return protocol === 'pop3' ? 'POP3' : 'IMAP';
+}
+
+function protocolHint(protocol: string) {
+  return protocol === 'pop3'
+    ? 'POP3 只同步收件箱，适合保留本地副本。'
+    : 'IMAP 会同步远端文件夹和状态。';
+}
 
 type AccountSettingsPageProps = {
   accounts: Account[];
@@ -71,6 +82,35 @@ export default function AccountSettingsPage({
 
   function closeAccountDialog() {
     setAccountDialogMode(null);
+  }
+
+  function providerPresetFor(provider: string) {
+    const normalized = provider.trim().toLowerCase();
+    return providerPresets.find((preset) => preset.provider === normalized || preset.id === normalized) ?? null;
+  }
+
+  function switchNewAccountProtocol(nextProtocol: IncomingProtocol) {
+    const preset = providerPresetFor(newAccountForm.provider);
+    onNewAccountFormChange({
+      ...newAccountForm,
+      incoming_protocol: nextProtocol,
+      imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : newAccountForm.imap_host,
+      auth_type: nextProtocol === 'pop3' && newAccountForm.auth_type === 'oauth2'
+        ? 'password'
+        : newAccountForm.auth_type,
+    });
+  }
+
+  function switchAccountProtocol(nextProtocol: IncomingProtocol) {
+    const preset = providerPresetFor(accountForm.provider);
+    onAccountFormChange({
+      ...accountForm,
+      incoming_protocol: nextProtocol,
+      imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : accountForm.imap_host,
+      auth_type: nextProtocol === 'pop3' && accountForm.auth_type === 'oauth2'
+        ? 'password'
+        : accountForm.auth_type,
+    });
   }
 
   const newAccountSecretLabel = newAccountForm.auth_type === 'oauth2' ? 'OAuth2 Token' : '密码 / 授权码';
@@ -237,13 +277,16 @@ export default function AccountSettingsPage({
             <div className="settings-account-protocol-grid" aria-label="邮件协议">
               <label>
                 收信协议
-                <select value="imap" onChange={() => undefined}>
+                <select
+                  value={newAccountForm.incoming_protocol}
+                  onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
+                >
                   <option value="imap">IMAP</option>
-                  <option value="pop3" disabled>POP3（暂未支持）</option>
+                  <option value="pop3">POP3</option>
                 </select>
               </label>
               <span>
-                当前版本使用 IMAP 收信、SMTP 发信。
+                {protocolHint(newAccountForm.incoming_protocol)}
               </span>
             </div>
 
@@ -255,7 +298,7 @@ export default function AccountSettingsPage({
 
             <div className="settings-account-form-grid">
               <label>
-                收信服务器（IMAP）
+                收信服务器（{protocolLabel(newAccountForm.incoming_protocol)}）
                 <input
                   value={newAccountForm.imap_host}
                   onChange={(event) => onNewAccountFormChange({
@@ -336,7 +379,7 @@ export default function AccountSettingsPage({
                 </span>
                 <span>
                   <small>协议</small>
-                  <strong>IMAP / SMTP</strong>
+                  <strong>{protocolLabel(accountForm.incoming_protocol)} / SMTP</strong>
                 </span>
                 <span>
                   <small>状态</small>
@@ -392,13 +435,16 @@ export default function AccountSettingsPage({
                 </label>
                 <label>
                   收信协议
-                  <select value="imap" onChange={() => undefined}>
+                  <select
+                    value={accountForm.incoming_protocol}
+                    onChange={(event) => switchAccountProtocol(event.target.value as IncomingProtocol)}
+                  >
                     <option value="imap">IMAP</option>
-                    <option value="pop3" disabled>POP3（暂未支持）</option>
+                    <option value="pop3">POP3</option>
                   </select>
                 </label>
                 <label>
-                  收信服务器（IMAP）
+                  收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
                   <input
                     value={accountForm.imap_host}
                     onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}

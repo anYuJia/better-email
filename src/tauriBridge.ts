@@ -89,6 +89,7 @@ let account = {
   provider: 'gmail',
   imap_host: 'imap.gmail.com:993',
   smtp_host: 'smtp.gmail.com:587',
+  incoming_protocol: 'imap',
   auth_type: 'oauth2',
   sync_mode: 'manual',
   remote_images_allowed: false,
@@ -1037,6 +1038,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         provider: String(input.provider ?? '').trim() || 'Custom',
         imap_host: String(input.imap_host ?? '').trim(),
         smtp_host: String(input.smtp_host ?? '').trim(),
+        incoming_protocol: String(input.incoming_protocol ?? 'imap').trim() === 'pop3' ? 'pop3' : 'imap',
         auth_type: String(input.auth_type ?? '').trim() || 'password',
         sync_mode: String(input.sync_mode ?? '').trim() || 'manual',
         remote_images_allowed: Boolean(input.remote_images_allowed),
@@ -1859,26 +1861,28 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     }
     case 'test_connection': {
       const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
+      const incomingName = targetAccount.incoming_protocol === 'pop3' ? 'POP3' : 'IMAP';
       return {
         account_email: targetAccount.email,
         checked_at: now,
         ready_for_credentials: true,
         endpoints: [
-          { name: 'IMAP', address: targetAccount.imap_host, reachable: true, latency_ms: 12, message: 'mock ok' },
+          { name: incomingName, address: targetAccount.imap_host, reachable: true, latency_ms: 12, message: 'mock ok' },
           { name: 'SMTP', address: targetAccount.smtp_host, reachable: true, latency_ms: 14, message: 'mock ok' },
         ],
       } as T;
     }
     case 'verify_account_credentials': {
       const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
+      const incomingName = targetAccount.incoming_protocol === 'pop3' ? 'POP3' : 'IMAP';
       return {
         account_email: targetAccount.email,
         checked_at: now,
         authenticated: true,
         status: 'ok',
-        message: 'IMAP 与 SMTP 登录验证通过，未发送任何邮件。',
+        message: `${incomingName} 与 SMTP 登录验证通过，未发送任何邮件。`,
         checks: [
-          { name: 'IMAP', address: targetAccount.imap_host, authenticated: true, message: 'IMAP 登录认证成功。' },
+          { name: incomingName, address: targetAccount.imap_host, authenticated: true, message: `${incomingName} 登录认证成功。` },
           { name: 'SMTP', address: targetAccount.smtp_host, authenticated: true, message: 'SMTP 登录认证成功。' },
         ],
       } as T;

@@ -574,6 +574,7 @@ export const emptyAccountCreateForm: AccountCreateInput = {
   provider: 'Custom',
   imap_host: '',
   smtp_host: '',
+  incoming_protocol: 'imap',
   auth_type: 'password',
   sync_mode: 'manual',
   remote_images_allowed: false,

@@ -14,6 +14,7 @@ const account: Account = {
   provider: 'netease',
   imap_host: 'imap.163.com:993',
   smtp_host: 'smtp.163.com:465',
+  incoming_protocol: 'imap',
   auth_type: 'password',
   sync_mode: 'manual',
   remote_images_allowed: false,
@@ -109,7 +110,7 @@ describe('buildConnectionDiagnosticModel', () => {
 
     expect(model.state).toBe('warning');
     expect(model.title).toBe('账号仅部分可用');
-    expect(model.steps.find((step) => step.id === 'imap')?.state).toBe('success');
+    expect(model.steps.find((step) => step.id === 'incoming')?.state).toBe('success');
     expect(model.steps.find((step) => step.id === 'smtp')?.state).toBe('error');
     expect(model.recommendations[0]).toContain('失败协议');
   });

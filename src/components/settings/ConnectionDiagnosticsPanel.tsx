@@ -37,7 +37,7 @@ type ConnectionDiagnosticsPanelProps = {
 const stepIcons = {
   network: Server,
   credential: KeyRound,
-  imap: MailCheck,
+  incoming: MailCheck,
   smtp: Send,
 };
 
@@ -90,13 +90,13 @@ export default function ConnectionDiagnosticsPanel({
           <button
             type="button"
             disabled={providerValidationRunning}
-            title="依次执行服务器、登录、文件夹发现和邮件头同步；不会发送邮件"
+            title="依次检查服务器、登录、文件夹发现和邮件头同步；不会发送邮件"
             onClick={onRunProviderValidation}
           >
             {providerValidationRunning
               ? <LoaderCircle className="connection-spinner" size={13} />
               : <PlayCircle size={13} />}
-            {providerValidationRunning ? '验收中' : '一键验收'}
+            {providerValidationRunning ? '验收中' : '只读验收'}
           </button>
         </div>
       </header>
@@ -154,7 +154,7 @@ export default function ConnectionDiagnosticsPanel({
             <p>{providerValidationReport.summary}</p>
           </>
         ) : (
-          <p>一键验收按顺序检查服务器、登录、文件夹与邮件头同步，不发送邮件或修改远端状态。</p>
+          <p>只读验收按顺序检查服务器、登录、文件夹与邮件头同步，不发送邮件或修改远端状态。</p>
         )}
       </div>
 

@@ -14,11 +14,17 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub fn test_endpoints(
     email: &str,
+    incoming_protocol: &str,
     imap_host: &str,
     smtp_host: &str,
 ) -> MailResult<ConnectionReport> {
+    let (incoming_name, incoming_port) = if incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+        ("POP3", 995)
+    } else {
+        ("IMAP", 993)
+    };
     let endpoints = vec![
-        check_endpoint("IMAP", imap_host, 993),
+        check_endpoint(incoming_name, imap_host, incoming_port),
         check_endpoint("SMTP", smtp_host, 465),
     ];
     let ready_for_credentials = endpoints.iter().all(|endpoint| endpoint.reachable);

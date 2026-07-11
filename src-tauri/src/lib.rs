@@ -4,6 +4,7 @@ mod db;
 mod imap_probe;
 mod models;
 mod oauth;
+mod pop3_probe;
 mod protocol;
 mod provider_probe;
 mod smtp;

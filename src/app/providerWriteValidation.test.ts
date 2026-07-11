@@ -18,6 +18,7 @@ const account: Account = {
   provider: 'custom',
   imap_host: 'imap.example.com:993',
   smtp_host: 'smtp.example.com:465',
+  incoming_protocol: 'imap',
   auth_type: 'password',
   sync_mode: 'manual',
   remote_images_allowed: false,

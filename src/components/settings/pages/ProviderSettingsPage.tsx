@@ -1,5 +1,6 @@
 import { Save } from 'lucide-react';
 import {
+  incomingHostForProtocol,
   providerCompatibilityMatrix,
   type AccountProviderPreset,
   type ProviderCompatibility,
@@ -9,6 +10,7 @@ import {
 } from '../../../app/appConfig';
 import type {
   Account,
+  IncomingProtocol,
   ProviderVerificationRecord,
   ProviderVerificationStatus,
 } from '../../../app/types';
@@ -32,6 +34,10 @@ function providerPresetStatusLabel(status: ProviderCompatibility['tested_status'
   if (status === 'verified') return '真实账号已验证';
   if (status === 'needs-account') return '需真实账号验证';
   return '预设可用';
+}
+
+function protocolLabel(protocol: string) {
+  return protocol === 'pop3' ? 'POP3' : 'IMAP';
 }
 
 export default function ProviderSettingsPage({
@@ -66,7 +72,30 @@ export default function ProviderSettingsPage({
         />
         <div className="settings-account-form-grid">
           <label>
-            IMAP 服务器
+            收信协议
+            <select
+              value={accountForm.incoming_protocol}
+              onChange={(event) => {
+                const nextProtocol = event.target.value as IncomingProtocol;
+                const preset = providerCompatibilityMatrix.find(
+                  (provider) => provider.provider === accountForm.provider,
+                );
+                onAccountFormChange({
+                  ...accountForm,
+                  incoming_protocol: nextProtocol,
+                  imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : accountForm.imap_host,
+                  auth_type: nextProtocol === 'pop3' && accountForm.auth_type === 'oauth2'
+                    ? 'password'
+                    : accountForm.auth_type,
+                });
+              }}
+            >
+              <option value="imap">IMAP</option>
+              <option value="pop3">POP3</option>
+            </select>
+          </label>
+          <label>
+            收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
             <input
               value={accountForm.imap_host}
               onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
@@ -109,7 +138,9 @@ export default function ProviderSettingsPage({
                 <strong>{provider.label}</strong>
                 <span>
                   {provider.auth_type === 'oauth2' ? 'OAuth2' : '授权码'}
-                  {' · '}{provider.imap_host} · {provider.smtp_host}
+                  {' · '}IMAP {provider.imap_host}
+                  {' · '}POP3 {provider.pop3_host}
+                  {' · '}SMTP {provider.smtp_host}
                 </span>
                 <small>{provider.setup}</small>
                 <em>
@@ -160,8 +191,8 @@ export default function ProviderSettingsPage({
                     })}
                   />
                   <span>
-                    <strong>IMAP 已通过</strong>
-                    <small>登录、文件夹发现和邮件头同步</small>
+                    <strong>收信已通过</strong>
+                    <small>IMAP 或 POP3 登录与同步</small>
                   </span>
                 </label>
                 <label className="checkbox-row">

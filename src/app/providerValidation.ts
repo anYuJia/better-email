@@ -36,6 +36,7 @@ type ProviderValidationDependencies = {
   verifyCredentials: () => Promise<CredentialVerificationReport>;
   discoverFolders: () => Promise<ImapProbeReport>;
   syncHeaders: () => Promise<SyncRun>;
+  incomingProtocol?: 'imap' | 'pop3';
   onUpdate?: (report: ProviderValidationReport) => void;
   now?: () => string;
 };
@@ -136,36 +137,42 @@ export async function runProviderValidation(
 ): Promise<ProviderValidationReport> {
   const now = dependencies.now ?? (() => new Date().toISOString());
   const onUpdate = dependencies.onUpdate;
+  const incomingProtocol = dependencies.incomingProtocol ?? 'imap';
+  const incomingLabel = incomingProtocol === 'pop3' ? 'POP3' : 'IMAP';
+  const folderLabel = incomingProtocol === 'pop3' ? '收件箱' : '文件夹';
   let report = publish(createProviderValidationReport(accountEmail, now), onUpdate);
   let hasWarning = false;
 
   report = updateStage(report, 'connection', {
     state: 'running',
-    detail: '正在检查 IMAP 与 SMTP 端点',
+    detail: `正在检查 ${incomingLabel} 与 SMTP 端点`,
   }, onUpdate);
   try {
     const connection = await dependencies.testConnection();
     const reachableCount = connection.endpoints.filter((endpoint) => endpoint.reachable).length;
     if (!connection.ready_for_credentials) {
-      const imapReachable = connection.endpoints.some(
-        (endpoint) => endpoint.name.toLowerCase().includes('imap') && endpoint.reachable,
+      const incomingReachable = connection.endpoints.some(
+        (endpoint) => {
+          const name = endpoint.name.toLowerCase();
+          return (name.includes('imap') || name.includes('pop3')) && endpoint.reachable;
+        },
       );
-      if (imapReachable) {
+      if (incomingReachable) {
         hasWarning = true;
         report = updateStage(report, 'connection', {
           state: 'warning',
-          detail: `${reachableCount}/${connection.endpoints.length} 个端点可连接；IMAP 可达，继续只读收信验收`,
+          detail: `${reachableCount}/${connection.endpoints.length} 个端点可连接；${incomingLabel} 可达，继续只读收信验收`,
         }, onUpdate);
       } else {
         report = updateStage(report, 'connection', {
           state: 'error',
-          detail: `${reachableCount}/${connection.endpoints.length} 个端点可连接，IMAP 不可达`,
+          detail: `${reachableCount}/${connection.endpoints.length} 个端点可连接，${incomingLabel} 不可达`,
         }, onUpdate);
-        report = skipRemaining(report, 'connection', 'IMAP 服务器连接未通过', onUpdate);
+        report = skipRemaining(report, 'connection', `${incomingLabel} 服务器连接未通过`, onUpdate);
         return finish(
           report,
           'error',
-          '只读验收已停止：请先修复 IMAP 地址、TLS 或网络连接。',
+          `只读验收已停止：请先修复 ${incomingLabel} 地址、TLS 或网络连接。`,
           now,
           onUpdate,
         );
@@ -187,19 +194,22 @@ export async function runProviderValidation(
 
   report = updateStage(report, 'credentials', {
     state: 'running',
-    detail: '正在验证 IMAP 与 SMTP 登录',
+    detail: `正在验证 ${incomingLabel} 与 SMTP 登录`,
   }, onUpdate);
   try {
     const verification = await dependencies.verifyCredentials();
     if (!verification.authenticated) {
-      const imapAuthenticated = verification.checks.some(
-        (check) => check.name.toLowerCase().includes('imap') && check.authenticated,
+      const incomingAuthenticated = verification.checks.some(
+        (check) => {
+          const name = check.name.toLowerCase();
+          return (name.includes('imap') || name.includes('pop3')) && check.authenticated;
+        },
       );
-      if (verification.status === 'partial' && imapAuthenticated) {
+      if (verification.status === 'partial' && incomingAuthenticated) {
         hasWarning = true;
         report = updateStage(report, 'credentials', {
           state: 'warning',
-          detail: 'IMAP 已认证，SMTP 未通过；继续只读收信验收',
+          detail: `${incomingLabel} 已认证，SMTP 未通过；继续只读收信验收`,
         }, onUpdate);
       } else {
         const state = verification.status === 'partial' ? 'warning' : 'error';
@@ -207,13 +217,13 @@ export async function runProviderValidation(
           state,
           detail: verification.message,
         }, onUpdate);
-        report = skipRemaining(report, 'credentials', 'IMAP 登录未通过', onUpdate);
+        report = skipRemaining(report, 'credentials', `${incomingLabel} 登录未通过`, onUpdate);
         return finish(
           report,
           state,
           state === 'warning'
-            ? '只读验收部分完成：SMTP 可用，但 IMAP 仍需修复。'
-            : '只读验收已停止：当前授权信息未通过 IMAP 认证。',
+            ? `只读验收部分完成：SMTP 可用，但 ${incomingLabel} 仍需修复。`
+            : `只读验收已停止：当前授权信息未通过 ${incomingLabel} 认证。`,
           now,
           onUpdate,
         );
@@ -221,7 +231,7 @@ export async function runProviderValidation(
     } else {
       report = updateStage(report, 'credentials', {
         state: 'success',
-        detail: 'IMAP 与 SMTP 均已认证',
+        detail: `${incomingLabel} 与 SMTP 均已认证`,
       }, onUpdate);
     }
   } catch (error) {
@@ -235,7 +245,7 @@ export async function runProviderValidation(
 
   report = updateStage(report, 'folders', {
     state: 'running',
-    detail: '正在读取远端文件夹结构',
+    detail: incomingProtocol === 'pop3' ? '正在检查 POP3 收件箱' : '正在读取远端文件夹结构',
   }, onUpdate);
   let folderCount = 0;
   try {
@@ -251,14 +261,14 @@ export async function runProviderValidation(
       return finish(
         report,
         state,
-        '只读验收已停止：没有可用于首轮同步的远端文件夹。',
+        `只读验收已停止：没有可用于首轮同步的远端${folderLabel}。`,
         now,
         onUpdate,
       );
     }
     report = updateStage(report, 'folders', {
       state: 'success',
-      detail: `发现 ${folders.folder_count} 个远端文件夹`,
+      detail: incomingProtocol === 'pop3' ? 'POP3 收件箱可同步' : `发现 ${folders.folder_count} 个远端文件夹`,
     }, onUpdate);
   } catch (error) {
     report = updateStage(report, 'folders', {

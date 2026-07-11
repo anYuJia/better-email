@@ -5,6 +5,7 @@ export type ListMode = 'messages' | 'threads';
 export type ListSort = 'newest' | 'oldest' | 'sender' | 'subject';
 export type AccountScope = number | 'all';
 export type SearchScope = 'folder' | 'account' | 'all';
+export type IncomingProtocol = 'imap' | 'pop3';
 export type ProviderVerificationStatus = 'untested' | 'passed' | 'partial' | 'failed';
 export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
 export type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed';
@@ -16,6 +17,7 @@ export type Account = {
   provider: string;
   imap_host: string;
   smtp_host: string;
+  incoming_protocol: IncomingProtocol;
   auth_type: string;
   sync_mode: string;
   remote_images_allowed: boolean;

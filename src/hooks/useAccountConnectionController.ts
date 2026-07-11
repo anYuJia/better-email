@@ -21,6 +21,7 @@ import type {
   SyncRun,
 } from '../app/types';
 import {
+  incomingHostForProtocol,
   providerCompatibilityMatrix,
   type AccountProviderPreset,
 } from '../providerCatalog';
@@ -100,7 +101,10 @@ export function credentialVerificationPatch(
   report: CredentialVerificationReport,
   authType: string,
 ): Partial<ProviderVerificationRecord> {
-  const imapOk = report.checks.some((check) => check.name === 'IMAP' && check.authenticated);
+  const imapOk = report.checks.some((check) => {
+    const name = check.name.toLowerCase();
+    return (name.includes('imap') || name.includes('pop3')) && check.authenticated;
+  });
   const smtpOk = report.checks.some((check) => check.name === 'SMTP' && check.authenticated);
   return {
     status: report.authenticated ? 'passed' : imapOk || smtpOk ? 'partial' : 'failed',
@@ -301,7 +305,7 @@ export default function useAccountConnectionController({
         ? {
             ...current,
             provider: preset.provider,
-            imap_host: preset.imap_host,
+            imap_host: incomingHostForProtocol(preset, current.incoming_protocol),
             smtp_host: preset.smtp_host,
             auth_type: preset.auth_type,
           }
@@ -314,7 +318,7 @@ export default function useAccountConnectionController({
     setNewAccountForm((current) => ({
       ...current,
       provider: preset.provider,
-      imap_host: preset.imap_host,
+      imap_host: incomingHostForProtocol(preset, current.incoming_protocol),
       smtp_host: preset.smtp_host,
       auth_type: preset.auth_type,
     }));
@@ -377,6 +381,7 @@ export default function useAccountConnectionController({
     setProviderValidationRunning(true);
     try {
       const report = await executeProviderValidation(validationAccount.email, {
+        incomingProtocol: validationAccount.incoming_protocol,
         testConnection: async () => {
           const result = await invoke<ConnectionReport>('test_connection', {
             accountId: validationAccount.id,
@@ -398,6 +403,19 @@ export default function useAccountConnectionController({
           return result;
         },
         discoverFolders: async () => {
+          if (validationAccount.incoming_protocol === 'pop3') {
+            const result: ImapProbeReport = {
+              account_email: validationAccount.email,
+              checked_at: new Date().toISOString(),
+              status: 'ok',
+              folder_count: 1,
+              folders: [],
+              message: 'POP3 账号使用收件箱同步，无需远端文件夹发现。',
+            };
+            setImapProbe(result);
+            setImapMailboxes([]);
+            return result;
+          }
           const result = await invoke<ImapProbeReport>('discover_imap_folders', {
             accountId: validationAccount.id,
           });

@@ -18,6 +18,7 @@ use crate::models::{
     ThreadSummary, TrashActionReport,
 };
 use crate::oauth;
+use crate::pop3_probe;
 use crate::protocol;
 use crate::smtp;
 use crate::vcard;
@@ -1139,6 +1140,7 @@ pub fn export_diagnostics(store: State<'_, MailStore>) -> MailResult<String> {
             provider: account.provider,
             imap_host: account.imap_host,
             smtp_host: account.smtp_host,
+            incoming_protocol: account.incoming_protocol,
             auth_type: account.auth_type,
             sync_mode: account.sync_mode,
             remote_images_allowed: account.remote_images_allowed,
@@ -1261,7 +1263,12 @@ pub fn test_connection(
     account_id: Option<i64>,
 ) -> MailResult<ConnectionReport> {
     let account = store.get_account_by_id(account_id)?;
-    protocol::test_endpoints(&account.email, &account.imap_host, &account.smtp_host)
+    protocol::test_endpoints(
+        &account.email,
+        &account.incoming_protocol,
+        &account.imap_host,
+        &account.smtp_host,
+    )
 }
 
 #[tauri::command]
@@ -1274,25 +1281,48 @@ pub fn verify_account_credentials(
         Ok(secret) => secret,
         Err(error) => return Ok(credential_error_report(&account, error)),
     };
-    let imap_result =
-        imap_probe::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+    let incoming_result = verify_incoming_credentials(&account, &secret);
     let smtp_result =
         smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
     Ok(credential_verification_report(
         &account,
-        imap_result,
+        incoming_result,
         smtp_result,
     ))
 }
 
+fn incoming_protocol_name(account: &Account) -> &'static str {
+    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+        "POP3"
+    } else {
+        "IMAP"
+    }
+}
+
+fn is_pop3_account(account: &Account) -> bool {
+    account.incoming_protocol.trim().eq_ignore_ascii_case("pop3")
+}
+
+fn verify_incoming_credentials(
+    account: &Account,
+    secret: &credentials::AccountSecret,
+) -> Result<(), String> {
+    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+        pop3_probe::verify_credentials(account, secret).map_err(|error| error.to_string())
+    } else {
+        imap_probe::verify_credentials(account, secret).map_err(|error| error.to_string())
+    }
+}
+
 fn credential_error_report(account: &Account, error: String) -> CredentialVerificationReport {
-    let message = format!("系统凭据不可用，未发起 IMAP/SMTP 登录验证：{error}");
+    let incoming_name = incoming_protocol_name(account);
+    let message = format!("系统凭据不可用，未发起 {incoming_name}/SMTP 登录验证：{error}");
     CredentialVerificationReport {
         account_email: account.email.clone(),
         checked_at: Utc::now().to_rfc3339(),
         checks: vec![
             CredentialProtocolCheck {
-                name: "IMAP".to_string(),
+                name: incoming_name.to_string(),
                 address: account.imap_host.clone(),
                 authenticated: false,
                 message: "未发起登录：系统凭据不可用。".to_string(),
@@ -1312,23 +1342,24 @@ fn credential_error_report(account: &Account, error: String) -> CredentialVerifi
 
 fn credential_verification_report(
     account: &Account,
-    imap_result: Result<(), String>,
+    incoming_result: Result<(), String>,
     smtp_result: Result<(), String>,
 ) -> CredentialVerificationReport {
+    let incoming_name = incoming_protocol_name(account);
     let checks = vec![
-        credential_protocol_check("IMAP", &account.imap_host, imap_result),
+        credential_protocol_check(incoming_name, &account.imap_host, incoming_result),
         credential_protocol_check("SMTP", &account.smtp_host, smtp_result),
     ];
     let passed = checks.iter().filter(|check| check.authenticated).count();
     let (status, message) = match passed {
-        2 => ("ok", "IMAP 与 SMTP 登录验证通过，未发送任何邮件。"),
+        2 => ("ok", format!("{incoming_name} 与 SMTP 登录验证通过，未发送任何邮件。")),
         1 => (
             "partial",
-            "仅一个协议登录成功，请检查失败协议的服务器、授权码或 OAuth2 配置。",
+            "仅一个协议登录成功，请检查失败协议的服务器、授权码或 OAuth2 配置。".to_string(),
         ),
         _ => (
             "error",
-            "IMAP 与 SMTP 登录均未通过，请先确认系统凭据和服务商设置。",
+            format!("{incoming_name} 与 SMTP 登录均未通过，请先确认系统凭据和服务商设置。"),
         ),
     };
     CredentialVerificationReport {
@@ -1337,7 +1368,7 @@ fn credential_verification_report(
         authenticated: passed == checks.len(),
         checks,
         status: status.to_string(),
-        message: message.to_string(),
+        message,
     }
 }
 
@@ -1425,7 +1456,7 @@ pub fn sync_imap_headers(
         let account = accounts
             .first()
             .ok_or_else(|| crate::db::MailError::Imap("没有可同步账号。".to_string()))?;
-        return sync_imap_headers_for_account(&store, account, false);
+        return sync_headers_for_account(&store, account, false);
     }
 
     let started_at = Utc::now().to_rfc3339();
@@ -1436,12 +1467,12 @@ pub fn sync_imap_headers(
     let mut warnings = Vec::new();
 
     for account in accounts {
-        match sync_imap_headers_for_account(&store, &account, false) {
+        match sync_headers_for_account(&store, &account, false) {
             Ok(run) => {
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
                 synced_accounts += 1;
-                if run.status == "imap_headers_account_partial" {
+                if run.status.ends_with("_account_partial") {
                     warnings.push(format!("{}: {}", account.email, run.message));
                 }
             }
@@ -1518,7 +1549,53 @@ pub fn sync_imap_history(
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
     let account = store.get_account_by_id(account_id)?;
-    sync_imap_headers_for_account(&store, &account, true)
+    sync_headers_for_account(&store, &account, true)
+}
+
+fn sync_headers_for_account(
+    store: &MailStore,
+    account: &Account,
+    history_only: bool,
+) -> MailResult<SyncRun> {
+    if account.incoming_protocol.trim().eq_ignore_ascii_case("pop3") {
+        sync_pop3_headers_for_account(store, account, history_only)
+    } else {
+        sync_imap_headers_for_account(store, account, history_only)
+    }
+}
+
+fn sync_pop3_headers_for_account(
+    store: &MailStore,
+    account: &Account,
+    history_only: bool,
+) -> MailResult<SyncRun> {
+    let started_at = Utc::now().to_rfc3339();
+    if history_only {
+        let finished_at = Utc::now().to_rfc3339();
+        let message = format!(
+            "{} 使用 POP3 收信；POP3 无远端文件夹历史游标，本地收件箱同步已覆盖最近邮件。",
+            account.email
+        );
+        return store.record_sync_run(&started_at, &finished_at, "pop3_history_complete", 0, 0, &message);
+    }
+
+    let secret = credentials::get_account_secret(account).map_err(crate::db::MailError::Imap)?;
+    let messages = pop3_probe::fetch_recent_messages(account, &secret)?;
+    let fetched_messages = messages.len() as i64;
+    let imported_messages = store.import_pop3_messages(account.id, &messages)?;
+    let finished_at = Utc::now().to_rfc3339();
+    let message = format!(
+        "{} POP3 同步完成：检查 {} 封最近邮件，新增 {} 封到收件箱。",
+        account.email, fetched_messages, imported_messages
+    );
+    store.record_sync_run(
+        &started_at,
+        &finished_at,
+        "pop3_headers_account",
+        1,
+        imported_messages,
+        &message,
+    )
 }
 
 fn sync_imap_headers_for_account(
@@ -1729,6 +1806,9 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 #[tauri::command]
 pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
     let account = store.get_message_account(message_id)?;
+    if is_pop3_account(&account) {
+        return store.get_message(message_id);
+    }
     let secret = credentials::get_account_secret(&account).map_err(crate::db::MailError::Imap)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
@@ -1874,6 +1954,11 @@ fn sync_remote_seen(
         ));
     }
     let account = store.get_message_account(message_id)?;
+    if is_pop3_account(&account) {
+        return Ok(local_only_report(
+            "本地已更新；POP3 不支持远端已读状态回写。",
+        ));
+    }
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
@@ -1906,6 +1991,11 @@ fn sync_remote_flagged(
         ));
     }
     let account = store.get_message_account(message_id)?;
+    if is_pop3_account(&account) {
+        return Ok(local_only_report(
+            "本地星标已更新；POP3 不支持远端星标回写。",
+        ));
+    }
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
@@ -1941,6 +2031,11 @@ fn sync_remote_move(
         ));
     }
     let account = store.get_account_by_id(Some(reference.account_id))?;
+    if is_pop3_account(&account) {
+        return Ok(local_only_report(
+            "本地已移动；POP3 不支持远端移动，远端邮件保持不变。",
+        ));
+    }
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
@@ -2021,6 +2116,11 @@ fn sync_remote_delete_reference(
         )));
     }
     let account = store.get_account_by_id(Some(reference.account_id))?;
+    if is_pop3_account(&account) {
+        return Ok(local_only_report(format!(
+            "{local_action}；POP3 不执行远端删除，远端邮件保持不变。"
+        )));
+    }
     let secret = match credentials::get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
@@ -2215,6 +2315,7 @@ mod tests {
             provider: "custom".to_string(),
             imap_host: "imap.example.com:993".to_string(),
             smtp_host: "smtp.example.com:465".to_string(),
+            incoming_protocol: "imap".to_string(),
             auth_type: "password".to_string(),
             sync_mode: "manual".to_string(),
             remote_images_allowed: false,

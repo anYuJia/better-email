@@ -8,7 +8,7 @@ import type {
 export type ConnectionDiagnosticState = 'pending' | 'success' | 'warning' | 'error';
 
 export type ConnectionDiagnosticStep = {
-  id: 'network' | 'credential' | 'imap' | 'smtp';
+  id: 'network' | 'credential' | 'incoming' | 'smtp';
   label: string;
   state: ConnectionDiagnosticState;
   detail: string;
@@ -50,6 +50,10 @@ function providerKey(account: Account): ProviderKey {
   return 'custom';
 }
 
+function incomingProtocolLabel(account: Account) {
+  return account.incoming_protocol === 'pop3' ? 'POP3' : 'IMAP';
+}
+
 function providerLabel(key: ProviderKey, account: Account) {
   if (key === 'gmail') return 'Gmail';
   if (key === 'outlook') return 'Outlook';
@@ -62,19 +66,19 @@ function providerCredentialRecommendations(key: ProviderKey, authType: string): 
   if (authType === 'oauth2') {
     return [
       '重新完成 OAuth2 授权，并确认授权页使用的是当前邮箱账号。',
-      '检查 IMAP、SMTP 或离线访问范围是否已获得授权，然后刷新 Token。',
+      '检查收信、SMTP 或离线访问范围是否已获得授权，然后刷新 Token。',
     ];
   }
   if (key === 'netease') {
     return [
-      '确认网页版邮箱已开启 IMAP/SMTP 服务，登录时使用客户端授权码，不使用网页登录密码。',
+      '确认网页版邮箱已开启收信和 SMTP 服务，登录时使用客户端授权码，不使用网页登录密码。',
       '重新生成授权码后等待几分钟再验证，并使用完整邮箱地址作为登录账号。',
       '撤销曾在聊天、截图或日志中暴露的旧授权码，只在本机系统凭据库中保存新码。',
     ];
   }
   if (key === 'qq') {
     return [
-      '确认 QQ 邮箱设置中已开启 IMAP/SMTP，并使用客户端授权码而不是 QQ 密码。',
+      '确认 QQ 邮箱设置中已开启收信和 SMTP，并使用客户端授权码而不是 QQ 密码。',
       '使用完整邮箱地址登录；若触发账号风控，请重新生成授权码后再验证。',
     ];
   }
@@ -86,12 +90,12 @@ function providerCredentialRecommendations(key: ProviderKey, authType: string): 
   }
   if (key === 'outlook') {
     return [
-      '推荐切换到 OAuth2；企业租户可能需要管理员允许 IMAP、SMTP AUTH 与相关授权范围。',
+      '推荐切换到 OAuth2；企业租户可能需要管理员允许收信、SMTP AUTH 与相关授权范围。',
       '确认当前租户没有禁用 SMTP AUTH。',
     ];
   }
   return [
-    '确认服务商已开启 IMAP/SMTP，并核对登录账号格式与应用专用密码要求。',
+    '确认服务商已开启收信和 SMTP，并核对登录账号格式与应用专用密码要求。',
     '检查服务器地址、端口和 TLS 模式是否与服务商文档一致。',
   ];
 }
@@ -118,7 +122,11 @@ export function buildConnectionDiagnosticModel({
     === account.email.trim().toLowerCase()
     ? credentialStatus
     : null;
-  const imap = verification?.checks.find((check) => check.name.toLowerCase().includes('imap')) ?? null;
+  const incomingLabel = incomingProtocolLabel(account);
+  const incoming = verification?.checks.find((check) => {
+    const name = check.name.toLowerCase();
+    return name.includes('imap') || name.includes('pop3');
+  }) ?? null;
   const smtp = verification?.checks.find((check) => check.name.toLowerCase().includes('smtp')) ?? null;
   const reachableCount = network?.endpoints.filter((endpoint) => endpoint.reachable).length ?? 0;
   const verificationReachedServers = Boolean(
@@ -150,7 +158,7 @@ export function buildConnectionDiagnosticModel({
         ? 'success'
         : 'warning';
   const protocolState = (
-    check: typeof imap,
+    check: typeof incoming,
   ): ConnectionDiagnosticState => !check ? 'pending' : check.authenticated ? 'success' : 'error';
 
   const steps: ConnectionDiagnosticStep[] = [
@@ -163,7 +171,7 @@ export function buildConnectionDiagnosticModel({
           ? '登录验证已收到服务器响应，可确认协议端点可达。'
           : verification
             ? '登录验证未确认全部端点，请单独运行服务器测试。'
-            : '运行服务器测试，确认 IMAP 与 SMTP 地址可达。'
+            : `运行服务器测试，确认 ${incomingLabel} 与 SMTP 地址可达。`
         : network.ready_for_credentials
           ? `${network.endpoints.length} 个端点均可连接。`
           : `${reachableCount}/${network.endpoints.length} 个端点可连接，请检查失败地址。`,
@@ -183,11 +191,11 @@ export function buildConnectionDiagnosticModel({
               : '当前账号没有可用凭据，请先保存授权码或 Token。',
     },
     {
-      id: 'imap',
-      label: 'IMAP 登录',
-      state: protocolState(imap),
-      detail: imap
-        ? imap.authenticated ? '登录成功，可以发现文件夹并同步邮件。' : '服务器可连接，但账号认证未通过。'
+      id: 'incoming',
+      label: `${incomingLabel} 登录`,
+      state: protocolState(incoming),
+      detail: incoming
+        ? incoming.authenticated ? '登录成功，可以同步邮件。' : '服务器可连接，但账号认证未通过。'
         : '保存凭据后运行登录验证。',
     },
     {
@@ -202,7 +210,7 @@ export function buildConnectionDiagnosticModel({
 
   const recommendations: string[] = [];
   if (networkState === 'error' || networkState === 'warning') {
-    recommendations.push('先核对 IMAP/SMTP 主机、端口与 TLS 模式，再检查防火墙或代理设置。');
+    recommendations.push(`先核对 ${incomingLabel}/SMTP 主机、端口与 TLS 模式，再检查防火墙或代理设置。`);
   }
   if (credentialState !== 'success') {
     recommendations.push(
@@ -228,7 +236,7 @@ export function buildConnectionDiagnosticModel({
   if (verification?.authenticated) {
     state = 'success';
     title = '账号连接已就绪';
-    summary = 'IMAP 与 SMTP 均已认证，可继续发现文件夹和同步邮件。';
+    summary = `${incomingLabel} 与 SMTP 均已认证，可继续同步邮件。`;
   } else if (verification?.status === 'partial') {
     state = 'warning';
     title = '账号仅部分可用';

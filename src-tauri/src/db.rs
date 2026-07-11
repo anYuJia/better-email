@@ -158,6 +158,7 @@ impl MailStore {
                     provider TEXT NOT NULL,
                     imap_host TEXT NOT NULL DEFAULT '',
                     smtp_host TEXT NOT NULL DEFAULT '',
+                    incoming_protocol TEXT NOT NULL DEFAULT 'imap',
                     auth_type TEXT NOT NULL DEFAULT 'password',
                     sync_mode TEXT NOT NULL DEFAULT 'manual',
                     remote_images_allowed INTEGER NOT NULL DEFAULT 0,
@@ -379,6 +380,12 @@ impl MailStore {
 
             add_column_if_missing(conn, "accounts", "imap_host", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "accounts", "smtp_host", "TEXT NOT NULL DEFAULT ''")?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "incoming_protocol",
+                "TEXT NOT NULL DEFAULT 'imap'",
+            )?;
             add_column_if_missing(conn, "accounts", "auth_type", "TEXT NOT NULL DEFAULT 'password'")?;
             add_column_if_missing(conn, "accounts", "sync_mode", "TEXT NOT NULL DEFAULT 'manual'")?;
             add_column_if_missing(
@@ -531,8 +538,8 @@ impl MailStore {
 
             let now = Utc::now();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, 1, ?9)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'imap', ?6, ?7, 0, ?8, 1, ?9)",
                 params![
                     "demo@better-email.local",
                     "Better Email Demo",
@@ -774,7 +781,7 @@ impl MailStore {
     pub fn list_accounts(&self) -> MailResult<Vec<Account>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
                  FROM accounts ORDER BY is_default DESC, id",
             )?;
             let accounts = stmt
@@ -807,14 +814,15 @@ impl MailStore {
                 conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| row.get::<_, bool>(0))?;
             let now = Utc::now().to_rfc3339();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     email,
                     display_name,
                     input.provider.trim(),
                     input.imap_host.trim(),
                     input.smtp_host.trim(),
+                    normalize_incoming_protocol(&input.incoming_protocol),
                     normalize_auth_type(&input.auth_type),
                     normalize_sync_mode(&input.sync_mode),
                     bool_to_int(input.remote_images_allowed),
@@ -909,13 +917,14 @@ impl MailStore {
             conn.execute(
                 "UPDATE accounts
                  SET display_name = ?1, provider = ?2, imap_host = ?3, smtp_host = ?4,
-                     auth_type = ?5, sync_mode = ?6, remote_images_allowed = ?7, signature = ?8
-                 WHERE id = ?9",
+                     incoming_protocol = ?5, auth_type = ?6, sync_mode = ?7, remote_images_allowed = ?8, signature = ?9
+                 WHERE id = ?10",
                 params![
                     input.display_name.trim(),
                     input.provider.trim(),
                     input.imap_host.trim(),
                     input.smtp_host.trim(),
+                    normalize_incoming_protocol(&input.incoming_protocol),
                     normalize_auth_type(&input.auth_type),
                     normalize_sync_mode(&input.sync_mode),
                     bool_to_int(input.remote_images_allowed),
@@ -1448,7 +1457,8 @@ impl MailStore {
             conn.query_row(
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
+                       a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
+                       a.signature, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1
@@ -1692,6 +1702,148 @@ impl MailStore {
         }
 
         self.get_message(message_id)
+    }
+
+    pub fn import_pop3_messages(
+        &self,
+        account_id: i64,
+        messages: &[crate::pop3_probe::Pop3Message],
+    ) -> MailResult<i64> {
+        let mut attachment_rows = Vec::new();
+        let mut imported_count = 0;
+        self.with_conn(|conn| {
+            let folder_id = folder_id_for_account_role(conn, account_id, "inbox")?;
+            for pop_message in messages {
+                let imported = protocol::parse_imported_eml(&pop_message.raw);
+                let subject = normalized_subject(&imported.subject);
+                let thread_key = thread_key_for_message(
+                    &subject,
+                    &imported.message_id_header,
+                    &imported.in_reply_to_header,
+                    &imported.references_header,
+                );
+                let updated = conn.execute(
+                    "
+                    UPDATE messages
+                    SET folder_id = ?1,
+                        subject = ?2,
+                        snippet = ?3,
+                        body = ?4,
+                        sanitized_html = ?5,
+                        security_warnings = ?6,
+                        received_at = ?7,
+                        has_attachments = ?8,
+                        thread_key = ?9,
+                        message_id_header = ?10,
+                        in_reply_to_header = ?11,
+                        references_header = ?12
+                    WHERE account_id = ?13
+                      AND remote_mailbox = 'POP3/INBOX'
+                      AND remote_uid = ?14
+                    ",
+                    params![
+                        folder_id,
+                        subject,
+                        imported.snippet,
+                        imported.body,
+                        imported.sanitized_html,
+                        warning_lines_to_text(&imported.security_warnings),
+                        imported.received_at,
+                        bool_to_int(!imported.attachments.is_empty()),
+                        thread_key,
+                        imported.message_id_header,
+                        imported.in_reply_to_header,
+                        imported.references_header,
+                        account_id,
+                        pop_message.remote_uid
+                    ],
+                )?;
+                if updated > 0 {
+                    continue;
+                }
+
+                let changed = conn.execute(
+                    "
+                    INSERT OR IGNORE INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients, cc, bcc,
+                        subject, snippet, body, sanitized_html, security_warnings, received_at,
+                        is_read, is_starred, has_attachments, thread_key, remote_mailbox,
+                        remote_uid, message_id_header, in_reply_to_header, references_header
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+                            0, 0, ?14, ?15, 'POP3/INBOX', ?16, ?17, ?18, ?19)
+                    ",
+                    params![
+                        account_id,
+                        folder_id,
+                        imported.sender_name,
+                        imported.sender_email,
+                        imported.recipients,
+                        imported.cc,
+                        imported.bcc,
+                        subject,
+                        imported.snippet,
+                        imported.body,
+                        imported.sanitized_html,
+                        warning_lines_to_text(&imported.security_warnings),
+                        imported.received_at,
+                        bool_to_int(!imported.attachments.is_empty()),
+                        thread_key,
+                        pop_message.remote_uid,
+                        imported.message_id_header,
+                        imported.in_reply_to_header,
+                        imported.references_header
+                    ],
+                )?;
+                if changed == 0 {
+                    continue;
+                }
+
+                let message_id = conn.last_insert_rowid();
+                for attachment in imported.attachments {
+                    conn.execute(
+                        "INSERT INTO attachments(
+                            message_id, filename, mime_type, size_bytes, is_downloaded,
+                            local_path, content_id, is_inline
+                         )
+                         VALUES (?1, ?2, ?3, ?4, 0, '', ?5, ?6)",
+                        params![
+                            message_id,
+                            &attachment.filename,
+                            fallback_mime_type(&attachment.mime_type),
+                            attachment.bytes.len().min(i64::MAX as usize) as i64,
+                            attachment.content_id,
+                            bool_to_int(attachment.is_inline)
+                        ],
+                    )?;
+                    attachment_rows.push((message_id, conn.last_insert_rowid(), attachment));
+                }
+                apply_enabled_rules_for_message(conn, message_id)?;
+                upsert_contact(
+                    conn,
+                    &imported.sender_name,
+                    &imported.sender_email,
+                    &imported.received_at,
+                )?;
+                imported_count += 1;
+            }
+            Ok(())
+        })?;
+
+        for (message_id, attachment_id, attachment) in attachment_rows {
+            let dir = self.attachment_dir(message_id);
+            fs::create_dir_all(&dir)?;
+            let filename = safe_attachment_filename(&attachment.filename);
+            let local_path = dir.join(format!("{attachment_id}-{filename}"));
+            fs::write(&local_path, &attachment.bytes)?;
+            self.mark_attachment_downloaded(
+                attachment_id,
+                &local_path.to_string_lossy(),
+                attachment.bytes.len().min(i64::MAX as usize) as i64,
+            )?;
+        }
+
+        Ok(imported_count)
     }
 
     pub fn list_attachments(&self, message_id: i64) -> MailResult<Vec<Attachment>> {
@@ -2375,11 +2527,13 @@ impl MailStore {
             let mut stmt = conn.prepare(
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                       a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
+                       a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
+                       a.signature, a.is_default
                 FROM accounts a
                 LEFT JOIN imap_mailboxes m ON m.account_id = a.id
                 GROUP BY a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
-                         a.auth_type, a.sync_mode, a.remote_images_allowed, a.signature, a.is_default
+                         a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
+                         a.signature, a.is_default
                 ORDER BY
                     CASE WHEN COUNT(m.id) = 0 THEN 0 ELSE 1 END,
                     MIN(CASE WHEN m.last_sync_at = '' THEN '0000-00-00T00:00:00Z' ELSE m.last_sync_at END) ASC,
@@ -4720,6 +4874,13 @@ fn normalize_auth_type(auth_type: &str) -> &str {
     }
 }
 
+fn normalize_incoming_protocol(incoming_protocol: &str) -> &str {
+    match incoming_protocol.trim().to_ascii_lowercase().as_str() {
+        "pop3" => "pop3",
+        _ => "imap",
+    }
+}
+
 fn normalize_sync_mode(sync_mode: &str) -> &str {
     match sync_mode.trim() {
         "15min" => "15min",
@@ -4745,11 +4906,12 @@ fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         provider: row.get(3)?,
         imap_host: row.get(4)?,
         smtp_host: row.get(5)?,
-        auth_type: row.get(6)?,
-        sync_mode: row.get(7)?,
-        remote_images_allowed: row.get::<_, i64>(8)? != 0,
-        signature: row.get(9)?,
-        is_default: row.get::<_, i64>(10)? != 0,
+        incoming_protocol: row.get(6)?,
+        auth_type: row.get(7)?,
+        sync_mode: row.get(8)?,
+        remote_images_allowed: row.get::<_, i64>(9)? != 0,
+        signature: row.get(10)?,
+        is_default: row.get::<_, i64>(11)? != 0,
     })
 }
 
@@ -5171,7 +5333,7 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
     if let Some(account_id) = account_id {
         return conn
             .query_row(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
                  FROM accounts WHERE id = ?1",
                 params![account_id],
                 map_account,
@@ -5180,7 +5342,7 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
     }
 
     conn.query_row(
-        "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type, sync_mode, remote_images_allowed, signature, is_default
+        "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
          FROM accounts ORDER BY is_default DESC, id LIMIT 1",
         [],
         map_account,
@@ -7235,6 +7397,7 @@ mod tests {
                     provider: "Custom".to_string(),
                     imap_host: "imap.mail.test:993".to_string(),
                     smtp_host: "smtp.mail.test:465".to_string(),
+                    incoming_protocol: "imap".to_string(),
                     auth_type: "oauth2".to_string(),
                     sync_mode: "15min".to_string(),
                     remote_images_allowed: true,
@@ -7313,6 +7476,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
                 smtp_host: "smtp.second.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "15min".to_string(),
                 remote_images_allowed: false,
@@ -7387,6 +7551,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.thread-scope.test:993".to_string(),
                 smtp_host: "smtp.thread-scope.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7564,6 +7729,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.thread-mute.test:993".to_string(),
                 smtp_host: "smtp.thread-mute.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7681,6 +7847,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.default.test:993".to_string(),
                 smtp_host: "smtp.default.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7721,6 +7888,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.remove.test:993".to_string(),
                 smtp_host: "smtp.remove.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7841,6 +8009,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
                 smtp_host: "smtp.second.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7910,6 +8079,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.second.test:993".to_string(),
                 smtp_host: "smtp.second.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
@@ -7923,6 +8093,7 @@ mod tests {
                 provider: "Custom".to_string(),
                 imap_host: "imap.third.test:993".to_string(),
                 smtp_host: "smtp.third.test:465".to_string(),
+                incoming_protocol: "imap".to_string(),
                 auth_type: "password".to_string(),
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,

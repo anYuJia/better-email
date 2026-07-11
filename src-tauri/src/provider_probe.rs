@@ -17,6 +17,7 @@ pub struct ProviderProbeAccount {
     pub auth_type: String,
     pub imap_host: String,
     pub smtp_host: String,
+    pub incoming_protocol: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,8 +46,9 @@ pub fn list_provider_probe_accounts(
     let connection = open_read_only(database_path)?;
     let mut statement = connection
         .prepare(
-            "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type,
-                    sync_mode, remote_images_allowed, signature, is_default
+            "SELECT id, email, display_name, provider, imap_host, smtp_host,
+                    incoming_protocol, auth_type, sync_mode, remote_images_allowed,
+                    signature, is_default
              FROM accounts ORDER BY is_default DESC, id",
         )
         .map_err(|error| format!("读取账号列表失败：{error}"))?;
@@ -242,8 +244,9 @@ fn load_account(database_path: &Path, account_id: i64) -> Result<Account, String
     let connection = open_read_only(database_path)?;
     connection
         .query_row(
-            "SELECT id, email, display_name, provider, imap_host, smtp_host, auth_type,
-                    sync_mode, remote_images_allowed, signature, is_default
+            "SELECT id, email, display_name, provider, imap_host, smtp_host,
+                    incoming_protocol, auth_type, sync_mode, remote_images_allowed,
+                    signature, is_default
              FROM accounts WHERE id = ?1",
             [account_id],
             map_account,
@@ -261,11 +264,12 @@ fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         provider: row.get(3)?,
         imap_host: row.get(4)?,
         smtp_host: row.get(5)?,
-        auth_type: row.get(6)?,
-        sync_mode: row.get(7)?,
-        remote_images_allowed: row.get::<_, i64>(8)? != 0,
-        signature: row.get(9)?,
-        is_default: row.get::<_, i64>(10)? != 0,
+        incoming_protocol: row.get(6)?,
+        auth_type: row.get(7)?,
+        sync_mode: row.get(8)?,
+        remote_images_allowed: row.get::<_, i64>(9)? != 0,
+        signature: row.get(10)?,
+        is_default: row.get::<_, i64>(11)? != 0,
     })
 }
 
@@ -283,6 +287,7 @@ fn probe_account(account: &Account) -> ProviderProbeAccount {
         auth_type: account.auth_type.clone(),
         imap_host: account.imap_host.clone(),
         smtp_host: account.smtp_host.clone(),
+        incoming_protocol: account.incoming_protocol.clone(),
     }
 }
 

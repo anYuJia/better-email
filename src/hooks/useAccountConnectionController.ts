@@ -188,12 +188,20 @@ export default function useAccountConnectionController({
     setStatus,
   ]);
 
-  const createNewAccount = useCallback(async () => {
+  const createNewAccount = useCallback(async (secret?: string) => {
     if (!newAccountForm.email.trim()) {
       setStatus('请先填写新账号邮箱地址');
       return;
     }
     const created = await invoke<Account>('create_account', { input: newAccountForm });
+    const trimmedSecret = secret?.trim() ?? '';
+    if (trimmedSecret) {
+      const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
+        input: { account_email: created.email, secret: trimmedSecret },
+      });
+      setCredentialStatus(credentialResult);
+      setCredentialVerification(null);
+    }
     setAccounts((current) => [...current, created]);
     setAccountScope(created.id);
     setAccount(created);
@@ -205,7 +213,7 @@ export default function useAccountConnectionController({
     setAttachments([]);
     const { folderId: nextFolderId } = await loadMeta(null, created.id);
     await loadMessages(nextFolderId, query, filter, created.id);
-    setStatus(`已创建账号：${created.email}`);
+    setStatus(trimmedSecret ? `已创建账号并保存凭据：${created.email}` : `已创建账号：${created.email}`);
   }, [
     filter,
     loadMessages,
@@ -217,6 +225,8 @@ export default function useAccountConnectionController({
     setAccountScope,
     setAccounts,
     setAttachments,
+    setCredentialStatus,
+    setCredentialVerification,
     setFolderId,
     setMessages,
     setNewAccountForm,

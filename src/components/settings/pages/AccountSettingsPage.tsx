@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Mail, Plus, X } from 'lucide-react';
+import { Eye, EyeOff, Mail, Plus, X } from 'lucide-react';
 import type { Account, AccountCreateInput } from '../../../app/types';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import AccountRemovalPanel from '../AccountRemovalPanel';
 import ProviderPresetGrid from '../ProviderPresetGrid';
+
+type AccountDialogMode = 'details' | 'edit' | 'config' | 'delete';
 
 type AccountSettingsPageProps = {
   accounts: Account[];
@@ -13,7 +15,7 @@ type AccountSettingsPageProps = {
   onAccountFormChange: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
-  onCreateNewAccount: () => void;
+  onCreateNewAccount: (secret?: string) => void;
   onRemoveAccount: () => Promise<void>;
 };
 
@@ -29,27 +31,56 @@ export default function AccountSettingsPage({
   onRemoveAccount,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [activeAccountMode, setActiveAccountMode] = useState<'details' | 'edit' | 'config' | null>(null);
+  const [newAccountSecret, setNewAccountSecret] = useState('');
+  const [newAccountSecretVisible, setNewAccountSecretVisible] = useState(false);
+  const [accountDialogMode, setAccountDialogMode] = useState<AccountDialogMode | null>(null);
 
   useEffect(() => {
-    if (!addDialogOpen) return undefined;
+    if (!addDialogOpen && !accountDialogMode) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAddDialogOpen(false);
+      if (event.key !== 'Escape') return;
+      setAddDialogOpen(false);
+      setAccountDialogMode(null);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [addDialogOpen, accountDialogMode]);
+
+  useEffect(() => {
+    if (!addDialogOpen) {
+      setNewAccountSecret('');
+      setNewAccountSecretVisible(false);
+    }
   }, [addDialogOpen]);
 
   function handleCreateNewAccount() {
-    onCreateNewAccount();
+    onCreateNewAccount(newAccountSecret);
     setAddDialogOpen(false);
   }
 
-  function openAccountMode(account: Account, mode: 'details' | 'edit' | 'config') {
+  function openAccountDialog(account: Account, mode: AccountDialogMode) {
     onAccountFormChange(account);
-    setActiveAccountMode(mode);
+    setAccountDialogMode(mode);
+  }
+
+  function closeAccountDialog() {
+    setAccountDialogMode(null);
+  }
+
+  const newAccountSecretLabel = newAccountForm.auth_type === 'oauth2' ? 'OAuth2 Token' : '密码 / 授权码';
+  const newAccountSecretPlaceholder = newAccountForm.provider === 'netease'
+    ? '网易客户端授权码'
+    : newAccountForm.auth_type === 'oauth2'
+      ? '访问或刷新 Token'
+      : '应用专用密码或授权码';
+
+  function dialogTitle(mode: AccountDialogMode) {
+    if (mode === 'details') return '账号详情';
+    if (mode === 'edit') return '修改账号';
+    if (mode === 'config') return '账号配置';
+    return '删除账号';
   }
 
   return (
@@ -79,7 +110,7 @@ export default function AccountSettingsPage({
                 <button
                   type="button"
                   className="settings-account-row-main"
-                  onClick={() => openAccountMode(account, 'details')}
+                  onClick={() => openAccountDialog(account, 'details')}
                 >
                   <span className="settings-account-row-icon" aria-hidden="true">
                     <Mail size={15} />
@@ -94,14 +125,22 @@ export default function AccountSettingsPage({
                   {account.is_default && <em>默认</em>}
                 </span>
                 <span className="settings-account-row-actions" aria-label="账号操作">
-                  <button type="button" onClick={() => openAccountMode(account, 'details')}>
+                  <button type="button" onClick={() => openAccountDialog(account, 'details')}>
                     详情
                   </button>
-                  <button type="button" onClick={() => openAccountMode(account, 'edit')}>
+                  <button type="button" onClick={() => openAccountDialog(account, 'edit')}>
                     修改
                   </button>
-                  <button type="button" onClick={() => openAccountMode(account, 'config')}>
+                  <button type="button" onClick={() => openAccountDialog(account, 'config')}>
                     配置
+                  </button>
+                  <button
+                    type="button"
+                    className="danger"
+                    disabled={accountCount <= 1}
+                    onClick={() => openAccountDialog(account, 'delete')}
+                  >
+                    删除
                   </button>
                 </span>
               </div>
@@ -109,115 +148,6 @@ export default function AccountSettingsPage({
           })}
         </div>
       </section>
-
-      {activeAccountMode && (
-        <section className="tool-panel settings-current-account-panel">
-          <header className="tool-header">
-            <span>
-              <strong>
-                {activeAccountMode === 'details' && '账号详情'}
-                {activeAccountMode === 'edit' && '修改账号'}
-                {activeAccountMode === 'config' && '账号配置'}
-              </strong>
-              <small>{accountForm.email}</small>
-            </span>
-            <button type="button" className="settings-account-close-detail" onClick={() => setActiveAccountMode(null)}>
-              <X size={14} />
-              收起
-            </button>
-          </header>
-
-          {activeAccountMode === 'details' && (
-            <div className="settings-account-detail-list">
-              <span>
-                <small>显示名称</small>
-                <strong>{accountForm.display_name || accountForm.email}</strong>
-              </span>
-              <span>
-                <small>服务商</small>
-                <strong>{accountForm.provider}</strong>
-              </span>
-              <span>
-                <small>同步</small>
-                <strong>{accountForm.sync_mode === 'manual' ? '手动' : accountForm.sync_mode}</strong>
-              </span>
-              <span>
-                <small>状态</small>
-                <strong>{accountForm.is_default ? '默认账号' : '普通账号'}</strong>
-              </span>
-            </div>
-          )}
-
-          {activeAccountMode === 'edit' && (
-            <>
-              <div className="settings-account-form-grid">
-                <label>
-                  显示名称
-                  <input
-                    value={accountForm.display_name}
-                    onChange={(event) => onAccountFormChange({
-                      ...accountForm,
-                      display_name: event.target.value,
-                    })}
-                  />
-                </label>
-                <label>
-                  同步策略
-                  <select
-                    value={accountForm.sync_mode}
-                    onChange={(event) => onAccountFormChange({ ...accountForm, sync_mode: event.target.value })}
-                  >
-                    <option value="manual">手动</option>
-                    <option value="15min">每 15 分钟</option>
-                    <option value="push">推送优先</option>
-                  </select>
-                </label>
-              </div>
-              <AccountRemovalPanel
-                account={accountForm}
-                accountCount={accountCount}
-                onRemove={onRemoveAccount}
-              />
-            </>
-          )}
-
-          {activeAccountMode === 'config' && (
-            <div className="settings-account-form-grid settings-account-config-grid">
-              <label>
-                服务商
-                <input
-                  value={accountForm.provider}
-                  onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
-                />
-              </label>
-              <label>
-                认证方式
-                <select
-                  value={accountForm.auth_type}
-                  onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
-                >
-                  <option value="password">密码</option>
-                  <option value="oauth2">OAuth2</option>
-                </select>
-              </label>
-              <label>
-                IMAP
-                <input
-                  value={accountForm.imap_host}
-                  onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
-                />
-              </label>
-              <label>
-                SMTP
-                <input
-                  value={accountForm.smtp_host}
-                  onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
-                />
-              </label>
-            </div>
-          )}
-        </section>
-      )}
 
       {addDialogOpen && (
         <div
@@ -264,6 +194,39 @@ export default function AccountSettingsPage({
                   placeholder="可选"
                 />
               </label>
+              <label>
+                {newAccountSecretLabel}
+                <span className="settings-account-secret-field">
+                  <input
+                    autoComplete="new-password"
+                    value={newAccountSecret}
+                    type={newAccountSecretVisible ? 'text' : 'password'}
+                    onChange={(event) => setNewAccountSecret(event.target.value)}
+                    placeholder={newAccountSecretPlaceholder}
+                  />
+                  <button
+                    type="button"
+                    aria-label={newAccountSecretVisible ? '隐藏凭据' : '显示凭据'}
+                    disabled={!newAccountSecret}
+                    onClick={() => setNewAccountSecretVisible((visible) => !visible)}
+                  >
+                    {newAccountSecretVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </span>
+              </label>
+              <label>
+                认证方式
+                <select
+                  value={newAccountForm.auth_type}
+                  onChange={(event) => onNewAccountFormChange({
+                    ...newAccountForm,
+                    auth_type: event.target.value,
+                  })}
+                >
+                  <option value="password">密码 / 授权码</option>
+                  <option value="oauth2">OAuth2 Token</option>
+                </select>
+              </label>
             </div>
 
             <ProviderPresetGrid
@@ -304,6 +267,127 @@ export default function AccountSettingsPage({
                 添加
               </button>
             </footer>
+          </section>
+        </div>
+      )}
+
+      {accountDialogMode && (
+        <div
+          className="settings-account-add-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeAccountDialog();
+          }}
+        >
+          <section
+            className="settings-account-add-dialog settings-account-manage-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-account-dialog-title"
+          >
+            <header>
+              <span>
+                <strong id="settings-account-dialog-title">{dialogTitle(accountDialogMode)}</strong>
+                <small>{accountForm.email}</small>
+              </span>
+              <button type="button" aria-label="关闭" onClick={closeAccountDialog}>
+                <X size={17} />
+              </button>
+            </header>
+
+            {accountDialogMode === 'details' && (
+              <div className="settings-account-detail-list">
+                <span>
+                  <small>显示名称</small>
+                  <strong>{accountForm.display_name || accountForm.email}</strong>
+                </span>
+                <span>
+                  <small>服务商</small>
+                  <strong>{accountForm.provider}</strong>
+                </span>
+                <span>
+                  <small>同步</small>
+                  <strong>{accountForm.sync_mode === 'manual' ? '手动' : accountForm.sync_mode}</strong>
+                </span>
+                <span>
+                  <small>状态</small>
+                  <strong>{accountForm.is_default ? '默认账号' : '普通账号'}</strong>
+                </span>
+              </div>
+            )}
+
+            {accountDialogMode === 'edit' && (
+              <div className="settings-account-form-grid">
+                <label>
+                  显示名称
+                  <input
+                    value={accountForm.display_name}
+                    onChange={(event) => onAccountFormChange({
+                      ...accountForm,
+                      display_name: event.target.value,
+                    })}
+                  />
+                </label>
+                <label>
+                  同步策略
+                  <select
+                    value={accountForm.sync_mode}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, sync_mode: event.target.value })}
+                  >
+                    <option value="manual">手动</option>
+                    <option value="15min">每 15 分钟</option>
+                    <option value="push">推送优先</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {accountDialogMode === 'config' && (
+              <div className="settings-account-form-grid settings-account-config-grid">
+                <label>
+                  服务商
+                  <input
+                    value={accountForm.provider}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
+                  />
+                </label>
+                <label>
+                  认证方式
+                  <select
+                    value={accountForm.auth_type}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
+                  >
+                    <option value="password">密码 / 授权码</option>
+                    <option value="oauth2">OAuth2 Token</option>
+                  </select>
+                </label>
+                <label>
+                  IMAP
+                  <input
+                    value={accountForm.imap_host}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
+                  />
+                </label>
+                <label>
+                  SMTP
+                  <input
+                    value={accountForm.smtp_host}
+                    onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
+                  />
+                </label>
+              </div>
+            )}
+
+            {accountDialogMode === 'delete' && (
+              <AccountRemovalPanel
+                account={accountForm}
+                accountCount={accountCount}
+                onRemove={async () => {
+                  await onRemoveAccount();
+                  closeAccountDialog();
+                }}
+              />
+            )}
           </section>
         </div>
       )}

@@ -278,6 +278,20 @@
   background: #edf4fa;
 }
 
+.settings-account-row-actions button.danger {
+  color: #9b4a44;
+}
+
+.settings-account-row-actions button.danger:hover:not(:disabled) {
+  color: #9d3028;
+  background: #fff2f0;
+}
+
+.settings-account-row-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .settings-account-close-detail {
   color: var(--ui-text-secondary) !important;
   border-color: #dce2e8 !important;
@@ -397,6 +411,40 @@
   box-shadow: none;
 }
 
+.settings-account-secret-field {
+  position: relative;
+  display: block;
+}
+
+.settings-account-secret-field input {
+  padding-right: 38px !important;
+}
+
+.settings-account-secret-field button {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.settings-account-secret-field button:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: #f1f4f6;
+}
+
+.settings-account-secret-field button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
 .settings-provider-presets {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -453,6 +501,15 @@
   color: var(--ui-text);
   background: #ffffff;
   box-shadow: 0 22px 60px rgba(23, 31, 42, 0.18), 0 2px 8px rgba(23, 31, 42, 0.08);
+}
+
+.settings-account-manage-dialog {
+  width: min(560px, 100%);
+}
+
+.settings-account-manage-dialog .settings-account-danger {
+  margin: 0;
+  padding: 12px;
 }
 
 .settings-account-add-dialog > header {

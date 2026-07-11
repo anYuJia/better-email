@@ -1346,10 +1346,7 @@ fn login_imap(
     Ok(session)
 }
 
-fn send_imap_client_id_if_needed(
-    session: &mut imap::Session<imap::Connection>,
-    account: &Account,
-) {
+fn send_imap_client_id_if_needed(session: &mut imap::Session<imap::Connection>, account: &Account) {
     if !needs_imap_client_id(account) {
         return;
     }
@@ -1436,15 +1433,37 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         .header()
         .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
         .unwrap_or_default();
-    let parsed = MessageParser::default().parse(raw_header.as_bytes());
+    let parsed = MessageParser::new()
+        .with_minimal_headers()
+        .with_message_ids()
+        .parse(raw_header.as_bytes());
     let subject = parsed
         .as_ref()
         .and_then(|message| message.subject())
         .map(ToOwned::to_owned)
-        .or_else(|| header_value(&raw_header, "subject"))
+        .or_else(|| {
+            header_value(&raw_header, "subject")
+                .map(|value| protocol::decode_mime_header_value(&value))
+        })
         .unwrap_or_else(|| "(无主题)".to_string());
-    let from = header_value(&raw_header, "from").unwrap_or_default();
-    let to = header_value(&raw_header, "to").unwrap_or_default();
+    let from = parsed
+        .as_ref()
+        .and_then(|message| message.from())
+        .map(protocol::format_address_list)
+        .or_else(|| {
+            header_value(&raw_header, "from")
+                .map(|value| protocol::decode_address_header_value(&value))
+        })
+        .unwrap_or_default();
+    let to = parsed
+        .as_ref()
+        .and_then(|message| message.to())
+        .map(protocol::format_address_list)
+        .or_else(|| {
+            header_value(&raw_header, "to")
+                .map(|value| protocol::decode_address_header_value(&value))
+        })
+        .unwrap_or_default();
     let message_id =
         header_value(&raw_header, "message-id").unwrap_or_else(|| format!("imap-{uid}"));
     let in_reply_to = header_value(&raw_header, "in-reply-to").unwrap_or_default();
@@ -1508,19 +1527,25 @@ fn header_value(headers: &str, name: &str) -> Option<String> {
 }
 
 fn display_name_from_address(address: &str) -> String {
-    address
+    let decoded = protocol::decode_address_header_value(address);
+    decoded
         .split('<')
         .next()
         .map(|name| name.trim().trim_matches('"').to_string())
         .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| email_from_address(address))
+        .unwrap_or_else(|| email_from_address(&decoded))
 }
 
 fn email_from_address(address: &str) -> String {
-    if let Some((_, rest)) = address.split_once('<') {
-        rest.split('>').next().unwrap_or(address).trim().to_string()
+    let decoded = protocol::decode_address_header_value(address);
+    if let Some((_, rest)) = decoded.split_once('<') {
+        rest.split('>')
+            .next()
+            .unwrap_or(&decoded)
+            .trim()
+            .to_string()
     } else {
-        address.trim().to_string()
+        decoded.trim().to_string()
     }
 }
 
@@ -1972,6 +1997,10 @@ mod tests {
         assert_eq!(
             email_from_address("Ada <ada@example.com>"),
             "ada@example.com"
+        );
+        assert_eq!(
+            display_name_from_address("=?utf-8?B?MTM2NTg0OTkwMjI=?= <13658499022@163.com>"),
+            "13658499022"
         );
     }
 

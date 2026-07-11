@@ -5,7 +5,7 @@ use crate::models::{
 };
 use ammonia::Builder;
 use chrono::{DateTime, Utc};
-use mail_parser::{MessageParser, MimeHeaders};
+use mail_parser::{Address, MessageParser, MimeHeaders};
 use std::collections::HashSet;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
@@ -37,7 +37,10 @@ pub fn test_endpoints(
 }
 
 pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
-    let parsed = MessageParser::default().parse(raw.as_bytes());
+    let parsed = MessageParser::new()
+        .with_minimal_headers()
+        .with_message_ids()
+        .parse(raw.as_bytes());
     let normalized = raw.replace("\r\n", "\n");
     let (header_block, fallback_body) = normalized
         .split_once("\n\n")
@@ -47,19 +50,25 @@ pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
         .as_ref()
         .and_then(|message| message.subject())
         .map(ToOwned::to_owned)
-        .or_else(|| header_value(header_block, "subject"))
+        .or_else(|| {
+            header_value(header_block, "subject").map(|value| decode_mime_header_value(&value))
+        })
         .unwrap_or_else(|| "(无主题)".to_string());
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
-        .map(|value| format!("{value:?}"))
-        .or_else(|| header_value(header_block, "from"))
+        .map(format_address_list)
+        .or_else(|| {
+            header_value(header_block, "from").map(|value| decode_address_header_value(&value))
+        })
         .unwrap_or_default();
     let to = parsed
         .as_ref()
         .and_then(|message| message.to())
-        .map(|value| format!("{value:?}"))
-        .or_else(|| header_value(header_block, "to"))
+        .map(format_address_list)
+        .or_else(|| {
+            header_value(header_block, "to").map(|value| decode_address_header_value(&value))
+        })
         .unwrap_or_default();
     let text_body = parsed
         .as_ref()
@@ -125,7 +134,10 @@ pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
 }
 
 pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
-    let parsed = MessageParser::default().parse(raw.as_bytes());
+    let parsed = MessageParser::new()
+        .with_minimal_headers()
+        .with_message_ids()
+        .parse(raw.as_bytes());
     let normalized = raw.replace("\r\n", "\n");
     let (header_block, fallback_body) = normalized
         .split_once("\n\n")
@@ -148,7 +160,14 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
     } else {
         fallback_body.to_string()
     };
-    let from = header_value(header_block, "from").unwrap_or_default();
+    let from = parsed
+        .as_ref()
+        .and_then(|message| message.from())
+        .map(format_address_list)
+        .or_else(|| {
+            header_value(header_block, "from").map(|value| decode_address_header_value(&value))
+        })
+        .unwrap_or_default();
     let received_at = header_value(header_block, "date")
         .and_then(|value| {
             DateTime::parse_from_rfc2822(&value)
@@ -201,9 +220,30 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
     ImportedEmlMessage {
         sender_name: display_name_from_address(&from),
         sender_email: email_from_address(&from),
-        recipients: header_value(header_block, "to").unwrap_or_default(),
-        cc: header_value(header_block, "cc").unwrap_or_default(),
-        bcc: header_value(header_block, "bcc").unwrap_or_default(),
+        recipients: parsed
+            .as_ref()
+            .and_then(|message| message.to())
+            .map(format_address_list)
+            .or_else(|| {
+                header_value(header_block, "to").map(|value| decode_address_header_value(&value))
+            })
+            .unwrap_or_default(),
+        cc: parsed
+            .as_ref()
+            .and_then(|message| message.cc())
+            .map(format_address_list)
+            .or_else(|| {
+                header_value(header_block, "cc").map(|value| decode_address_header_value(&value))
+            })
+            .unwrap_or_default(),
+        bcc: parsed
+            .as_ref()
+            .and_then(|message| message.bcc())
+            .map(format_address_list)
+            .or_else(|| {
+                header_value(header_block, "bcc").map(|value| decode_address_header_value(&value))
+            })
+            .unwrap_or_default(),
         subject: preview.subject,
         snippet: body
             .lines()
@@ -256,20 +296,62 @@ pub(crate) fn link_risk_warnings(html: &str) -> Vec<String> {
 }
 
 fn display_name_from_address(address: &str) -> String {
-    address
+    let decoded = decode_address_header_value(address);
+    decoded
         .split('<')
         .next()
         .map(|name| name.trim().trim_matches('"').to_string())
         .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| email_from_address(address))
+        .unwrap_or_else(|| email_from_address(&decoded))
 }
 
 fn email_from_address(address: &str) -> String {
-    if let Some((_, rest)) = address.split_once('<') {
-        rest.split('>').next().unwrap_or(address).trim().to_string()
+    let decoded = decode_address_header_value(address);
+    if let Some((_, rest)) = decoded.split_once('<') {
+        rest.split('>')
+            .next()
+            .unwrap_or(&decoded)
+            .trim()
+            .to_string()
     } else {
-        address.trim().to_string()
+        decoded.trim().to_string()
     }
+}
+
+pub(crate) fn decode_mime_header_value(value: &str) -> String {
+    let probe = format!("Subject: {value}\r\n\r\n");
+    MessageParser::new()
+        .header_text(mail_parser::HeaderName::Subject)
+        .parse(probe.as_bytes())
+        .and_then(|message| message.subject().map(ToOwned::to_owned))
+        .unwrap_or_else(|| value.trim().to_string())
+}
+
+pub(crate) fn decode_address_header_value(value: &str) -> String {
+    let probe = format!("To: {value}\r\n\r\n");
+    MessageParser::new()
+        .header_address(mail_parser::HeaderName::To)
+        .parse(probe.as_bytes())
+        .and_then(|message| message.to().map(format_address_list))
+        .unwrap_or_else(|| decode_mime_header_value(value))
+}
+
+pub(crate) fn format_address_list(addresses: &Address<'_>) -> String {
+    addresses
+        .iter()
+        .map(|addr| {
+            let name = addr.name.as_deref().unwrap_or_default().trim();
+            let email = addr.address.as_deref().unwrap_or_default().trim();
+            match (name.is_empty(), email.is_empty()) {
+                (false, false) => format!("{name} <{email}>"),
+                (false, true) => name.to_string(),
+                (true, false) => email.to_string(),
+                (true, true) => String::new(),
+            }
+        })
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn looks_like_html(body: &str) -> bool {
@@ -612,6 +694,21 @@ mod tests {
         assert!(!parsed.sanitized_html.contains("onclick"));
         assert!(!parsed.sanitized_html.contains("src=\"http"));
         assert!(parsed.sanitized_html.contains("<p>Hi</p>"));
+    }
+
+    #[test]
+    fn decodes_mime_encoded_subject_and_addresses() {
+        let parsed = parse_message_preview(concat!(
+            "Subject: =?utf-8?B?c2E=?=\r\n",
+            "From: =?utf-8?B?cHl1LmlkYQ==?= <pyu.ida@foxmail.com>\r\n",
+            "To: =?utf-8?B?MTM2NTg0OTkwMjI=?= <13658499022@163.com>\r\n",
+            "\r\n",
+            "Body"
+        ));
+
+        assert_eq!(parsed.subject, "sa");
+        assert_eq!(parsed.from, "pyu.ida <pyu.ida@foxmail.com>");
+        assert_eq!(parsed.to, "13658499022 <13658499022@163.com>");
     }
 
     #[test]

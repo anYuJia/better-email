@@ -14,7 +14,7 @@ use chrono::{DateTime, Duration, Utc};
 use rusqlite::{
     params, params_from_iter,
     types::{Value, ValueRef},
-    Connection, OptionalExtension,
+    Connection, OptionalExtension, Row,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -1386,36 +1386,7 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    let message_id: i64 = row.get(0)?;
-                    Ok(Message {
-                        id: message_id,
-                        account_id: row.get(1)?,
-                        account_email: row.get(2)?,
-                        folder_id: row.get(3)?,
-                        folder_role: row.get(4)?,
-                        sender_name: row.get(5)?,
-                        sender_email: row.get(6)?,
-                        recipients: row.get(7)?,
-                        cc: row.get(8)?,
-                        bcc: row.get(9)?,
-                        subject: row.get(10)?,
-                        snippet: row.get(11)?,
-                        body: row.get(12)?,
-                        sanitized_html: row.get(13)?,
-                        security_warnings: warning_lines_from_text(row.get(14)?),
-                        received_at: row.get(15)?,
-                        is_read: row.get::<_, i64>(16)? != 0,
-                        is_starred: row.get::<_, i64>(17)? != 0,
-                        has_attachments: row.get::<_, i64>(18)? != 0,
-                        snoozed_until: row.get(19)?,
-                        labels: labels_for_message(conn, message_id)?,
-                        attachment_count: attachment_count_for_message(conn, message_id)?,
-                        remote_mailbox: row.get(20)?,
-                        remote_uid: row.get(21)?,
-                        message_id_header: row.get(22)?,
-                        in_reply_to_header: row.get(23)?,
-                        references_header: row.get(24)?,
-                    })
+                    map_message_row(conn, row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(rows)
@@ -1486,36 +1457,7 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    let message_id: i64 = row.get(0)?;
-                    Ok(Message {
-                        id: message_id,
-                        account_id: row.get(1)?,
-                        account_email: row.get(2)?,
-                        folder_id: row.get(3)?,
-                        folder_role: row.get(4)?,
-                        sender_name: row.get(5)?,
-                        sender_email: row.get(6)?,
-                        recipients: row.get(7)?,
-                        cc: row.get(8)?,
-                        bcc: row.get(9)?,
-                        subject: row.get(10)?,
-                        snippet: row.get(11)?,
-                        body: row.get(12)?,
-                        sanitized_html: row.get(13)?,
-                        security_warnings: warning_lines_from_text(row.get(14)?),
-                        received_at: row.get(15)?,
-                        is_read: row.get::<_, i64>(16)? != 0,
-                        is_starred: row.get::<_, i64>(17)? != 0,
-                        has_attachments: row.get::<_, i64>(18)? != 0,
-                        snoozed_until: row.get(19)?,
-                        labels: labels_for_message(conn, message_id)?,
-                        attachment_count: attachment_count_for_message(conn, message_id)?,
-                        remote_mailbox: row.get(20)?,
-                        remote_uid: row.get(21)?,
-                        message_id_header: row.get(22)?,
-                        in_reply_to_header: row.get(23)?,
-                        references_header: row.get(24)?,
-                    })
+                    map_message_row(conn, row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(rows)
@@ -5411,39 +5353,42 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
         WHERE m.id = ?1
         ",
         params![message_id],
-        |row| {
-            Ok(Message {
-                id: row.get(0)?,
-                account_id: row.get(1)?,
-                account_email: row.get(2)?,
-                folder_id: row.get(3)?,
-                folder_role: row.get(4)?,
-                sender_name: row.get(5)?,
-                sender_email: row.get(6)?,
-                recipients: row.get(7)?,
-                cc: row.get(8)?,
-                bcc: row.get(9)?,
-                subject: row.get(10)?,
-                snippet: row.get(11)?,
-                body: row.get(12)?,
-                sanitized_html: row.get(13)?,
-                security_warnings: warning_lines_from_text(row.get(14)?),
-                received_at: row.get(15)?,
-                is_read: row.get::<_, i64>(16)? != 0,
-                is_starred: row.get::<_, i64>(17)? != 0,
-                has_attachments: row.get::<_, i64>(18)? != 0,
-                snoozed_until: row.get(19)?,
-                labels: labels_for_message(conn, message_id)?,
-                attachment_count: attachment_count_for_message(conn, message_id)?,
-                remote_mailbox: row.get(20)?,
-                remote_uid: row.get(21)?,
-                message_id_header: row.get(22)?,
-                in_reply_to_header: row.get(23)?,
-                references_header: row.get(24)?,
-            })
-        },
+        |row| map_message_row(conn, row),
     )
     .map_err(Into::into)
+}
+
+fn map_message_row(conn: &Connection, row: &Row<'_>) -> rusqlite::Result<Message> {
+    let message_id: i64 = row.get(0)?;
+    Ok(Message {
+        id: message_id,
+        account_id: row.get(1)?,
+        account_email: row.get(2)?,
+        folder_id: row.get(3)?,
+        folder_role: row.get(4)?,
+        sender_name: protocol::decode_address_header_value(&row.get::<_, String>(5)?),
+        sender_email: row.get(6)?,
+        recipients: protocol::decode_address_header_value(&row.get::<_, String>(7)?),
+        cc: protocol::decode_address_header_value(&row.get::<_, String>(8)?),
+        bcc: protocol::decode_address_header_value(&row.get::<_, String>(9)?),
+        subject: protocol::decode_mime_header_value(&row.get::<_, String>(10)?),
+        snippet: row.get(11)?,
+        body: row.get(12)?,
+        sanitized_html: row.get(13)?,
+        security_warnings: warning_lines_from_text(row.get(14)?),
+        received_at: row.get(15)?,
+        is_read: row.get::<_, i64>(16)? != 0,
+        is_starred: row.get::<_, i64>(17)? != 0,
+        has_attachments: row.get::<_, i64>(18)? != 0,
+        snoozed_until: row.get(19)?,
+        labels: labels_for_message(conn, message_id)?,
+        attachment_count: attachment_count_for_message(conn, message_id)?,
+        remote_mailbox: row.get(20)?,
+        remote_uid: row.get(21)?,
+        message_id_header: row.get(22)?,
+        in_reply_to_header: row.get(23)?,
+        references_header: row.get(24)?,
+    })
 }
 
 fn message_remote_ref_for_conn(conn: &Connection, message_id: i64) -> MailResult<MessageRemoteRef> {

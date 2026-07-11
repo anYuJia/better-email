@@ -2594,6 +2594,7 @@ export default function App() {
             <>
             <AccountConnectionSettings
               section={activeSettingsSection}
+              accounts={accounts}
               accountForm={accountForm}
               accountCount={accounts.length}
               newAccountForm={newAccountForm}

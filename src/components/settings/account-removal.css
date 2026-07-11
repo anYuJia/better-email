@@ -1,9 +1,9 @@
 .settings-account-danger {
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 11px;
-  border-color: #ecd9d6 !important;
-  background: #fffbfa !important;
+  gap: 12px;
+  border-color: #e3e7eb !important;
+  background: #ffffff !important;
 }
 
 .settings-account-danger-icon,
@@ -23,20 +23,20 @@
 .settings-account-danger > div {
   min-width: 0;
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .settings-account-danger strong {
-  color: #432321;
-  font-size: 11.5px;
-  font-weight: 720;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .settings-account-danger p,
 .settings-account-danger small {
   margin: 0;
-  color: #866764;
-  font-size: 9.8px;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
   line-height: 1.5;
 }
 
@@ -53,18 +53,18 @@
   justify-content: center;
   gap: 6px;
   padding: 0 11px;
-  border: 1px solid #e3b9b5;
+  border: 1px solid #e1c4c1;
   border-radius: 8px;
-  color: #b42318;
+  color: #a73a32;
   background: #ffffff;
   box-shadow: none;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .settings-account-stack .settings-danger-action:hover:not(:disabled) {
-  border-color: #d9958f;
-  background: #fff3f1;
+  border-color: #d7a9a4;
+  background: #fff7f6;
 }
 
 .settings-account-stack .settings-danger-action:disabled {

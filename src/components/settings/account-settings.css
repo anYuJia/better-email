@@ -140,6 +140,100 @@
   font-weight: 680;
 }
 
+.settings-account-list-panel {
+  gap: 10px;
+}
+
+.settings-account-list-header {
+  margin-bottom: 8px;
+}
+
+.settings-account-list {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-account-row {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.settings-account-row:hover {
+  border-color: #e0e5ea;
+  background: #f8fafc;
+}
+
+.settings-account-row.active {
+  border-color: #cbd9e6;
+  background: #f4f8fb;
+}
+
+.settings-account-row-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: #486989;
+  background: #eef4f8;
+}
+
+.settings-account-row.active .settings-account-row-icon {
+  color: #2f5f8d;
+  background: #e4eef6;
+}
+
+.settings-account-row-copy,
+.settings-account-row-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-account-row-copy :is(strong, span),
+.settings-account-row-meta :is(span, em) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-account-row-copy strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.settings-account-row-copy span {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.settings-account-row-meta {
+  justify-items: end;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+.settings-account-row-meta em {
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #315d85;
+  background: #edf4fa;
+  font-style: normal;
+  font-weight: 650;
+}
+
 .settings-account-stack .tool-header button,
 .settings-primary-action,
 .settings-oauth-actions button,
@@ -253,6 +347,113 @@
   border-color: #afc4d7;
   background: #f4f8fb;
   box-shadow: inset 2px 0 0 #7da7cf;
+}
+
+.settings-account-add-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(24, 29, 36, 0.24);
+}
+
+.settings-account-add-dialog {
+  width: min(640px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow: auto;
+  display: grid;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #d8dee5;
+  border-radius: 13px;
+  color: var(--ui-text);
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(23, 31, 42, 0.18), 0 2px 8px rgba(23, 31, 42, 0.08);
+}
+
+.settings-account-add-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-account-add-dialog > header > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-account-add-dialog > header strong {
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.settings-account-add-dialog > header small {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.settings-account-add-dialog > header button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.settings-account-add-dialog > header button:hover {
+  color: var(--ui-text);
+  background: #f2f4f6;
+}
+
+.settings-account-add-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.settings-account-add-cancel,
+.settings-account-add-submit {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.settings-account-add-cancel {
+  border: 1px solid #dbe0e5;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+}
+
+.settings-account-add-cancel:hover {
+  color: var(--ui-text);
+  background: #f5f6f7;
+}
+
+.settings-account-add-submit {
+  border: 1px solid #5f8ebd;
+  color: #ffffff;
+  background: #5f8ebd;
+}
+
+.settings-account-add-submit:hover {
+  border-color: #4d7ba6;
+  background: #4f7fae;
 }
 
 .settings-provider-presets button strong,

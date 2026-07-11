@@ -17,6 +17,7 @@ import './account-settings.css';
 
 export type AccountConnectionSettingsProps = {
   section: 'accounts' | 'providers' | 'auth';
+  accounts: Account[];
   accountForm: Account;
   accountCount: number;
   newAccountForm: AccountCreateInput;
@@ -92,6 +93,7 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
   if (props.section === 'accounts') {
     page = (
       <AccountSettingsPage
+        accounts={props.accounts}
         accountForm={props.accountForm}
         accountCount={props.accountCount}
         newAccountForm={props.newAccountForm}

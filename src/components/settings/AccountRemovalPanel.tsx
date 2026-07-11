@@ -53,12 +53,8 @@ export default function AccountRemovalPanel({
   return (
     <>
       <section className="tool-panel settings-account-danger" aria-labelledby="remove-account-title">
-        <span className="settings-account-danger-icon" aria-hidden="true">
-          <Trash2 size={17} />
-        </span>
         <div>
-          <strong id="remove-account-title">移除这个邮箱账号</strong>
-          <p>将清除本机中的邮件、目录、身份和同步记录，不会删除服务商服务器上的邮件。</p>
+          <strong id="remove-account-title">删除账号</strong>
           {!canRemove && <small>当前是唯一账号，请先添加另一个邮箱账号。</small>}
         </div>
         <button

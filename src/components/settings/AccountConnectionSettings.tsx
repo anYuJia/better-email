@@ -1,3 +1,4 @@
+import type React from 'react';
 import type {
   Account,
   AccountCreateInput,
@@ -54,9 +55,42 @@ export type AccountConnectionSettingsProps = {
   onExchangeOAuth2Token: (sessionId: number) => void;
 };
 
+const connectionSteps = [
+  { id: 'accounts', index: '01', label: '账号', detail: '邮箱与显示名称' },
+  { id: 'providers', index: '02', label: '连接', detail: '服务商与服务器' },
+  { id: 'auth', index: '03', label: '认证', detail: '密码或 OAuth2' },
+] as const;
+
+function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsProps['section'] }) {
+  const activeIndex = connectionSteps.findIndex((step) => step.id === section);
+
+  return (
+    <nav className="settings-connection-flow" aria-label="账号连接流程">
+      {connectionSteps.map((step, index) => (
+        <span
+          className={[
+            'settings-connection-step',
+            index === activeIndex ? 'active' : '',
+            index < activeIndex ? 'complete' : '',
+          ].filter(Boolean).join(' ')}
+          key={step.id}
+        >
+          <b>{step.index}</b>
+          <span>
+            <strong>{step.label}</strong>
+            <small>{step.detail}</small>
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
+  let page: React.ReactNode;
+
   if (props.section === 'accounts') {
-    return (
+    page = (
       <AccountSettingsPage
         accountForm={props.accountForm}
         accountCount={props.accountCount}
@@ -68,10 +102,8 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         onRemoveAccount={props.onRemoveAccount}
       />
     );
-  }
-
-  if (props.section === 'providers') {
-    return (
+  } else if (props.section === 'providers') {
+    page = (
       <ProviderSettingsPage
         accountForm={props.accountForm}
         providerVerifications={props.providerVerifications}
@@ -82,32 +114,39 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         onSaveProviderVerification={props.onSaveProviderVerification}
       />
     );
+  } else {
+    page = (
+      <AuthenticationSettingsPage
+        accountForm={props.accountForm}
+        oauthClientId={props.oauthClientId}
+        oauthClientSecret={props.oauthClientSecret}
+        oauthRedirectUri={props.oauthRedirectUri}
+        oauthCallbackState={props.oauthCallbackState}
+        oauthCallbackCode={props.oauthCallbackCode}
+        oauthReport={props.oauthReport}
+        oauthCallbackReport={props.oauthCallbackReport}
+        oauthExchangeReport={props.oauthExchangeReport}
+        oauthRefreshReport={props.oauthRefreshReport}
+        oauthSessions={props.oauthSessions}
+        onAccountFormChange={props.onAccountFormChange}
+        onOauthClientIdChange={props.onOauthClientIdChange}
+        onOauthClientSecretChange={props.onOauthClientSecretChange}
+        onOauthRedirectUriChange={props.onOauthRedirectUriChange}
+        onOauthCallbackStateChange={props.onOauthCallbackStateChange}
+        onOauthCallbackCodeChange={props.onOauthCallbackCodeChange}
+        onStartOAuth2Pkce={props.onStartOAuth2Pkce}
+        onRefreshOAuth2Token={props.onRefreshOAuth2Token}
+        onCompleteOAuth2Callback={props.onCompleteOAuth2Callback}
+        onWaitForOAuth2Callback={props.onWaitForOAuth2Callback}
+        onExchangeOAuth2Token={props.onExchangeOAuth2Token}
+      />
+    );
   }
 
   return (
-    <AuthenticationSettingsPage
-      accountForm={props.accountForm}
-      oauthClientId={props.oauthClientId}
-      oauthClientSecret={props.oauthClientSecret}
-      oauthRedirectUri={props.oauthRedirectUri}
-      oauthCallbackState={props.oauthCallbackState}
-      oauthCallbackCode={props.oauthCallbackCode}
-      oauthReport={props.oauthReport}
-      oauthCallbackReport={props.oauthCallbackReport}
-      oauthExchangeReport={props.oauthExchangeReport}
-      oauthRefreshReport={props.oauthRefreshReport}
-      oauthSessions={props.oauthSessions}
-      onAccountFormChange={props.onAccountFormChange}
-      onOauthClientIdChange={props.onOauthClientIdChange}
-      onOauthClientSecretChange={props.onOauthClientSecretChange}
-      onOauthRedirectUriChange={props.onOauthRedirectUriChange}
-      onOauthCallbackStateChange={props.onOauthCallbackStateChange}
-      onOauthCallbackCodeChange={props.onOauthCallbackCodeChange}
-      onStartOAuth2Pkce={props.onStartOAuth2Pkce}
-      onRefreshOAuth2Token={props.onRefreshOAuth2Token}
-      onCompleteOAuth2Callback={props.onCompleteOAuth2Callback}
-      onWaitForOAuth2Callback={props.onWaitForOAuth2Callback}
-      onExchangeOAuth2Token={props.onExchangeOAuth2Token}
-    />
+    <div className="settings-connection-shell">
+      <ConnectionFlowHeader section={props.section} />
+      {page}
+    </div>
   );
 }

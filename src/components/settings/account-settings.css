@@ -1,17 +1,108 @@
 .settings-account-stack {
   display: grid;
+  gap: 12px;
+}
+
+.settings-connection-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-connection-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #dfe4ea;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.settings-connection-step {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-right: 1px solid #edf0f3;
+  color: var(--ui-text-tertiary);
+}
+
+.settings-connection-step:last-child {
+  border-right: 0;
+}
+
+.settings-connection-step b {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfe4ea;
+  border-radius: 50%;
+  color: #73808e;
+  background: #f8f9fa;
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.settings-connection-step > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-connection-step strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-connection-step small {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-connection-step.complete {
+  color: #4d657c;
+  background: #fbfcfd;
+}
+
+.settings-connection-step.complete b {
+  color: #3f6f9b;
+  border-color: #c9d8e6;
+  background: #f3f7fb;
+}
+
+.settings-connection-step.active {
+  color: var(--ui-text);
+  background: #f6f8fa;
+  box-shadow: inset 0 -2px 0 #7da7cf;
+}
+
+.settings-connection-step.active b {
+  color: #fff;
+  border-color: #6f9dcc;
+  background: #6f9dcc;
 }
 
 .settings-account-stack .tool-panel {
-  padding: 14px;
+  padding: 13px 14px;
   border-color: #dfe4ea;
-  border-radius: 10px;
+  border-radius: 11px;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(24, 33, 45, 0.035);
+  box-shadow: none;
 }
 
 .settings-account-stack .tool-header {
-  min-height: 42px;
+  min-height: 36px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -27,7 +118,7 @@
 .settings-account-stack .tool-header > span strong {
   color: var(--ui-text);
   font-size: 12.5px;
-  font-weight: 720;
+  font-weight: 650;
 }
 
 .settings-account-stack .tool-header > span small {
@@ -42,8 +133,8 @@
   padding: 4px 7px;
   border: 1px solid #dce8f5;
   border-radius: 6px;
-  color: #1768ad;
-  background: #f3f8fe;
+  color: #526477;
+  background: #f8f9fb;
   font-size: 9.5px;
   font-style: normal;
   font-weight: 680;
@@ -61,8 +152,9 @@
   padding: 0 11px;
   border: 0;
   border-radius: 8px;
-  color: #ffffff;
-  background: var(--ui-accent);
+  border: 1px solid #cad7e3;
+  color: #275f92;
+  background: #ffffff;
   box-shadow: none;
   font-size: 10.5px;
   font-weight: 680;
@@ -72,14 +164,15 @@
 .settings-primary-action:hover,
 .settings-oauth-actions button:hover,
 .settings-oauth-callback button:hover {
-  background: var(--ui-accent-hover);
+  border-color: #aecaeb;
+  background: #f5f9fd;
 }
 
 .settings-account-form-grid,
 .settings-oauth-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 9px;
 }
 
 .settings-account-form-grid > label,
@@ -99,7 +192,7 @@
   border-radius: 8px;
   color: var(--ui-text);
   background: #ffffff;
-  box-shadow: inset 0 1px 1px rgba(24, 33, 45, 0.025);
+  box-shadow: none;
 }
 
 .settings-account-stack :is(input, select) {
@@ -123,42 +216,43 @@
 }
 
 .settings-account-stack :is(input, select, textarea):focus {
-  border-color: rgba(8, 127, 245, 0.52);
-  box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.10);
+  outline: none;
+  border-color: #aebdca;
+  box-shadow: none;
 }
 
 .settings-provider-presets {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 6px;
   margin: 10px 0;
 }
 
 .settings-provider-presets button {
   min-width: 0;
-  min-height: 62px;
+  min-height: 48px;
   display: grid;
   align-content: center;
   gap: 3px;
   padding: 8px 9px;
   border: 1px solid #dfe4ea;
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--ui-text-secondary);
-  background: #fafbfc;
+  background: #ffffff;
   box-shadow: none;
   text-align: left;
 }
 
 .settings-provider-presets button:hover {
-  border-color: #c1d9f0;
-  background: #f6faff;
+  border-color: #cbd5df;
+  background: #f8fafc;
 }
 
 .settings-provider-presets button.active {
-  color: #075eae;
-  border-color: #a9cff3;
-  background: #eaf5ff;
-  box-shadow: inset 0 0 0 1px rgba(8, 127, 245, 0.08);
+  color: #244f78;
+  border-color: #afc4d7;
+  background: #f4f8fb;
+  box-shadow: inset 2px 0 0 #7da7cf;
 }
 
 .settings-provider-presets button strong,
@@ -222,7 +316,7 @@
 }
 
 .settings-provider-advanced > summary {
-  min-height: 64px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -244,7 +338,7 @@
 .settings-provider-advanced > summary strong {
   color: var(--ui-text);
   font-size: 12.5px;
-  font-weight: 710;
+  font-weight: 640;
 }
 
 .settings-provider-advanced > summary em {
@@ -263,8 +357,8 @@
   padding: 4px 7px;
   border: 1px solid #d8e5f4;
   border-radius: 6px;
-  color: #1767ae;
-  background: #f3f8fd;
+  color: #526477;
+  background: #f8f9fb;
   font-size: 9.5px;
   font-weight: 680;
 }
@@ -291,7 +385,7 @@
 
 .settings-provider-advanced-content {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 12px;
 }
 
@@ -312,12 +406,12 @@
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  margin: 12px 18px;
+  margin: 0;
   padding: 12px;
-  border: 1px solid #cfe1f3;
+  border: 1px solid #dfe4ea;
   border-radius: 10px;
-  color: #17436b;
-  background: #f1f7fd;
+  color: var(--ui-text);
+  background: #ffffff;
 }
 
 .settings-auth-guide > span {
@@ -326,9 +420,9 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: var(--ui-accent);
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(24, 33, 45, 0.06);
+  color: #58708a;
+  background: #f7f9fb;
+  box-shadow: none;
 }
 
 .settings-auth-guide > div {
@@ -343,7 +437,7 @@
 
 .settings-auth-guide p {
   margin: 0;
-  color: #55728e;
+  color: var(--ui-text-tertiary);
   font-size: 10.5px;
   line-height: 1.5;
 }
@@ -351,8 +445,9 @@
 .settings-oauth-panel {
   display: grid;
   gap: 9px;
-  margin: 12px;
+  margin: 0;
   padding: 13px;
+  border: 1px solid #dfe4ea;
   border-radius: 10px;
   background: #ffffff;
 }

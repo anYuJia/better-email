@@ -48,7 +48,7 @@ export default function ProviderSettingsPage({
       <section className="tool-panel settings-current-account-panel settings-provider-config-panel">
         <header className="tool-header">
           <span>
-            <strong>服务器与服务商</strong>
+            <strong>连接参数</strong>
             <small>{accountForm.email}</small>
           </span>
           <em>{accountForm.provider}</em>
@@ -88,8 +88,8 @@ export default function ProviderSettingsPage({
       >
         <summary>
           <span>
-            <strong>兼容性与真实验证</strong>
-            <em>服务商限制、IMAP/SMTP/OAuth 状态和测试记录</em>
+            <strong>兼容性验证</strong>
+            <em>服务商限制、协议状态和测试记录</em>
           </span>
           <b>{providerVerificationLabel(activeProviderVerification?.status ?? 'untested')}</b>
         </summary>
@@ -97,7 +97,7 @@ export default function ProviderSettingsPage({
           <section className="provider-matrix settings-provider-matrix" aria-label="服务商兼容性矩阵">
             <header>
               <strong>兼容性矩阵</strong>
-              <span>用于排查服务商差异，不影响上方常用配置</span>
+              <span>排查服务商差异</span>
             </header>
             {providerCompatibilityMatrix.map((provider) => (
               <button
@@ -132,7 +132,7 @@ export default function ProviderSettingsPage({
               <header className="tool-header">
                 <span>
                   <strong>真实账号验证记录</strong>
-                  <small>记录当前服务商在真实账号环境下的可用性</small>
+                  <small>记录真实账号环境下的可用性</small>
                 </span>
                 <em>{providerVerificationLabel(activeProviderVerification.status)}</em>
               </header>

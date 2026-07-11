@@ -63,7 +63,7 @@ export default function AuthenticationSettingsPage({
         <header className="tool-header">
           <span>
             <strong>认证方式</strong>
-            <small>选择当前账号的登录方式，敏感凭据由系统安全存储管理</small>
+            <small>选择登录方式</small>
           </span>
           <em>{accountForm.auth_type === 'oauth2' ? 'OAuth2' : '授权码'}</em>
         </header>

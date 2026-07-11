@@ -31,7 +31,7 @@ export default function AccountSettingsPage({
         <summary>
           <span className="add-account-summary-copy">
             <strong>添加邮箱账号</strong>
-            <small>选择服务商预设并填写邮箱地址</small>
+            <small>邮箱 · 服务商 · 服务器</small>
           </span>
           <span className="add-account-summary-action">
             <Plus size={14} />
@@ -42,7 +42,7 @@ export default function AccountSettingsPage({
           <header className="tool-header">
             <span>
               <strong>新增账号</strong>
-              <small>凭据将在账号创建后单独写入系统安全存储</small>
+              <small>创建账号后再写入登录凭据</small>
             </span>
             <button type="button" onClick={onCreateNewAccount}>
               <Plus size={14} />

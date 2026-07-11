@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type React from 'react';
+import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput } from '../../app/types';
+import { formatBytes } from '../../mailUtils';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -9,6 +11,8 @@ type ComposerPrimaryFieldsProps = {
   dropActive: boolean;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
   onAddContact: (contact: Contact) => void;
+  onPickAttachments: () => void;
+  onRemoveAttachment: (index: number) => void;
   onAttachmentDrop: React.DragEventHandler<HTMLElement>;
   onAttachmentDragEnter: React.DragEventHandler<HTMLElement>;
   onAttachmentDragLeave: React.DragEventHandler<HTMLElement>;
@@ -92,6 +96,24 @@ function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
   );
 }
 
+function attachmentIcon(filename: string, mimeType: string) {
+  const lowerName = filename.toLowerCase();
+  const lowerMime = mimeType.toLowerCase();
+  if (lowerMime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|heic)$/i.test(lowerName)) {
+    return <FileImage size={25} />;
+  }
+  if (/\.(xlsx?|csv|numbers)$/i.test(lowerName)) {
+    return <FileSpreadsheet size={25} />;
+  }
+  if (/\.(zip|rar|7z|tar|gz)$/i.test(lowerName)) {
+    return <FileArchive size={25} />;
+  }
+  if (lowerMime.startsWith('text/') || /\.(pdf|txt|md|docx?|pages)$/i.test(lowerName)) {
+    return <FileText size={25} />;
+  }
+  return <File size={25} />;
+}
+
 export default function ComposerPrimaryFields({
   draft,
   contacts,
@@ -99,6 +121,8 @@ export default function ComposerPrimaryFields({
   dropActive,
   onPatchDraft,
   onAddContact,
+  onPickAttachments,
+  onRemoveAttachment,
   onAttachmentDrop,
   onAttachmentDragEnter,
   onAttachmentDragLeave,
@@ -183,6 +207,29 @@ export default function ComposerPrimaryFields({
           }}
           placeholder="正文"
         />
+        {draft.attachments.length > 0 && (
+          <section className="composer-body-attachments" aria-label="附件">
+            {draft.attachments.map((attachment, index) => (
+              <article className="composer-attachment-tile" key={`${attachment.filename}-${index}`}>
+                <span className="composer-attachment-tile-icon" aria-hidden="true">
+                  {attachmentIcon(attachment.filename, attachment.mime_type)}
+                </span>
+                <span className="composer-attachment-tile-copy">
+                  <strong>{attachment.filename}</strong>
+                  <small>{formatBytes(attachment.size_bytes)}</small>
+                </span>
+                <button type="button" aria-label={`移除 ${attachment.filename}`} onClick={() => onRemoveAttachment(index)}>
+                  <X size={14} />
+                </button>
+              </article>
+            ))}
+          </section>
+        )}
+        {draft.attachments.length === 0 && dropActive && (
+          <button type="button" className="composer-body-attachment-empty" onClick={onPickAttachments}>
+            松开添加附件
+          </button>
+        )}
         {originalQuote && <ComposerOriginalQuote originalQuote={originalQuote} />}
       </label>
     </div>

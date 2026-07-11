@@ -217,6 +217,8 @@ export default function ComposerWindow({
           dropActive={dropActive}
           onPatchDraft={patchDraft}
           onAddContact={onAddContact}
+          onPickAttachments={onPickAttachments}
+          onRemoveAttachment={onRemoveAttachment}
           onAttachmentDrop={onAttachmentDrop}
           onAttachmentDragEnter={onAttachmentDragEnter}
           onAttachmentDragLeave={onAttachmentDragLeave}
@@ -233,7 +235,6 @@ export default function ComposerWindow({
           onRichComposerChange={onRichComposerChange}
           onInsertSignature={onInsertSignature}
           onPickAttachments={onPickAttachments}
-          onRemoveAttachment={onRemoveAttachment}
           onAttachmentDrop={onAttachmentDrop}
           onAttachmentDragEnter={onAttachmentDragEnter}
           onAttachmentDragLeave={onAttachmentDragLeave}

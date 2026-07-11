@@ -89,8 +89,8 @@
 .settings-confirm-dialog {
   width: min(420px, 100%);
   display: grid;
-  gap: 14px;
-  padding: 17px;
+  gap: 16px;
+  padding: 20px;
   border: 1px solid rgba(214, 219, 225, 0.96);
   border-radius: 12px;
   color: var(--ui-text);
@@ -99,11 +99,25 @@
   animation: settings-dialog-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.settings-confirm-dialog-embedded {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
 .settings-confirm-dialog > header {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 30px;
   align-items: start;
-  gap: 10px;
+  gap: 12px;
+}
+
+.settings-confirm-dialog-embedded > header {
+  grid-template-columns: 38px minmax(0, 1fr);
 }
 
 .settings-confirm-warning {
@@ -121,8 +135,8 @@
 
 .settings-confirm-dialog header strong {
   color: #2e1d1b;
-  font-size: 13.5px;
-  font-weight: 740;
+  font-size: 14px;
+  font-weight: 720;
 }
 
 .settings-confirm-dialog header p,
@@ -156,7 +170,7 @@
 .settings-confirm-summary {
   display: grid;
   gap: 3px;
-  padding: 10px 11px;
+  padding: 11px 12px;
   border: 1px solid #e6e9ed;
   border-radius: 9px;
   background: #f8f9fa;
@@ -170,19 +184,19 @@
 }
 
 .settings-confirm-summary strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .settings-confirm-summary span {
   color: var(--ui-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .settings-confirm-dialog > label {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   color: var(--ui-text-secondary);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 650;
 }
 
@@ -198,8 +212,8 @@
 }
 
 .settings-confirm-dialog input:focus {
-  border-color: rgba(196, 50, 39, 0.52);
-  box-shadow: 0 0 0 3px rgba(196, 50, 39, 0.10);
+  border-color: #aebdca;
+  box-shadow: none;
 }
 
 .settings-confirm-error {
@@ -212,7 +226,7 @@
 .settings-confirm-dialog > footer {
   display: flex;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 8px;
 }
 
 .settings-confirm-dialog .settings-dialog-cancel {
@@ -234,13 +248,13 @@
 .settings-confirm-dialog .settings-dialog-danger {
   min-height: 34px;
   color: #ffffff;
-  border-color: #bf2d22;
-  background: #c9362b;
+  border-color: #c84b42;
+  background: #d45a50;
 }
 
 .settings-confirm-dialog .settings-dialog-danger:hover:not(:disabled) {
-  border-color: #a9231a;
-  background: #b92b21;
+  border-color: #b73d34;
+  background: #c94b42;
 }
 
 .settings-confirm-dialog button:disabled {

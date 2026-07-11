@@ -507,6 +507,7 @@ export default function AccountSettingsPage({
               <AccountRemovalPanel
                 account={accountForm}
                 accountCount={accountCount}
+                embedded
                 onRemove={async () => {
                   await onRemoveAccount();
                   closeAccountDialog();

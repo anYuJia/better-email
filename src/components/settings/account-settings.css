@@ -598,6 +598,10 @@
   padding: 12px;
 }
 
+.settings-account-manage-dialog .settings-confirm-dialog-embedded {
+  margin: 0;
+}
+
 .settings-account-add-dialog > header {
   display: flex;
   align-items: flex-start;

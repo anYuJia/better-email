@@ -7,12 +7,14 @@ type AccountRemovalPanelProps = {
   account: Account;
   accountCount: number;
   onRemove: () => Promise<void>;
+  embedded?: boolean;
 };
 
 export default function AccountRemovalPanel({
   account,
   accountCount,
   onRemove,
+  embedded = false,
 }: AccountRemovalPanelProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -29,13 +31,14 @@ export default function AccountRemovalPanel({
   }, [account.id]);
 
   useEffect(() => {
+    if (embedded) return undefined;
     if (!dialogOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !pending) setDialogOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dialogOpen, pending]);
+  }, [dialogOpen, embedded, pending]);
 
   async function handleRemove() {
     if (!canRemove || !confirmationMatches || pending) return;
@@ -48,6 +51,72 @@ export default function AccountRemovalPanel({
       setError(String(removeError));
       setPending(false);
     }
+  }
+
+  const confirmationForm = (
+    <>
+      <div className="settings-confirm-summary">
+        <strong>{account.display_name || account.email}</strong>
+        <span>{account.email}</span>
+      </div>
+      <label>
+        输入完整邮箱地址以确认
+        <input
+          autoFocus
+          value={confirmation}
+          aria-label="输入邮箱地址确认移除"
+          placeholder={account.email}
+          disabled={pending}
+          onChange={(event) => {
+            setConfirmation(event.target.value);
+            setError('');
+          }}
+        />
+      </label>
+      {error && <p className="settings-confirm-error">{error}</p>}
+      <footer>
+        <button
+          type="button"
+          className="settings-dialog-cancel"
+          disabled={pending}
+          onClick={() => {
+            setConfirmation('');
+            setError('');
+          }}
+        >
+          清空
+        </button>
+        <button
+          type="button"
+          className="settings-dialog-danger"
+          disabled={!confirmationMatches || pending}
+          data-account-remove-confirm
+          onClick={() => { handleRemove().catch(() => undefined); }}
+        >
+          <Trash2 size={15} />
+          {pending ? '正在移除…' : '永久移除'}
+        </button>
+      </footer>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <section className="settings-confirm-dialog settings-confirm-dialog-embedded" data-account-remove-dialog>
+        <header>
+          <span className="settings-confirm-warning" aria-hidden="true">
+            <AlertTriangle size={19} />
+          </span>
+          <div>
+            <strong id="remove-account-dialog-title">确认移除邮箱账号？</strong>
+            <p>此操作会永久清除当前设备中的该账号数据。</p>
+          </div>
+        </header>
+        {canRemove ? confirmationForm : (
+          <p className="settings-confirm-error">当前是唯一账号，请先添加另一个邮箱账号。</p>
+        )}
+      </section>
+    );
   }
 
   return (
@@ -105,45 +174,7 @@ export default function AccountRemovalPanel({
                 <X size={17} />
               </button>
             </header>
-            <div className="settings-confirm-summary">
-              <strong>{account.display_name || account.email}</strong>
-              <span>{account.email}</span>
-            </div>
-            <label>
-              输入完整邮箱地址以确认
-              <input
-                autoFocus
-                value={confirmation}
-                aria-label="输入邮箱地址确认移除"
-                placeholder={account.email}
-                disabled={pending}
-                onChange={(event) => {
-                  setConfirmation(event.target.value);
-                  setError('');
-                }}
-              />
-            </label>
-            {error && <p className="settings-confirm-error">{error}</p>}
-            <footer>
-              <button
-                type="button"
-                className="settings-dialog-cancel"
-                disabled={pending}
-                onClick={() => setDialogOpen(false)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="settings-dialog-danger"
-                disabled={!confirmationMatches || pending}
-                data-account-remove-confirm
-                onClick={() => { handleRemove().catch(() => undefined); }}
-              >
-                <Trash2 size={15} />
-                {pending ? '正在移除…' : '永久移除'}
-              </button>
-            </footer>
+            {confirmationForm}
           </section>
         </div>
       )}

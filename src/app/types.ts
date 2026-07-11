@@ -223,6 +223,25 @@ export type LocalBackupSummary = {
   credentials_included: boolean;
 };
 
+export type StorageUsage = {
+  database_bytes: number;
+  reclaimable_cache_bytes: number;
+  reclaimable_file_count: number;
+  cached_attachment_count: number;
+  local_attachment_bytes: number;
+  local_attachment_file_count: number;
+  partial_download_bytes: number;
+  partial_download_count: number;
+  total_managed_bytes: number;
+};
+
+export type CacheClearResult = {
+  removed_file_count: number;
+  reset_attachment_count: number;
+  released_bytes: number;
+  storage: StorageUsage;
+};
+
 export type EndpointCheck = {
   name: string;
   address: string;

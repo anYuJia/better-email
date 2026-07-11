@@ -78,6 +78,8 @@ pub fn run() {
             commands::export_local_backup,
             commands::preview_local_backup,
             commands::import_local_backup,
+            commands::get_storage_usage,
+            commands::clear_attachment_cache,
             commands::test_connection,
             commands::verify_account_credentials,
             commands::discover_imap_folders,

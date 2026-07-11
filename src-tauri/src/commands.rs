@@ -3,17 +3,18 @@ use crate::db::{MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, AttachmentDownload,
-    BackgroundTask, BackgroundTaskInput, ConnectionReport, Contact, ContactCreateInput,
-    ContactExportSummary, ContactImportSummary, ContactInput, ContactMergeSuggestion,
-    CredentialInput, CredentialProtocolCheck, CredentialStatus, CredentialVerificationReport,
-    DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput,
-    DraftSaveReport, Folder, FolderReadReport, ImapMailboxState, ImapProbeReport, Label,
-    LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
-    MailStats, Message, MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport,
-    OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput,
-    OAuthStartReport, OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput,
-    OutboundMessage, OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport,
-    RemoteImageTrust, RemoteImageTrustInput, RestoreMessageReport, SyncRun, SyncSchedulePlan,
+    BackgroundTask, BackgroundTaskInput, CacheClearResult, ConnectionReport, Contact,
+    ContactCreateInput, ContactExportSummary, ContactImportSummary, ContactInput,
+    ContactMergeSuggestion, CredentialInput, CredentialProtocolCheck, CredentialStatus,
+    CredentialVerificationReport, DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession,
+    DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder, FolderReadReport, ImapMailboxState,
+    ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput,
+    MailRule, MailRuleInput, MailStats, Message, MessageThreadingInput, OAuthCallbackInput,
+    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
+    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
+    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
+    ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    RemoteImageTrustInput, RestoreMessageReport, StorageUsage, SyncRun, SyncSchedulePlan,
     ThreadSummary, TrashActionReport,
 };
 use crate::oauth;
@@ -1218,6 +1219,16 @@ pub fn import_local_backup(
     Ok(Some(MailStore::summarize_local_backup(
         &backup, path, size_bytes,
     )))
+}
+
+#[tauri::command]
+pub fn get_storage_usage(store: State<'_, MailStore>) -> MailResult<StorageUsage> {
+    store.storage_usage()
+}
+
+#[tauri::command]
+pub fn clear_attachment_cache(store: State<'_, MailStore>) -> MailResult<CacheClearResult> {
+    store.clear_reclaimable_attachment_cache()
 }
 
 #[tauri::command]

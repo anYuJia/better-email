@@ -1,0 +1,558 @@
+.settings-modal .settings-body {
+  grid-template-columns: 238px minmax(0, 1fr);
+}
+
+.settings-modal .settings-nav {
+  gap: 4px;
+  padding: 16px 12px 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent 110px),
+    var(--settings-sidebar);
+}
+
+.settings-modal .settings-nav-intro {
+  min-height: auto;
+  gap: 3px;
+  padding: 2px 8px 10px;
+}
+
+.settings-modal .settings-nav-intro strong {
+  font-size: 13.5px;
+  letter-spacing: 0;
+}
+
+.settings-modal .settings-nav-intro span {
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.settings-modal .settings-nav-search {
+  position: relative;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 6px;
+  padding: 0 8px;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  color: #818a95;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 1px 2px rgba(20, 28, 38, 0.025);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.settings-modal .settings-nav-search:focus-within {
+  border-color: rgba(10, 122, 255, 0.52);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(10, 122, 255, 0.09);
+}
+
+.settings-modal .settings-nav-search input {
+  min-width: 0;
+  min-height: 34px;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--settings-text);
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: 11px;
+}
+
+.settings-modal .settings-nav-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.settings-modal .settings-nav-search input::placeholder {
+  color: #98a1ab;
+}
+
+.settings-modal .settings-nav-search > button {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #8a939e;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-modal .settings-nav-search > button:hover {
+  color: #343a42;
+  background: #edf0f3;
+}
+
+.settings-modal .settings-nav .settings-nav-group {
+  margin: 12px 8px 5px;
+  color: #939ca6;
+  font-size: 9px;
+}
+
+.settings-modal .settings-nav-section > button {
+  min-height: 39px;
+  gap: 9px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 11.5px;
+}
+
+.settings-modal .settings-nav-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 7px;
+}
+
+.settings-modal .settings-nav-section > button.active {
+  border-color: #cbdff4;
+  box-shadow:
+    0 1px 2px rgba(21, 37, 55, 0.06),
+    0 5px 14px rgba(21, 37, 55, 0.045);
+}
+
+.settings-modal .settings-nav-active-dot {
+  width: 3px;
+  height: 17px;
+  margin-left: auto;
+  border-radius: 999px;
+}
+
+.settings-modal .settings-nav-empty {
+  display: grid;
+  gap: 4px;
+  margin: 22px 8px;
+  padding: 16px 12px;
+  border: 1px dashed #d6dce3;
+  border-radius: 9px;
+  text-align: center;
+}
+
+.settings-modal .settings-nav-empty strong {
+  color: var(--settings-text-secondary);
+  font-size: 11px;
+}
+
+.settings-modal .settings-nav-empty span {
+  color: var(--settings-text-tertiary);
+  font-size: 9.5px;
+}
+
+.settings-modal .settings-page {
+  width: min(100%, 900px);
+}
+
+.settings-modal .settings-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 16px;
+  padding: 22px 34px 17px;
+  border-bottom: 1px solid rgba(220, 225, 231, 0.9);
+  background: rgba(247, 248, 250, 0.94);
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.settings-modal .settings-page-heading {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.settings-modal .settings-page-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.settings-modal .settings-page-heading > div {
+  gap: 3px;
+}
+
+.settings-modal .settings-page-heading .settings-page-kicker {
+  color: #7e8994;
+  font-size: 9.5px;
+  font-weight: 660;
+}
+
+.settings-modal .settings-page-heading strong {
+  font-size: 21px;
+  letter-spacing: 0;
+}
+
+.settings-modal .settings-page-count {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  padding: 5px 8px;
+  border: 1px solid #dce2e8;
+  border-radius: 7px;
+  color: #77818c;
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 9.5px;
+  font-weight: 680;
+  line-height: 1;
+}
+
+.settings-modal .settings-page-header > p {
+  grid-column: 1 / -1;
+  margin: 0 0 0 50px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.settings-modal .settings-page-content {
+  flex: 1 0 auto;
+  gap: 14px;
+  padding: 18px 34px 24px;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) {
+  border-color: #dde2e7;
+  border-radius: 11px;
+  box-shadow: 0 1px 2px rgba(20, 28, 38, 0.03);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-static-section,
+  .settings-section-overview
+):hover {
+  border-color: #d5dbe2;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea) {
+  border-color: #d7dde4;
+  border-radius: 8px;
+  font-size: 11.5px;
+}
+
+.settings-modal .settings-page-content :is(input, select) {
+  min-height: 39px;
+}
+
+.settings-modal .settings-page-content :is(input, select):not([type="checkbox"]) {
+  padding-left: 11px;
+}
+
+.settings-modal .settings-page-content textarea {
+  min-height: 88px;
+  padding: 10px 11px;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):disabled {
+  color: #8d96a0;
+  background-color: #f3f5f7;
+  cursor: not-allowed;
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"] {
+  width: 36px;
+  min-width: 36px;
+  height: 22px;
+  min-height: 22px;
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]::after {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-modal .settings-page-content label.checkbox-row > input[type="checkbox"]:checked::after {
+  transform: translateX(14px);
+}
+
+.settings-modal .settings-page-pagination {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 34px 28px;
+}
+
+.settings-modal .settings-page-pagination-button {
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid #dbe1e7;
+  border-radius: 10px;
+  color: var(--settings-text-secondary);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 1px 2px rgba(20, 28, 38, 0.025);
+  text-align: left;
+}
+
+.settings-modal .settings-page-pagination-button.next {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.settings-modal .settings-page-pagination-button > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-page-pagination-button small {
+  color: var(--settings-text-tertiary);
+  font-size: 9px;
+  font-weight: 620;
+}
+
+.settings-modal .settings-page-pagination-button strong {
+  overflow: hidden;
+  color: var(--settings-text);
+  font-size: 11px;
+  font-weight: 690;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-page-pagination-button:hover:not(:disabled) {
+  border-color: #bed6ef;
+  color: #0b68bd;
+  background: #f7fbff;
+  box-shadow: 0 4px 12px rgba(32, 74, 116, 0.06);
+}
+
+.settings-modal .settings-page-pagination-button:disabled {
+  opacity: 0.46;
+  cursor: default;
+}
+
+@media (max-width: 900px) {
+  .settings-modal .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-content {
+    grid-column: 1;
+  }
+
+  .settings-modal .settings-mobile-toolbar {
+    position: relative;
+    z-index: 20;
+    padding: 9px 16px;
+  }
+
+  .settings-modal .settings-page-picker {
+    width: 100%;
+    min-height: 44px;
+    display: grid;
+    grid-template-columns: 29px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 10px;
+    border: 1px solid #d8dee5;
+    border-radius: 10px;
+    color: #1768b4;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(20, 28, 38, 0.03);
+    text-align: left;
+  }
+
+  .settings-modal .settings-page-picker:hover,
+  .settings-modal .settings-page-picker[aria-expanded="true"] {
+    border-color: #bcd5ef;
+    background: #f8fbff;
+  }
+
+  .settings-modal .settings-page-picker-icon {
+    width: 29px;
+    height: 29px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: #0a70d5;
+    background: #eaf4ff;
+  }
+
+  .settings-modal .settings-page-picker-copy {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+  }
+
+  .settings-modal .settings-page-picker-copy small {
+    color: var(--settings-text-tertiary);
+    font-size: 8.5px;
+    font-weight: 620;
+  }
+
+  .settings-modal .settings-page-picker-copy strong {
+    overflow: hidden;
+    color: var(--settings-text);
+    font-size: 11.5px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-modal .settings-page-picker > svg {
+    color: #78828d;
+    transition: transform 140ms ease;
+  }
+
+  .settings-modal .settings-page-picker > svg.open {
+    transform: rotate(180deg);
+  }
+
+  .settings-modal .settings-mobile-menu {
+    position: absolute;
+    top: calc(100% - 4px);
+    right: 16px;
+    left: 16px;
+    z-index: 50;
+    max-height: min(62vh, 520px);
+    padding: 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid #d7dde4;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow:
+      0 22px 54px rgba(15, 23, 42, 0.2),
+      0 4px 14px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(20px) saturate(1.08);
+  }
+
+  .settings-modal .settings-mobile-menu-group {
+    display: grid;
+    gap: 2px;
+  }
+
+  .settings-modal .settings-mobile-menu-group + .settings-mobile-menu-group {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #edf0f3;
+  }
+
+  .settings-modal .settings-mobile-menu-group > span {
+    padding: 6px 8px 4px;
+    color: #9099a4;
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button {
+    min-width: 0;
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #66707b;
+    background: transparent;
+    box-shadow: none;
+    text-align: left;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button > span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button strong,
+  .settings-modal .settings-mobile-menu-group > button small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button strong {
+    color: var(--settings-text);
+    font-size: 11px;
+    font-weight: 680;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button small {
+    color: var(--settings-text-tertiary);
+    font-size: 8.5px;
+  }
+
+  .settings-modal .settings-mobile-menu-group > button:hover,
+  .settings-modal .settings-mobile-menu-group > button.active {
+    border-color: #d5e5f5;
+    color: #0a70d5;
+    background: #f3f8fe;
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-modal .settings-page-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 18px 17px 15px;
+  }
+
+  .settings-modal .settings-page-header > p {
+    margin-left: 0;
+  }
+
+  .settings-modal .settings-page-count {
+    padding: 4px 6px;
+    font-size: 8.5px;
+  }
+
+  .settings-modal .settings-page-content {
+    padding: 14px 17px 20px;
+  }
+
+  .settings-modal .settings-page-pagination {
+    gap: 8px;
+    padding: 0 17px 19px;
+  }
+
+  .settings-modal .settings-page-pagination-button {
+    min-height: 54px;
+    padding: 8px 9px;
+  }
+}
+
+@media (max-width: 460px) {
+  .settings-modal .settings-mobile-toolbar {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .settings-modal .settings-mobile-menu {
+    right: 12px;
+    left: 12px;
+  }
+
+  .settings-modal .settings-page-pagination-button {
+    gap: 7px;
+  }
+
+  .settings-modal .settings-page-pagination-button strong {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-modal .settings-page-picker > svg,
+  .settings-modal .settings-nav-search,
+  .settings-modal .settings-page-pagination-button {
+    transition: none;
+  }
+}

@@ -181,6 +181,279 @@
   padding: 8px 0 0;
 }
 
+.settings-storage-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-storage-refresh,
+.settings-storage-actions > button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #dce2e8;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.settings-storage-refresh:hover:not(:disabled) {
+  color: var(--ui-accent);
+  border-color: #bfd8f1;
+  background: #f5faff;
+}
+
+.settings-storage-refresh[aria-busy="true"] svg {
+  animation: settings-storage-spin 0.9s linear infinite;
+}
+
+@keyframes settings-storage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.settings-storage-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #e1e6eb;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.settings-storage-metrics > div {
+  min-width: 0;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+  border-left: 1px solid #e6eaee;
+  color: #718096;
+}
+
+.settings-storage-metrics > div:first-child {
+  border-left: 0;
+}
+
+.settings-storage-metrics > div.reclaimable {
+  color: #c2410c;
+  background: #fffaf7;
+}
+
+.settings-storage-metrics > div.protected {
+  color: #16794b;
+  background: #f7fcf9;
+}
+
+.settings-storage-metrics > div > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-storage-metrics small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-storage-metrics strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-storage-actions {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 2px;
+}
+
+.settings-storage-actions > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-storage-actions > span strong {
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-storage-actions > span small {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.settings-storage-actions > button.danger-secondary {
+  flex: 0 0 auto;
+  color: var(--ui-danger);
+  border-color: #efc8c3;
+  background: #fffafa;
+}
+
+.settings-storage-actions > button.danger-secondary:hover:not(:disabled) {
+  border-color: #e7aaa3;
+  background: #fff4f2;
+}
+
+.settings-storage-refresh:disabled,
+.settings-storage-actions > button:disabled {
+  color: #a1a8b0;
+  cursor: default;
+  border-color: #e3e7eb;
+  background: #f4f6f8;
+}
+
+.settings-cache-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(28, 35, 43, 0.28);
+  backdrop-filter: blur(10px) saturate(1.05);
+}
+
+.settings-cache-confirm {
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 26px 74px rgba(20, 29, 40, 0.24);
+}
+
+.settings-cache-confirm > header {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.settings-cache-confirm-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--ui-danger);
+  background: #fff1ef;
+}
+
+.settings-cache-confirm > header > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-cache-confirm > header strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.settings-cache-confirm > header small {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.settings-cache-confirm > header .icon-only-action {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.settings-cache-confirm > header .icon-only-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: #f1f3f5;
+}
+
+.settings-cache-confirm-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 18px 18px 6px;
+}
+
+.settings-cache-confirm-summary strong {
+  color: var(--ui-danger);
+  font-size: 24px;
+  font-weight: 740;
+}
+
+.settings-cache-confirm-summary span {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+.settings-cache-confirm > p {
+  margin: 0;
+  padding: 6px 18px 18px;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.settings-cache-confirm > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 11px 14px;
+  border-top: 1px solid #edf0f3;
+  background: #fafbfc;
+}
+
+.settings-cache-confirm > footer button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+  font-size: 10.5px;
+  font-weight: 680;
+}
+
+.settings-cache-confirm > footer button.danger {
+  color: #ffffff;
+  border-color: #d92d20;
+  background: #d92d20;
+}
+
+.settings-cache-confirm > footer button.danger:hover:not(:disabled) {
+  background: #b42318;
+}
+
 .settings-endpoint-grid,
 .settings-folder-grid {
   display: grid;
@@ -1003,6 +1276,31 @@
   .settings-credential-panel .credential-actions {
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .settings-storage-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-storage-metrics > div {
+    border-top: 1px solid #e6eaee;
+  }
+
+  .settings-storage-metrics > div:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .settings-storage-metrics > div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .settings-storage-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-storage-actions > button {
+    align-self: flex-start;
   }
 
   .settings-endpoint-grid,

@@ -73,6 +73,8 @@ import type {
   ComposerAutosave,
   MailStats,
   LocalBackupSummary,
+  StorageUsage,
+  CacheClearResult,
   EndpointCheck,
   ConnectionReport,
   CredentialVerificationReport,
@@ -197,6 +199,8 @@ export default function App() {
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [diagnosticExport, setDiagnosticExport] = useState<string | null>(null);
   const [localBackupSummary, setLocalBackupSummary] = useState<LocalBackupSummary | null>(null);
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
+  const [storageBusy, setStorageBusy] = useState(false);
   const [providerVerifications, setProviderVerifications] = useState<Record<string, ProviderVerificationRecord>>(loadProviderVerifications);
   const [rawMessage, setRawMessage] = useState(sampleRawMessage);
   const [parsedPreview, setParsedPreview] = useState<ParsedMessagePreview | null>(null);
@@ -444,7 +448,10 @@ export default function App() {
   function scrollSettingsSection(section: SettingsSectionId) {
     setActiveSettingsSection(section);
     window.requestAnimationFrame(() => {
-      document.querySelector('.settings-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector(`[data-settings-page="${section}"]`)?.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
     });
   }
 
@@ -835,6 +842,11 @@ export default function App() {
       .then(setAttachments)
       .catch((error) => setStatus(String(error)));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!isSettingsOpen || activeSettingsSection !== 'backup') return;
+    refreshStorageUsage(false).catch((error) => setStatus(String(error)));
+  }, [isSettingsOpen, activeSettingsSection]);
 
   async function refreshAll() {
     const meta = await loadMeta(folderId);
@@ -1656,6 +1668,46 @@ export default function App() {
     const { folderId: nextFolderId } = await loadMeta(null);
     await loadMessages(nextFolderId);
     setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号`);
+  }
+
+  async function refreshStorageUsage(announce = true) {
+    setStorageBusy(true);
+    try {
+      const usage = await invoke<StorageUsage>('get_storage_usage');
+      setStorageUsage(usage);
+      if (announce) {
+          setStatus(`本地存储已刷新：共 ${formatBytes(usage.total_managed_bytes)}`);
+      }
+    } catch (error) {
+      setStatus(`读取本地存储失败：${String(error).replace(/^Error:\s*/i, '')}`);
+      throw error;
+    } finally {
+      setStorageBusy(false);
+    }
+  }
+
+  async function clearAttachmentCache() {
+    setStorageBusy(true);
+    try {
+      const result = await invoke<CacheClearResult>('clear_attachment_cache');
+      setStorageUsage(result.storage);
+      if (selected) {
+        const refreshedAttachments = await invoke<Attachment[]>('list_attachments', {
+          messageId: selected.id,
+        });
+        setAttachments(refreshedAttachments);
+      }
+      setStatus(
+        result.released_bytes > 0
+          ? `已释放 ${formatBytes(result.released_bytes)}，${result.reset_attachment_count} 个远端附件可按需重新下载`
+          : '当前没有可清理的远端附件缓存',
+      );
+    } catch (error) {
+      setStatus(`清理附件缓存失败：${String(error).replace(/^Error:\s*/i, '')}`);
+      throw error;
+    } finally {
+      setStorageBusy(false);
+    }
   }
 
   async function importEmlFile() {
@@ -2571,11 +2623,15 @@ export default function App() {
               diagnosticExport={diagnosticExport}
               localBackupSummary={localBackupSummary}
               connectionReport={connectionReport}
+              storageUsage={storageUsage}
+              storageBusy={storageBusy}
               onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
               onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
               onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
               onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
               onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
+              onRefreshStorage={() => refreshStorageUsage()}
+              onClearAttachmentCache={() => clearAttachmentCache()}
             />
             )}
             {activeSettingsSection === 'sync' && (

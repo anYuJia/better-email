@@ -1,12 +1,13 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
-    BackgroundTaskInput, Contact, ContactCreateInput, ContactInput, ContactMergeSuggestion,
-    DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch, ImapMailboxState,
-    ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary, MailIdentity,
-    MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageThreadingInput,
-    OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
-    OutboundAttachmentInput, OutboundMessage, OutboxItem, RemoteImageTrust, RemoteImageTrustInput,
-    RemoteMessageBody, SyncRun, SyncSchedulePlan, ThreadSummary,
+    BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactInput,
+    ContactMergeSuggestion, DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch,
+    ImapMailboxState, ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
+    MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
+    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
+    SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -48,6 +49,7 @@ impl serde::Serialize for MailError {
 }
 
 pub type MailResult<T> = Result<T, MailError>;
+type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf)>);
 
 #[derive(Debug, Clone)]
 pub struct OAuthTokenExchangeSession {
@@ -103,6 +105,7 @@ const LOCAL_BACKUP_TABLES: &[&str] = &[
 pub struct MailStore {
     conn: Mutex<Connection>,
     data_dir: PathBuf,
+    database_path: PathBuf,
 }
 
 impl MailStore {
@@ -125,10 +128,11 @@ impl MailStore {
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
         fs::create_dir_all(&data_dir)?;
-        let conn = Connection::open(path)?;
+        let conn = Connection::open(&path)?;
         let store = Self {
             conn: Mutex::new(conn),
             data_dir,
+            database_path: path,
         };
         store.migrate()?;
         store.seed_if_empty()?;
@@ -1743,6 +1747,122 @@ impl MailStore {
         self.data_dir
             .join("attachments")
             .join(message_id.to_string())
+    }
+
+    pub fn storage_usage(&self) -> MailResult<StorageUsage> {
+        let attachment_root = self.data_dir.join("attachments");
+        let (protected_paths, reclaimable_rows) = self.attachment_storage_index()?;
+        let mut reclaimable_cache_bytes = 0_i64;
+        let mut reclaimable_file_count = 0_i64;
+        let mut local_attachment_bytes = 0_i64;
+        let mut local_attachment_file_count = 0_i64;
+        let mut partial_download_bytes = 0_i64;
+        let mut partial_download_count = 0_i64;
+
+        for (path, size_bytes) in collect_regular_files(&attachment_root)? {
+            if protected_paths.contains(&path) {
+                local_attachment_bytes += size_bytes;
+                local_attachment_file_count += 1;
+                continue;
+            }
+            reclaimable_cache_bytes += size_bytes;
+            reclaimable_file_count += 1;
+            if is_partial_attachment_path(&path) {
+                partial_download_bytes += size_bytes;
+                partial_download_count += 1;
+            }
+        }
+
+        let database_bytes = database_storage_bytes(&self.database_path);
+        Ok(StorageUsage {
+            database_bytes,
+            reclaimable_cache_bytes,
+            reclaimable_file_count,
+            cached_attachment_count: reclaimable_rows.len().min(i64::MAX as usize) as i64,
+            local_attachment_bytes,
+            local_attachment_file_count,
+            partial_download_bytes,
+            partial_download_count,
+            total_managed_bytes: database_bytes
+                .saturating_add(reclaimable_cache_bytes)
+                .saturating_add(local_attachment_bytes),
+        })
+    }
+
+    pub fn clear_reclaimable_attachment_cache(&self) -> MailResult<CacheClearResult> {
+        let attachment_root = self.data_dir.join("attachments");
+        let usage_before = self.storage_usage()?;
+        let (protected_paths, reclaimable_rows) = self.attachment_storage_index()?;
+
+        for (path, _) in collect_regular_files(&attachment_root)? {
+            if !protected_paths.contains(&path) {
+                fs::remove_file(path)?;
+            }
+        }
+
+        if !reclaimable_rows.is_empty() {
+            self.with_conn(|conn| {
+                let transaction = conn.unchecked_transaction()?;
+                for (attachment_id, _) in &reclaimable_rows {
+                    transaction.execute(
+                        "UPDATE attachments SET is_downloaded = 0, local_path = '' WHERE id = ?1",
+                        params![attachment_id],
+                    )?;
+                }
+                transaction.commit()?;
+                Ok(())
+            })?;
+        }
+
+        prune_empty_directories(&attachment_root, true)?;
+        let storage = self.storage_usage()?;
+        Ok(CacheClearResult {
+            removed_file_count: usage_before.reclaimable_file_count,
+            reset_attachment_count: reclaimable_rows.len().min(i64::MAX as usize) as i64,
+            released_bytes: usage_before
+                .reclaimable_cache_bytes
+                .saturating_sub(storage.reclaimable_cache_bytes),
+            storage,
+        })
+    }
+
+    fn attachment_storage_index(&self) -> MailResult<AttachmentStorageIndex> {
+        let attachment_root = self.data_dir.join("attachments");
+        self.with_conn(|conn| {
+            let mut statement = conn.prepare(
+                "
+                SELECT a.id, a.local_path, m.remote_mailbox, m.remote_uid
+                FROM attachments a
+                JOIN messages m ON m.id = a.message_id
+                WHERE a.is_downloaded = 1 AND a.local_path <> ''
+                ",
+            )?;
+            let rows = statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let mut protected_paths = BTreeSet::new();
+            let mut reclaimable_rows = Vec::new();
+            for (attachment_id, local_path, remote_mailbox, remote_uid) in rows {
+                let path = PathBuf::from(local_path);
+                if !is_managed_attachment_path(&attachment_root, &path) {
+                    continue;
+                }
+                if remote_uid > 0 && !remote_mailbox.trim().is_empty() {
+                    reclaimable_rows.push((attachment_id, path));
+                } else {
+                    protected_paths.insert(path);
+                }
+            }
+            Ok((protected_paths, reclaimable_rows))
+        })
     }
 
     pub fn set_message_read(&self, message_id: i64, is_read: bool) -> MailResult<()> {
@@ -6042,6 +6162,81 @@ fn snippet_from_body(body: &str) -> String {
         .collect()
 }
 
+fn database_storage_bytes(database_path: &Path) -> i64 {
+    [
+        database_path.to_path_buf(),
+        path_with_suffix(database_path, "-wal"),
+        path_with_suffix(database_path, "-shm"),
+    ]
+    .iter()
+    .filter_map(|path| fs::metadata(path).ok())
+    .map(|metadata| metadata.len().min(i64::MAX as u64) as i64)
+    .fold(0_i64, i64::saturating_add)
+}
+
+fn is_managed_attachment_path(root: &Path, path: &Path) -> bool {
+    path.is_absolute()
+        && path.starts_with(root)
+        && !path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+}
+
+fn is_partial_attachment_path(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|extension| extension.to_str()),
+        Some("download" | "decoded")
+    )
+}
+
+fn collect_regular_files(root: &Path) -> MailResult<Vec<(PathBuf, i64)>> {
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut files = Vec::new();
+    collect_regular_files_into(root, &mut files)?;
+    Ok(files)
+}
+
+fn collect_regular_files_into(root: &Path, files: &mut Vec<(PathBuf, i64)>) -> MailResult<()> {
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        let path = entry.path();
+        if file_type.is_dir() {
+            collect_regular_files_into(&path, files)?;
+        } else if file_type.is_file() {
+            files.push((path, entry.metadata()?.len().min(i64::MAX as u64) as i64));
+        }
+    }
+    Ok(())
+}
+
+fn prune_empty_directories(root: &Path, preserve_root: bool) -> MailResult<bool> {
+    if !root.exists() {
+        return Ok(true);
+    }
+    let mut empty = true;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() || file_type.is_file() {
+            empty = false;
+            continue;
+        }
+        if file_type.is_dir() && !prune_empty_directories(&entry.path(), false)? {
+            empty = false;
+        }
+    }
+    if empty && !preserve_root {
+        fs::remove_dir(root)?;
+    }
+    Ok(empty)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6051,12 +6246,14 @@ mod tests {
 
     fn test_store() -> MailStore {
         let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "better-email-test-{}-{}-{}.sqlite3",
+        let data_dir = std::env::temp_dir().join(format!(
+            "better-email-test-{}-{}-{}",
             std::process::id(),
             Utc::now().timestamp_nanos_opt().unwrap(),
             unique
         ));
+        fs::create_dir_all(&data_dir).expect("test data dir created");
+        let path = data_dir.join(DATABASE_FILENAME);
         MailStore::open_at(path).expect("test store opens")
     }
 
@@ -9524,5 +9721,95 @@ mod tests {
             .unwrap()
             .iter()
             .any(|contact| contact.email == "migration@example.com"));
+    }
+
+    #[test]
+    fn cache_cleanup_removes_remote_files_and_preserves_local_imports() {
+        let store = test_store();
+        let inbox = store
+            .list_folders_for_account(None)
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let remote_message = store
+            .list_messages_for_scope(None, inbox.id, None, None, 10)
+            .unwrap()
+            .remove(0);
+        store
+            .set_message_remote_ref(remote_message.id, "INBOX", 9901)
+            .unwrap();
+        store
+            .update_message_body(
+                remote_message.id,
+                &RemoteMessageBody {
+                    body: "Remote cache".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "Remote cache".to_string(),
+                    has_attachments: true,
+                    attachments: vec![crate::models::RemoteAttachmentMetadata {
+                        filename: "remote-cache.bin".to_string(),
+                        mime_type: "application/octet-stream".to_string(),
+                        size_bytes: 64,
+                        content_id: String::new(),
+                        is_inline: false,
+                    }],
+                },
+            )
+            .unwrap();
+        let remote_attachment = store.list_attachments(remote_message.id).unwrap().remove(0);
+        let remote_dir = store.attachment_dir(remote_message.id);
+        fs::create_dir_all(&remote_dir).unwrap();
+        let remote_path = remote_dir.join(format!("{}-remote-cache.bin", remote_attachment.id));
+        fs::write(&remote_path, vec![7_u8; 64]).unwrap();
+        store
+            .mark_attachment_downloaded(remote_attachment.id, &remote_path.to_string_lossy(), 64)
+            .unwrap();
+        let partial_path = remote_dir.join("999.download");
+        fs::write(&partial_path, vec![3_u8; 32]).unwrap();
+
+        let local_raw = concat!(
+            "Subject: Protected local attachment\r\n",
+            "From: Local <local@example.com>\r\n",
+            "To: demo@better-email.local\r\n",
+            "Content-Type: multipart/mixed; boundary=\"mix\"\r\n",
+            "\r\n",
+            "--mix\r\n",
+            "Content-Type: text/plain\r\n",
+            "\r\n",
+            "Local body\r\n",
+            "--mix\r\n",
+            "Content-Type: text/plain; name=\"keep.txt\"\r\n",
+            "Content-Disposition: attachment; filename=\"keep.txt\"\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "a2VlcCBtZQ==\r\n",
+            "--mix--\r\n",
+        );
+        let local_message = store.import_eml_message(None, local_raw).unwrap();
+        let local_attachment = store.list_attachments(local_message.id).unwrap().remove(0);
+        let local_path = PathBuf::from(&local_attachment.local_path);
+
+        let before = store.storage_usage().unwrap();
+        assert_eq!(before.cached_attachment_count, 1);
+        assert_eq!(before.partial_download_count, 1);
+        assert!(before.reclaimable_cache_bytes >= 96);
+        assert!(before.local_attachment_bytes > 0);
+
+        let cleared = store.clear_reclaimable_attachment_cache().unwrap();
+        assert_eq!(cleared.reset_attachment_count, 1);
+        assert_eq!(cleared.removed_file_count, 2);
+        assert!(cleared.released_bytes >= 96);
+        assert!(!remote_path.exists());
+        assert!(!partial_path.exists());
+        assert!(local_path.exists());
+        assert_eq!(fs::read(local_path).unwrap(), b"keep me");
+
+        let refreshed = store.get_attachment(remote_attachment.id).unwrap();
+        assert!(!refreshed.is_downloaded);
+        assert!(refreshed.local_path.is_empty());
+        assert_eq!(cleared.storage.reclaimable_cache_bytes, 0);
+        assert!(cleared.storage.local_attachment_bytes > 0);
     }
 }

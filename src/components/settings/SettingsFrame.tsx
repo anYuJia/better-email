@@ -18,6 +18,7 @@ import {
 } from './settingsNavigation';
 import './settings.css';
 import './settings-shell.css';
+import './settings-pages.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 
@@ -136,6 +137,7 @@ export default function SettingsFrame({
               group={activeGroup}
               item={activeItem}
               pageIndex={activeIndex}
+              onNavigate={onNavigate}
             >
               {children}
             </SettingsPageShell>

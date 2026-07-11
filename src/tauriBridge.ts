@@ -531,6 +531,27 @@ let attachments = [
   },
 ];
 const attachmentDownloadAttempts = new Map<number, number>();
+let mockReclaimableCacheBytes = 5_308_416;
+let mockReclaimableFileCount = 4;
+let mockCachedAttachmentCount = 2;
+let mockPartialDownloadBytes = 65_536;
+let mockPartialDownloadCount = 1;
+
+function mockStorageUsage() {
+  const databaseBytes = 2_654_208;
+  const localAttachmentBytes = 24;
+  return {
+    database_bytes: databaseBytes,
+    reclaimable_cache_bytes: mockReclaimableCacheBytes,
+    reclaimable_file_count: mockReclaimableFileCount,
+    cached_attachment_count: mockCachedAttachmentCount,
+    local_attachment_bytes: localAttachmentBytes,
+    local_attachment_file_count: 1,
+    partial_download_bytes: mockPartialDownloadBytes,
+    partial_download_count: mockPartialDownloadCount,
+    total_managed_bytes: databaseBytes + mockReclaimableCacheBytes + localAttachmentBytes,
+  };
+}
 
 let rules = [
   { id: 1, name: '客户邮件标记', condition: 'from contains customer', action: 'apply label 重要客户', enabled: true },
@@ -1858,6 +1879,24 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         size_bytes: 8192,
         credentials_included: false,
       } as T;
+    case 'get_storage_usage':
+      return mockStorageUsage() as T;
+    case 'clear_attachment_cache': {
+      const releasedBytes = mockReclaimableCacheBytes;
+      const removedFileCount = mockReclaimableFileCount;
+      const resetAttachmentCount = mockCachedAttachmentCount;
+      mockReclaimableCacheBytes = 0;
+      mockReclaimableFileCount = 0;
+      mockCachedAttachmentCount = 0;
+      mockPartialDownloadBytes = 0;
+      mockPartialDownloadCount = 0;
+      return {
+        removed_file_count: removedFileCount,
+        reset_attachment_count: resetAttachmentCount,
+        released_bytes: releasedBytes,
+        storage: mockStorageUsage(),
+      } as T;
+    }
     case 'run_sync_dry_run':
     case 'sync_imap_headers':
     case 'sync_imap_history': {

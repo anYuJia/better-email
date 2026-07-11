@@ -780,7 +780,25 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav button').length === 12");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-section > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置页面\"]') && document.querySelector('.settings-page-pagination')");
+    await evalInPage(
+      cdp,
+      `(() => {
+        const element = document.querySelector('.settings-nav-search input');
+        if (!element) throw new Error('Settings search input not found');
+        element.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter.call(element, '隐私');
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '隐私' }));
+      })()`,
+    );
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-section > button').length === 1 && document.querySelector('.settings-nav-section > button')?.innerText.includes('隐私')");
+    await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-section > button').length === 12");
+    await evalInPage(cdp, "document.querySelector('.settings-page-pagination-button.next').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'providers' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '服务商'");
+    await evalInPage(cdp, "document.querySelector('.settings-page-pagination-button.previous').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号'");
     await clickButton(cdp, '服务商', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'providers' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '服务商'");
     await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
@@ -830,8 +848,13 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'block' && document.querySelector('select[aria-label=\"切换设置页面\"]')?.value === 'sending' && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
+    await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'block' && document.querySelector('.settings-page-picker[aria-label=\"切换设置页面\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-page-picker')?.innerText.includes('发送') && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
     await waitForExpression(cdp, "(() => { const content = document.querySelector('.settings-content'); const toolbar = document.querySelector('.settings-mobile-toolbar'); const page = document.querySelector('.settings-page'); return content && toolbar && page && getComputedStyle(page).overflowY === 'auto' && Math.abs(content.clientHeight - toolbar.offsetHeight - page.clientHeight) <= 2; })()");
+    await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 12 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
+    await captureScreenshot(cdp, 'settings-page-picker-narrow');
+    await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page')?.dataset.settingsPage === 'sending'");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-sending-narrow');
     await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -845,7 +868,7 @@ async function main() {
     await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
     await openSettingsSection(cdp, '服务商', 'providers', '.settings-provider-advanced');
-    await waitForExpression(cdp, "!document.querySelector('.settings-provider-advanced')?.open && !document.querySelector('.settings-page-pagination')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-provider-advanced')?.open && document.querySelector('.settings-page-pagination')?.innerText.includes('账号') && document.querySelector('.settings-page-pagination')?.innerText.includes('认证')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-closed-desktop');
     await openDetails(cdp, '.settings-provider-advanced');
@@ -889,6 +912,14 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('静音账号') && document.body.innerText.includes('重点账号') && document.querySelector('.notification-account-grid')");
     await openSettingsSection(cdp, '隐私', 'privacy', '.settings-privacy-panel');
     await openSettingsSection(cdp, '备份', 'backup', '.settings-backup-panel');
+    await waitForExpression(cdp, "document.querySelector('[data-storage-total]')?.textContent !== '—' && document.querySelector('[data-storage-reclaimable]')?.textContent.includes('MB') && ![...document.querySelectorAll('.settings-storage-actions button')].find((item) => item.textContent.includes('清理缓存'))?.disabled");
+    await waitForSettingsPageStable(cdp);
+    await captureScreenshot(cdp, 'settings-storage-desktop');
+    await clickButton(cdp, '清理缓存', "document.querySelector('.settings-storage-actions')");
+    await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm[role=\"dialog\"]')?.innerText.includes('本地导入且没有远端副本的附件不会被清理') && document.querySelector('.settings-cache-confirm-summary')?.innerText.includes('MB')");
+    await captureScreenshot(cdp, 'settings-storage-confirm');
+    await clickButton(cdp, '确认清理', "document.querySelector('.settings-cache-confirm')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-cache-confirm') && document.querySelector('[data-storage-reclaimable]')?.textContent === '0 B' && [...document.querySelectorAll('.settings-storage-actions button')].find((item) => item.textContent.includes('清理缓存'))?.disabled && document.querySelector('.status-line')?.textContent.includes('已释放')");
     await clickButton(cdp, '导入 EML');
     await waitForExpression(
       cdp,
@@ -1160,6 +1191,8 @@ async function main() {
         'settings primary sections open without redundant disclosure',
         'settings primary actions stay visible in header',
         'settings header save completes update flow',
+        'storage management separates database cache and protected local attachments',
+        'attachment cache clear uses confirmation and preserves recoverable data boundaries',
         'new account preset creation and scope switch work',
         'new account default folders and identity are available',
         'account removal requires exact email confirmation',

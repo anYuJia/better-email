@@ -255,6 +255,27 @@ pub struct MailStats {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct StorageUsage {
+    pub database_bytes: i64,
+    pub reclaimable_cache_bytes: i64,
+    pub reclaimable_file_count: i64,
+    pub cached_attachment_count: i64,
+    pub local_attachment_bytes: i64,
+    pub local_attachment_file_count: i64,
+    pub partial_download_bytes: i64,
+    pub partial_download_count: i64,
+    pub total_managed_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CacheClearResult {
+    pub removed_file_count: i64,
+    pub reset_attachment_count: i64,
+    pub released_bytes: i64,
+    pub storage: StorageUsage,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DiagnosticAccount {
     pub id: i64,
     pub email_masked: String,

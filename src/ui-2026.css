@@ -2723,7 +2723,7 @@ body {
 /* Sidebar de-AI pass: remove product-card cues and saturated CTA treatment. */
 .sidebar {
   padding: 12px 10px 10px;
-  gap: 7px;
+  gap: 9px;
 }
 
 .brand {
@@ -2749,26 +2749,26 @@ body {
 }
 
 .compose-button {
-  min-height: 32px;
+  min-height: 36px;
   justify-content: flex-start;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--ui-text);
-  background: transparent;
+  padding: 0 11px;
+  border: 1px solid rgba(26, 115, 232, 0.22);
+  border-radius: 8px;
+  color: #0f5fb7;
+  background: #eef5ff;
   box-shadow: none;
-  font-size: 12px;
-  font-weight: 620;
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .compose-button:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
+  color: #0b4f9d;
+  background: #e6f0ff;
   box-shadow: var(--quiet-row-shadow);
 }
 
 .compose-button svg {
-  color: var(--ui-accent);
+  color: currentColor;
 }
 
 .sidebar-label {
@@ -2819,7 +2819,7 @@ body {
 }
 
 .sidebar-footer {
-  padding-top: 10px;
+  padding-top: 12px;
 }
 
 .sidebar-footer-actions {
@@ -2850,7 +2850,7 @@ body {
 }
 
 .background-sync-card {
-  border-top: 0;
+  display: none !important;
 }
 
 .background-sync-card summary {
@@ -2988,7 +2988,7 @@ body {
 }
 
 .sidebar {
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .brand strong,
@@ -2997,7 +2997,7 @@ body {
 .folder-main,
 .sidebar-disclosure summary,
 .settings-button {
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .account-switcher .account-switcher-copy > span,
@@ -3009,7 +3009,7 @@ body {
 .background-sync-card > span,
 .background-sync-card > em,
 .background-sync-card > small {
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .sender,
@@ -3033,4 +3033,17 @@ body {
 
 .sidebar-footer-actions {
   padding-top: 9px;
+}
+
+.folder-main {
+  min-height: 34px;
+}
+
+.folder-name {
+  gap: 9px;
+}
+
+.folder-name svg {
+  width: 18px;
+  height: 18px;
 }

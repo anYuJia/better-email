@@ -2309,11 +2309,6 @@ export default function App() {
         folderId={folderId}
         renamingFolderId={renamingFolderId}
         renamingFolderName={renamingFolderName}
-        backgroundTasks={backgroundTasks}
-        backgroundSyncStatus={backgroundSyncStatus}
-        lastNewMailNotice={lastNewMailNotice}
-        notificationStatus={notificationStatus}
-        appBadgeStatus={appBadgeStatus}
         onAccountScopeChange={changeAccountScope}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
@@ -2336,11 +2331,6 @@ export default function App() {
         onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onSync={() => enqueueBackgroundTask('sync', 'manual')}
-        onResetLayout={() => {
-          resetAppLayout();
-          setStatus('已恢复默认三栏宽度');
-        }}
       />
 
       <button

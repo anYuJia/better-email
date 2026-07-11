@@ -18,6 +18,7 @@ import {
   primaryFolderRoles,
 } from '../app/appConfig';
 import type { Folder } from '../app/types';
+import type { FolderRole } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import {
   hasMessageDragPayload,
@@ -40,6 +41,27 @@ type FolderItemsProps = {
   onDragLeaveFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
   onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
 };
+
+const visibleSystemRoles: FolderRole[] = ['inbox', 'sent', 'drafts', 'archive', 'trash', 'spam'];
+
+const folderDisplayName: Partial<Record<FolderRole, string>> = {
+  inbox: '收件箱',
+  sent: '已发送',
+  drafts: '草稿',
+  archive: '归档',
+  trash: '废纸篓',
+  spam: '垃圾邮件',
+};
+
+function displayNameForFolder(folder: Folder) {
+  return folderDisplayName[folder.role] ?? folder.name;
+}
+
+function orderedVisibleFolders(folders: Folder[]) {
+  return visibleSystemRoles
+    .map((role) => folders.find((folder) => folder.role === role))
+    .filter((folder): folder is Folder => Boolean(folder));
+}
 
 function FolderItems({
   folders,
@@ -98,7 +120,7 @@ function FolderItems({
             <button type="button" className="folder-main" onClick={() => onSelectFolder(folder.id)}>
               <span className="folder-name">
                 {folderIconForRole(folder.role)}
-                {folder.name}
+                {displayNameForFolder(folder)}
               </span>
               {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
             </button>
@@ -170,12 +192,7 @@ export default function SidebarFolderNavigation({
     () => new Set(favoriteFolderKeys),
     [favoriteFolderKeys],
   );
-  const primaryFolders = folders.filter((folder) => (
-    primaryFolderRoles.has(folder.role) || favoriteFolderKeySet.has(folderPreferenceKey(folder))
-  ));
-  const secondaryFolders = folders.filter((folder) => (
-    !primaryFolderRoles.has(folder.role) && !favoriteFolderKeySet.has(folderPreferenceKey(folder))
-  ));
+  const primaryFolders = React.useMemo(() => orderedVisibleFolders(folders), [folders]);
 
   React.useEffect(() => {
     window.localStorage.setItem(favoriteFolderKeysStorageKey, JSON.stringify(favoriteFolderKeys));
@@ -294,19 +311,7 @@ export default function SidebarFolderNavigation({
         <FolderItems folders={primaryFolders} {...folderItemProps} />
       </nav>
 
-      <div className="sidebar-secondary sidebar-quick-menus">
-        {secondaryFolders.length > 0 && (
-          <details className="sidebar-disclosure more-mailboxes">
-            <summary>
-              <span>更多邮箱</span>
-            </summary>
-            <nav className="folder-list folded-folder-list">
-              <FolderItems folders={secondaryFolders} {...folderItemProps} />
-            </nav>
-          </details>
-        )}
-        {children}
-      </div>
+      {children && <div className="sidebar-secondary sidebar-quick-menus">{children}</div>}
 
       {contextMenu && (
         <ContextMenu

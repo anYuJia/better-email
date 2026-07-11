@@ -8,7 +8,6 @@ import {
 import type {
   Account,
   AccountScope,
-  BackgroundTask,
   Folder,
 } from '../app/types';
 import AccountSwitcher from './AccountSwitcher';
@@ -21,11 +20,6 @@ export type SidebarProps = {
   folderId: number | null;
   renamingFolderId: number | null;
   renamingFolderName: string;
-  backgroundTasks: BackgroundTask[];
-  backgroundSyncStatus: string;
-  lastNewMailNotice: string | null;
-  notificationStatus: string;
-  appBadgeStatus: string;
   onAccountScopeChange: (value: string) => void;
   onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
@@ -42,8 +36,6 @@ export type SidebarProps = {
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
   onOpenCommandPalette: () => void;
-  onSync: () => void;
-  onResetLayout: () => void;
 };
 
 export default function Sidebar({
@@ -53,11 +45,6 @@ export default function Sidebar({
   folderId,
   renamingFolderId,
   renamingFolderName,
-  backgroundTasks,
-  backgroundSyncStatus,
-  lastNewMailNotice,
-  notificationStatus,
-  appBadgeStatus,
   onAccountScopeChange,
   onSetDefaultAccount,
   onCompose,
@@ -74,8 +61,6 @@ export default function Sidebar({
   onOpenSettings,
   onOpenShortcuts,
   onOpenCommandPalette,
-  onSync,
-  onResetLayout,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
@@ -124,28 +109,6 @@ export default function Sidebar({
             <Search size={17} /> <span>命令</span>
           </button>
         </div>
-        <details className="sidebar-disclosure background-sync-card">
-          <summary>
-            <span>同步</span>
-          </summary>
-          <span>{backgroundSyncStatus}</span>
-          {lastNewMailNotice && <em>{lastNewMailNotice}</em>}
-          <small>{notificationStatus}</small>
-          <small>{appBadgeStatus}</small>
-          {backgroundTasks.length > 0 && (
-            <div className="task-stack">
-              {backgroundTasks.slice(0, 3).map((task) => (
-                <small key={task.id}>
-                  {task.title} · {task.status === 'queued' ? '排队' : task.status === 'running' ? '执行中' : task.status === 'done' ? '完成' : '失败'}
-                </small>
-              ))}
-            </div>
-          )}
-          <div className="sidebar-utility-actions">
-            <button type="button" onClick={onSync}>立即同步</button>
-            <button className="layout-reset-button" type="button" onClick={onResetLayout}>重置布局</button>
-          </div>
-        </details>
       </div>
     </aside>
   );

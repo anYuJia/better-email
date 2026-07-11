@@ -89,6 +89,14 @@ function outboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
   console.warn(`[outbox-flow] ${event}`, details);
 }
 
+function fetchTimerLog(event: string, details: Record<string, unknown> = {}) {
+  console.info('[better-email][fetch-timer]', event, details);
+}
+
+function fetchTimerWarn(event: string, details: Record<string, unknown> = {}) {
+  console.warn('[better-email][fetch-timer]', event, details);
+}
+
 type OutboxInvoke = <T>(command: string) => Promise<T>;
 
 export async function runDueOutboxSmtp(invokeCommand: OutboxInvoke = invoke): Promise<OutboxItem[]> {
@@ -303,13 +311,32 @@ export default function useBackgroundTaskCoordinator({
   }, [setOutbox, setStatus]);
 
   const runBackgroundSync = useCallback(async (reason: 'manual' | 'timer'): Promise<string> => {
-    if (backgroundSyncRef.current) return '同步任务已在运行';
+    if (backgroundSyncRef.current) {
+      fetchTimerLog('sync skipped: already running', { reason });
+      return '同步任务已在运行';
+    }
     backgroundSyncRef.current = true;
     const current = currentRef.current;
     const syncAccountId = current.accountScope === 'all' ? null : current.accountScope;
+    const startedAt = performance.now();
+    fetchTimerLog('sync start', {
+      reason,
+      accountId: syncAccountId,
+      folderId: current.folderId,
+      scope: current.accountScope,
+      query: current.query.trim() || null,
+      filter: current.filter,
+    });
     setBackgroundSyncStatus(reason === 'timer' ? '后台同步中...' : '手动同步中...');
     try {
       const plan = await invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: syncAccountId });
+      fetchTimerLog('sync plan', {
+        reason,
+        accountId: syncAccountId,
+        totalAccounts: plan.total_accounts,
+        batchAccounts: plan.batch_accounts.map((item) => item.id),
+        delayedAccounts: plan.delayed_accounts.map((item) => item.id),
+      });
       setSyncSchedulePlan(plan);
       setBackgroundSyncStatus(
         plan.total_accounts > 1
@@ -334,12 +361,28 @@ export default function useBackgroundTaskCoordinator({
           : syncStatusLabel(run);
       setBackgroundSyncStatus(summary);
       await notifyNewMail(run, latestMessages);
+      fetchTimerLog('sync done', {
+        reason,
+        accountId: syncAccountId,
+        status: run.status,
+        scannedFolders: run.scanned_folders,
+        importedMessages: run.imported_messages,
+        releasedSnoozedMessages: released.length,
+        visibleMessages: latestMessages.length,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
       if (reason === 'manual') {
         setStatus(released.length > 0 ? `${run.message} 已恢复 ${released.length} 封稍后邮件。` : run.message);
       }
       return summary;
     } catch (error) {
       const message = String(error);
+      fetchTimerWarn('sync failed', {
+        reason,
+        accountId: syncAccountId,
+        error: message,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
       setBackgroundSyncStatus(`后台同步暂停：${message}`);
       if (reason === 'manual') setStatus(message);
       throw error;
@@ -405,9 +448,17 @@ export default function useBackgroundTaskCoordinator({
     kind: BackgroundTaskKind,
     source: 'manual' | 'timer' = 'manual',
   ) => {
+    fetchTimerLog('enqueue start', { kind, source });
     const task = await invoke<BackgroundTask>('enqueue_background_task', { input: { kind, source } });
     const tasks = await refreshBackgroundTasks();
     const isReusedActiveTask = task.kind === 'sync' && task.status !== 'queued';
+    fetchTimerLog('enqueue done', {
+      kind: task.kind,
+      source: task.source,
+      taskId: task.id,
+      taskStatus: task.status,
+      queuedTasks: tasks.filter((item) => item.status === 'queued').length,
+    });
     setBackgroundSyncStatus(isReusedActiveTask ? '同步任务已在队列中' : `${task.title} 已入队`);
     if (!tasks.some((item) => item.status === 'queued')) return;
     void drainBackgroundTaskQueue();
@@ -465,14 +516,42 @@ export default function useBackgroundTaskCoordinator({
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
     if (!intervalMs) {
+      fetchTimerLog('disabled', {
+        accountId: account?.id ?? null,
+        email: account?.email ?? null,
+        syncMode: account?.sync_mode ?? 'manual',
+      });
       setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
       return;
     }
+    fetchTimerLog('enabled', {
+      accountId: account?.id ?? null,
+      email: account?.email ?? null,
+      syncMode: account?.sync_mode ?? 'manual',
+      intervalMs,
+      nextRunAt: new Date(Date.now() + intervalMs).toISOString(),
+    });
     setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
     const timer = window.setInterval(() => {
-      enqueueBackgroundTask('sync', 'timer').catch((error) => setStatus(String(error)));
+      fetchTimerLog('timer fired', {
+        accountId: account?.id ?? null,
+        syncMode: account?.sync_mode ?? 'manual',
+      });
+      enqueueBackgroundTask('sync', 'timer').catch((error) => {
+        fetchTimerWarn('enqueue failed', {
+          accountId: account?.id ?? null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        setStatus(String(error));
+      });
     }, intervalMs);
-    return () => window.clearInterval(timer);
+    return () => {
+      fetchTimerLog('cleared', {
+        accountId: account?.id ?? null,
+        syncMode: account?.sync_mode ?? 'manual',
+      });
+      window.clearInterval(timer);
+    };
   }, [
     account?.sync_mode,
     enqueueBackgroundTask,

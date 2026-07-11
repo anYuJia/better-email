@@ -139,7 +139,29 @@ pub fn update_account_settings(
     account_id: Option<i64>,
     input: AccountSettingsInput,
 ) -> MailResult<Account> {
-    store.update_account_settings_for(account_id, input)
+    eprintln!(
+        "[better-email][account] update settings start account_id={account_id:?} provider={} protocol={} sync_mode={}",
+        input.provider.trim(),
+        input.incoming_protocol.trim(),
+        input.sync_mode.trim(),
+    );
+    match store.update_account_settings_for(account_id, input) {
+        Ok(account) => {
+            eprintln!(
+                "[better-email][account] update settings ok account_id={} email={} sync_mode={}",
+                account.id,
+                mask_email(&account.email),
+                account.sync_mode,
+            );
+            Ok(account)
+        }
+        Err(error) => {
+            eprintln!(
+                "[better-email][account] update settings failed account_id={account_id:?} error={error}"
+            );
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -1593,7 +1615,14 @@ pub fn get_sync_schedule_plan(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncSchedulePlan> {
-    store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)
+    let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
+    eprintln!(
+        "[better-email][sync] plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
+        plan.total_accounts,
+        plan.batch_accounts.len(),
+        plan.delayed_accounts.len()
+    );
+    Ok(plan)
 }
 
 #[tauri::command]
@@ -1601,13 +1630,35 @@ pub fn sync_imap_headers(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
+    let command_started_at = std::time::Instant::now();
+    eprintln!("[better-email][sync] command start account_id={account_id:?}");
     let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
     let accounts = plan.batch_accounts.clone();
+    eprintln!(
+        "[better-email][sync] command plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
+        plan.total_accounts,
+        accounts.len(),
+        plan.delayed_accounts.len()
+    );
     if account_id.is_some() {
         let account = accounts
             .first()
             .ok_or_else(|| crate::db::MailError::Imap("没有可同步账号。".to_string()))?;
-        return sync_headers_for_account(&store, account, false);
+        let result = sync_headers_for_account(&store, account, false);
+        match &result {
+            Ok(run) => eprintln!(
+                "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} duration_ms={}",
+                run.status,
+                run.scanned_folders,
+                run.imported_messages,
+                command_started_at.elapsed().as_millis()
+            ),
+            Err(error) => eprintln!(
+                "[better-email][sync] command failed account_id={account_id:?} error={error} duration_ms={}",
+                command_started_at.elapsed().as_millis()
+            ),
+        }
+        return result;
     }
 
     let started_at = Utc::now().to_rfc3339();
@@ -1627,7 +1678,14 @@ pub fn sync_imap_headers(
                     warnings.push(format!("{}: {}", account.email, run.message));
                 }
             }
-            Err(error) => failures.push(format!("{}: {error}", account.email)),
+            Err(error) => {
+                eprintln!(
+                    "[better-email][sync] account failed account_id={} email={} error={error}",
+                    account.id,
+                    mask_email(&account.email),
+                );
+                failures.push(format!("{}: {error}", account.email));
+            }
         }
     }
 
@@ -1684,14 +1742,32 @@ pub fn sync_imap_headers(
         )
     };
 
-    store.record_sync_run(
+    let result = store.record_sync_run(
         &started_at,
         &finished_at,
         status,
         scanned_folders,
         imported_messages,
         &message,
-    )
+    );
+    match &result {
+        Ok(run) => eprintln!(
+            "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} synced_accounts={} failures={} warnings={} duration_ms={} message={}",
+            run.status,
+            run.scanned_folders,
+            run.imported_messages,
+            synced_accounts,
+            failures.len(),
+            warnings.len(),
+            command_started_at.elapsed().as_millis(),
+            run.message,
+        ),
+        Err(error) => eprintln!(
+            "[better-email][sync] record failed account_id={account_id:?} error={error} duration_ms={}",
+            command_started_at.elapsed().as_millis()
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -2882,7 +2958,27 @@ pub fn enqueue_background_task(
     store: State<'_, MailStore>,
     input: BackgroundTaskInput,
 ) -> MailResult<BackgroundTask> {
-    store.enqueue_background_task(input)
+    eprintln!(
+        "[better-email][task] enqueue start kind={} source={}",
+        input.kind.trim(),
+        input.source.trim(),
+    );
+    match store.enqueue_background_task(input) {
+        Ok(task) => {
+            eprintln!(
+                "[better-email][task] enqueue ok task_id={} kind={} source={} status={}",
+                task.id,
+                task.kind,
+                task.source,
+                task.status,
+            );
+            Ok(task)
+        }
+        Err(error) => {
+            eprintln!("[better-email][task] enqueue failed error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2892,7 +2988,23 @@ pub fn list_background_tasks(store: State<'_, MailStore>) -> MailResult<Vec<Back
 
 #[tauri::command]
 pub fn next_background_task(store: State<'_, MailStore>) -> MailResult<Option<BackgroundTask>> {
-    store.next_background_task()
+    match store.next_background_task() {
+        Ok(Some(task)) => {
+            eprintln!(
+                "[better-email][task] next task_id={} kind={} source={} status={}",
+                task.id,
+                task.kind,
+                task.source,
+                task.status,
+            );
+            Ok(Some(task))
+        }
+        Ok(None) => Ok(None),
+        Err(error) => {
+            eprintln!("[better-email][task] next failed error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2900,7 +3012,21 @@ pub fn mark_background_task_running(
     store: State<'_, MailStore>,
     task_id: i64,
 ) -> MailResult<BackgroundTask> {
-    store.mark_background_task_running(task_id)
+    match store.mark_background_task_running(task_id) {
+        Ok(task) => {
+            eprintln!(
+                "[better-email][task] running task_id={} kind={} source={}",
+                task.id,
+                task.kind,
+                task.source,
+            );
+            Ok(task)
+        }
+        Err(error) => {
+            eprintln!("[better-email][task] running failed task_id={task_id} error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2909,7 +3035,22 @@ pub fn complete_background_task(
     task_id: i64,
     message: String,
 ) -> MailResult<BackgroundTask> {
-    store.complete_background_task(task_id, &message)
+    match store.complete_background_task(task_id, &message) {
+        Ok(task) => {
+            eprintln!(
+                "[better-email][task] complete task_id={} kind={} source={} message={}",
+                task.id,
+                task.kind,
+                task.source,
+                task.message,
+            );
+            Ok(task)
+        }
+        Err(error) => {
+            eprintln!("[better-email][task] complete failed task_id={task_id} error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2918,7 +3059,22 @@ pub fn fail_background_task(
     task_id: i64,
     message: String,
 ) -> MailResult<BackgroundTask> {
-    store.fail_background_task(task_id, &message)
+    match store.fail_background_task(task_id, &message) {
+        Ok(task) => {
+            eprintln!(
+                "[better-email][task] fail task_id={} kind={} source={} message={}",
+                task.id,
+                task.kind,
+                task.source,
+                task.message,
+            );
+            Ok(task)
+        }
+        Err(error) => {
+            eprintln!("[better-email][task] fail failed task_id={task_id} error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]

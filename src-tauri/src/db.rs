@@ -799,6 +799,10 @@ impl MailStore {
         self.with_conn(|conn| account_for_conn(conn, account_id))
     }
 
+    pub fn get_account_by_id_optional(&self, account_id: Option<i64>) -> MailResult<Option<Account>> {
+        self.with_conn(|conn| account_for_conn_optional(conn, account_id))
+    }
+
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
             let email = input.email.trim().to_lowercase();
@@ -876,7 +880,7 @@ impl MailStore {
         })
     }
 
-    pub fn delete_account(&self, account_id: i64) -> MailResult<Account> {
+    pub fn delete_account(&self, account_id: i64) -> MailResult<Option<Account>> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
             let exists = transaction
@@ -891,17 +895,9 @@ impl MailStore {
                 return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
             }
 
-            let account_count: i64 =
-                transaction.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
-            if account_count <= 1 {
-                return Err(MailError::Imap(
-                    "至少需要保留一个邮箱账号，无法移除当前唯一账号。".to_string(),
-                ));
-            }
-
             transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
             ensure_default_account_for_conn(&transaction)?;
-            let next_account = account_for_conn(&transaction, None)?;
+            let next_account = account_for_conn_optional(&transaction, None)?;
             transaction.commit()?;
             Ok(next_account)
         })
@@ -5330,6 +5326,11 @@ fn due_snoozed_message_ids(now: &str, rows: Vec<(i64, String)>) -> Vec<i64> {
 }
 
 fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Account> {
+    account_for_conn_optional(conn, account_id)?
+        .ok_or_else(|| MailError::Imap("没有可用邮箱账号。".to_string()))
+}
+
+fn account_for_conn_optional(conn: &Connection, account_id: Option<i64>) -> MailResult<Option<Account>> {
     if let Some(account_id) = account_id {
         return conn
             .query_row(
@@ -5338,6 +5339,7 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
                 params![account_id],
                 map_account,
             )
+            .optional()
             .map_err(Into::into);
     }
 
@@ -5347,6 +5349,7 @@ fn account_for_conn(conn: &Connection, account_id: Option<i64>) -> MailResult<Ac
         [],
         map_account,
     )
+    .optional()
     .map_err(Into::into)
 }
 
@@ -7954,7 +7957,7 @@ mod tests {
             })
             .unwrap();
 
-        let next_account = store.delete_account(second_account.id).unwrap();
+        let next_account = store.delete_account(second_account.id).unwrap().unwrap();
         assert_eq!(next_account.id, first_account.id);
         assert!(next_account.is_default);
         assert_eq!(store.list_accounts().unwrap().len(), 1);
@@ -7990,12 +7993,10 @@ mod tests {
             })
             .unwrap();
 
-        let error = store
-            .delete_account(first_account.id)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("至少需要保留一个邮箱账号"));
-        assert_eq!(store.list_accounts().unwrap().len(), 1);
+        let final_account = store.delete_account(first_account.id).unwrap();
+        assert!(final_account.is_none());
+        assert!(store.list_accounts().unwrap().is_empty());
+        assert!(store.get_account_by_id_optional(None).unwrap().is_none());
     }
 
     #[test]

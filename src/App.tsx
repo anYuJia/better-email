@@ -676,7 +676,7 @@ export default function App() {
       nextOauthSessions,
     ] = await Promise.all([
       invoke<Account[]>('list_accounts'),
-      invoke<Account>('get_account', { accountId: nextAccountId }),
+      invoke<Account | null>('get_account', { accountId: nextAccountId }),
       invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
       invoke<Label[]>('list_labels'),
       invoke<MailStats>('get_stats', { accountId: nextAccountId }),
@@ -2577,15 +2577,27 @@ export default function App() {
         </Suspense>
       )}
 
-      {isSettingsOpen && accountForm && (
+      {isSettingsOpen && (accountForm || activeSettingsSection === 'accounts') && (
         <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
           <SettingsFrame
           title="设置"
-          subtitle={`${accountForm.email} · ${accountForm.provider}`}
+          subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
           activeSection={activeSettingsSection}
           onNavigate={scrollSettingsSection}
-          onTestConnection={() => { testConnection().catch((error) => setStatus(String(error))); }}
-          onSave={() => { saveSettings().catch((error) => setStatus(String(error))); }}
+          onTestConnection={() => {
+            if (!accountForm) {
+              setStatus('请先添加邮箱账号');
+              return;
+            }
+            testConnection().catch((error) => setStatus(String(error)));
+          }}
+          onSave={() => {
+            if (!accountForm) {
+              setStatus('请先添加邮箱账号');
+              return;
+            }
+            saveSettings().catch((error) => setStatus(String(error)));
+          }}
           onClose={() => setSettingsOpen(false)}
         >
             {(activeSettingsSection === 'accounts'
@@ -2636,7 +2648,7 @@ export default function App() {
               onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
               onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
             />
-            {activeSettingsSection === 'auth' && (
+            {activeSettingsSection === 'auth' && accountForm && (
               <CredentialSecuritySettings
                 account={accountForm}
                 credentialSecret={credentialSecret}
@@ -2669,7 +2681,7 @@ export default function App() {
             {(activeSettingsSection === 'sending'
               || activeSettingsSection === 'notifications'
               || activeSettingsSection === 'privacy'
-              || activeSettingsSection === 'identities') && (
+              || activeSettingsSection === 'identities') && accountForm && (
             <ExperienceSettings
               section={activeSettingsSection}
               accountForm={accountForm}
@@ -2705,7 +2717,7 @@ export default function App() {
               onClearAttachmentCache={() => clearAttachmentCache()}
             />
             )}
-            {activeSettingsSection === 'sync' && (
+            {activeSettingsSection === 'sync' && accountForm && (
             <SyncOperationsSettings
               accountForm={accountForm}
               imapProbe={imapProbe}

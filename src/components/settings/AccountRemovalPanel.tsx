@@ -20,7 +20,7 @@ export default function AccountRemovalPanel({
   const [confirmation, setConfirmation] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  const canRemove = accountCount > 1;
+  const canRemove = accountCount > 0;
   const confirmationMatches = confirmation.trim().toLowerCase() === account.email.toLowerCase();
 
   useEffect(() => {
@@ -112,9 +112,7 @@ export default function AccountRemovalPanel({
             <p>此操作会永久清除当前设备中的该账号数据。</p>
           </div>
         </header>
-        {canRemove ? confirmationForm : (
-          <p className="settings-confirm-error">当前是唯一账号，请先添加另一个邮箱账号。</p>
-        )}
+        {canRemove ? confirmationForm : <p className="settings-confirm-error">当前没有可移除的账号。</p>}
       </section>
     );
   }
@@ -124,7 +122,7 @@ export default function AccountRemovalPanel({
       <section className="tool-panel settings-account-danger" aria-labelledby="remove-account-title">
         <div>
           <strong id="remove-account-title">删除账号</strong>
-          {!canRemove && <small>当前是唯一账号，请先添加另一个邮箱账号。</small>}
+          {!canRemove && <small>当前没有可移除的账号。</small>}
         </div>
         <button
           type="button"

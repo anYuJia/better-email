@@ -18,7 +18,7 @@ import './account-settings.css';
 export type AccountConnectionSettingsProps = {
   section: 'accounts' | 'providers' | 'auth';
   accounts: Account[];
-  accountForm: Account;
+  accountForm: Account | null;
   accountCount: number;
   newAccountForm: AccountCreateInput;
   providerVerifications: Record<string, ProviderVerificationRecord>;
@@ -90,7 +90,7 @@ function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsP
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
   let page: React.ReactNode;
 
-  if (props.section === 'accounts') {
+  if (props.section === 'accounts' || !props.accountForm) {
     page = (
       <AccountSettingsPage
         accounts={props.accounts}

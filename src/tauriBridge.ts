@@ -1021,6 +1021,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
     case 'list_accounts':
       return mockAccounts as T;
     case 'get_account':
+      if (mockAccounts.length === 0) return null as T;
       return (Number(args?.accountId ?? 0) > 0
         ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
         : account) as T;
@@ -1031,6 +1032,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       if (mockAccounts.some((item) => item.email.toLowerCase() === email)) {
         throw new Error('该邮箱账号已存在。');
       }
+      const isFirstAccount = mockAccounts.length === 0;
       const created = {
         id: nextAccountId++,
         email,
@@ -1043,9 +1045,10 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         sync_mode: String(input.sync_mode ?? '').trim() || 'manual',
         remote_images_allowed: Boolean(input.remote_images_allowed),
         signature: String(input.signature ?? ''),
-        is_default: false,
+        is_default: isFirstAccount,
       };
       mockAccounts = [...mockAccounts, created];
+      if (created.is_default) account = created;
       folders = [
         ...folders,
         ...mockSystemFolders.map((folder) => ({
@@ -1085,9 +1088,6 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const accountId = Number(args?.accountId ?? 0);
       const removedAccount = mockAccounts.find((item) => item.id === accountId);
       if (!removedAccount) throw new Error('邮箱账号不存在或已被移除。');
-      if (mockAccounts.length <= 1) {
-        throw new Error('至少需要保留一个邮箱账号，无法移除当前唯一账号。');
-      }
       const removedMessageIds = new Set(
         messages.filter((message) => message.account_id === accountId).map((message) => message.id),
       );
@@ -1104,7 +1104,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         mockAccounts = mockAccounts.map((item, index) => ({ ...item, is_default: index === 0 }));
       }
       account = mockAccounts.find((item) => item.is_default) ?? mockAccounts[0];
-      return account as T;
+      return (mockAccounts[0] ? account : null) as T;
     }
     case 'update_account_settings': {
       const accountId = Number(args?.accountId ?? 0);

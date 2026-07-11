@@ -241,7 +241,7 @@ export default function useAccountConnectionController({
   const removeCurrentAccount = useCallback(async () => {
     if (!accountForm) return;
     const removedAccount = accountForm;
-    const nextAccount = await invoke<Account>('delete_account', { accountId: removedAccount.id });
+    const nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
     try {
       const credentialResult = await invoke<CredentialStatus>('delete_account_secret', {
         accountEmail: removedAccount.email,
@@ -254,17 +254,23 @@ export default function useAccountConnectionController({
         message: '账号已移除，但系统安全存储中的凭据需要手动检查。',
       });
     }
-    setAccountScope(nextAccount.id);
+    setAccountScope(nextAccount?.id ?? 'all');
     setAccount(nextAccount);
     setAccountForm(nextAccount);
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);
     setAttachments([]);
-    const { folderId: nextFolderId } = await loadMeta(null, nextAccount.id);
-    await loadMessages(nextFolderId, query, filter, nextAccount.id);
-    setSettingsOpen(false);
-    setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
+    if (nextAccount) {
+      const { folderId: nextFolderId } = await loadMeta(null, nextAccount.id);
+      await loadMessages(nextFolderId, query, filter, nextAccount.id);
+      setSettingsOpen(false);
+      setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
+      return;
+    }
+    await loadMeta(null, 'all');
+    setSettingsOpen(true);
+    setStatus(`已移除 ${removedAccount.email}，当前没有邮箱账号`);
   }, [
     accountForm,
     filter,

@@ -20,7 +20,7 @@ function protocolHint(protocol: string) {
 
 type AccountSettingsPageProps = {
   accounts: Account[];
-  accountForm: Account;
+  accountForm: Account | null;
   accountCount: number;
   newAccountForm: AccountCreateInput;
   onAccountFormChange: (account: Account) => void;
@@ -120,6 +120,7 @@ export default function AccountSettingsPage({
   }
 
   function switchAccountProtocol(nextProtocol: IncomingProtocol) {
+    if (!accountForm) return;
     const preset = providerPresetFor(accountForm.provider);
     onAccountFormChange({
       ...accountForm,
@@ -165,7 +166,7 @@ export default function AccountSettingsPage({
 
         <div className="settings-account-list" role="listbox" aria-label="邮箱账号">
           {accounts.map((account) => {
-            const active = account.id === accountForm.id;
+            const active = account.id === accountForm?.id;
             return (
               <div
                 className={['settings-account-row', active ? 'active' : ''].filter(Boolean).join(' ')}
@@ -203,7 +204,6 @@ export default function AccountSettingsPage({
                   <button
                     type="button"
                     className="danger"
-                    disabled={accountCount <= 1}
                     onClick={() => openAccountDialog(account, 'delete')}
                   >
                     删除
@@ -382,7 +382,7 @@ export default function AccountSettingsPage({
         </div>
       )}
 
-      {accountDialogMode && (
+      {accountDialogMode && accountForm && (
         <div
           className="settings-account-add-overlay"
           role="presentation"

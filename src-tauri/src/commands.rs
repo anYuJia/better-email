@@ -69,8 +69,8 @@ pub fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
 }
 
 #[tauri::command]
-pub fn get_account(store: State<'_, MailStore>, account_id: Option<i64>) -> MailResult<Account> {
-    store.get_account_by_id(account_id)
+pub fn get_account(store: State<'_, MailStore>, account_id: Option<i64>) -> MailResult<Option<Account>> {
+    store.get_account_by_id_optional(account_id)
 }
 
 #[tauri::command]
@@ -87,7 +87,7 @@ pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> Mail
 }
 
 #[tauri::command]
-pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Account> {
+pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
     store.delete_account(account_id)
 }
 

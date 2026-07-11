@@ -684,7 +684,7 @@ export default function ReaderPane({
           <section className="quick-reply" aria-label="快速回复">
             <header>
               <div>
-                <strong>快速回复</strong>
+                <strong>回复</strong>
                 <span>发给 {selected.sender_name || selected.sender_email}</span>
               </div>
               <Reply size={16} />
@@ -692,12 +692,12 @@ export default function ReaderPane({
             <textarea
               value={quickReplyBody}
               onChange={(event) => onQuickReplyChange(event.target.value)}
-              placeholder="直接回复这封邮件"
+              placeholder="输入回复"
             />
             <footer>
-              <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : 'Enter 换行，发送时保留上下文'}</span>
+              <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : ''}</span>
               <div>
-                <button type="button" onClick={() => onComposeFromMessage(selected, 'reply')}>完整写信</button>
+                <button type="button" onClick={() => onComposeFromMessage(selected, 'reply')}>写信窗口</button>
                 <button type="button" onClick={() => onQuickReplyChange('')} disabled={!quickReplyBody.trim()}>
                   清空
                 </button>

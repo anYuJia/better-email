@@ -3541,3 +3541,186 @@ body {
   height: 2px;
   background: #6fa4df;
 }
+
+/* Reader quick reply: quiet inline composer, not a floating card. */
+.quick-reply {
+  max-width: none;
+  margin-top: 20px;
+  padding: 12px 0 0;
+  display: grid;
+  gap: 8px;
+  overflow: visible;
+  border: 0;
+  border-top: 1px solid #e3e6ea;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.quick-reply > header {
+  min-height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.quick-reply > header > div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.quick-reply > header strong {
+  color: #222933;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.quick-reply > header span {
+  overflow: hidden;
+  color: #8a929d;
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-reply > header svg {
+  color: #9aa2ad;
+}
+
+.quick-reply textarea {
+  min-height: 86px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #dfe3e8;
+  border-radius: 7px;
+  color: #1f2328;
+  background: #fff;
+  box-shadow: none;
+  font-size: 13.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.quick-reply textarea::placeholder {
+  color: #a0a7b0;
+}
+
+.quick-reply textarea:focus {
+  border-color: #b8c4d1;
+  box-shadow: 0 0 0 1px rgba(31, 35, 40, 0.04);
+}
+
+.quick-reply > footer {
+  min-height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.quick-reply > footer > span {
+  min-width: 36px;
+  color: #98a0aa;
+  font-size: 11.5px;
+}
+
+.quick-reply > footer > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-reply > footer button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #65707c;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.quick-reply > footer button:hover:not(:disabled) {
+  color: #2f3a45;
+  border-color: #dfe3e8;
+  background: #f6f7f9;
+}
+
+.quick-reply > footer button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.quick-reply > footer .quick-reply-send {
+  color: #fff;
+  border-color: #4f8fd0;
+  background: #4f8fd0;
+  font-weight: 620;
+}
+
+.quick-reply > footer .quick-reply-send:hover:not(:disabled) {
+  border-color: #3f7fbd;
+  background: #3f7fbd;
+}
+
+.label-tools .label-menu {
+  position: relative;
+}
+
+.label-tools .label-menu summary {
+  min-height: 27px;
+  padding: 0 8px;
+  border-color: #dde2e7;
+  border-radius: 7px;
+  color: #65707c;
+  background: #fff;
+  font-size: 12px;
+}
+
+.label-tools .label-menu[open] summary,
+.label-tools .label-menu summary:hover {
+  color: #2f6f9f;
+  border-color: #cbd8e5;
+  background: #f4f7fa;
+}
+
+.label-tools .label-menu > div {
+  left: 0;
+  right: auto;
+  top: calc(100% + 4px);
+  width: 168px;
+  min-width: 168px;
+  max-height: min(220px, calc(100vh - 180px));
+  padding: 4px;
+  gap: 2px;
+  border-color: rgba(31, 35, 40, 0.13);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(31, 35, 40, 0.12), 0 1px 4px rgba(31, 35, 40, 0.08);
+}
+
+.label-tools .label-menu > div button {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: #3d4651;
+  font-size: 12.5px;
+}
+
+.label-tools .label-menu > div button:hover,
+.label-tools .label-menu > div button.active {
+  color: #1f2a36;
+  background: #f1f4f7;
+}

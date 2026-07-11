@@ -558,6 +558,57 @@ export default function App() {
     };
   }
 
+  async function focusMailboxRole(role: FolderRole, targetAccountId: number | null, statusMessage: string) {
+    const startedAt = performance.now();
+    const nextScope = targetAccountId ?? accountScope;
+    appFlowLog('focus mailbox role start', {
+      role,
+      accountId: targetAccountId,
+      scope: nextScope,
+    });
+    if (targetAccountId) {
+      setAccountScope(targetAccountId);
+    }
+    setSearchScope('folder');
+    setQuery('');
+    setFilter('all');
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+    const meta = await loadMeta(null, nextScope);
+    const targetFolder =
+      meta.folders.find((folder) => folder.role === role && (!targetAccountId || folder.account_id === targetAccountId)) ??
+      meta.folders.find((folder) => folder.role === role);
+    if (!targetFolder) {
+      appFlowWarn('focus mailbox role missing folder', {
+        role,
+        accountId: targetAccountId,
+        folderCount: meta.folders.length,
+      });
+      await loadMessagesWithVisibleFallback(meta.folderId, '', 'all', nextScope, mailboxRefreshRef.current, meta.folders, messagePageSize, 'folder');
+      setStatus(statusMessage);
+      return;
+    }
+    setFolderId(targetFolder.id);
+    await loadMessagesWithVisibleFallback(
+      targetFolder.id,
+      '',
+      'all',
+      nextScope,
+      mailboxRefreshRef.current,
+      meta.folders,
+      messagePageSize,
+      'folder',
+    );
+    appFlowLog('focus mailbox role done', {
+      role,
+      accountId: targetAccountId,
+      folderId: targetFolder.id,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
+    setStatus(statusMessage);
+  }
+
   function threadingForDraft(input: DraftInput) {
     const inReplyTo = input.in_reply_to?.trim() ?? '';
     const references = input.references?.trim() ?? '';
@@ -959,11 +1010,23 @@ export default function App() {
   }, [isSettingsOpen, activeSettingsSection]);
 
   async function refreshAll() {
+    const startedAt = performance.now();
+    appFlowLog('refreshAll start', {
+      folderId,
+      scope: accountScope,
+      searchScope,
+      query: query.trim() || null,
+      filter,
+    });
     const meta = await loadMeta(folderId);
     await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, messagePageSize);
     if (activeThread) {
       await openThread(activeThread, false);
     }
+    appFlowLog('refreshAll done', {
+      resolvedFolderId: meta.folderId,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     setStatus('已刷新本地邮箱数据');
   }
 
@@ -1547,23 +1610,35 @@ export default function App() {
       return;
     }
     const subject = draft.subject.trim() || '(无主题)';
+    const input = { ...draftInputForCurrentAccount(draft), draft_id: 0 };
+    appFlowLog('sendDraft start', {
+      accountId: input.account_id,
+      toCount: input.to.split(/[;,，；]/).filter((item) => item.trim()).length,
+      subjectLength: subject.length,
+      attachments: input.attachments.length,
+      undoDelaySeconds: sendUndoDelaySeconds,
+    });
     if (sendUndoDelaySeconds === 0) {
-      await invoke('send_message', {
-        input: { ...draftInputForCurrentAccount(draft), draft_id: 0 },
+      const messageId = await invoke<number>('send_message', {
+        input,
         threading: threadingForDraft(draft),
       });
       setDraft(emptyDraft);
       clearComposerAutosave();
       closeComposer();
-      await refreshAll();
-      setStatus('邮件已进入已发送，本地发送流转验证通过');
+      await focusMailboxRole('sent', input.account_id || account?.id || null, '邮件已进入已发送');
+      appFlowLog('sendDraft done', {
+        messageId,
+        accountId: input.account_id,
+        targetRole: 'sent',
+      });
       return;
     }
 
     const expiresAt = new Date(Date.now() + sendUndoDelaySeconds * 1000).toISOString();
     const item = await invoke<OutboxItem>('queue_outbox_message', {
       input: {
-        ...draftInputForCurrentAccount(draft),
+        ...input,
         draft_id: 0,
         send_at: expiresAt,
       },
@@ -1579,8 +1654,13 @@ export default function App() {
     setDraft(emptyDraft);
     clearComposerAutosave();
     closeComposer();
-    await refreshAll();
-    setStatus(`邮件将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回`);
+    await focusMailboxRole('outbox', item.message_id ? input.account_id || account?.id || null : null, `邮件将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回`);
+    appFlowLog('sendDraft queued', {
+      outboxId: item.id,
+      messageId: item.message_id,
+      accountId: input.account_id,
+      targetRole: 'outbox',
+    });
   }
 
   async function sendQuickReply(message: Message) {
@@ -1589,7 +1669,7 @@ export default function App() {
       setStatus('请先填写快速回复正文');
       return;
     }
-    await invoke('send_message', {
+    const messageId = await invoke<number>('send_message', {
       input: {
         draft_id: 0,
         account_id: message.account_id,
@@ -1606,8 +1686,12 @@ export default function App() {
       threading: replyThreadingHeaders(message),
     });
     setQuickReplyBody('');
-    await refreshAll();
-    setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
+    await focusMailboxRole('sent', message.account_id, `已快速回复：${message.sender_name || message.sender_email}`);
+    appFlowLog('sendQuickReply done', {
+      messageId,
+      accountId: message.account_id,
+      targetRole: 'sent',
+    });
   }
 
   async function queueDraft() {
@@ -1621,15 +1705,20 @@ export default function App() {
       draft_id: 0,
       send_at: sendAt ? new Date(sendAt).toISOString() : '',
     };
-    await invoke<OutboxItem>('queue_outbox_message', {
+    const item = await invoke<OutboxItem>('queue_outbox_message', {
       input,
       threading: threadingForDraft(draft),
     });
     setDraft(emptyDraft);
     clearComposerAutosave();
     closeComposer();
-    await refreshAll();
-    setStatus(sendAt ? `邮件已安排稍后发送：${formatDate(input.send_at)}` : '邮件已加入发件箱队列');
+    await focusMailboxRole('outbox', input.account_id || account?.id || null, sendAt ? `邮件已安排稍后发送：${formatDate(input.send_at)}` : '邮件已加入发件箱队列');
+    appFlowLog('queueDraft done', {
+      outboxId: item.id,
+      messageId: item.message_id,
+      accountId: input.account_id,
+      targetRole: 'outbox',
+    });
   }
 
   async function cancelOutboxItem(item: OutboxItem) {

@@ -242,6 +242,23 @@ export default function useAccountConnectionController({
           exists: credentialResult.exists,
           message: credentialResult.message,
         });
+        if (!credentialResult.exists) {
+          accountFlowWarn('credential store failed: rolling back account', {
+            accountId: created.id,
+            email: maskEmailForLog(created.email),
+            message: credentialResult.message,
+          });
+          try {
+            await invoke<Account | null>('delete_account', { accountId: created.id });
+          } catch (rollbackError) {
+            accountFlowWarn('credential rollback failed', {
+              accountId: created.id,
+              email: maskEmailForLog(created.email),
+              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+            });
+          }
+          throw new Error(credentialResult.message);
+        }
       }
       setAccounts((current) => [...current, created]);
       setAccountScope(created.id);

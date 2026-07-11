@@ -1,6 +1,10 @@
 use crate::models::{Account, CredentialStatus};
 use crate::oauth::{self, OAuthTokenBundle};
 use keyring::Entry;
+#[cfg(target_os = "macos")]
+use security_framework::os::macos::keychain::SecKeychain;
+#[cfg(target_os = "macos")]
+use security_framework::os::macos::passwords::find_generic_password;
 
 const SERVICE: &str = "Better Email";
 const LEGACY_SERVICE: &str = "SwiftMail";
@@ -69,12 +73,51 @@ pub fn store_secret(account_email: &str, secret: &str) -> CredentialStatus {
             exists: true,
             message: "凭据已保存到系统凭据库。".to_string(),
         },
+        Err(error) if should_try_keychain_update(&error.to_string()) => {
+            match update_existing_secret(account_email, secret) {
+                Ok(()) => CredentialStatus {
+                    account_email: account_email.to_string(),
+                    exists: true,
+                    message: "已更新系统凭据库中的现有凭据。".to_string(),
+                },
+                Err(update_error) => CredentialStatus {
+                    account_email: account_email.to_string(),
+                    exists: false,
+                    message: format!(
+                        "系统凭据库保存失败：{error}；覆盖现有凭据失败：{update_error}"
+                    ),
+                },
+            }
+        }
         Err(error) => CredentialStatus {
             account_email: account_email.to_string(),
             exists: false,
             message: format!("系统凭据库保存失败：{error}"),
         },
     }
+}
+
+fn should_try_keychain_update(error: &str) -> bool {
+    let normalized = error.to_lowercase();
+    normalized.contains("already exists") || normalized.contains("specified item already exists")
+}
+
+#[cfg(target_os = "macos")]
+fn update_existing_secret(account_email: &str, secret: &str) -> Result<(), String> {
+    let keychain = SecKeychain::default().map_err(|error| error.to_string())?;
+    let (_, mut item) = find_generic_password(Some(&[keychain]), SERVICE, account_email)
+        .map_err(|error| error.to_string())?;
+    item.set_password(secret.as_bytes())
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn update_existing_secret(account_email: &str, secret: &str) -> Result<(), String> {
+    let entry = Entry::new(SERVICE, account_email).map_err(|error| error.to_string())?;
+    entry
+        .delete_credential()
+        .map_err(|error| error.to_string())?;
+    entry.set_password(secret).map_err(|error| error.to_string())
 }
 
 pub fn check_secret(account_email: &str) -> CredentialStatus {

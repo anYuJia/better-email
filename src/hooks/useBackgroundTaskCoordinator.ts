@@ -220,7 +220,8 @@ export default function useBackgroundTaskCoordinator({
     const items = await invoke<OutboxItem[]>('flush_outbox_dry_run');
     setOutbox(items);
     const current = currentRef.current;
-    await current.loadMeta(current.folderId, current.accountScope);
+    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = '发件箱队列已完成本地发送演练';
     setStatus(message);
     return message;
@@ -230,7 +231,8 @@ export default function useBackgroundTaskCoordinator({
     const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
     setOutbox(items);
     const current = currentRef.current;
-    await current.loadMeta(current.folderId, current.accountScope);
+    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = outboxFlushMessage(items);
     setStatus(message);
     return message;

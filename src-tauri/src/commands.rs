@@ -1141,8 +1141,21 @@ pub fn send_message(
     input: DraftInput,
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<i64> {
+    let started_at = std::time::Instant::now();
+    eprintln!(
+        "[better-email][send] local send start account_id={} to={} subject_len={} attachments={}",
+        input.account_id,
+        mask_recipient_list(&input.to),
+        input.subject.trim().chars().count(),
+        input.attachments.len(),
+    );
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
+    eprintln!(
+        "[better-email][send] local send ok message_id={} duration_ms={}",
+        message_id,
+        started_at.elapsed().as_millis(),
+    );
     Ok(message_id)
 }
 
@@ -1152,8 +1165,23 @@ pub fn queue_outbox_message(
     input: DraftInput,
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<OutboxItem> {
+    let started_at = std::time::Instant::now();
+    eprintln!(
+        "[better-email][send] queue start account_id={} to={} send_at={} attachments={}",
+        input.account_id,
+        mask_recipient_list(&input.to),
+        if input.send_at.trim().is_empty() { "now" } else { "scheduled" },
+        input.attachments.len(),
+    );
     let item = store.queue_outbox_message(input)?;
     store.set_message_threading(item.message_id, threading)?;
+    eprintln!(
+        "[better-email][send] queue ok outbox_id={} message_id={} status={} duration_ms={}",
+        item.id,
+        item.message_id,
+        item.status,
+        started_at.elapsed().as_millis(),
+    );
     Ok(item)
 }
 
@@ -2834,13 +2862,29 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
 
 #[tauri::command]
 pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    let started_at = std::time::Instant::now();
+    eprintln!("[better-email][send] flush smtp start");
     retry_pending_remote_archives(store.inner())?;
 
     for message in store.pending_outbox_messages()? {
         let account = store.get_account_by_id(Some(message.account_id))?;
+        eprintln!(
+            "[better-email][send] smtp item start message_id={} account_id={} email={} to={} attachments={}",
+            message.id,
+            message.account_id,
+            mask_email(&account.email),
+            mask_recipient_list(&message.recipients),
+            message.attachments.len(),
+        );
         let secret = match credentials::get_account_secret(&account) {
             Ok(secret) => secret,
             Err(error) => {
+                eprintln!(
+                    "[better-email][send] smtp item credential failed message_id={} account_id={} error={}",
+                    message.id,
+                    message.account_id,
+                    error,
+                );
                 store.mark_outbox_failed(message.id, &error)?;
                 continue;
             }
@@ -2850,10 +2894,29 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
                 let message_id_header = smtp::outbound_message_id(&message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
                 archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
+                eprintln!(
+                    "[better-email][send] smtp item ok message_id={} account_id={}",
+                    message.id,
+                    message.account_id,
+                );
             }
-            Err(error) => store.mark_outbox_failed(message.id, &error.to_string())?,
+            Err(error) => {
+                eprintln!(
+                    "[better-email][send] smtp item failed message_id={} account_id={} error={}",
+                    message.id,
+                    message.account_id,
+                    error,
+                );
+                store.mark_outbox_failed(message.id, &error.to_string())?;
+            }
         }
     }
 
-    store.list_outbox()
+    let outbox = store.list_outbox()?;
+    eprintln!(
+        "[better-email][send] flush smtp done outbox_items={} duration_ms={}",
+        outbox.len(),
+        started_at.elapsed().as_millis(),
+    );
+    Ok(outbox)
 }

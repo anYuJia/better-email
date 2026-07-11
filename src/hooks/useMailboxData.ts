@@ -72,18 +72,20 @@ export function buildMailboxRequests(
   sort: ListSort,
   limit: number,
 ): MailboxRequests {
-  const accountId = searchScope === 'all'
+  const trimmedQuery = query.trim();
+  const effectiveSearchScope = trimmedQuery ? searchScope : 'folder';
+  const accountId = effectiveSearchScope === 'all'
     ? null
-    : searchScope === 'account'
+    : effectiveSearchScope === 'account'
       ? currentAccountId
       : scope === 'all'
         ? null
         : scope;
-  const scopedFolderId = searchScope === 'folder' ? folderId : null;
+  const scopedFolderId = effectiveSearchScope === 'folder' ? folderId : null;
   const common = {
     accountId,
     folderId: scopedFolderId,
-    query: query.trim() || null,
+    query: trimmedQuery || null,
     filter,
     sort,
   };

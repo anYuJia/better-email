@@ -65,6 +65,27 @@ describe('buildMailboxRequests', () => {
     });
   });
 
+  it('keeps empty current-account search scoped to the selected folder', () => {
+    expect(buildMailboxRequests(7, 7, 4, 'account', '   ', 'all', 'newest', 40)).toEqual({
+      messages: {
+        accountId: 7,
+        folderId: 4,
+        query: null,
+        filter: 'all',
+        sort: 'newest',
+        limit: 41,
+      },
+      threads: {
+        accountId: 7,
+        folderId: 4,
+        query: null,
+        filter: 'all',
+        sort: 'newest',
+        limit: 80,
+      },
+    });
+  });
+
   it('removes both account and folder constraints for global search', () => {
     expect(buildMailboxRequests(7, 7, 42, 'all', 'roadmap', 'starred', 'subject', 40)).toEqual({
       messages: {
@@ -79,6 +100,27 @@ describe('buildMailboxRequests', () => {
         accountId: null,
         folderId: null,
         query: 'roadmap',
+        filter: 'starred',
+        sort: 'subject',
+        limit: 80,
+      },
+    });
+  });
+
+  it('keeps empty global search scoped to the selected folder', () => {
+    expect(buildMailboxRequests(7, 7, 42, 'all', '', 'starred', 'subject', 40)).toEqual({
+      messages: {
+        accountId: 7,
+        folderId: 42,
+        query: null,
+        filter: 'starred',
+        sort: 'subject',
+        limit: 41,
+      },
+      threads: {
+        accountId: 7,
+        folderId: 42,
+        query: null,
         filter: 'starred',
         sort: 'subject',
         limit: 80,

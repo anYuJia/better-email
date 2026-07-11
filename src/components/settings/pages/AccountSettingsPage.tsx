@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Mail, Plus, X } from 'lucide-react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
-import { incomingHostForProtocol, providerPresets } from '../../../providerCatalog';
+import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import AccountRemovalPanel from '../AccountRemovalPanel';
 import ProviderPresetGrid from '../ProviderPresetGrid';
@@ -44,6 +44,7 @@ export default function AccountSettingsPage({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newAccountSecret, setNewAccountSecret] = useState('');
   const [newAccountSecretVisible, setNewAccountSecretVisible] = useState(false);
+  const [newAccountManualConfigOpen, setNewAccountManualConfigOpen] = useState(false);
   const [accountDialogMode, setAccountDialogMode] = useState<AccountDialogMode | null>(null);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function AccountSettingsPage({
     if (!addDialogOpen) {
       setNewAccountSecret('');
       setNewAccountSecretVisible(false);
+      setNewAccountManualConfigOpen(false);
     }
   }, [addDialogOpen]);
 
@@ -87,6 +89,22 @@ export default function AccountSettingsPage({
   function providerPresetFor(provider: string) {
     const normalized = provider.trim().toLowerCase();
     return providerPresets.find((preset) => preset.provider === normalized || preset.id === normalized) ?? null;
+  }
+
+  function updateNewAccountEmail(email: string) {
+    const preset = providerPresetForEmail(email);
+    if (!preset) {
+      onNewAccountFormChange({ ...newAccountForm, email });
+      return;
+    }
+    onNewAccountFormChange({
+      ...newAccountForm,
+      email,
+      provider: preset.provider,
+      imap_host: incomingHostForProtocol(preset, newAccountForm.incoming_protocol),
+      smtp_host: preset.smtp_host,
+      auth_type: 'password',
+    });
   }
 
   function switchNewAccountProtocol(nextProtocol: IncomingProtocol) {
@@ -116,9 +134,13 @@ export default function AccountSettingsPage({
   const newAccountSecretLabel = newAccountForm.auth_type === 'oauth2' ? 'OAuth2 Token' : '密码 / 授权码';
   const newAccountSecretPlaceholder = newAccountForm.provider === 'netease'
     ? '网易客户端授权码'
+    : newAccountForm.provider === 'qq'
+      ? 'QQ 邮箱授权码'
     : newAccountForm.auth_type === 'oauth2'
       ? '访问或刷新 Token'
       : '应用专用密码或授权码';
+  const matchedNewAccountPreset = providerPresetForEmail(newAccountForm.email);
+  const newAccountServerReady = Boolean(newAccountForm.imap_host.trim() && newAccountForm.smtp_host.trim());
 
   function dialogTitle(mode: AccountDialogMode) {
     if (mode === 'details') return '账号详情';
@@ -210,7 +232,7 @@ export default function AccountSettingsPage({
             <header>
               <span>
                 <strong id="settings-add-account-title">添加邮箱</strong>
-                <small>账号、授权码、收信和发信服务器</small>
+                <small>输入邮箱和授权码，服务器会自动匹配</small>
               </span>
               <button type="button" aria-label="关闭" onClick={() => setAddDialogOpen(false)}>
                 <X size={17} />
@@ -223,19 +245,8 @@ export default function AccountSettingsPage({
                 <input
                   autoFocus
                   value={newAccountForm.email}
-                  onChange={(event) => onNewAccountFormChange({ ...newAccountForm, email: event.target.value })}
+                  onChange={(event) => updateNewAccountEmail(event.target.value)}
                   placeholder="name@example.com"
-                />
-              </label>
-              <label>
-                显示名称
-                <input
-                  value={newAccountForm.display_name}
-                  onChange={(event) => onNewAccountFormChange({
-                    ...newAccountForm,
-                    display_name: event.target.value,
-                  })}
-                  placeholder="可选"
                 />
               </label>
               <label>
@@ -259,65 +270,97 @@ export default function AccountSettingsPage({
                   </button>
                 </span>
               </label>
-              <label>
-                认证方式
-                <select
-                  value={newAccountForm.auth_type}
-                  onChange={(event) => onNewAccountFormChange({
-                    ...newAccountForm,
-                    auth_type: event.target.value,
-                  })}
-                >
-                  <option value="password">密码 / 授权码</option>
-                  <option value="oauth2">OAuth2 Token</option>
-                </select>
-              </label>
             </div>
 
-            <div className="settings-account-protocol-grid" aria-label="邮件协议">
-              <label>
-                收信协议
-                <select
-                  value={newAccountForm.incoming_protocol}
-                  onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
-                >
-                  <option value="imap">IMAP</option>
-                  <option value="pop3">POP3</option>
-                </select>
-              </label>
+            <div className="settings-account-auto-match" data-ready={newAccountServerReady}>
               <span>
-                {protocolHint(newAccountForm.incoming_protocol)}
+                <strong>{matchedNewAccountPreset?.label ?? '自定义邮箱'}</strong>
+                <small>
+                  {newAccountServerReady
+                    ? `${protocolLabel(newAccountForm.incoming_protocol)} ${newAccountForm.imap_host} · SMTP ${newAccountForm.smtp_host}`
+                    : '未识别服务商，请打开手动配置填写服务器'}
+                </small>
               </span>
+              <button type="button" onClick={() => setNewAccountManualConfigOpen((open) => !open)}>
+                {newAccountManualConfigOpen ? '收起配置' : '手动配置'}
+              </button>
             </div>
 
-            <ProviderPresetGrid
-              compact
-              activeProvider={newAccountForm.provider}
-              onSelect={onApplyNewAccountPreset}
-            />
+            {newAccountManualConfigOpen && (
+              <>
+                <div className="settings-account-form-grid">
+                  <label>
+                    显示名称
+                    <input
+                      value={newAccountForm.display_name}
+                      onChange={(event) => onNewAccountFormChange({
+                        ...newAccountForm,
+                        display_name: event.target.value,
+                      })}
+                      placeholder="可选"
+                    />
+                  </label>
+                  <label>
+                    认证方式
+                    <select
+                      value={newAccountForm.auth_type}
+                      onChange={(event) => onNewAccountFormChange({
+                        ...newAccountForm,
+                        auth_type: event.target.value,
+                      })}
+                    >
+                      <option value="password">密码 / 授权码</option>
+                      <option value="oauth2">OAuth2 Token</option>
+                    </select>
+                  </label>
+                </div>
 
-            <div className="settings-account-form-grid">
-              <label>
-                收信服务器（{protocolLabel(newAccountForm.incoming_protocol)}）
-                <input
-                  value={newAccountForm.imap_host}
-                  onChange={(event) => onNewAccountFormChange({
-                    ...newAccountForm,
-                    imap_host: event.target.value,
-                  })}
+                <div className="settings-account-protocol-grid" aria-label="邮件协议">
+                  <label>
+                    收信协议
+                    <select
+                      value={newAccountForm.incoming_protocol}
+                      onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
+                    >
+                      <option value="imap">IMAP</option>
+                      <option value="pop3">POP3</option>
+                    </select>
+                  </label>
+                  <span>
+                    {protocolHint(newAccountForm.incoming_protocol)}
+                  </span>
+                </div>
+
+                <ProviderPresetGrid
+                  compact
+                  activeProvider={newAccountForm.provider}
+                  onSelect={onApplyNewAccountPreset}
                 />
-              </label>
-              <label>
-                发信服务器（SMTP）
-                <input
-                  value={newAccountForm.smtp_host}
-                  onChange={(event) => onNewAccountFormChange({
-                    ...newAccountForm,
-                    smtp_host: event.target.value,
-                  })}
-                />
-              </label>
-            </div>
+
+                <div className="settings-account-form-grid">
+                  <label>
+                    收信服务器（{protocolLabel(newAccountForm.incoming_protocol)}）
+                    <input
+                      value={newAccountForm.imap_host}
+                      onChange={(event) => onNewAccountFormChange({
+                        ...newAccountForm,
+                        imap_host: event.target.value,
+                      })}
+                    />
+                  </label>
+                  <label>
+                    发信服务器（SMTP）
+                    <input
+                      value={newAccountForm.smtp_host}
+                      onChange={(event) => onNewAccountFormChange({
+                        ...newAccountForm,
+                        smtp_host: event.target.value,
+                      })}
+                    />
+                  </label>
+                </div>
+              </>
+            )}
 
             <footer>
               <button type="button" className="settings-account-add-cancel" onClick={() => setAddDialogOpen(false)}>

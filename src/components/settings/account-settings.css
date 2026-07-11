@@ -446,6 +446,62 @@
   opacity: 0.38;
 }
 
+.settings-account-auto-match {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e1e6eb;
+  border-radius: 9px;
+  color: var(--ui-text-secondary);
+  background: #fafbfc;
+}
+
+.settings-account-auto-match[data-ready="true"] {
+  border-color: #d7e2ec;
+  background: #f8fafc;
+}
+
+.settings-account-auto-match span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-account-auto-match strong {
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.settings-account-auto-match small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-account-auto-match button {
+  min-height: 28px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border: 1px solid #d6dce3;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.settings-account-auto-match button:hover {
+  border-color: #c7d0da;
+  background: #f4f6f8;
+}
+
 .settings-account-protocol-grid {
   display: grid;
   grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);

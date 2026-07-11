@@ -3403,3 +3403,58 @@ body {
   font-size: 11.5px;
   line-height: 1.2;
 }
+
+/* Sidebar folder icons: quiet color cues for system mailboxes. */
+.sidebar .folder[data-folder-role="inbox"] .folder-name svg {
+  color: #4f7ea8;
+}
+
+.sidebar .folder[data-folder-role="sent"] .folder-name svg {
+  color: #3f7f9f;
+}
+
+.sidebar .folder[data-folder-role="drafts"] .folder-name svg {
+  color: #8a785d;
+}
+
+.sidebar .folder[data-folder-role="archive"] .folder-name svg {
+  color: #6d7580;
+}
+
+.sidebar .folder[data-folder-role="trash"] .folder-name svg {
+  color: #8b6f68;
+}
+
+.sidebar .folder[data-folder-role="spam"] .folder-name svg {
+  color: #8a6655;
+}
+
+.sidebar .folder.active[data-folder-role="inbox"] .folder-name svg,
+.sidebar .folder[data-folder-role="inbox"]:hover .folder-name svg {
+  color: #2f6f9f;
+}
+
+.sidebar .folder.active[data-folder-role="sent"] .folder-name svg,
+.sidebar .folder[data-folder-role="sent"]:hover .folder-name svg {
+  color: #1f7496;
+}
+
+.sidebar .folder.active[data-folder-role="drafts"] .folder-name svg,
+.sidebar .folder[data-folder-role="drafts"]:hover .folder-name svg {
+  color: #75603e;
+}
+
+.sidebar .folder.active[data-folder-role="archive"] .folder-name svg,
+.sidebar .folder[data-folder-role="archive"]:hover .folder-name svg {
+  color: #56616d;
+}
+
+.sidebar .folder.active[data-folder-role="trash"] .folder-name svg,
+.sidebar .folder[data-folder-role="trash"]:hover .folder-name svg {
+  color: #805f57;
+}
+
+.sidebar .folder.active[data-folder-role="spam"] .folder-name svg,
+.sidebar .folder[data-folder-role="spam"]:hover .folder-name svg {
+  color: #7a5545;
+}

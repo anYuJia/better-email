@@ -96,22 +96,23 @@ function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
   );
 }
 
-function attachmentIcon(filename: string, mimeType: string) {
+function attachmentIconMeta(filename: string, mimeType: string) {
   const lowerName = filename.toLowerCase();
   const lowerMime = mimeType.toLowerCase();
+  const extension = lowerName.split('.').pop()?.replace(/[^a-z0-9]/g, '').slice(0, 4) || 'file';
   if (lowerMime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|heic)$/i.test(lowerName)) {
-    return <FileImage size={25} />;
+    return { icon: <FileImage size={25} />, label: extension, tone: 'image' };
   }
   if (/\.(xlsx?|csv|numbers)$/i.test(lowerName)) {
-    return <FileSpreadsheet size={25} />;
+    return { icon: <FileSpreadsheet size={25} />, label: extension, tone: 'sheet' };
   }
   if (/\.(zip|rar|7z|tar|gz)$/i.test(lowerName)) {
-    return <FileArchive size={25} />;
+    return { icon: <FileArchive size={25} />, label: extension, tone: 'archive' };
   }
   if (lowerMime.startsWith('text/') || /\.(pdf|txt|md|docx?|pages)$/i.test(lowerName)) {
-    return <FileText size={25} />;
+    return { icon: <FileText size={25} />, label: extension, tone: lowerName.endsWith('.pdf') ? 'pdf' : 'text' };
   }
-  return <File size={25} />;
+  return { icon: <File size={25} />, label: extension, tone: 'file' };
 }
 
 export default function ComposerPrimaryFields({
@@ -209,20 +210,27 @@ export default function ComposerPrimaryFields({
         />
         {draft.attachments.length > 0 && (
           <section className="composer-body-attachments" aria-label="附件">
-            {draft.attachments.map((attachment, index) => (
-              <article className="composer-attachment-tile" key={`${attachment.filename}-${index}`}>
-                <span className="composer-attachment-tile-icon" aria-hidden="true">
-                  {attachmentIcon(attachment.filename, attachment.mime_type)}
-                </span>
-                <span className="composer-attachment-tile-copy">
-                  <strong>{attachment.filename}</strong>
-                  <small>{formatBytes(attachment.size_bytes)}</small>
-                </span>
-                <button type="button" aria-label={`移除 ${attachment.filename}`} onClick={() => onRemoveAttachment(index)}>
-                  <X size={14} />
-                </button>
-              </article>
-            ))}
+            {draft.attachments.map((attachment, index) => {
+              const iconMeta = attachmentIconMeta(attachment.filename, attachment.mime_type);
+              return (
+                <article className={`composer-attachment-tile attachment-${iconMeta.tone}`} key={`${attachment.filename}-${index}`}>
+                  <span className="composer-attachment-filemark" aria-hidden="true">
+                    <span className="composer-attachment-filemark-fold" />
+                    <span className="composer-attachment-filemark-icon">
+                      {iconMeta.icon}
+                    </span>
+                    <span className="composer-attachment-filemark-label">{iconMeta.label}</span>
+                  </span>
+                  <span className="composer-attachment-tile-copy">
+                    <strong title={attachment.filename}>{attachment.filename}</strong>
+                    <small>{formatBytes(attachment.size_bytes)}</small>
+                  </span>
+                  <button type="button" aria-label={`移除 ${attachment.filename}`} onClick={() => onRemoveAttachment(index)}>
+                    <X size={14} />
+                  </button>
+                </article>
+              );
+            })}
           </section>
         )}
         {draft.attachments.length === 0 && dropActive && (

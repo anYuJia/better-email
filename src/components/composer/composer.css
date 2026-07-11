@@ -1001,42 +1001,136 @@
   flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 0 18px 16px;
+  gap: 9px;
+  padding: 0 18px 14px;
   background: #fff;
 }
 
 .composer-attachment-tile {
-  width: 154px;
-  min-height: 92px;
+  width: 228px;
+  min-height: 70px;
   position: relative;
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr);
-  align-content: start;
-  gap: 8px;
-  padding: 12px 32px 10px 12px;
-  border: 1px solid #dfe5eb;
-  border-radius: 10px;
+  grid-template-columns: 52px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px 9px 10px;
+  border: 1px solid #dde4eb;
+  border-radius: 11px;
   color: #24303d;
-  background: #fbfcfd;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   box-shadow: none;
 }
 
 .composer-attachment-tile:hover {
-  border-color: #cbd6e1;
-  background: #f7fafc;
+  border-color: #c8d4df;
+  background: #ffffff;
 }
 
-.composer-attachment-tile-icon {
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d4e0eb;
-  border-radius: 9px;
-  color: #3d719f;
-  background: #f1f6fb;
+.composer-attachment-filemark {
+  width: 48px;
+  height: 52px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #cfd9e3;
+  border-radius: 10px;
+  color: #466f9a;
+  background:
+    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
+    linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
+}
+
+.composer-attachment-filemark::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 15px;
+  background: #e9f2fb;
+}
+
+.composer-attachment-filemark-fold {
+  width: 13px;
+  height: 13px;
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  border-left: 1px solid #cfd9e3;
+  border-bottom: 1px solid #cfd9e3;
+  background: #ffffff;
+}
+
+.composer-attachment-filemark-icon {
+  position: relative;
+  z-index: 1;
+  margin-top: -5px;
+}
+
+.composer-attachment-filemark-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  z-index: 1;
+  overflow: hidden;
+  padding: 0 4px;
+  color: #426b95;
+  font-size: 8.5px;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.composer-attachment-tile.attachment-image .composer-attachment-filemark {
+  color: #2f7f76;
+  border-color: #c9dedb;
+  background:
+    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
+    linear-gradient(180deg, #f5fbfa 0%, #e9f5f2 100%);
+}
+
+.composer-attachment-tile.attachment-image .composer-attachment-filemark::after {
+  background: #dff0ed;
+}
+
+.composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
+  color: #317547;
+  border-color: #c8ddce;
+  background:
+    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
+    linear-gradient(180deg, #f5fbf6 0%, #e8f4eb 100%);
+}
+
+.composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
+  background: #dceee2;
+}
+
+.composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
+  color: #9a4a4a;
+  border-color: #e2caca;
+  background:
+    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
+    linear-gradient(180deg, #fff8f8 0%, #f7ecec 100%);
+}
+
+.composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
+  background: #f2dddd;
+}
+
+.composer-attachment-tile.attachment-archive .composer-attachment-filemark {
+  color: #8a6a34;
+  border-color: #e0d5be;
+  background:
+    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
+    linear-gradient(180deg, #fffaf1 0%, #f5edda 100%);
+}
+
+.composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
+  background: #eee3c9;
 }
 
 .composer-attachment-tile-copy {
@@ -1047,8 +1141,8 @@
 
 .composer-attachment-tile-copy strong {
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 560;
+  font-size: 12.5px;
+  font-weight: 610;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1060,11 +1154,8 @@
 }
 
 .composer-attachment-tile button {
-  width: 24px;
-  min-height: 24px;
-  position: absolute;
-  right: 7px;
-  top: 7px;
+  width: 22px;
+  min-height: 22px;
   padding: 0;
   border: 0;
   border-radius: 7px;

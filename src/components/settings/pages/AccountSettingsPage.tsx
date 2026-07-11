@@ -78,11 +78,21 @@ export default function AccountSettingsPage({
     }
   }, [addDialogOpen]);
 
+  const requiresNewAccountSecret = newAccountForm.auth_type !== 'oauth2';
   const canCreateAccount = newAccountForm.email.trim().length > 0
-    && (newAccountForm.auth_type === 'oauth2' || newAccountSecret.trim().length > 0);
+    && (!requiresNewAccountSecret || newAccountSecret.trim().length > 0);
 
   async function handleCreateNewAccount() {
-    if (!canCreateAccount || addAccountSubmitting) return;
+    if (addAccountSubmitting) return;
+    if (!newAccountForm.email.trim()) {
+      setAddAccountError('请输入邮箱地址。');
+      return;
+    }
+    if (requiresNewAccountSecret && !newAccountSecret.trim()) {
+      setAddAccountError('请输入邮箱授权码或应用专用密码。');
+      return;
+    }
+    if (!canCreateAccount) return;
     if (!newAccountServerReady) {
       setNewAccountManualConfigOpen(true);
       setAddAccountError('未识别服务商，请填写收信服务器和发信服务器。');
@@ -297,7 +307,7 @@ export default function AccountSettingsPage({
                       setNewAccountSecret(event.target.value);
                     }}
                     placeholder={newAccountSecretPlaceholder}
-                    required={newAccountForm.auth_type !== 'oauth2'}
+                    required={requiresNewAccountSecret}
                     aria-invalid={Boolean(addAccountError)}
                   />
                   <button

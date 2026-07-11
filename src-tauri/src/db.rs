@@ -4529,10 +4529,21 @@ fn build_message_query(
         JOIN folders f ON f.id = m.folder_id
         ",
     );
-    sql.push_str("WHERE ");
-    sql.push_str(scope_condition);
-    sql.push(' ');
-    sql.push_str(&build_message_filter_clause(search, filter));
+    let filter_clause = build_message_filter_clause(search, filter);
+    let mut conditions = Vec::new();
+    let trimmed_scope = scope_condition.trim();
+    if !trimmed_scope.is_empty() {
+        conditions.push(trimmed_scope.to_string());
+    }
+    let trimmed_filter = filter_clause.trim().trim_start_matches("AND").trim();
+    if !trimmed_filter.is_empty() {
+        conditions.push(trimmed_filter.to_string());
+    }
+    if !conditions.is_empty() {
+        sql.push_str("WHERE ");
+        sql.push_str(&conditions.join(" AND "));
+        sql.push(' ');
+    }
     sql.push_str("ORDER BY ");
     sql.push_str(message_order_clause(sort));
     sql.push_str(" LIMIT ?");
@@ -6587,6 +6598,10 @@ mod tests {
             newest_messages.first().unwrap().id,
             oldest_messages.last().unwrap().id
         );
+        let unscoped_messages = store
+            .list_messages_for_scope_sorted(None, 0, None, None, Some("newest".to_string()), 50)
+            .unwrap();
+        assert!(unscoped_messages.len() >= newest_messages.len());
 
         let newest_threads = store
             .list_threads_for_scope_sorted(

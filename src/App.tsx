@@ -2770,7 +2770,7 @@ export default function App() {
         }}
         onDismissAction={clearUndoAction}
       />
-      <div className="status-line" role="status" aria-live="polite">{status}</div>
+      <div className="status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );
 }

@@ -10,7 +10,6 @@ import {
 import {
   filters,
   listSortOptions,
-  searchShortcuts,
   searchScopeOptions,
 } from '../app/appConfig';
 import type {
@@ -200,19 +199,6 @@ export default function MessageListToolbar({
             </div>
           </details>
         </div>
-        <details className="compact-menu search-options-menu">
-          <summary title="搜索条件" aria-label="搜索条件">
-            <SlidersHorizontal size={16} />
-          </summary>
-          <div>
-            <span className="menu-section-title">快捷搜索</span>
-            {searchShortcuts.map((item) => (
-              <button type="button" key={item.label} onClick={() => onApplySearchShortcut(item.query)}>
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </details>
         <button className="icon-button" title="刷新" onClick={onRefresh}>
           <RefreshCw size={17} />
         </button>

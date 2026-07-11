@@ -3,6 +3,7 @@ import type { OutboxItem } from '../app/types';
 import {
   nextOutboxWakeItem,
   outboxFlushMessage,
+  runDueOutboxSmtp,
 } from './useBackgroundTaskCoordinator';
 
 function outboxItem(
@@ -58,5 +59,21 @@ describe('background task coordinator helpers', () => {
         outboxItem(1, 'failed', ''),
       ]),
     ).toBe('SMTP 发送暂停，1 封需要重新保存账号授权码');
+  });
+
+  it('releases due scheduled mail before flushing real SMTP', async () => {
+    const calls: string[] = [];
+    const sentItems = [outboxItem(4, 'sent', '')];
+    const invokeCommand = async <T>(command: string): Promise<T> => {
+      calls.push(command);
+      if (command === 'release_due_outbox_items') return [] as T;
+      if (command === 'flush_outbox_smtp') return sentItems as T;
+      throw new Error(`unexpected command: ${command}`);
+    };
+
+    const result = await runDueOutboxSmtp(invokeCommand);
+
+    expect(calls).toEqual(['release_due_outbox_items', 'flush_outbox_smtp']);
+    expect(result).toBe(sentItems);
   });
 });

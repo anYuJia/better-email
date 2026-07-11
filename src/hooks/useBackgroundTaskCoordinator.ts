@@ -74,6 +74,21 @@ type CurrentCoordinatorState = Pick<
 
 const scheduledOutboxStatuses = new Set(['scheduled']);
 
+function outboxFlowLog(event: string, details: Record<string, unknown> = {}) {
+  console.info(`[outbox-flow] ${event}`, details);
+}
+
+function outboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
+  console.warn(`[outbox-flow] ${event}`, details);
+}
+
+type OutboxInvoke = <T>(command: string) => Promise<T>;
+
+export async function runDueOutboxSmtp(invokeCommand: OutboxInvoke = invoke): Promise<OutboxItem[]> {
+  await invokeCommand<OutboxItem[]>('release_due_outbox_items');
+  return invokeCommand<OutboxItem[]>('flush_outbox_smtp');
+}
+
 export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
   return (
     items
@@ -103,6 +118,13 @@ export function outboxFlushMessage(items: OutboxItem[]): string {
     return `SMTP 发送完成，${archivePending} 封仅等待远端已发送留档重试`;
   }
   return 'SMTP 发件箱发送完成';
+}
+
+function outboxStatusCounts(items: OutboxItem[]): Record<string, number> {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    counts[item.status] = (counts[item.status] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 export default function useBackgroundTaskCoordinator({
@@ -232,24 +254,43 @@ export default function useBackgroundTaskCoordinator({
   }, [setOutbox, setStatus]);
 
   const flushOutboxSmtp = useCallback(async (): Promise<string> => {
+    outboxFlowLog('manual smtp flush start');
     const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
     setOutbox(items);
     const current = currentRef.current;
     const meta = await current.loadMeta(current.folderId, current.accountScope);
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = outboxFlushMessage(items);
+    outboxFlowLog('manual smtp flush done', {
+      outboxItems: items.length,
+      statuses: outboxStatusCounts(items),
+      message,
+    });
     setStatus(message);
     return message;
   }, [setOutbox, setStatus]);
 
   const sendDueOutboxItems = useCallback(async (): Promise<string> => {
-    await invoke<OutboxItem[]>('release_due_outbox_items');
-    const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
+    outboxFlowLog('scheduled smtp due start');
+    let items: OutboxItem[];
+    try {
+      items = await runDueOutboxSmtp();
+    } catch (error) {
+      outboxFlowWarn('scheduled smtp due failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
     setOutbox(items);
     const current = currentRef.current;
     const meta = await current.loadMeta(current.folderId, current.accountScope);
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = outboxFlushMessage(items);
+    outboxFlowLog('scheduled smtp due done', {
+      outboxItems: items.length,
+      statuses: outboxStatusCounts(items),
+      message,
+    });
     setStatus(message);
     return message;
   }, [setOutbox, setStatus]);
@@ -392,6 +433,11 @@ export default function useBackgroundTaskCoordinator({
       setPendingSendUndo((current) => (
         current?.outboxId === nextScheduledItem.id ? null : current
       ));
+      outboxFlowLog('scheduled smtp timer fired', {
+        outboxId: nextScheduledItem.id,
+        messageId: nextScheduledItem.message_id,
+        dueAt: nextScheduledItem.next_attempt_at,
+      });
       sendDueOutboxItems().catch((error) => setStatus(String(error)));
     }, timerDelay);
 

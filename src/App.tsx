@@ -220,7 +220,7 @@ export default function App() {
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<SearchScope>('folder');
+  const [searchScope, setSearchScope] = useState<SearchScope>('account');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const [savedSearchName, setSavedSearchName] = useState('');
@@ -2081,7 +2081,7 @@ export default function App() {
   async function clearSearchAndFilter() {
     setQuery('');
     setFilter('all');
-    setSearchScope('folder');
+    setSearchScope('account');
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
@@ -2093,7 +2093,7 @@ export default function App() {
       mailboxRefreshRef.current,
       folders,
       messagePageSize,
-      'folder',
+      'account',
     );
     setStatus('已清空搜索和筛选');
   }
@@ -2187,7 +2187,7 @@ export default function App() {
   function changeAccountScope(value: string) {
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
-    setSearchScope('folder');
+    setSearchScope('account');
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);

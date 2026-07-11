@@ -167,6 +167,10 @@ export default function ComposerPrimaryFields({
         <span className="sr-only">正文</span>
         <textarea
           value={editableBody}
+          onDrop={onAttachmentDrop}
+          onDragEnter={onAttachmentDragEnter}
+          onDragLeave={onAttachmentDragLeave}
+          onDragOver={onAttachmentDragOver}
           onPaste={onAttachmentPaste}
           onChange={(event) => {
             const nextBody = joinEditableBody(event.target.value, originalQuote);

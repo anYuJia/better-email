@@ -460,10 +460,10 @@ export default function App() {
     setSettingsOpen(true);
   }
 
-  function openComposer(nextDraft?: DraftInput) {
+  function openComposer(nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) {
     if (nextDraft) {
       setDraft(nextDraft);
-    } else if (isDraftEmpty(draft) && composerAutosave) {
+    } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
       setDraft(composerAutosave.draft);
       setRichComposer(composerAutosave.isRichComposer);
       setStatus(`已恢复自动保存草稿：${formatDate(composerAutosave.saved_at)}`);
@@ -2288,7 +2288,8 @@ export default function App() {
     openShortcuts: () => setShortcutsOpen(true),
     composeNew: () => {
       setDraft(emptyDraft);
-      openComposer();
+      setRichComposer(false);
+      openComposer(emptyDraft);
       setStatus('已打开新邮件');
     },
     setSelectedId,
@@ -2321,7 +2322,12 @@ export default function App() {
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
-        onCompose={() => openComposer()}
+        onCompose={() => {
+          setDraft(emptyDraft);
+          setRichComposer(false);
+          openComposer(emptyDraft);
+          setStatus('已打开新邮件');
+        }}
         onSelectFolder={selectFolder}
         onDropMessagesToFolder={(folder, messageIds) => {
           moveMessagesToFolderByIds(folder, messageIds).catch((error) => setStatus(String(error)));

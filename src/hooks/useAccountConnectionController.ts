@@ -28,6 +28,21 @@ import {
 } from '../providerCatalog';
 import { invoke } from '../tauriBridge';
 
+function maskEmailForLog(value: string) {
+  const email = value.trim();
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return email ? '***' : '';
+  return `${local[0] ?? '*'}***@${domain}`;
+}
+
+function accountFlowLog(event: string, details: Record<string, unknown> = {}) {
+  console.info(`[account-flow] ${event}`, details);
+}
+
+function accountFlowWarn(event: string, details: Record<string, unknown> = {}) {
+  console.warn(`[account-flow] ${event}`, details);
+}
+
 type LoadMetaResult = {
   folderId: number | null;
   folders: Folder[];
@@ -199,29 +214,63 @@ export default function useAccountConnectionController({
   const createNewAccount = useCallback(async (secret?: string) => {
     if (!newAccountForm.email.trim()) {
       setStatus('请先填写新账号邮箱地址');
+      accountFlowWarn('create skipped: missing email');
       return;
     }
-    const created = await invoke<Account>('create_account', { input: newAccountForm });
     const trimmedSecret = secret?.trim() ?? '';
-    if (trimmedSecret) {
-      const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
-        input: { account_email: created.email, secret: trimmedSecret },
+    accountFlowLog('create start', {
+      email: maskEmailForLog(newAccountForm.email),
+      provider: newAccountForm.provider,
+      incomingProtocol: newAccountForm.incoming_protocol,
+      hasSecret: Boolean(trimmedSecret),
+    });
+    try {
+      const created = await invoke<Account>('create_account', { input: newAccountForm });
+      accountFlowLog('create account stored', {
+        accountId: created.id,
+        email: maskEmailForLog(created.email),
+        isDefault: created.is_default,
       });
-      setCredentialStatus(credentialResult);
-      setCredentialVerification(null);
+      if (trimmedSecret) {
+        const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
+          input: { account_email: created.email, secret: trimmedSecret },
+        });
+        setCredentialStatus(credentialResult);
+        setCredentialVerification(null);
+        accountFlowLog('credential stored', {
+          email: maskEmailForLog(created.email),
+          exists: credentialResult.exists,
+          message: credentialResult.message,
+        });
+      }
+      setAccounts((current) => [...current, created]);
+      setAccountScope(created.id);
+      setAccount(created);
+      setAccountForm(created);
+      setNewAccountForm(emptyAccountCreateForm);
+      setFolderId(null);
+      setMessages([]);
+      setSelectedId(null);
+      setAttachments([]);
+      const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
+      accountFlowLog('metadata loaded after create', {
+        accountId: created.id,
+        folderId: nextFolderId,
+        folderCount: nextFolders.length,
+      });
+      await loadMessages(nextFolderId, query, filter, created.id, undefined, undefined, 'all');
+      accountFlowLog('messages loaded after create', {
+        accountId: created.id,
+        folderId: nextFolderId,
+      });
+      setStatus(trimmedSecret ? `已创建账号并保存凭据：${created.email}` : `已创建账号：${created.email}`);
+    } catch (error) {
+      accountFlowWarn('create failed', {
+        email: maskEmailForLog(newAccountForm.email),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
-    setAccounts((current) => [...current, created]);
-    setAccountScope(created.id);
-    setAccount(created);
-    setAccountForm(created);
-    setNewAccountForm(emptyAccountCreateForm);
-    setFolderId(null);
-    setMessages([]);
-    setSelectedId(null);
-    setAttachments([]);
-    const { folderId: nextFolderId } = await loadMeta(null, created.id);
-    await loadMessages(nextFolderId, query, filter, created.id, undefined, undefined, 'all');
-    setStatus(trimmedSecret ? `已创建账号并保存凭据：${created.email}` : `已创建账号：${created.email}`);
   }, [
     filter,
     loadMessages,
@@ -245,13 +294,29 @@ export default function useAccountConnectionController({
   const removeCurrentAccount = useCallback(async () => {
     if (!accountForm) return;
     const removedAccount = accountForm;
+    accountFlowLog('remove start', {
+      accountId: removedAccount.id,
+      email: maskEmailForLog(removedAccount.email),
+    });
     const nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
+    accountFlowLog('remove account deleted', {
+      removedAccountId: removedAccount.id,
+      nextAccountId: nextAccount?.id ?? null,
+    });
     try {
       const credentialResult = await invoke<CredentialStatus>('delete_account_secret', {
         accountEmail: removedAccount.email,
       });
       setCredentialStatus(credentialResult);
+      accountFlowLog('credential deleted', {
+        email: maskEmailForLog(removedAccount.email),
+        exists: credentialResult.exists,
+        message: credentialResult.message,
+      });
     } catch {
+      accountFlowWarn('credential delete failed', {
+        email: maskEmailForLog(removedAccount.email),
+      });
       setCredentialStatus({
         account_email: removedAccount.email,
         exists: false,
@@ -268,12 +333,17 @@ export default function useAccountConnectionController({
     setAttachments([]);
     if (nextAccount) {
       const { folderId: nextFolderId } = await loadMeta(null, nextAccount.id);
+      accountFlowLog('metadata loaded after remove', {
+        nextAccountId: nextAccount.id,
+        folderId: nextFolderId,
+      });
       await loadMessages(nextFolderId, query, filter, nextAccount.id);
       setSettingsOpen(false);
       setStatus(`已移除 ${removedAccount.email}，当前切换到 ${nextAccount.email}`);
       return;
     }
     await loadMeta(null, 'all');
+    accountFlowLog('all accounts removed');
     setSettingsOpen(true);
     setStatus(`已移除 ${removedAccount.email}，当前没有邮箱账号`);
   }, [

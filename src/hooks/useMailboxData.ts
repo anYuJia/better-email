@@ -54,6 +54,14 @@ type MailboxRequests = {
   threads: MailboxRequestArgs;
 };
 
+function mailboxFlowLog(event: string, details: Record<string, unknown> = {}) {
+  console.info(`[mailbox-flow] ${event}`, details);
+}
+
+function mailboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
+  console.warn(`[mailbox-flow] ${event}`, details);
+}
+
 export function buildMailboxRequests(
   scope: AccountScope,
   currentAccountId: number | null,
@@ -153,6 +161,10 @@ export default function useMailboxData({
     nextSearchScope = searchScope,
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
+      mailboxFlowLog('loadMessages skipped: missing folder', {
+        searchScope: nextSearchScope,
+        scope: nextScope,
+      });
       setMessages([]);
       setThreads([]);
       setHasMoreMessages(false);
@@ -160,6 +172,7 @@ export default function useMailboxData({
       setSelectedMessageIds([]);
       return [];
     }
+    const startedAt = performance.now();
     const requests = buildMailboxRequests(
       nextScope,
       currentAccountId,
@@ -170,10 +183,34 @@ export default function useMailboxData({
       listSort,
       nextLimit,
     );
-    const [nextMessages, nextThreads] = await Promise.all([
-      invoke<Message[]>('list_messages', requests.messages),
-      invoke<ThreadSummary[]>('list_threads', requests.threads),
-    ]);
+    mailboxFlowLog('loadMessages start', {
+      scope: nextScope,
+      currentAccountId,
+      folderId: nextFolderId ?? 0,
+      searchScope: nextSearchScope,
+      query: nextQuery.trim() || null,
+      filter: nextFilter,
+      sort: listSort,
+      requestMessages: requests.messages,
+      requestThreads: requests.threads,
+    });
+    let nextMessages: Message[];
+    let nextThreads: ThreadSummary[];
+    try {
+      [nextMessages, nextThreads] = await Promise.all([
+        invoke<Message[]>('list_messages', requests.messages),
+        invoke<ThreadSummary[]>('list_threads', requests.threads),
+      ]);
+    } catch (error) {
+      mailboxFlowWarn('loadMessages failed', {
+        scope: nextScope,
+        folderId: nextFolderId ?? 0,
+        searchScope: nextSearchScope,
+        requestMessages: requests.messages,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
     if (refreshId !== mailboxRefreshRef.current) return nextMessages;
     setThreads(nextThreads);
     const visibleMessages = nextMessages.slice(0, nextLimit);
@@ -194,6 +231,16 @@ export default function useMailboxData({
       });
       void maybeRunBenchmarkSync();
     }
+    mailboxFlowLog('loadMessages done', {
+      scope: nextScope,
+      folderId: nextFolderId ?? 0,
+      searchScope: nextSearchScope,
+      messageCount: nextMessages.length,
+      visibleCount: visibleMessages.length,
+      threadCount: nextThreads.length,
+      selectedId: visibleMessages[0]?.id ?? null,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     return visibleMessages;
   }
 

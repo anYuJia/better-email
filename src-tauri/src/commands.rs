@@ -78,7 +78,29 @@ pub fn create_account(
     store: State<'_, MailStore>,
     input: AccountCreateInput,
 ) -> MailResult<Account> {
-    store.create_account(input)
+    eprintln!(
+        "[better-email][account] create command start email={} provider={} protocol={} imap_host={} smtp_host={}",
+        mask_email(&input.email),
+        input.provider.trim(),
+        input.incoming_protocol.trim(),
+        input.imap_host.trim(),
+        input.smtp_host.trim(),
+    );
+    match store.create_account(input) {
+        Ok(account) => {
+            eprintln!(
+                "[better-email][account] create command ok account_id={} email={} default={}",
+                account.id,
+                mask_email(&account.email),
+                account.is_default,
+            );
+            Ok(account)
+        }
+        Err(error) => {
+            eprintln!("[better-email][account] create command failed error={error}");
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -88,7 +110,24 @@ pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> Mail
 
 #[tauri::command]
 pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
-    store.delete_account(account_id)
+    eprintln!("[better-email][account] delete command start account_id={account_id}");
+    match store.delete_account(account_id) {
+        Ok(next_account) => {
+            eprintln!(
+                "[better-email][account] delete command ok removed_account_id={} next_account_id={}",
+                account_id,
+                next_account.as_ref().map(|account| account.id).unwrap_or_default(),
+            );
+            Ok(next_account)
+        }
+        Err(error) => {
+            eprintln!(
+                "[better-email][account] delete command failed account_id={} error={error}",
+                account_id,
+            );
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -1832,7 +1871,19 @@ pub fn parse_raw_message(input: RawMessageInput) -> ParsedMessagePreview {
 
 #[tauri::command]
 pub fn store_account_secret(input: CredentialInput) -> CredentialStatus {
-    credentials::store_secret(&input.account_email, &input.secret)
+    eprintln!(
+        "[better-email][credential] store start email={} has_secret={}",
+        mask_email(&input.account_email),
+        !input.secret.trim().is_empty(),
+    );
+    let status = credentials::store_secret(&input.account_email, &input.secret);
+    eprintln!(
+        "[better-email][credential] store done email={} exists={} message={}",
+        mask_email(&input.account_email),
+        status.exists,
+        status.message,
+    );
+    status
 }
 
 #[tauri::command]
@@ -1842,7 +1893,18 @@ pub fn check_account_secret(account_email: String) -> CredentialStatus {
 
 #[tauri::command]
 pub fn delete_account_secret(account_email: String) -> CredentialStatus {
-    credentials::delete_secret(&account_email)
+    eprintln!(
+        "[better-email][credential] delete start email={}",
+        mask_email(&account_email),
+    );
+    let status = credentials::delete_secret(&account_email);
+    eprintln!(
+        "[better-email][credential] delete done email={} exists={} message={}",
+        mask_email(&account_email),
+        status.exists,
+        status.message,
+    );
+    status
 }
 
 #[tauri::command]

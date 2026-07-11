@@ -177,6 +177,14 @@ function DeferredSurface({ label }: { label: string }) {
   );
 }
 
+function appFlowLog(event: string, details: Record<string, unknown> = {}) {
+  console.info(`[app-flow] ${event}`, details);
+}
+
+function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
+  console.warn(`[app-flow] ${event}`, details);
+}
+
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -652,70 +660,94 @@ export default function App() {
   }
 
   async function loadMeta(nextFolderId: number | null = folderId, nextScope: AccountScope = accountScope) {
-    const released = await releaseDueSnoozedMessages();
-    if (released.length > 0) {
-      setStatus(`已恢复 ${released.length} 封到期稍后邮件`);
-    }
+    const startedAt = performance.now();
     const nextAccountId = accountIdForScope(nextScope);
-    const [
-      nextAccounts,
-      nextAccount,
-      nextFolders,
-      nextLabels,
-      nextStats,
-      nextSyncRuns,
-      nextContacts,
-      nextContactMergeSuggestions,
-      nextIdentities,
-      nextRules,
-      nextOutbox,
-      nextBackgroundTasks,
-      nextSyncSchedulePlan,
-      nextRemoteImageTrusts,
-      nextImapMailboxes,
-      nextOauthSessions,
-    ] = await Promise.all([
-      invoke<Account[]>('list_accounts'),
-      invoke<Account | null>('get_account', { accountId: nextAccountId }),
-      invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
-      invoke<Label[]>('list_labels'),
-      invoke<MailStats>('get_stats', { accountId: nextAccountId }),
-      invoke<SyncRun[]>('list_sync_runs'),
-      invoke<Contact[]>('list_contacts'),
-      invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions'),
-      invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
-      invoke<MailRule[]>('list_rules'),
-      invoke<OutboxItem[]>('list_outbox'),
-      invoke<BackgroundTask[]>('list_background_tasks'),
-      invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
-      invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
-      invoke<ImapMailboxState[]>('list_imap_mailboxes'),
-      invoke<OAuthSession[]>('list_oauth_sessions'),
-    ]);
-    setAccounts(nextAccounts);
-    setAccount(nextAccount);
-    setAccountForm(nextAccount);
-    setFolders(nextFolders);
-    setLabels(nextLabels);
-    setStats(nextStats);
-    setSyncRuns(nextSyncRuns);
-    setContacts(nextContacts);
-    setContactMergeSuggestions(nextContactMergeSuggestions);
-    setIdentities(nextIdentities);
-    setRules(nextRules);
-    setOutbox(nextOutbox);
-    setBackgroundTasks(nextBackgroundTasks);
-    setSyncSchedulePlan(nextSyncSchedulePlan);
-    setRemoteImageTrusts(nextRemoteImageTrusts);
-    setImapMailboxes(nextImapMailboxes);
-    setOauthSessions(nextOauthSessions);
-    void updateAppUnreadBadge(nextStats.unread_messages);
-    const resolvedFolderId =
-      nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
-        ? nextFolderId
-        : nextFolders[0]?.id ?? null;
-    setFolderId(resolvedFolderId);
-    return { folderId: resolvedFolderId, folders: nextFolders };
+    appFlowLog('loadMeta start', {
+      requestedFolderId: nextFolderId,
+      scope: nextScope,
+      accountId: nextAccountId,
+    });
+    try {
+      const released = await releaseDueSnoozedMessages();
+      if (released.length > 0) {
+        setStatus(`已恢复 ${released.length} 封到期稍后邮件`);
+      }
+      const [
+        nextAccounts,
+        nextAccount,
+        nextFolders,
+        nextLabels,
+        nextStats,
+        nextSyncRuns,
+        nextContacts,
+        nextContactMergeSuggestions,
+        nextIdentities,
+        nextRules,
+        nextOutbox,
+        nextBackgroundTasks,
+        nextSyncSchedulePlan,
+        nextRemoteImageTrusts,
+        nextImapMailboxes,
+        nextOauthSessions,
+      ] = await Promise.all([
+        invoke<Account[]>('list_accounts'),
+        invoke<Account | null>('get_account', { accountId: nextAccountId }),
+        invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
+        invoke<Label[]>('list_labels'),
+        invoke<MailStats>('get_stats', { accountId: nextAccountId }),
+        invoke<SyncRun[]>('list_sync_runs'),
+        invoke<Contact[]>('list_contacts'),
+        invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions'),
+        invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
+        invoke<MailRule[]>('list_rules'),
+        invoke<OutboxItem[]>('list_outbox'),
+        invoke<BackgroundTask[]>('list_background_tasks'),
+        invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
+        invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
+        invoke<ImapMailboxState[]>('list_imap_mailboxes'),
+        invoke<OAuthSession[]>('list_oauth_sessions'),
+      ]);
+      setAccounts(nextAccounts);
+      setAccount(nextAccount);
+      setAccountForm(nextAccount);
+      setFolders(nextFolders);
+      setLabels(nextLabels);
+      setStats(nextStats);
+      setSyncRuns(nextSyncRuns);
+      setContacts(nextContacts);
+      setContactMergeSuggestions(nextContactMergeSuggestions);
+      setIdentities(nextIdentities);
+      setRules(nextRules);
+      setOutbox(nextOutbox);
+      setBackgroundTasks(nextBackgroundTasks);
+      setSyncSchedulePlan(nextSyncSchedulePlan);
+      setRemoteImageTrusts(nextRemoteImageTrusts);
+      setImapMailboxes(nextImapMailboxes);
+      setOauthSessions(nextOauthSessions);
+      void updateAppUnreadBadge(nextStats.unread_messages);
+      const resolvedFolderId =
+        nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
+          ? nextFolderId
+          : nextFolders[0]?.id ?? null;
+      setFolderId(resolvedFolderId);
+      appFlowLog('loadMeta done', {
+        accountCount: nextAccounts.length,
+        activeAccountId: nextAccount?.id ?? null,
+        folderCount: nextFolders.length,
+        requestedFolderId: nextFolderId,
+        resolvedFolderId,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      return { folderId: resolvedFolderId, folders: nextFolders };
+    } catch (error) {
+      appFlowWarn('loadMeta failed', {
+        requestedFolderId: nextFolderId,
+        scope: nextScope,
+        accountId: nextAccountId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   async function updateAppUnreadBadge(unreadCount: number) {

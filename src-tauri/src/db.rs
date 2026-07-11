@@ -51,6 +51,19 @@ impl serde::Serialize for MailError {
 pub type MailResult<T> = Result<T, MailError>;
 type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf)>);
 
+fn mask_email_for_log(value: &str) -> String {
+    let email = value.trim();
+    let Some((local, domain)) = email.split_once('@') else {
+        return if email.is_empty() {
+            String::new()
+        } else {
+            "***".to_string()
+        };
+    };
+    let first = local.chars().next().unwrap_or('*');
+    format!("{first}***@{}", domain.trim())
+}
+
 #[derive(Debug, Clone)]
 pub struct OAuthTokenExchangeSession {
     pub id: i64,
@@ -129,6 +142,11 @@ impl MailStore {
             .unwrap_or_else(std::env::temp_dir);
         fs::create_dir_all(&data_dir)?;
         let should_seed_demo_data = !path.exists();
+        eprintln!(
+            "[better-email][db] open path={} should_seed_demo_data={}",
+            path.display(),
+            should_seed_demo_data,
+        );
         let conn = Connection::open(&path)?;
         let store = Self {
             conn: Mutex::new(conn),
@@ -137,6 +155,7 @@ impl MailStore {
         };
         store.migrate()?;
         store.seed_if_empty(should_seed_demo_data)?;
+        eprintln!("[better-email][db] open ok");
         Ok(store)
     }
 
@@ -532,13 +551,16 @@ impl MailStore {
 
     fn seed_if_empty(&self, should_seed_demo_data: bool) -> MailResult<()> {
         if !should_seed_demo_data {
+            eprintln!("[better-email][db] seed skipped existing database");
             return Ok(());
         }
         self.with_conn(|conn| {
             let count: i64 = conn.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
             if count > 0 {
+                eprintln!("[better-email][db] seed skipped existing_accounts={count}");
                 return Ok(());
             }
+            eprintln!("[better-email][db] seed demo data start");
 
             let now = Utc::now();
             conn.execute(
@@ -705,6 +727,7 @@ impl MailStore {
                 }
                 upsert_contact(conn, sender_name, sender_email, &received_at.to_rfc3339())?;
             }
+            eprintln!("[better-email][db] seed demo data ok account_id={account_id}");
             Ok(())
         })
     }
@@ -810,7 +833,16 @@ impl MailStore {
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
             let email = input.email.trim().to_lowercase();
+            eprintln!(
+                "[better-email][db] create_account start email={} provider={} protocol={} imap_host={} smtp_host={}",
+                mask_email_for_log(&email),
+                input.provider.trim(),
+                normalize_incoming_protocol(&input.incoming_protocol),
+                input.imap_host.trim(),
+                input.smtp_host.trim(),
+            );
             if email.is_empty() || !email.contains('@') {
+                eprintln!("[better-email][db] create_account invalid email");
                 return Err(MailError::Imap("请输入有效邮箱地址。".to_string()));
             }
             let display_name = if input.display_name.trim().is_empty() {
@@ -841,8 +873,13 @@ impl MailStore {
             )
             .map_err(|error| {
                 if is_unique_constraint_error(&error) {
+                    eprintln!(
+                        "[better-email][db] create_account duplicate email={}",
+                        mask_email_for_log(&email),
+                    );
                     MailError::Imap("该邮箱账号已存在。".to_string())
                 } else {
+                    eprintln!("[better-email][db] create_account insert failed error={error}");
                     MailError::Database(error)
                 }
             })?;
@@ -855,7 +892,14 @@ impl MailStore {
                 &email,
                 &input.signature,
             )?;
-            account_for_conn(conn, Some(account_id))
+            let account = account_for_conn(conn, Some(account_id))?;
+            eprintln!(
+                "[better-email][db] create_account ok account_id={} email={} default={}",
+                account.id,
+                mask_email_for_log(&account.email),
+                account.is_default,
+            );
+            Ok(account)
         })
     }
 
@@ -886,6 +930,7 @@ impl MailStore {
 
     pub fn delete_account(&self, account_id: i64) -> MailResult<Option<Account>> {
         self.with_conn(|conn| {
+            eprintln!("[better-email][db] delete_account start account_id={account_id}");
             let transaction = conn.unchecked_transaction()?;
             let exists = transaction
                 .query_row(
@@ -896,6 +941,7 @@ impl MailStore {
                 .optional()?
                 .is_some();
             if !exists {
+                eprintln!("[better-email][db] delete_account missing account_id={account_id}");
                 return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
             }
 
@@ -903,6 +949,11 @@ impl MailStore {
             ensure_default_account_for_conn(&transaction)?;
             let next_account = account_for_conn_optional(&transaction, None)?;
             transaction.commit()?;
+            eprintln!(
+                "[better-email][db] delete_account ok removed_account_id={} next_account_id={}",
+                account_id,
+                next_account.as_ref().map(|account| account.id).unwrap_or_default(),
+            );
             Ok(next_account)
         })
     }
@@ -1184,6 +1235,15 @@ impl MailStore {
             let search_criteria = SearchCriteria::parse(search.as_deref());
             let mut scope_conditions = Vec::new();
             let mut query_params = Vec::new();
+            if folder_id == 0 {
+                eprintln!(
+                    "[better-email][mailbox] list_messages unscoped folder_id=0 account_id={:?} filter={} sort={:?} limit={}",
+                    account_id,
+                    filter,
+                    sort,
+                    limit,
+                );
+            }
             if folder_id > 0 {
                 scope_conditions.push("m.folder_id = ?".to_string());
                 query_params.push(Value::Integer(folder_id));

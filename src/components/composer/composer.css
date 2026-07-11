@@ -1003,3 +1003,21 @@
   top: calc(100% + 5px);
   border-radius: 12px;
 }
+
+/* Composer shell: keep the window centered; only the backdrop closes it. */
+.composer-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+
+.composer {
+  transform-origin: center;
+}
+
+.composer-backdrop-minimized {
+  align-items: flex-end;
+  justify-content: flex-end;
+  pointer-events: none;
+}

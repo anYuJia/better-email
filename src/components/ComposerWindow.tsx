@@ -175,10 +175,18 @@ export default function ComposerWindow({
   }
 
   return (
-    <div className="composer-backdrop">
+    <div
+      className="composer-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <section
         className="composer"
         style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+        onMouseDown={(event) => event.stopPropagation()}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}

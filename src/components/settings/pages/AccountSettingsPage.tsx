@@ -15,7 +15,7 @@ type AccountSettingsPageProps = {
   onAccountFormChange: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
-  onCreateNewAccount: (secret?: string) => void;
+  onCreateNewAccount: (secret?: string) => Promise<void>;
   onRemoveAccount: () => Promise<void>;
 };
 
@@ -55,8 +55,12 @@ export default function AccountSettingsPage({
     }
   }, [addDialogOpen]);
 
-  function handleCreateNewAccount() {
-    onCreateNewAccount(newAccountSecret);
+  const canCreateAccount = newAccountForm.email.trim().length > 0
+    && (newAccountForm.auth_type === 'oauth2' || newAccountSecret.trim().length > 0);
+
+  async function handleCreateNewAccount() {
+    if (!canCreateAccount) return;
+    await onCreateNewAccount(newAccountSecret);
     setAddDialogOpen(false);
   }
 
@@ -166,7 +170,7 @@ export default function AccountSettingsPage({
             <header>
               <span>
                 <strong id="settings-add-account-title">添加邮箱</strong>
-                <small>填写账号和服务器</small>
+                <small>账号、授权码、收信和发信服务器</small>
               </span>
               <button type="button" aria-label="关闭" onClick={() => setAddDialogOpen(false)}>
                 <X size={17} />
@@ -203,6 +207,7 @@ export default function AccountSettingsPage({
                     type={newAccountSecretVisible ? 'text' : 'password'}
                     onChange={(event) => setNewAccountSecret(event.target.value)}
                     placeholder={newAccountSecretPlaceholder}
+                    required={newAccountForm.auth_type !== 'oauth2'}
                   />
                   <button
                     type="button"
@@ -229,6 +234,19 @@ export default function AccountSettingsPage({
               </label>
             </div>
 
+            <div className="settings-account-protocol-grid" aria-label="邮件协议">
+              <label>
+                收信协议
+                <select value="imap" onChange={() => undefined}>
+                  <option value="imap">IMAP</option>
+                  <option value="pop3" disabled>POP3（暂未支持）</option>
+                </select>
+              </label>
+              <span>
+                当前版本使用 IMAP 收信、SMTP 发信。
+              </span>
+            </div>
+
             <ProviderPresetGrid
               compact
               activeProvider={newAccountForm.provider}
@@ -237,7 +255,7 @@ export default function AccountSettingsPage({
 
             <div className="settings-account-form-grid">
               <label>
-                IMAP
+                收信服务器（IMAP）
                 <input
                   value={newAccountForm.imap_host}
                   onChange={(event) => onNewAccountFormChange({
@@ -247,7 +265,7 @@ export default function AccountSettingsPage({
                 />
               </label>
               <label>
-                SMTP
+                发信服务器（SMTP）
                 <input
                   value={newAccountForm.smtp_host}
                   onChange={(event) => onNewAccountFormChange({
@@ -262,7 +280,14 @@ export default function AccountSettingsPage({
               <button type="button" className="settings-account-add-cancel" onClick={() => setAddDialogOpen(false)}>
                 取消
               </button>
-              <button type="button" className="settings-account-add-submit" onClick={handleCreateNewAccount}>
+              <button
+                type="button"
+                className="settings-account-add-submit"
+                disabled={!canCreateAccount}
+                onClick={() => {
+                  handleCreateNewAccount().catch(() => undefined);
+                }}
+              >
                 <Plus size={14} />
                 添加
               </button>
@@ -308,6 +333,10 @@ export default function AccountSettingsPage({
                 <span>
                   <small>同步</small>
                   <strong>{accountForm.sync_mode === 'manual' ? '手动' : accountForm.sync_mode}</strong>
+                </span>
+                <span>
+                  <small>协议</small>
+                  <strong>IMAP / SMTP</strong>
                 </span>
                 <span>
                   <small>状态</small>
@@ -362,14 +391,21 @@ export default function AccountSettingsPage({
                   </select>
                 </label>
                 <label>
-                  IMAP
+                  收信协议
+                  <select value="imap" onChange={() => undefined}>
+                    <option value="imap">IMAP</option>
+                    <option value="pop3" disabled>POP3（暂未支持）</option>
+                  </select>
+                </label>
+                <label>
+                  收信服务器（IMAP）
                   <input
                     value={accountForm.imap_host}
                     onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
                   />
                 </label>
                 <label>
-                  SMTP
+                  发信服务器（SMTP）
                   <input
                     value={accountForm.smtp_host}
                     onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}

@@ -2614,7 +2614,14 @@ export default function App() {
               onNewAccountFormChange={setNewAccountForm}
               onApplyProviderPreset={applyProviderPreset}
               onApplyNewAccountPreset={applyNewAccountPreset}
-              onCreateNewAccount={(secret) => { createNewAccount(secret).catch((error) => setStatus(String(error))); }}
+              onCreateNewAccount={async (secret) => {
+                try {
+                  await createNewAccount(secret);
+                } catch (error) {
+                  setStatus(String(error));
+                  throw error;
+                }
+              }}
               onRemoveAccount={removeCurrentAccount}
               onUpdateProviderVerification={updateProviderVerification}
               onSaveProviderVerification={saveProviderVerification}

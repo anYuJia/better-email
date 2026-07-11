@@ -300,7 +300,7 @@
 
 .settings-account-detail-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -424,6 +424,7 @@
   position: absolute;
   top: 50%;
   right: 5px;
+  transform: translateY(-50%);
   width: 28px;
   height: 28px;
   display: grid;
@@ -443,6 +444,35 @@
 .settings-account-secret-field button:disabled {
   cursor: default;
   opacity: 0.38;
+}
+
+.settings-account-protocol-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 9px;
+}
+
+.settings-account-protocol-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.settings-account-protocol-grid > span {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #e4e8ec;
+  border-radius: 8px;
+  color: var(--ui-text-tertiary);
+  background: #fafbfc;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
 .settings-provider-presets {
@@ -593,6 +623,11 @@
 .settings-account-add-submit:hover {
   border-color: #4d7ba6;
   background: #4f7fae;
+}
+
+.settings-account-add-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .settings-provider-presets button strong,

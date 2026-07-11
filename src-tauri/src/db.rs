@@ -128,6 +128,7 @@ impl MailStore {
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
         fs::create_dir_all(&data_dir)?;
+        let should_seed_demo_data = !path.exists();
         let conn = Connection::open(&path)?;
         let store = Self {
             conn: Mutex::new(conn),
@@ -135,7 +136,7 @@ impl MailStore {
             database_path: path,
         };
         store.migrate()?;
-        store.seed_if_empty()?;
+        store.seed_if_empty(should_seed_demo_data)?;
         Ok(store)
     }
 
@@ -529,7 +530,10 @@ impl MailStore {
         })
     }
 
-    fn seed_if_empty(&self) -> MailResult<()> {
+    fn seed_if_empty(&self, should_seed_demo_data: bool) -> MailResult<()> {
+        if !should_seed_demo_data {
+            return Ok(());
+        }
         self.with_conn(|conn| {
             let count: i64 = conn.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
             if count > 0 {
@@ -7997,6 +8001,30 @@ mod tests {
         assert!(final_account.is_none());
         assert!(store.list_accounts().unwrap().is_empty());
         assert!(store.get_account_by_id_optional(None).unwrap().is_none());
+    }
+
+    #[test]
+    fn reopening_after_removing_all_accounts_does_not_seed_demo_again() {
+        let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let data_dir = std::env::temp_dir().join(format!(
+            "better-email-reopen-empty-{}-{}",
+            std::process::id(),
+            unique
+        ));
+        fs::create_dir_all(&data_dir).expect("test data dir created");
+        let path = data_dir.join(DATABASE_FILENAME);
+
+        {
+            let store = MailStore::open_at(path.clone()).expect("test store opens");
+            let account = store.get_account().expect("seed account exists");
+            assert!(store.delete_account(account.id).unwrap().is_none());
+            assert!(store.list_accounts().unwrap().is_empty());
+        }
+
+        let reopened = MailStore::open_at(path).expect("empty account store reopens");
+        assert!(reopened.list_accounts().unwrap().is_empty());
+        assert!(reopened.get_account_by_id_optional(None).unwrap().is_none());
+        fs::remove_dir_all(data_dir).expect("test data dir removed");
     }
 
     #[test]

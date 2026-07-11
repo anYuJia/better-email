@@ -118,7 +118,7 @@
   transform: rotate(180deg);
 }
 .context-menu.account-switcher-menu {
-  width: min(272px, calc(100vw - 16px));
+  width: min(238px, calc(100vw - 16px));
 }
 
 /* Native sidebar treatment: account scope should read like a row, not a card. */
@@ -171,4 +171,61 @@
 
 .account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
   transform: none;
+}
+
+.context-menu.account-switcher-menu {
+  padding: 4px;
+  border-color: rgba(31, 35, 40, 0.12);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow:
+    0 12px 30px rgba(31, 35, 40, 0.12),
+    0 1px 4px rgba(31, 35, 40, 0.08);
+  backdrop-filter: none;
+}
+
+.account-switcher-menu .context-menu-heading {
+  display: none;
+}
+
+.account-switcher-menu .context-menu-separator {
+  margin: 4px 6px;
+  background: var(--ui-border);
+}
+
+.account-switcher-menu .context-menu button {
+  min-height: 34px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 520;
+}
+
+.account-switcher-menu .context-menu button.has-detail {
+  min-height: 42px;
+}
+
+.account-switcher-menu .context-menu button:hover,
+.account-switcher-menu .context-menu button:focus-visible {
+  background: #f5f6f7;
+}
+
+.account-switcher-menu .context-menu-icon {
+  color: var(--ui-text-tertiary);
+}
+
+.account-switcher-menu .context-menu button:has(.context-menu-icon svg:first-child) .context-menu-icon {
+  color: var(--ui-text-secondary);
+}
+
+.account-switcher-menu .context-menu-copy {
+  gap: 1px;
+}
+
+.account-switcher-menu .context-menu-copy small {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
 }

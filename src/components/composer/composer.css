@@ -656,17 +656,77 @@
   font-size: 13px;
 }
 
+.composer-recipient-field {
+  position: relative;
+  z-index: 4;
+}
+
 .composer .recipient-suggestions {
-  min-height: 34px;
-  padding: 4px 14px 5px 68px;
+  position: absolute;
+  left: 68px;
+  right: 14px;
+  top: calc(100% - 1px);
+  z-index: 8;
+  width: auto;
+  max-height: 218px;
+  min-height: 0;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  overflow: auto;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
   background: #fff;
+  box-shadow:
+    0 12px 26px rgba(31, 35, 40, 0.13),
+    0 1px 4px rgba(31, 35, 40, 0.08);
 }
 
 .composer .recipient-suggestions > span {
-  background: #fff;
+  position: static;
+  padding: 3px 7px 4px;
+  background: transparent;
+  color: #8b95a1;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
-.composer .recipient-suggestions button,
+.composer .recipient-suggestions button {
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.9fr);
+  gap: 8px;
+  justify-content: stretch;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  color: #202833;
+  background: transparent;
+  text-align: left;
+  box-shadow: none;
+}
+
+.composer .recipient-suggestions button:hover {
+  color: #1f2a36;
+  background: #f2f5f8;
+}
+
+.composer .recipient-suggestions button strong {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer .recipient-suggestions button small {
+  overflow: hidden;
+  color: #8b95a1;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer-quick-tools .composer-attachment-chip {
   border-color: var(--ui-border);
   background: #fff;
@@ -676,6 +736,19 @@
   padding: 17px 18px;
   font-size: 13px;
   line-height: 1.65;
+}
+
+.composer .composer-body-field textarea:is(:hover, :focus) {
+  outline: none;
+}
+
+.composer .composer-body-field textarea {
+  color: #202833;
+}
+
+.composer .composer-body-field textarea {
+  background:
+    linear-gradient(#fff, #fff) padding-box;
 }
 
 .composer-quick-tools,
@@ -745,4 +818,20 @@
   border-radius: 10px;
   background: #fff;
   box-shadow: var(--ui-shadow-popover);
+}
+
+/* Reply composer: keep quoted/original content visually secondary inside the textarea. */
+.composer .composer-body-field {
+  position: relative;
+}
+
+.composer .composer-body-field::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background: #eef1f4;
 }

@@ -200,17 +200,6 @@ export default function ComposerWindow({
           </div>
         </header>
 
-        <datalist id="contact-suggestions">
-          {contacts.map((contact) => (
-            <React.Fragment key={contact.id}>
-              <option value={contact.email}>{contact.name}</option>
-              {contact.aliases.map((alias) => (
-                <option key={`${contact.id}-${alias}`} value={alias}>{contact.name}</option>
-              ))}
-            </React.Fragment>
-          ))}
-        </datalist>
-
         <ComposerPrimaryFields
           draft={draft}
           contacts={contacts}

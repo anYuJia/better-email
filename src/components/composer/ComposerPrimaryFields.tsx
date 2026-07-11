@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { Contact, DraftInput } from '../../app/types';
 
 type ComposerPrimaryFieldsProps = {
@@ -15,29 +16,47 @@ export default function ComposerPrimaryFields({
   onPatchDraft,
   onAddContact,
 }: ComposerPrimaryFieldsProps) {
+  const [recipientFocused, setRecipientFocused] = useState(false);
+  const recipientQuery = draft.to.split(/[;,]/).pop()?.trim().toLowerCase() ?? '';
+  const suggestedContacts = useMemo(() => {
+    const pool = recipientQuery
+      ? contacts.filter((contact) => {
+          const name = contact.name.toLowerCase();
+          const email = contact.email.toLowerCase();
+          return name.includes(recipientQuery)
+            || email.includes(recipientQuery)
+            || contact.aliases.some((alias) => alias.toLowerCase().includes(recipientQuery));
+        })
+      : contacts;
+    return pool.slice(0, 5);
+  }, [contacts, recipientQuery]);
+
   return (
     <div className="composer-primary-fields">
-      <label className="composer-field-row">
-        <span>收件人</span>
-        <input
-          list="contact-suggestions"
-          value={draft.to}
-          onChange={(event) => onPatchDraft({ to: event.target.value })}
-          placeholder="收件人"
-        />
-      </label>
+      <div className="composer-recipient-field">
+        <label className="composer-field-row">
+          <span>收件人</span>
+          <input
+            value={draft.to}
+            onChange={(event) => onPatchDraft({ to: event.target.value })}
+            onFocus={() => setRecipientFocused(true)}
+            onBlur={() => window.setTimeout(() => setRecipientFocused(false), 120)}
+            placeholder="收件人"
+          />
+        </label>
 
-      {contacts.length > 0 && (
-        <div className="recipient-suggestions">
-          <span>常用联系人</span>
-          {contacts.slice(0, 5).map((contact) => (
-            <button type="button" key={contact.id} onClick={() => onAddContact(contact)}>
-              <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-              <small>{contact.email}{contact.aliases.length ? ` · ${contact.aliases.length} 个别名` : ''}</small>
-            </button>
-          ))}
-        </div>
-      )}
+        {recipientFocused && suggestedContacts.length > 0 && (
+          <div className="recipient-suggestions">
+            <span>{recipientQuery ? '匹配联系人' : '常用联系人'}</span>
+            {suggestedContacts.map((contact) => (
+              <button type="button" key={contact.id} onMouseDown={(event) => event.preventDefault()} onClick={() => onAddContact(contact)}>
+                <strong>{contact.name || contact.email}</strong>
+                <small>{contact.email}</small>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <label className="composer-field-row">
         <span>主题</span>

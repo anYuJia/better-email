@@ -254,6 +254,7 @@ export default function useAccountConnectionController({
         message: '账号已移除，但系统安全存储中的凭据需要手动检查。',
       });
     }
+    setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));
     setAccountScope(nextAccount?.id ?? 'all');
     setAccount(nextAccount);
     setAccountForm(nextAccount);

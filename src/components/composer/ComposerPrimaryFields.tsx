@@ -144,7 +144,7 @@ export default function ComposerPrimaryFields({
         />
       </label>
 
-      <label className="composer-body-field">
+      <label className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}`}>
         <span className="sr-only">正文</span>
         <textarea
           value={editableBody}

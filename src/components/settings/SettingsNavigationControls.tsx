@@ -46,8 +46,8 @@ export function SettingsSidebar({
   return (
     <nav className="settings-nav" aria-label="设置分类">
       <div className="settings-nav-intro">
-        <strong>偏好设置</strong>
-        <span>{settingsNavigationItems.length} 个独立页面，按需配置</span>
+        <strong>设置</strong>
+        <span>独立分页，常用项直接操作</span>
       </div>
       <div className="settings-nav-search" role="search">
         <Search size={14} aria-hidden="true" />
@@ -88,7 +88,10 @@ export function SettingsSidebar({
                 <span className="settings-nav-icon">
                   <Icon size={15} />
                 </span>
-                <span className="settings-nav-label">{item.label}</span>
+                <span className="settings-nav-copy">
+                  <span className="settings-nav-label">{item.label}</span>
+                  <small>{item.description}</small>
+                </span>
                 {active && <span className="settings-nav-active-dot" aria-hidden="true" />}
               </button>
             );

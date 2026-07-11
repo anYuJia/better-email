@@ -200,7 +200,10 @@ async function clickButton(cdp, text, scope = 'document') {
     cdp,
     `(() => {
       const root = ${scope};
-      const button = [...root.querySelectorAll('button')].find((item) => item.textContent.includes(${JSON.stringify(text)}));
+      const button = [...root.querySelectorAll('button')].find((item) => {
+        const navLabel = item.querySelector('.settings-nav-label')?.textContent.trim();
+        return navLabel ? navLabel === ${JSON.stringify(text)} : item.textContent.includes(${JSON.stringify(text)});
+      });
       if (!button) throw new Error('Button not found: ${text}');
       button.click();
     })()`,

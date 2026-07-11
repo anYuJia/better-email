@@ -1,32 +1,32 @@
 .settings-backdrop {
-  --settings-border: #dfe4ea;
-  --settings-border-strong: #cdd5de;
-  --settings-text: #171d25;
-  --settings-text-secondary: #56616d;
-  --settings-text-tertiary: #89939f;
+  --settings-border: #e4e8ee;
+  --settings-border-strong: #d2d9e2;
+  --settings-text: #151a21;
+  --settings-text-secondary: #505b67;
+  --settings-text-tertiary: #8b95a1;
   --settings-accent: #0a7aff;
   --settings-accent-hover: #0069d9;
-  --settings-accent-soft: #edf6ff;
-  --settings-card: rgba(255, 255, 255, 0.94);
-  --settings-card-subtle: rgba(250, 251, 253, 0.9);
-  --settings-canvas: #f6f7f9;
-  --settings-sidebar: #f0f2f5;
-  --settings-radius-lg: 16px;
-  --settings-radius-md: 12px;
+  --settings-accent-soft: #eef7ff;
+  --settings-card: rgba(255, 255, 255, 0.96);
+  --settings-card-subtle: rgba(249, 250, 252, 0.92);
+  --settings-canvas: #f7f8fa;
+  --settings-sidebar: #f2f4f7;
+  --settings-radius-lg: 14px;
+  --settings-radius-md: 11px;
   --settings-radius-sm: 9px;
-  --settings-shadow-soft: 0 1px 2px rgba(21, 31, 44, 0.045);
+  --settings-shadow-soft: 0 1px 2px rgba(21, 31, 44, 0.04);
   --settings-shadow-float: 0 22px 56px rgba(16, 24, 40, 0.18);
   background:
-    radial-gradient(circle at 22% 6%, rgba(255, 255, 255, 0.34), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 36%),
     rgba(20, 26, 34, 0.34);
   backdrop-filter: blur(26px) saturate(1.08);
 }
 
 .settings-modal {
-  width: min(1180px, calc(100vw - 32px));
-  height: min(820px, calc(100vh - 32px));
+  width: min(1160px, calc(100vw - 32px));
+  height: min(810px, calc(100vh - 32px));
   border-color: rgba(210, 216, 224, 0.92);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--settings-canvas);
   box-shadow:
     0 36px 108px rgba(15, 23, 42, 0.26),
@@ -34,8 +34,8 @@
 }
 
 .settings-modal .settings-main-header {
-  min-height: 60px;
-  padding: 0 13px 0 18px;
+  min-height: 58px;
+  padding: 0 12px 0 17px;
   border-bottom-color: rgba(219, 225, 232, 0.9);
   background: rgba(251, 252, 253, 0.92);
 }
@@ -51,7 +51,7 @@
 
 .settings-app-mark {
   border-color: #d5e6f8;
-  border-radius: 10px;
+  border-radius: 9px;
   color: #0872d7;
   background:
     linear-gradient(180deg, #f7fbff, #eaf4ff);
@@ -80,24 +80,25 @@
 }
 
 .settings-modal .settings-body {
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   background: var(--settings-canvas);
 }
 
 .settings-modal .settings-nav {
-  padding: 18px 13px 20px;
+  gap: 5px;
+  padding: 16px 12px 18px;
   border-right-color: rgba(218, 224, 231, 0.88);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62), transparent 132px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), transparent 118px),
     var(--settings-sidebar);
 }
 
 .settings-modal .settings-nav-intro {
-  padding: 2px 9px 11px;
+  padding: 2px 9px 9px;
 }
 
 .settings-modal .settings-nav-intro strong {
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .settings-modal .settings-nav-intro span {
@@ -105,11 +106,11 @@
 }
 
 .settings-modal .settings-nav-search {
-  min-height: 38px;
+  min-height: 36px;
   margin-bottom: 7px;
   border-color: #dae1e8;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .settings-modal .settings-nav-search:focus-within {
@@ -118,25 +119,52 @@
 }
 
 .settings-modal .settings-nav .settings-nav-group {
-  margin: 14px 9px 6px;
+  margin: 12px 9px 5px;
   color: #8d97a3;
   font-size: 9px;
   font-weight: 760;
 }
 
 .settings-modal .settings-nav-section > button {
-  min-height: 41px;
-  padding: 0 10px;
-  border-radius: 11px;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 9px;
+  border-radius: 10px;
   color: #596571;
   font-size: 11.5px;
 }
 
 .settings-modal .settings-nav-icon {
-  width: 27px;
-  height: 27px;
+  width: 28px;
+  height: 28px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.settings-modal .settings-nav-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.settings-modal .settings-nav-label {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-nav-copy small {
+  display: block;
+  overflow: hidden;
+  color: #98a1ac;
+  font-size: 9px;
+  font-weight: 520;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-modal .settings-nav-section > button:hover {
@@ -158,6 +186,10 @@
   background: #eaf4ff;
 }
 
+.settings-modal .settings-nav-section > button.active .settings-nav-copy small {
+  color: #6f8ba8;
+}
+
 .settings-modal .settings-nav-active-dot {
   width: 3px;
   height: 18px;
@@ -170,14 +202,16 @@
 }
 
 .settings-modal .settings-page {
-  width: min(100%, 930px);
+  width: min(100%, 920px);
   scrollbar-color: #c7d0da transparent;
 }
 
 .settings-modal .settings-page-header {
-  padding: 23px 36px 18px;
+  padding: 21px 34px 17px;
   border-bottom-color: rgba(218, 224, 231, 0.78);
-  background: rgba(247, 248, 250, 0.86);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 248, 250, 0.9)),
+    rgba(247, 248, 250, 0.86);
 }
 
 .settings-modal .settings-page-heading {
@@ -185,10 +219,10 @@
 }
 
 .settings-modal .settings-page-icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-color: #d4e6f9;
-  border-radius: 12px;
+  border-radius: 11px;
   background:
     linear-gradient(180deg, #f8fbff, #eaf4ff);
 }
@@ -199,18 +233,39 @@
 }
 
 .settings-modal .settings-page-heading strong {
-  font-size: 21px;
+  font-size: 20px;
   letter-spacing: 0;
 }
 
-.settings-modal .settings-page-count {
-  border-radius: 999px;
-  color: #687482;
-  background: rgba(255, 255, 255, 0.76);
+.settings-modal .settings-page-meta {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: start;
+  display: inline-grid;
+  justify-items: end;
+  gap: 4px;
+  padding: 7px 9px;
+  border: 1px solid #dfe5eb;
+  border-radius: 10px;
+  color: #7c8793;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 9.5px;
+  line-height: 1;
+}
+
+.settings-modal .settings-page-meta span {
+  color: #8a95a1;
+  font-weight: 580;
+}
+
+.settings-modal .settings-page-meta strong {
+  color: #56616d;
+  font-size: 10px;
+  font-weight: 740;
 }
 
 .settings-modal .settings-page-header > p {
-  max-width: 690px;
+  max-width: 640px;
   color: #606b78;
   font-size: 11.5px;
 }
@@ -236,8 +291,8 @@
 }
 
 .settings-modal .settings-page-content {
-  gap: 16px;
-  padding: 19px 36px 24px;
+  gap: 14px;
+  padding: 18px 34px 23px;
 }
 
 .settings-modal .settings-page-content :is(
@@ -250,6 +305,20 @@
   border-radius: var(--settings-radius-md);
   background: var(--settings-card);
   box-shadow: var(--settings-shadow-soft);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) + :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) {
+  margin-top: 0;
 }
 
 .settings-modal .settings-page-content :is(
@@ -270,7 +339,7 @@
 
 .settings-modal .settings-page-content :is(input, select, textarea) {
   border-color: #d8e0e8;
-  border-radius: 10px;
+  border-radius: 9px;
   background:
     linear-gradient(180deg, #ffffff, #fbfcfd);
   font-size: 11.5px;
@@ -324,14 +393,14 @@
 }
 
 .settings-modal .settings-page-pagination {
-  gap: 12px;
-  padding: 0 36px 30px;
+  gap: 10px;
+  padding: 0 34px 26px;
 }
 
 .settings-modal .settings-page-pagination-button {
-  min-height: 62px;
+  min-height: 56px;
   border-color: #dfe5eb;
-  border-radius: 13px;
+  border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 251, 253, 0.9));
 }
@@ -351,11 +420,11 @@
 }
 
 .settings-modal .settings-page-picker {
-  border-radius: 13px;
+  border-radius: 12px;
 }
 
 .settings-modal .settings-mobile-menu {
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: var(--settings-shadow-float);
 }
 
@@ -415,6 +484,17 @@
 
   .settings-modal .settings-page-picker {
     min-height: 46px;
+  }
+
+  .settings-modal .settings-page-meta {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-self: start;
+    justify-items: start;
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 7px;
+    margin-left: 50px;
   }
 }
 

@@ -50,9 +50,10 @@ export default function SettingsPageShell({
             <strong id={`settings-page-${activeSection}`}>{item.label}</strong>
           </div>
         </div>
-        <span className="settings-page-count">
-          {pageIndex + 1} / {settingsNavigationItems.length}
-        </span>
+        <div className="settings-page-meta" aria-label={`第 ${pageIndex + 1} 页，共 ${settingsNavigationItems.length} 页`}>
+          <span>{group.label}</span>
+          <strong>{pageIndex + 1} / {settingsNavigationItems.length}</strong>
+        </div>
         <p>{item.description}</p>
         <span className="settings-page-progress-bar" aria-hidden="true" />
       </header>

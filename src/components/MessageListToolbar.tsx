@@ -92,7 +92,7 @@ export default function MessageListToolbar({
       {
         id: 'to',
         label: '收件人',
-        hint: '按收件人、抄送或密送搜索',
+        hint: '收件人、抄送、密送',
         count: countMatches((message) => (
           includes(message.recipients) || includes(message.cc) || includes(message.bcc)
         )),
@@ -101,21 +101,21 @@ export default function MessageListToolbar({
       {
         id: 'from',
         label: '发件人',
-        hint: '按发件人姓名或邮箱搜索',
+        hint: '姓名或邮箱',
         count: countMatches((message) => includes(message.sender_name) || includes(message.sender_email)),
         query: `from:${trimmedQuery}`,
       },
       {
         id: 'attachment',
         label: '附件',
-        hint: '搜索附件名',
+        hint: '附件名',
         count: countMatches((message) => message.has_attachments),
         query: `filename:${trimmedQuery}`,
       },
       {
         id: 'body',
         label: '内容',
-        hint: '按正文内容搜索',
+        hint: '正文',
         count: countMatches((message) => includes(message.body) || includes(message.snippet)),
         query: `body:${trimmedQuery}`,
       },

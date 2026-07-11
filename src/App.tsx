@@ -769,6 +769,42 @@ export default function App() {
   }, [composeTemplates]);
 
   useEffect(() => {
+    const dropdownSelector = [
+      'details.compact-menu',
+      'details.sidebar-disclosure',
+      'details.composer-advanced',
+      'details.rule-advanced',
+    ].join(',');
+
+    function closestDropdown(target: EventTarget | null) {
+      return target instanceof Element
+        ? target.closest<HTMLDetailsElement>(dropdownSelector)
+        : null;
+    }
+
+    function closeOpenDropdowns(except: HTMLDetailsElement | null = null) {
+      document.querySelectorAll<HTMLDetailsElement>(`${dropdownSelector}[open]`).forEach((details) => {
+        if (details !== except) details.open = false;
+      });
+    }
+
+    function handleGlobalPointerDown(event: PointerEvent) {
+      closeOpenDropdowns(closestDropdown(event.target));
+    }
+
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeOpenDropdowns();
+    }
+
+    document.addEventListener('pointerdown', handleGlobalPointerDown, true);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isComposerOpen || isDraftEmpty(draft)) return;
     const autosave: ComposerAutosave = {
       draft,

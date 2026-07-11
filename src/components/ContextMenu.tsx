@@ -23,6 +23,7 @@ type ContextMenuProps = {
   items: ContextMenuItem[];
   onClose: () => void;
   className?: string;
+  closeIgnoreRef?: React.RefObject<HTMLElement>;
   ariaLabel?: string;
   title?: string;
   detail?: string;
@@ -81,6 +82,7 @@ export default function ContextMenu({
   items,
   onClose,
   className,
+  closeIgnoreRef,
   ariaLabel = '快捷操作',
   title,
   detail,
@@ -110,7 +112,9 @@ export default function ContextMenu({
       ?.focus();
 
     function handlePointerDown(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) onClose();
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || closeIgnoreRef?.current?.contains(target)) return;
+      onClose();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -193,7 +197,7 @@ export default function ContextMenu({
       window.removeEventListener('blur', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [onClose]);
+  }, [closeIgnoreRef, onClose]);
 
   return createPortal(
     <div

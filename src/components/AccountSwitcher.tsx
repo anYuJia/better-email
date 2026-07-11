@@ -146,6 +146,7 @@ export default function AccountSwitcher({
           y={menu.y}
           items={items}
           className="account-switcher-menu"
+          closeIgnoreRef={triggerRef}
           ariaLabel="邮箱范围选择"
           onClose={() => setMenu(null)}
         />

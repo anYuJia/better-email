@@ -3070,7 +3070,7 @@ body {
 .sidebar .folder.active:hover {
   color: #17202b;
   background: var(--quiet-row-selected);
-  box-shadow: inset 3px 0 0 var(--quiet-row-selected-border);
+  box-shadow: none;
 }
 
 .sidebar .folder.active .folder-main {

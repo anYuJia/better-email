@@ -3,7 +3,6 @@ import {
   Search,
 } from 'lucide-react';
 import type {
-  AccountScope,
   FilterMode,
   Message,
 } from '../app/types';
@@ -22,7 +21,6 @@ type MessageListViewProps = {
   query: string;
   filter: FilterMode;
   selectedId: number | null;
-  accountScope: AccountScope;
   hasMoreMessages: boolean;
   selectedMessageIds: number[];
   draggingMessageIds: number[];
@@ -43,7 +41,6 @@ export default function MessageListView({
   query,
   filter,
   selectedId,
-  accountScope,
   hasMoreMessages,
   selectedMessageIds,
   draggingMessageIds,
@@ -125,7 +122,6 @@ export default function MessageListView({
               </div>
               <p>{message.snippet}</p>
               <div className="message-chips">
-                {accountScope === 'all' && <span>{message.account_email}</span>}
                 {message.labels.map((label) => <span key={label}>{label}</span>)}
                 {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
               </div>

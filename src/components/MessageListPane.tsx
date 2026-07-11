@@ -271,7 +271,6 @@ export default function MessageListPane({
           query={query}
           filter={filter}
           selectedId={selectedId}
-          accountScope={accountScope}
           hasMoreMessages={hasMoreMessages}
           selectedMessageIds={selectedMessageIds}
           draggingMessageIds={draggingMessageIds}

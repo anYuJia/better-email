@@ -24,7 +24,7 @@ function outboxItem(
 }
 
 describe('background task coordinator helpers', () => {
-  it('wakes only for scheduled items that need a local release', () => {
+  it('wakes only for scheduled items that are due for SMTP send', () => {
     const next = nextOutboxWakeItem([
       outboxItem(1, 'sent', ''),
       outboxItem(2, 'retry', '2026-07-10T10:10:00.000Z'),

@@ -242,13 +242,14 @@ export default function useBackgroundTaskCoordinator({
     return message;
   }, [setOutbox, setStatus]);
 
-  const releaseDueOutboxItems = useCallback(async (): Promise<string> => {
-    const items = await invoke<OutboxItem[]>('release_due_outbox_items');
+  const sendDueOutboxItems = useCallback(async (): Promise<string> => {
+    await invoke<OutboxItem[]>('release_due_outbox_items');
+    const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
     setOutbox(items);
     const current = currentRef.current;
     const meta = await current.loadMeta(current.folderId, current.accountScope);
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
-    const message = '发件时间已到，等待手动点击真实发送';
+    const message = outboxFlushMessage(items);
     setStatus(message);
     return message;
   }, [setOutbox, setStatus]);
@@ -307,10 +308,10 @@ export default function useBackgroundTaskCoordinator({
 
   const executeBackgroundTask = useCallback(async (task: BackgroundTask): Promise<string> => {
     if (task.kind === 'sync') return runBackgroundSync(task.source);
-    if (task.kind === 'outbox-smtp' && task.source === 'timer') return releaseDueOutboxItems();
+    if (task.kind === 'outbox-smtp' && task.source === 'timer') return sendDueOutboxItems();
     if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
     return flushOutboxDryRun();
-  }, [flushOutboxDryRun, flushOutboxSmtp, releaseDueOutboxItems, runBackgroundSync]);
+  }, [flushOutboxDryRun, flushOutboxSmtp, runBackgroundSync, sendDueOutboxItems]);
 
   const drainBackgroundTaskQueue = useCallback(async () => {
     if (backgroundTaskWorkerRef.current) return;
@@ -391,7 +392,7 @@ export default function useBackgroundTaskCoordinator({
       setPendingSendUndo((current) => (
         current?.outboxId === nextScheduledItem.id ? null : current
       ));
-      releaseDueOutboxItems().catch((error) => setStatus(String(error)));
+      sendDueOutboxItems().catch((error) => setStatus(String(error)));
     }, timerDelay);
 
     return () => {
@@ -402,7 +403,7 @@ export default function useBackgroundTaskCoordinator({
     };
   }, [
     outbox,
-    releaseDueOutboxItems,
+    sendDueOutboxItems,
     setOutbox,
     setPendingSendUndo,
     setStatus,

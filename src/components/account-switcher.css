@@ -229,3 +229,16 @@
   color: var(--ui-text-tertiary);
   font-size: 10.5px;
 }
+
+.account-switcher-menu [data-context-item='add-account'] {
+  min-height: 32px;
+}
+
+.account-switcher-menu [data-context-item='add-account'] .context-menu-label {
+  color: var(--ui-text);
+  font-weight: 540;
+}
+
+.account-switcher-menu [data-context-item='add-account'] .context-menu-icon {
+  color: var(--ui-text-secondary);
+}

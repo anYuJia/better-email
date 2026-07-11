@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Mail, Mails, Star } from 'lucide-react';
+import { ChevronDown, Mail, Mails, Plus, Star } from 'lucide-react';
 import type { Account, AccountScope } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import './account-switcher.css';
@@ -9,6 +9,7 @@ type AccountSwitcherProps = {
   accounts: Account[];
   onChange: (value: string) => void;
   onSetDefault: (accountId: number) => void;
+  onAddAccount: () => void;
 };
 
 function providerLabel(provider: string) {
@@ -33,8 +34,10 @@ export default function AccountSwitcher({
   accounts,
   onChange,
   onSetDefault,
+  onAddAccount,
 }: AccountSwitcherProps) {
   const [menu, setMenu] = React.useState<{ x: number; y: number } | null>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const selectedAccount = accountScope === 'all'
     ? null
     : accounts.find((account) => account.id === accountScope) ?? null;
@@ -50,6 +53,12 @@ export default function AccountSwitcher({
 
   function openMenu(x: number, y: number) {
     setMenu({ x, y });
+  }
+
+  function openMenuFromTrigger() {
+    const bounds = triggerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    openMenu(bounds.left, bounds.bottom + 6);
   }
 
   const items: ContextMenuItem[] = [
@@ -85,6 +94,13 @@ export default function AccountSwitcher({
       onSelect: () => onSetDefault(selectedAccount.id),
     });
   }
+  items.push({
+    id: 'add-account',
+    label: '添加邮箱',
+    icon: <Plus size={15} />,
+    separatorBefore: true,
+    onSelect: onAddAccount,
+  });
 
   return (
     <section
@@ -93,16 +109,28 @@ export default function AccountSwitcher({
       aria-label="邮箱范围"
     >
       <button
+        ref={triggerRef}
         type="button"
         className="account-switcher-trigger"
         aria-haspopup="menu"
         aria-expanded={Boolean(menu)}
+        onPointerDown={(event) => {
+          if (!menu) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setMenu(null);
+        }}
         onClick={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          openMenu(bounds.left, bounds.bottom + 6);
+          event.stopPropagation();
+          if (menu) {
+            setMenu(null);
+            return;
+          }
+          openMenuFromTrigger();
         }}
         onContextMenu={(event) => {
           event.preventDefault();
+          event.stopPropagation();
           openMenu(event.clientX, event.clientY);
         }}
       >

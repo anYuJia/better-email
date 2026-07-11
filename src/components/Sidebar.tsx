@@ -197,6 +197,7 @@ export default function Sidebar({
         accounts={accounts}
         onChange={onAccountScopeChange}
         onSetDefault={onSetDefaultAccount}
+        onAddAccount={onOpenSettings}
       />
       <button className="compose-button" onClick={onCompose}>
         <Edit3 size={17} /> 写邮件

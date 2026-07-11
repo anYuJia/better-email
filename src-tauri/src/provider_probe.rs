@@ -70,7 +70,9 @@ pub fn run_provider_probe(
     let account_summary = probe_account(&account);
 
     let credential_started = Instant::now();
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match load_account_secret(database_path, &account)
+        .and_then(|raw| credentials::account_secret_from_raw(&account.auth_type, &raw))
+    {
         Ok(secret) => secret,
         Err(error) => {
             let credential =
@@ -89,7 +91,7 @@ pub fn run_provider_probe(
     };
     let credential = success_stage(
         credential_started,
-        "已从系统凭据库读取凭据，报告不会输出敏感内容。",
+        "已从本地应用数据读取授权码，报告不会输出敏感内容。",
         None,
     );
 
@@ -144,6 +146,20 @@ pub fn run_provider_probe(
         folder_discovery,
         inbox_header_sample,
     })
+}
+
+fn load_account_secret(database_path: &Path, account: &Account) -> Result<String, String> {
+    let connection = open_read_only(database_path)?;
+    let raw = connection
+        .query_row(
+            "SELECT secret FROM account_credentials WHERE account_email = ?1",
+            [account.email.trim().to_ascii_lowercase()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("读取本地授权码失败：{error}"))?;
+    raw.filter(|secret| !secret.trim().is_empty())
+        .ok_or_else(|| "未保存该账号授权码。".to_string())
 }
 
 fn probe_folders_and_headers(

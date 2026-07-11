@@ -1894,6 +1894,35 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         ],
       } as T;
     }
+    case 'verify_account_credentials_with_secret': {
+      const input = (args?.input ?? {}) as { account_id?: number; secret?: string };
+      const targetAccount = mockAccounts.find((item) => item.id === Number(input.account_id)) ?? account;
+      const incomingName = targetAccount.incoming_protocol === 'pop3' ? 'POP3' : 'IMAP';
+      const hasSecret = Boolean(String(input.secret ?? '').trim());
+      return {
+        account_email: targetAccount.email,
+        checked_at: now,
+        authenticated: hasSecret,
+        status: hasSecret ? 'ok' : 'credential_error',
+        message: hasSecret
+          ? `${incomingName} 与 SMTP 登录验证通过，未发送任何邮件。`
+          : '请输入授权码或密码后再验证。',
+        checks: [
+          {
+            name: incomingName,
+            address: targetAccount.imap_host,
+            authenticated: hasSecret,
+            message: hasSecret ? `${incomingName} 登录认证成功。` : '未发起登录：缺少授权码。',
+          },
+          {
+            name: 'SMTP',
+            address: targetAccount.smtp_host,
+            authenticated: hasSecret,
+            message: hasSecret ? 'SMTP 登录认证成功。' : '未发起登录：缺少授权码。',
+          },
+        ],
+      } as T;
+    }
     case 'discover_imap_folders': {
       const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
       const previous = new Map(

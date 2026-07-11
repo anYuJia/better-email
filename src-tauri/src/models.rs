@@ -698,6 +698,12 @@ pub struct CredentialInput {
     pub secret: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct CredentialVerificationInput {
+    pub account_id: Option<i64>,
+    pub secret: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct CredentialStatus {
     pub account_email: String,

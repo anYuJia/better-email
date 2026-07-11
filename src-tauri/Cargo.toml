@@ -24,8 +24,6 @@ thiserror = "2.0"
 once_cell = "1.21"
 mail-parser = "0.11.4"
 ammonia = "4.1.3"
-keyring = "4.1.4"
-security-framework = "3.7"
 lettre = { version = "0.11.22", default-features = false, features = ["builder", "smtp-transport", "pool", "hostname", "rustls-tls"] }
 imap = "3.0.0-alpha.15"
 imap-proto = "0.16.7"

@@ -1,10 +1,10 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
     BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactInput,
-    ContactMergeSuggestion, DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch,
-    ImapMailboxState, ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
-    MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    ContactMergeSuggestion, CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
+    ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, ImapReconcileResult, Label, LocalBackup,
+    LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
+    MailStats, Message, MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
     RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
     SyncSchedulePlan, ThreadSummary,
@@ -185,6 +185,12 @@ impl MailStore {
                     signature TEXT NOT NULL DEFAULT '',
                     is_default INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS account_credentials (
+                    account_email TEXT PRIMARY KEY,
+                    secret TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS folders (
@@ -420,6 +426,12 @@ impl MailStore {
                 "accounts",
                 "is_default",
                 "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "account_credentials",
+                "updated_at",
+                "TEXT NOT NULL DEFAULT ''",
             )?;
             ensure_default_account_for_conn(conn)?;
             conn.execute_batch(
@@ -833,6 +845,112 @@ impl MailStore {
         self.with_conn(|conn| account_for_conn_optional(conn, account_id))
     }
 
+    pub fn get_account_secret_raw(&self, account: &Account) -> MailResult<String> {
+        self.with_conn(|conn| account_secret_raw_for_conn(conn, account))
+    }
+
+    pub fn get_account_secret(
+        &self,
+        account: &Account,
+    ) -> MailResult<crate::credentials::AccountSecret> {
+        let raw = self.get_account_secret_raw(account)?;
+        let secret = crate::credentials::account_secret_from_raw(&account.auth_type, &raw)
+            .map_err(MailError::Imap)?;
+        let crate::credentials::AccountSecret::OAuth2(bundle) = &secret else {
+            return Ok(secret);
+        };
+        if !crate::oauth::token_needs_refresh(bundle) {
+            return Ok(secret);
+        }
+        let refreshed = crate::oauth::refresh_token(bundle, "", "").map_err(MailError::Imap)?;
+        let serialized = serde_json::to_string(&refreshed)
+            .map_err(|error| MailError::Imap(format!("OAuth2 token 序列化失败：{error}")))?;
+        let status = self.store_account_secret(&account.email, &serialized)?;
+        if !status.exists {
+            return Err(MailError::Imap(status.message));
+        }
+        Ok(crate::credentials::AccountSecret::OAuth2(refreshed))
+    }
+
+    pub fn store_account_secret(
+        &self,
+        account_email: &str,
+        secret: &str,
+    ) -> MailResult<CredentialStatus> {
+        self.with_conn(|conn| {
+            let email = account_email.trim().to_ascii_lowercase();
+            let secret = secret.trim().to_string();
+            if email.is_empty() {
+                return Ok(CredentialStatus {
+                    account_email: email,
+                    exists: false,
+                    message: "账号邮箱不能为空。".to_string(),
+                });
+            }
+            if secret.is_empty() {
+                return Ok(CredentialStatus {
+                    account_email: email,
+                    exists: false,
+                    message: "授权码不能为空。".to_string(),
+                });
+            }
+            let now = Utc::now().to_rfc3339();
+            conn.execute(
+                "
+                INSERT INTO account_credentials(account_email, secret, updated_at)
+                VALUES (?1, ?2, ?3)
+                ON CONFLICT(account_email) DO UPDATE
+                SET secret = excluded.secret,
+                    updated_at = excluded.updated_at
+                ",
+                params![email, secret, now],
+            )?;
+            Ok(CredentialStatus {
+                account_email: email,
+                exists: true,
+                message: "授权码已保存到本地应用数据。".to_string(),
+            })
+        })
+    }
+
+    pub fn check_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
+        self.with_conn(|conn| {
+            let email = account_email.trim().to_ascii_lowercase();
+            let exists = conn
+                .query_row(
+                    "SELECT length(secret) > 0 FROM account_credentials WHERE account_email = ?1",
+                    params![email],
+                    |row| row.get::<_, bool>(0),
+                )
+                .optional()?
+                .unwrap_or(false);
+            Ok(CredentialStatus {
+                account_email: email,
+                exists,
+                message: if exists {
+                    "本地应用数据中存在该账号授权码。".to_string()
+                } else {
+                    "未保存该账号授权码。".to_string()
+                },
+            })
+        })
+    }
+
+    pub fn delete_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
+        self.with_conn(|conn| {
+            let email = account_email.trim().to_ascii_lowercase();
+            conn.execute(
+                "DELETE FROM account_credentials WHERE account_email = ?1",
+                params![email],
+            )?;
+            Ok(CredentialStatus {
+                account_email: email,
+                exists: false,
+                message: "本地授权码已删除。".to_string(),
+            })
+        })
+    }
+
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
             let email = input.email.trim().to_lowercase();
@@ -935,19 +1053,22 @@ impl MailStore {
         self.with_conn(|conn| {
             eprintln!("[better-email][db] delete_account start account_id={account_id}");
             let transaction = conn.unchecked_transaction()?;
-            let exists = transaction
+            let account_email = transaction
                 .query_row(
-                    "SELECT 1 FROM accounts WHERE id = ?1",
+                    "SELECT email FROM accounts WHERE id = ?1",
                     params![account_id],
-                    |row| row.get::<_, i64>(0),
+                    |row| row.get::<_, String>(0),
                 )
-                .optional()?
-                .is_some();
-            if !exists {
+                .optional()?;
+            let Some(account_email) = account_email else {
                 eprintln!("[better-email][db] delete_account missing account_id={account_id}");
                 return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
-            }
+            };
 
+            transaction.execute(
+                "DELETE FROM account_credentials WHERE account_email = ?1",
+                params![account_email],
+            )?;
             transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
             ensure_default_account_for_conn(&transaction)?;
             let next_account = account_for_conn_optional(&transaction, None)?;
@@ -2355,7 +2476,16 @@ impl MailStore {
     }
 
     pub fn send_message(&self, input: DraftInput) -> MailResult<i64> {
-        self.create_outbound_message(input, "sent")
+        self.with_conn(|conn| {
+            let message_id = create_outbound_message_for_conn(conn, input, "outbox")?;
+            let queued_at = Utc::now().to_rfc3339();
+            conn.execute(
+                "INSERT INTO outbox_queue(message_id, status, attempts, last_error, queued_at, next_attempt_at)
+                 VALUES (?1, 'queued', 0, '', ?2, '')",
+                params![message_id, queued_at],
+            )?;
+            Ok(message_id)
+        })
     }
 
     pub fn queue_outbox_message(&self, input: DraftInput) -> MailResult<OutboxItem> {
@@ -3927,6 +4057,18 @@ impl MailStore {
     fn create_outbound_message(&self, input: DraftInput, role: &str) -> MailResult<i64> {
         self.with_conn(|conn| create_outbound_message_for_conn(conn, input, role))
     }
+}
+
+fn account_secret_raw_for_conn(conn: &Connection, account: &Account) -> MailResult<String> {
+    let raw = conn
+        .query_row(
+            "SELECT secret FROM account_credentials WHERE account_email = ?1",
+            params![account.email.trim().to_ascii_lowercase()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    raw.filter(|secret| !secret.trim().is_empty())
+        .ok_or_else(|| MailError::Imap("未保存该账号授权码。".to_string()))
 }
 
 fn migrate_legacy_database(data_dir: &Path, database_path: &Path) -> MailResult<()> {
@@ -7168,7 +7310,7 @@ mod tests {
     }
 
     #[test]
-    fn draft_and_sent_messages_are_saved_to_expected_folders() {
+    fn draft_and_outbox_messages_are_saved_to_expected_folders() {
         let store = test_store();
         let draft_id = store
             .save_draft(DraftInput {
@@ -7206,17 +7348,38 @@ mod tests {
             .into_iter()
             .find(|folder| folder.role == "drafts")
             .unwrap();
-        let sent = store
+        let outbox = store
             .list_folders_for_account(Some(store.get_account().unwrap().id))
             .unwrap()
             .into_iter()
-            .find(|folder| folder.role == "sent")
+            .find(|folder| folder.role == "outbox")
             .unwrap();
         assert!(store
             .list_messages_for_scope(None, drafts.id, Some("Hello".to_string()), None, 10)
             .unwrap()
             .iter()
             .any(|message| message.id == draft_id));
+        assert!(store
+            .list_messages_for_scope(None, outbox.id, Some("Ship".to_string()), None, 10)
+            .unwrap()
+            .iter()
+            .any(|message| message.id == sent_id));
+        assert!(store
+            .list_outbox()
+            .unwrap()
+            .iter()
+            .any(|item| item.message_id == sent_id && item.status == "queued"));
+
+        let message_id_header = "<better-email-direct-send@better-email.local>";
+        store
+            .mark_outbox_smtp_sent_pending_archive(sent_id, message_id_header)
+            .unwrap();
+        let sent = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "sent")
+            .unwrap();
         assert!(store
             .list_messages_for_scope(None, sent.id, Some("Ship".to_string()), None, 10)
             .unwrap()

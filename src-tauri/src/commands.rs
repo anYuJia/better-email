@@ -6,14 +6,14 @@ use crate::models::{
     BackgroundTask, BackgroundTaskInput, CacheClearResult, ConnectionReport, Contact,
     ContactCreateInput, ContactExportSummary, ContactImportSummary, ContactInput,
     ContactMergeSuggestion, CredentialInput, CredentialProtocolCheck, CredentialStatus,
-    CredentialVerificationReport, DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession,
-    DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder, FolderReadReport, ImapMailboxState,
-    ImapProbeReport, Label, LocalBackup, LocalBackupSummary, MailIdentity, MailIdentityInput,
-    MailRule, MailRuleInput, MailStats, Message, MessageThreadingInput, OAuthCallbackInput,
-    OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput, OAuthRefreshReport,
-    OAuthSession, OAuthStartInput, OAuthStartReport, OAuthTokenExchangeInput,
-    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    CredentialVerificationInput, CredentialVerificationReport, DiagnosticAccount, DiagnosticExport,
+    DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder,
+    FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
+    MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput,
+    OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport,
+    OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage,
+    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
     RemoteImageTrustInput, RestoreMessageReport, StorageUsage, SyncRun, SyncSchedulePlan,
     ThreadSummary, TrashActionReport,
 };
@@ -397,7 +397,7 @@ pub fn download_attachment(
 ) -> MailResult<AttachmentDownload> {
     let attachment = store.get_attachment(attachment_id)?;
     let account = store.get_message_account(attachment.message_id)?;
-    let secret = credentials::get_account_secret(&account).map_err(crate::db::MailError::Imap)?;
+    let secret = store.get_account_secret(&account)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(attachment.message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
         return Err(crate::db::MailError::Imap(
@@ -756,7 +756,7 @@ pub fn mark_folder_read(
                 continue;
             }
         };
-        let secret = match credentials::get_account_secret(&account) {
+        let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
             Err(_) => {
                 remote_skipped_count += remote_uids.len() as i64;
@@ -877,7 +877,7 @@ pub fn empty_trash(
                 continue;
             }
         };
-        let secret = match credentials::get_account_secret(&account) {
+        let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
             Err(_) => {
                 remote_skipped_count += group_count;
@@ -1037,7 +1037,7 @@ pub fn save_draft(
             && (previous.remote_uid > 0 || !previous.message_id_header.trim().is_empty())
         {
             let previous_account = store.get_account_by_id(Some(previous.account_id))?;
-            let previous_secret = match credentials::get_account_secret(&previous_account) {
+            let previous_secret = match store.get_account_secret(&previous_account) {
                 Ok(secret) => secret,
                 Err(error) => {
                     return Ok(DraftSaveReport {
@@ -1074,7 +1074,7 @@ pub fn save_draft(
         }
     }
 
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(DraftSaveReport {
@@ -1148,7 +1148,7 @@ pub fn send_message(
 ) -> MailResult<i64> {
     let started_at = std::time::Instant::now();
     eprintln!(
-        "[better-email][send] local send start account_id={} to={} subject_len={} attachments={}",
+        "[better-email][send] direct smtp start account_id={} to={} subject_len={} attachments={}",
         input.account_id,
         mask_recipient_list(&input.to),
         input.subject.trim().chars().count(),
@@ -1156,9 +1156,43 @@ pub fn send_message(
     );
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
+    let message = store.get_outbound_message(message_id)?;
+    let account = store.get_account_by_id(Some(message.account_id))?;
+    let secret = match store.get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => {
+            let blocked_error =
+                "缺少账号授权码，请在账号设置中重新保存授权码；邮件已留在发件箱。".to_string();
+            eprintln!(
+                "[better-email][send] direct smtp credential missing message_id={} account_id={} email={} error={}",
+                message_id,
+                message.account_id,
+                mask_email(&account.email),
+                error,
+            );
+            store.mark_outbox_blocked(message_id, &blocked_error)?;
+            return Err(crate::db::MailError::Smtp(blocked_error));
+        }
+    };
+    let raw_message = match smtp::send_outbound(&account, &message, &secret) {
+        Ok(raw_message) => raw_message,
+        Err(error) => {
+            let error_message = error.to_string();
+            eprintln!(
+                "[better-email][send] direct smtp failed message_id={} account_id={} error={}",
+                message_id, message.account_id, error,
+            );
+            store.mark_outbox_failed(message_id, &error_message)?;
+            return Err(error);
+        }
+    };
+    let message_id_header = smtp::outbound_message_id(&message);
+    store.mark_outbox_smtp_sent_pending_archive(message_id, &message_id_header)?;
+    archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
     eprintln!(
-        "[better-email][send] local send ok message_id={} duration_ms={}",
+        "[better-email][send] direct smtp ok message_id={} account_id={} duration_ms={}",
         message_id,
+        message.account_id,
         started_at.elapsed().as_millis(),
     );
     Ok(message_id)
@@ -1353,7 +1387,34 @@ pub fn verify_account_credentials(
     account_id: Option<i64>,
 ) -> MailResult<CredentialVerificationReport> {
     let account = store.get_account_by_id(account_id)?;
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
+        Ok(secret) => secret,
+        Err(error) => return Ok(credential_error_report(&account, error.to_string())),
+    };
+    let incoming_result = verify_incoming_credentials(&account, &secret);
+    let smtp_result =
+        smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+    Ok(credential_verification_report(
+        &account,
+        incoming_result,
+        smtp_result,
+    ))
+}
+
+#[tauri::command]
+pub fn verify_account_credentials_with_secret(
+    store: State<'_, MailStore>,
+    input: CredentialVerificationInput,
+) -> MailResult<CredentialVerificationReport> {
+    let account = store.get_account_by_id(input.account_id)?;
+    let raw_secret = input.secret.trim();
+    if raw_secret.is_empty() {
+        return Ok(credential_error_report(
+            &account,
+            "请输入授权码或密码后再验证。".to_string(),
+        ));
+    }
+    let secret = match credentials::account_secret_from_raw(&account.auth_type, raw_secret) {
         Ok(secret) => secret,
         Err(error) => return Ok(credential_error_report(&account, error)),
     };
@@ -1489,9 +1550,9 @@ pub fn discover_imap_folders(
     account_id: Option<i64>,
 ) -> MailResult<ImapProbeReport> {
     let account = store.get_account_by_id(account_id)?;
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
-        Err(error) => return Ok(imap_probe::failed_report(&account.email, error)),
+        Err(error) => return Ok(imap_probe::failed_report(&account.email, error.to_string())),
     };
 
     match imap_probe::discover_folders(&account, &secret) {
@@ -1680,7 +1741,7 @@ fn sync_pop3_headers_for_account(
         );
     }
 
-    let secret = credentials::get_account_secret(account).map_err(crate::db::MailError::Imap)?;
+    let secret = store.get_account_secret(account)?;
     let messages = pop3_probe::fetch_recent_messages(account, &secret)?;
     let fetched_messages = messages.len() as i64;
     let imported_messages = store.import_pop3_messages(account.id, &messages)?;
@@ -1704,7 +1765,7 @@ fn sync_imap_headers_for_account(
     account: &Account,
     history_only: bool,
 ) -> MailResult<SyncRun> {
-    let secret = credentials::get_account_secret(account).map_err(crate::db::MailError::Imap)?;
+    let secret = store.get_account_secret(account)?;
     let started_at = Utc::now().to_rfc3339();
     let mut mailboxes = store.list_imap_mailboxes_for_account(Some(account.id))?;
     if mailboxes.is_empty() {
@@ -1910,7 +1971,7 @@ pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailR
     if is_pop3_account(&account) {
         return store.get_message(message_id);
     }
-    let secret = credentials::get_account_secret(&account).map_err(crate::db::MailError::Imap)?;
+    let secret = store.get_account_secret(&account)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
         return Err(crate::db::MailError::Imap(
@@ -1932,13 +1993,23 @@ pub fn parse_raw_message(input: RawMessageInput) -> ParsedMessagePreview {
 }
 
 #[tauri::command]
-pub fn store_account_secret(input: CredentialInput) -> CredentialStatus {
+pub fn store_account_secret(
+    store: State<'_, MailStore>,
+    input: CredentialInput,
+) -> CredentialStatus {
     eprintln!(
         "[better-email][credential] store start email={} has_secret={}",
         mask_email(&input.account_email),
         !input.secret.trim().is_empty(),
     );
-    let status = credentials::store_secret(&input.account_email, &input.secret);
+    let status = match store.store_account_secret(&input.account_email, &input.secret) {
+        Ok(status) => status,
+        Err(error) => CredentialStatus {
+            account_email: input.account_email.trim().to_ascii_lowercase(),
+            exists: false,
+            message: error.to_string(),
+        },
+    };
     eprintln!(
         "[better-email][credential] store done email={} exists={} message={}",
         mask_email(&input.account_email),
@@ -1949,17 +2020,37 @@ pub fn store_account_secret(input: CredentialInput) -> CredentialStatus {
 }
 
 #[tauri::command]
-pub fn check_account_secret(account_email: String) -> CredentialStatus {
-    credentials::check_secret(&account_email)
+pub fn check_account_secret(
+    store: State<'_, MailStore>,
+    account_email: String,
+) -> CredentialStatus {
+    match store.check_account_secret(&account_email) {
+        Ok(status) => status,
+        Err(error) => CredentialStatus {
+            account_email: account_email.trim().to_ascii_lowercase(),
+            exists: false,
+            message: error.to_string(),
+        },
+    }
 }
 
 #[tauri::command]
-pub fn delete_account_secret(account_email: String) -> CredentialStatus {
+pub fn delete_account_secret(
+    store: State<'_, MailStore>,
+    account_email: String,
+) -> CredentialStatus {
     eprintln!(
         "[better-email][credential] delete start email={}",
         mask_email(&account_email),
     );
-    let status = credentials::delete_secret(&account_email);
+    let status = match store.delete_account_secret(&account_email) {
+        Ok(status) => status,
+        Err(error) => CredentialStatus {
+            account_email: account_email.trim().to_ascii_lowercase(),
+            exists: false,
+            message: error.to_string(),
+        },
+    };
     eprintln!(
         "[better-email][credential] delete done email={} exists={} message={}",
         mask_email(&account_email),
@@ -2019,7 +2110,7 @@ pub fn exchange_oauth2_token(
             let secret = serde_json::to_string(&bundle).map_err(|error| {
                 crate::db::MailError::Imap(format!("OAuth2 token 序列化失败：{error}"))
             })?;
-            let status = credentials::store_secret(&session.account_email, &secret);
+            let status = store.store_account_secret(&session.account_email, &secret)?;
             if !status.exists {
                 let report = store.mark_oauth_token_exchange_failed(session.id, &status.message)?;
                 return Err(crate::db::MailError::Imap(report.message));
@@ -2039,7 +2130,7 @@ pub fn refresh_oauth2_token(
     input: OAuthRefreshInput,
 ) -> MailResult<OAuthRefreshReport> {
     let account = store.get_account()?;
-    let raw = credentials::get_secret(&account.email).map_err(crate::db::MailError::Imap)?;
+    let raw = store.get_account_secret_raw(&account)?;
     let secret = credentials::account_secret_from_raw(&account.auth_type, &raw)
         .map_err(crate::db::MailError::Imap)?;
     let bundle = match secret {
@@ -2054,7 +2145,7 @@ pub fn refresh_oauth2_token(
         .map_err(crate::db::MailError::Imap)?;
     let secret = serde_json::to_string(&refreshed)
         .map_err(|error| crate::db::MailError::Imap(format!("OAuth2 token 序列化失败：{error}")))?;
-    let status = credentials::store_secret(&account.email, &secret);
+    let status = store.store_account_secret(&account.email, &secret)?;
     if !status.exists {
         return Err(crate::db::MailError::Imap(status.message));
     }
@@ -2083,7 +2174,7 @@ fn sync_remote_seen(
             "本地已更新；POP3 不支持远端已读状态回写。",
         ));
     }
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
@@ -2120,7 +2211,7 @@ fn sync_remote_flagged(
             "本地星标已更新；POP3 不支持远端星标回写。",
         ));
     }
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
@@ -2160,7 +2251,7 @@ fn sync_remote_move(
             "本地已移动；POP3 不支持远端移动，远端邮件保持不变。",
         ));
     }
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
@@ -2245,7 +2336,7 @@ fn sync_remote_delete_reference(
             "{local_action}；POP3 不执行远端删除，远端邮件保持不变。"
         )));
     }
-    let secret = match credentials::get_account_secret(&account) {
+    let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
@@ -2880,7 +2971,7 @@ fn archive_sent_message(
 fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
     for message in store.pending_remote_archive_messages()? {
         let account = store.get_account_by_id(Some(message.account_id))?;
-        let secret = match credentials::get_account_secret(&account) {
+        let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
             Err(error) => {
                 store.mark_outbox_remote_archive_failed(
@@ -2921,7 +3012,7 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
             mask_recipient_list(&message.recipients),
             message.attachments.len(),
         );
-        let secret = match credentials::get_account_secret(&account) {
+        let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
             Err(error) => {
                 let blocked_error =

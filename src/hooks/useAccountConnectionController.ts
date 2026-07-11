@@ -259,6 +259,36 @@ export default function useAccountConnectionController({
           }
           throw new Error(credentialResult.message);
         }
+        const verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
+          input: {
+            account_id: created.id,
+            secret: trimmedSecret,
+          },
+        });
+        setCredentialVerification(verification);
+        accountFlowLog('credential verified after create', {
+          email: maskEmailForLog(created.email),
+          status: verification.status,
+          authenticated: verification.authenticated,
+        });
+        if (!verification.authenticated) {
+          accountFlowWarn('credential verification failed: rolling back account', {
+            accountId: created.id,
+            email: maskEmailForLog(created.email),
+            status: verification.status,
+            message: verification.message,
+          });
+          try {
+            await invoke<Account | null>('delete_account', { accountId: created.id });
+          } catch (rollbackError) {
+            accountFlowWarn('verification rollback failed', {
+              accountId: created.id,
+              email: maskEmailForLog(created.email),
+              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+            });
+          }
+          throw new Error(verification.message || '账号登录验证失败，请检查授权码和服务器配置。');
+        }
       }
       setAccounts((current) => [...current, created]);
       setAccountScope(created.id);
@@ -280,7 +310,7 @@ export default function useAccountConnectionController({
         accountId: created.id,
         folderId: nextFolderId,
       });
-      setStatus(trimmedSecret ? `已创建账号并保存凭据：${created.email}` : `已创建账号：${created.email}`);
+      setStatus(trimmedSecret ? `已创建并验证账号：${created.email}` : `已创建账号：${created.email}`);
     } catch (error) {
       accountFlowWarn('create failed', {
         email: maskEmailForLog(newAccountForm.email),

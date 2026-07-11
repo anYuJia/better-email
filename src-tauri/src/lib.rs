@@ -84,6 +84,7 @@ pub fn run() {
             commands::clear_attachment_cache,
             commands::test_connection,
             commands::verify_account_credentials,
+            commands::verify_account_credentials_with_secret,
             commands::discover_imap_folders,
             commands::list_imap_mailboxes,
             commands::map_imap_mailbox,

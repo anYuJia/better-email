@@ -1619,19 +1619,30 @@ export default function App() {
       undoDelaySeconds: sendUndoDelaySeconds,
     });
     if (sendUndoDelaySeconds === 0) {
-      const messageId = await invoke<number>('send_message', {
-        input,
-        threading: threadingForDraft(draft),
-      });
-      setDraft(emptyDraft);
-      clearComposerAutosave();
-      closeComposer();
-      await focusMailboxRole('sent', input.account_id || account?.id || null, '邮件已进入已发送');
-      appFlowLog('sendDraft done', {
-        messageId,
-        accountId: input.account_id,
-        targetRole: 'sent',
-      });
+      try {
+        const messageId = await invoke<number>('send_message', {
+          input,
+          threading: threadingForDraft(draft),
+        });
+        setDraft(emptyDraft);
+        clearComposerAutosave();
+        closeComposer();
+        await focusMailboxRole('sent', input.account_id || account?.id || null, '邮件已发送并进入已发送');
+        appFlowLog('sendDraft done', {
+          messageId,
+          accountId: input.account_id,
+          targetRole: 'sent',
+        });
+      } catch (error) {
+        const message = String(error);
+        closeComposer();
+        await focusMailboxRole('outbox', input.account_id || account?.id || null, `发送失败，邮件已留在发件箱：${message}`);
+        appFlowWarn('sendDraft failed', {
+          accountId: input.account_id,
+          error: message,
+          targetRole: 'outbox',
+        });
+      }
       return;
     }
 
@@ -1669,29 +1680,40 @@ export default function App() {
       setStatus('请先填写快速回复正文');
       return;
     }
-    const messageId = await invoke<number>('send_message', {
-      input: {
-        draft_id: 0,
-        account_id: message.account_id,
-        identity_id: 0,
-        to: message.sender_email,
-        cc: '',
-        bcc: '',
-        subject: prefixedSubject(message.subject, 'Re'),
-        body: `${body}${quoteMessage(message)}`,
-        html_body: '',
-        send_at: '',
-        attachments: [],
-      },
-      threading: replyThreadingHeaders(message),
-    });
-    setQuickReplyBody('');
-    await focusMailboxRole('sent', message.account_id, `已快速回复：${message.sender_name || message.sender_email}`);
-    appFlowLog('sendQuickReply done', {
-      messageId,
-      accountId: message.account_id,
-      targetRole: 'sent',
-    });
+    try {
+      const messageId = await invoke<number>('send_message', {
+        input: {
+          draft_id: 0,
+          account_id: message.account_id,
+          identity_id: 0,
+          to: message.sender_email,
+          cc: '',
+          bcc: '',
+          subject: prefixedSubject(message.subject, 'Re'),
+          body: `${body}${quoteMessage(message)}`,
+          html_body: '',
+          send_at: '',
+          attachments: [],
+        },
+        threading: replyThreadingHeaders(message),
+      });
+      setQuickReplyBody('');
+      await focusMailboxRole('sent', message.account_id, `已快速回复：${message.sender_name || message.sender_email}`);
+      appFlowLog('sendQuickReply done', {
+        messageId,
+        accountId: message.account_id,
+        targetRole: 'sent',
+      });
+    } catch (error) {
+      const errorMessage = String(error);
+      setQuickReplyBody('');
+      await focusMailboxRole('outbox', message.account_id, `快速回复发送失败，邮件已留在发件箱：${errorMessage}`);
+      appFlowWarn('sendQuickReply failed', {
+        accountId: message.account_id,
+        error: errorMessage,
+        targetRole: 'outbox',
+      });
+    }
   }
 
   async function queueDraft() {

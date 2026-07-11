@@ -299,7 +299,6 @@ export default function SidebarFolderNavigation({
           <details className="sidebar-disclosure more-mailboxes">
             <summary>
               <span>更多邮箱</span>
-              <em>{secondaryFolders.length}</em>
             </summary>
             <nav className="folder-list folded-folder-list">
               <FolderItems folders={secondaryFolders} {...folderItemProps} />

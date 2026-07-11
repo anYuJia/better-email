@@ -120,3 +120,55 @@
 .context-menu.account-switcher-menu {
   width: min(272px, calc(100vw - 16px));
 }
+
+/* Native sidebar treatment: account scope should read like a row, not a card. */
+.account-switcher {
+  gap: 0;
+}
+
+.account-switcher-heading,
+.account-switcher .account-switcher-icon {
+  display: none;
+}
+
+.account-switcher-trigger {
+  min-height: 32px;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.account-switcher-trigger:hover,
+.account-switcher-trigger[aria-expanded='true'] {
+  border-color: transparent;
+  background: #f7f8fa;
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.06);
+}
+
+.account-switcher-copy strong {
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.account-switcher .account-switcher-copy > span {
+  margin-top: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+.account-switcher-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--ui-text-tertiary);
+  transition: none;
+}
+
+.account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
+  transform: none;
+}

@@ -190,7 +190,6 @@ export default function Sidebar({
         <div className="brand-mark">B</div>
         <div>
           <strong>Better Email</strong>
-          <span>跨平台 · 本地优先</span>
         </div>
       </div>
       <AccountSwitcher
@@ -221,7 +220,6 @@ export default function Sidebar({
         <details className="sidebar-disclosure sidebar-tools">
           <summary>
             <span>工具</span>
-            <em>4 项</em>
           </summary>
           <div className="sidebar-tool-stack">
             <section className="sidebar-tool-section saved-searches">
@@ -323,7 +321,7 @@ export default function Sidebar({
             <section className="sidebar-tool-section contact-center">
               <div className="sidebar-tool-heading">
                 <strong>联系人</strong>
-                <span>{contacts.length ? `${contacts.length} 位` : '自动收集'}</span>
+                <span>{contacts.length ? `${contacts.length} 位` : '暂无联系人'}</span>
               </div>
               <input
                 value={contactQuery}
@@ -440,8 +438,7 @@ export default function Sidebar({
         </div>
         <details className="sidebar-disclosure background-sync-card">
           <summary>
-            <span>同步与布局</span>
-            <em>{backgroundTasks.some((task) => task.status === 'running') ? '同步中' : '就绪'}</em>
+            <span>同步</span>
           </summary>
           <span>{backgroundSyncStatus}</span>
           {lastNewMailNotice && <em>{lastNewMailNotice}</em>}

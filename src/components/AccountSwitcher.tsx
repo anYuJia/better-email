@@ -43,8 +43,10 @@ export default function AccountSwitcher({
     || selectedAccount?.email
     || '统一邮箱';
   const secondaryLabel = selectedAccount
-    ? `${providerLabel(selectedAccount.provider)} · ${selectedAccount.email}${selectedAccount.is_default ? ' · 默认' : ''}`
-    : `${accounts.length || 1} 个账号汇总${defaultAccount ? ` · 默认 ${defaultAccount.email}` : ''}`;
+    ? selectedAccount.email
+    : accounts.length > 1
+      ? `${accounts.length} 个账号`
+      : defaultAccount?.email ?? '全部账号';
 
   function openMenu(x: number, y: number) {
     setMenu({ x, y });
@@ -88,10 +90,6 @@ export default function AccountSwitcher({
       data-account-scope={String(accountScope)}
       aria-label="邮箱范围"
     >
-      <div className="account-switcher-heading">
-        <span>邮箱范围</span>
-        <em>{accounts.length || 1} 个账号</em>
-      </div>
       <button
         type="button"
         className="account-switcher-trigger"
@@ -106,9 +104,6 @@ export default function AccountSwitcher({
           openMenu(event.clientX, event.clientY);
         }}
       >
-        <span className="account-switcher-icon" aria-hidden="true">
-          {selectedAccount ? <Mail size={16} /> : <Mails size={16} />}
-        </span>
         <span className="account-switcher-copy">
           <strong>{primaryLabel}</strong>
           <span>{secondaryLabel}</span>

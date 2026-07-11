@@ -220,7 +220,7 @@ export default function Sidebar({
       >
         <details className="sidebar-disclosure sidebar-tools">
           <summary>
-            <span>工具</span>
+            <span>更多</span>
           </summary>
           <div className="sidebar-tool-stack">
             <section className="sidebar-tool-section saved-searches">

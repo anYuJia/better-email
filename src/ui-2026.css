@@ -2858,3 +2858,126 @@ body {
   padding-inline: 8px;
   font-weight: 520;
 }
+
+/* Sidebar density pass: keep secondary tools inside the rail and improve legibility. */
+.app-shell {
+  font-size: 14px;
+}
+
+.sidebar {
+  font-size: 13px;
+}
+
+.brand strong,
+.account-switcher-copy strong,
+.compose-button,
+.folder-main,
+.sidebar-disclosure summary,
+.settings-button {
+  font-size: 13px;
+}
+
+.account-switcher .account-switcher-copy > span,
+.sidebar-label,
+.badge,
+.sidebar-disclosure summary em,
+.sidebar-tool-heading span,
+.sidebar-tool-section small,
+.background-sync-card > span,
+.background-sync-card > em,
+.background-sync-card > small {
+  font-size: 11.5px;
+}
+
+.sender,
+.subject,
+.reader-sender-copy strong {
+  font-size: 13.5px;
+}
+
+.message-card p,
+.reader-header p,
+.message-chips span,
+.active-label-chip,
+.reader-meta span {
+  font-size: 12px;
+}
+
+.message-card time,
+.reader-sender-copy > span {
+  font-size: 11.5px;
+}
+
+.sidebar-quick-menus .sidebar-disclosure > :not(summary),
+.sidebar-quick-menus .more-mailboxes > .folded-folder-list,
+.sidebar-tools > .sidebar-tool-stack {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  max-height: min(320px, 38vh);
+  margin-top: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.sidebar-tools > .sidebar-tool-stack {
+  display: grid;
+  gap: 0;
+  padding: 3px 0 5px 10px;
+}
+
+.sidebar-tool-section {
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+}
+
+.sidebar-tool-section:last-child {
+  border-bottom: 0;
+}
+
+.sidebar-tool-heading {
+  margin-bottom: 6px;
+}
+
+.sidebar-tool-heading strong {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.saved-search-form,
+.custom-folder-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.saved-search-form input,
+.custom-folder-form input,
+.contact-center > input {
+  min-height: 31px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.saved-search-form button,
+.custom-folder-form button {
+  min-height: 31px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.saved-search-row > button,
+.contact-row > button,
+.label-row .label-row-main {
+  min-height: 31px;
+  font-size: 12.5px;
+}

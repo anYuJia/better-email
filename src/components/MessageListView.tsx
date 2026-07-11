@@ -73,6 +73,7 @@ export default function MessageListView({
               key={message.id}
               className={[
                 'message-card',
+                message.is_read ? 'is-read' : 'is-unread',
                 message.id === selectedId ? 'selected' : '',
                 draggingMessageSet.has(message.id) ? 'dragging' : '',
               ].filter(Boolean).join(' ')}

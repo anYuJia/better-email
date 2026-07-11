@@ -3231,3 +3231,175 @@ body {
 .settings-button:hover {
   box-shadow: none;
 }
+
+/* Message list density pass: compact rows, low-saturation color, clearer state. */
+.message-list {
+  background: #fafbfc;
+}
+
+.message-date-section + .message-date-section {
+  border-top: 1px solid #e7ebf0;
+}
+
+.message-date-header {
+  min-height: 23px;
+  padding: 5px 12px 3px;
+  color: #7f8894;
+  background: #fafbfc;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+.message-card {
+  min-height: 62px;
+  padding: 7px 12px 7px 48px;
+  border-bottom: 1px solid #e9edf2;
+  background: #fff;
+}
+
+.message-card:hover {
+  background: #f5f8fb;
+  box-shadow: inset 0 0 0 1px rgba(88, 111, 139, 0.08);
+}
+
+.message-card.selected,
+.message-card.selected:hover {
+  background: #eaf2fb;
+  box-shadow:
+    inset 2px 0 0 #6fa4df,
+    inset 0 0 0 1px rgba(111, 164, 223, 0.20);
+}
+
+.message-card.is-unread {
+  background: #fbfdff;
+  box-shadow: inset 2px 0 0 #8bb5df;
+}
+
+.message-card.is-unread:hover {
+  background: #f1f7fc;
+  box-shadow:
+    inset 2px 0 0 #7ba9d7,
+    inset 0 0 0 1px rgba(94, 129, 172, 0.10);
+}
+
+.message-card.is-unread.selected,
+.message-card.is-unread.selected:hover {
+  background: #e6f1fb;
+  box-shadow:
+    inset 2px 0 0 #4f8fd0,
+    inset 0 0 0 1px rgba(79, 143, 208, 0.24);
+}
+
+.message-avatar {
+  left: 14px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  color: #405061;
+  background: #e6ebf1;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.avatar-tone-0 {
+  color: #425466;
+  background: #e4ebf4;
+}
+
+.avatar-tone-1 {
+  color: #4d5264;
+  background: #ece8f4;
+}
+
+.avatar-tone-2 {
+  color: #3f5a50;
+  background: #e4eee9;
+}
+
+.avatar-tone-3 {
+  color: #62533f;
+  background: #f0ebe1;
+}
+
+.avatar-tone-4 {
+  color: #4c5967;
+  background: #e6edf1;
+}
+
+.avatar-tone-5 {
+  color: #604d55;
+  background: #f1e7ea;
+}
+
+.message-select {
+  left: 18px;
+  top: 14px;
+}
+
+.message-select input {
+  width: 14px;
+  height: 14px;
+}
+
+.message-card:hover .message-select,
+.message-card:focus-visible .message-select,
+.message-card:has(.message-select input:checked) .message-select {
+  opacity: 1;
+}
+
+.message-card:hover .message-avatar,
+.message-card:focus-visible .message-avatar,
+.message-card:has(.message-select input:checked) .message-avatar {
+  opacity: 0;
+}
+
+.message-topline {
+  min-height: 17px;
+  gap: 8px;
+}
+
+.sender,
+.subject {
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+.sender {
+  color: #5a6470;
+  font-weight: 560;
+}
+
+.sender.unread,
+.subject.unread {
+  color: #18212d;
+  font-weight: 720;
+}
+
+.message-card time {
+  color: #8b95a1;
+  font-size: 11.5px;
+}
+
+.subject {
+  margin-top: 2px;
+  color: #242b35;
+  font-weight: 580;
+}
+
+.message-card p {
+  margin-top: 2px;
+  color: #7d8794;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.message-chips {
+  margin-top: 3px;
+  gap: 5px;
+}
+
+.message-chips span {
+  color: #8b95a1;
+  font-size: 11.5px;
+  line-height: 1.2;
+}

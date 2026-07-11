@@ -4144,6 +4144,7 @@ struct SearchCriteria {
     cc: Option<String>,
     bcc: Option<String>,
     subject: Option<String>,
+    body: Option<String>,
     label: Option<String>,
     account: Option<String>,
     mailbox: Option<String>,
@@ -4183,6 +4184,12 @@ impl SearchCriteria {
                 .filter(|value| !value.is_empty())
             {
                 criteria.subject = Some(value.to_string());
+            } else if let Some(value) = token
+                .strip_prefix("body:")
+                .or_else(|| token.strip_prefix("content:"))
+                .filter(|value| !value.is_empty())
+            {
+                criteria.body = Some(value.to_string());
             } else if let Some(value) = token
                 .strip_prefix("label:")
                 .filter(|value| !value.is_empty())
@@ -4270,6 +4277,10 @@ impl SearchCriteria {
         }
         if let Some(subject) = &self.subject {
             params.push(build_like_query(subject));
+        }
+        if let Some(body) = &self.body {
+            let value = build_like_query(body);
+            params.extend(std::iter::repeat_n(value, 2));
         }
         if let Some(label) = &self.label {
             params.push(build_like_query(label));
@@ -4390,6 +4401,9 @@ fn build_message_filter_clause(search: &SearchCriteria, filter: &str) -> String 
     }
     if search.subject.is_some() {
         sql.push_str("AND m.subject LIKE ? ESCAPE '\\' ");
+    }
+    if search.body.is_some() {
+        sql.push_str("AND (m.body LIKE ? ESCAPE '\\' OR m.snippet LIKE ? ESCAPE '\\') ");
     }
     if search.label.is_some() {
         sql.push_str(

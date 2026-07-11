@@ -17,8 +17,17 @@ import type {
   FilterMode,
   ListMode,
   ListSort,
+  Message,
   SearchScope,
 } from '../app/types';
+
+type SearchSuggestion = {
+  id: 'to' | 'from' | 'attachment' | 'body';
+  label: string;
+  hint: string;
+  count: number;
+  query: string;
+};
 
 type MessageListToolbarProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -30,6 +39,7 @@ type MessageListToolbarProps = {
   currentViewLabel: string;
   visibleListSummary: string;
   messageListSummary: string;
+  messages: Message[];
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
   onSearchScopeChange: (scope: SearchScope) => void;
@@ -52,6 +62,7 @@ export default function MessageListToolbar({
   currentViewLabel,
   visibleListSummary,
   messageListSummary,
+  messages,
   onSearchSubmit,
   onQueryChange,
   onSearchScopeChange,
@@ -63,27 +74,104 @@ export default function MessageListToolbar({
   onFilterChange,
   onSortChange,
 }: MessageListToolbarProps) {
+  const [searchFocused, setSearchFocused] = React.useState(false);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
     ?? searchScopeOptions[0];
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
+  const trimmedQuery = query.trim();
+  const normalizedQuery = trimmedQuery.toLowerCase();
+  const searchSuggestions = React.useMemo<SearchSuggestion[]>(() => {
+    if (!normalizedQuery || normalizedQuery.includes(':')) return [];
+
+    const includes = (value: string) => value.toLowerCase().includes(normalizedQuery);
+    const countMatches = (predicate: (message: Message) => boolean) =>
+      messages.reduce((count, message) => count + (predicate(message) ? 1 : 0), 0);
+
+    return [
+      {
+        id: 'to',
+        label: '收件人',
+        hint: '按收件人、抄送或密送搜索',
+        count: countMatches((message) => (
+          includes(message.recipients) || includes(message.cc) || includes(message.bcc)
+        )),
+        query: `to:${trimmedQuery}`,
+      },
+      {
+        id: 'from',
+        label: '发件人',
+        hint: '按发件人姓名或邮箱搜索',
+        count: countMatches((message) => includes(message.sender_name) || includes(message.sender_email)),
+        query: `from:${trimmedQuery}`,
+      },
+      {
+        id: 'attachment',
+        label: '附件',
+        hint: '搜索附件名',
+        count: countMatches((message) => message.has_attachments),
+        query: `filename:${trimmedQuery}`,
+      },
+      {
+        id: 'body',
+        label: '内容',
+        hint: '按正文内容搜索',
+        count: countMatches((message) => includes(message.body) || includes(message.snippet)),
+        query: `body:${trimmedQuery}`,
+      },
+    ];
+  }, [messages, normalizedQuery, trimmedQuery]);
+  const showSearchSuggestions = searchFocused && searchSuggestions.length > 0;
+
+  function applySuggestedSearch(nextQuery: string) {
+    onApplySearchShortcut(nextQuery);
+    setSearchFocused(false);
+  }
 
   return (
     <>
       <header className="toolbar">
         <div className="search-cluster">
-          <form onSubmit={onSearchSubmit} className="search-box">
+          <form
+            onSubmit={(event) => {
+              setSearchFocused(false);
+              onSearchSubmit(event);
+            }}
+            className="search-box"
+          >
             <Search size={17} />
             <input
               ref={searchInputRef}
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => setSearchFocused(false), 120);
+              }}
               placeholder="搜索主题、发件人、正文"
             />
             {(query.trim() || filter !== 'all') && (
               <button type="button" className="search-clear-button" title="清空搜索和筛选" onClick={onClearSearchAndFilter}>
                 <X size={14} />
               </button>
+            )}
+            {showSearchSuggestions && (
+              <div className="search-suggestion-panel" role="listbox" aria-label="搜索建议">
+                {searchSuggestions.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applySuggestedSearch(item.query)}
+                  >
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.hint}</small>
+                    </span>
+                    <em>{item.count} 封</em>
+                  </button>
+                ))}
+              </div>
             )}
           </form>
           <details className="compact-menu search-scope-menu">
@@ -149,7 +237,7 @@ export default function MessageListToolbar({
             className={listMode === 'threads' ? 'active' : ''}
             onClick={onShowThreads}
           >
-            线程
+            会话
           </button>
           <details className="compact-menu filter-menu">
             <summary className={filter !== 'all' ? 'active' : ''}>

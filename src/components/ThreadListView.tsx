@@ -45,7 +45,7 @@ export default function ThreadListView({
           </span>
         </button>
       ))}
-      {threads.length === 0 && <div className="empty-state">没有会话线程</div>}
+      {threads.length === 0 && <div className="empty-state">没有会话</div>}
     </div>
   );
 }

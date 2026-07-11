@@ -904,7 +904,7 @@ export default function App() {
     setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
     setSelectedMessageIds([]);
     if (announce) {
-      setStatus(`已打开线程：${thread.subject} · ${nextMessages.length} 封`);
+      setStatus(`已打开会话：${thread.subject} · ${nextMessages.length} 封`);
     }
     return nextMessages;
   }

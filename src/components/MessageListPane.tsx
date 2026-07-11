@@ -223,6 +223,7 @@ export default function MessageListPane({
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}
         messageListSummary={messageListSummary}
+        messages={messages}
         onSearchSubmit={onSearchSubmit}
         onQueryChange={onQueryChange}
         onSearchScopeChange={onSearchScopeChange}

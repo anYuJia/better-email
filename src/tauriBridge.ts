@@ -366,7 +366,7 @@ messages = [
       bcc: '',
       subject: `Low memory digest ${String(index + 1).padStart(2, '0')}`,
       snippet: '用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。',
-      body: '分页加载样本，帮助验证低内存邮件列表体验。',
+      body: '分页加载样本，用于验证低内存邮件列表。',
       sanitized_html: '',
       security_warnings: [],
       received_at: `2026-07-${String(7 - Math.floor(index / 12)).padStart(2, '0')}T${String(18 - (index % 12)).padStart(2, '0')}:00:00+08:00`,
@@ -776,6 +776,9 @@ function listMessages(args: InvokeArgs) {
         if (!message.bcc.toLowerCase().includes(term.replace(/^bcc:/, ''))) return false;
       } else if (term.startsWith('subject:')) {
         if (!message.subject.toLowerCase().includes(term.replace(/^subject:/, ''))) return false;
+      } else if (term.startsWith('body:') || term.startsWith('content:')) {
+        const value = term.replace(/^(body|content):/, '');
+        if (!message.body.toLowerCase().includes(value) && !message.snippet.toLowerCase().includes(value)) return false;
       } else if (term.startsWith('label:')) {
         const value = term.replace(/^label:/, '');
         if (!message.labels.some((label) => label.toLowerCase().includes(value))) return false;

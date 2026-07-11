@@ -1,4 +1,4 @@
-import { Clock3, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -39,72 +39,79 @@ export default function ComposerAdvancedTools({
     <details className="composer-advanced">
       <summary>
         <SlidersHorizontal size={15} />
-        更多选项
+        发送选项
         <span>
-          {draft.send_at.trim() ? '已设置稍后发送' : '抄送 · 身份 · 模板 · 定时'}
+          {draft.send_at.trim() ? '已设置定时发送' : '账号 · 抄送 · 模板 · 定时'}
         </span>
       </summary>
       <div className="composer-advanced-panel">
         <section className="composer-tool-card composer-delivery-card">
-          <strong>发送设置</strong>
-          <label className="composer-from">
-            <span>发件账号</span>
-            <select
-              value={accountId}
-              onChange={(event) => onPatchDraft({ account_id: Number(event.target.value), identity_id: 0 })}
-            >
-              {accounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.display_name} &lt;{entry.email}&gt;
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="composer-from">
-            <span>发件身份</span>
-            <select
-              aria-label="发件身份"
-              value={identityId}
-              onChange={(event) => onPatchDraft({ identity_id: Number(event.target.value) })}
-            >
-              {identities.map((identity) => (
-                <option key={identity.id} value={identity.id}>
-                  {identity.name} &lt;{identity.email}&gt;{identity.is_default ? ' · 默认' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="composer-recipient-grid">
-            <input
-              list="contact-suggestions"
-              value={draft.cc}
-              onChange={(event) => onPatchDraft({ cc: event.target.value })}
-              placeholder="抄送"
-            />
-            <input
-              list="contact-suggestions"
-              value={draft.bcc}
-              onChange={(event) => onPatchDraft({ bcc: event.target.value })}
-              placeholder="密送"
-            />
+          <div className="composer-advanced-row composer-route-row">
+            <label className="composer-from">
+              <span>账号</span>
+              <select
+                value={accountId}
+                onChange={(event) => onPatchDraft({ account_id: Number(event.target.value), identity_id: 0 })}
+              >
+                {accounts.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.display_name} &lt;{entry.email}&gt;
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="composer-from">
+              <span>身份</span>
+              <select
+                aria-label="发件身份"
+                value={identityId}
+                onChange={(event) => onPatchDraft({ identity_id: Number(event.target.value) })}
+              >
+                {identities.map((identity) => (
+                  <option key={identity.id} value={identity.id}>
+                    {identity.name} &lt;{identity.email}&gt;{identity.is_default ? ' · 默认' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <label className="composer-schedule">
-            <span>
-              <Clock3 size={14} />
-              稍后发送
-            </span>
-            <input
-              type="datetime-local"
-              value={draft.send_at}
-              onChange={(event) => onPatchDraft({ send_at: event.target.value })}
-            />
-          </label>
+
+          <div className="composer-advanced-row composer-options-row">
+            <label className="composer-inline-input">
+              <span>抄送</span>
+              <input
+                list="contact-suggestions"
+                value={draft.cc}
+                onChange={(event) => onPatchDraft({ cc: event.target.value })}
+                placeholder="可选"
+              />
+            </label>
+            <label className="composer-inline-input">
+              <span>密送</span>
+              <input
+                list="contact-suggestions"
+                value={draft.bcc}
+                onChange={(event) => onPatchDraft({ bcc: event.target.value })}
+                placeholder="可选"
+              />
+            </label>
+            <label className="composer-schedule">
+              <span>
+                <Clock3 size={13} />
+                定时
+              </span>
+              <input
+                type="datetime-local"
+                value={draft.send_at}
+                onChange={(event) => onPatchDraft({ send_at: event.target.value })}
+              />
+            </label>
+          </div>
         </section>
 
         <section className="composer-tool-card composer-template-card">
-          <strong>邮件模板</strong>
           <div className="composer-template-list">
-            {templates.length === 0 && <small>暂无模板，可从当前主题和正文保存</small>}
+            {templates.length === 0 && <small>暂无模板</small>}
             {templates.slice(0, 6).map((template) => (
               <span className="composer-template-row" key={template.id}>
                 <button type="button" onClick={() => onApplyTemplate(template)}>
@@ -116,7 +123,7 @@ export default function ComposerAdvancedTools({
                   aria-label={`删除模板 ${template.name}`}
                   onClick={() => onDeleteTemplate(template)}
                 >
-                  删除
+                  <Trash2 size={12} />
                 </button>
               </span>
             ))}
@@ -127,7 +134,7 @@ export default function ComposerAdvancedTools({
               onChange={(event) => onTemplateNameChange(event.target.value)}
               placeholder="模板名称"
             />
-            <button type="button" onClick={onSaveTemplate}>保存当前</button>
+            <button type="button" onClick={onSaveTemplate}>保存模板</button>
           </div>
         </section>
       </div>

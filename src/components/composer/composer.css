@@ -396,18 +396,21 @@
 }
 
 .composer-advanced-panel {
-  max-height: 255px;
-  grid-template-columns: minmax(0, 1.15fr) minmax(250px, 0.85fr);
-  gap: 8px;
-  padding: 8px 11px 11px;
-  background: #f7f8fa;
+  max-height: 220px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 0 12px 10px;
+  background: #f8f9fa;
 }
 
 .composer-tool-card {
-  gap: 8px;
-  padding: 11px;
-  border-color: #dde2e8;
-  border-radius: 9px;
+  gap: 7px;
+  padding: 9px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .composer-tool-card > strong {
@@ -416,44 +419,45 @@
   font-weight: 720;
 }
 
-.composer-delivery-card .composer-from {
-  min-height: 38px;
+.composer-advanced-row {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
   gap: 8px;
+}
+
+.composer-route-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.composer-options-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 1.1fr);
+}
+
+.composer-delivery-card .composer-from,
+.composer-inline-input,
+.composer-delivery-card .composer-schedule {
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
   padding: 0;
   border: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
   font-size: 10.5px;
-  font-weight: 650;
+  font-weight: 560;
 }
 
-.composer-delivery-card .composer-from select {
-  min-height: 34px;
-  padding: 0 30px 0 9px;
-  border-radius: 7px;
-  font-size: 10.5px;
-}
-
-.composer-delivery-card .composer-recipient-grid {
-  gap: 6px;
-}
-
-.composer-delivery-card .composer-recipient-grid input,
-.composer-template-save input {
-  min-height: 34px;
+.composer-delivery-card .composer-from select,
+.composer-inline-input input,
+.composer-template-save input,
+.composer-delivery-card .composer-schedule input {
+  min-height: 32px;
   padding: 0 9px;
   border-radius: 7px;
-  font-size: 10.5px;
-}
-
-.composer-delivery-card .composer-schedule {
-  min-height: 38px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: 10.5px;
+  border-color: #dce2e8;
+  background: #fff;
+  font-size: 11px;
 }
 
 .composer-delivery-card .composer-schedule > span {
@@ -464,15 +468,21 @@
 }
 
 .composer-delivery-card .composer-schedule input {
-  min-height: 34px;
-  max-width: 205px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: 10px;
+  max-width: none;
+  font-size: 10.5px;
+}
+
+.composer-template-card {
+  grid-template-columns: minmax(0, 1fr) 238px;
+  align-items: center;
 }
 
 .composer-template-list {
-  max-height: 112px;
+  min-height: 32px;
+  max-height: 74px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   overflow: auto;
 }
 
@@ -482,6 +492,34 @@
   border-radius: 7px;
   box-shadow: none;
   font-size: 10.5px;
+}
+
+.composer-template-row {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.composer-template-row button:first-child {
+  max-width: 132px;
+  justify-content: flex-start;
+}
+
+.composer-template-row button:last-child {
+  width: 28px;
+  padding: 0;
+  color: #8f4f4f;
+}
+
+.composer-template-list small {
+  align-self: center;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.composer-template-save {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  gap: 6px;
 }
 
 .composer footer {
@@ -755,9 +793,9 @@
 }
 
 .composer-advanced-panel {
-  max-height: 230px;
-  gap: 8px;
-  padding: 8px 10px 10px;
+  max-height: 190px;
+  gap: 0;
+  padding: 0 12px 9px;
   background: #f8f9fa;
 }
 

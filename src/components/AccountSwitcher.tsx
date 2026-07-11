@@ -115,18 +115,17 @@ export default function AccountSwitcher({
         aria-haspopup="menu"
         aria-expanded={Boolean(menu)}
         onPointerDown={(event) => {
-          if (!menu) return;
           event.preventDefault();
-          event.stopPropagation();
-          setMenu(null);
-        }}
-        onClick={(event) => {
           event.stopPropagation();
           if (menu) {
             setMenu(null);
             return;
           }
           openMenuFromTrigger();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
         }}
         onContextMenu={(event) => {
           event.preventDefault();

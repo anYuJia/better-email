@@ -1370,7 +1370,7 @@ export default function App() {
     });
   }
 
-  function handleComposerAttachmentDrop(event: React.DragEvent<HTMLDivElement>) {
+  function handleComposerAttachmentDrop(event: React.DragEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
     setComposerDropActive(false);
@@ -1382,17 +1382,25 @@ export default function App() {
     addDraftAttachments(attachmentsFromDroppedFiles(files), '已拖入附件');
   }
 
-  function handleComposerAttachmentDragOver(event: React.DragEvent<HTMLDivElement>) {
+  function handleComposerAttachmentPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = event.clipboardData.files;
+    if (!files || files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addDraftAttachments(attachmentsFromDroppedFiles(files), '已粘贴附件');
+  }
+
+  function handleComposerAttachmentDragOver(event: React.DragEvent<HTMLElement>) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
   }
 
-  function handleComposerAttachmentDragEnter(event: React.DragEvent<HTMLDivElement>) {
+  function handleComposerAttachmentDragEnter(event: React.DragEvent<HTMLElement>) {
     event.preventDefault();
     setComposerDropActive(true);
   }
 
-  function handleComposerAttachmentDragLeave(event: React.DragEvent<HTMLDivElement>) {
+  function handleComposerAttachmentDragLeave(event: React.DragEvent<HTMLElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setComposerDropActive(false);
     }
@@ -2502,6 +2510,7 @@ export default function App() {
           onAttachmentDragEnter={handleComposerAttachmentDragEnter}
           onAttachmentDragLeave={handleComposerAttachmentDragLeave}
           onAttachmentDragOver={handleComposerAttachmentDragOver}
+          onAttachmentPaste={handleComposerAttachmentPaste}
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
           onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}

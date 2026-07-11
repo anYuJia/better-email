@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react';
+import type React from 'react';
 import type { Contact, DraftInput } from '../../app/types';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
   contacts: Contact[];
   richComposer: boolean;
+  dropActive: boolean;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
   onAddContact: (contact: Contact) => void;
+  onAttachmentDrop: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragEnter: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragLeave: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragOver: React.DragEventHandler<HTMLElement>;
+  onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
 };
 
 const originalMessageMarkerPattern = /\n{0,2}-{2,}\s*(?:原始邮件|original message|forwarded message)\s*-{2,}[\s\S]*$/i;
@@ -89,8 +96,14 @@ export default function ComposerPrimaryFields({
   draft,
   contacts,
   richComposer,
+  dropActive,
   onPatchDraft,
   onAddContact,
+  onAttachmentDrop,
+  onAttachmentDragEnter,
+  onAttachmentDragLeave,
+  onAttachmentDragOver,
+  onAttachmentPaste,
 }: ComposerPrimaryFieldsProps) {
   const [recipientFocused, setRecipientFocused] = useState(false);
   const recipientQuery = draft.to.split(/[;,]/).pop()?.trim().toLowerCase() ?? '';
@@ -144,10 +157,17 @@ export default function ComposerPrimaryFields({
         />
       </label>
 
-      <label className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}`}>
+      <label
+        className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}${dropActive ? ' drop-active' : ''}`}
+        onDrop={onAttachmentDrop}
+        onDragEnter={onAttachmentDragEnter}
+        onDragLeave={onAttachmentDragLeave}
+        onDragOver={onAttachmentDragOver}
+      >
         <span className="sr-only">正文</span>
         <textarea
           value={editableBody}
+          onPaste={onAttachmentPaste}
           onChange={(event) => {
             const nextBody = joinEditableBody(event.target.value, originalQuote);
             onPatchDraft({

@@ -60,10 +60,11 @@ export type ComposerWindowProps = {
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
-  onAttachmentDrop: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragEnter: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragLeave: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragOver: React.DragEventHandler<HTMLDivElement>;
+  onAttachmentDrop: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragEnter: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragLeave: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragOver: React.DragEventHandler<HTMLElement>;
+  onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
   onSaveDraft: () => void;
   onQueueDraft: () => void;
   onSendDraft: () => void;
@@ -99,6 +100,7 @@ export default function ComposerWindow({
   onAttachmentDragEnter,
   onAttachmentDragLeave,
   onAttachmentDragOver,
+  onAttachmentPaste,
   onSaveDraft,
   onQueueDraft,
   onSendDraft,
@@ -212,8 +214,14 @@ export default function ComposerWindow({
           draft={draft}
           contacts={contacts}
           richComposer={richComposer}
+          dropActive={dropActive}
           onPatchDraft={patchDraft}
           onAddContact={onAddContact}
+          onAttachmentDrop={onAttachmentDrop}
+          onAttachmentDragEnter={onAttachmentDragEnter}
+          onAttachmentDragLeave={onAttachmentDragLeave}
+          onAttachmentDragOver={onAttachmentDragOver}
+          onAttachmentPaste={onAttachmentPaste}
         />
 
         <ComposerQuickTools

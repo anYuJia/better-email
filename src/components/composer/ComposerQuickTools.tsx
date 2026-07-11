@@ -13,10 +13,10 @@ type ComposerQuickToolsProps = {
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
-  onAttachmentDrop: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragEnter: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragLeave: React.DragEventHandler<HTMLDivElement>;
-  onAttachmentDragOver: React.DragEventHandler<HTMLDivElement>;
+  onAttachmentDrop: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragEnter: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragLeave: React.DragEventHandler<HTMLElement>;
+  onAttachmentDragOver: React.DragEventHandler<HTMLElement>;
 };
 
 export default function ComposerQuickTools({

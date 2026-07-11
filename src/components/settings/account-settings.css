@@ -650,6 +650,17 @@
   padding-top: 2px;
 }
 
+.settings-account-add-error {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #ead1cf;
+  border-radius: 8px;
+  color: #9b3b35;
+  background: #fff8f7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .settings-account-add-cancel,
 .settings-account-add-submit {
   min-height: 34px;

@@ -8,6 +8,12 @@ import ProviderPresetGrid from '../ProviderPresetGrid';
 
 type AccountDialogMode = 'details' | 'edit' | 'config' | 'delete';
 
+function errorMessage(error: unknown) {
+  return (error instanceof Error ? error.message : String(error))
+    .replace(/^Error:\s*/i, '')
+    .trim() || '添加失败，请检查邮箱和授权码。';
+}
+
 function protocolLabel(protocol: string) {
   return protocol === 'pop3' ? 'POP3' : 'IMAP';
 }
@@ -45,6 +51,8 @@ export default function AccountSettingsPage({
   const [newAccountSecret, setNewAccountSecret] = useState('');
   const [newAccountSecretVisible, setNewAccountSecretVisible] = useState(false);
   const [newAccountManualConfigOpen, setNewAccountManualConfigOpen] = useState(false);
+  const [addAccountError, setAddAccountError] = useState('');
+  const [addAccountSubmitting, setAddAccountSubmitting] = useState(false);
   const [accountDialogMode, setAccountDialogMode] = useState<AccountDialogMode | null>(null);
 
   useEffect(() => {
@@ -65,6 +73,8 @@ export default function AccountSettingsPage({
       setNewAccountSecret('');
       setNewAccountSecretVisible(false);
       setNewAccountManualConfigOpen(false);
+      setAddAccountError('');
+      setAddAccountSubmitting(false);
     }
   }, [addDialogOpen]);
 
@@ -72,9 +82,23 @@ export default function AccountSettingsPage({
     && (newAccountForm.auth_type === 'oauth2' || newAccountSecret.trim().length > 0);
 
   async function handleCreateNewAccount() {
-    if (!canCreateAccount) return;
-    await onCreateNewAccount(newAccountSecret);
-    setAddDialogOpen(false);
+    if (!canCreateAccount || addAccountSubmitting) return;
+    if (!newAccountServerReady) {
+      setNewAccountManualConfigOpen(true);
+      setAddAccountError('未识别服务商，请填写收信服务器和发信服务器。');
+      return;
+    }
+
+    setAddAccountError('');
+    setAddAccountSubmitting(true);
+    try {
+      await onCreateNewAccount(newAccountSecret);
+      setAddDialogOpen(false);
+    } catch (error) {
+      setAddAccountError(errorMessage(error));
+    } finally {
+      setAddAccountSubmitting(false);
+    }
   }
 
   function openAccountDialog(account: Account, mode: AccountDialogMode) {
@@ -92,6 +116,7 @@ export default function AccountSettingsPage({
   }
 
   function updateNewAccountEmail(email: string) {
+    setAddAccountError('');
     const preset = providerPresetForEmail(email);
     if (!preset) {
       onNewAccountFormChange({ ...newAccountForm, email });
@@ -232,7 +257,7 @@ export default function AccountSettingsPage({
             <header>
               <span>
                 <strong id="settings-add-account-title">添加邮箱</strong>
-                <small>输入邮箱和授权码，服务器会自动匹配</small>
+                <small>输入邮箱和授权码</small>
               </span>
               <button type="button" aria-label="关闭" onClick={() => setAddDialogOpen(false)}>
                 <X size={17} />
@@ -247,6 +272,7 @@ export default function AccountSettingsPage({
                   value={newAccountForm.email}
                   onChange={(event) => updateNewAccountEmail(event.target.value)}
                   placeholder="name@example.com"
+                  aria-invalid={Boolean(addAccountError)}
                 />
               </label>
               <label>
@@ -256,9 +282,13 @@ export default function AccountSettingsPage({
                     autoComplete="new-password"
                     value={newAccountSecret}
                     type={newAccountSecretVisible ? 'text' : 'password'}
-                    onChange={(event) => setNewAccountSecret(event.target.value)}
+                    onChange={(event) => {
+                      setAddAccountError('');
+                      setNewAccountSecret(event.target.value);
+                    }}
                     placeholder={newAccountSecretPlaceholder}
                     required={newAccountForm.auth_type !== 'oauth2'}
+                    aria-invalid={Boolean(addAccountError)}
                   />
                   <button
                     type="button"
@@ -320,7 +350,10 @@ export default function AccountSettingsPage({
                     收信协议
                     <select
                       value={newAccountForm.incoming_protocol}
-                      onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
+                      onChange={(event) => {
+                        setAddAccountError('');
+                        switchNewAccountProtocol(event.target.value as IncomingProtocol);
+                      }}
                     >
                       <option value="imap">IMAP</option>
                       <option value="pop3">POP3</option>
@@ -362,6 +395,12 @@ export default function AccountSettingsPage({
               </>
             )}
 
+            {addAccountError && (
+              <p className="settings-account-add-error" role="alert">
+                {addAccountError}
+              </p>
+            )}
+
             <footer>
               <button type="button" className="settings-account-add-cancel" onClick={() => setAddDialogOpen(false)}>
                 取消
@@ -369,13 +408,11 @@ export default function AccountSettingsPage({
               <button
                 type="button"
                 className="settings-account-add-submit"
-                disabled={!canCreateAccount}
-                onClick={() => {
-                  handleCreateNewAccount().catch(() => undefined);
-                }}
+                disabled={!canCreateAccount || addAccountSubmitting}
+                onClick={() => { handleCreateNewAccount(); }}
               >
-                <Plus size={14} />
-                添加
+                {!addAccountSubmitting && <Plus size={14} />}
+                {addAccountSubmitting ? '添加中' : '添加'}
               </button>
             </footer>
           </section>

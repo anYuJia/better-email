@@ -74,6 +74,13 @@ type CurrentCoordinatorState = Pick<
 
 const scheduledOutboxStatuses = new Set(['scheduled']);
 
+function syncModeStatus(syncMode: string) {
+  const intervalMs = syncIntervalMs(syncMode);
+  if (!intervalMs) return '后台获取新邮件已关闭';
+  const minutes = Math.round(intervalMs / 60_000);
+  return `后台获取新邮件已启用：每 ${minutes} 分钟`;
+}
+
 function outboxFlowLog(event: string, details: Record<string, unknown> = {}) {
   console.info(`[outbox-flow] ${event}`, details);
 }
@@ -458,10 +465,10 @@ export default function useBackgroundTaskCoordinator({
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
     if (!intervalMs) {
-      setBackgroundSyncStatus('后台同步已关闭');
+      setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
       return;
     }
-    setBackgroundSyncStatus(`后台同步已启用：${account?.sync_mode === 'push' ? '每 5 分钟' : '每 15 分钟'}`);
+    setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
     const timer = window.setInterval(() => {
       enqueueBackgroundTask('sync', 'timer').catch((error) => setStatus(String(error)));
     }, intervalMs);

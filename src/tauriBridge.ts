@@ -23,6 +23,14 @@ let coreModule: Promise<TauriCore> | null = null;
 let windowModule: Promise<TauriWindow> | null = null;
 let notificationModule: Promise<TauriNotification> | null = null;
 
+function normalizeMockSyncMode(syncMode: unknown) {
+  const normalized = String(syncMode ?? '').trim();
+  if (normalized === 'push') return '5min';
+  return ['manual', '1min', '5min', '15min', '30min', '60min'].includes(normalized)
+    ? normalized
+    : 'manual';
+}
+
 function loadCore() {
   coreModule ??= import('@tauri-apps/api/core');
   return coreModule;
@@ -1042,7 +1050,7 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         smtp_host: String(input.smtp_host ?? '').trim(),
         incoming_protocol: String(input.incoming_protocol ?? 'imap').trim() === 'pop3' ? 'pop3' : 'imap',
         auth_type: String(input.auth_type ?? '').trim() || 'password',
-        sync_mode: String(input.sync_mode ?? '').trim() || 'manual',
+        sync_mode: normalizeMockSyncMode(input.sync_mode),
         remote_images_allowed: Boolean(input.remote_images_allowed),
         signature: String(input.signature ?? ''),
         is_default: isFirstAccount,

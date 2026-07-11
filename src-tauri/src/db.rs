@@ -5114,8 +5114,12 @@ fn normalize_incoming_protocol(incoming_protocol: &str) -> &str {
 
 fn normalize_sync_mode(sync_mode: &str) -> &str {
     match sync_mode.trim() {
+        "1min" => "1min",
+        "5min" => "5min",
         "15min" => "15min",
-        "push" => "push",
+        "30min" => "30min",
+        "60min" => "60min",
+        "push" => "5min",
         _ => "manual",
     }
 }
@@ -7682,7 +7686,7 @@ mod tests {
                     smtp_host: "smtp.mail.test:465".to_string(),
                     incoming_protocol: "imap".to_string(),
                     auth_type: "oauth2".to_string(),
-                    sync_mode: "15min".to_string(),
+                    sync_mode: "5min".to_string(),
                     remote_images_allowed: true,
                     signature: "Regards".to_string(),
                 },

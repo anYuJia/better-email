@@ -90,8 +90,13 @@ describe('mail UI utilities', () => {
 
   it('maps sync modes to conservative background intervals', () => {
     expect(syncIntervalMs('manual')).toBeNull();
+    expect(syncIntervalMs('1min')).toBe(60 * 1000);
+    expect(syncIntervalMs('5min')).toBe(5 * 60 * 1000);
     expect(syncIntervalMs('15min')).toBe(15 * 60 * 1000);
+    expect(syncIntervalMs('30min')).toBe(30 * 60 * 1000);
+    expect(syncIntervalMs('60min')).toBe(60 * 60 * 1000);
     expect(syncIntervalMs('push')).toBe(5 * 60 * 1000);
+    expect(syncIntervalMs('2min')).toBeNull();
   });
 
   it('summarizes sync runs for background status and notifications', () => {

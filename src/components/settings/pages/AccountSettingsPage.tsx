@@ -24,6 +24,20 @@ function protocolHint(protocol: string) {
     : 'IMAP 会同步远端文件夹和状态。';
 }
 
+const syncModeOptions = [
+  { value: 'manual', label: '手动获取' },
+  { value: '1min', label: '每 1 分钟' },
+  { value: '5min', label: '每 5 分钟' },
+  { value: '15min', label: '每 15 分钟' },
+  { value: '30min', label: '每 30 分钟' },
+  { value: '60min', label: '每 60 分钟' },
+];
+
+function syncModeLabel(syncMode: string) {
+  const normalized = syncMode === 'push' ? '5min' : syncMode;
+  return syncModeOptions.find((option) => option.value === normalized)?.label ?? '手动获取';
+}
+
 type AccountSettingsPageProps = {
   accounts: Account[];
   accountForm: Account | null;
@@ -320,6 +334,20 @@ export default function AccountSettingsPage({
                   </button>
                 </span>
               </label>
+              <label>
+                获取新邮件时间
+                <select
+                  value={newAccountForm.sync_mode === 'push' ? '5min' : newAccountForm.sync_mode}
+                  onChange={(event) => onNewAccountFormChange({
+                    ...newAccountForm,
+                    sync_mode: event.target.value,
+                  })}
+                >
+                  {syncModeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="settings-account-auto-match" data-ready={newAccountServerReady}>
@@ -474,8 +502,8 @@ export default function AccountSettingsPage({
                   <strong>{accountForm.provider}</strong>
                 </span>
                 <span>
-                  <small>同步</small>
-                  <strong>{accountForm.sync_mode === 'manual' ? '手动' : accountForm.sync_mode}</strong>
+                  <small>获取新邮件</small>
+                  <strong>{syncModeLabel(accountForm.sync_mode)}</strong>
                 </span>
                 <span>
                   <small>协议</small>
@@ -501,14 +529,14 @@ export default function AccountSettingsPage({
                   />
                 </label>
                 <label>
-                  同步策略
+                  获取新邮件时间
                   <select
-                    value={accountForm.sync_mode}
+                    value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
                     onChange={(event) => onAccountFormChange({ ...accountForm, sync_mode: event.target.value })}
                   >
-                    <option value="manual">手动</option>
-                    <option value="15min">每 15 分钟</option>
-                    <option value="push">推送优先</option>
+                    {syncModeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </label>
               </div>

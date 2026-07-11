@@ -98,9 +98,12 @@ export function quoteMessage(message: QuotedMessage): string {
 }
 
 export function syncIntervalMs(syncMode: string): number | null {
-  if (syncMode === '15min') return 15 * 60 * 1000;
-  if (syncMode === 'push') return 5 * 60 * 1000;
-  return null;
+  const normalized = syncMode.trim() === 'push' ? '5min' : syncMode.trim();
+  const match = normalized.match(/^(\d+)min$/);
+  if (!match) return null;
+  const minutes = Number(match[1]);
+  if (![1, 5, 15, 30, 60].includes(minutes)) return null;
+  return minutes * 60 * 1000;
 }
 
 export type SyncRunSummary = {

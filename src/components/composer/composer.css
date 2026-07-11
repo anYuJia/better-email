@@ -835,3 +835,131 @@
   pointer-events: none;
   background: #eef1f4;
 }
+
+/* Composer polish: softer recipient menu and read-only quoted mail. */
+.composer-recipient-field .composer-field-row:focus-within {
+  background: #fbfcfd;
+  box-shadow: inset 2px 0 0 #9fc4ea;
+}
+
+.composer .recipient-suggestions {
+  left: 72px;
+  right: auto;
+  top: calc(100% + 6px);
+  width: min(390px, calc(100% - 88px));
+  max-height: 190px;
+  padding: 6px;
+  border-color: rgba(31, 35, 40, 0.12);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 14px 30px rgba(31, 35, 40, 0.13),
+    0 1px 4px rgba(31, 35, 40, 0.07);
+}
+
+.composer .recipient-suggestions > span {
+  padding: 4px 9px 5px;
+  font-size: 11px;
+}
+
+.composer .recipient-suggestions button {
+  min-height: 34px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  padding: 5px 9px;
+  border-radius: 9px;
+}
+
+.composer .recipient-suggestions button small {
+  font-size: 11px;
+}
+
+.composer .composer-body-field {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: auto;
+  background: #fff;
+}
+
+.composer .composer-body-field textarea {
+  min-height: 120px;
+  flex: 1 0 140px;
+  resize: none;
+}
+
+.composer-original-quote {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 9px;
+  margin: 0 18px 16px;
+  padding: 11px 13px;
+  border: 1px solid #e0e5ea;
+  border-left: 3px solid #c9d3de;
+  border-radius: 10px;
+  color: #4f5a66;
+  background: #f7f9fb;
+  user-select: text;
+}
+
+.composer-original-quote header {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.composer-original-quote header span {
+  color: #5d6875;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.composer-original-quote header small {
+  color: #8d96a1;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.composer-original-quote dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid #e5e9ee;
+}
+
+.composer-original-quote dl > div {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.composer-original-quote dt,
+.composer-original-quote dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.composer-original-quote dt {
+  color: #8b95a1;
+}
+
+.composer-original-quote dd {
+  overflow: hidden;
+  color: #3e4854;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-original-quote pre {
+  margin: 0;
+  color: #4f5a66;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

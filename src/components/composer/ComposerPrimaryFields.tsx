@@ -9,6 +9,82 @@ type ComposerPrimaryFieldsProps = {
   onAddContact: (contact: Contact) => void;
 };
 
+const originalMessageMarkerPattern = /\n{0,2}-{2,}\s*(?:原始邮件|original message|forwarded message)\s*-{2,}[\s\S]*$/i;
+const originalMessageMetaPattern = /^\s*(?:发件人|收件人|抄送|时间|日期|主题|from|to|cc|date|subject)\s*[:：]/i;
+
+function splitEditableBody(body: string) {
+  const match = body.match(originalMessageMarkerPattern);
+  if (!match || match.index === undefined) {
+    return { editableBody: body, originalQuote: '' };
+  }
+  return {
+    editableBody: body.slice(0, match.index).trimEnd(),
+    originalQuote: body.slice(match.index).trimStart(),
+  };
+}
+
+function joinEditableBody(editableBody: string, originalQuote: string) {
+  if (!originalQuote) return editableBody;
+  const trimmedEditable = editableBody.trimEnd();
+  return `${trimmedEditable}${trimmedEditable ? '\n\n' : ''}${originalQuote}`;
+}
+
+function stripQuotePrefix(line: string) {
+  return line.replace(/^\s*(?:>\s*)+/, '').trimEnd();
+}
+
+function parseOriginalQuote(originalQuote: string) {
+  const lines = originalQuote.replace(/\r\n?/g, '\n').split('\n');
+  const [, ...rest] = lines;
+  const meta: string[] = [];
+  const content: string[] = [];
+  let sawContent = false;
+
+  for (const line of rest) {
+    if (!sawContent && originalMessageMetaPattern.test(line)) {
+      meta.push(line.trim());
+      continue;
+    }
+    if (!sawContent && !line.trim()) {
+      continue;
+    }
+    sawContent = true;
+    content.push(stripQuotePrefix(line));
+  }
+
+  return {
+    meta,
+    content: content.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
+function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
+  const quote = parseOriginalQuote(originalQuote);
+
+  return (
+    <section className="composer-original-quote" aria-label="原始邮件，只读">
+      <header>
+        <span>原始邮件</span>
+        <small>只读</small>
+      </header>
+      {quote.meta.length > 0 && (
+        <dl>
+          {quote.meta.map((item) => {
+            const [label, ...valueParts] = item.split(/[:：]/);
+            return (
+              <div key={item}>
+                <dt>{label.trim()}</dt>
+                <dd>{valueParts.join(':').trim()}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      )}
+      {quote.content && <pre>{quote.content}</pre>}
+    </section>
+  );
+}
+
 export default function ComposerPrimaryFields({
   draft,
   contacts,
@@ -30,6 +106,7 @@ export default function ComposerPrimaryFields({
       : contacts;
     return pool.slice(0, 5);
   }, [contacts, recipientQuery]);
+  const { editableBody, originalQuote } = splitEditableBody(draft.body);
 
   return (
     <div className="composer-primary-fields">
@@ -70,15 +147,19 @@ export default function ComposerPrimaryFields({
       <label className="composer-body-field">
         <span className="sr-only">正文</span>
         <textarea
-          value={draft.body}
-          onChange={(event) => onPatchDraft({
-            body: event.target.value,
-            html_body: richComposer
-              ? `<p>${event.target.value.replace(/\n/g, '<br>')}</p>`
-              : draft.html_body,
-          })}
+          value={editableBody}
+          onChange={(event) => {
+            const nextBody = joinEditableBody(event.target.value, originalQuote);
+            onPatchDraft({
+              body: nextBody,
+              html_body: richComposer
+                ? `<p>${nextBody.replace(/\n/g, '<br>')}</p>`
+                : draft.html_body,
+            });
+          }}
           placeholder="正文"
         />
+        {originalQuote && <ComposerOriginalQuote originalQuote={originalQuote} />}
       </label>
     </div>
   );

@@ -23,6 +23,7 @@ type MessageCollectionActionOptions = {
     snapshots: UndoMessageSnapshot[],
     detail?: string,
   ) => void;
+  onReadStateChange?: (messageIds: number[], isRead: boolean) => void;
 };
 
 function uniqueMessages(items: Message[]) {
@@ -58,6 +59,7 @@ export default function useMessageCollectionActions({
   setStatus,
   snapshotMessages,
   queueUndoAction,
+  onReadStateChange,
 }: MessageCollectionActionOptions) {
   return React.useMemo(() => {
     async function runMessageCollectionAction(
@@ -89,6 +91,12 @@ export default function useMessageCollectionActions({
             role: action,
           });
         }
+      }
+      if (action === 'read' || action === 'unread') {
+        onReadStateChange?.(
+          targetMessages.map((message) => message.id),
+          action === 'read',
+        );
       }
       const count = targetMessages.length;
       setSelectedMessageIds([]);
@@ -298,5 +306,6 @@ export default function useMessageCollectionActions({
     setSelectedMessageIds,
     setStatus,
     snapshotMessages,
+    onReadStateChange,
   ]);
 }

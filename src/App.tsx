@@ -185,6 +185,29 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
   console.warn(`[app-flow] ${event}`, details);
 }
 
+const manualUnreadStorageKey = 'better-email.manual-unread-message-ids';
+
+function loadManualUnreadMessageIds(): Set<number> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(manualUnreadStorageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is number => Number.isInteger(id) && id > 0));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveManualUnreadMessageIds(ids: Set<number>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(manualUnreadStorageKey, JSON.stringify([...ids].slice(-5000)));
+  } catch {
+    // Best effort only; read state still works for the current session.
+  }
+}
+
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -225,6 +248,8 @@ export default function App() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
+  const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
+  const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
@@ -996,6 +1021,20 @@ export default function App() {
       ),
     [remoteImageTrusts, selected?.account_id, selected?.sender_email, selectedSenderDomain],
   );
+
+  function rememberManualReadState(messageIds: number[], isRead: boolean) {
+    const next = new Set(manualUnreadMessageIdsRef.current);
+    for (const messageId of messageIds) {
+      if (isRead) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+    }
+    manualUnreadMessageIdsRef.current = next;
+    saveManualUnreadMessageIds(next);
+  }
+
   useEffect(() => {
     if (!selected) {
       setAttachments([]);
@@ -1005,6 +1044,53 @@ export default function App() {
       .then(setAttachments)
       .catch((error) => setStatus(String(error)));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected || selected.is_read) return;
+    if (manualUnreadMessageIdsRef.current.has(selected.id)) return;
+    if (autoReadInFlightRef.current.has(selected.id)) return;
+
+    autoReadInFlightRef.current.add(selected.id);
+    appFlowLog('autoMarkRead start', {
+      messageId: selected.id,
+      accountId: selected.account_id,
+      mailbox: selected.remote_mailbox,
+      uid: selected.remote_uid,
+    });
+    invoke<RemoteActionReport>('set_message_read', { messageId: selected.id, isRead: true })
+      .then((report) => {
+        setMessages((current) => current.map((message) => (
+          message.id === selected.id ? { ...message, is_read: true } : message
+        )));
+        if (activeThread) {
+          setThreadMessages((current) => current.map((message) => (
+            message.id === selected.id ? { ...message, is_read: true } : message
+          )));
+          setActiveThread((current) => current && current.thread_key === activeThread.thread_key
+            ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
+            : current);
+          setThreads((current) => current.map((thread) => thread.thread_key === activeThread.thread_key
+            ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
+            : thread));
+        }
+        setStats((current) => current
+          ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
+          : current);
+        appFlowLog('autoMarkRead done', {
+          messageId: selected.id,
+          message: report.message,
+        });
+      })
+      .catch((error) => {
+        appFlowWarn('autoMarkRead failed', {
+          messageId: selected.id,
+          error: String(error).replace(/^Error:\s*/i, ''),
+        });
+      })
+      .finally(() => {
+        autoReadInFlightRef.current.delete(selected.id);
+      });
+  }, [selectedId, selected?.is_read, activeThread]);
 
   useEffect(() => {
     if (!selected) return;
@@ -1188,6 +1274,7 @@ export default function App() {
     setStatus,
     snapshotMessages,
     queueUndoAction,
+    onReadStateChange: rememberManualReadState,
   });
 
   async function restoreUndoAction() {
@@ -1400,7 +1487,9 @@ export default function App() {
 
   async function toggleRead(message: Message) {
     const undoSnapshots = snapshotMessages([message]);
-    const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: !message.is_read });
+    const nextRead = !message.is_read;
+    const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: nextRead });
+    rememberManualReadState([message.id], nextRead);
     await refreshAll();
     setStatus(report.message);
     queueUndoAction(message.is_read ? '标为未读' : '标为已读', undoSnapshots);

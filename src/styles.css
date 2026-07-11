@@ -828,7 +828,7 @@ button { cursor: pointer; }
   border: none;
   border-bottom: 1px solid #edf0f3;
   background: #fff;
-  padding: 14px 14px 14px 42px;
+  padding: 14px 14px 14px 50px;
 }
 .message-card:hover, .message-card.selected { background: #eef7f2; }
 .message-select {
@@ -839,6 +839,17 @@ button { cursor: pointer; }
   place-items: center;
 }
 .message-select input { width: 15px; height: 15px; }
+.message-unread-dot {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #2f7ed8;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 2px rgba(47, 126, 216, 0.10);
+}
 .message-topline { display: flex; justify-content: space-between; gap: 10px; }
 time { color: #7a8490; font-size: 12px; white-space: nowrap; }
 .sender, .subject { color: #20242a; }
@@ -848,10 +859,10 @@ time { color: #7a8490; font-size: 12px; white-space: nowrap; }
   margin: 6px 0 0;
   color: #68717d;
   line-height: 1.35;
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .message-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .message-chips span {

@@ -135,6 +135,7 @@ export default function MessageListView({
                 >
                   {(message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase()}
                 </span>
+                {!message.is_read && <span className="message-unread-dot" aria-label="未读" />}
                 <span className="message-select" onClick={(event) => event.stopPropagation()}>
                   <input
                     aria-label={`选择 ${message.subject || '无主题'}`}

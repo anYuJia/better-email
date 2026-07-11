@@ -220,13 +220,13 @@ export default function Sidebar({
       >
         <details className="sidebar-disclosure sidebar-tools">
           <summary>
-            <span>更多</span>
+            <span>其他</span>
           </summary>
           <div className="sidebar-tool-stack">
             <section className="sidebar-tool-section saved-searches">
               <div className="sidebar-tool-heading">
                 <strong>保存搜索</strong>
-                <span>{savedSearches.length ? `${savedSearches.length} 个` : '保存常用条件'}</span>
+                {savedSearches.length > 0 && <span>{savedSearches.length} 个</span>}
               </div>
               <form
                 className="saved-search-form"
@@ -315,14 +315,14 @@ export default function Sidebar({
                     </button>
                   </div>
                 ))}
-                {savedSearches.length === 0 && <small>保存常用搜索条件</small>}
+                {savedSearches.length === 0 && <small>暂无保存搜索</small>}
               </div>
             </section>
 
             <section className="sidebar-tool-section contact-center">
               <div className="sidebar-tool-heading">
                 <strong>联系人</strong>
-                <span>{contacts.length ? `${contacts.length} 位` : '暂无联系人'}</span>
+                {contacts.length > 0 && <span>{contacts.length} 位</span>}
               </div>
               <input
                 value={contactQuery}
@@ -358,14 +358,14 @@ export default function Sidebar({
                     </button>
                   </div>
                 ))}
-                {filteredContacts.length === 0 && <small>没有匹配联系人</small>}
+                {filteredContacts.length === 0 && <small>暂无匹配</small>}
               </div>
             </section>
 
             <section className="sidebar-tool-section label-section">
               <div className="sidebar-tool-heading">
                 <strong>标签</strong>
-                <span>{labels.length} 个</span>
+                {labels.length > 0 && <span>{labels.length} 个</span>}
               </div>
               <div className="label-list">
                 {labels.map((label) => (
@@ -404,7 +404,7 @@ export default function Sidebar({
             <section className="sidebar-tool-section folder-manager">
               <div className="sidebar-tool-heading">
                 <strong>文件夹</strong>
-                <span>{customFolderCount ? `${customFolderCount} 个自定义` : '新建文件夹'}</span>
+                {customFolderCount > 0 && <span>{customFolderCount} 个</span>}
               </div>
               <form
                 className="custom-folder-form"

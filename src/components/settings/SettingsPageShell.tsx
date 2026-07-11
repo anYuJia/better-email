@@ -30,7 +30,6 @@ export default function SettingsPageShell({
   const ActiveIcon = item.icon;
   const previousItem = settingsNavigationItems[pageIndex - 1];
   const nextItem = settingsNavigationItems[pageIndex + 1];
-  const pageProgress = `${Math.round(((pageIndex + 1) / settingsNavigationItems.length) * 100)}%`;
 
   return (
     <section
@@ -38,7 +37,6 @@ export default function SettingsPageShell({
       className="settings-page"
       data-settings-page={activeSection}
       aria-labelledby={`settings-page-${activeSection}`}
-      style={{ '--settings-page-progress': pageProgress } as React.CSSProperties}
     >
       <header className="settings-page-header">
         <div className="settings-page-heading">
@@ -50,12 +48,6 @@ export default function SettingsPageShell({
             <strong id={`settings-page-${activeSection}`}>{item.label}</strong>
           </div>
         </div>
-        <div className="settings-page-meta" aria-label={`第 ${pageIndex + 1} 页，共 ${settingsNavigationItems.length} 页`}>
-          <span>{group.label}</span>
-          <strong>{pageIndex + 1} / {settingsNavigationItems.length}</strong>
-        </div>
-        <p>{item.description}</p>
-        <span className="settings-page-progress-bar" aria-hidden="true" />
       </header>
       <div className="settings-page-content">{children}</div>
       <nav className="settings-page-pagination" aria-label="设置页面导航">
@@ -67,10 +59,7 @@ export default function SettingsPageShell({
           onClick={() => previousItem && onNavigate(previousItem.id)}
         >
           <ArrowLeft size={16} aria-hidden="true" />
-          <span>
-            <small>上一页</small>
-            <strong>{previousItem?.label ?? '已经是第一页'}</strong>
-          </span>
+          <strong>{previousItem?.label ?? '第一页'}</strong>
         </button>
         <button
           type="button"
@@ -79,10 +68,7 @@ export default function SettingsPageShell({
           aria-label={nextItem ? `下一页：${nextItem.label}` : '已经是最后一页'}
           onClick={() => nextItem && onNavigate(nextItem.id)}
         >
-          <span>
-            <small>下一页</small>
-            <strong>{nextItem?.label ?? '已经是最后一页'}</strong>
-          </span>
+          <strong>{nextItem?.label ?? '最后一页'}</strong>
           <ArrowRight size={16} aria-hidden="true" />
         </button>
       </nav>

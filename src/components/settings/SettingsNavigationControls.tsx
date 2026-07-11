@@ -47,7 +47,6 @@ export function SettingsSidebar({
     <nav className="settings-nav" aria-label="设置分类">
       <div className="settings-nav-intro">
         <strong>设置</strong>
-        <span>独立分页，常用项直接操作</span>
       </div>
       <div className="settings-nav-search" role="search">
         <Search size={14} aria-hidden="true" />
@@ -90,7 +89,6 @@ export function SettingsSidebar({
                 </span>
                 <span className="settings-nav-copy">
                   <span className="settings-nav-label">{item.label}</span>
-                  <small>{item.description}</small>
                 </span>
                 {active && <span className="settings-nav-active-dot" aria-hidden="true" />}
               </button>
@@ -116,7 +114,6 @@ export function SettingsMobileNavigation({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const ActiveIcon = activeItem.icon;
-  const activeGroup = getSettingsNavigationContext(activeSection).group;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -153,7 +150,6 @@ export function SettingsMobileNavigation({
           <ActiveIcon size={16} />
         </span>
         <span className="settings-page-picker-copy">
-          <small>{activeGroup.label}</small>
           <strong>{activeItem.label}</strong>
         </span>
         <ChevronDown
@@ -181,7 +177,6 @@ export function SettingsMobileNavigation({
                   <item.icon size={15} aria-hidden="true" />
                   <span>
                     <strong>{item.label}</strong>
-                    <small>{item.description}</small>
                   </span>
                 </button>
               ))}

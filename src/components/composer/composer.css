@@ -586,3 +586,163 @@
     justify-content: flex-end;
   }
 }
+
+/* Quiet composer override: mail body first, tools stay secondary. */
+.composer-backdrop {
+  background: rgba(24, 29, 36, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.composer {
+  width: min(760px, calc(100vw - 44px));
+  height: min(680px, calc(100vh - 44px));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-modal);
+  background: #fff;
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.composer header {
+  min-height: 46px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--ui-border);
+  background: #fff;
+}
+
+.composer-title-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.composer-title-copy small,
+.composer footer > span {
+  display: none;
+}
+
+.composer-header-actions button,
+.composer footer button,
+.composer-quick-tools .rich-toolbar button,
+.composer-quick-tools .composer-signature button,
+.composer-quick-tools .composer-attachment-button,
+.composer-quick-tools .checkbox-row,
+.composer-template-row button,
+.composer-template-save button {
+  border-radius: var(--ui-radius-control);
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.composer-header-actions button {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.composer-field-row {
+  min-height: 40px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  padding: 0 14px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.composer-field-row:focus-within {
+  background: #fff;
+}
+
+.composer .composer-field-row input {
+  min-height: 39px;
+  font-size: 13px;
+}
+
+.composer .recipient-suggestions {
+  min-height: 34px;
+  padding: 4px 14px 5px 68px;
+  background: #fff;
+}
+
+.composer .recipient-suggestions > span {
+  background: #fff;
+}
+
+.composer .recipient-suggestions button,
+.composer-quick-tools .composer-attachment-chip {
+  border-color: var(--ui-border);
+  background: #fff;
+}
+
+.composer .composer-body-field textarea {
+  padding: 17px 18px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.composer-quick-tools,
+.composer-advanced {
+  background: #f8f9fa;
+}
+
+.composer-quick-toolbar {
+  min-height: 40px;
+  padding: 5px 10px;
+  gap: 6px;
+}
+
+.composer-quick-tools .composer-signature small,
+.composer-quick-tools .composer-attachment-controls > span,
+.composer-advanced summary span {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.composer-advanced summary {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.composer-advanced-panel {
+  max-height: 230px;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  background: #f8f9fa;
+}
+
+.composer-tool-card {
+  padding: 9px;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.composer-tool-card > strong {
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.composer footer {
+  min-height: 48px;
+  padding: 0 10px;
+  border-top: 1px solid var(--ui-border);
+  background: #fff;
+  justify-content: flex-end;
+}
+
+.composer footer button {
+  min-height: 32px;
+  padding: 0 11px;
+}
+
+.composer footer button:last-child {
+  min-width: 72px;
+  background: var(--ui-accent);
+  box-shadow: none;
+}
+
+.composer-minimized {
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--ui-shadow-popover);
+}

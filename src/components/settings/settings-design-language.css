@@ -525,3 +525,333 @@
     transition: none;
   }
 }
+
+/* Quiet settings override: form groups instead of dashboard cards. */
+.settings-backdrop {
+  --settings-border: var(--ui-border);
+  --settings-border-strong: var(--ui-border-strong);
+  --settings-text: var(--ui-text);
+  --settings-text-secondary: var(--ui-text-secondary);
+  --settings-text-tertiary: var(--ui-text-tertiary);
+  --settings-accent: var(--ui-accent);
+  --settings-accent-hover: var(--ui-accent-hover);
+  --settings-accent-soft: var(--ui-accent-soft);
+  --settings-canvas: #f7f8f9;
+  --settings-sidebar: #f1f2f4;
+  padding: 16px;
+  background: rgba(24, 29, 36, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.settings-modal {
+  width: min(1080px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px));
+  border: 1px solid var(--settings-border);
+  border-radius: var(--ui-radius-modal);
+  background: #fff;
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.settings-modal .settings-main-header {
+  min-height: 48px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--settings-border);
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.settings-app-mark {
+  display: none;
+}
+
+.settings-title-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.settings-title-copy small,
+.settings-modal .settings-nav-copy small,
+.settings-modal .settings-page-meta,
+.settings-page-progress-bar,
+.settings-modal .settings-page-header > p {
+  display: none;
+}
+
+.settings-modal .settings-header-actions {
+  gap: 5px;
+}
+
+.settings-modal .settings-header-button,
+.settings-modal .settings-close-button {
+  min-height: 30px;
+  border-radius: var(--ui-radius-control);
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-header-button.primary {
+  border-color: var(--settings-accent);
+  background: var(--settings-accent);
+  box-shadow: none;
+}
+
+.settings-modal .settings-body {
+  grid-template-columns: 216px minmax(0, 1fr);
+  background: #fff;
+}
+
+.settings-modal .settings-nav {
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--settings-border);
+  background: var(--settings-sidebar);
+}
+
+.settings-modal .settings-nav-intro {
+  min-height: 30px;
+  padding: 0 8px 7px;
+}
+
+.settings-modal .settings-nav-intro strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.settings-modal .settings-nav-search {
+  min-height: 32px;
+  margin: 0 0 7px;
+  border-color: var(--settings-border);
+  border-radius: var(--ui-radius-control);
+  background: #fff;
+  box-shadow: none;
+}
+
+.settings-modal .settings-nav-search:focus-within {
+  border-color: var(--settings-border-strong);
+  box-shadow: none;
+}
+
+.settings-modal .settings-nav .settings-nav-group {
+  margin: 10px 8px 4px;
+  color: var(--settings-text-tertiary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.settings-modal .settings-nav-section > button {
+  min-height: 32px;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--settings-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-nav-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--settings-text-tertiary);
+  background: transparent;
+}
+
+.settings-modal .settings-nav-section > button:hover {
+  color: var(--settings-text);
+  background: rgba(31, 35, 40, 0.045);
+}
+
+.settings-modal .settings-nav-section > button.active {
+  border: 0;
+  color: var(--settings-text);
+  background: #e8edf3;
+  box-shadow: inset 2px 0 0 var(--settings-accent);
+}
+
+.settings-modal .settings-nav-section > button.active .settings-nav-icon {
+  color: var(--settings-accent);
+}
+
+.settings-modal .settings-nav-active-dot {
+  display: none;
+}
+
+.settings-modal .settings-content {
+  background: #fff;
+}
+
+.settings-modal .settings-page {
+  width: min(100%, 860px);
+}
+
+.settings-modal .settings-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: 18px 30px 13px;
+  border-bottom: 1px solid var(--settings-border);
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.settings-modal .settings-page-heading {
+  gap: 10px;
+}
+
+.settings-modal .settings-page-icon {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--settings-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--settings-text-secondary);
+  background: #fff;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-heading .settings-page-kicker {
+  color: var(--settings-text-tertiary);
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-page-heading strong {
+  font-size: 18px;
+  font-weight: 680;
+}
+
+.settings-modal .settings-page-content {
+  gap: 0;
+  padding: 14px 30px 22px;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) {
+  border: 0;
+  border-top: 1px solid var(--settings-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-static-section,
+  .settings-section-overview
+):hover {
+  border-color: var(--settings-border);
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-header,
+  .settings-static-header,
+  .settings-section-overview
+) {
+  min-height: 42px;
+  padding-top: 12px;
+}
+
+.settings-modal .settings-page-content :is(.tool-header, .settings-static-header) small,
+.settings-modal .settings-page-content .settings-section-overview em,
+.settings-modal .settings-page-content .settings-section-overview > b {
+  color: var(--settings-text-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea) {
+  border-color: var(--settings-border);
+  border-radius: var(--ui-radius-control);
+  background: #fff;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.settings-modal .settings-page-content :is(input, select) {
+  min-height: 34px;
+}
+
+.settings-modal .settings-page-content textarea {
+  min-height: 78px;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):focus {
+  border-color: var(--settings-accent);
+  box-shadow: 0 0 0 2px rgba(10, 115, 217, 0.12);
+}
+
+.settings-provider-presets button,
+.settings-toggle-grid .checkbox-row,
+.settings-send-control,
+.notification-account-grid > div,
+.notification-account-grid,
+.notification-account-grid-header em,
+.notification-account-mode,
+.settings-compact-list .tool-row,
+.settings-storage-metrics,
+.settings-rule-editor,
+.settings-contact-create {
+  border-radius: var(--ui-radius-control);
+  box-shadow: none;
+}
+
+.settings-provider-presets button.active,
+.settings-rule-editor .rule-action-chips button.active,
+.notification-account-grid button.active {
+  border-color: var(--settings-accent);
+  background: var(--settings-accent-soft);
+}
+
+.settings-modal .settings-page-pagination {
+  gap: 8px;
+  padding: 0 30px 22px;
+}
+
+.settings-modal .settings-page-pagination-button {
+  min-height: 36px;
+  padding: 0 10px;
+  border-color: var(--settings-border);
+  border-radius: var(--ui-radius-control);
+  background: #fff;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-pagination-button:hover:not(:disabled) {
+  border-color: var(--settings-border-strong);
+  background: #f5f6f7;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-pagination-button strong {
+  font-size: 11.5px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-mobile-toolbar {
+  background: #fff;
+}
+
+.settings-modal .settings-page-picker,
+.settings-modal .settings-mobile-menu {
+  border-radius: var(--ui-radius-control);
+}
+
+@media (max-width: 900px) {
+  .settings-modal {
+    width: calc(100vw - 18px);
+    height: calc(100vh - 18px);
+    border-radius: var(--ui-radius-modal);
+  }
+
+  .settings-modal .settings-page-header,
+  .settings-modal .settings-page-content,
+  .settings-modal .settings-page-pagination {
+    padding-inline: 18px;
+  }
+}

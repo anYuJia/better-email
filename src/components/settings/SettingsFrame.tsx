@@ -36,7 +36,6 @@ type SettingsFrameProps = {
 
 export default function SettingsFrame({
   title,
-  subtitle,
   activeSection,
   children,
   onNavigate,
@@ -85,7 +84,6 @@ export default function SettingsFrame({
             </span>
             <span className="settings-title-copy">
               <strong>{title}</strong>
-              <small>{subtitle}</small>
             </span>
           </div>
           <div className="settings-header-actions">

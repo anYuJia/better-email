@@ -1030,6 +1030,55 @@ export default function App() {
     setStatus('已刷新本地邮箱数据');
   }
 
+  async function syncAndRefresh() {
+    const startedAt = performance.now();
+    const syncAccountId = accountScope === 'all' ? null : accountScope;
+    appFlowLog('syncAndRefresh start', {
+      accountId: syncAccountId,
+      folderId,
+      scope: accountScope,
+      searchScope,
+      query: query.trim() || null,
+      filter,
+    });
+    setStatus('正在同步服务器邮件...');
+    try {
+      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
+      setSyncRuns((current) => [run, ...current].slice(0, 10));
+      const meta = await loadMeta(folderId);
+      await loadMessagesWithVisibleFallback(
+        meta.folderId,
+        query,
+        filter,
+        accountScope,
+        mailboxRefreshRef.current,
+        meta.folders,
+        messagePageSize,
+      );
+      if (activeThread) {
+        await openThread(activeThread, false);
+      }
+      appFlowLog('syncAndRefresh done', {
+        accountId: syncAccountId,
+        status: run.status,
+        scannedFolders: run.scanned_folders,
+        importedMessages: run.imported_messages,
+        resolvedFolderId: meta.folderId,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      setStatus(run.message);
+    } catch (error) {
+      const message = String(error);
+      appFlowWarn('syncAndRefresh failed', {
+        accountId: syncAccountId,
+        error: message,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      setStatus(message);
+      throw error;
+    }
+  }
+
   async function openThread(thread: ThreadSummary, announce = true) {
     const nextMessages = await invoke<Message[]>('list_thread_messages', {
       accountId: accountIdForScope(accountScope),
@@ -2415,7 +2464,7 @@ export default function App() {
     isComposerOpen,
     searchInputRef,
     openComposer: () => openComposer(),
-    refreshAll,
+    refreshAll: syncAndRefresh,
     setListMode,
     clearActiveThread: () => {
       setActiveThread(null);
@@ -2567,7 +2616,9 @@ export default function App() {
         }}
         onClearSearchAndFilter={() => { clearSearchAndFilter().catch((error) => setStatus(String(error))); }}
         onApplySearchShortcut={(nextQuery) => { applySearchShortcut(nextQuery).catch((error) => setStatus(String(error))); }}
-        onRefresh={refreshAll}
+        onRefresh={() => {
+          syncAndRefresh().catch((error) => setStatus(String(error)));
+        }}
         onShowMessages={() => {
           setListMode('messages');
           setActiveThread(null);

@@ -134,6 +134,15 @@ export function credentialVerificationPatch(
   };
 }
 
+export function shouldRunInitialMailboxSync(
+  incomingProtocol: string,
+  hasSecret: boolean,
+  authenticated: boolean,
+): boolean {
+  if (!hasSecret || !authenticated) return false;
+  return ['imap', 'pop3'].includes(incomingProtocol.trim().toLowerCase());
+}
+
 export default function useAccountConnectionController({
   accountForm,
   newAccountForm,
@@ -231,6 +240,7 @@ export default function useAccountConnectionController({
         email: maskEmailForLog(created.email),
         isDefault: created.is_default,
       });
+      let verification: CredentialVerificationReport | null = null;
       if (trimmedSecret) {
         const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
           input: { account_email: created.email, secret: trimmedSecret },
@@ -259,7 +269,7 @@ export default function useAccountConnectionController({
           }
           throw new Error(credentialResult.message);
         }
-        const verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
+        verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
           input: {
             account_id: created.id,
             secret: trimmedSecret,
@@ -299,6 +309,31 @@ export default function useAccountConnectionController({
       setMessages([]);
       setSelectedId(null);
       setAttachments([]);
+      if (shouldRunInitialMailboxSync(created.incoming_protocol, Boolean(trimmedSecret), Boolean(verification?.authenticated))) {
+        accountFlowLog('initial mailbox sync start', {
+          accountId: created.id,
+          email: maskEmailForLog(created.email),
+          protocol: created.incoming_protocol,
+        });
+        try {
+          const syncRun = await invoke<SyncRun>('sync_imap_headers', {
+            accountId: created.id,
+          });
+          setSyncRuns((current) => [syncRun, ...current].slice(0, 10));
+          accountFlowLog('initial mailbox sync done', {
+            accountId: created.id,
+            status: syncRun.status,
+            scannedFolders: syncRun.scanned_folders,
+            importedMessages: syncRun.imported_messages,
+          });
+        } catch (syncError) {
+          accountFlowWarn('initial mailbox sync failed', {
+            accountId: created.id,
+            email: maskEmailForLog(created.email),
+            error: syncError instanceof Error ? syncError.message : String(syncError),
+          });
+        }
+      }
       const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
       accountFlowLog('metadata loaded after create', {
         accountId: created.id,
@@ -310,7 +345,7 @@ export default function useAccountConnectionController({
         accountId: created.id,
         folderId: nextFolderId,
       });
-      setStatus(trimmedSecret ? `已创建并验证账号：${created.email}` : `已创建账号：${created.email}`);
+      setStatus(trimmedSecret ? `已创建并同步账号：${created.email}` : `已创建账号：${created.email}`);
     } catch (error) {
       accountFlowWarn('create failed', {
         email: maskEmailForLog(newAccountForm.email),

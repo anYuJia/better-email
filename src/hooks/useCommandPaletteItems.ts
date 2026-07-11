@@ -85,7 +85,7 @@ export default function useCommandPaletteItems({
         id: 'refresh',
         title: '刷新邮箱',
         section: '常用',
-        hint: '重新加载本地和同步状态',
+        hint: '同步服务器并刷新列表',
         run: refreshAll,
       },
       {

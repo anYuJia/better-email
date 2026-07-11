@@ -4,6 +4,7 @@ import {
   credentialVerificationPatch,
   providerVerificationKey,
   providerVerificationRecordFor,
+  shouldRunInitialMailboxSync,
 } from './useAccountConnectionController';
 
 describe('account connection controller helpers', () => {
@@ -49,5 +50,13 @@ describe('account connection controller helpers', () => {
       smtp_ok: false,
       checked_at: report.checked_at,
     });
+  });
+
+  it('runs initial mailbox sync only after authenticated account creation', () => {
+    expect(shouldRunInitialMailboxSync('imap', true, true)).toBe(true);
+    expect(shouldRunInitialMailboxSync('pop3', true, true)).toBe(true);
+    expect(shouldRunInitialMailboxSync('imap', false, true)).toBe(false);
+    expect(shouldRunInitialMailboxSync('imap', true, false)).toBe(false);
+    expect(shouldRunInitialMailboxSync('unknown', true, true)).toBe(false);
   });
 });

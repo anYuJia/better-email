@@ -3047,3 +3047,45 @@ body {
   width: 18px;
   height: 18px;
 }
+
+/* Sidebar selection pass: clearer current row, flatter hover. */
+:root {
+  --quiet-row-hover: #f2f4f6;
+  --quiet-row-selected: #e7edf5;
+  --quiet-row-selected-border: #7f9fca;
+  --quiet-row-shadow: none;
+}
+
+.sidebar .folder {
+  border-radius: 7px;
+}
+
+.sidebar .folder:hover,
+.sidebar .folder:focus-within {
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+.sidebar .folder.active,
+.sidebar .folder.active:hover {
+  color: #17202b;
+  background: var(--quiet-row-selected);
+  box-shadow: inset 3px 0 0 var(--quiet-row-selected-border);
+}
+
+.sidebar .folder.active .folder-main {
+  font-weight: 680;
+}
+
+.sidebar .folder.active .folder-name svg {
+  color: #3f6594;
+}
+
+.sidebar .folder:not(.active):hover .folder-main {
+  font-weight: 540;
+}
+
+.sidebar-footer-actions .settings-button:hover,
+.settings-button:hover {
+  box-shadow: none;
+}

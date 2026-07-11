@@ -816,6 +816,48 @@ export default function App() {
   }, [draft, isRichComposer, isComposerOpen]);
 
   useEffect(() => {
+    if (!isComposerOpen) return undefined;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+
+    getCurrentWindow().onDragDropEvent(async (event) => {
+      if (!active) return;
+      if (event.type === 'enter' || event.type === 'over') {
+        setComposerDropActive(true);
+        return;
+      }
+      if (event.type === 'leave') {
+        setComposerDropActive(false);
+        return;
+      }
+      setComposerDropActive(false);
+      const paths = event.paths.filter((path) => path.trim());
+      if (paths.length === 0) {
+        setStatus('拖拽内容中没有文件');
+        return;
+      }
+      try {
+        const newAttachments = await invoke<OutboundAttachmentInput[]>('outbound_attachments_from_paths', { paths });
+        addDraftAttachments(newAttachments, '已拖入附件');
+      } catch (error) {
+        setStatus(`附件拖入失败：${String(error)}`);
+      }
+    })
+      .then((nextUnlisten) => {
+        unlisten = nextUnlisten;
+      })
+      .catch((error) => {
+        setStatus(`附件拖拽不可用：${String(error)}`);
+      });
+
+    return () => {
+      active = false;
+      setComposerDropActive(false);
+      unlisten?.();
+    };
+  }, [isComposerOpen]);
+
+  useEffect(() => {
     refreshMailbox(accountScope, null).catch((error) => setStatus(String(error)));
   }, [accountScope]);
 

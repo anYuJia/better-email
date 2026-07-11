@@ -6,6 +6,12 @@ type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };
 type TauriCore = typeof import('@tauri-apps/api/core');
 type TauriWindow = typeof import('@tauri-apps/api/window');
 type TauriNotification = typeof import('@tauri-apps/plugin-notification');
+type DesktopFileDropEvent =
+  | { type: 'enter'; paths: string[]; position?: unknown }
+  | { type: 'over'; position?: unknown }
+  | { type: 'drop'; paths: string[]; position?: unknown }
+  | { type: 'leave' };
+type DesktopFileDropHandler = (event: DesktopFileDropEvent) => void;
 
 const hasTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 const mockMode =
@@ -30,6 +36,50 @@ function loadWindow() {
 function loadNotification() {
   notificationModule ??= import('@tauri-apps/plugin-notification');
   return notificationModule;
+}
+
+function mimeTypeForMockPath(path: string) {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+  switch (extension) {
+    case 'txt':
+    case 'log':
+    case 'md':
+      return 'text/plain';
+    case 'html':
+    case 'htm':
+      return 'text/html';
+    case 'csv':
+      return 'text/csv';
+    case 'pdf':
+      return 'application/pdf';
+    case 'json':
+      return 'application/json';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'zip':
+      return 'application/zip';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'ppt':
+      return 'application/vnd.ms-powerpoint';
+    case 'pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 let account = {
@@ -2064,6 +2114,20 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
           local_path: '/tmp/better-email/smoke-brief.txt',
         },
       ] as T;
+    case 'outbound_attachments_from_paths': {
+      const paths = Array.isArray(args?.paths) ? args.paths : [];
+      return paths
+        .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
+        .map((path) => {
+          const filename = path.split(/[\\/]/).pop() || 'attachment';
+          return {
+            filename,
+            mime_type: mimeTypeForMockPath(filename),
+            size_bytes: 0,
+            local_path: path,
+          };
+        }) as T;
+    }
     case 'parse_raw_message':
       return {
         subject: '安全预览样例',
@@ -2211,6 +2275,7 @@ export function getCurrentWindow() {
     return {
       setBadgeCount: async () => undefined,
       setBadgeLabel: async () => undefined,
+      onDragDropEvent: async () => async () => undefined,
     };
   }
   return {
@@ -2221,6 +2286,10 @@ export function getCurrentWindow() {
     setBadgeLabel: async (label?: string) => {
       const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
       return getTauriCurrentWindow().setBadgeLabel(label);
+    },
+    onDragDropEvent: async (handler: DesktopFileDropHandler) => {
+      const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+      return getTauriCurrentWindow().onDragDropEvent((event) => handler(event.payload as unknown as DesktopFileDropEvent));
     },
   };
 }

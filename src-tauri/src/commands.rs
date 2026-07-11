@@ -236,6 +236,30 @@ pub fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttac
 }
 
 #[tauri::command]
+pub fn outbound_attachments_from_paths(paths: Vec<String>) -> MailResult<Vec<OutboundAttachmentInput>> {
+    paths
+        .into_iter()
+        .filter(|path| !path.trim().is_empty())
+        .map(|path| attachment_input_from_path(PathBuf::from(path)))
+        .collect()
+}
+
+fn attachment_input_from_path(path: PathBuf) -> MailResult<OutboundAttachmentInput> {
+    let metadata = fs::metadata(&path)?;
+    let filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "attachment".to_string());
+    Ok(OutboundAttachmentInput {
+        filename,
+        mime_type: mime_type_for_path(&path),
+        size_bytes: metadata.len().min(i64::MAX as u64) as i64,
+        local_path: path.to_string_lossy().into_owned(),
+    })
+}
+
+#[tauri::command]
 pub fn mark_frontend_ready(message: String) -> MailResult<()> {
     let Some(path) = benchmark_env(
         "BETTER_EMAIL_BENCH_READY_FILE",

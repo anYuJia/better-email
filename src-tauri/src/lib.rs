@@ -42,6 +42,7 @@ pub fn run() {
             commands::list_muted_thread_keys,
             commands::list_attachments,
             commands::pick_outbound_attachments,
+            commands::outbound_attachments_from_paths,
             commands::mark_frontend_ready,
             commands::mark_benchmark_sync_complete,
             commands::benchmark_sync_requested,

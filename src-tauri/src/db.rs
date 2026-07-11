@@ -3237,11 +3237,11 @@ impl MailStore {
                 .query_map(params_from_iter(query_params), |row| {
                     Ok(ThreadSummary {
                         thread_key: row.get(0)?,
-                        subject: row.get(1)?,
+                        subject: protocol::decode_mime_header_value(&row.get::<_, String>(1)?),
                         message_count: row.get(2)?,
                         unread_count: row.get(3)?,
                         latest_at: row.get(4)?,
-                        participants: row.get(5)?,
+                        participants: decode_thread_participants(&row.get::<_, String>(5)?),
                         is_muted: row.get::<_, i64>(6)? != 0,
                     })
                 })?
@@ -5356,6 +5356,15 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
         |row| map_message_row(conn, row),
     )
     .map_err(Into::into)
+}
+
+fn decode_thread_participants(value: &str) -> String {
+    value
+        .split(',')
+        .map(|participant| protocol::decode_mime_header_value(participant).trim().to_string())
+        .filter(|participant| !participant.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn map_message_row(conn: &Connection, row: &Row<'_>) -> rusqlite::Result<Message> {
@@ -7948,6 +7957,51 @@ mod tests {
         assert!(starred_threads
             .iter()
             .all(|thread| thread.thread_key != thread_key));
+    }
+
+    #[test]
+    fn thread_summaries_decode_mime_encoded_headers() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        let inbox = store
+            .list_folders_for_account(Some(account.id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let thread_key = "msgid:<mime-thread@example.com>";
+
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "
+                    INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at, is_read, thread_key
+                    ) VALUES (?1, ?2, ?3, 'pyu.ida@foxmail.com', 'reader@example.com',
+                              ?4, 'header only', '', '2026-07-12T00:43:00Z', 0, ?5)
+                    ",
+                    params![
+                        account.id,
+                        inbox.id,
+                        "=?utf-8?B?cHl1LmlkYQ==?=",
+                        "=?utf-8?B?c2E=?=",
+                        thread_key
+                    ],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let thread = store
+            .list_threads_for_scope(Some(account.id), Some(inbox.id), None, None, 50)
+            .unwrap()
+            .into_iter()
+            .find(|thread| thread.thread_key == thread_key)
+            .unwrap();
+
+        assert_eq!(thread.subject, "sa");
+        assert_eq!(thread.participants, "pyu.ida");
     }
 
     #[test]

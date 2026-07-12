@@ -2211,6 +2211,16 @@ export default function App() {
     return updated;
   }
 
+  async function allowRemoteImagesForSelectedOnce() {
+    if (!selected) return;
+    const updated = await invoke<Message>('render_message_with_remote_images_once', { messageId: selected.id });
+    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    if (activeThread) {
+      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    }
+    setStatus('已允许查看当前邮件的远程图片');
+  }
+
   async function trustRemoteImagesForSelected(scope: 'sender' | 'domain') {
     if (!selected) return;
     const input = remoteImageTrustInput(selected.account_id, selected.sender_email, scope);
@@ -2899,6 +2909,7 @@ export default function App() {
         onFetchBody={fetchSelectedBody}
         onMarkNotSpam={markSelectedNotSpam}
         onMarkAsSpam={markSelectedAsSpam}
+        onAllowRemoteImagesOnce={() => { allowRemoteImagesForSelectedOnce().catch((error) => setStatus(String(error))); }}
         onTrustRemoteImages={trustRemoteImagesForSelected}
         onBlockSender={blockSelectedSender}
         onPermanentlyDelete={permanentlyDeleteSelected}

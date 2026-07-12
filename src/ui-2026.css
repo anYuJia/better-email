@@ -1321,6 +1321,30 @@ textarea:disabled {
   margin-bottom: 6px;
 }
 
+.reader-warning-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.reader-warning-primary-action {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #e0c895;
+  border-radius: var(--ui-radius-control);
+  color: #704a00;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.reader-warning-primary-action:hover {
+  border-color: #d1ad67;
+  background: #fff;
+}
+
 .inline-image-notice {
   width: min(100%, 760px);
   min-height: 44px;

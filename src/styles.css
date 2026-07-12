@@ -1195,6 +1195,30 @@ h1 {
   margin-top: 10px;
 }
 
+.reader-warning-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.reader-warning-primary-action {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(180, 83, 9, 0.3);
+  border-radius: 7px;
+  color: #7c2d12;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.reader-warning-primary-action:hover {
+  border-color: rgba(180, 83, 9, 0.42);
+  background: #fff;
+}
+
 .reader-warning-actions summary {
   min-height: 30px;
   border-color: rgba(245, 158, 11, 0.28);

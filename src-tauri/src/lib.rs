@@ -53,6 +53,7 @@ pub fn run() {
             commands::trust_remote_images,
             commands::delete_remote_image_trust,
             commands::render_message_with_remote_image_policy,
+            commands::render_message_with_remote_images_once,
             commands::download_attachment,
             commands::open_attachment,
             commands::reveal_attachment_in_finder,

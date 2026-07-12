@@ -507,6 +507,21 @@ pub fn render_message_with_remote_image_policy(
 }
 
 #[tauri::command]
+pub fn render_message_with_remote_images_once(
+    store: State<'_, MailStore>,
+    message_id: i64,
+) -> MailResult<Message> {
+    let mut message = store.get_message(message_id)?;
+    if !message.body.trim().is_empty() {
+        message.sanitized_html = protocol::sanitize_html_with_remote_images(&message.body);
+    }
+    message
+        .security_warnings
+        .retain(|warning| !warning.contains("远程图片"));
+    Ok(message)
+}
+
+#[tauri::command]
 pub fn download_attachment(
     store: State<'_, MailStore>,
     attachment_id: i64,

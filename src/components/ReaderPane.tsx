@@ -94,6 +94,7 @@ export type ReaderPaneProps = {
   onFetchBody: () => void | Promise<void>;
   onMarkNotSpam: () => void;
   onMarkAsSpam: () => void;
+  onAllowRemoteImagesOnce: () => void;
   onTrustRemoteImages: (scope: TrustScope) => void;
   onBlockSender: () => void;
   onPermanentlyDelete: () => void;
@@ -284,6 +285,7 @@ export default function ReaderPane({
   onFetchBody,
   onMarkNotSpam,
   onMarkAsSpam,
+  onAllowRemoteImagesOnce,
   onTrustRemoteImages,
   onBlockSender,
   onPermanentlyDelete,
@@ -1367,18 +1369,27 @@ export default function ReaderPane({
             </div>
             {visibleSecurityWarnings.map((warning) => <p key={warning}>{warning}</p>)}
             {selectedHasRemoteImageWarning && (
-              <details className="compact-menu reader-warning-actions">
-                <summary><SlidersHorizontal size={15} /> 处理</summary>
-                <div>
-                  <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
-                  {selectedSenderDomain && (
-                    <button type="button" onClick={() => onTrustRemoteImages('domain')}>
-                      信任 {selectedSenderDomain}
-                    </button>
-                  )}
-                  <button type="button" onClick={onBlockSender}>阻止该发件人</button>
-                </div>
-              </details>
+              <div className="reader-warning-action-row">
+                <button
+                  type="button"
+                  className="reader-warning-primary-action"
+                  onClick={onAllowRemoteImagesOnce}
+                >
+                  允许查看本邮件
+                </button>
+                <details className="compact-menu reader-warning-actions">
+                  <summary><SlidersHorizontal size={15} /> 更多</summary>
+                  <div>
+                    <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
+                    {selectedSenderDomain && (
+                      <button type="button" onClick={() => onTrustRemoteImages('domain')}>
+                        信任 {selectedSenderDomain}
+                      </button>
+                    )}
+                    <button type="button" onClick={onBlockSender}>阻止该发件人</button>
+                  </div>
+                </details>
+              </div>
             )}
           </div>
         )}

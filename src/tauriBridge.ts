@@ -2224,6 +2224,18 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       return undefined as T;
     case 'render_message_with_remote_image_policy':
       return renderMessageWithPolicy(Number(args?.messageId)) as T;
+    case 'render_message_with_remote_images_once': {
+      const messageId = Number(args?.messageId);
+      const message = messages.find((item) => item.id === messageId);
+      if (!message) throw new Error('message not found');
+      const updated = {
+        ...message,
+        sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
+        security_warnings: message.security_warnings.filter((warning) => !warning.includes('远程图片')),
+      };
+      messages = messages.map((item) => (item.id === messageId ? updated : item));
+      return updated as T;
+    }
     case 'enqueue_background_task': {
       const input = args?.input as { kind?: string; source?: string } | undefined;
       const kind = String(input?.kind ?? 'sync');

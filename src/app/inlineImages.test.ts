@@ -30,7 +30,7 @@ describe('CID inline images', () => {
     const result = resolveCidInlineImages(
       '<p>Hello</p><img src="cid:<Logo@Example.COM>"><img src="https://example.com/remote.png">',
       [attachment()],
-      (path) => `asset://localhost/${path}`,
+      (item) => `asset://localhost/${item.local_path}`,
     );
 
     expect(result.html).toContain('src="asset://localhost//tmp/logo.png"');

@@ -22,6 +22,7 @@ use crate::pop3_probe;
 use crate::protocol;
 use crate::smtp;
 use crate::vcard;
+use base64::Engine as _;
 use chrono::Utc;
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
@@ -262,6 +263,36 @@ pub fn list_attachments(
     message_id: i64,
 ) -> MailResult<Vec<Attachment>> {
     store.list_attachments(message_id)
+}
+
+#[tauri::command]
+pub fn read_attachment_data_url(
+    store: State<'_, MailStore>,
+    attachment_id: i64,
+) -> MailResult<String> {
+    let attachment = store.get_attachment(attachment_id)?;
+    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "附件尚未下载到本地。",
+        )));
+    }
+
+    let path = PathBuf::from(&attachment.local_path);
+    let metadata = fs::metadata(&path)?;
+    validate_attachment_download_size(metadata.len().min(i64::MAX as u64) as i64)?;
+    let bytes = fs::read(&path)?;
+    let mime_type = if attachment.mime_type.trim().is_empty()
+        || attachment
+            .mime_type
+            .eq_ignore_ascii_case("application/octet-stream")
+    {
+        mime_type_for_path(&path).to_string()
+    } else {
+        attachment.mime_type.trim().to_string()
+    };
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{mime_type};base64,{encoded}"))
 }
 
 #[tauri::command]

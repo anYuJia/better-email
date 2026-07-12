@@ -33,7 +33,7 @@ import type {
   ThreadSummary,
 } from '../app/types';
 import { formatBytes, formatDate } from '../mailUtils';
-import { localFileAssetUrl } from '../tauriBridge';
+import { invoke, localFileAssetUrl } from '../tauriBridge';
 import type { BulkMessageAction } from './messageContextMenu';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
@@ -285,6 +285,7 @@ export default function ReaderPane({
   const [isDownloadingInlineImages, setIsDownloadingInlineImages] = useState(false);
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
+  const [inlineImageDataUrls, setInlineImageDataUrls] = useState<Record<number, string>>({});
   const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
@@ -295,7 +296,7 @@ export default function ReaderPane({
   const inlineImageResolution = resolveCidInlineImages(
     selected?.sanitized_html ?? '',
     attachments,
-    localFileAssetUrl,
+    (attachment) => inlineImageDataUrls[attachment.id] ?? localFileAssetUrl(attachment.local_path),
   );
   const inlineImageError = inlineImageResolution.pendingAttachments
     .map((attachment) => attachmentErrors[attachment.id])
@@ -311,8 +312,43 @@ export default function ReaderPane({
     setIsDownloadingInlineImages(false);
     setIsRefreshingInlineImages(false);
     setInlineImageRefreshError('');
+    setInlineImageDataUrls({});
     setImagePreview(null);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const readyInlineImages = attachments.filter((attachment) =>
+      attachment.is_inline
+      && attachment.is_downloaded
+      && Boolean(attachment.local_path.trim())
+      && Boolean(attachment.content_id.trim())
+      && !inlineImageDataUrls[attachment.id]);
+    if (readyInlineImages.length === 0) return;
+
+    let cancelled = false;
+    readyInlineImages.forEach((attachment) => {
+      invoke<string>('read_attachment_data_url', { attachmentId: attachment.id })
+        .then((dataUrl) => {
+          if (cancelled || !dataUrl.trim()) return;
+          setInlineImageDataUrls((current) => ({
+            ...current,
+            [attachment.id]: dataUrl,
+          }));
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setAttachmentErrors((current) => ({
+            ...current,
+            [attachment.id]: attachmentErrorMessage(error),
+          }));
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachments, inlineImageDataUrls, selected?.id]);
 
   useEffect(() => {
     if (!selected) return;

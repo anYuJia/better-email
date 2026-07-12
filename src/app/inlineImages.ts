@@ -51,7 +51,7 @@ function looksLikeImageAttachment(attachment: Attachment) {
 export function resolveCidInlineImages(
   html: string,
   attachments: Attachment[],
-  assetUrlForPath: (localPath: string) => string,
+  assetUrlForAttachment: (attachment: Attachment) => string,
 ): InlineImageResolution {
   const inlineImagesByContentId = new Map<string, Attachment>();
 
@@ -102,7 +102,7 @@ export function resolveCidInlineImages(
       );
     }
 
-    const assetUrl = assetUrlForPath(attachment.local_path).trim();
+    const assetUrl = assetUrlForAttachment(attachment).trim();
     if (!assetUrl) {
       pendingAttachments.set(attachment.id, attachment);
       return imageTag.replace(

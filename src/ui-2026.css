@@ -1113,29 +1113,29 @@ textarea:disabled {
 
 .attachments {
   display: grid;
-  gap: 5px;
+  gap: 8px;
   margin: 0;
 }
 
 .attachment-item {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
   width: 100%;
-  min-height: 58px;
+  min-height: 70px;
   align-items: center;
-  gap: 11px;
-  padding: 8px 10px;
-  border: 1px solid #e7ebef;
-  border-radius: 12px;
-  background: #fbfcfd;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid #e8edf2;
+  border-radius: 13px;
+  background: #fff;
   box-shadow: none;
   box-sizing: border-box;
 }
 
 .attachment-item:hover {
-  border-color: #d9e1e8;
-  background: #fff;
-  box-shadow: none;
+  border-color: #dce4eb;
+  background: #fcfdfe;
+  box-shadow: 0 4px 14px rgba(30, 41, 59, 0.05);
 }
 
 .attachment-item.attachment-download-failed {
@@ -1144,45 +1144,73 @@ textarea:disabled {
 }
 
 .attachment-file-icon {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  position: relative;
+  width: 44px;
+  height: 52px;
+  flex: 0 0 44px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d9e1e8;
+  border-radius: 9px;
   color: #5f7183;
+  background: linear-gradient(180deg, #fff 0%, #f7f9fb 100%);
+  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04);
+  --attachment-accent: #6f7b88;
+}
+
+.attachment-file-icon::before {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 15px;
+  height: 15px;
+  content: '';
+  border-left: 1px solid #d9e1e8;
+  border-bottom: 1px solid #d9e1e8;
+  border-radius: 0 8px 0 5px;
   background: #eef2f6;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
 }
 
 .attachment-file-icon-image {
   color: #2f7a57;
-  background: #edf7f1;
+  --attachment-accent: #2f8a60;
 }
 
 .attachment-file-icon-archive {
   color: #8a6827;
-  background: #fbf3df;
+  --attachment-accent: #b87818;
 }
 
 .attachment-file-icon-presentation {
   color: #9a5730;
-  background: #fbf0e9;
+  --attachment-accent: #d1612f;
 }
 
 .attachment-file-icon-spreadsheet {
   color: #2f7650;
-  background: #edf8f2;
+  --attachment-accent: #278557;
 }
 
 .attachment-file-icon-audio,
 .attachment-file-icon-video {
   color: #69569a;
-  background: #f3effa;
+  --attachment-accent: #7357b8;
 }
 
 .attachment-file-type-mark {
-  font-size: 10px;
-  font-weight: 780;
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  min-width: 30px;
+  height: 18px;
+  place-items: center;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--attachment-accent);
+  font-size: 9.5px;
+  font-weight: 760;
   letter-spacing: 0;
   line-height: 1;
 }

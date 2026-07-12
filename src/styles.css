@@ -5895,7 +5895,7 @@ h1 {
 }
 
 .attachments {
-  gap: 7px;
+  gap: 8px;
 }
 
 .attachments div {
@@ -5915,57 +5915,83 @@ h1 {
 /* Reader attachment rows use the newer compact desktop-mail layout. */
 .attachments .attachment-item {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  width: min(100%, 560px);
-  min-height: 58px;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+  width: min(100%, 620px);
+  min-height: 70px;
   align-items: center;
-  gap: 11px;
-  padding: 8px 10px;
-  border: 1px solid #e7ebef;
-  border-radius: 12px;
-  background: #fbfcfd;
-  box-shadow: none;
-}
-
-.attachments .attachment-item:hover {
-  border-color: #d9e1e8;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid #e8edf2;
+  border-radius: 13px;
   background: #fff;
   box-shadow: none;
 }
 
+.attachments .attachment-item:hover {
+  border-color: #dce4eb;
+  background: #fcfdfe;
+  box-shadow: 0 4px 14px rgba(30, 41, 59, 0.05);
+}
+
 .attachments .attachment-file-icon {
-  width: 38px;
-  height: 38px;
+  position: relative;
+  width: 44px;
+  height: 52px;
   display: grid;
   place-items: center;
-  border: 0;
-  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #d9e1e8;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #fff 0%, #f7f9fb 100%);
+  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04);
+  --attachment-accent: #6f7b88;
+}
+
+.attachments .attachment-file-icon::before {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 15px;
+  height: 15px;
+  content: '';
+  border-left: 1px solid #d9e1e8;
+  border-bottom: 1px solid #d9e1e8;
+  border-radius: 0 8px 0 5px;
   background: #eef2f6;
-  box-shadow: none;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
 }
 
 .attachments .attachment-file-icon-presentation {
   color: #9a5730;
-  background: #fbf0e9;
+  --attachment-accent: #d1612f;
 }
 
 .attachments .attachment-file-icon-spreadsheet {
   color: #2f7650;
-  background: #edf8f2;
+  --attachment-accent: #278557;
 }
 
 .attachments .attachment-file-icon-document {
   color: #4b6178;
-  background: #eef2f6;
+  --attachment-accent: #5f7183;
 }
 
 .attachments .attachment-file-icon-archive {
   color: #8a6827;
-  background: #fbf3df;
+  --attachment-accent: #b87818;
 }
 
 .attachments .attachment-file-type-mark {
-  font-size: 10px;
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  min-width: 30px;
+  height: 18px;
+  place-items: center;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--attachment-accent);
+  font-size: 9.5px;
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1;

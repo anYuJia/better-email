@@ -12,7 +12,7 @@ use imap_proto::parser::bodystructure::BodyStructParser;
 use imap_proto::types::{
     BodyStructure, ContentDisposition, ContentEncoding, SectionPath, UidSetMember,
 };
-use mail_parser::{MessageParser, MimeHeaders};
+use mail_parser::{Message, MessageParser, MessagePart, MimeHeaders};
 use std::collections::BTreeSet;
 use std::io::{Read, Write};
 use std::thread;
@@ -1608,47 +1608,9 @@ fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
         .chars()
         .take(120)
         .collect();
-    let has_attachments = parsed
-        .as_ref()
-        .map(|message| message.attachments().next().is_some())
-        .unwrap_or(false);
     let attachments = parsed
         .as_ref()
-        .map(|message| {
-            message
-                .attachments()
-                .enumerate()
-                .map(|(index, part)| {
-                    let mime_type = part
-                        .content_type()
-                        .map(|content_type| {
-                            content_type
-                                .c_subtype
-                                .as_ref()
-                                .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
-                                .unwrap_or_else(|| content_type.c_type.to_string())
-                        })
-                        .unwrap_or_else(|| "application/octet-stream".to_string());
-                    let content_id = protocol::normalize_content_id(part.content_id());
-                    let is_inline = part
-                        .content_disposition()
-                        .is_some_and(|disposition| disposition.is_inline())
-                        || !content_id.is_empty();
-                    RemoteAttachmentMetadata {
-                        filename: part
-                            .attachment_name()
-                            .map(str::to_string)
-                            .unwrap_or_else(|| {
-                                protocol::inline_attachment_filename(&mime_type, &content_id, index)
-                            }),
-                        mime_type,
-                        size_bytes: part.body.len() as i64,
-                        content_id,
-                        is_inline,
-                    }
-                })
-                .collect::<Vec<_>>()
-        })
+        .map(remote_attachment_metadata_from_message)
         .unwrap_or_default();
 
     RemoteMessageBody {
@@ -1656,9 +1618,92 @@ fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
         sanitized_html,
         security_warnings,
         snippet,
-        has_attachments: has_attachments || !attachments.is_empty(),
+        has_attachments: !attachments.is_empty(),
         attachments,
     }
+}
+
+fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteAttachmentMetadata> {
+    let mut attachments = Vec::new();
+    let mut seen_inline_content_ids = BTreeSet::new();
+
+    for (index, part) in message.attachments().enumerate() {
+        let metadata = remote_attachment_metadata_from_part(part, index);
+        if metadata.is_inline && !metadata.content_id.is_empty() {
+            seen_inline_content_ids.insert(metadata.content_id.clone());
+        }
+        attachments.push(metadata);
+    }
+
+    for (index, part) in message.parts.iter().enumerate() {
+        let content_id = protocol::normalize_content_id(part.content_id());
+        if content_id.is_empty() || seen_inline_content_ids.contains(&content_id) {
+            continue;
+        }
+        let mime_type = part_mime_type(part);
+        if !mime_type.to_ascii_lowercase().starts_with("image/") || !part.is_binary() {
+            continue;
+        }
+
+        eprintln!(
+            "[better-email][imap] inline cid part recovered content_id={} mime={} bytes={}",
+            content_id,
+            mime_type,
+            part.contents().len()
+        );
+        seen_inline_content_ids.insert(content_id.clone());
+        attachments.push(RemoteAttachmentMetadata {
+            filename: part
+                .attachment_name()
+                .map(str::to_string)
+                .unwrap_or_else(|| {
+                    protocol::inline_attachment_filename(&mime_type, &content_id, index)
+                }),
+            mime_type,
+            size_bytes: part.contents().len() as i64,
+            content_id,
+            is_inline: true,
+        });
+    }
+
+    attachments
+}
+
+fn remote_attachment_metadata_from_part(
+    part: &MessagePart<'_>,
+    index: usize,
+) -> RemoteAttachmentMetadata {
+    let mime_type = part_mime_type(part);
+    let content_id = protocol::normalize_content_id(part.content_id());
+    let is_inline = part
+        .content_disposition()
+        .is_some_and(|disposition| disposition.is_inline())
+        || !content_id.is_empty();
+
+    RemoteAttachmentMetadata {
+        filename: part
+            .attachment_name()
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                protocol::inline_attachment_filename(&mime_type, &content_id, index)
+            }),
+        mime_type,
+        size_bytes: part.contents().len() as i64,
+        content_id,
+        is_inline,
+    }
+}
+
+fn part_mime_type(part: &MessagePart<'_>) -> String {
+    part.content_type()
+        .map(|content_type| {
+            content_type
+                .c_subtype
+                .as_ref()
+                .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
+                .unwrap_or_else(|| content_type.c_type.to_string())
+        })
+        .unwrap_or_else(|| "application/octet-stream".to_string())
 }
 
 fn looks_like_html(body: &str) -> bool {
@@ -1707,32 +1752,23 @@ fn parse_attachment_payload_from_raw(
     let requested = filename.trim();
     let requested_content_id = protocol::normalize_content_id(Some(content_id));
     let parsed = MessageParser::default().parse(raw.as_bytes())?;
-    let mut attachments = parsed.attachments();
+    let attachments = remote_payload_parts(&parsed);
     if requested.is_empty() && requested_content_id.is_empty() {
-        let part = attachments.next()?;
-        let mime_type = part
-            .content_type()
-            .map(|content_type| {
-                content_type
-                    .c_subtype
-                    .as_ref()
-                    .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
-                    .unwrap_or_else(|| content_type.c_type.to_string())
-            })
-            .unwrap_or_else(|| "application/octet-stream".to_string());
+        let (index, part) = attachments.first()?;
+        let mime_type = part_mime_type(part);
         let part_content_id = protocol::normalize_content_id(part.content_id());
         return Some(RemoteAttachmentPayload {
             filename: part
                 .attachment_name()
                 .map(str::to_string)
                 .unwrap_or_else(|| {
-                    protocol::inline_attachment_filename(&mime_type, &part_content_id, 0)
+                    protocol::inline_attachment_filename(&mime_type, &part_content_id, *index)
                 }),
             bytes: part.contents().to_vec(),
         });
     }
 
-    let payload = attachments.enumerate().find_map(|(index, part)| {
+    let payload = attachments.into_iter().find_map(|(index, part)| {
         let part_name = part.attachment_name().unwrap_or("");
         let part_content_id = protocol::normalize_content_id(part.content_id());
         let matches = if !requested_content_id.is_empty() {
@@ -1741,16 +1777,7 @@ fn parse_attachment_payload_from_raw(
             part_name == requested
         };
         if matches {
-            let mime_type = part
-                .content_type()
-                .map(|content_type| {
-                    content_type
-                        .c_subtype
-                        .as_ref()
-                        .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
-                        .unwrap_or_else(|| content_type.c_type.to_string())
-                })
-                .unwrap_or_else(|| "application/octet-stream".to_string());
+            let mime_type = part_mime_type(part);
             Some(RemoteAttachmentPayload {
                 filename: if part_name.is_empty() {
                     protocol::inline_attachment_filename(&mime_type, &part_content_id, index)
@@ -1764,6 +1791,33 @@ fn parse_attachment_payload_from_raw(
         }
     });
     payload
+}
+
+fn remote_payload_parts<'a>(message: &'a Message<'a>) -> Vec<(usize, &'a MessagePart<'a>)> {
+    let mut parts = Vec::new();
+    let mut seen_inline_content_ids = BTreeSet::new();
+
+    for (index, part) in message.attachments().enumerate() {
+        let content_id = protocol::normalize_content_id(part.content_id());
+        if !content_id.is_empty() {
+            seen_inline_content_ids.insert(content_id);
+        }
+        parts.push((index, part));
+    }
+
+    for (index, part) in message.parts.iter().enumerate() {
+        let content_id = protocol::normalize_content_id(part.content_id());
+        if content_id.is_empty() || seen_inline_content_ids.contains(&content_id) {
+            continue;
+        }
+        let mime_type = part_mime_type(part);
+        if mime_type.to_ascii_lowercase().starts_with("image/") && part.is_binary() {
+            seen_inline_content_ids.insert(content_id);
+            parts.push((index, part));
+        }
+    }
+
+    parts
 }
 
 #[cfg(test)]
@@ -2124,6 +2178,63 @@ mod tests {
         .unwrap();
         assert_eq!(payload.filename, "notes.txt");
         assert_eq!(payload.bytes, b"attachment body");
+    }
+
+    #[test]
+    fn parses_inline_cid_image_without_filename_from_raw_message() {
+        let body = parse_body_from_raw(concat!(
+            "Subject: Inline image\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/related; boundary=\"rel\"\r\n",
+            "\r\n",
+            "--rel\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p>Hello</p><img src=\"cid:image001@example.com\">\r\n",
+            "--rel\r\n",
+            "Content-Type: image/png\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "Content-ID: <image001@example.com>\r\n",
+            "\r\n",
+            "aW1hZ2UgYnl0ZXM=\r\n",
+            "--rel--\r\n",
+        ));
+
+        assert!(body.has_attachments);
+        assert_eq!(body.attachments.len(), 1);
+        assert_eq!(body.attachments[0].content_id, "image001@example.com");
+        assert_eq!(body.attachments[0].mime_type, "image/png");
+        assert!(body.attachments[0].is_inline);
+        assert!(body.attachments[0].filename.ends_with(".png"));
+    }
+
+    #[test]
+    fn parses_inline_cid_image_payload_without_filename() {
+        let payload = parse_attachment_payload_from_raw(
+            concat!(
+                "Subject: Inline image\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/related; boundary=\"rel\"\r\n",
+                "\r\n",
+                "--rel\r\n",
+                "Content-Type: text/html; charset=utf-8\r\n",
+                "\r\n",
+                "<p>Hello</p><img src=\"cid:image001@example.com\">\r\n",
+                "--rel\r\n",
+                "Content-Type: image/png\r\n",
+                "Content-Transfer-Encoding: base64\r\n",
+                "Content-ID: <image001@example.com>\r\n",
+                "\r\n",
+                "aW1hZ2UgYnl0ZXM=\r\n",
+                "--rel--\r\n",
+            ),
+            "",
+            "IMAGE001@example.com",
+        )
+        .expect("content id should locate the inline image");
+
+        assert!(payload.filename.ends_with(".png"));
+        assert_eq!(payload.bytes, b"image bytes");
     }
 
     #[test]

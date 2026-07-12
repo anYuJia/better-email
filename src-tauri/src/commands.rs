@@ -28,6 +28,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -62,6 +63,32 @@ fn benchmark_env(primary: &str, legacy: &str) -> Option<String> {
     std::env::var(primary)
         .ok()
         .or_else(|| std::env::var(legacy).ok())
+}
+
+fn prompt_save_file_path(
+    app: &AppHandle,
+    title: &str,
+    filename: String,
+) -> MailResult<Option<PathBuf>> {
+    let (sender, receiver) = mpsc::channel();
+    app.dialog()
+        .file()
+        .set_title(title)
+        .set_file_name(filename)
+        .save_file(move |path| {
+            let _ = sender.send(path);
+        });
+
+    let Some(path) = receiver
+        .recv()
+        .map_err(|error| crate::db::MailError::Imap(format!("保存面板响应失败：{error}")))?
+    else {
+        return Ok(None);
+    };
+
+    path.into_path()
+        .map(Some)
+        .map_err(|error| crate::db::MailError::Imap(format!("无法解析另存为路径：{error}")))
 }
 
 #[tauri::command]
@@ -296,7 +323,7 @@ pub fn read_attachment_data_url(
 }
 
 #[tauri::command]
-pub fn save_image_data_url_as(
+pub async fn save_image_data_url_as(
     app: AppHandle,
     data_url: String,
     filename: String,
@@ -319,15 +346,10 @@ pub fn save_image_data_url_as(
         .map_err(|error| crate::db::MailError::Imap(format!("图片数据解析失败：{error}")))?;
     validate_attachment_download_size(payload.len().min(i64::MAX as usize) as i64)?;
 
-    let target_path = app
-        .dialog()
-        .file()
-        .set_title("另存图片")
-        .set_file_name(sanitize_filename(&filename))
-        .blocking_save_file()
-        .ok_or_else(|| crate::db::MailError::Imap("已取消图片另存为。".to_string()))?
-        .into_path()
-        .map_err(|error| crate::db::MailError::Imap(format!("无法解析另存为路径：{error}")))?;
+    let Some(target_path) = prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename))?
+    else {
+        return Err(crate::db::MailError::Imap("已取消图片另存为。".to_string()));
+    };
 
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)?;
@@ -635,7 +657,7 @@ pub fn open_attachment(
 }
 
 #[tauri::command]
-pub fn save_attachment_as(
+pub async fn save_attachment_as(
     app: AppHandle,
     store: State<'_, MailStore>,
     attachment_id: i64,
@@ -655,15 +677,11 @@ pub fn save_attachment_as(
         )));
     }
 
-    let target_path = app
-        .dialog()
-        .file()
-        .set_title("另存附件")
-        .set_file_name(sanitize_filename(&attachment.filename))
-        .blocking_save_file()
-        .ok_or_else(|| crate::db::MailError::Imap("已取消附件另存为。".to_string()))?
-        .into_path()
-        .map_err(|error| crate::db::MailError::Imap(format!("无法解析另存为路径：{error}")))?;
+    let Some(target_path) =
+        prompt_save_file_path(&app, "另存附件", sanitize_filename(&attachment.filename))?
+    else {
+        return Err(crate::db::MailError::Imap("已取消附件另存为。".to_string()));
+    };
 
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)?;

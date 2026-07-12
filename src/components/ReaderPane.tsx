@@ -726,6 +726,30 @@ export default function ReaderPane({
     }
   }
 
+  async function copyPreviewImageToClipboard() {
+    if (!imageContextMenu) return;
+    try {
+      const clipboard = navigator.clipboard;
+      if (!clipboard || typeof ClipboardItem === 'undefined' || !clipboard.write) {
+        throw new Error('Clipboard image write is unavailable');
+      }
+
+      const response = await fetch(imageContextMenu.src);
+      if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
+      const blob = await response.blob();
+      const mimeType = blob.type || 'image/png';
+      await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
+    } catch {
+      try {
+        await navigator.clipboard?.writeText(imageContextMenu.src);
+      } catch {
+        // Clipboard access can be unavailable in some WebView contexts.
+      }
+    } finally {
+      setImageContextMenu(null);
+    }
+  }
+
   if (activeThread && threadMessages.length > 0) {
     const allThreadRead = threadMessages.every((message) => message.is_read);
     const allThreadStarred = threadMessages.every((message) => message.is_starred);
@@ -1326,6 +1350,9 @@ export default function ReaderPane({
           </button>
           <button type="button" role="menuitem" onClick={downloadPreviewImage}>
             下载图片
+          </button>
+          <button type="button" role="menuitem" onClick={copyPreviewImageToClipboard}>
+            复制图片
           </button>
           <button type="button" role="menuitem" onClick={copyPreviewImageSource}>
             复制图片地址

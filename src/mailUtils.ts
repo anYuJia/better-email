@@ -105,6 +105,23 @@ export function plainTextPreview(value: string): string {
     .trim();
 }
 
+const remoteHeaderOnlySnippet = '远端邮件头已同步';
+
+export type PreviewableMailboxMessage = {
+  body: string;
+  sanitized_html: string;
+  snippet: string;
+};
+
+export function mailboxListPreview(message: PreviewableMailboxMessage): string {
+  const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
+  if (bodyPreview) return bodyPreview;
+  if (!message.snippet.includes(remoteHeaderOnlySnippet)) {
+    return plainTextPreview(message.snippet);
+  }
+  return '';
+}
+
 export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
   const normalized = subject.trim() || '(无主题)';
   const matcher = prefix === 'Re' ? /^(re|回复)\s*:/i : /^(fwd|fw|转发)\s*:/i;

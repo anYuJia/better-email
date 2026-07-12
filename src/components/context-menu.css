@@ -173,7 +173,8 @@
     0 2px 8px rgba(29, 40, 54, 0.07);
 }
 
-.context-menu-branch:hover > .context-submenu {
+.context-menu-branch:hover > .context-submenu,
+.context-menu-branch.is-keyboard-open > .context-submenu {
   display: block;
 }
 

@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatDate,
   messageDateGroup,
+  mailboxListPreview,
   newMailNotificationDecision,
   newMailNotificationBody,
   notificationThreadScopeKey,
@@ -54,6 +55,29 @@ describe('mail UI utilities', () => {
     expect(plainTextPreview('&lt;div style=&quot;font-family: system-ui;&quot;&gt;周雪莹王欣答辩PPT&lt;/div&gt;'))
       .toBe('周雪莹王欣答辩PPT');
     expect(plainTextPreview('<script>alert(1)</script><p>正文</p>')).toBe('正文');
+  });
+
+  it('builds mailbox previews without showing remote-header placeholders', () => {
+    expect(mailboxListPreview({
+      body: '<p>完整正文</p>',
+      sanitized_html: '',
+      snippet: '短摘要',
+    })).toBe('完整正文');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '&lt;p&gt;安全正文&lt;/p&gt;',
+      snippet: '短摘要',
+    })).toBe('安全正文');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '远端邮件头已同步，打开邮件后自动获取正文。',
+    })).toBe('');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '普通摘要',
+    })).toBe('普通摘要');
   });
 
   it('quotes message bodies for reply and forward drafts', () => {

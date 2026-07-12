@@ -24,6 +24,20 @@ const BODY_FETCH_QUERY_PRESERVE_SEEN: &str = "BODY.PEEK[]";
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
 const ATTACHMENT_RETRY_BASE_DELAY_MS: u64 = 150;
+const VERBOSE_IMAP_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
+
+fn verbose_imap_logs_enabled() -> bool {
+    cfg!(debug_assertions)
+        || std::env::var(VERBOSE_IMAP_LOG_ENV)
+            .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            .unwrap_or(false)
+}
+
+fn imap_info(message: impl AsRef<str>) {
+    if verbose_imap_logs_enabled() {
+        eprintln!("{}", message.as_ref());
+    }
+}
 
 fn retry_attachment_fetch<T>(
     operation: impl FnMut() -> Result<T, MailError>,
@@ -346,10 +360,10 @@ pub fn fetch_message_body(
     remote_name: &str,
     remote_uid: i64,
 ) -> Result<RemoteMessageBody, MailError> {
-    eprintln!(
+    imap_info(format!(
         "[better-email][imap] body fetch start account_id={} mailbox={} uid={} peek=true seen_unchanged=true",
         account.id, remote_name, remote_uid
-    );
+    ));
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = imap::ClientBuilder::new(host.as_str(), port)
         .connect()
@@ -368,13 +382,13 @@ pub fn fetch_message_body(
         .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
     let _ = session.logout();
 
-    eprintln!(
+    imap_info(format!(
         "[better-email][imap] body fetch ok account_id={} mailbox={} uid={} bytes={} seen_unchanged=true",
         account.id,
         remote_name,
         remote_uid,
         raw.len()
-    );
+    ));
     Ok(parse_body_from_raw(&raw))
 }
 
@@ -1373,12 +1387,12 @@ fn send_imap_client_id_if_needed(session: &mut imap::Session<imap::Connection>, 
         }
     };
     match session.run_command_and_check_ok(&command) {
-        Ok(()) => eprintln!(
+        Ok(()) => imap_info(format!(
             "[better-email][imap] client id sent email={} provider={} host={}",
             mask_imap_email(&account.email),
             account.provider,
             account.imap_host,
-        ),
+        )),
         Err(error) => eprintln!(
             "[better-email][imap] client id failed email={} provider={} host={} error={error}",
             mask_imap_email(&account.email),
@@ -1645,12 +1659,12 @@ fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteA
             continue;
         }
 
-        eprintln!(
+        imap_info(format!(
             "[better-email][imap] inline cid part recovered content_id={} mime={} bytes={}",
             content_id,
             mime_type,
             part.contents().len()
-        );
+        ));
         seen_inline_content_ids.insert(content_id.clone());
         attachments.push(RemoteAttachmentMetadata {
             filename: part
@@ -1769,9 +1783,7 @@ fn reader_security_warnings(raw: &str, html_body: &str) -> Vec<String> {
     {
         warnings.push("HTML 正文包含事件属性，阅读面已清洗移除。".to_string());
     }
-    if (lower.contains("<img") && lower.contains("src=\"http"))
-        || (lower.contains("<img") && lower.contains("src='http"))
-    {
+    if protocol::html_has_remote_images(html_body) || protocol::html_has_remote_images(raw) {
         warnings.push("检测到远程图片，默认已阻止自动加载。".to_string());
     }
     if lower.contains("href=\"http://") || lower.contains("href='http://") {

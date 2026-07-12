@@ -7,6 +7,12 @@ import {
   type NotificationPolicy,
 } from '../mailUtils';
 import {
+  diagnosticInfo,
+  diagnosticWarn,
+  flowInfo,
+  flowWarn,
+} from '../app/logger';
+import {
   invoke,
   isPermissionGranted,
   requestPermission,
@@ -82,19 +88,19 @@ function syncModeStatus(syncMode: string) {
 }
 
 function outboxFlowLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[outbox-flow] ${event}`, details);
+  flowInfo('outbox-flow', event, details);
 }
 
 function outboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn(`[outbox-flow] ${event}`, details);
+  flowWarn('outbox-flow', event, details);
 }
 
 function fetchTimerLog(event: string, details: Record<string, unknown> = {}) {
-  console.info('[better-email][fetch-timer]', event, details);
+  diagnosticInfo('[better-email][fetch-timer]', event, details);
 }
 
 function fetchTimerWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn('[better-email][fetch-timer]', event, details);
+  diagnosticWarn('[better-email][fetch-timer]', event, details);
 }
 
 type OutboxInvoke = <T>(command: string) => Promise<T>;
@@ -105,24 +111,37 @@ export async function runDueOutboxSmtp(invokeCommand: OutboxInvoke = invoke): Pr
 }
 
 export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
-  return (
-    items
-      .filter(
-        (item) =>
-          scheduledOutboxStatuses.has(item.status)
-          && Boolean(item.next_attempt_at)
-          && Number.isFinite(Date.parse(item.next_attempt_at)),
-      )
-      .sort((left, right) => Date.parse(left.next_attempt_at) - Date.parse(right.next_attempt_at))[0]
-    ?? null
-  );
+  let nextItem: OutboxItem | null = null;
+  let nextTimestamp = Number.POSITIVE_INFINITY;
+
+  for (const item of items) {
+    if (!scheduledOutboxStatuses.has(item.status) || !item.next_attempt_at) continue;
+    const timestamp = Date.parse(item.next_attempt_at);
+    if (!Number.isFinite(timestamp) || timestamp >= nextTimestamp) continue;
+    nextItem = item;
+    nextTimestamp = timestamp;
+  }
+
+  return nextItem;
 }
 
 export function outboxFlushMessage(items: OutboxItem[]): string {
-  const failed = items.filter((item) => item.status === 'retry').length;
-  const blocked = items.filter((item) => item.status === 'failed').length;
-  const pendingRetry = items.filter((item) => item.status === 'retry' && item.next_attempt_at).length;
-  const archivePending = items.filter((item) => item.status === 'sent_remote_pending').length;
+  let failed = 0;
+  let blocked = 0;
+  let pendingRetry = 0;
+  let archivePending = 0;
+
+  for (const item of items) {
+    if (item.status === 'retry') {
+      failed += 1;
+      if (item.next_attempt_at) pendingRetry += 1;
+    } else if (item.status === 'failed') {
+      blocked += 1;
+    } else if (item.status === 'sent_remote_pending') {
+      archivePending += 1;
+    }
+  }
+
   if (blocked > 0) {
     return `SMTP 发送暂停，${blocked} 封需要重新保存账号授权码`;
   }
@@ -553,6 +572,8 @@ export default function useBackgroundTaskCoordinator({
       window.clearInterval(timer);
     };
   }, [
+    account?.email,
+    account?.id,
     account?.sync_mode,
     enqueueBackgroundTask,
     setBackgroundSyncStatus,

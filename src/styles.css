@@ -10,6 +10,104 @@ body { margin: 0; overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
+.app-error-boundary {
+  min-height: 100vh;
+  padding: 32px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(58, 166, 117, 0.16), transparent 32%),
+    #f5f6f8;
+}
+
+.app-error-card {
+  width: min(620px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(31, 41, 51, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  color: #20242a;
+}
+
+.app-error-eyebrow {
+  margin: 0 0 8px;
+  color: #3aa675;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-error-card h1 {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1.1;
+}
+
+.app-error-card p {
+  margin: 0 0 16px;
+  color: #58616d;
+  line-height: 1.65;
+}
+
+.app-error-card pre,
+.app-error-card code {
+  display: block;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.app-error-card pre {
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #1f2933;
+  color: #f6f8fb;
+}
+
+.app-error-card details {
+  margin-bottom: 18px;
+}
+
+.app-error-card summary {
+  cursor: pointer;
+  color: #3b4856;
+  font-weight: 700;
+}
+
+.app-error-card code {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #eef2f5;
+  color: #334155;
+}
+
+.app-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app-error-actions button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: #3aa675;
+  color: #fff;
+  font-weight: 800;
+}
+
+.app-error-actions button.secondary {
+  border: 1px solid rgba(31, 41, 51, 0.16);
+  background: #fff;
+  color: #20242a;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 236px 6px 386px 6px minmax(420px, 1fr);

@@ -133,7 +133,9 @@ impl Pop3Client {
     }
 
     fn retr(&mut self, number: i64) -> Result<String, MailError> {
-        Ok(self.multiline_command(&format!("RETR {number}"))?.join("\r\n"))
+        Ok(self
+            .multiline_command(&format!("RETR {number}"))?
+            .join("\r\n"))
     }
 
     fn quit(&mut self) {

@@ -172,7 +172,9 @@ async function evalInPage(cdp, expression) {
     returnByValue: true,
   });
   if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.text ?? 'Page evaluation failed');
+    const exception = result.exceptionDetails.exception;
+    const description = exception?.description || exception?.value || result.exceptionDetails.text;
+    throw new Error(description ?? 'Page evaluation failed');
   }
   return result.result?.value;
 }
@@ -892,7 +894,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.credential-input-shell input')?.value === '' && document.querySelector('.credential-input-shell input')?.type === 'password' && document.querySelector('[data-credential-primary-action]')?.innerText.includes('验证登录')");
     await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
     await waitForExpression(cdp, "document.querySelector('[data-connection-diagnostics]')?.innerText.includes('账号连接已就绪') && [...document.querySelectorAll('[data-diagnostic-step]')].length === 4 && [...document.querySelectorAll('[data-diagnostic-step]')].every((step) => step.classList.contains('success')) && !document.querySelector('.connection-technical-details')?.open");
-    await clickButton(cdp, '一键验收', "document.querySelector('[data-connection-diagnostics]')");
+    await clickButton(cdp, '只读验收', "document.querySelector('[data-connection-diagnostics]')");
     await waitForExpression(cdp, "document.querySelector('[data-provider-validation-status=\"success\"]') && [...document.querySelectorAll('[data-provider-validation-stage]')].length === 4 && [...document.querySelectorAll('[data-provider-validation-stage]')].every((stage) => stage.classList.contains('success')) && document.querySelector('[data-provider-validation]')?.innerText.includes('未发送邮件或修改远端邮件状态')");
     await evalInPage(cdp, "document.querySelector('.connection-technical-details > summary').click()");
     await waitForExpression(cdp, "document.querySelector('.connection-technical-details')?.open && document.querySelector('.connection-technical-details')?.textContent.includes('未发送任何邮件') && document.querySelector('.connection-technical-details')?.textContent.includes('不显示或导出授权码与 Token')");
@@ -948,7 +950,7 @@ async function main() {
     await fillInput(cdp, '.contact-create-form textarea[placeholder^="别名邮箱"]', 'ada@example.com');
     await clickButton(cdp, '新增联系人', "document.querySelector('.contact-create-form')");
     await waitForExpression(cdp, "document.body.innerText.includes('重复联系人建议') && document.body.innerText.includes('Ada Duplicate') && document.body.innerText.includes('邮箱或别名重叠')");
-    await clickButton(cdp, '一键合并', "document.querySelector('.contact-suggestion-panel')");
+    await clickButton(cdp, '合并建议', "document.querySelector('.contact-suggestion-panel')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已按建议合并：Ada Duplicate') && !document.querySelector('.settings-modal').innerText.includes('ada.duplicate@example.com')");
     await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Merge Source');
     await fillInput(cdp, '.contact-create-form input[placeholder="邮箱地址"]', 'merge-source@example.com');

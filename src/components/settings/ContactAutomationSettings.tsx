@@ -108,7 +108,7 @@ export default function ContactAutomationSettings({
               </span>
               <button type="button" onClick={() => onMergeSuggested(suggestion)}>
                 <Merge size={14} />
-                一键合并
+                合并建议
               </button>
             </div>
           ))}

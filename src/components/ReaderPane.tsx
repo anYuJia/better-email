@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   Clock,
@@ -210,7 +210,11 @@ function parsePlainBody(body: string): PlainBodyBlock[] {
 }
 
 function PlainMessageBody({ body }: { body: string }) {
-  const blocks = parsePlainBody(body);
+  const blocks = useMemo(() => parsePlainBody(body), [body]);
+  const originalBlockCount = useMemo(
+    () => blocks.filter((item) => item.type === 'original').length,
+    [blocks],
+  );
 
   return (
     <div className="body-text">
@@ -227,7 +231,7 @@ function PlainMessageBody({ body }: { body: string }) {
           <section className="original-message-block" key={`original-${block.index}-${index}`}>
             <header>
               <span>原始邮件</span>
-              {blocks.filter((item) => item.type === 'original').length > 1 && (
+              {originalBlockCount > 1 && (
                 <small>{block.index}</small>
               )}
             </header>
@@ -307,6 +311,7 @@ export default function ReaderPane({
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
   const [inlineImageDataUrls, setInlineImageDataUrls] = useState<Record<number, string>>({});
+  const [inlineImageAssetUrls, setInlineImageAssetUrls] = useState<Record<number, string>>({});
   const [imagePreview, setImagePreview] = useState<PreviewImage | null>(null);
   const [imagePreviewZoom, setImagePreviewZoom] = useState(1);
   const [imagePreviewFit, setImagePreviewFit] = useState(true);
@@ -319,23 +324,40 @@ export default function ReaderPane({
   const imagePreviewImageRef = useRef<HTMLImageElement | null>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
-  const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
-  const pendingAttachmentCount = regularAttachments.filter(
-    (attachment) => !attachment.is_downloaded,
-  ).length;
-  const inlineImageResolution = resolveCidInlineImages(
-    selected?.sanitized_html ?? '',
-    attachments,
-    (attachment) => inlineImageDataUrls[attachment.id] ?? localFileAssetUrl(attachment.local_path),
+  const regularAttachments = useMemo(
+    () => attachments.filter((attachment) => !attachment.is_inline),
+    [attachments],
   );
-  const inlineImageError = inlineImageResolution.pendingAttachments
-    .map((attachment) => attachmentErrors[attachment.id])
-    .find(Boolean) ?? '';
-  const visibleSecurityWarnings = selected?.security_warnings.filter(
-    (warning) =>
-      warning !== '正文包含外部链接，请核对域名后再访问。' &&
-      !(selectedSenderTrusted && warning.includes('远程图片')),
-  ) ?? [];
+  const pendingAttachmentCount = useMemo(
+    () => regularAttachments.filter((attachment) => !attachment.is_downloaded).length,
+    [regularAttachments],
+  );
+  const regularAttachmentTotalSize = useMemo(
+    () => regularAttachments.reduce((sum, item) => sum + item.size_bytes, 0),
+    [regularAttachments],
+  );
+  const inlineImageResolution = useMemo(
+    () => resolveCidInlineImages(
+      selected?.sanitized_html ?? '',
+      attachments,
+      (attachment) => inlineImageAssetUrls[attachment.id] ?? inlineImageDataUrls[attachment.id] ?? '',
+    ),
+    [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.sanitized_html],
+  );
+  const inlineImageError = useMemo(
+    () => inlineImageResolution.pendingAttachments
+      .map((attachment) => attachmentErrors[attachment.id])
+      .find(Boolean) ?? '',
+    [attachmentErrors, inlineImageResolution.pendingAttachments],
+  );
+  const visibleSecurityWarnings = useMemo(
+    () => selected?.security_warnings.filter(
+      (warning) =>
+        warning !== '正文包含外部链接，请核对域名后再访问。' &&
+        !(selectedSenderTrusted && warning.includes('远程图片')),
+    ) ?? [],
+    [selected?.security_warnings, selectedSenderTrusted],
+  );
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());
@@ -345,6 +367,7 @@ export default function ReaderPane({
     setIsRefreshingInlineImages(false);
     setInlineImageRefreshError('');
     setInlineImageDataUrls({});
+    setInlineImageAssetUrls({});
     setImagePreview(null);
     setImagePreviewZoom(1);
     setImagePreviewFit(true);
@@ -354,6 +377,43 @@ export default function ReaderPane({
     setImageContextMenu(null);
     setAttachmentContextMenu(null);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const readyInlineImages = attachments.filter((attachment) =>
+      attachment.is_inline
+      && attachment.is_downloaded
+      && Boolean(attachment.local_path.trim())
+      && Boolean(attachment.content_id.trim())
+      && !inlineImageDataUrls[attachment.id]
+      && !inlineImageAssetUrls[attachment.id]);
+    if (readyInlineImages.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      readyInlineImages.map(async (attachment) => {
+        const assetUrl = await localFileAssetUrl(attachment.local_path);
+        return [attachment.id, assetUrl] as const;
+      }),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setInlineImageAssetUrls((current) => {
+          const next = { ...current };
+          entries.forEach(([attachmentId, assetUrl]) => {
+            if (assetUrl.trim()) next[attachmentId] = assetUrl;
+          });
+          return next;
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) setInlineImageRefreshError(attachmentErrorMessage(error));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id]);
 
   useEffect(() => {
     if (!selected) return;
@@ -1238,7 +1298,7 @@ export default function ReaderPane({
             <header className="attachment-section-header">
               <span>
                 <strong>附件</strong>
-                <small>{regularAttachments.length} 个 · {formatBytes(regularAttachments.reduce((sum, item) => sum + item.size_bytes, 0))}</small>
+                <small>{regularAttachments.length} 个 · {formatBytes(regularAttachmentTotalSize)}</small>
               </span>
               {pendingAttachmentCount > 0 && (
                 <button
@@ -1258,7 +1318,8 @@ export default function ReaderPane({
               {regularAttachments.map((attachment) => {
                 const downloading = downloadingAttachmentIds.has(attachment.id);
                 const transferError = attachmentErrors[attachment.id] ?? '';
-                const canPreview = attachmentKind(attachment) === 'image';
+                const kind = attachmentKind(attachment);
+                const canPreview = kind === 'image';
                 return (
                   <div
                     className={`attachment-item ${transferError ? 'attachment-download-failed' : ''}`}
@@ -1272,7 +1333,7 @@ export default function ReaderPane({
                       setAttachmentContextMenu({ attachment, x: event.clientX, y: event.clientY });
                     }}
                   >
-                    <span className={`attachment-file-icon attachment-file-icon-${attachmentKind(attachment)}`} aria-hidden="true">
+                    <span className={`attachment-file-icon attachment-file-icon-${kind}`} aria-hidden="true">
                       {attachmentIcon(attachment)}
                     </span>
                     <span className="attachment-copy">

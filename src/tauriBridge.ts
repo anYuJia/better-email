@@ -1,4 +1,3 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
 import type { ListSort, Message } from './app/types';
 
 type InvokeArgs = Record<string, unknown> | undefined;
@@ -2206,6 +2205,19 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
         warning_count: 2,
         warnings: ['检测到远程图片，应默认阻止自动加载。', 'HTML 正文包含 script 标签，渲染前必须清洗。'],
       } as T;
+    case 'fetch_message_body': {
+      const messageId = Number(args?.messageId);
+      const message = messages.find((item) => item.id === messageId);
+      if (!message) throw new Error('message not found');
+      const updated: MockMessage = {
+        ...message,
+        body: message.body.trim() || `已缓存远端正文：${message.subject}`,
+        snippet: message.snippet.replace('远端邮件头已同步', '远端正文已同步'),
+        sanitized_html: message.sanitized_html || '',
+      };
+      messages = messages.map((item) => (item.id === messageId ? updated : item));
+      return updated as T;
+    }
     case 'trust_remote_images': {
       const input = args?.input as { account_id: number; scope: 'sender' | 'domain'; value: string };
       const trust = {
@@ -2336,7 +2348,7 @@ export function invoke<T>(command: string, args?: InvokeArgs): Promise<T> {
   return mockMode ? mockInvoke<T>(command, args) : loadCore().then(({ invoke: tauriInvoke }) => tauriInvoke<T>(command, args));
 }
 
-export function localFileAssetUrl(localPath: string): string {
+export async function localFileAssetUrl(localPath: string): Promise<string> {
   const normalizedPath = localPath.trim();
   if (!normalizedPath) return '';
   if (mockMode) {
@@ -2345,6 +2357,7 @@ export function localFileAssetUrl(localPath: string): string {
     }
     return encodeURI(`file://${normalizedPath}`);
   }
+  const { convertFileSrc } = await loadCore();
   return convertFileSrc(normalizedPath);
 }
 

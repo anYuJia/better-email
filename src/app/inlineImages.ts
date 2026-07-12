@@ -12,6 +12,18 @@ const CID_SOURCE_ATTRIBUTE =
   /\bsrc\s*=\s*(?:"\s*cid:([^"]*)"|'\s*cid:([^']*)'|cid:([^\s>]+))/i;
 const IMAGE_TAG = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
 
+function hasHtmlAttribute(tag: string, attributeName: string) {
+  return new RegExp(`\\b${attributeName}\\s*=`, 'i').test(tag);
+}
+
+function addInlineImageRenderHints(tag: string) {
+  const attributes: string[] = [];
+  if (!hasHtmlAttribute(tag, 'loading')) attributes.push('loading="lazy"');
+  if (!hasHtmlAttribute(tag, 'decoding')) attributes.push('decoding="async"');
+  if (attributes.length === 0) return tag;
+  return tag.replace(/^<img\b/i, (match) => `${match} ${attributes.join(' ')}`);
+}
+
 function decodeContentId(value: string) {
   try {
     return decodeURIComponent(value);
@@ -112,10 +124,10 @@ export function resolveCidInlineImages(
     }
 
     resolvedContentIds.add(contentId);
-    return imageTag.replace(
+    return addInlineImageRenderHints(imageTag.replace(
       sourceMatch[0],
       `src="${escapeAttribute(assetUrl)}" data-better-email-attachment-id="${attachment.id}"`,
-    );
+    ));
   });
 
   return {

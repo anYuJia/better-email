@@ -46,7 +46,11 @@ export default function AccountSwitcher({
     || selectedAccount?.email
     || '统一邮箱';
   const secondaryLabel = selectedAccount
-    ? selectedAccount.email
+    ? [
+        selectedAccount.email,
+        providerLabel(selectedAccount.provider),
+        selectedAccount.is_default ? '默认' : '',
+      ].filter(Boolean).join(' · ')
     : accounts.length > 1
       ? `${accounts.length} 个账号`
       : defaultAccount?.email ?? '全部账号';
@@ -74,8 +78,8 @@ export default function AccountSwitcher({
       id: `account-scope-${account.id}`,
       label: account.display_name.trim() || account.email,
       detail: account.is_default
-        ? `${account.email} · 默认`
-        : account.email,
+        ? `${account.email} · ${providerLabel(account.provider)} · 默认发件`
+        : `${account.email} · ${providerLabel(account.provider)}`,
       icon: <Mail size={15} />,
       checked: accountScope === account.id,
       separatorBefore: index === 0,
@@ -85,7 +89,7 @@ export default function AccountSwitcher({
   if (selectedAccount) {
     items.push({
       id: 'set-default-account',
-      label: selectedAccount.is_default ? '默认发件' : '设为默认发件',
+      label: selectedAccount.is_default ? '默认发件账号' : '设为默认发件账号',
       detail: undefined,
       icon: <Star size={15} />,
       checked: selectedAccount.is_default,
@@ -126,6 +130,7 @@ export default function AccountSwitcher({
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (!menu) openMenuFromTrigger();
         }}
         onContextMenu={(event) => {
           event.preventDefault();

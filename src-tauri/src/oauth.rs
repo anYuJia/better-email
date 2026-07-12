@@ -452,13 +452,12 @@ pub fn parse_local_callback_url(path_and_query: &str) -> Result<OAuthCallbackPay
     let params = parse_query(query)?;
     let state = params.get("state").cloned().unwrap_or_default();
     let code = params.get("code").cloned().unwrap_or_default();
-    if !params.get("error").cloned().unwrap_or_default().is_empty() {
-        return Err(format!(
-            "OAuth2 授权失败：{}",
-            params
-                .get("error_description")
-                .unwrap_or(params.get("error").unwrap())
-        ));
+    if let Some(error) = params.get("error").filter(|value| !value.trim().is_empty()) {
+        let detail = params
+            .get("error_description")
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(error);
+        return Err(format!("OAuth2 授权失败：{}", detail));
     }
     if state.trim().is_empty() || code.trim().is_empty() {
         return Err("OAuth2 回调缺少 state 或 code。".to_string());
@@ -714,5 +713,15 @@ mod tests {
             .expect("callback parses");
         assert_eq!(payload.state, "s-123");
         assert_eq!(payload.code, "c 123");
+
+        let error = parse_local_callback_url("/oauth/callback?error=access_denied")
+            .expect_err("callback error should be reported");
+        assert_eq!(error, "OAuth2 授权失败：access_denied");
+
+        let described_error = parse_local_callback_url(
+            "/oauth/callback?error=server_error&error_description=Try%20again",
+        )
+        .expect_err("callback error description should be reported");
+        assert_eq!(described_error, "OAuth2 授权失败：Try again");
     }
 }

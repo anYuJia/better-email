@@ -141,9 +141,18 @@ export default function MessageListPane({
     thread: ThreadSummary;
     messages: Message[];
   } | null>(null);
-  const selectedMessageSet = new Set(selectedMessageIds);
-  const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
-  const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
+  const selectedMessageSet = React.useMemo(
+    () => new Set(selectedMessageIds),
+    [selectedMessageIds],
+  );
+  const selectedMessages = React.useMemo(
+    () => messages.filter((message) => selectedMessageSet.has(message.id)),
+    [messages, selectedMessageSet],
+  );
+  const activeSortLabel = React.useMemo(
+    () => listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先',
+    [listSort],
+  );
   const contextMessage = messageMenu?.message;
   const isBulkContext = Boolean(messageMenu?.bulk && selectedMessages.length > 1);
   const messageContextItems = isBulkContext
@@ -168,9 +177,15 @@ export default function MessageListPane({
           onToggleMessageLabel,
         })
       : [];
-  const threadContextMessages = threadMenu?.messages ?? [];
-  const threadMovableMessages = threadContextMessages.filter(
-    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+  const threadContextMessages = React.useMemo(
+    () => threadMenu?.messages ?? [],
+    [threadMenu?.messages],
+  );
+  const threadMovableMessages = React.useMemo(
+    () => threadContextMessages.filter(
+      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+    ),
+    [threadContextMessages],
   );
   const threadContextItems = threadMenu
     ? (() => {

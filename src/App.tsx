@@ -150,6 +150,7 @@ import {
   buildForwardAttachmentPlan,
   forwardAttachmentStatus,
 } from './app/forwarding';
+import { flowInfo, flowWarn } from './app/logger';
 import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
@@ -179,11 +180,11 @@ function DeferredSurface({ label }: { label: string }) {
 }
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[app-flow] ${event}`, details);
+  flowInfo('app-flow', event, details);
 }
 
 function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn(`[app-flow] ${event}`, details);
+  flowWarn('app-flow', event, details);
 }
 
 const manualUnreadStorageKey = 'better-email.manual-unread-message-ids';
@@ -256,7 +257,7 @@ export default function App() {
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<SearchScope>('account');
+  const [searchScope, setSearchScope] = useState<SearchScope>('folder');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const [savedSearchName, setSavedSearchName] = useState('');
@@ -588,13 +589,13 @@ export default function App() {
 
   async function focusMailboxRole(role: FolderRole, targetAccountId: number | null, statusMessage: string) {
     const startedAt = performance.now();
-    const nextScope = targetAccountId ?? accountScope;
+    const nextScope = accountScope === 'all' ? 'all' : targetAccountId ?? accountScope;
     appFlowLog('focus mailbox role start', {
       role,
       accountId: targetAccountId,
       scope: nextScope,
     });
-    if (targetAccountId) {
+    if (targetAccountId && accountScope !== 'all') {
       setAccountScope(targetAccountId);
     }
     setSearchScope('folder');
@@ -604,8 +605,12 @@ export default function App() {
     setActiveThread(null);
     setThreadMessages([]);
     const meta = await loadMeta(null, nextScope);
+    const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
     const targetFolder =
-      meta.folders.find((folder) => folder.role === role && (!targetAccountId || folder.account_id === targetAccountId)) ??
+      meta.folders.find((folder) => (
+        folder.role === role
+        && (!shouldMatchTargetAccount || folder.account_id === targetAccountId)
+      )) ??
       meta.folders.find((folder) => folder.role === role);
     if (!targetFolder) {
       appFlowWarn('focus mailbox role missing folder', {
@@ -1051,26 +1056,32 @@ export default function App() {
     if (manualUnreadMessageIdsRef.current.has(selected.id)) return;
     if (autoReadInFlightRef.current.has(selected.id)) return;
 
+    const selectedMessageId = selected.id;
+    const selectedAccountId = selected.account_id;
+    const selectedRemoteMailbox = selected.remote_mailbox;
+    const selectedRemoteUid = selected.remote_uid;
+    const activeThreadKey = activeThread?.thread_key ?? null;
+
     autoReadInFlightRef.current.add(selected.id);
     appFlowLog('autoMarkRead start', {
-      messageId: selected.id,
-      accountId: selected.account_id,
-      mailbox: selected.remote_mailbox,
-      uid: selected.remote_uid,
+      messageId: selectedMessageId,
+      accountId: selectedAccountId,
+      mailbox: selectedRemoteMailbox,
+      uid: selectedRemoteUid,
     });
-    invoke<RemoteActionReport>('set_message_read', { messageId: selected.id, isRead: true })
+    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
       .then((report) => {
         setMessages((current) => current.map((message) => (
-          message.id === selected.id ? { ...message, is_read: true } : message
+          message.id === selectedMessageId ? { ...message, is_read: true } : message
         )));
-        if (activeThread) {
+        if (activeThreadKey) {
           setThreadMessages((current) => current.map((message) => (
-            message.id === selected.id ? { ...message, is_read: true } : message
+            message.id === selectedMessageId ? { ...message, is_read: true } : message
           )));
-          setActiveThread((current) => current && current.thread_key === activeThread.thread_key
+          setActiveThread((current) => current && current.thread_key === activeThreadKey
             ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
             : current);
-          setThreads((current) => current.map((thread) => thread.thread_key === activeThread.thread_key
+          setThreads((current) => current.map((thread) => thread.thread_key === activeThreadKey
             ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
             : thread));
         }
@@ -1078,20 +1089,20 @@ export default function App() {
           ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
           : current);
         appFlowLog('autoMarkRead done', {
-          messageId: selected.id,
+          messageId: selectedMessageId,
           message: report.message,
         });
       })
       .catch((error) => {
         appFlowWarn('autoMarkRead failed', {
-          messageId: selected.id,
+          messageId: selectedMessageId,
           error: String(error).replace(/^Error:\s*/i, ''),
         });
       })
       .finally(() => {
-        autoReadInFlightRef.current.delete(selected.id);
+        autoReadInFlightRef.current.delete(selectedMessageId);
       });
-  }, [selectedId, selected?.is_read, activeThread]);
+  }, [selectedId, selected?.is_read, activeThread?.thread_key]);
 
   useEffect(() => {
     if (!selected) return;
@@ -1625,13 +1636,18 @@ export default function App() {
   }
 
   async function markFolderRead(folder: Folder) {
+    const visibleUnreadCount = folder.unread_count;
     const report = await invoke<FolderReadReport>('mark_folder_read', {
       folderId: folder.id,
       role: folder.role,
       isVirtual: folder.is_virtual,
     });
     await refreshAll();
-    setStatus(report.message);
+    setStatus(
+      report.updated_count > 0 || visibleUnreadCount <= 0
+        ? report.message
+        : `已将 ${visibleUnreadCount} 封邮件标为已读；本地状态已刷新。`,
+    );
   }
 
   async function snoozeSelected() {
@@ -1889,11 +1905,13 @@ export default function App() {
         threading: replyThreadingHeaders(message),
       });
       setQuickReplyBody('');
-      await focusMailboxRole('sent', message.account_id, `已快速回复：${message.sender_name || message.sender_email}`);
+      await refreshAll();
+      setSelectedId(message.id);
+      setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
       appFlowLog('sendQuickReply done', {
         messageId,
         accountId: message.account_id,
-        targetRole: 'sent',
+        targetRole: 'current',
       });
     } catch (error) {
       const errorMessage = String(error);
@@ -2047,7 +2065,7 @@ export default function App() {
       return;
     }
     const nextRecipients = [...existing, contact.email].join(', ');
-    setDraft({ ...draft, [field]: nextRecipients });
+    setDraft((current) => ({ ...current, [field]: nextRecipients }));
     setStatus(`已添加联系人：${contact.name || contact.email}`);
   }
 
@@ -2520,7 +2538,7 @@ export default function App() {
   async function clearSearchAndFilter() {
     setQuery('');
     setFilter('all');
-    setSearchScope('account');
+    setSearchScope('folder');
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
@@ -2532,7 +2550,7 @@ export default function App() {
       mailboxRefreshRef.current,
       folders,
       messagePageSize,
-      'account',
+      'folder',
     );
     setStatus('已清空搜索和筛选');
   }
@@ -2626,7 +2644,9 @@ export default function App() {
   function changeAccountScope(value: string) {
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
-    setSearchScope('account');
+    setQuery('');
+    setFilter('all');
+    setSearchScope('folder');
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);
@@ -2638,6 +2658,8 @@ export default function App() {
   }
 
   function selectFolder(nextFolderId: number) {
+    setQuery('');
+    setFilter('all');
     setSearchScope('folder');
     setFolderId(nextFolderId);
   }
@@ -2749,15 +2771,48 @@ export default function App() {
         folderId={folderId}
         renamingFolderId={renamingFolderId}
         renamingFolderName={renamingFolderName}
+        backgroundSyncStatus={backgroundSyncStatus}
+        backgroundTasks={backgroundTasks}
+        savedSearchName={savedSearchName}
+        savedSearches={savedSearches}
+        customFolderName={customFolderName}
+        contacts={managedContacts}
+        contactQuery={contactQuery}
         onAccountScopeChange={changeAccountScope}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
         onCompose={() => {
-          setDraft(emptyDraft);
-          setRichComposer(false);
-          openComposer(emptyDraft);
-          setStatus('已打开新邮件');
+          if (isDraftEmpty(draft) && composerAutosave) {
+            openComposer(undefined, { restoreAutosave: true });
+          } else {
+            setRichComposer(false);
+            openComposer(emptyDraft);
+            setStatus('已打开新邮件');
+          }
+        }}
+        onSyncNow={() => {
+          syncAndRefresh().catch((error) => setStatus(String(error)));
+        }}
+        onResetAppLayout={() => {
+          resetAppLayout();
+          setStatus('已重置布局');
+        }}
+        onSavedSearchNameChange={setSavedSearchName}
+        onSaveCurrentSearch={saveCurrentSearch}
+        onRunSavedSearch={(savedSearch) => {
+          runSavedSearch(savedSearch).catch((error) => setStatus(String(error)));
+        }}
+        onDeleteSavedSearch={deleteSavedSearch}
+        onCustomFolderNameChange={setCustomFolderName}
+        onCreateCustomFolder={() => {
+          createCustomFolder().catch((error) => setStatus(String(error)));
+        }}
+        onContactQueryChange={setContactQuery}
+        onComposeToContact={composeToContact}
+        onEditContact={openContactEditor}
+        onDeleteContact={(contact) => {
+          deleteManagedContact(contact).catch((error) => setStatus(String(error)));
         }}
         onSelectFolder={selectFolder}
         onDropMessagesToFolder={(folder, messageIds) => {
@@ -3245,7 +3300,7 @@ export default function App() {
         onDismissAction={clearUndoAction}
       />
       <GlobalTooltip />
-      <div className="status-live-region" role="status" aria-live="polite">{status}</div>
+      <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );
 }

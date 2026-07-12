@@ -39,6 +39,20 @@ const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
 const MAX_VCARD_IMPORT_BYTES: usize = 5 * 1024 * 1024;
 const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
 const SYNCABLE_IMAP_ROLES: [&str; 6] = ["inbox", "sent", "drafts", "archive", "trash", "spam"];
+const VERBOSE_COMMAND_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
+
+fn verbose_command_logs_enabled() -> bool {
+    cfg!(debug_assertions)
+        || std::env::var(VERBOSE_COMMAND_LOG_ENV)
+            .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            .unwrap_or(false)
+}
+
+fn command_info(message: impl AsRef<str>) {
+    if verbose_command_logs_enabled() {
+        eprintln!("{}", message.as_ref());
+    }
+}
 
 fn attachment_resume_offset(bytes: u64) -> Option<usize> {
     if bytes > MAX_ATTACHMENT_TRANSFER_BYTES as u64 {
@@ -109,22 +123,22 @@ pub fn create_account(
     store: State<'_, MailStore>,
     input: AccountCreateInput,
 ) -> MailResult<Account> {
-    eprintln!(
+    command_info(format!(
         "[better-email][account] create command start email={} provider={} protocol={} imap_host={} smtp_host={}",
         mask_email(&input.email),
         input.provider.trim(),
         input.incoming_protocol.trim(),
         input.imap_host.trim(),
         input.smtp_host.trim(),
-    );
+    ));
     match store.create_account(input) {
         Ok(account) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][account] create command ok account_id={} email={} default={}",
                 account.id,
                 mask_email(&account.email),
                 account.is_default,
-            );
+            ));
             Ok(account)
         }
         Err(error) => {
@@ -141,14 +155,16 @@ pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> Mail
 
 #[tauri::command]
 pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
-    eprintln!("[better-email][account] delete command start account_id={account_id}");
+    command_info(format!(
+        "[better-email][account] delete command start account_id={account_id}"
+    ));
     match store.delete_account(account_id) {
         Ok(next_account) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][account] delete command ok removed_account_id={} next_account_id={}",
                 account_id,
                 next_account.as_ref().map(|account| account.id).unwrap_or_default(),
-            );
+            ));
             Ok(next_account)
         }
         Err(error) => {
@@ -167,20 +183,20 @@ pub fn update_account_settings(
     account_id: Option<i64>,
     input: AccountSettingsInput,
 ) -> MailResult<Account> {
-    eprintln!(
+    command_info(format!(
         "[better-email][account] update settings start account_id={account_id:?} provider={} protocol={} sync_mode={}",
         input.provider.trim(),
         input.incoming_protocol.trim(),
         input.sync_mode.trim(),
-    );
+    ));
     match store.update_account_settings_for(account_id, input) {
         Ok(account) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][account] update settings ok account_id={} email={} sync_mode={}",
                 account.id,
                 mask_email(&account.email),
                 account.sync_mode,
-            );
+            ));
             Ok(account)
         }
         Err(error) => {
@@ -329,16 +345,22 @@ pub async fn save_image_data_url_as(
     filename: String,
 ) -> MailResult<String> {
     let Some((metadata, encoded)) = data_url.split_once(',') else {
-        return Err(crate::db::MailError::Imap("图片数据无效，无法另存为。".to_string()));
+        return Err(crate::db::MailError::Imap(
+            "图片数据无效，无法另存为。".to_string(),
+        ));
     };
     let Some(mime_type) = metadata
         .strip_prefix("data:")
         .and_then(|value| value.split(';').next())
     else {
-        return Err(crate::db::MailError::Imap("图片类型无效，无法另存为。".to_string()));
+        return Err(crate::db::MailError::Imap(
+            "图片类型无效，无法另存为。".to_string(),
+        ));
     };
     if !mime_type.starts_with("image/") || !metadata.contains(";base64") {
-        return Err(crate::db::MailError::Imap("仅支持另存为邮件中的图片。".to_string()));
+        return Err(crate::db::MailError::Imap(
+            "仅支持另存为邮件中的图片。".to_string(),
+        ));
     }
 
     let payload = base64::engine::general_purpose::STANDARD
@@ -1399,13 +1421,13 @@ pub fn send_message(
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<i64> {
     let started_at = std::time::Instant::now();
-    eprintln!(
+    command_info(format!(
         "[better-email][send] direct smtp start account_id={} to={} subject_len={} attachments={}",
         input.account_id,
         mask_recipient_list(&input.to),
         input.subject.trim().chars().count(),
         input.attachments.len(),
-    );
+    ));
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
     let message = store.get_outbound_message(message_id)?;
@@ -1441,12 +1463,12 @@ pub fn send_message(
     let message_id_header = smtp::outbound_message_id(&message);
     store.mark_outbox_smtp_sent_pending_archive(message_id, &message_id_header)?;
     archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
-    eprintln!(
+    command_info(format!(
         "[better-email][send] direct smtp ok message_id={} account_id={} duration_ms={}",
         message_id,
         message.account_id,
         started_at.elapsed().as_millis(),
-    );
+    ));
     Ok(message_id)
 }
 
@@ -1457,7 +1479,7 @@ pub fn queue_outbox_message(
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<OutboxItem> {
     let started_at = std::time::Instant::now();
-    eprintln!(
+    command_info(format!(
         "[better-email][send] queue start account_id={} to={} send_at={} attachments={}",
         input.account_id,
         mask_recipient_list(&input.to),
@@ -1467,16 +1489,16 @@ pub fn queue_outbox_message(
             "scheduled"
         },
         input.attachments.len(),
-    );
+    ));
     let item = store.queue_outbox_message(input)?;
     store.set_message_threading(item.message_id, threading)?;
-    eprintln!(
+    command_info(format!(
         "[better-email][send] queue ok outbox_id={} message_id={} status={} duration_ms={}",
         item.id,
         item.message_id,
         item.status,
         started_at.elapsed().as_millis(),
-    );
+    ));
     Ok(item)
 }
 
@@ -1846,12 +1868,12 @@ pub fn get_sync_schedule_plan(
     account_id: Option<i64>,
 ) -> MailResult<SyncSchedulePlan> {
     let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
-    eprintln!(
+    command_info(format!(
         "[better-email][sync] plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
         plan.total_accounts,
         plan.batch_accounts.len(),
         plan.delayed_accounts.len()
-    );
+    ));
     Ok(plan)
 }
 
@@ -1861,28 +1883,30 @@ pub fn sync_imap_headers(
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
     let command_started_at = std::time::Instant::now();
-    eprintln!("[better-email][sync] command start account_id={account_id:?}");
+    command_info(format!(
+        "[better-email][sync] command start account_id={account_id:?}"
+    ));
     let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
     let accounts = plan.batch_accounts.clone();
-    eprintln!(
+    command_info(format!(
         "[better-email][sync] command plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
         plan.total_accounts,
         accounts.len(),
         plan.delayed_accounts.len()
-    );
+    ));
     if account_id.is_some() {
         let account = accounts
             .first()
             .ok_or_else(|| crate::db::MailError::Imap("没有可同步账号。".to_string()))?;
         let result = sync_headers_for_account(&store, account, false);
         match &result {
-            Ok(run) => eprintln!(
+            Ok(run) => command_info(format!(
                 "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} duration_ms={}",
                 run.status,
                 run.scanned_folders,
                 run.imported_messages,
                 command_started_at.elapsed().as_millis()
-            ),
+            )),
             Err(error) => eprintln!(
                 "[better-email][sync] command failed account_id={account_id:?} error={error} duration_ms={}",
                 command_started_at.elapsed().as_millis()
@@ -1981,7 +2005,7 @@ pub fn sync_imap_headers(
         &message,
     );
     match &result {
-        Ok(run) => eprintln!(
+        Ok(run) => command_info(format!(
             "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} synced_accounts={} failures={} warnings={} duration_ms={} message={}",
             run.status,
             run.scanned_folders,
@@ -1991,7 +2015,7 @@ pub fn sync_imap_headers(
             warnings.len(),
             command_started_at.elapsed().as_millis(),
             run.message,
-        ),
+        )),
         Err(error) => eprintln!(
             "[better-email][sync] record failed account_id={account_id:?} error={error} duration_ms={}",
             command_started_at.elapsed().as_millis()
@@ -2273,29 +2297,31 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 
 #[tauri::command]
 pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
-    eprintln!("[better-email][body] fetch command start message_id={message_id}");
+    command_info(format!(
+        "[better-email][body] fetch command start message_id={message_id}"
+    ));
     let account = store.get_message_account(message_id)?;
     if is_pop3_account(&account) {
-        eprintln!(
+        command_info(format!(
             "[better-email][body] fetch command skipped pop3 message_id={} account_id={}",
             message_id, account.id
-        );
+        ));
         return store.get_message(message_id);
     }
     let secret = store.get_account_secret(&account)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
-        eprintln!(
+        command_info(format!(
             "[better-email][body] fetch command missing remote ref message_id={} account_id={} mailbox={} uid={}",
             message_id, account.id, remote_mailbox, remote_uid
-        );
+        ));
         return Err(crate::db::MailError::Imap(
             "该邮件没有远端 UID，无法按需拉取正文。".to_string(),
         ));
     }
     let body = imap_probe::fetch_message_body(&account, &secret, &remote_mailbox, remote_uid)?;
     let updated = store.update_message_body(message_id, &body)?;
-    eprintln!(
+    command_info(format!(
         "[better-email][body] fetch command ok message_id={} account_id={} mailbox={} uid={} body_chars={} html_chars={} attachments={}",
         message_id,
         account.id,
@@ -2304,7 +2330,7 @@ pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailR
         updated.body.chars().count(),
         updated.sanitized_html.chars().count(),
         body.attachments.len()
-    );
+    ));
     Ok(updated)
 }
 
@@ -2323,11 +2349,11 @@ pub fn store_account_secret(
     store: State<'_, MailStore>,
     input: CredentialInput,
 ) -> CredentialStatus {
-    eprintln!(
+    command_info(format!(
         "[better-email][credential] store start email={} has_secret={}",
         mask_email(&input.account_email),
         !input.secret.trim().is_empty(),
-    );
+    ));
     let status = match store.store_account_secret(&input.account_email, &input.secret) {
         Ok(status) => status,
         Err(error) => CredentialStatus {
@@ -2336,12 +2362,12 @@ pub fn store_account_secret(
             message: error.to_string(),
         },
     };
-    eprintln!(
+    command_info(format!(
         "[better-email][credential] store done email={} exists={} message={}",
         mask_email(&input.account_email),
         status.exists,
         status.message,
-    );
+    ));
     status
 }
 
@@ -2365,10 +2391,10 @@ pub fn delete_account_secret(
     store: State<'_, MailStore>,
     account_email: String,
 ) -> CredentialStatus {
-    eprintln!(
+    command_info(format!(
         "[better-email][credential] delete start email={}",
         mask_email(&account_email),
-    );
+    ));
     let status = match store.delete_account_secret(&account_email) {
         Ok(status) => status,
         Err(error) => CredentialStatus {
@@ -2377,12 +2403,12 @@ pub fn delete_account_secret(
             message: error.to_string(),
         },
     };
-    eprintln!(
+    command_info(format!(
         "[better-email][credential] delete done email={} exists={} message={}",
         mask_email(&account_email),
         status.exists,
         status.message,
-    );
+    ));
     status
 }
 
@@ -3213,20 +3239,17 @@ pub fn enqueue_background_task(
     store: State<'_, MailStore>,
     input: BackgroundTaskInput,
 ) -> MailResult<BackgroundTask> {
-    eprintln!(
+    command_info(format!(
         "[better-email][task] enqueue start kind={} source={}",
         input.kind.trim(),
         input.source.trim(),
-    );
+    ));
     match store.enqueue_background_task(input) {
         Ok(task) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][task] enqueue ok task_id={} kind={} source={} status={}",
-                task.id,
-                task.kind,
-                task.source,
-                task.status,
-            );
+                task.id, task.kind, task.source, task.status,
+            ));
             Ok(task)
         }
         Err(error) => {
@@ -3245,13 +3268,10 @@ pub fn list_background_tasks(store: State<'_, MailStore>) -> MailResult<Vec<Back
 pub fn next_background_task(store: State<'_, MailStore>) -> MailResult<Option<BackgroundTask>> {
     match store.next_background_task() {
         Ok(Some(task)) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][task] next task_id={} kind={} source={} status={}",
-                task.id,
-                task.kind,
-                task.source,
-                task.status,
-            );
+                task.id, task.kind, task.source, task.status,
+            ));
             Ok(Some(task))
         }
         Ok(None) => Ok(None),
@@ -3269,12 +3289,10 @@ pub fn mark_background_task_running(
 ) -> MailResult<BackgroundTask> {
     match store.mark_background_task_running(task_id) {
         Ok(task) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][task] running task_id={} kind={} source={}",
-                task.id,
-                task.kind,
-                task.source,
-            );
+                task.id, task.kind, task.source,
+            ));
             Ok(task)
         }
         Err(error) => {
@@ -3292,13 +3310,10 @@ pub fn complete_background_task(
 ) -> MailResult<BackgroundTask> {
     match store.complete_background_task(task_id, &message) {
         Ok(task) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][task] complete task_id={} kind={} source={} message={}",
-                task.id,
-                task.kind,
-                task.source,
-                task.message,
-            );
+                task.id, task.kind, task.source, task.message,
+            ));
             Ok(task)
         }
         Err(error) => {
@@ -3316,13 +3331,10 @@ pub fn fail_background_task(
 ) -> MailResult<BackgroundTask> {
     match store.fail_background_task(task_id, &message) {
         Ok(task) => {
-            eprintln!(
+            command_info(format!(
                 "[better-email][task] fail task_id={} kind={} source={} message={}",
-                task.id,
-                task.kind,
-                task.source,
-                task.message,
-            );
+                task.id, task.kind, task.source, task.message,
+            ));
             Ok(task)
         }
         Err(error) => {
@@ -3339,12 +3351,12 @@ pub fn flush_outbox_dry_run(store: State<'_, MailStore>) -> MailResult<Vec<Outbo
 
 #[tauri::command]
 pub fn release_due_outbox_items(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
-    eprintln!("[better-email][send] release due outbox start");
+    command_info("[better-email][send] release due outbox start");
     let outbox = store.release_due_outbox_items()?;
-    eprintln!(
+    command_info(format!(
         "[better-email][send] release due outbox done outbox_items={}",
         outbox.len(),
-    );
+    ));
     Ok(outbox)
 }
 
@@ -3410,19 +3422,19 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
 #[tauri::command]
 pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
     let started_at = std::time::Instant::now();
-    eprintln!("[better-email][send] flush smtp start");
+    command_info("[better-email][send] flush smtp start");
     retry_pending_remote_archives(store.inner())?;
 
     for message in store.pending_outbox_messages()? {
         let account = store.get_account_by_id(Some(message.account_id))?;
-        eprintln!(
+        command_info(format!(
             "[better-email][send] smtp item start message_id={} account_id={} email={} to={} attachments={}",
             message.id,
             message.account_id,
             mask_email(&account.email),
             mask_recipient_list(&message.recipients),
             message.attachments.len(),
-        );
+        ));
         let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
             Err(error) => {
@@ -3444,10 +3456,10 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
                 let message_id_header = smtp::outbound_message_id(&message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
                 archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
-                eprintln!(
+                command_info(format!(
                     "[better-email][send] smtp item ok message_id={} account_id={}",
                     message.id, message.account_id,
-                );
+                ));
             }
             Err(error) => {
                 eprintln!(
@@ -3460,10 +3472,10 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
     }
 
     let outbox = store.list_outbox()?;
-    eprintln!(
+    command_info(format!(
         "[better-email][send] flush smtp done outbox_items={} duration_ms={}",
         outbox.len(),
         started_at.elapsed().as_millis(),
-    );
+    ));
     Ok(outbox)
 }

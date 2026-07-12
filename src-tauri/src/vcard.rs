@@ -152,7 +152,9 @@ fn unfold_lines(raw: &str) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     for line in normalized.lines() {
         if (line.starts_with(' ') || line.starts_with('\t')) && !lines.is_empty() {
-            lines.last_mut().expect("line exists").push_str(&line[1..]);
+            if let Some(previous) = lines.last_mut() {
+                previous.push_str(&line[1..]);
+            }
         } else {
             lines.push(line.to_string());
         }
@@ -266,6 +268,23 @@ mod tests {
         assert_eq!(parsed.total_cards, 2);
         assert_eq!(parsed.skipped, 1);
         assert_eq!(parsed.contacts.len(), 1);
+    }
+
+    #[test]
+    fn parses_vcard_with_malformed_leading_folded_line() {
+        let parsed = parse_contacts(concat!(
+            " orphaned continuation\r\n",
+            "BEGIN:VCARD\r\n",
+            "VERSION:3.0\r\n",
+            "FN:Katherine Johnson\r\n",
+            "EMAIL:katherine@example.com\r\n",
+            "END:VCARD\r\n",
+        ));
+
+        assert_eq!(parsed.total_cards, 1);
+        assert_eq!(parsed.skipped, 0);
+        assert_eq!(parsed.contacts.len(), 1);
+        assert_eq!(parsed.contacts[0].email, "katherine@example.com");
     }
 
     #[test]

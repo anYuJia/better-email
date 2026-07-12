@@ -21,6 +21,7 @@ import type {
   SearchScope,
   SyncRun,
 } from '../app/types';
+import { flowInfo, flowWarn } from '../app/logger';
 import {
   incomingHostForProtocol,
   providerCompatibilityMatrix,
@@ -36,11 +37,11 @@ function maskEmailForLog(value: string) {
 }
 
 function accountFlowLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[account-flow] ${event}`, details);
+  flowInfo('account-flow', event, details);
 }
 
 function accountFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn(`[account-flow] ${event}`, details);
+  flowWarn('account-flow', event, details);
 }
 
 type LoadMetaResult = {

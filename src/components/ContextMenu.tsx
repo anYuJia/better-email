@@ -36,8 +36,7 @@ function MenuItems({
   items: ContextMenuItem[];
   onClose: () => void;
 }) {
-  function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
-    const branch = event.currentTarget;
+  function positionSubmenuForBranch(branch: HTMLElement) {
     const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
     const trigger = branch.querySelector<HTMLElement>(':scope > button');
     if (!submenu || !trigger) return;
@@ -70,6 +69,10 @@ function MenuItems({
     submenu.style.setProperty('--context-submenu-max-height', `${Math.max(140, window.innerHeight - top - margin)}px`);
     submenu.style.display = previousDisplay;
     submenu.style.visibility = previousVisibility;
+  }
+
+  function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
+    positionSubmenuForBranch(event.currentTarget);
   }
 
   return items.map((item) => (
@@ -146,7 +149,7 @@ export default function ContextMenu({
     const menu = menuRef.current;
     menu
       ?.querySelector<HTMLButtonElement>(
-        '.context-menu-items > button:not(:disabled), .context-menu-items > .context-menu-branch > button:not(:disabled)',
+        '.context-menu-items > div > button:not(:disabled)',
       )
       ?.focus();
 
@@ -175,7 +178,7 @@ export default function ContextMenu({
         ?? menuRef.current?.querySelector<HTMLElement>('.context-menu-items')
         ?? null;
       const buttons = Array.from(activeMenu?.querySelectorAll<HTMLButtonElement>(
-        ':scope > button:not(:disabled), :scope > .context-menu-branch > button:not(:disabled)',
+        ':scope > div > button:not(:disabled)',
       ) ?? []);
       if (!buttons.length) return;
 
@@ -202,10 +205,11 @@ export default function ContextMenu({
           : null;
         const submenu = branch?.querySelector<HTMLElement>(':scope > .context-submenu') ?? null;
         const firstChild = submenu?.querySelector<HTMLButtonElement>(
-          'button:not(:disabled)',
+          ':scope > div > button:not(:disabled)',
         );
         if (firstChild) {
           event.preventDefault();
+          branch?.classList.add('is-keyboard-open');
           firstChild.focus();
         }
         return;
@@ -215,6 +219,7 @@ export default function ContextMenu({
         const parentButton = activeMenu.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
         if (parentButton) {
           event.preventDefault();
+          activeMenu.parentElement?.classList.remove('is-keyboard-open');
           parentButton.focus();
         }
       }

@@ -54,8 +54,8 @@ export default function RuleAutomationSettings({
     <section className="tool-panel settings-rule-panel" data-settings-section="rules">
       <header className="tool-header">
         <span>
-          <strong>自动化规则</strong>
-          <small>按发件人、主题、正文或收件人自动执行动作</small>
+          <strong>处理规则</strong>
+          <small>按发件人、主题、正文或收件人处理新邮件</small>
         </span>
         <em>{rules.length} 条规则</em>
       </header>
@@ -118,7 +118,7 @@ export default function RuleAutomationSettings({
           </div>
         </div>
         <details className="rule-advanced">
-          <summary>高级语法</summary>
+          <summary>规则语法</summary>
           <small>可手动组合多个动作，用分号分隔。</small>
           <input
             value={ruleForm.condition}

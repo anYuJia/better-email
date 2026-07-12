@@ -31,6 +31,8 @@ pub enum MailError {
     Io(#[from] std::io::Error),
     #[error("application data directory is unavailable")]
     MissingDataDir,
+    #[error("database connection lock is unavailable")]
+    DatabaseLockPoisoned,
     #[error("folder role not found: {0}")]
     MissingFolderRole(String),
     #[error("{0}")]
@@ -50,6 +52,21 @@ impl serde::Serialize for MailError {
 
 pub type MailResult<T> = Result<T, MailError>;
 type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf)>);
+
+const VERBOSE_DB_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
+
+fn verbose_db_logs_enabled() -> bool {
+    cfg!(debug_assertions)
+        || std::env::var(VERBOSE_DB_LOG_ENV)
+            .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            .unwrap_or(false)
+}
+
+fn db_info(message: impl AsRef<str>) {
+    if verbose_db_logs_enabled() {
+        eprintln!("{}", message.as_ref());
+    }
+}
 
 fn mask_email_for_log(value: &str) -> String {
     let email = value.trim();
@@ -142,11 +159,11 @@ impl MailStore {
             .unwrap_or_else(std::env::temp_dir);
         fs::create_dir_all(&data_dir)?;
         let should_seed_demo_data = !path.exists();
-        eprintln!(
+        db_info(format!(
             "[better-email][db] open path={} should_seed_demo_data={}",
             path.display(),
             should_seed_demo_data,
-        );
+        ));
         let conn = Connection::open(&path)?;
         let store = Self {
             conn: Mutex::new(conn),
@@ -155,12 +172,15 @@ impl MailStore {
         };
         store.migrate()?;
         store.seed_if_empty(should_seed_demo_data)?;
-        eprintln!("[better-email][db] open ok");
+        db_info("[better-email][db] open ok");
         Ok(store)
     }
 
     fn with_conn<T>(&self, f: impl FnOnce(&Connection) -> MailResult<T>) -> MailResult<T> {
-        let conn = self.conn.lock().expect("mail store mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| MailError::DatabaseLockPoisoned)?;
         f(&conn)
     }
 
@@ -563,16 +583,18 @@ impl MailStore {
 
     fn seed_if_empty(&self, should_seed_demo_data: bool) -> MailResult<()> {
         if !should_seed_demo_data {
-            eprintln!("[better-email][db] seed skipped existing database");
+            db_info("[better-email][db] seed skipped existing database");
             return Ok(());
         }
         self.with_conn(|conn| {
             let count: i64 = conn.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
             if count > 0 {
-                eprintln!("[better-email][db] seed skipped existing_accounts={count}");
+                db_info(format!(
+                    "[better-email][db] seed skipped existing_accounts={count}"
+                ));
                 return Ok(());
             }
-            eprintln!("[better-email][db] seed demo data start");
+            db_info("[better-email][db] seed demo data start");
 
             let now = Utc::now();
             conn.execute(
@@ -739,7 +761,9 @@ impl MailStore {
                 }
                 upsert_contact(conn, sender_name, sender_email, &received_at.to_rfc3339())?;
             }
-            eprintln!("[better-email][db] seed demo data ok account_id={account_id}");
+            db_info(format!(
+                "[better-email][db] seed demo data ok account_id={account_id}"
+            ));
             Ok(())
         })
     }
@@ -954,14 +978,14 @@ impl MailStore {
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
             let email = input.email.trim().to_lowercase();
-            eprintln!(
+            db_info(format!(
                 "[better-email][db] create_account start email={} provider={} protocol={} imap_host={} smtp_host={}",
                 mask_email_for_log(&email),
                 input.provider.trim(),
                 normalize_incoming_protocol(&input.incoming_protocol),
                 input.imap_host.trim(),
                 input.smtp_host.trim(),
-            );
+            ));
             if email.is_empty() || !email.contains('@') {
                 eprintln!("[better-email][db] create_account invalid email");
                 return Err(MailError::Imap("请输入有效邮箱地址。".to_string()));
@@ -1014,12 +1038,12 @@ impl MailStore {
                 &input.signature,
             )?;
             let account = account_for_conn(conn, Some(account_id))?;
-            eprintln!(
+            db_info(format!(
                 "[better-email][db] create_account ok account_id={} email={} default={}",
                 account.id,
                 mask_email_for_log(&account.email),
                 account.is_default,
-            );
+            ));
             Ok(account)
         })
     }
@@ -1051,7 +1075,9 @@ impl MailStore {
 
     pub fn delete_account(&self, account_id: i64) -> MailResult<Option<Account>> {
         self.with_conn(|conn| {
-            eprintln!("[better-email][db] delete_account start account_id={account_id}");
+            db_info(format!(
+                "[better-email][db] delete_account start account_id={account_id}"
+            ));
             let transaction = conn.unchecked_transaction()?;
             let account_email = transaction
                 .query_row(
@@ -1073,14 +1099,14 @@ impl MailStore {
             ensure_default_account_for_conn(&transaction)?;
             let next_account = account_for_conn_optional(&transaction, None)?;
             transaction.commit()?;
-            eprintln!(
+            db_info(format!(
                 "[better-email][db] delete_account ok removed_account_id={} next_account_id={}",
                 account_id,
                 next_account
                     .as_ref()
                     .map(|account| account.id)
                     .unwrap_or_default(),
-            );
+            ));
             Ok(next_account)
         })
     }
@@ -5361,7 +5387,11 @@ fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
 fn decode_thread_participants(value: &str) -> String {
     value
         .split(',')
-        .map(|participant| protocol::decode_mime_header_value(participant).trim().to_string())
+        .map(|participant| {
+            protocol::decode_mime_header_value(participant)
+                .trim()
+                .to_string()
+        })
         .filter(|participant| !participant.is_empty())
         .collect::<Vec<_>>()
         .join(", ")

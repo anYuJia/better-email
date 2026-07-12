@@ -42,25 +42,77 @@ type FolderItemsProps = {
   onDropOnFolder: (event: React.DragEvent<HTMLDivElement>, folder: Folder) => void;
 };
 
-const visibleSystemRoles: FolderRole[] = ['inbox', 'sent', 'drafts', 'archive', 'trash', 'spam'];
+const visibleSystemRoles: FolderRole[] = ['inbox', 'sent', 'drafts', 'archive', 'trash', 'spam', 'snoozed'];
 
 const folderDisplayName: Partial<Record<FolderRole, string>> = {
   inbox: '收件箱',
   sent: '已发送',
-  drafts: '草稿',
+  drafts: '草稿箱',
   archive: '归档',
   trash: '废纸篓',
   spam: '垃圾邮件',
+  snoozed: '稍后处理',
 };
 
 function displayNameForFolder(folder: Folder) {
   return folderDisplayName[folder.role] ?? folder.name;
 }
 
-function orderedVisibleFolders(folders: Folder[]) {
-  return visibleSystemRoles
-    .map((role) => folders.find((folder) => folder.role === role))
+export type SidebarFolderGroups = {
+  primaryFolders: Folder[];
+  moreFolders: Folder[];
+};
+
+export function sidebarFolderGroups(
+  folders: Folder[],
+  favoriteFolderKeys: ReadonlySet<string>,
+): SidebarFolderGroups {
+  const firstSystemFolderByRole = new Map<FolderRole, Folder>();
+
+  for (const folder of folders) {
+    if (!visibleSystemRoles.includes(folder.role)) continue;
+    if (!firstSystemFolderByRole.has(folder.role)) {
+      firstSystemFolderByRole.set(folder.role, folder);
+    }
+  }
+
+  const orderedSystemFolders = visibleSystemRoles
+    .map((role) => firstSystemFolderByRole.get(role))
     .filter((folder): folder is Folder => Boolean(folder));
+  const orderedSystemIds = new Set(orderedSystemFolders.map((folder) => folder.id));
+  const primaryFolders: Folder[] = [];
+  const favoriteFolders: Folder[] = [];
+  const moreFolders: Folder[] = [];
+  const primaryIds = new Set<number>();
+
+  const appendFolder = (folder: Folder) => {
+    const isPrimary = primaryFolderRoles.has(folder.role);
+    const isFavorite = !isPrimary && favoriteFolderKeys.has(folderPreferenceKey(folder));
+
+    if (isPrimary) {
+      if (primaryIds.has(folder.id)) return;
+      primaryIds.add(folder.id);
+      primaryFolders.push(folder);
+      return;
+    }
+    if (isFavorite) {
+      if (primaryIds.has(folder.id)) return;
+      primaryIds.add(folder.id);
+      favoriteFolders.push(folder);
+      return;
+    }
+
+    moreFolders.push(folder);
+  };
+
+  for (const folder of orderedSystemFolders) {
+    appendFolder(folder);
+  }
+  for (const folder of folders) {
+    if (!orderedSystemIds.has(folder.id)) appendFolder(folder);
+  }
+
+  return { primaryFolders: [...primaryFolders, ...favoriteFolders], moreFolders };
 }
 
 function FolderItems({
@@ -192,7 +244,10 @@ export default function SidebarFolderNavigation({
     () => new Set(favoriteFolderKeys),
     [favoriteFolderKeys],
   );
-  const primaryFolders = React.useMemo(() => orderedVisibleFolders(folders), [folders]);
+  const { primaryFolders, moreFolders } = React.useMemo(
+    () => sidebarFolderGroups(folders, favoriteFolderKeySet),
+    [favoriteFolderKeySet, folders],
+  );
 
   React.useEffect(() => {
     window.localStorage.setItem(favoriteFolderKeysStorageKey, JSON.stringify(favoriteFolderKeys));
@@ -310,6 +365,18 @@ export default function SidebarFolderNavigation({
       <nav className="folder-list primary-folder-list">
         <FolderItems folders={primaryFolders} {...folderItemProps} />
       </nav>
+
+      {moreFolders.length > 0 && (
+        <details className="sidebar-disclosure more-mailboxes">
+          <summary>
+            <span>更多邮箱</span>
+            <em>{moreFolders.length}</em>
+          </summary>
+          <div className="folded-folder-list">
+            <FolderItems folders={moreFolders} {...folderItemProps} />
+          </div>
+        </details>
+      )}
 
       {children && <div className="sidebar-secondary sidebar-quick-menus">{children}</div>}
 

@@ -6,6 +6,7 @@ import {
   Forward,
   Image as ImageIcon,
   Mail,
+  MailPlus,
   MailOpen,
   MoreHorizontal,
   Paperclip,
@@ -18,6 +19,7 @@ import {
   Trash2,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
 import { resolveCidInlineImages } from '../app/inlineImages';
@@ -55,6 +57,7 @@ export type ReaderPaneProps = {
   selectedHasRemoteImageWarning: boolean;
   quickReplyBody: string;
   onSelectMessage: (messageId: number) => void;
+  onComposeNew: () => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
@@ -244,6 +247,7 @@ export default function ReaderPane({
   selectedHasRemoteImageWarning,
   quickReplyBody,
   onSelectMessage,
+  onComposeNew,
   onComposeFromMessage,
   onRunThreadAction,
   onMoveThreadToFolder,
@@ -281,6 +285,7 @@ export default function ReaderPane({
   const [isDownloadingInlineImages, setIsDownloadingInlineImages] = useState(false);
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
+  const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
@@ -306,6 +311,7 @@ export default function ReaderPane({
     setIsDownloadingInlineImages(false);
     setIsRefreshingInlineImages(false);
     setInlineImageRefreshError('');
+    setImagePreview(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -407,6 +413,34 @@ export default function ReaderPane({
     selected?.id,
   ]);
 
+  useEffect(() => {
+    if (!imagePreview) return undefined;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setImagePreview(null);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [imagePreview]);
+
+  function handleReaderHtmlClick(event: React.MouseEvent<HTMLDivElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLImageElement)) return;
+    if (target.dataset.betterEmailInlineCid) return;
+
+    const src = target.currentSrc || target.src;
+    if (!src) return;
+
+    event.preventDefault();
+    setImagePreview({
+      src,
+      alt: target.alt || selected?.subject || '邮件图片',
+    });
+  }
+
   if (activeThread && threadMessages.length > 0) {
     const allThreadRead = threadMessages.every((message) => message.is_read);
     const allThreadStarred = threadMessages.every((message) => message.is_starred);
@@ -461,6 +495,9 @@ export default function ReaderPane({
                 onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
               >
                 <Forward size={17} />
+              </button>
+              <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={onComposeNew}>
+                <MailPlus size={17} />
               </button>
               <button
                 className="icon-only-action"
@@ -558,6 +595,10 @@ export default function ReaderPane({
             </div>
             <strong>选择一封邮件开始阅读</strong>
             <span>常用动作会保持可见，整理与安全选项按需展开。</span>
+            <button type="button" className="empty-reader-compose" onClick={onComposeNew}>
+              <MailPlus size={15} />
+              新邮件
+            </button>
           </div>
         </div>
       </section>
@@ -610,6 +651,9 @@ export default function ReaderPane({
                   onClick={() => onComposeFromMessage(selected, 'forward')}
                 >
                   <Forward size={17} />
+                </button>
+                <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={onComposeNew}>
+                  <MailPlus size={17} />
                 </button>
               </>
             )}
@@ -851,7 +895,11 @@ export default function ReaderPane({
         )}
 
         {selected.sanitized_html ? (
-          <div className="reader-html" dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }} />
+          <div
+            className="reader-html"
+            onClick={handleReaderHtmlClick}
+            dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }}
+          />
         ) : (
           <PlainMessageBody body={selected.body} />
         )}
@@ -885,6 +933,22 @@ export default function ReaderPane({
           </section>
         )}
       </article>
+      {imagePreview && (
+        <div
+          className="reader-image-preview-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+          onClick={() => setImagePreview(null)}
+        >
+          <figure className="reader-image-preview" onClick={(event) => event.stopPropagation()}>
+            <button type="button" aria-label="关闭图片预览" onClick={() => setImagePreview(null)}>
+              <X size={18} />
+            </button>
+            <img src={imagePreview.src} alt={imagePreview.alt} />
+          </figure>
+        </div>
+      )}
     </section>
   );
 }

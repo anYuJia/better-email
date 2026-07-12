@@ -2865,6 +2865,11 @@ export default function App() {
         selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
         quickReplyBody={quickReplyBody}
         onSelectMessage={setSelectedId}
+        onComposeNew={() => {
+          setRichComposer(false);
+          openComposer(emptyDraft);
+          setStatus('已打开新邮件');
+        }}
         onComposeFromMessage={composeFromMessage}
         onRunThreadAction={(action) => {
           if (!activeThread) return;

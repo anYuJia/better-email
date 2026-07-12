@@ -42,6 +42,10 @@ type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = { src: string; alt: string; x: number; y: number } | null;
 type PreviewImage = { src: string; alt: string };
+const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.08;
+const IMAGE_PREVIEW_WHEEL_ZOOM_STEP = 0.05;
+const IMAGE_PREVIEW_KEYBOARD_PAN_STEP = 18;
+const IMAGE_PREVIEW_WHEEL_PAN_RATIO = 0.72;
 type PlainBodyBlock =
   | { type: 'text'; content: string }
   | { type: 'original'; index: number; meta: string[]; content: string };
@@ -476,11 +480,11 @@ export default function ReaderPane({
       if (!imagePreview) return;
       if (event.key === '+' || event.key === '=') {
         event.preventDefault();
-        zoomImagePreview(0.15);
+        zoomImagePreview(IMAGE_PREVIEW_BUTTON_ZOOM_STEP);
       }
       if (event.key === '-') {
         event.preventDefault();
-        zoomImagePreview(-0.15);
+        zoomImagePreview(-IMAGE_PREVIEW_BUTTON_ZOOM_STEP);
       }
       if (event.key === '0') {
         event.preventDefault();
@@ -490,8 +494,8 @@ export default function ReaderPane({
         event.preventDefault();
         setImagePreviewFit(false);
         setImagePreviewPan((pan) => ({
-          x: pan.x + (event.key === 'ArrowLeft' ? 32 : event.key === 'ArrowRight' ? -32 : 0),
-          y: pan.y + (event.key === 'ArrowUp' ? 32 : event.key === 'ArrowDown' ? -32 : 0),
+          x: pan.x + (event.key === 'ArrowLeft' ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP : event.key === 'ArrowRight' ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP : 0),
+          y: pan.y + (event.key === 'ArrowUp' ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP : event.key === 'ArrowDown' ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP : 0),
         }));
       }
     }
@@ -573,8 +577,20 @@ export default function ReaderPane({
   }
 
   function handleImagePreviewWheel(event: React.WheelEvent<HTMLDivElement>) {
-    event.preventDefault();
-    zoomImagePreview(event.deltaY > 0 ? -0.12 : 0.12);
+    const shouldZoom = event.metaKey || event.ctrlKey;
+    if (shouldZoom) {
+      event.preventDefault();
+      zoomImagePreview(event.deltaY > 0 ? -IMAGE_PREVIEW_WHEEL_ZOOM_STEP : IMAGE_PREVIEW_WHEEL_ZOOM_STEP);
+      return;
+    }
+
+    if (!imagePreviewFit) {
+      event.preventDefault();
+      setImagePreviewPan((pan) => ({
+        x: pan.x - event.deltaX * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
+        y: pan.y - event.deltaY * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
+      }));
+    }
   }
 
   function handleImagePreviewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -1171,7 +1187,7 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="缩小"
-                onClick={() => zoomImagePreview(-0.15)}
+                onClick={() => zoomImagePreview(-IMAGE_PREVIEW_BUTTON_ZOOM_STEP)}
               >
                 <ZoomOut size={16} />
               </button>
@@ -1179,7 +1195,7 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="放大"
-                onClick={() => zoomImagePreview(0.15)}
+                onClick={() => zoomImagePreview(IMAGE_PREVIEW_BUTTON_ZOOM_STEP)}
               >
                 <ZoomIn size={16} />
               </button>

@@ -707,6 +707,81 @@ pub fn reveal_attachment_in_finder(
 }
 
 #[tauri::command]
+pub fn copy_attachment_file_to_clipboard(
+    store: State<'_, MailStore>,
+    attachment_id: i64,
+) -> MailResult<String> {
+    let attachment = store.get_attachment(attachment_id)?;
+    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
+        return Err(crate::db::MailError::Imap(
+            "附件尚未下载，请先下载后再复制。".to_string(),
+        ));
+    }
+
+    let path = std::path::PathBuf::from(&attachment.local_path);
+    if !path.exists() {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "已下载附件文件不存在，请重新下载。",
+        )));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg("on run argv")
+            .arg("-e")
+            .arg("set the clipboard to (POSIX file (item 1 of argv))")
+            .arg("-e")
+            .arg("end run")
+            .arg(path.to_string_lossy().into_owned())
+            .output()
+            .map_err(crate::db::MailError::Io)?;
+        if !output.status.success() {
+            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(crate::db::MailError::Imap(if message.is_empty() {
+                "无法复制附件文件到剪切板。".to_string()
+            } else {
+                format!("无法复制附件文件到剪切板：{message}")
+            }));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let script = format!(
+            "Set-Clipboard -LiteralPath {}",
+            powershell_single_quote(&path.to_string_lossy())
+        );
+        let output = std::process::Command::new("powershell")
+            .arg("-NoProfile")
+            .arg("-NonInteractive")
+            .arg("-Command")
+            .arg(script)
+            .output()
+            .map_err(crate::db::MailError::Io)?;
+        if !output.status.success() {
+            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(crate::db::MailError::Imap(if message.is_empty() {
+                "无法复制附件文件到剪切板。".to_string()
+            } else {
+                format!("无法复制附件文件到剪切板：{message}")
+            }));
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        return Err(crate::db::MailError::Imap(
+            "当前系统暂不支持复制附件文件对象。".to_string(),
+        ));
+    }
+
+    Ok(format!("已复制附件文件：{}", attachment.filename))
+}
+
+#[tauri::command]
 pub async fn save_attachment_as(
     app: AppHandle,
     store: State<'_, MailStore>,
@@ -2691,6 +2766,11 @@ fn sanitize_filename(filename: &str) -> String {
     } else {
         sanitized
     }
+}
+
+#[cfg(target_os = "windows")]
+fn powershell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
 }
 
 fn mime_type_for_path(path: &Path) -> String {

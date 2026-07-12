@@ -527,28 +527,18 @@ export default function ReaderPane({
 
   async function copyAttachmentToClipboard(attachment: Attachment) {
     if (!attachment.is_downloaded) {
-      await navigator.clipboard?.writeText(attachment.filename);
-      return;
+      const downloaded = await handleAttachmentDownload(attachment);
+      if (!downloaded) return;
     }
 
-    if (attachmentKind(attachment) === 'image') {
-      try {
-        const clipboard = navigator.clipboard;
-        if (!clipboard || typeof ClipboardItem === 'undefined' || !clipboard.write) {
-          throw new Error('Clipboard image write is unavailable');
-        }
-        const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        const mimeType = blob.type || attachment.mime_type || 'image/png';
-        await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
-        return;
-      } catch {
-        // Fall back to copying a traceable local path or filename.
-      }
+    try {
+      await invoke<string>('copy_attachment_file_to_clipboard', { attachmentId: attachment.id });
+    } catch (error) {
+      setAttachmentErrors((current) => ({
+        ...current,
+        [attachment.id]: attachmentErrorMessage(error) || '复制附件文件失败，请重新下载后再试。',
+      }));
     }
-
-    await navigator.clipboard?.writeText(attachment.local_path || attachment.filename);
   }
 
   function attachmentMenuItems(attachment: Attachment): ContextMenuItem[] {
@@ -594,7 +584,7 @@ export default function ReaderPane({
       },
       {
         id: 'copy',
-        label: '复制到剪切板',
+        label: '复制文件',
         icon: <Copy size={14} />,
         separatorBefore: true,
         onSelect: () => { copyAttachmentToClipboard(attachment).catch(() => undefined); },

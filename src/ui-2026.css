@@ -2066,10 +2066,6 @@ textarea:disabled {
     padding-inline: 28px;
   }
 
-  .attachments > div > span {
-    display: none;
-  }
-
   .reader-actions button {
     padding-inline: 8px;
   }
@@ -2840,7 +2836,6 @@ body {
 .body-text,
 .reader-html,
 .quick-reply,
-.attachments div,
 .empty-reader-card,
 .reader-warning-panel {
   border: 0;
@@ -2862,10 +2857,9 @@ body {
   margin-top: 14px;
 }
 
-.attachments div {
+.attachments .attachment-item {
   min-height: 36px;
-  padding: 7px 0;
-  border-top: 1px solid var(--ui-border);
+  padding: 8px 10px;
 }
 
 .quick-reply {

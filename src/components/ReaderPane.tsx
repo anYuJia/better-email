@@ -6,7 +6,6 @@ import {
   Download,
   ExternalLink,
   File,
-  FileArchive,
   FileAudio,
   FileImage,
   FileText,
@@ -458,6 +457,9 @@ export default function ReaderPane({
   function attachmentKind(attachment: Attachment) {
     const filename = attachment.filename.toLowerCase();
     const mimeType = attachment.mime_type.toLowerCase();
+    if (/\.(ppt|pptx|key)$/i.test(filename)) return 'presentation';
+    if (/\.(xls|xlsx|csv|numbers)$/i.test(filename)) return 'spreadsheet';
+    if (/\.(doc|docx|rtf|pdf|txt|md|log)$/i.test(filename)) return 'document';
     if (mimeType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(filename)) return 'image';
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType.startsWith('video/')) return 'video';
@@ -470,14 +472,32 @@ export default function ReaderPane({
 
   function attachmentIcon(attachment: Attachment) {
     const kind = attachmentKind(attachment);
+    const filename = attachment.filename.toLowerCase();
+    if (kind === 'presentation') return <span className="attachment-file-type-mark">PPT</span>;
+    if (kind === 'spreadsheet') return <span className="attachment-file-type-mark">XLS</span>;
+    if (/\.pdf$/i.test(filename)) return <span className="attachment-file-type-mark">PDF</span>;
+    if (/\.(doc|docx|rtf)$/i.test(filename)) return <span className="attachment-file-type-mark">DOC</span>;
+    if (kind === 'archive') return <span className="attachment-file-type-mark">ZIP</span>;
     if (kind === 'image') return <FileImage size={15} strokeWidth={1.9} />;
     if (kind === 'audio') return <FileAudio size={15} strokeWidth={1.9} />;
     if (kind === 'video') return <FileVideo size={15} strokeWidth={1.9} />;
-    if (kind === 'archive') return <FileArchive size={15} strokeWidth={1.9} />;
-    if (kind === 'presentation') return <ImageIcon size={15} strokeWidth={1.9} />;
-    if (kind === 'spreadsheet') return <FileText size={15} strokeWidth={1.9} />;
     if (kind === 'document') return <FileText size={15} strokeWidth={1.9} />;
     return <File size={15} strokeWidth={1.9} />;
+  }
+
+  function attachmentTypeDescription(attachment: Attachment) {
+    const filename = attachment.filename.toLowerCase();
+    const kind = attachmentKind(attachment);
+    if (/\.pdf$/i.test(filename)) return 'PDF 文档';
+    if (/\.(ppt|pptx|key)$/i.test(filename)) return 'PowerPoint 演示文稿';
+    if (/\.(xls|xlsx|csv|numbers)$/i.test(filename)) return filename.endsWith('.csv') ? 'CSV 表格' : 'Excel 表格';
+    if (/\.(doc|docx|rtf)$/i.test(filename)) return 'Word 文档';
+    if (/\.(zip|rar|7z|tar|gz)$/i.test(filename)) return '压缩文件';
+    if (kind === 'image') return '图片';
+    if (kind === 'audio') return '音频';
+    if (kind === 'video') return '视频';
+    if (kind === 'document') return '文档';
+    return '附件';
   }
 
   async function previewAttachment(attachment: Attachment) {
@@ -1262,7 +1282,7 @@ export default function ReaderPane({
                     <span className="attachment-copy">
                       <strong>{attachment.filename}</strong>
                       <small>
-                        {attachment.mime_type || '未知类型'} · {formatBytes(attachment.size_bytes)}
+                        {attachmentTypeDescription(attachment)} · {formatBytes(attachment.size_bytes)}
                         {attachment.is_downloaded ? ' · 已下载' : ' · 未下载'}
                       </small>
                     </span>

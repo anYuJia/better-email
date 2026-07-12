@@ -1179,6 +1179,13 @@ textarea:disabled {
   background: #f3effa;
 }
 
+.attachment-file-type-mark {
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
 .attachment-copy {
   display: grid;
   min-width: 0;

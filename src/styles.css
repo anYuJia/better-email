@@ -5943,6 +5943,33 @@ h1 {
   box-shadow: none;
 }
 
+.attachments .attachment-file-icon-presentation {
+  color: #9a5730;
+  background: #fbf0e9;
+}
+
+.attachments .attachment-file-icon-spreadsheet {
+  color: #2f7650;
+  background: #edf8f2;
+}
+
+.attachments .attachment-file-icon-document {
+  color: #4b6178;
+  background: #eef2f6;
+}
+
+.attachments .attachment-file-icon-archive {
+  color: #8a6827;
+  background: #fbf3df;
+}
+
+.attachments .attachment-file-type-mark {
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
 .attachments .attachment-copy {
   min-width: 0;
   display: grid;

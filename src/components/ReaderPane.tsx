@@ -330,7 +330,9 @@ export default function ReaderPane({
     .map((attachment) => attachmentErrors[attachment.id])
     .find(Boolean) ?? '';
   const visibleSecurityWarnings = selected?.security_warnings.filter(
-    (warning) => warning !== '正文包含外部链接，请核对域名后再访问。',
+    (warning) =>
+      warning !== '正文包含外部链接，请核对域名后再访问。' &&
+      !(selectedSenderTrusted && warning.includes('远程图片')),
   ) ?? [];
 
   useEffect(() => {
@@ -1360,7 +1362,7 @@ export default function ReaderPane({
             <div className="reader-warning-heading">
               <strong>安全提示</strong>
               {selectedHasRemoteImageWarning && (
-                <span>{selectedSenderTrusted ? '当前发件人已信任' : '远程图片默认阻止'}</span>
+                <span>远程图片默认阻止</span>
               )}
             </div>
             {visibleSecurityWarnings.map((warning) => <p key={warning}>{warning}</p>)}

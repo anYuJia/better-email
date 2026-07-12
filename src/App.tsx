@@ -1005,9 +1005,6 @@ export default function App() {
     () => (selected ? senderDomain(selected.sender_email) : ''),
     [selected?.sender_email],
   );
-  const selectedHasRemoteImageWarning = Boolean(
-    selected?.security_warnings.some((warning) => warning.includes('远程图片')),
-  );
   const selectedHasImagePreview = Boolean(selected?.sanitized_html.includes('<img'));
   const selectedSenderTrusted = useMemo(
     () =>
@@ -1022,6 +1019,9 @@ export default function App() {
       ),
     [remoteImageTrusts, selected?.account_id, selected?.sender_email, selectedSenderDomain],
   );
+  const selectedHasRemoteImageWarning = Boolean(
+    selected?.security_warnings.some((warning) => warning.includes('远程图片')),
+  ) && !selectedSenderTrusted;
 
   function rememberManualReadState(messageIds: number[], isRead: boolean) {
     const next = new Set(manualUnreadMessageIdsRef.current);

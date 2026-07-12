@@ -2,14 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Archive,
   Clock,
+  Copy,
   Download,
+  ExternalLink,
+  File,
+  FileArchive,
+  FileAudio,
+  FileImage,
+  FileText,
+  FileVideo,
+  FolderOpen,
   Forward,
   Image as ImageIcon,
   Mail,
   MailPlus,
   MailOpen,
   MoreHorizontal,
-  Paperclip,
   Reply,
   ReplyAll,
   RotateCcw,
@@ -36,12 +44,14 @@ import type {
 } from '../app/types';
 import { formatBytes, formatDate } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
+import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
 type PreviewImage = { src: string; alt: string; attachmentId: number | null };
+type AttachmentContextMenu = { attachment: Attachment; x: number; y: number } | null;
 const IMAGE_PREVIEW_MIN_ZOOM = 0.25;
 const IMAGE_PREVIEW_MAX_ZOOM = 8;
 const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.04;
@@ -302,6 +312,7 @@ export default function ReaderPane({
   const [imagePreviewPan, setImagePreviewPan] = useState({ x: 0, y: 0 });
   const [isImagePreviewPanning, setIsImagePreviewPanning] = useState(false);
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
+  const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
   const imagePreviewDragRef = useRef<{ x: number; y: number } | null>(null);
   const imagePreviewStageRef = useRef<HTMLDivElement | null>(null);
   const imagePreviewImageRef = useRef<HTMLImageElement | null>(null);
@@ -338,6 +349,7 @@ export default function ReaderPane({
     setIsImagePreviewPanning(false);
     imagePreviewDragRef.current = null;
     setImageContextMenu(null);
+    setAttachmentContextMenu(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -443,6 +455,132 @@ export default function ReaderPane({
     }
   }
 
+  function attachmentKind(attachment: Attachment) {
+    const filename = attachment.filename.toLowerCase();
+    const mimeType = attachment.mime_type.toLowerCase();
+    if (mimeType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(filename)) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || /\.(zip|rar|7z|tar|gz)$/i.test(filename)) return 'archive';
+    if (mimeType.includes('presentation') || /\.(ppt|pptx|key)$/i.test(filename)) return 'presentation';
+    if (mimeType.includes('spreadsheet') || /\.(xls|xlsx|csv|numbers)$/i.test(filename)) return 'spreadsheet';
+    if (mimeType.includes('pdf') || mimeType.startsWith('text/') || /\.(pdf|txt|md|log|rtf|doc|docx)$/i.test(filename)) return 'document';
+    return 'file';
+  }
+
+  function attachmentIcon(attachment: Attachment) {
+    const kind = attachmentKind(attachment);
+    if (kind === 'image') return <FileImage size={18} />;
+    if (kind === 'audio') return <FileAudio size={18} />;
+    if (kind === 'video') return <FileVideo size={18} />;
+    if (kind === 'archive') return <FileArchive size={18} />;
+    if (kind === 'presentation') return <ImageIcon size={18} />;
+    if (kind === 'spreadsheet') return <FileText size={18} />;
+    if (kind === 'document') return <FileText size={18} />;
+    return <File size={18} />;
+  }
+
+  async function previewAttachment(attachment: Attachment) {
+    if (!attachment.is_downloaded) {
+      const downloaded = await handleAttachmentDownload(attachment);
+      if (!downloaded) return;
+    }
+    if (attachmentKind(attachment) === 'image') {
+      const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
+      openImagePreview({
+        src: dataUrl,
+        alt: attachment.filename,
+        attachmentId: attachment.id,
+      });
+      return;
+    }
+    onOpenAttachment(attachment);
+  }
+
+  async function revealAttachmentInFinder(attachment: Attachment) {
+    if (!attachment.is_downloaded) {
+      const downloaded = await handleAttachmentDownload(attachment);
+      if (!downloaded) return;
+    }
+    await invoke<string>('reveal_attachment_in_finder', { attachmentId: attachment.id });
+  }
+
+  async function copyAttachmentToClipboard(attachment: Attachment) {
+    if (!attachment.is_downloaded) {
+      await navigator.clipboard?.writeText(attachment.filename);
+      return;
+    }
+
+    if (attachmentKind(attachment) === 'image') {
+      try {
+        const clipboard = navigator.clipboard;
+        if (!clipboard || typeof ClipboardItem === 'undefined' || !clipboard.write) {
+          throw new Error('Clipboard image write is unavailable');
+        }
+        const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const mimeType = blob.type || attachment.mime_type || 'image/png';
+        await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
+        return;
+      } catch {
+        // Fall back to copying a traceable local path or filename.
+      }
+    }
+
+    await navigator.clipboard?.writeText(attachment.local_path || attachment.filename);
+  }
+
+  function attachmentMenuItems(attachment: Attachment): ContextMenuItem[] {
+    const downloaded = attachment.is_downloaded;
+    const downloading = downloadingAttachmentIds.has(attachment.id);
+    return [
+      {
+        id: 'preview',
+        label: '预览',
+        icon: <ImageIcon size={14} />,
+        disabled: downloading,
+        onSelect: () => { previewAttachment(attachment).catch(() => undefined); },
+      },
+      {
+        id: 'open',
+        label: '打开',
+        icon: <ExternalLink size={14} />,
+        disabled: !downloaded || downloading,
+        onSelect: () => onOpenAttachment(attachment),
+      },
+      {
+        id: 'open-with',
+        label: '选择 App 打开',
+        detail: downloaded ? '在 Finder 中定位后选择应用' : '先下载并定位文件',
+        icon: <FolderOpen size={14} />,
+        disabled: downloading,
+        onSelect: () => { revealAttachmentInFinder(attachment).catch(() => undefined); },
+      },
+      {
+        id: 'download',
+        label: downloaded ? '重新下载' : '下载',
+        icon: <Download size={14} />,
+        disabled: downloading,
+        onSelect: () => { handleAttachmentDownload(attachment).catch(() => undefined); },
+      },
+      {
+        id: 'save-as',
+        label: '另存为…',
+        icon: <Download size={14} />,
+        disabled: !downloaded || downloading,
+        onSelect: () => onSaveAttachmentAs(attachment),
+      },
+      {
+        id: 'copy',
+        label: '复制到剪切板',
+        icon: <Copy size={14} />,
+        separatorBefore: true,
+        onSelect: () => { copyAttachmentToClipboard(attachment).catch(() => undefined); },
+      },
+    ];
+  }
+
   async function handleLoadInlineImages() {
     if (isDownloadingInlineImages || inlineImageResolution.pendingAttachments.length === 0) {
       return;
@@ -474,12 +612,13 @@ export default function ReaderPane({
   ]);
 
   useEffect(() => {
-    if (!imagePreview && !imageContextMenu) return undefined;
+    if (!imagePreview && !imageContextMenu && !attachmentContextMenu) return undefined;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setImagePreview(null);
         setImageContextMenu(null);
+        setAttachmentContextMenu(null);
       }
       if (!imagePreview) return;
       if (event.key === '+' || event.key === '=') {
@@ -518,7 +657,7 @@ export default function ReaderPane({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [imagePreview, imageContextMenu]);
+  }, [imagePreview, imageContextMenu, attachmentContextMenu]);
 
   useEffect(() => {
     if (!imageContextMenu) return undefined;
@@ -884,7 +1023,7 @@ export default function ReaderPane({
                 <div className="message-chips">
                   <span>{message.folder_role}</span>
                   {message.labels.map((label) => <span key={label}>{label}</span>)}
-                  {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
+                  {message.attachment_count > 0 && <span><File size={12} /> {message.attachment_count}</span>}
                 </div>
               </section>
             ))}
@@ -1105,35 +1244,61 @@ export default function ReaderPane({
                 const downloading = downloadingAttachmentIds.has(attachment.id);
                 const transferError = attachmentErrors[attachment.id] ?? '';
                 return (
-                <div className={transferError ? 'attachment-download-failed' : ''} key={attachment.id}>
-                  <span className="attachment-icon"><Paperclip size={15} /></span>
-                  <strong>{attachment.filename}</strong>
-                  <span>{attachment.mime_type}</span>
-                  <em>{formatBytes(attachment.size_bytes)}</em>
-                  <button
-                    type="button"
-                    title={attachment.local_path || attachment.filename}
-                    disabled={downloading}
-                    aria-busy={downloading}
-                    onClick={() => attachment.is_downloaded
-                      ? onOpenAttachment(attachment)
-                      : handleAttachmentDownload(attachment)}
+                  <div
+                    className={`attachment-item ${transferError ? 'attachment-download-failed' : ''}`}
+                    key={attachment.id}
+                    onDoubleClick={() => {
+                      if (attachment.is_downloaded) onOpenAttachment(attachment);
+                      else handleAttachmentDownload(attachment).catch(() => undefined);
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setAttachmentContextMenu({ attachment, x: event.clientX, y: event.clientY });
+                    }}
                   >
-                    {attachment.is_downloaded
-                      ? '打开'
-                      : downloading ? '下载中…' : transferError ? '重试' : '下载'}
-                  </button>
-                  {attachment.is_downloaded && (
-                    <button type="button" title={`另存为 ${attachment.filename}`} onClick={() => onSaveAttachmentAs(attachment)}>
-                      另存为
-                    </button>
-                  )}
-                  {transferError && (
-                    <small className="attachment-transfer-status" role="status">
-                      {transferError}
-                    </small>
-                  )}
-                </div>
+                    <span className={`attachment-icon attachment-icon-${attachmentKind(attachment)}`}>
+                      {attachmentIcon(attachment)}
+                    </span>
+                    <span className="attachment-copy">
+                      <strong>{attachment.filename}</strong>
+                      <small>
+                        {attachment.mime_type || '未知类型'} · {formatBytes(attachment.size_bytes)}
+                        {attachment.is_downloaded ? ' · 已下载' : ' · 未下载'}
+                      </small>
+                    </span>
+                    <span className={`attachment-state ${attachment.is_downloaded ? 'is-ready' : ''}`}>
+                      {downloading ? '下载中…' : attachment.is_downloaded ? '可打开' : '待下载'}
+                    </span>
+                    <div className="attachment-actions">
+                      <button
+                        type="button"
+                        title={attachment.local_path || attachment.filename}
+                        disabled={downloading}
+                        aria-busy={downloading}
+                        onClick={() => previewAttachment(attachment).catch(() => undefined)}
+                      >
+                        预览
+                      </button>
+                      <button
+                        type="button"
+                        title={attachment.local_path || attachment.filename}
+                        disabled={downloading}
+                        aria-busy={downloading}
+                        onClick={() => attachment.is_downloaded
+                          ? onOpenAttachment(attachment)
+                          : handleAttachmentDownload(attachment)}
+                      >
+                        {attachment.is_downloaded
+                          ? '打开'
+                          : downloading ? '下载中…' : transferError ? '重试' : '下载'}
+                      </button>
+                    </div>
+                    {transferError && (
+                      <small className="attachment-transfer-status" role="status">
+                        {transferError}
+                      </small>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -1358,6 +1523,17 @@ export default function ReaderPane({
             复制图片地址
           </button>
         </div>
+      )}
+      {attachmentContextMenu && (
+        <ContextMenu
+          x={attachmentContextMenu.x}
+          y={attachmentContextMenu.y}
+          title={attachmentContextMenu.attachment.filename}
+          detail={`${attachmentContextMenu.attachment.mime_type || '未知类型'} · ${formatBytes(attachmentContextMenu.attachment.size_bytes)}`}
+          items={attachmentMenuItems(attachmentContextMenu.attachment)}
+          onClose={() => setAttachmentContextMenu(null)}
+          ariaLabel="附件操作"
+        />
       )}
     </section>
   );

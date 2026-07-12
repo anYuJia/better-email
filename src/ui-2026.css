@@ -1112,24 +1112,30 @@ textarea:disabled {
 }
 
 .attachments {
-  gap: 6px;
+  display: grid;
+  gap: 7px;
   margin: 0;
 }
 
-.attachments > div {
-  display: flex;
-  flex-wrap: wrap;
-  min-height: 43px;
+.attachment-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  min-height: 52px;
   align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
+  gap: 10px;
+  padding: 8px 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 9px;
-  background: #f9fafb;
+  border-radius: 8px;
+  background: #fbfcfd;
   box-shadow: none;
 }
 
-.attachments > div.attachment-download-failed {
+.attachment-item:hover {
+  border-color: #d5dde7;
+  background: #f7f9fc;
+}
+
+.attachment-item.attachment-download-failed {
   border-color: #edc7c7;
   background: #fffafa;
 }
@@ -1141,35 +1147,91 @@ textarea:disabled {
   display: grid;
   place-items: center;
   border-radius: 7px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: #2d6f9f;
+  background: #e8f4fb;
 }
 
-.attachments strong {
-  min-width: 120px;
-  flex: 1 1 180px;
+.attachment-icon-image {
+  color: #2f7a57;
+  background: #e8f6ee;
+}
+
+.attachment-icon-archive {
+  color: #986f25;
+  background: #fbf2df;
+}
+
+.attachment-icon-presentation {
+  color: #9a5a2f;
+  background: #f8eee7;
+}
+
+.attachment-icon-spreadsheet {
+  color: #2d7a4f;
+  background: #e7f5ec;
+}
+
+.attachment-icon-audio,
+.attachment-icon-video {
+  color: #7257a5;
+  background: #f0ecfb;
+}
+
+.attachment-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.attachment-copy strong {
   overflow: hidden;
   color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.attachments span,
-.attachments em {
+.attachment-copy small {
+  overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.attachments button {
+.attachment-state {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.attachment-state.is-ready {
+  color: #53715f;
+}
+
+.attachment-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.attachment-actions button {
   min-height: 29px;
   padding: 0 9px;
   border: 1px solid var(--ui-border);
   border-radius: 7px;
   color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.attachment-actions button:hover {
+  border-color: #cbd6e2;
+  color: var(--ui-text);
   background: #ffffff;
 }
 
-.attachments button[aria-busy="true"] {
+.attachment-actions button[aria-busy="true"] {
   color: var(--ui-text-tertiary);
   cursor: progress;
   background: #f2f4f6;

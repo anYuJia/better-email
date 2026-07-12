@@ -2109,6 +2109,10 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const attachment = attachments.find((item) => item.id === args?.attachmentId);
       return `已打开附件：${attachment?.filename ?? 'unknown'}` as T;
     }
+    case 'reveal_attachment_in_finder': {
+      const attachment = attachments.find((item) => item.id === args?.attachmentId);
+      return `已在 Finder 中显示：${attachment?.filename ?? 'unknown'}` as T;
+    }
     case 'save_attachment_as': {
       const attachment = attachments.find((item) => item.id === args?.attachmentId);
       return `已另存附件：${attachment?.filename ?? 'unknown'}` as T;

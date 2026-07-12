@@ -55,6 +55,7 @@ pub fn run() {
             commands::render_message_with_remote_image_policy,
             commands::download_attachment,
             commands::open_attachment,
+            commands::reveal_attachment_in_finder,
             commands::save_attachment_as,
             commands::export_message_as_eml,
             commands::import_eml_file,

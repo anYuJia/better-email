@@ -656,6 +656,56 @@ pub fn open_attachment(
     Ok(format!("已打开附件：{}", attachment.filename))
 }
 
+#[allow(deprecated)]
+#[tauri::command]
+pub fn reveal_attachment_in_finder(
+    _app: AppHandle,
+    store: State<'_, MailStore>,
+    attachment_id: i64,
+) -> MailResult<String> {
+    let attachment = store.get_attachment(attachment_id)?;
+    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
+        return Err(crate::db::MailError::Imap(
+            "附件尚未下载，请先下载后再定位。".to_string(),
+        ));
+    }
+    let path = std::path::PathBuf::from(&attachment.local_path);
+    if !path.exists() {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "已下载附件文件不存在，请重新下载。",
+        )));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(crate::db::MailError::Io)?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", path.to_string_lossy()))
+            .spawn()
+            .map_err(crate::db::MailError::Io)?;
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let target = path
+            .parent()
+            .map(|parent| parent.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        _app.shell()
+            .open(target, None)
+            .map_err(|error| crate::db::MailError::Imap(format!("无法定位附件：{error}")))?;
+    }
+
+    Ok(format!("已在 Finder 中显示：{}", attachment.filename))
+}
+
 #[tauri::command]
 pub async fn save_attachment_as(
     app: AppHandle,

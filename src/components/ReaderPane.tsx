@@ -42,8 +42,10 @@ type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
 type PreviewImage = { src: string; alt: string; attachmentId: number | null };
-const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.08;
-const IMAGE_PREVIEW_WHEEL_ZOOM_STEP = 0.05;
+const IMAGE_PREVIEW_MIN_ZOOM = 0.25;
+const IMAGE_PREVIEW_MAX_ZOOM = 8;
+const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.04;
+const IMAGE_PREVIEW_WHEEL_ZOOM_STEP = 0.025;
 const IMAGE_PREVIEW_KEYBOARD_PAN_STEP = 18;
 const IMAGE_PREVIEW_WHEEL_PAN_RATIO = 0.72;
 type PlainBodyBlock =
@@ -590,7 +592,10 @@ export default function ReaderPane({
   function zoomImagePreview(delta: number) {
     setImagePreviewFit(false);
     setImagePreviewZoom((zoom) => {
-      const nextZoom = Math.min(3, Math.max(0.35, Number((zoom + delta).toFixed(2))));
+      const nextZoom = Math.min(
+        IMAGE_PREVIEW_MAX_ZOOM,
+        Math.max(IMAGE_PREVIEW_MIN_ZOOM, Number((zoom + delta).toFixed(3))),
+      );
       setImagePreviewPan((pan) => clampImagePreviewPan(pan, nextZoom));
       return nextZoom;
     });

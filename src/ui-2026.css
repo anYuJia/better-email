@@ -3859,6 +3859,11 @@ body {
 .message-card {
   min-height: 76px;
   padding: 9px 12px 9px 66px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .message-card:hover {
@@ -3909,11 +3914,11 @@ body {
 }
 
 .message-select {
-  left: 7px;
-  top: 50%;
+  left: 6px;
+  top: 6px;
   z-index: 3;
   opacity: 0;
-  transform: translate(-50%, -50%);
+  transform: none;
 }
 
 .message-select input {
@@ -3936,12 +3941,17 @@ body {
 .message-card > .message-topline,
 .message-card > .subject,
 .message-card > p {
+  grid-column: 1;
   min-width: 0;
+  max-width: 100%;
 }
 
 .message-topline {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .sender {
@@ -3953,6 +3963,10 @@ body {
 
 .subject {
   margin-top: 2px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-card p {
@@ -3962,6 +3976,16 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.message-card time {
+  flex: 0 0 auto;
+}
+
+.message-list,
+.message-date-section {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .message-chips {

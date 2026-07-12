@@ -17,6 +17,15 @@ const TOOLTIP_SELECTOR = [
   '.settings-button[aria-label]',
 ].join(',');
 
+const OPEN_OVERLAY_SELECTOR = [
+  'details[open]',
+  '.context-menu',
+  '.context-submenu',
+  '.search-suggestion-panel',
+  '.composer-select-menu',
+  '.settings-mobile-menu',
+].join(',');
+
 function isTextOnlyButton(element: HTMLElement) {
   const text = element.textContent?.trim() ?? '';
   return text.length > 0 && element.querySelector('svg') === null;
@@ -34,6 +43,10 @@ function getTooltipText(element: HTMLElement) {
 function targetFromEvent(event: Event) {
   const target = event.target instanceof Element ? event.target : null;
   return target?.closest<HTMLElement>(TOOLTIP_SELECTOR) ?? null;
+}
+
+function isInsideOpenOverlay(element: HTMLElement) {
+  return element.closest(OPEN_OVERLAY_SELECTOR) !== null;
 }
 
 export default function GlobalTooltip() {
@@ -67,7 +80,12 @@ export default function GlobalTooltip() {
 
     const showTooltip = (target: HTMLElement) => {
       const text = getTooltipText(target);
-      if (!text || target.hasAttribute('disabled') || target.getAttribute('aria-disabled') === 'true') {
+      if (
+        !text
+        || target.hasAttribute('disabled')
+        || target.getAttribute('aria-disabled') === 'true'
+        || isInsideOpenOverlay(target)
+      ) {
         hideTooltip();
         return;
       }
@@ -120,9 +138,13 @@ export default function GlobalTooltip() {
     };
 
     const handleFocusOut = () => hideTooltip();
+    const handleImmediateHide = () => hideTooltip();
 
     document.addEventListener('pointerover', handlePointerOver, true);
     document.addEventListener('pointerout', handlePointerOut, true);
+    document.addEventListener('pointerdown', handleImmediateHide, true);
+    document.addEventListener('click', handleImmediateHide, true);
+    document.addEventListener('keydown', handleImmediateHide, true);
     document.addEventListener('focusin', handleFocusIn, true);
     document.addEventListener('focusout', handleFocusOut, true);
     document.addEventListener('scroll', hideTooltip, true);
@@ -133,6 +155,9 @@ export default function GlobalTooltip() {
       hideTooltip();
       document.removeEventListener('pointerover', handlePointerOver, true);
       document.removeEventListener('pointerout', handlePointerOut, true);
+      document.removeEventListener('pointerdown', handleImmediateHide, true);
+      document.removeEventListener('click', handleImmediateHide, true);
+      document.removeEventListener('keydown', handleImmediateHide, true);
       document.removeEventListener('focusin', handleFocusIn, true);
       document.removeEventListener('focusout', handleFocusOut, true);
       document.removeEventListener('scroll', hideTooltip, true);

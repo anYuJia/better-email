@@ -19,6 +19,8 @@ import {
   Trash2,
   Volume2,
   VolumeX,
+  ZoomIn,
+  ZoomOut,
   X,
 } from 'lucide-react';
 import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
@@ -39,6 +41,7 @@ import type { BulkMessageAction } from './messageContextMenu';
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = { src: string; alt: string; x: number; y: number } | null;
+type PreviewImage = { src: string; alt: string };
 type PlainBodyBlock =
   | { type: 'text'; content: string }
   | { type: 'original'; index: number; meta: string[]; content: string };
@@ -287,7 +290,9 @@ export default function ReaderPane({
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
   const [inlineImageDataUrls, setInlineImageDataUrls] = useState<Record<number, string>>({});
-  const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
+  const [imagePreview, setImagePreview] = useState<PreviewImage | null>(null);
+  const [imagePreviewZoom, setImagePreviewZoom] = useState(1);
+  const [imagePreviewFit, setImagePreviewFit] = useState(true);
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
@@ -316,6 +321,8 @@ export default function ReaderPane({
     setInlineImageRefreshError('');
     setInlineImageDataUrls({});
     setImagePreview(null);
+    setImagePreviewZoom(1);
+    setImagePreviewFit(true);
     setImageContextMenu(null);
   }, [selectedId]);
 
@@ -460,6 +467,22 @@ export default function ReaderPane({
         setImagePreview(null);
         setImageContextMenu(null);
       }
+      if (!imagePreview) return;
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        setImagePreviewFit(false);
+        setImagePreviewZoom((zoom) => Math.min(3, Number((zoom + 0.15).toFixed(2))));
+      }
+      if (event.key === '-') {
+        event.preventDefault();
+        setImagePreviewFit(false);
+        setImagePreviewZoom((zoom) => Math.max(0.35, Number((zoom - 0.15).toFixed(2))));
+      }
+      if (event.key === '0') {
+        event.preventDefault();
+        setImagePreviewZoom(1);
+        setImagePreviewFit(true);
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -504,7 +527,7 @@ export default function ReaderPane({
 
     event.preventDefault();
     setImageContextMenu(null);
-    setImagePreview(image);
+    openImagePreview(image);
   }
 
   function handleReaderHtmlContextMenu(event: React.MouseEvent<HTMLDivElement>) {
@@ -520,15 +543,46 @@ export default function ReaderPane({
     });
   }
 
-  function downloadPreviewImage() {
-    if (!imageContextMenu) return;
+  function openImagePreview(image: PreviewImage) {
+    setImagePreview(image);
+    setImagePreviewZoom(1);
+    setImagePreviewFit(true);
+  }
+
+  function imageDownloadName(image: PreviewImage) {
+    const cleanAlt = image.alt.trim().replace(/[\\/:*?"<>|]+/g, '-');
+    if (cleanAlt && /\.[a-z0-9]{2,5}$/i.test(cleanAlt)) return cleanAlt;
+    if (cleanAlt) return `${cleanAlt}.png`;
+
+    try {
+      const pathName = new URL(image.src).pathname.split('/').pop() ?? '';
+      const decoded = decodeURIComponent(pathName).replace(/[\\/:*?"<>|]+/g, '-');
+      if (decoded && /\.[a-z0-9]{2,5}$/i.test(decoded)) return decoded;
+    } catch {
+      // Data URLs and local asset URLs can be invalid for URL parsing here.
+    }
+    return '邮件图片.png';
+  }
+
+  function downloadImage(image: PreviewImage) {
     const link = document.createElement('a');
-    link.href = imageContextMenu.src;
-    link.download = imageContextMenu.alt.trim() || '邮件图片';
+    link.href = image.src;
+    link.download = imageDownloadName(image);
     link.rel = 'noreferrer';
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }
+
+  function downloadPreviewImage() {
+    if (!imageContextMenu) return;
+    downloadImage(imageContextMenu);
+    setImageContextMenu(null);
+  }
+
+  function savePreviewImageAs() {
+    if (!imageContextMenu) return;
+    downloadImage(imageContextMenu);
     setImageContextMenu(null);
   }
 
@@ -1045,11 +1099,66 @@ export default function ReaderPane({
           aria-label="图片预览"
           onClick={() => setImagePreview(null)}
         >
-          <figure className="reader-image-preview" onClick={(event) => event.stopPropagation()}>
-            <button type="button" aria-label="关闭图片预览" onClick={() => setImagePreview(null)}>
-              <X size={18} />
-            </button>
-            <img src={imagePreview.src} alt={imagePreview.alt} />
+          <figure
+            className={`reader-image-preview ${imagePreviewFit ? 'is-fit' : 'is-zoomed'}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="reader-image-preview-toolbar" aria-label="图片预览工具">
+              <button
+                type="button"
+                aria-label="缩小"
+                onClick={() => {
+                  setImagePreviewFit(false);
+                  setImagePreviewZoom((zoom) => Math.max(0.35, Number((zoom - 0.15).toFixed(2))));
+                }}
+              >
+                <ZoomOut size={16} />
+              </button>
+              <span>{Math.round((imagePreviewFit ? 1 : imagePreviewZoom) * 100)}%</span>
+              <button
+                type="button"
+                aria-label="放大"
+                onClick={() => {
+                  setImagePreviewFit(false);
+                  setImagePreviewZoom((zoom) => Math.min(3, Number((zoom + 0.15).toFixed(2))));
+                }}
+              >
+                <ZoomIn size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImagePreviewZoom(1);
+                  setImagePreviewFit(true);
+                }}
+              >
+                适配
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImagePreviewZoom(1);
+                  setImagePreviewFit(false);
+                }}
+              >
+                原始
+              </button>
+              <button type="button" aria-label="下载图片" onClick={() => downloadImage(imagePreview)}>
+                <Download size={16} />
+              </button>
+              <button type="button" aria-label="关闭图片预览" onClick={() => setImagePreview(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="reader-image-preview-stage">
+              <img
+                src={imagePreview.src}
+                alt={imagePreview.alt}
+                style={{
+                  transform: imagePreviewFit ? undefined : `scale(${imagePreviewZoom})`,
+                }}
+              />
+            </div>
           </figure>
         </div>
       )}
@@ -1064,17 +1173,20 @@ export default function ReaderPane({
             type="button"
             role="menuitem"
             onClick={() => {
-              setImagePreview({ src: imageContextMenu.src, alt: imageContextMenu.alt });
+              openImagePreview({ src: imageContextMenu.src, alt: imageContextMenu.alt });
               setImageContextMenu(null);
             }}
           >
             查看大图
           </button>
-          <button type="button" role="menuitem" onClick={copyPreviewImageSource}>
-            复制图片地址
+          <button type="button" role="menuitem" onClick={savePreviewImageAs}>
+            另存为…
           </button>
           <button type="button" role="menuitem" onClick={downloadPreviewImage}>
             下载图片
+          </button>
+          <button type="button" role="menuitem" onClick={copyPreviewImageSource}>
+            复制图片地址
           </button>
         </div>
       )}

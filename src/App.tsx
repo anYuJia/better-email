@@ -17,6 +17,7 @@ import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
+import GlobalTooltip from './components/GlobalTooltip';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
@@ -3215,6 +3216,7 @@ export default function App() {
         }}
         onDismissAction={clearUndoAction}
       />
+      <GlobalTooltip />
       <div className="status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );

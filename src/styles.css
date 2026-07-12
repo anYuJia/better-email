@@ -828,21 +828,22 @@ button { cursor: pointer; }
   border: none;
   border-bottom: 1px solid #edf0f3;
   background: #fff;
-  padding: 14px 14px 14px 52px;
+  padding: 14px 14px 14px 58px;
 }
 .message-card:hover, .message-card.selected { background: #eef7f2; }
 .message-select {
   position: absolute;
-  left: 14px;
-  top: 15px;
+  left: 27px;
+  top: 50%;
   display: grid;
   place-items: center;
+  transform: translate(-50%, -50%);
 }
 .message-select input { width: 15px; height: 15px; }
 .message-unread-dot {
   position: absolute;
-  left: 26px;
-  top: calc(50% + 18px);
+  left: 27px;
+  top: calc(50% + 19px);
   width: 6px;
   height: 6px;
   border-radius: 999px;

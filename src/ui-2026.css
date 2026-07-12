@@ -3252,7 +3252,7 @@ body {
 
 .message-card {
   min-height: 66px;
-  padding: 8px 12px 8px 56px;
+  padding: 8px 12px 8px 62px;
   border-bottom: 1px solid #e9edf2;
   background: #fff;
 }
@@ -3289,7 +3289,7 @@ body {
 }
 
 .message-avatar {
-  left: 24px;
+  left: 27px;
   top: 50%;
   width: 30px;
   height: 30px;
@@ -3297,7 +3297,7 @@ body {
   background: #e6ebf1;
   font-size: 11.5px;
   font-weight: 650;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .avatar-tone-0 {
@@ -3331,9 +3331,9 @@ body {
 }
 
 .message-select {
-  left: 24px;
+  left: 27px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
 }
 
 .message-select input {

@@ -94,10 +94,10 @@
 }
 
 .settings-account-stack .tool-panel {
-  padding: 13px 14px;
-  border-color: #dfe4ea;
-  border-radius: 11px;
-  background: #ffffff;
+  padding: 12px 13px;
+  border-color: var(--settings-border, #e1e5ea);
+  border-radius: 8px;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -152,19 +152,19 @@
   display: grid;
   gap: 1px;
   overflow: hidden;
-  border: 1px solid #e1e6eb;
-  border-radius: 9px;
+  border: 1px solid var(--settings-border, #e1e5ea);
+  border-radius: 7px;
   background: #ffffff;
 }
 
 .settings-account-row {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
-  padding: 6px 9px;
+  padding: 5px 8px;
   border: 0;
   border-bottom: 1px solid #edf0f3;
   border-radius: 0;
@@ -179,11 +179,11 @@
 }
 
 .settings-account-row:hover {
-  background: #f8fafb;
+  background: #f7f8f9;
 }
 
 .settings-account-row.active {
-  background: #f4f7fa;
+  background: #f2f5f7;
 }
 
 .settings-account-row-main {
@@ -200,13 +200,13 @@
 }
 
 .settings-account-row-icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border-radius: 6px;
-  color: #486989;
-  background: #eef4f8;
+  color: #5d7182;
+  background: #eef2f5;
 }
 
 .settings-account-row.active .settings-account-row-icon {
@@ -263,8 +263,8 @@
 }
 
 .settings-account-row-actions button {
-  min-height: 28px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 0 7px;
   border: 0;
   border-radius: 7px;
   color: #51606f;
@@ -274,8 +274,8 @@
 }
 
 .settings-account-row-actions button:hover {
-  color: #275f92;
-  background: #edf4fa;
+  color: #174c78;
+  background: #eef3f7;
 }
 
 .settings-account-row-actions button.danger {
@@ -572,7 +572,7 @@
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgba(24, 29, 36, 0.24);
+  background: rgba(24, 29, 36, 0.18);
 }
 
 .settings-account-add-dialog {
@@ -580,13 +580,13 @@
   max-height: min(760px, calc(100vh - 44px));
   overflow: auto;
   display: grid;
-  gap: 13px;
-  padding: 16px;
-  border: 1px solid #d8dee5;
-  border-radius: 13px;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--settings-border-strong, #cbd2da);
+  border-radius: 12px;
   color: var(--ui-text);
   background: #ffffff;
-  box-shadow: 0 22px 60px rgba(23, 31, 42, 0.18), 0 2px 8px rgba(23, 31, 42, 0.08);
+  box-shadow: 0 18px 46px rgba(23, 31, 42, 0.16);
 }
 
 .settings-account-manage-dialog {

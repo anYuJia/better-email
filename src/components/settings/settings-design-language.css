@@ -855,3 +855,236 @@
     padding-inline: 18px;
   }
 }
+
+/* Quiet settings system pass: keep the preferences surface native and low-noise. */
+.settings-backdrop {
+  --settings-border: #e1e5ea;
+  --settings-border-strong: #cbd2da;
+  --settings-text: #171b20;
+  --settings-text-secondary: #59636e;
+  --settings-text-tertiary: #8b949f;
+  --settings-accent: #1971c2;
+  --settings-accent-hover: #155fa6;
+  --settings-accent-soft: #edf4fb;
+  --settings-card: #fff;
+  --settings-card-subtle: #f8f9fa;
+  --settings-canvas: #f6f7f8;
+  --settings-sidebar: #f0f2f4;
+  --settings-radius-lg: 12px;
+  --settings-radius-md: 8px;
+  --settings-radius-sm: 6px;
+  --settings-shadow-soft: none;
+  background: rgba(18, 24, 31, 0.22);
+  backdrop-filter: blur(16px) saturate(1.02);
+}
+
+.settings-modal {
+  border-color: var(--settings-border-strong);
+  border-radius: var(--settings-radius-lg);
+  background: var(--settings-canvas);
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.18);
+}
+
+.settings-modal .settings-main-header {
+  min-height: 52px;
+  border-bottom-color: var(--settings-border);
+  background: #fbfbfc;
+  backdrop-filter: none;
+}
+
+.settings-app-mark,
+.settings-modal .settings-page-icon {
+  border: 0;
+  color: #426783;
+  background: #eef2f5;
+  box-shadow: none;
+}
+
+.settings-modal .settings-header-button.primary {
+  border-color: #b9c9d8;
+  color: #174c78;
+  background: #eef5fb;
+  box-shadow: none;
+}
+
+.settings-modal .settings-header-button.primary:hover {
+  border-color: #a9bdcf;
+  color: #123f66;
+  background: #e7f0f8;
+}
+
+.settings-modal .settings-header-button.secondary {
+  border-color: var(--settings-border);
+  color: var(--settings-text-secondary);
+  background: transparent;
+}
+
+.settings-modal .settings-body {
+  grid-template-columns: 236px minmax(0, 1fr);
+  background: var(--settings-canvas);
+}
+
+.settings-modal .settings-nav {
+  gap: 3px;
+  padding: 14px 10px 16px;
+  border-right-color: var(--settings-border);
+  background: var(--settings-sidebar);
+}
+
+.settings-modal .settings-nav-intro span,
+.settings-modal .settings-nav-copy small {
+  display: none;
+}
+
+.settings-modal .settings-nav .settings-nav-group {
+  margin: 13px 8px 5px;
+  color: var(--settings-text-tertiary);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.settings-modal .settings-nav-section > button {
+  min-height: 34px;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--settings-radius-sm);
+  color: var(--settings-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 520;
+}
+
+.settings-modal .settings-nav-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: #76828e;
+  background: transparent;
+}
+
+.settings-modal .settings-nav-section > button:hover {
+  color: var(--settings-text);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.settings-modal .settings-nav-section > button.active {
+  color: #174c78;
+  background: #fff;
+  box-shadow: none;
+}
+
+.settings-modal .settings-nav-section > button.active .settings-nav-icon {
+  color: #174c78;
+  background: var(--settings-accent-soft);
+}
+
+.settings-modal .settings-nav-active-dot {
+  width: 3px;
+  height: 14px;
+  background: #4f84b1;
+}
+
+.settings-modal .settings-content {
+  background: var(--settings-canvas);
+}
+
+.settings-modal .settings-page {
+  width: min(100%, 860px);
+  animation: none;
+}
+
+.settings-modal .settings-page-header {
+  padding: 18px 30px 14px;
+  border-bottom-color: var(--settings-border);
+  background: rgba(246, 247, 248, 0.96);
+  backdrop-filter: none;
+}
+
+.settings-modal .settings-page-heading {
+  gap: 10px;
+}
+
+.settings-modal .settings-page-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+.settings-modal .settings-page-heading .settings-page-kicker {
+  color: var(--settings-text-tertiary);
+  font-size: 9px;
+  font-weight: 560;
+}
+
+.settings-modal .settings-page-heading strong {
+  font-size: 16px;
+  font-weight: 660;
+}
+
+.settings-page-progress-bar,
+.settings-modal .settings-page-meta {
+  display: none;
+}
+
+.settings-modal .settings-page-content {
+  gap: 10px;
+  padding: 14px 30px 20px;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-disclosure,
+  .settings-static-section,
+  .settings-section-overview
+) {
+  border-color: var(--settings-border);
+  border-radius: var(--settings-radius-md);
+  background: #fff;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-content :is(
+  .tool-panel,
+  .settings-static-section,
+  .settings-section-overview
+):hover {
+  border-color: var(--settings-border);
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea) {
+  border-color: #d7dde4;
+  border-radius: var(--settings-radius-sm);
+  background: #fff;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.settings-modal .settings-page-content :is(input, select) {
+  min-height: 34px;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):focus {
+  border-color: #a9b6c2;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-pagination {
+  gap: 8px;
+  padding: 0 30px 20px;
+}
+
+.settings-modal .settings-page-pagination-button {
+  min-height: 34px;
+  border-color: var(--settings-border);
+  border-radius: var(--settings-radius-sm);
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-pagination-button:hover:not(:disabled) {
+  border-color: var(--settings-border-strong);
+  background: #fff;
+  box-shadow: none;
+}

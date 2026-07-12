@@ -301,6 +301,8 @@ export default function ReaderPane({
   const [isImagePreviewPanning, setIsImagePreviewPanning] = useState(false);
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const imagePreviewDragRef = useRef<{ x: number; y: number } | null>(null);
+  const imagePreviewStageRef = useRef<HTMLDivElement | null>(null);
+  const imagePreviewImageRef = useRef<HTMLImageElement | null>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
@@ -493,9 +495,21 @@ export default function ReaderPane({
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
         setImagePreviewFit(false);
-        setImagePreviewPan((pan) => ({
-          x: pan.x + (event.key === 'ArrowLeft' ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP : event.key === 'ArrowRight' ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP : 0),
-          y: pan.y + (event.key === 'ArrowUp' ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP : event.key === 'ArrowDown' ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP : 0),
+        updateImagePreviewPan((pan) => ({
+          x: pan.x + (
+            event.key === 'ArrowLeft'
+              ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP
+              : event.key === 'ArrowRight'
+                ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP
+                : 0
+          ),
+          y: pan.y + (
+            event.key === 'ArrowUp'
+              ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP
+              : event.key === 'ArrowDown'
+                ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP
+                : 0
+          ),
         }));
       }
     }
@@ -573,7 +587,38 @@ export default function ReaderPane({
 
   function zoomImagePreview(delta: number) {
     setImagePreviewFit(false);
-    setImagePreviewZoom((zoom) => Math.min(3, Math.max(0.35, Number((zoom + delta).toFixed(2)))));
+    setImagePreviewZoom((zoom) => {
+      const nextZoom = Math.min(3, Math.max(0.35, Number((zoom + delta).toFixed(2))));
+      setImagePreviewPan((pan) => clampImagePreviewPan(pan, nextZoom));
+      return nextZoom;
+    });
+  }
+
+  function clampImagePreviewPan(
+    pan: { x: number; y: number },
+    zoom = imagePreviewZoom,
+  ) {
+    const stage = imagePreviewStageRef.current;
+    const image = imagePreviewImageRef.current;
+    if (!stage || !image) return pan;
+
+    const baseWidth = image.offsetWidth;
+    const baseHeight = image.offsetHeight;
+    const stageWidth = stage.clientWidth;
+    const stageHeight = stage.clientHeight;
+    const maxX = Math.max(0, (baseWidth * zoom - stageWidth) / 2);
+    const maxY = Math.max(0, (baseHeight * zoom - stageHeight) / 2);
+
+    return {
+      x: Math.min(maxX, Math.max(-maxX, pan.x)),
+      y: Math.min(maxY, Math.max(-maxY, pan.y)),
+    };
+  }
+
+  function updateImagePreviewPan(
+    updater: (pan: { x: number; y: number }) => { x: number; y: number },
+  ) {
+    setImagePreviewPan((pan) => clampImagePreviewPan(updater(pan)));
   }
 
   function handleImagePreviewWheel(event: React.WheelEvent<HTMLDivElement>) {
@@ -586,7 +631,7 @@ export default function ReaderPane({
 
     if (!imagePreviewFit) {
       event.preventDefault();
-      setImagePreviewPan((pan) => ({
+      updateImagePreviewPan((pan) => ({
         x: pan.x - event.deltaX * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
         y: pan.y - event.deltaY * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
       }));
@@ -607,7 +652,7 @@ export default function ReaderPane({
     const dx = event.clientX - previous.x;
     const dy = event.clientY - previous.y;
     imagePreviewDragRef.current = { x: event.clientX, y: event.clientY };
-    setImagePreviewPan((pan) => ({ x: pan.x + dx, y: pan.y + dy }));
+    updateImagePreviewPan((pan) => ({ x: pan.x + dx, y: pan.y + dy }));
   }
 
   function stopImagePreviewPanning() {
@@ -1227,6 +1272,7 @@ export default function ReaderPane({
             </div>
             <div
               className="reader-image-preview-stage"
+              ref={imagePreviewStageRef}
               onWheel={handleImagePreviewWheel}
               onPointerDown={handleImagePreviewPointerDown}
               onPointerMove={handleImagePreviewPointerMove}
@@ -1235,8 +1281,10 @@ export default function ReaderPane({
               onPointerLeave={stopImagePreviewPanning}
             >
               <img
+                ref={imagePreviewImageRef}
                 src={imagePreview.src}
                 alt={imagePreview.alt}
+                onLoad={() => setImagePreviewPan((pan) => clampImagePreviewPan(pan))}
                 style={{
                   transform: imagePreviewFit
                     ? undefined

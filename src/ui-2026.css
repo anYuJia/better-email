@@ -1366,7 +1366,7 @@ textarea:disabled {
   display: grid;
   flex: 1;
   place-items: center;
-  overflow: auto;
+  overflow: hidden;
   padding: 18px;
   cursor: grab;
   user-select: none;
@@ -1387,15 +1387,6 @@ textarea:disabled {
   transform-origin: center center;
   transition: transform 120ms ease;
   user-select: none;
-}
-
-.reader-image-preview.is-zoomed .reader-image-preview-stage {
-  place-items: start center;
-}
-
-.reader-image-preview.is-zoomed .reader-image-preview-stage img {
-  max-width: none;
-  max-height: none;
 }
 
 .reader-image-context-menu {

@@ -1579,23 +1579,32 @@ fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
         .and_then(|message| message.body_html(0))
         .map(|body| body.into_owned())
         .unwrap_or_default();
-    let body = if !text_body.trim().is_empty() {
-        text_body
-    } else if has_html_part && looks_like_html(&html_body) {
+    let has_renderable_html = has_html_part && looks_like_html(&html_body);
+    let body = if has_renderable_html {
         html_body.clone()
+    } else if !text_body.trim().is_empty() {
+        text_body.clone()
     } else {
-        fallback_body
+        fallback_body.clone()
     };
-    let sanitized_html = if has_html_part && looks_like_html(&html_body) {
+    let sanitized_html = if has_renderable_html {
         protocol::sanitize_html(&html_body)
     } else {
         String::new()
     };
     let security_warnings = reader_security_warnings(raw, &html_body);
-    let snippet = body
+    let snippet_source = if !text_body.trim().is_empty() {
+        text_body.as_str()
+    } else if has_renderable_html {
+        &html_body
+    } else {
+        &fallback_body
+    };
+    let snippet = snippet_source
         .lines()
         .find(|line| !line.trim().is_empty())
         .unwrap_or("")
+        .replace(['<', '>'], " ")
         .chars()
         .take(120)
         .collect();
@@ -2046,6 +2055,7 @@ mod tests {
         );
 
         assert!(body.body.contains("Hi"));
+        assert!(body.body.contains("http://tracker.example/pixel.png"));
         assert!(body.sanitized_html.contains("<p>Hi</p>"));
         assert!(!body.sanitized_html.contains("<script"));
         assert!(!body.sanitized_html.contains("onclick"));

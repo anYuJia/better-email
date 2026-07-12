@@ -2202,9 +2202,13 @@ export default function App() {
   }
 
   async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
-    if (!messageId) return;
+    if (!messageId) return null;
     const updated = await invoke<Message>('render_message_with_remote_image_policy', { messageId });
     setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    if (activeThread) {
+      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    }
+    return updated;
   }
 
   async function trustRemoteImagesForSelected(scope: 'sender' | 'domain') {
@@ -2219,7 +2223,15 @@ export default function App() {
       const withoutDuplicate = current.filter((item) => item.id !== trust.id);
       return [...withoutDuplicate, trust].sort((a, b) => `${a.scope}:${a.value}`.localeCompare(`${b.scope}:${b.value}`));
     });
-    await renderSelectedWithRemoteImagePolicy(selected.id);
+    let updated = await renderSelectedWithRemoteImagePolicy(selected.id);
+    if (
+      updated?.security_warnings.some((warning) => warning.includes('远程图片')) &&
+      selected.remote_uid > 0
+    ) {
+      bodyFetchFailedRef.current.delete(selected.id);
+      await fetchSelectedBody();
+      updated = await renderSelectedWithRemoteImagePolicy(selected.id);
+    }
     setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任域名远程图片：${trust.value}`);
   }
 

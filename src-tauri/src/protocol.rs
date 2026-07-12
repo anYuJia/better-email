@@ -153,12 +153,20 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
         .and_then(|message| message.body_html(0))
         .map(|body| body.into_owned())
         .unwrap_or_default();
-    let body = if !text_body.trim().is_empty() {
-        text_body
-    } else if looks_like_html(&html_body) {
+    let has_renderable_html = looks_like_html(&html_body);
+    let body = if has_renderable_html {
         html_body.clone()
+    } else if !text_body.trim().is_empty() {
+        text_body.clone()
     } else {
         fallback_body.to_string()
+    };
+    let snippet_source = if !text_body.trim().is_empty() {
+        text_body.as_str()
+    } else if has_renderable_html {
+        &html_body
+    } else {
+        &body
     };
     let from = parsed
         .as_ref()
@@ -245,15 +253,16 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
             })
             .unwrap_or_default(),
         subject: preview.subject,
-        snippet: body
+        snippet: snippet_source
             .lines()
             .find(|line| !line.trim().is_empty())
             .unwrap_or("")
+            .replace(['<', '>'], " ")
             .chars()
             .take(120)
             .collect(),
         body,
-        sanitized_html: if looks_like_html(&html_body) {
+        sanitized_html: if has_renderable_html {
             sanitize_html(&html_body)
         } else {
             String::new()
@@ -798,6 +807,7 @@ mod tests {
         );
         let imported = parse_imported_eml(raw);
 
+        assert!(imported.body.contains("src=\"cid:Logo@Example.COM\""));
         assert!(imported
             .sanitized_html
             .contains("src=\"cid:Logo@Example.COM\""));

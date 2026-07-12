@@ -3923,8 +3923,20 @@ body {
 }
 
 .message-select input {
-  width: 13px;
-  height: 13px;
+  box-sizing: border-box;
+  flex: 0 0 14px;
+  inline-size: 14px;
+  block-size: 14px;
+  width: 14px;
+  min-width: 14px;
+  max-width: 14px;
+  height: 14px;
+  min-height: 14px;
+  max-height: 14px;
+  margin: 0;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
 }
 
 .message-card:hover .message-select,

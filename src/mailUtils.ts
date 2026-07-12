@@ -76,6 +76,35 @@ export function formatBytes(value: number): string {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+    .replace(/&#x([a-f0-9]+);/gi, (_, code: string) => String.fromCharCode(parseInt(code, 16)));
+}
+
+export function plainTextPreview(value: string): string {
+  let preview = value;
+  for (let index = 0; index < 2; index += 1) {
+    preview = decodeHtmlEntities(preview)
+      .replace(/<!doctype[^>]*>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/(?:p|div|li|tr|h[1-6])>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ');
+  }
+  return preview
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
   const normalized = subject.trim() || '(无主题)';
   const matcher = prefix === 'Re' ? /^(re|回复)\s*:/i : /^(fwd|fw|转发)\s*:/i;

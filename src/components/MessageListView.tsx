@@ -6,7 +6,7 @@ import type {
   FilterMode,
   Message,
 } from '../app/types';
-import { formatDate } from '../mailUtils';
+import { formatDate, plainTextPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
 
 type MessageGroup = {
@@ -37,28 +37,11 @@ type MessageListViewProps = {
 
 const REMOTE_HEADER_ONLY_SNIPPET = '远端邮件头已同步';
 
-function stripHtmlPreview(value: string): string {
-  return value
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/(?:p|div|li|tr|h[1-6])>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function messagePreview(message: Message): string {
-  const bodyPreview = stripHtmlPreview(message.body || message.sanitized_html || '');
+  const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
   if (bodyPreview) return bodyPreview;
   if (!message.snippet.includes(REMOTE_HEADER_ONLY_SNIPPET)) {
-    return stripHtmlPreview(message.snippet);
+    return plainTextPreview(message.snippet);
   }
   return '';
 }

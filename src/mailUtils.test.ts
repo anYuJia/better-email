@@ -7,6 +7,7 @@ import {
   newMailNotificationBody,
   notificationThreadScopeKey,
   prefixedSubject,
+  plainTextPreview,
   quoteMessage,
   replyThreadingHeaders,
   remoteImageTrustInput,
@@ -45,6 +46,14 @@ describe('mail UI utilities', () => {
     expect(prefixedSubject('回复: Quarterly update', 'Re')).toBe('回复: Quarterly update');
     expect(prefixedSubject('Fwd: Quarterly update', 'Fwd')).toBe('Fwd: Quarterly update');
     expect(prefixedSubject('', 'Fwd')).toBe('Fwd: (无主题)');
+  });
+
+  it('cleans raw and escaped HTML from mailbox list previews', () => {
+    expect(plainTextPreview('<!doctype html><html><body><div style="font-family: system-ui;">你好&nbsp;世界</div></body></html>'))
+      .toBe('你好 世界');
+    expect(plainTextPreview('&lt;div style=&quot;font-family: system-ui;&quot;&gt;周雪莹王欣答辩PPT&lt;/div&gt;'))
+      .toBe('周雪莹王欣答辩PPT');
+    expect(plainTextPreview('<script>alert(1)</script><p>正文</p>')).toBe('正文');
   });
 
   it('quotes message bodies for reply and forward drafts', () => {

@@ -40,8 +40,8 @@ import type { BulkMessageAction } from './messageContextMenu';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
-type ImageContextMenu = { src: string; alt: string; x: number; y: number } | null;
-type PreviewImage = { src: string; alt: string };
+type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
+type PreviewImage = { src: string; alt: string; attachmentId: number | null };
 const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.08;
 const IMAGE_PREVIEW_WHEEL_ZOOM_STEP = 0.05;
 const IMAGE_PREVIEW_KEYBOARD_PAN_STEP = 18;
@@ -544,9 +544,11 @@ export default function ReaderPane({
     if (imageElement.dataset.betterEmailInlineCid) return null;
     const src = imageElement.currentSrc || imageElement.src;
     if (!src) return null;
+    const attachmentId = Number(imageElement.dataset.betterEmailAttachmentId ?? 0) || null;
     return {
       src,
       alt: imageElement.alt || selected?.subject || '邮件图片',
+      attachmentId,
     };
   }
 
@@ -692,11 +694,8 @@ export default function ReaderPane({
   }
 
   async function saveImageAs(image: PreviewImage) {
-    if (image.src.startsWith('data:')) {
-      await invoke<string>('save_image_data_url_as', {
-        dataUrl: image.src,
-        filename: imageDownloadName(image),
-      });
+    if (image.attachmentId) {
+      await invoke<string>('save_attachment_as', { attachmentId: image.attachmentId });
       return;
     }
     downloadImage(image);
@@ -1307,7 +1306,11 @@ export default function ReaderPane({
             type="button"
             role="menuitem"
             onClick={() => {
-              openImagePreview({ src: imageContextMenu.src, alt: imageContextMenu.alt });
+              openImagePreview({
+                src: imageContextMenu.src,
+                alt: imageContextMenu.alt,
+                attachmentId: imageContextMenu.attachmentId,
+              });
               setImageContextMenu(null);
             }}
           >

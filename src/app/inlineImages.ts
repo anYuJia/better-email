@@ -112,7 +112,10 @@ export function resolveCidInlineImages(
     }
 
     resolvedContentIds.add(contentId);
-    return imageTag.replace(sourceMatch[0], `src="${escapeAttribute(assetUrl)}"`);
+    return imageTag.replace(
+      sourceMatch[0],
+      `src="${escapeAttribute(assetUrl)}" data-better-email-attachment-id="${attachment.id}"`,
+    );
   });
 
   return {

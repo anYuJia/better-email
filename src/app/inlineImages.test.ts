@@ -34,6 +34,7 @@ describe('CID inline images', () => {
     );
 
     expect(result.html).toContain('src="asset://localhost//tmp/logo.png"');
+    expect(result.html).toContain('data-better-email-attachment-id="1"');
     expect(result.html).toContain('src="https://example.com/remote.png"');
     expect(result.resolvedContentIds).toEqual(['logo@example.com']);
     expect(result.pendingAttachments).toEqual([]);

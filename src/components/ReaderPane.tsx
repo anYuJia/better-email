@@ -487,13 +487,14 @@ export default function ReaderPane({
   }, [imageContextMenu]);
 
   function imageFromEventTarget(target: EventTarget | null) {
-    if (!(target instanceof HTMLImageElement)) return null;
-    if (target.dataset.betterEmailInlineCid) return null;
-    const src = target.currentSrc || target.src;
+    const imageElement = target instanceof Element ? target.closest('img') : null;
+    if (!(imageElement instanceof HTMLImageElement)) return null;
+    if (imageElement.dataset.betterEmailInlineCid) return null;
+    const src = imageElement.currentSrc || imageElement.src;
     if (!src) return null;
     return {
       src,
-      alt: target.alt || selected?.subject || '邮件图片',
+      alt: imageElement.alt || selected?.subject || '邮件图片',
     };
   }
 
@@ -511,6 +512,7 @@ export default function ReaderPane({
     if (!image) return;
 
     event.preventDefault();
+    event.stopPropagation();
     setImageContextMenu({
       ...image,
       x: Math.min(event.clientX, window.innerWidth - 188),
@@ -998,6 +1000,7 @@ export default function ReaderPane({
           <div
             className="reader-html"
             onClick={handleReaderHtmlClick}
+            onContextMenuCapture={handleReaderHtmlContextMenu}
             onContextMenu={handleReaderHtmlContextMenu}
             dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }}
           />

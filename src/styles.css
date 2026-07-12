@@ -5912,6 +5912,102 @@ h1 {
   box-shadow: 0 7px 20px rgba(146, 93, 17, 0.045);
 }
 
+/* Reader attachment rows use the newer compact desktop-mail layout. */
+.attachments .attachment-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.attachments .attachment-item:hover {
+  background: #f7f8f9;
+  box-shadow: none;
+}
+
+.attachments .attachment-file-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: #f1f4f6;
+  box-shadow: none;
+}
+
+.attachments .attachment-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.attachments .attachment-copy strong {
+  overflow: hidden;
+  color: var(--ui-text, #20242a);
+  font-size: 13px;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachments .attachment-copy small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary, #8a939e);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachments .attachment-actions {
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: max-content;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.attachments .attachment-actions button {
+  min-height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ui-text-secondary, #59636e);
+  background: transparent;
+  box-shadow: none;
+  font-size: 11.5px;
+  font-weight: 520;
+}
+
+.attachments .attachment-actions button:hover:not(:disabled) {
+  color: var(--ui-text, #20242a);
+  background: #eef1f4;
+  box-shadow: none;
+}
+
+.attachments .attachment-actions .attachment-primary-button {
+  min-width: 0;
+  color: #2f5f8d;
+  background: transparent;
+}
+
+.attachments .attachment-actions .attachment-preview-button {
+  color: var(--ui-text-tertiary, #8a939e);
+}
+
 @media (max-width: 1220px) {
   .toolbar {
     min-height: 76px;

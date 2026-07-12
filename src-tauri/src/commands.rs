@@ -296,6 +296,47 @@ pub fn read_attachment_data_url(
 }
 
 #[tauri::command]
+pub fn save_image_data_url_as(
+    app: AppHandle,
+    data_url: String,
+    filename: String,
+) -> MailResult<String> {
+    let Some((metadata, encoded)) = data_url.split_once(',') else {
+        return Err(crate::db::MailError::Imap("图片数据无效，无法另存为。".to_string()));
+    };
+    let Some(mime_type) = metadata
+        .strip_prefix("data:")
+        .and_then(|value| value.split(';').next())
+    else {
+        return Err(crate::db::MailError::Imap("图片类型无效，无法另存为。".to_string()));
+    };
+    if !mime_type.starts_with("image/") || !metadata.contains(";base64") {
+        return Err(crate::db::MailError::Imap("仅支持另存为邮件中的图片。".to_string()));
+    }
+
+    let payload = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|error| crate::db::MailError::Imap(format!("图片数据解析失败：{error}")))?;
+    validate_attachment_download_size(payload.len().min(i64::MAX as usize) as i64)?;
+
+    let target_path = app
+        .dialog()
+        .file()
+        .set_title("另存图片")
+        .set_file_name(sanitize_filename(&filename))
+        .blocking_save_file()
+        .ok_or_else(|| crate::db::MailError::Imap("已取消图片另存为。".to_string()))?
+        .into_path()
+        .map_err(|error| crate::db::MailError::Imap(format!("无法解析另存为路径：{error}")))?;
+
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&target_path, payload)?;
+    Ok(format!("图片已另存为 {}", target_path.to_string_lossy()))
+}
+
+#[tauri::command]
 pub fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttachmentInput>> {
     let Some(paths) = app
         .dialog()

@@ -293,7 +293,10 @@ export default function ReaderPane({
   const [imagePreview, setImagePreview] = useState<PreviewImage | null>(null);
   const [imagePreviewZoom, setImagePreviewZoom] = useState(1);
   const [imagePreviewFit, setImagePreviewFit] = useState(true);
+  const [imagePreviewPan, setImagePreviewPan] = useState({ x: 0, y: 0 });
+  const [isImagePreviewPanning, setIsImagePreviewPanning] = useState(false);
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
+  const imagePreviewDragRef = useRef<{ x: number; y: number } | null>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
@@ -323,6 +326,9 @@ export default function ReaderPane({
     setImagePreview(null);
     setImagePreviewZoom(1);
     setImagePreviewFit(true);
+    setImagePreviewPan({ x: 0, y: 0 });
+    setIsImagePreviewPanning(false);
+    imagePreviewDragRef.current = null;
     setImageContextMenu(null);
   }, [selectedId]);
 
@@ -470,18 +476,23 @@ export default function ReaderPane({
       if (!imagePreview) return;
       if (event.key === '+' || event.key === '=') {
         event.preventDefault();
-        setImagePreviewFit(false);
-        setImagePreviewZoom((zoom) => Math.min(3, Number((zoom + 0.15).toFixed(2))));
+        zoomImagePreview(0.15);
       }
       if (event.key === '-') {
         event.preventDefault();
-        setImagePreviewFit(false);
-        setImagePreviewZoom((zoom) => Math.max(0.35, Number((zoom - 0.15).toFixed(2))));
+        zoomImagePreview(-0.15);
       }
       if (event.key === '0') {
         event.preventDefault();
-        setImagePreviewZoom(1);
-        setImagePreviewFit(true);
+        resetImagePreview();
+      }
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
+        setImagePreviewFit(false);
+        setImagePreviewPan((pan) => ({
+          x: pan.x + (event.key === 'ArrowLeft' ? 32 : event.key === 'ArrowRight' ? -32 : 0),
+          y: pan.y + (event.key === 'ArrowUp' ? 32 : event.key === 'ArrowDown' ? -32 : 0),
+        }));
       }
     }
 
@@ -545,8 +556,47 @@ export default function ReaderPane({
 
   function openImagePreview(image: PreviewImage) {
     setImagePreview(image);
+    resetImagePreview();
+  }
+
+  function resetImagePreview() {
     setImagePreviewZoom(1);
     setImagePreviewFit(true);
+    setImagePreviewPan({ x: 0, y: 0 });
+    setIsImagePreviewPanning(false);
+    imagePreviewDragRef.current = null;
+  }
+
+  function zoomImagePreview(delta: number) {
+    setImagePreviewFit(false);
+    setImagePreviewZoom((zoom) => Math.min(3, Math.max(0.35, Number((zoom + delta).toFixed(2)))));
+  }
+
+  function handleImagePreviewWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    zoomImagePreview(event.deltaY > 0 ? -0.12 : 0.12);
+  }
+
+  function handleImagePreviewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    setImagePreviewFit(false);
+    setIsImagePreviewPanning(true);
+    imagePreviewDragRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleImagePreviewPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!isImagePreviewPanning || !imagePreviewDragRef.current) return;
+    const previous = imagePreviewDragRef.current;
+    const dx = event.clientX - previous.x;
+    const dy = event.clientY - previous.y;
+    imagePreviewDragRef.current = { x: event.clientX, y: event.clientY };
+    setImagePreviewPan((pan) => ({ x: pan.x + dx, y: pan.y + dy }));
+  }
+
+  function stopImagePreviewPanning() {
+    setIsImagePreviewPanning(false);
+    imagePreviewDragRef.current = null;
   }
 
   function imageDownloadName(image: PreviewImage) {
@@ -580,10 +630,24 @@ export default function ReaderPane({
     setImageContextMenu(null);
   }
 
-  function savePreviewImageAs() {
+  async function saveImageAs(image: PreviewImage) {
+    if (image.src.startsWith('data:')) {
+      await invoke<string>('save_image_data_url_as', {
+        dataUrl: image.src,
+        filename: imageDownloadName(image),
+      });
+      return;
+    }
+    downloadImage(image);
+  }
+
+  async function savePreviewImageAs() {
     if (!imageContextMenu) return;
-    downloadImage(imageContextMenu);
-    setImageContextMenu(null);
+    try {
+      await saveImageAs(imageContextMenu);
+    } finally {
+      setImageContextMenu(null);
+    }
   }
 
   async function copyPreviewImageSource() {
@@ -1107,10 +1171,7 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="缩小"
-                onClick={() => {
-                  setImagePreviewFit(false);
-                  setImagePreviewZoom((zoom) => Math.max(0.35, Number((zoom - 0.15).toFixed(2))));
-                }}
+                onClick={() => zoomImagePreview(-0.15)}
               >
                 <ZoomOut size={16} />
               </button>
@@ -1118,19 +1179,13 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="放大"
-                onClick={() => {
-                  setImagePreviewFit(false);
-                  setImagePreviewZoom((zoom) => Math.min(3, Number((zoom + 0.15).toFixed(2))));
-                }}
+                onClick={() => zoomImagePreview(0.15)}
               >
                 <ZoomIn size={16} />
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setImagePreviewZoom(1);
-                  setImagePreviewFit(true);
-                }}
+                onClick={resetImagePreview}
               >
                 适配
               </button>
@@ -1139,9 +1194,13 @@ export default function ReaderPane({
                 onClick={() => {
                   setImagePreviewZoom(1);
                   setImagePreviewFit(false);
+                  setImagePreviewPan({ x: 0, y: 0 });
                 }}
               >
                 原始
+              </button>
+              <button type="button" onClick={() => saveImageAs(imagePreview)}>
+                另存为
               </button>
               <button type="button" aria-label="下载图片" onClick={() => downloadImage(imagePreview)}>
                 <Download size={16} />
@@ -1150,13 +1209,24 @@ export default function ReaderPane({
                 <X size={16} />
               </button>
             </div>
-            <div className="reader-image-preview-stage">
+            <div
+              className="reader-image-preview-stage"
+              onWheel={handleImagePreviewWheel}
+              onPointerDown={handleImagePreviewPointerDown}
+              onPointerMove={handleImagePreviewPointerMove}
+              onPointerUp={stopImagePreviewPanning}
+              onPointerCancel={stopImagePreviewPanning}
+              onPointerLeave={stopImagePreviewPanning}
+            >
               <img
                 src={imagePreview.src}
                 alt={imagePreview.alt}
                 style={{
-                  transform: imagePreviewFit ? undefined : `scale(${imagePreviewZoom})`,
+                  transform: imagePreviewFit
+                    ? undefined
+                    : `translate(${imagePreviewPan.x}px, ${imagePreviewPan.y}px) scale(${imagePreviewZoom})`,
                 }}
+                draggable={false}
               />
             </div>
           </figure>

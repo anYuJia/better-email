@@ -43,6 +43,7 @@ pub fn run() {
             commands::list_muted_thread_keys,
             commands::list_attachments,
             commands::read_attachment_data_url,
+            commands::save_image_data_url_as,
             commands::pick_outbound_attachments,
             commands::outbound_attachments_from_paths,
             commands::mark_frontend_ready,

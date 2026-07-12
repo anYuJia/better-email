@@ -1341,10 +1341,10 @@ textarea:disabled {
   min-width: 32px;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 0;
   border-radius: 8px;
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   box-shadow: none;
   font-size: 12px;
   font-weight: 600;
@@ -1368,6 +1368,13 @@ textarea:disabled {
   place-items: center;
   overflow: auto;
   padding: 18px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.reader-image-preview-stage:active {
+  cursor: grabbing;
 }
 
 .reader-image-preview-stage img {
@@ -1379,6 +1386,7 @@ textarea:disabled {
   background: #ffffff;
   transform-origin: center center;
   transition: transform 120ms ease;
+  user-select: none;
 }
 
 .reader-image-preview.is-zoomed .reader-image-preview-stage {

@@ -2103,6 +2103,8 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" rx="18" fill="#f4f7fb"/><rect x="28" y="28" width="264" height="124" rx="12" fill="#ffffff" stroke="#d8e0ea"/><circle cx="78" cy="78" r="22" fill="#9ac7f7"/><path d="M42 136l64-54 46 36 34-28 92 46H42z" fill="#6f9ed2"/></svg>`;
       return `data:${mimeType};base64,${btoa(svg)}` as T;
     }
+    case 'save_image_data_url_as':
+      return `图片已另存为 /tmp/${String(args?.filename || '邮件图片.png')}` as T;
     case 'open_attachment': {
       const attachment = attachments.find((item) => item.id === args?.attachmentId);
       return `已打开附件：${attachment?.filename ?? 'unknown'}` as T;

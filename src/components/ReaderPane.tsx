@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Archive,
   Clock,
@@ -69,7 +69,7 @@ export type ReaderPaneProps = {
   onUnsnooze: () => void;
   onSnooze: () => void;
   onExportMessage: () => void;
-  onFetchBody: () => void;
+  onFetchBody: () => void | Promise<void>;
   onMarkNotSpam: () => void;
   onMarkAsSpam: () => void;
   onTrustRemoteImages: (scope: TrustScope) => void;
@@ -279,6 +279,9 @@ export default function ReaderPane({
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
   const [isDownloadingInlineImages, setIsDownloadingInlineImages] = useState(false);
+  const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
+  const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
+  const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
   const pendingAttachmentCount = regularAttachments.filter(
     (attachment) => !attachment.is_downloaded,
@@ -300,7 +303,34 @@ export default function ReaderPane({
     setAttachmentErrors({});
     setIsDownloadingAllAttachments(false);
     setIsDownloadingInlineImages(false);
+    setIsRefreshingInlineImages(false);
+    setInlineImageRefreshError('');
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    if (inlineImageResolution.missingContentIds.length === 0) return;
+    if (inlineImageResolution.pendingAttachments.length > 0) return;
+    if (selected.remote_uid <= 0) return;
+    if (inlineImageRefreshAttemptsRef.current.has(selected.id)) return;
+
+    inlineImageRefreshAttemptsRef.current.add(selected.id);
+    setInlineImageRefreshError('');
+    setIsRefreshingInlineImages(true);
+    Promise.resolve(onFetchBody())
+      .catch((error) => {
+        setInlineImageRefreshError(attachmentErrorMessage(error));
+      })
+      .finally(() => {
+        setIsRefreshingInlineImages(false);
+      });
+  }, [
+    inlineImageResolution.missingContentIds.length,
+    inlineImageResolution.pendingAttachments.length,
+    onFetchBody,
+    selected?.id,
+    selected?.remote_uid,
+  ]);
 
   async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
     if (downloadingAttachmentIds.has(attachment.id)) return false;
@@ -748,15 +778,20 @@ export default function ReaderPane({
             </span>
             <span className="inline-image-notice-copy">
               <strong>
-                {inlineImageResolution.pendingAttachments.length > 0
-                  ? `正文包含 ${inlineImageResolution.pendingAttachments.length} 张内嵌图片`
-                  : '部分内嵌图片不可用'}
+                {isRefreshingInlineImages
+                  ? '正在读取内嵌图片'
+                  : inlineImageResolution.pendingAttachments.length > 0
+                    ? `正文包含 ${inlineImageResolution.pendingAttachments.length} 张内嵌图片`
+                    : '部分内嵌图片不可用'}
               </strong>
               <small>
                 {inlineImageError
-                  || (inlineImageResolution.missingContentIds.length > 0
-                    ? `${inlineImageResolution.missingContentIds.length} 张图片未包含在邮件中`
-                    : '按需加载，减少内存和网络占用')}
+                  || inlineImageRefreshError
+                  || (isRefreshingInlineImages
+                    ? '正在从服务器重新获取附件信息'
+                    : inlineImageResolution.missingContentIds.length > 0
+                      ? `${inlineImageResolution.missingContentIds.length} 张图片暂未匹配到附件`
+                      : '按需加载，减少内存和网络占用')}
               </small>
             </span>
             {inlineImageResolution.pendingAttachments.length > 0 && (

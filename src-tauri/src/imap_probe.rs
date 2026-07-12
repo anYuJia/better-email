@@ -1695,7 +1695,8 @@ fn remote_attachment_metadata_from_part(
 }
 
 fn part_mime_type(part: &MessagePart<'_>) -> String {
-    part.content_type()
+    let mime_type = part
+        .content_type()
         .map(|content_type| {
             content_type
                 .c_subtype
@@ -1703,7 +1704,43 @@ fn part_mime_type(part: &MessagePart<'_>) -> String {
                 .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
                 .unwrap_or_else(|| content_type.c_type.to_string())
         })
-        .unwrap_or_else(|| "application/octet-stream".to_string())
+        .unwrap_or_else(|| "application/octet-stream".to_string());
+
+    if mime_type.eq_ignore_ascii_case("application/octet-stream") {
+        if let Some(inferred) = infer_image_mime_type_from_part(part) {
+            return inferred.to_string();
+        }
+    }
+
+    mime_type
+}
+
+fn infer_image_mime_type_from_part(part: &MessagePart<'_>) -> Option<&'static str> {
+    let filename = part.attachment_name().unwrap_or("");
+    let content_id = part.content_id().unwrap_or("");
+    let lower = format!("{filename} {content_id}").to_ascii_lowercase();
+
+    if lower.contains(".png") {
+        Some("image/png")
+    } else if lower.contains(".jpg") || lower.contains(".jpeg") {
+        Some("image/jpeg")
+    } else if lower.contains(".gif") {
+        Some("image/gif")
+    } else if lower.contains(".webp") {
+        Some("image/webp")
+    } else if lower.contains(".svg") {
+        Some("image/svg+xml")
+    } else if lower.contains(".bmp") {
+        Some("image/bmp")
+    } else if lower.contains(".ico") {
+        Some("image/x-icon")
+    } else if lower.contains(".heic") {
+        Some("image/heic")
+    } else if lower.contains(".heif") {
+        Some("image/heif")
+    } else {
+        None
+    }
 }
 
 fn looks_like_html(body: &str) -> bool {
@@ -2235,6 +2272,35 @@ mod tests {
 
         assert!(payload.filename.ends_with(".png"));
         assert_eq!(payload.bytes, b"image bytes");
+    }
+
+    #[test]
+    fn infers_inline_cid_image_mime_from_content_id_extension() {
+        let body = parse_body_from_raw(concat!(
+            "Subject: Generic inline image\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/related; boundary=\"rel\"\r\n",
+            "\r\n",
+            "--rel\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<img src=\"cid:37053DDF@48E10A4E.2A20536A00000000.png\">\r\n",
+            "--rel\r\n",
+            "Content-Type: application/octet-stream\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "Content-ID: <37053DDF@48E10A4E.2A20536A00000000.png>\r\n",
+            "\r\n",
+            "aW1hZ2UgYnl0ZXM=\r\n",
+            "--rel--\r\n",
+        ));
+
+        assert_eq!(body.attachments.len(), 1);
+        assert_eq!(body.attachments[0].mime_type, "image/png");
+        assert_eq!(
+            body.attachments[0].content_id,
+            "37053ddf@48e10a4e.2a20536a00000000.png"
+        );
+        assert!(body.attachments[0].is_inline);
     }
 
     #[test]

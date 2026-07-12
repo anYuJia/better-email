@@ -40,6 +40,14 @@ function attachmentIsReady(attachment: Attachment) {
   return attachment.is_downloaded && Boolean(attachment.local_path.trim());
 }
 
+function looksLikeImageAttachment(attachment: Attachment) {
+  const mimeType = attachment.mime_type.toLowerCase();
+  if (mimeType.startsWith('image/')) return true;
+
+  return /\.(png|jpe?g|gif|webp|svg|bmp|ico|heic|heif)(?:$|[?#])/i.test(attachment.filename)
+    || /\.(png|jpe?g|gif|webp|svg|bmp|ico|heic|heif)(?:$|[?#])/i.test(attachment.content_id);
+}
+
 export function resolveCidInlineImages(
   html: string,
   attachments: Attachment[],
@@ -51,7 +59,7 @@ export function resolveCidInlineImages(
     .filter(
       (attachment) =>
         attachment.is_inline
-        && attachment.mime_type.toLowerCase().startsWith('image/')
+        && looksLikeImageAttachment(attachment)
         && normalizeContentId(attachment.content_id),
     )
     .forEach((attachment) => {

@@ -54,6 +54,24 @@ describe('CID inline images', () => {
     expect(result.missingContentIds).toEqual([]);
   });
 
+  it('accepts inline image attachments when servers report generic binary MIME', () => {
+    const pending = attachment({
+      filename: '37053DDF@48E10A4E.2A20536A00000000.png',
+      mime_type: 'application/octet-stream',
+      is_downloaded: false,
+      local_path: '',
+      content_id: '37053ddf@48e10a4e.2a20536a00000000.png',
+    });
+    const result = resolveCidInlineImages(
+      '<img src="cid:37053DDF@48E10A4E.2A20536A00000000.png">',
+      [pending],
+      () => '',
+    );
+
+    expect(result.pendingAttachments).toEqual([pending]);
+    expect(result.missingContentIds).toEqual([]);
+  });
+
   it('ignores regular files and reports missing CID references', () => {
     const result = resolveCidInlineImages(
       '<img src="cid:missing@example.com">',

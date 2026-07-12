@@ -282,6 +282,7 @@ export default function ReaderPane({
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
+  const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
   const pendingAttachmentCount = regularAttachments.filter(
     (attachment) => !attachment.is_downloaded,
@@ -389,6 +390,22 @@ export default function ReaderPane({
       setIsDownloadingInlineImages(false);
     }
   }
+
+  useEffect(() => {
+    if (!selected) return;
+    if (inlineImageResolution.pendingAttachments.length === 0) return;
+    if (inlineImageError) return;
+    if (isDownloadingInlineImages) return;
+    if (inlineImageDownloadAttemptsRef.current.has(selected.id)) return;
+
+    inlineImageDownloadAttemptsRef.current.add(selected.id);
+    void handleLoadInlineImages();
+  }, [
+    inlineImageError,
+    inlineImageResolution.pendingAttachments.length,
+    isDownloadingInlineImages,
+    selected?.id,
+  ]);
 
   if (activeThread && threadMessages.length > 0) {
     const allThreadRead = threadMessages.every((message) => message.is_read);

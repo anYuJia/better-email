@@ -1272,12 +1272,10 @@ export default function ReaderPane({
                         {attachment.is_downloaded ? ' · 已下载' : ' · 未下载'}
                       </small>
                     </span>
-                    <span className={`attachment-state ${attachment.is_downloaded ? 'is-ready' : ''}`}>
-                      {downloading ? '下载中…' : attachment.is_downloaded ? '可打开' : '待下载'}
-                    </span>
                     <div className="attachment-actions">
                       <button
                         type="button"
+                        className="attachment-preview-button"
                         title={attachment.local_path || attachment.filename}
                         disabled={downloading}
                         aria-busy={downloading}
@@ -1287,6 +1285,7 @@ export default function ReaderPane({
                       </button>
                       <button
                         type="button"
+                        className="attachment-primary-button"
                         title={attachment.local_path || attachment.filename}
                         disabled={downloading}
                         aria-busy={downloading}

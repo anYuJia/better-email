@@ -5915,31 +5915,32 @@ h1 {
 /* Reader attachment rows use the newer compact desktop-mail layout. */
 .attachments .attachment-item {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  width: 100%;
-  min-height: 38px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  width: min(100%, 560px);
+  min-height: 58px;
   align-items: center;
-  gap: 8px;
-  padding: 4px 2px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  gap: 11px;
+  padding: 8px 10px;
+  border: 1px solid #e7ebef;
+  border-radius: 12px;
+  background: #fbfcfd;
   box-shadow: none;
 }
 
 .attachments .attachment-item:hover {
-  background: #f7f8f9;
+  border-color: #d9e1e8;
+  background: #fff;
   box-shadow: none;
 }
 
 .attachments .attachment-file-icon {
-  width: 22px;
-  height: 22px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 5px;
-  background: #f1f4f6;
+  border-radius: 10px;
+  background: #eef2f6;
   box-shadow: none;
 }
 
@@ -5964,7 +5965,7 @@ h1 {
 }
 
 .attachments .attachment-file-type-mark {
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1;
@@ -5973,13 +5974,13 @@ h1 {
 .attachments .attachment-copy {
   min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: 3px;
 }
 
 .attachments .attachment-copy strong {
   overflow: hidden;
   color: var(--ui-text, #20242a);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 640;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5988,7 +5989,7 @@ h1 {
 .attachments .attachment-copy small {
   overflow: hidden;
   color: var(--ui-text-tertiary, #8a939e);
-  font-size: 11px;
+  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5998,7 +5999,7 @@ h1 {
   grid-template-columns: none;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 5px;
   min-width: max-content;
   padding: 0;
   border: 0;
@@ -6008,14 +6009,14 @@ h1 {
 }
 
 .attachments .attachment-actions button {
-  min-height: 24px;
-  padding: 0 7px;
+  min-height: 28px;
+  padding: 0 9px;
   border: 0;
   border-radius: 5px;
   color: var(--ui-text-secondary, #59636e);
   background: transparent;
   box-shadow: none;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 520;
 }
 
@@ -6027,7 +6028,7 @@ h1 {
 
 .attachments .attachment-actions .attachment-primary-button {
   min-width: 0;
-  color: #2f5f8d;
+  color: #225f9a;
   background: transparent;
 }
 

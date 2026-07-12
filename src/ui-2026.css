@@ -1119,21 +1119,22 @@ textarea:disabled {
 
 .attachment-item {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   width: 100%;
-  min-height: 42px;
+  min-height: 58px;
   align-items: center;
-  gap: 9px;
-  padding: 5px 2px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  gap: 11px;
+  padding: 8px 10px;
+  border: 1px solid #e7ebef;
+  border-radius: 12px;
+  background: #fbfcfd;
   box-shadow: none;
   box-sizing: border-box;
 }
 
 .attachment-item:hover {
-  background: #f7f9fb;
+  border-color: #d9e1e8;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -1143,14 +1144,14 @@ textarea:disabled {
 }
 
 .attachment-file-icon {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   display: grid;
   place-items: center;
-  border-radius: 5px;
+  border-radius: 10px;
   color: #5f7183;
-  background: #f2f5f8;
+  background: #eef2f6;
 }
 
 .attachment-file-icon-image {
@@ -1180,8 +1181,8 @@ textarea:disabled {
 }
 
 .attachment-file-type-mark {
-  font-size: 7px;
-  font-weight: 760;
+  font-size: 10px;
+  font-weight: 780;
   letter-spacing: 0;
   line-height: 1;
 }
@@ -1189,13 +1190,13 @@ textarea:disabled {
 .attachment-copy {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: 3px;
 }
 
 .attachment-copy strong {
   overflow: hidden;
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 640;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1204,7 +1205,7 @@ textarea:disabled {
 .attachment-copy small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1221,23 +1222,23 @@ textarea:disabled {
   display: inline-flex;
   align-items: center;
   justify-self: end;
-  gap: 4px;
+  gap: 5px;
   min-width: max-content;
 }
 
 .attachment-actions button {
   width: auto;
   min-width: 0;
-  min-height: 24px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 9px;
   border: 0;
   border-radius: 6px;
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1258,9 +1259,9 @@ textarea:disabled {
 }
 
 .attachment-actions .attachment-primary-button {
-  min-width: 70px;
-  color: #334155;
-  background: #f3f6f9;
+  min-width: 0;
+  color: #225f9a;
+  background: transparent;
 }
 
 .attachment-actions button[aria-busy="true"] {
@@ -2823,8 +2824,8 @@ body {
 }
 
 .attachments .attachment-item {
-  min-height: 42px;
-  padding: 5px 2px;
+  min-height: 58px;
+  padding: 8px 10px;
 }
 
 .quick-reply {

@@ -1695,9 +1695,6 @@ fn reader_security_warnings(raw: &str, html_body: &str) -> Vec<String> {
     if lower.contains("href=\"http://") || lower.contains("href='http://") {
         warnings.push("正文包含明文 HTTP 链接，已移除可点击目标。".to_string());
     }
-    if lower.contains("href=\"https://") || lower.contains("href='https://") {
-        warnings.push("正文包含外部链接，请核对域名后再访问。".to_string());
-    }
     warnings.extend(protocol::link_risk_warnings(html_body));
     warnings
 }

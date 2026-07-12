@@ -554,14 +554,15 @@ export default function ReaderPane({
   function attachmentMenuItems(attachment: Attachment): ContextMenuItem[] {
     const downloaded = attachment.is_downloaded;
     const downloading = downloadingAttachmentIds.has(attachment.id);
+    const canPreview = attachmentKind(attachment) === 'image';
     return [
-      {
+      ...(canPreview ? [{
         id: 'preview',
         label: '预览',
         icon: <ImageIcon size={14} />,
         disabled: downloading,
         onSelect: () => { previewAttachment(attachment).catch(() => undefined); },
-      },
+      }] : []),
       {
         id: 'open',
         label: '打开',
@@ -1263,6 +1264,7 @@ export default function ReaderPane({
               {regularAttachments.map((attachment) => {
                 const downloading = downloadingAttachmentIds.has(attachment.id);
                 const transferError = attachmentErrors[attachment.id] ?? '';
+                const canPreview = attachmentKind(attachment) === 'image';
                 return (
                   <div
                     className={`attachment-item ${transferError ? 'attachment-download-failed' : ''}`}
@@ -1287,16 +1289,18 @@ export default function ReaderPane({
                       </small>
                     </span>
                     <div className="attachment-actions">
-                      <button
-                        type="button"
-                        className="attachment-preview-button"
-                        title={attachment.local_path || attachment.filename}
-                        disabled={downloading}
-                        aria-busy={downloading}
-                        onClick={() => previewAttachment(attachment).catch(() => undefined)}
-                      >
-                        预览
-                      </button>
+                      {canPreview && (
+                        <button
+                          type="button"
+                          className="attachment-preview-button"
+                          title={attachment.local_path || attachment.filename}
+                          disabled={downloading}
+                          aria-busy={downloading}
+                          onClick={() => previewAttachment(attachment).catch(() => undefined)}
+                        >
+                          预览
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="attachment-primary-button"

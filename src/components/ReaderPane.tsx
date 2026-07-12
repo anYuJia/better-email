@@ -38,6 +38,7 @@ import type { BulkMessageAction } from './messageContextMenu';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
+type ImageContextMenu = { src: string; alt: string; x: number; y: number } | null;
 type PlainBodyBlock =
   | { type: 'text'; content: string }
   | { type: 'original'; index: number; meta: string[]; content: string };
@@ -287,6 +288,7 @@ export default function ReaderPane({
   const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
   const [inlineImageDataUrls, setInlineImageDataUrls] = useState<Record<number, string>>({});
   const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
+  const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   const regularAttachments = attachments.filter((attachment) => !attachment.is_inline);
@@ -314,6 +316,7 @@ export default function ReaderPane({
     setInlineImageRefreshError('');
     setInlineImageDataUrls({});
     setImagePreview(null);
+    setImageContextMenu(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -450,31 +453,92 @@ export default function ReaderPane({
   ]);
 
   useEffect(() => {
-    if (!imagePreview) return undefined;
+    if (!imagePreview && !imageContextMenu) return undefined;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setImagePreview(null);
+        setImageContextMenu(null);
       }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [imagePreview]);
+  }, [imagePreview, imageContextMenu]);
 
-  function handleReaderHtmlClick(event: React.MouseEvent<HTMLDivElement>) {
-    const target = event.target;
-    if (!(target instanceof HTMLImageElement)) return;
-    if (target.dataset.betterEmailInlineCid) return;
+  useEffect(() => {
+    if (!imageContextMenu) return undefined;
 
+    function closeOnPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest('.reader-image-context-menu')) return;
+      setImageContextMenu(null);
+    }
+    function closeOnScroll() {
+      setImageContextMenu(null);
+    }
+
+    window.addEventListener('pointerdown', closeOnPointerDown, true);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnPointerDown, true);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [imageContextMenu]);
+
+  function imageFromEventTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLImageElement)) return null;
+    if (target.dataset.betterEmailInlineCid) return null;
     const src = target.currentSrc || target.src;
-    if (!src) return;
-
-    event.preventDefault();
-    setImagePreview({
+    if (!src) return null;
+    return {
       src,
       alt: target.alt || selected?.subject || '邮件图片',
+    };
+  }
+
+  function handleReaderHtmlClick(event: React.MouseEvent<HTMLDivElement>) {
+    const image = imageFromEventTarget(event.target);
+    if (!image) return;
+
+    event.preventDefault();
+    setImageContextMenu(null);
+    setImagePreview(image);
+  }
+
+  function handleReaderHtmlContextMenu(event: React.MouseEvent<HTMLDivElement>) {
+    const image = imageFromEventTarget(event.target);
+    if (!image) return;
+
+    event.preventDefault();
+    setImageContextMenu({
+      ...image,
+      x: Math.min(event.clientX, window.innerWidth - 188),
+      y: Math.min(event.clientY, window.innerHeight - 132),
     });
+  }
+
+  function downloadPreviewImage() {
+    if (!imageContextMenu) return;
+    const link = document.createElement('a');
+    link.href = imageContextMenu.src;
+    link.download = imageContextMenu.alt.trim() || '邮件图片';
+    link.rel = 'noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setImageContextMenu(null);
+  }
+
+  async function copyPreviewImageSource() {
+    if (!imageContextMenu) return;
+    try {
+      await navigator.clipboard?.writeText(imageContextMenu.src);
+    } catch {
+      // Clipboard access can be unavailable in some WebView contexts.
+    } finally {
+      setImageContextMenu(null);
+    }
   }
 
   if (activeThread && threadMessages.length > 0) {
@@ -934,6 +998,7 @@ export default function ReaderPane({
           <div
             className="reader-html"
             onClick={handleReaderHtmlClick}
+            onContextMenu={handleReaderHtmlContextMenu}
             dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }}
           />
         ) : (
@@ -983,6 +1048,31 @@ export default function ReaderPane({
             </button>
             <img src={imagePreview.src} alt={imagePreview.alt} />
           </figure>
+        </div>
+      )}
+      {imageContextMenu && (
+        <div
+          className="reader-image-context-menu"
+          style={{ left: imageContextMenu.x, top: imageContextMenu.y }}
+          role="menu"
+          aria-label="图片操作"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setImagePreview({ src: imageContextMenu.src, alt: imageContextMenu.alt });
+              setImageContextMenu(null);
+            }}
+          >
+            查看大图
+          </button>
+          <button type="button" role="menuitem" onClick={copyPreviewImageSource}>
+            复制图片地址
+          </button>
+          <button type="button" role="menuitem" onClick={downloadPreviewImage}>
+            下载图片
+          </button>
         </div>
       )}
     </section>

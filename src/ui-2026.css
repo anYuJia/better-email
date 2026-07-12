@@ -1140,41 +1140,108 @@ textarea:disabled {
   background: #fffafa;
 }
 
-.attachment-icon {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+.attachment-file-badge {
+  position: relative;
+  width: 32px;
+  height: 38px;
+  flex: 0 0 32px;
   display: grid;
-  place-items: center;
+  align-items: end;
+  justify-items: center;
+  padding: 0 4px 5px;
+  border: 1px solid #cfd9e3;
   border-radius: 7px;
-  color: #2d6f9f;
-  background: #e8f4fb;
+  color: #3d6687;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8fb 100%);
+  box-shadow: inset 0 -1px 0 rgba(20, 35, 50, 0.04);
+  overflow: hidden;
 }
 
-.attachment-icon-image {
-  color: #2f7a57;
-  background: #e8f6ee;
+.attachment-file-badge::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid rgba(120, 139, 158, 0.45);
+  border-bottom: 1px solid rgba(120, 139, 158, 0.35);
+  border-radius: 0 6px 0 4px;
+  background: #eef3f7;
 }
 
-.attachment-icon-archive {
-  color: #986f25;
-  background: #fbf2df;
+.attachment-file-fold {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  width: 13px;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  opacity: 0.28;
 }
 
-.attachment-icon-presentation {
-  color: #9a5a2f;
-  background: #f8eee7;
+.attachment-file-lines {
+  position: absolute;
+  top: 11px;
+  left: 6px;
+  display: grid;
+  gap: 3px;
 }
 
-.attachment-icon-spreadsheet {
-  color: #2d7a4f;
-  background: #e7f5ec;
+.attachment-file-lines span {
+  width: 18px;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  opacity: 0.16;
 }
 
-.attachment-icon-audio,
-.attachment-icon-video {
-  color: #7257a5;
-  background: #f0ecfb;
+.attachment-file-lines span:last-child {
+  width: 12px;
+}
+
+.attachment-file-type {
+  position: relative;
+  z-index: 1;
+  max-width: 24px;
+  color: currentColor;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  text-align: center;
+}
+
+.attachment-file-badge-image {
+  border-color: #bdd8c8;
+  color: #327454;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f8f4 100%);
+}
+
+.attachment-file-badge-archive {
+  border-color: #e1c88f;
+  color: #8a6827;
+  background: linear-gradient(180deg, #ffffff 0%, #fbf5e8 100%);
+}
+
+.attachment-file-badge-presentation {
+  border-color: #e0bfa8;
+  color: #9a5730;
+  background: linear-gradient(180deg, #ffffff 0%, #faf1eb 100%);
+}
+
+.attachment-file-badge-spreadsheet {
+  border-color: #b9d9c5;
+  color: #2f7650;
+  background: linear-gradient(180deg, #ffffff 0%, #eef8f2 100%);
+}
+
+.attachment-file-badge-audio,
+.attachment-file-badge-video {
+  border-color: #cdc3e3;
+  color: #69569a;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f1fb 100%);
 }
 
 .attachment-copy {

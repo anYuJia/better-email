@@ -6,11 +6,6 @@ import {
   Download,
   ExternalLink,
   File,
-  FileArchive,
-  FileAudio,
-  FileImage,
-  FileText,
-  FileVideo,
   FolderOpen,
   Forward,
   Image as ImageIcon,
@@ -468,16 +463,22 @@ export default function ReaderPane({
     return 'file';
   }
 
-  function attachmentIcon(attachment: Attachment) {
+  function attachmentTypeLabel(attachment: Attachment) {
+    const filename = attachment.filename.toLowerCase();
     const kind = attachmentKind(attachment);
-    if (kind === 'image') return <FileImage size={18} />;
-    if (kind === 'audio') return <FileAudio size={18} />;
-    if (kind === 'video') return <FileVideo size={18} />;
-    if (kind === 'archive') return <FileArchive size={18} />;
-    if (kind === 'presentation') return <ImageIcon size={18} />;
-    if (kind === 'spreadsheet') return <FileText size={18} />;
-    if (kind === 'document') return <FileText size={18} />;
-    return <File size={18} />;
+    if (/\.pdf$/i.test(filename)) return 'PDF';
+    if (/\.(doc|docx|rtf)$/i.test(filename)) return 'DOC';
+    if (/\.(xls|xlsx|csv|numbers)$/i.test(filename)) return 'XLS';
+    if (/\.(ppt|pptx|key)$/i.test(filename)) return 'PPT';
+    if (/\.(zip|rar|7z|tar|gz)$/i.test(filename)) return 'ZIP';
+    if (kind === 'image') return 'IMG';
+    if (kind === 'audio') return 'AUD';
+    if (kind === 'video') return 'VID';
+    if (kind === 'archive') return 'ZIP';
+    if (kind === 'presentation') return 'PPT';
+    if (kind === 'spreadsheet') return 'XLS';
+    if (kind === 'document') return 'TXT';
+    return 'FILE';
   }
 
   async function previewAttachment(attachment: Attachment) {
@@ -1256,8 +1257,13 @@ export default function ReaderPane({
                       setAttachmentContextMenu({ attachment, x: event.clientX, y: event.clientY });
                     }}
                   >
-                    <span className={`attachment-icon attachment-icon-${attachmentKind(attachment)}`}>
-                      {attachmentIcon(attachment)}
+                    <span className={`attachment-file-badge attachment-file-badge-${attachmentKind(attachment)}`} aria-hidden="true">
+                      <span className="attachment-file-fold" />
+                      <span className="attachment-file-lines">
+                        <span />
+                        <span />
+                      </span>
+                      <span className="attachment-file-type">{attachmentTypeLabel(attachment)}</span>
                     </span>
                     <span className="attachment-copy">
                       <strong>{attachment.filename}</strong>

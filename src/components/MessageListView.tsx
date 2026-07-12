@@ -95,13 +95,14 @@ export default function MessageListView({
           </header>
           {group.messages.map((message) => {
             const preview = messagePreview(message);
+            const isCurrentMessage = message.id === selectedId;
             return (
               <button
                 key={message.id}
                 className={[
                   'message-card',
                   message.is_read ? 'is-read' : 'is-unread',
-                  message.id === selectedId ? 'selected' : '',
+                  isCurrentMessage ? 'selected is-current' : '',
                   draggingMessageSet.has(message.id) ? 'dragging' : '',
                 ].filter(Boolean).join(' ')}
                 draggable
@@ -129,21 +130,24 @@ export default function MessageListView({
                   onOpenMessageMenu(message, event.clientX, event.clientY, useBulkContext);
                 }}
               >
-                <span
-                  className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
-                  aria-hidden="true"
-                >
-                  {(message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase()}
+                <span className="message-leading" aria-hidden="true">
+                  <span
+                    className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
+                  >
+                    {(message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase()}
+                  </span>
+                  {!message.is_read && <span className="message-unread-dot" aria-label="未读" />}
                 </span>
-                {!message.is_read && <span className="message-unread-dot" aria-label="未读" />}
-                <span className="message-select" onClick={(event) => event.stopPropagation()}>
-                  <input
-                    aria-label={`选择 ${message.subject || '无主题'}`}
-                    checked={selectedMessageSet.has(message.id)}
-                    type="checkbox"
-                    onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
-                  />
-                </span>
+                {!isCurrentMessage && (
+                  <span className="message-select" onClick={(event) => event.stopPropagation()}>
+                    <input
+                      aria-label={`选择 ${message.subject || '无主题'}`}
+                      checked={selectedMessageSet.has(message.id)}
+                      type="checkbox"
+                      onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
+                    />
+                  </span>
+                )}
                 <div className="message-topline">
                   <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
                   <time>{formatDate(message.received_at)}</time>

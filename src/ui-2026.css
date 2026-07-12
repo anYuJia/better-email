@@ -3853,3 +3853,117 @@ body {
   background: #f3f7fb;
   box-shadow: inset 2px 0 0 #6f9dcc;
 }
+
+/* Message list final layout: keep the avatar stable, move bulk select aside,
+   and keep previews compact with a native one-line ellipsis. */
+.message-card {
+  min-height: 76px;
+  padding: 9px 12px 9px 66px;
+}
+
+.message-card:hover {
+  background: #f6f8fb;
+  box-shadow: inset 0 0 0 1px rgba(86, 103, 123, 0.08);
+}
+
+.message-card.selected,
+.message-card.selected:hover {
+  background: #edf3f9;
+  box-shadow: inset 2px 0 0 #8aa7c8;
+}
+
+.message-leading {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 40px;
+  height: 50px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.message-avatar {
+  left: 4px;
+  top: 4px;
+  width: 34px;
+  height: 34px;
+  font-size: 12.5px;
+  opacity: 1;
+  transform: none;
+}
+
+.message-card:hover .message-avatar,
+.message-card:focus-visible .message-avatar,
+.message-card:has(.message-select input:checked) .message-avatar {
+  opacity: 1;
+}
+
+.message-unread-dot {
+  left: 21px;
+  top: 43px;
+  width: 5px;
+  height: 5px;
+  background: #2d73c8;
+  box-shadow: 0 0 0 2px #fff;
+  transform: translateX(-50%);
+}
+
+.message-select {
+  left: 7px;
+  top: 50%;
+  z-index: 3;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.message-select input {
+  width: 13px;
+  height: 13px;
+}
+
+.message-card:hover .message-select,
+.message-card:focus-visible .message-select,
+.message-card:has(.message-select input:checked) .message-select {
+  opacity: 1;
+}
+
+.message-card.is-current .message-select,
+.message-card.is-current:hover .message-select,
+.message-card.is-current:focus-visible .message-select {
+  display: none;
+}
+
+.message-card > .message-topline,
+.message-card > .subject,
+.message-card > p {
+  min-width: 0;
+}
+
+.message-topline {
+  display: flex;
+  align-items: center;
+}
+
+.sender {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject {
+  margin-top: 2px;
+}
+
+.message-card p {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-chips {
+  display: none;
+}

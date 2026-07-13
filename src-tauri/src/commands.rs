@@ -810,9 +810,9 @@ pub fn copy_attachment_file_to_clipboard(
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        return Err(crate::db::MailError::Imap(
+        Err(crate::db::MailError::Imap(
             "当前系统暂不支持复制附件文件对象。".to_string(),
-        ));
+        ))
     }
 
     #[cfg(any(target_os = "macos", target_os = "windows"))]

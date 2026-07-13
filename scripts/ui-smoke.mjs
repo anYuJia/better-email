@@ -1132,9 +1132,9 @@ async function main() {
     await clickButton(cdp, '垃圾邮件', "document.querySelector('.more-mailboxes')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
-    await waitForExpression(cdp, "document.querySelector('.reader-more-menu') && document.querySelector('.reader-more-menu').textContent.includes('信任该发件人')");
+    await waitForExpression(cdp, "document.querySelector('.reader-more-menu') && document.querySelector('.reader-more-menu').textContent.includes('信任发件人')");
     await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '信任该发件人', "document.querySelector('.reader-more-menu')");
+    await clickButton(cdp, '信任发件人', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已信任发件人远程图片') || document.querySelector('.reader-html img[src=\"https://cdn.example.com/open.png\"]')");
 
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);

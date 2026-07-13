@@ -1284,10 +1284,12 @@ export default function ReaderPane({
                   <>
                     <span className="menu-section-title">安全</span>
                     {!selectedSenderTrusted && (
-                      <button onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
+                      <button onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
                     )}
                     {selectedSenderDomain && !selectedSenderTrusted && (
-                      <button onClick={() => onTrustRemoteImages('domain')}>信任 {selectedSenderDomain}</button>
+                      <button onClick={() => onTrustRemoteImages('domain')}>
+                        信任发件人域名：{selectedSenderDomain}
+                      </button>
                     )}
                     <button onClick={onBlockSender}>阻止该发件人</button>
                   </>
@@ -1496,10 +1498,12 @@ export default function ReaderPane({
                 <details className="compact-menu reader-warning-actions">
                   <summary><SlidersHorizontal size={15} /> 更多</summary>
                   <div>
-                    <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任该发件人</button>
-                    {selectedSenderDomain && (
+                    {!selectedSenderTrusted && (
+                      <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
+                    )}
+                    {selectedSenderDomain && !selectedSenderTrusted && (
                       <button type="button" onClick={() => onTrustRemoteImages('domain')}>
-                        信任 {selectedSenderDomain}
+                        信任发件人域名：{selectedSenderDomain}
                       </button>
                     )}
                     <button type="button" onClick={onBlockSender}>阻止该发件人</button>

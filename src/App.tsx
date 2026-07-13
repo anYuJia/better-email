@@ -250,6 +250,7 @@ export default function App() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
+  const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const [listMode, setListMode] = useState<ListMode>('messages');
@@ -1010,7 +1011,6 @@ export default function App() {
     () => (selected ? senderDomain(selected.sender_email) : ''),
     [selected?.sender_email],
   );
-  const selectedHasImagePreview = Boolean(selected?.sanitized_html.includes('<img'));
   const selectedSenderTrusted = useMemo(
     () =>
       Boolean(
@@ -1027,6 +1027,12 @@ export default function App() {
   const selectedHasRemoteImageWarning = Boolean(
     selected?.security_warnings.some((warning) => warning.includes('远程图片')),
   ) && !selectedSenderTrusted;
+
+  function messageHasRemoteVisualContent(message: Message): boolean {
+    return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(message.body)
+      || /\bbackground\s*=\s*['"]?https?:\/\//i.test(message.body)
+      || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(message.body);
+  }
 
   function rememberManualReadState(messageIds: number[], isRead: boolean) {
     const next = new Set(manualUnreadMessageIdsRef.current);
@@ -1103,6 +1109,36 @@ export default function App() {
         autoReadInFlightRef.current.delete(selectedMessageId);
       });
   }, [selectedId, selected?.is_read, activeThread?.thread_key]);
+
+  useEffect(() => {
+    if (!selected || !selectedSenderTrusted) return;
+    if (!messageHasRemoteVisualContent(selected)) return;
+    if (selected.sanitized_html.includes('src="https://')) return;
+    if (trustedRemoteImageRenderRef.current.has(selected.id)) return;
+
+    trustedRemoteImageRenderRef.current.add(selected.id);
+    invoke<Message>('render_message_with_remote_image_policy', { messageId: selected.id })
+      .then((updated) => {
+        setMessages((current) => current.map((message) => (
+          message.id === updated.id ? updated : message
+        )));
+        if (activeThread) {
+          setThreadMessages((current) => current.map((message) => (
+            message.id === updated.id ? updated : message
+          )));
+        }
+      })
+      .catch((error) => {
+        trustedRemoteImageRenderRef.current.delete(selected.id);
+        setStatus(String(error));
+      });
+  }, [
+    activeThread,
+    selected?.id,
+    selected?.body,
+    selected?.sanitized_html,
+    selectedSenderTrusted,
+  ]);
 
   useEffect(() => {
     if (!selected) return;
@@ -2260,7 +2296,7 @@ export default function App() {
       await fetchSelectedBody();
       updated = await renderSelectedWithRemoteImagePolicy(selected.id);
     }
-    setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任域名远程图片：${trust.value}`);
+    setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任发件人域名远程图片：${trust.value}`);
   }
 
   async function blockSelectedSender() {

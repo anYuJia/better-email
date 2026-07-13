@@ -367,16 +367,19 @@ export default function ReaderPane({
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
   const [bodyRenderMessageId, setBodyRenderMessageId] = useState<number | null>(null);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
   const readerRef = useRef<HTMLElement | null>(null);
   const completedReadMessageIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setBodyRenderMessageId(null);
+    setShowPlaceholder(false);
     if (!selectedId) return undefined;
 
     const scheduler = window as IdleScheduler;
     let idleHandle: number | null = null;
     let cancelled = false;
+    
     const timer = window.setTimeout(() => {
       const renderBody = () => {
         if (!cancelled) React.startTransition(() => setBodyRenderMessageId(selectedId));
@@ -388,9 +391,16 @@ export default function ReaderPane({
       }
     }, readerBodyRenderDelayMs);
 
+    const placeholderTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setShowPlaceholder(true);
+      }
+    }, 180);
+
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      window.clearTimeout(placeholderTimer);
       if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
     };
   }, [selectedId]);
@@ -1208,10 +1218,12 @@ export default function ReaderPane({
         )}
 
         {!isBodyRenderReady ? (
-          <EmptyMessageBody
-            title="正在打开邮件"
-            detail="正文会在界面稳定后显示，滚动和选择操作可立即响应。"
-          />
+          showPlaceholder ? (
+            <EmptyMessageBody
+              title="正在打开邮件"
+              detail="正文会在界面稳定后显示，滚动和选择操作可立即响应。"
+            />
+          ) : null
         ) : hasRenderableHtml ? (
           <div
             className="reader-html"

@@ -4466,3 +4466,23 @@ textarea:focus-visible {
   border-radius: var(--ui-radius-control);
   transition: all 120ms ease;
 }
+
+/* Premium fade-in animation for email reader body transition */
+@keyframes reader-body-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reader-html,
+.body-text,
+.empty-state,
+.empty-reader {
+  animation: reader-body-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}

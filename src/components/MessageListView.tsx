@@ -84,7 +84,7 @@ const MessageListCard = React.memo(function MessageListCard({
         isDragging ? 'dragging' : '',
         isNew ? 'is-new' : '',
       ].filter(Boolean).join(' ')}
-      style={{ width: '100%', height: '100%', display: 'block' }}
+      style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
       draggable
       onClick={() => onSelectMessage(message.id)}
       onDragStart={(event) => {
@@ -176,6 +176,11 @@ export default function MessageListView({
   const [scrollTop, setScrollTop] = useState(initialScrollTop);
   const [viewportHeight, setViewportHeight] = useState(600);
 
+  const messagePreviewMap = useMemo(
+    () => new Map(messages.map((message) => [message.id, mailboxListPreview(message)])),
+    [messages],
+  );
+
   const newIds = useMemo(() => {
     const set = new Set<number>();
     if (prevIds.size > 0) {
@@ -246,12 +251,16 @@ export default function MessageListView({
     const layout: { top: number; height: number }[] = [];
     let currentTop = 0;
     for (const item of flatItems) {
-      const height = item.type === 'header' ? 34 : 83;
+      let height = 34;
+      if (item.type === 'message') {
+        const preview = messagePreviewMap.get(item.message.id) ?? '';
+        height = preview.trim() ? 83 : 68;
+      }
       layout.push({ top: currentTop, height });
       currentTop += height;
     }
     return { layout, totalHeight: currentTop };
-  }, [flatItems]);
+  }, [flatItems, messagePreviewMap]);
 
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
@@ -287,10 +296,6 @@ export default function MessageListView({
   const draggingMessageSet = useMemo(
     () => new Set(draggingMessageIds),
     [draggingMessageIds],
-  );
-  const messagePreviewMap = useMemo(
-    () => new Map(messages.map((message) => [message.id, mailboxListPreview(message)])),
-    [messages],
   );
 
   const startIdx = useMemo(() => {

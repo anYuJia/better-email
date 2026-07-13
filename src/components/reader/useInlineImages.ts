@@ -141,6 +141,7 @@ export default function useInlineImages({
     if (inlineImageResolution.missingContentIds.length === 0) return;
     if (inlineImageResolution.pendingAttachments.length > 0) return;
     if (selected.remote_uid <= 0) return;
+    if (selected.body.trim() || selected.sanitized_html.trim()) return;
     if (inlineImageRefreshAttemptsRef.current.has(selected.id)) return;
 
     inlineImageRefreshAttemptsRef.current.add(selected.id);

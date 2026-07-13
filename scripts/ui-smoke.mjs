@@ -1017,7 +1017,7 @@ async function main() {
     await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-add-account-panel')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'smtp.qq.com:587')");
     await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
-    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-current-account-panel')?.innerText.includes('qa-new@better-email.local')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-account-list')?.innerText.includes('qa-new@better-email.local')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
     await openSettingsSection(cdp, '身份', 'identities', '.settings-identity-panel');
     await waitForExpression(cdp, "document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
@@ -1026,8 +1026,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.message-list')");
-    await waitForExpression(cdp, "document.querySelector('[data-account-remove-trigger]') && !document.querySelector('[data-account-remove-trigger]').disabled");
-    await evalInPage(cdp, "document.querySelector('[data-account-remove-trigger]').click()");
+    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.settings-account-row')].find((r) => r.innerText.includes('qa-new@better-email.local')); const deleteBtn = row?.querySelector('.settings-account-row-actions button.danger'); if (!deleteBtn) throw new Error('Delete button for qa-new@better-email.local not found'); deleteBtn.click(); })()");
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-dialog]') && document.querySelector('[data-account-remove-confirm]').disabled");
     await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'wrong@better-email.local');
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-confirm]').disabled");

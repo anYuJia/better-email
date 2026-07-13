@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
-import AccountRemovalPanel from '../AccountRemovalPanel';
 import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
@@ -203,39 +202,6 @@ export default function AccountSettingsPage({
         onOpen={openAccountDialog}
       />
 
-      {accountForm && (
-        <>
-          <section className="tool-panel settings-current-account-panel">
-            <header className="tool-header">
-              <span>
-                <strong>当前账号</strong>
-                <small>{accountForm.email}</small>
-              </span>
-              <em>{accountForm.provider}</em>
-            </header>
-            <div className="settings-account-form-grid">
-              <label>
-                显示名称
-                <input value={accountForm.display_name || accountForm.email} readOnly />
-              </label>
-              <label>
-                收信服务器
-                <input value={accountForm.imap_host} readOnly />
-              </label>
-              <label>
-                发信服务器
-                <input value={accountForm.smtp_host} readOnly />
-              </label>
-            </div>
-          </section>
-
-          <AccountRemovalPanel
-            account={accountForm}
-            accountCount={accountCount}
-            onRemove={onRemoveAccount}
-          />
-        </>
-      )}
 
       <details className="add-account-disclosure tool-panel">
         <summary>

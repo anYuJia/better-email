@@ -113,6 +113,7 @@ const THREAD_KEY_SCHEMA_VERSION: i64 = 1;
 const DATABASE_FILENAME: &str = "better-email.sqlite3";
 const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
 const LEGACY_APP_IDENTIFIER: &str = "app.swiftmail.client";
+const DEMO_DATA_SEED_ENV: &str = "BETTER_EMAIL_SEED_DEMO_DATA";
 const LOCAL_BACKUP_TABLES: &[&str] = &[
     "accounts",
     "folders",
@@ -153,12 +154,16 @@ impl MailStore {
     }
 
     pub fn open_at(path: PathBuf) -> MailResult<Self> {
+        Self::open_at_with_seed(path, demo_data_seed_enabled())
+    }
+
+    fn open_at_with_seed(path: PathBuf, seed_demo_data: bool) -> MailResult<Self> {
         let data_dir = path
             .parent()
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
         fs::create_dir_all(&data_dir)?;
-        let should_seed_demo_data = !path.exists();
+        let should_seed_demo_data = seed_demo_data && !path.exists();
         db_info(format!(
             "[better-email][db] open path={} should_seed_demo_data={}",
             path.display(),
@@ -171,6 +176,9 @@ impl MailStore {
             database_path: path,
         };
         store.migrate()?;
+        if !seed_demo_data {
+            store.remove_demo_seed_data()?;
+        }
         store.seed_if_empty(should_seed_demo_data)?;
         db_info("[better-email][db] open ok");
         Ok(store)
@@ -766,6 +774,10 @@ impl MailStore {
             ));
             Ok(())
         })
+    }
+
+    fn remove_demo_seed_data(&self) -> MailResult<()> {
+        self.with_conn(remove_demo_seed_data_for_conn)
     }
 
     pub fn export_local_backup(&self) -> MailResult<LocalBackup> {
@@ -4027,6 +4039,81 @@ impl MailStore {
     }
 }
 
+fn demo_data_seed_enabled() -> bool {
+    std::env::var(DEMO_DATA_SEED_ENV)
+        .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
+    let demo_account_id = conn
+        .query_row(
+            "
+            SELECT id
+            FROM accounts
+            WHERE email = 'demo@better-email.local'
+              AND display_name = 'Better Email Demo'
+              AND provider = 'Local'
+              AND imap_host = 'imap.example.com:993'
+              AND smtp_host = 'smtp.example.com:465'
+              AND auth_type = 'password'
+              AND signature = 'Sent from Better Email'
+            LIMIT 1
+            ",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?;
+
+    if let Some(account_id) = demo_account_id {
+        db_info(format!(
+            "[better-email][db] removing built-in demo account account_id={account_id}"
+        ));
+        conn.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
+        ensure_default_account_for_conn(conn)?;
+    }
+
+    conn.execute(
+        "
+        DELETE FROM mail_rules
+        WHERE (name = '重要客户置顶' AND condition = 'from contains customer' AND action = 'apply label 重要客户')
+           OR (name = '安全提醒标记' AND condition = 'subject contains 安全' AND action = 'apply label 工作')
+           OR (name = '新闻邮件稍后处理' AND condition = 'from contains updates' AND action = 'apply label 稍后处理')
+        ",
+        [],
+    )?;
+    conn.execute(
+        "
+        DELETE FROM labels
+        WHERE NOT EXISTS (
+            SELECT 1 FROM message_labels WHERE message_labels.label_id = labels.id
+        )
+          AND (
+            (name = '工作' AND color = '#2f7ed8')
+            OR (name = '稍后处理' AND color = '#d97706')
+            OR (name = '重要客户' AND color = '#7c3aed')
+          )
+        ",
+        [],
+    )?;
+    conn.execute(
+        "
+        DELETE FROM contacts
+        WHERE aliases = ''
+          AND vip = 0
+          AND (
+            (email = 'ada@example.com' AND name = 'Ada Chen')
+            OR (email = 'updates@example.com' AND name = 'Product Robot')
+            OR (email = 'security@example.com' AND name = 'Security Team')
+            OR (email = 'demo@better-email.local' AND name = 'Better Email Demo')
+          )
+        ",
+        [],
+    )?;
+
+    Ok(())
+}
+
 fn account_secret_raw_for_conn(conn: &Connection, account: &Account) -> MailResult<String> {
     let raw = conn
         .query_row(
@@ -6666,17 +6753,21 @@ mod tests {
 
     static TEST_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    fn test_store() -> MailStore {
+    fn test_database_path(prefix: &str) -> PathBuf {
         let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
         let data_dir = std::env::temp_dir().join(format!(
-            "better-email-test-{}-{}-{}",
+            "{prefix}-{}-{}-{}",
             std::process::id(),
             Utc::now().timestamp_nanos_opt().unwrap(),
             unique
         ));
         fs::create_dir_all(&data_dir).expect("test data dir created");
-        let path = data_dir.join(DATABASE_FILENAME);
-        MailStore::open_at(path).expect("test store opens")
+        data_dir.join(DATABASE_FILENAME)
+    }
+
+    fn test_store() -> MailStore {
+        MailStore::open_at_with_seed(test_database_path("better-email-test"), true)
+            .expect("test store opens")
     }
 
     #[test]
@@ -6716,6 +6807,44 @@ mod tests {
         let stats = store.get_stats_for_account(None).expect("stats load");
         assert!(stats.total_messages >= 4);
         assert!(stats.attachment_messages >= 1);
+    }
+
+    #[test]
+    fn new_database_starts_empty_without_demo_seed_env() {
+        let store = MailStore::open_at(test_database_path("better-email-empty-default"))
+            .expect("empty default store opens");
+
+        assert!(store.list_accounts().unwrap().is_empty());
+        assert!(store.list_folders_for_account(None).unwrap().is_empty());
+        assert_eq!(store.get_stats_for_account(None).unwrap().total_messages, 0);
+        assert!(store.get_account_by_id_optional(None).unwrap().is_none());
+    }
+
+    #[test]
+    fn existing_demo_seed_data_is_removed_by_default() {
+        let path = test_database_path("better-email-clean-demo");
+        {
+            let seeded = MailStore::open_at_with_seed(path.clone(), true)
+                .expect("seeded store opens");
+            assert!(seeded
+                .list_accounts()
+                .unwrap()
+                .iter()
+                .any(|account| account.email == "demo@better-email.local"));
+            assert!(seeded.get_stats_for_account(None).unwrap().total_messages > 0);
+        }
+
+        let cleaned = MailStore::open_at(path).expect("cleaned store opens");
+        assert!(cleaned
+            .list_accounts()
+            .unwrap()
+            .iter()
+            .all(|account| account.email != "demo@better-email.local"));
+        assert_eq!(cleaned.get_stats_for_account(None).unwrap().total_messages, 0);
+        assert!(cleaned.list_folders_for_account(None).unwrap().is_empty());
+        assert!(cleaned.list_labels().unwrap().is_empty());
+        assert!(cleaned.list_rules().unwrap().is_empty());
+        assert!(cleaned.list_contacts().unwrap().is_empty());
     }
 
     #[test]
@@ -8324,7 +8453,8 @@ mod tests {
         let path = data_dir.join(DATABASE_FILENAME);
 
         {
-            let store = MailStore::open_at(path.clone()).expect("test store opens");
+            let store =
+                MailStore::open_at_with_seed(path.clone(), true).expect("test store opens");
             let account = store.get_account().expect("seed account exists");
             assert!(store.delete_account(account.id).unwrap().is_none());
             assert!(store.list_accounts().unwrap().is_empty());

@@ -3302,8 +3302,6 @@ kbd {
   border-bottom: 1px solid rgba(17, 24, 39, 0.07);
   background: transparent;
   padding: 15px 15px 15px 44px;
-  transform: translate3d(0, 0, 0);
-  will-change: transform, background-color;
 }
 
 .message-select {
@@ -6366,4 +6364,26 @@ h1 {
   .folder-actions button {
     opacity: 1;
   }
+}
+
+.btn-load-more {
+  background: var(--ui-control-bg, #edf0f3);
+  border: 1px solid var(--ui-border, #d1d5db);
+  border-radius: var(--ui-radius-control, 4px);
+  color: var(--ui-text-secondary, #4b5563);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  margin-left: 8px;
+  text-decoration: none;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: var(--ui-control-hover, #e2e5e9);
+  color: var(--ui-text, #111);
+}
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

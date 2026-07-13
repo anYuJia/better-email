@@ -135,8 +135,13 @@ const MessageListCard = React.memo(function MessageListCard({
       </div>
       {preview && <p title={preview}>{preview}</p>}
       <div className="message-chips">
-        {message.labels.map((label) => <span key={label}>{label}</span>)}
-        {message.attachment_count > 0 && <span><Paperclip size={12} /> {message.attachment_count}</span>}
+        {message.labels.slice(0, 2).map((label) => <span key={label} title={label}>{label}</span>)}
+        {message.labels.length > 2 && (
+          <span title={message.labels.slice(2).join(', ')}>
+            +{message.labels.length - 2}
+          </span>
+        )}
+        {message.attachment_count > 0 && <span title={`${message.attachment_count} 个附件`}><Paperclip size={12} /> {message.attachment_count}</span>}
       </div>
     </button>
   );
@@ -254,22 +259,13 @@ export default function MessageListView({
     for (const item of flatItems) {
       let height = 34;
       if (item.type === 'message') {
-        const preview = messagePreviewMap.get(item.message.id) ?? '';
-        const hasPreview = Boolean(preview.trim());
-        const hasChips = item.message.labels.length > 0 || item.message.attachment_count > 0;
-        if (hasPreview && hasChips) {
-          height = 102;
-        } else if (hasPreview || hasChips) {
-          height = 83;
-        } else {
-          height = 68;
-        }
+        height = 96;
       }
       layout.push({ top: currentTop, height });
       currentTop += height;
     }
     return { layout, totalHeight: currentTop };
-  }, [flatItems, messagePreviewMap]);
+  }, [flatItems]);
 
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
@@ -299,10 +295,10 @@ export default function MessageListView({
 
   useEffect(() => {
     const triggerThreshold = 300;
-    if (hasMoreMessages && totalHeight - (scrollTop + viewportHeight) < triggerThreshold) {
+    if (hasMoreMessages && !loadMoreStatus && totalHeight - (scrollTop + viewportHeight) < triggerThreshold) {
       onLoadMore();
     }
-  }, [scrollTop, viewportHeight, totalHeight, hasMoreMessages, onLoadMore]);
+  }, [scrollTop, viewportHeight, totalHeight, hasMoreMessages, loadMoreStatus, onLoadMore]);
 
   useEffect(() => {
     return () => {
@@ -356,7 +352,7 @@ export default function MessageListView({
       }
     }
     return Math.min(layout.length - 1, index);
-  }, [layout, startIdx, scrollTop, viewportHeight]);
+  }, [layout, startIdx, scrollTop, viewportHeight, flatItems.length]);
 
   const visibleItems = useMemo(() => {
     const items = [];
@@ -444,7 +440,24 @@ export default function MessageListView({
           >
             <span>
               已显示 {messages.length} 封
-              {loadMoreStatus ? ` · ${loadMoreStatus}` : (hasMoreMessages ? ' · 自动同步中...' : ' · 已到底')}
+              {hasMoreMessages ? (
+                loadMoreStatus ? ` · ${loadMoreStatus}` : (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      className="btn-load-more"
+                      disabled={Boolean(loadMoreStatus)}
+                      aria-busy={Boolean(loadMoreStatus)}
+                      onClick={() => {
+                        if (!loadMoreStatus) onLoadMore();
+                      }}
+                    >
+                      加载更多
+                    </button>
+                  </>
+                )
+              ) : ' · 已到底'}
             </span>
           </div>
         </div>

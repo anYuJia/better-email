@@ -673,7 +673,11 @@ textarea:disabled {
 }
 
 .message-card {
-  min-height: 82px;
+  height: 96px !important;
+  min-height: 96px !important;
+  max-height: 96px !important;
+  box-sizing: border-box !important;
+  overflow: hidden;
   margin: 0;
   padding: 10px 12px 9px 57px;
   border: 0;
@@ -682,9 +686,6 @@ textarea:disabled {
   color: var(--ui-text);
   background: transparent;
   box-shadow: none;
-  transform: translate3d(0, 0, 0);
-  will-change: transform, background-color;
-  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .message-card:hover {
@@ -706,12 +707,10 @@ textarea:disabled {
 @keyframes message-card-appear {
   from {
     opacity: 0;
-    transform: translateY(-24px);
     background: #e6f1fc;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -4486,5 +4485,37 @@ textarea:focus-visible {
 .empty-state,
 .empty-reader {
   animation: reader-body-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: 0s !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.btn-load-more {
+  background: var(--ui-control-bg, #edf0f3);
+  border: 1px solid var(--ui-border, #d1d5db);
+  border-radius: var(--ui-radius-control, 4px);
+  color: var(--ui-text-secondary, #4b5563);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  margin-left: 8px;
+  text-decoration: none;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: var(--ui-control-hover, #e2e5e9);
+  color: var(--ui-text, #111);
+}
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

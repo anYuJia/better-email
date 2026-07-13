@@ -335,12 +335,8 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedId, setSelectedIdState] = useState<number | null>(null);
   const setSelectedId = useCallback((value: React.SetStateAction<number | null>) => {
-    const id = typeof value === 'function' ? (value as Function)(selectedId) : value;
-    if (id !== null) {
-      console.time('[Perf] OpenEmail');
-    }
     setSelectedIdState(value);
-  }, [selectedId]);
+  }, []);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
@@ -1226,17 +1222,13 @@ export default function App() {
   }, [selected?.id]);
 
   const markMessageReadAfterReading = useCallback((message: Message) => {
-    console.log('[AutoRead] markMessageReadAfterReading triggered in App for message:', message.id, 'is_read:', message.is_read);
     if (message.is_read) {
-      console.log('[AutoRead] message is already read, skipping');
       return;
     }
     if (manualUnreadMessageIdsRef.current.has(message.id)) {
-      console.log('[AutoRead] message was manually marked unread, skipping');
       return;
     }
     if (autoReadInFlightRef.current.has(message.id)) {
-      console.log('[AutoRead] message read update in-flight, skipping');
       return;
     }
 
@@ -1253,11 +1245,8 @@ export default function App() {
       mailbox: selectedRemoteMailbox,
       uid: selectedRemoteUid,
     });
-    console.time('[Perf] set_message_read API');
     invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
       .then((report) => {
-        console.timeEnd('[Perf] set_message_read API');
-        console.time('[Perf] set_message_read React transition');
         React.startTransition(() => {
           setMessages((current) => current.map((item) => (
             item.id === selectedMessageId ? { ...item, is_read: true } : item
@@ -1277,9 +1266,7 @@ export default function App() {
             ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
             : current);
         });
-        setTimeout(() => {
-          console.timeEnd('[Perf] set_message_read React transition');
-        }, 0);
+
         appFlowLog('markReadAfterReading done', {
           messageId: selectedMessageId,
           message: report.message,

@@ -370,52 +370,65 @@ export default function ReaderPane({
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const readerRef = useRef<HTMLElement | null>(null);
   const completedReadMessageIdsRef = useRef<Set<number>>(new Set());
+  const prevIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setBodyRenderMessageId(null);
-    setShowPlaceholder(false);
-    if (!selectedId) return undefined;
+    const currentId = selected?.id ?? null;
+    const isDifferentMessage = currentId !== prevIdRef.current;
+    prevIdRef.current = currentId;
+
+    if (isDifferentMessage) {
+      setBodyRenderMessageId(null);
+      setShowPlaceholder(false);
+    }
+
+    if (!selectedId || !selected) return undefined;
+
+    const isPlainText = !selected.sanitized_html?.trim() &&
+                        !bodyLooksLikeHtml(selected.body) &&
+                        selected.attachment_count === 0;
+
+    if (isPlainText) {
+      setBodyRenderMessageId(selectedId);
+      return undefined;
+    }
 
     const scheduler = window as IdleScheduler;
     let idleHandle: number | null = null;
     let cancelled = false;
     
-    const timer = window.setTimeout(() => {
-      const renderBody = () => {
-        if (!cancelled) React.startTransition(() => setBodyRenderMessageId(selectedId));
+    if (bodyRenderMessageId !== selectedId) {
+      const timer = window.setTimeout(() => {
+        const renderBody = () => {
+          if (!cancelled) React.startTransition(() => setBodyRenderMessageId(selectedId));
+        };
+        if (scheduler.requestIdleCallback) {
+          idleHandle = scheduler.requestIdleCallback(renderBody, { timeout: readerBodyRenderIdleTimeoutMs });
+        } else {
+          renderBody();
+        }
+      }, readerBodyRenderDelayMs);
+
+      const placeholderTimer = window.setTimeout(() => {
+        if (!cancelled && isDifferentMessage) {
+          setShowPlaceholder(true);
+        }
+      }, 180);
+
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+        window.clearTimeout(placeholderTimer);
+        if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
       };
-      if (scheduler.requestIdleCallback) {
-        idleHandle = scheduler.requestIdleCallback(renderBody, { timeout: readerBodyRenderIdleTimeoutMs });
-      } else {
-        renderBody();
-      }
-    }, readerBodyRenderDelayMs);
-
-    const placeholderTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setShowPlaceholder(true);
-      }
-    }, 180);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      window.clearTimeout(placeholderTimer);
-      if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
-    };
-  }, [selectedId]);
+    }
+  }, [selectedId, selected?.id, selected?.sanitized_html, selected?.body, selected?.attachment_count, bodyRenderMessageId]);
 
   const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
   const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
   const isBodyRenderReady = Boolean(bodySelected) && !isSelectedBodyCorrupted;
 
-  useEffect(() => {
-    if (isBodyRenderReady && selected?.id) {
-      try {
-        console.timeEnd('[Perf] OpenEmail');
-      } catch (_) {}
-    }
-  }, [isBodyRenderReady, selected?.id]);
+
 
   useEffect(() => {
     if (!selected?.id) return;
@@ -531,18 +544,13 @@ export default function ReaderPane({
   }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
 
   useEffect(() => {
-    console.log('[AutoRead] Timer effect check selectedId:', selected?.id, 'is_read:', selected?.is_read, 'isBodyRenderReady:', isBodyRenderReady);
     if (!selected || selected.is_read || !isBodyRenderReady) return undefined;
     if (completedReadMessageIdsRef.current.has(selected.id)) {
-      console.log('[AutoRead] already completed read, skipping timer setup');
       return undefined;
     }
 
-    console.log('[AutoRead] setting 2s timer for message:', selected.id);
     const timerId = window.setTimeout(() => {
-      console.log('[AutoRead] 2s timer fired for message:', selected.id);
       if (completedReadMessageIdsRef.current.has(selected.id)) {
-        console.log('[AutoRead] timer fired but completedReadMessageIdsRef already has message, skipping');
         return;
       }
       completedReadMessageIdsRef.current.add(selected.id);
@@ -550,7 +558,6 @@ export default function ReaderPane({
     }, 2000);
 
     return () => {
-      console.log('[AutoRead] clearing 2s timer for message:', selected?.id);
       window.clearTimeout(timerId);
     };
   }, [selected?.id, isBodyRenderReady, onReadComplete]);

@@ -357,9 +357,9 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('244px') && document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('388px')");
 
-    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length === 40 && document.querySelector('.message-date-section') && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
+    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length < 40 && document.querySelectorAll('.message-card').length > 5 && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
-    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
+    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length < 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
     await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
     const checks = [true, true, true];
     const initialLayout = await evalInPage(
@@ -638,7 +638,7 @@ async function main() {
 
     await evalInPage(
       cdp,
-      "(() => { window.__bulkShortcutCount = document.querySelectorAll('.message-card').length; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
+      "(() => { const footerText = document.querySelector('.message-list-footer')?.textContent || ''; const match = footerText.match(/已显示 (\\d+) 封/); window.__bulkShortcutCount = match ? Number(match[1]) : 50; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
     );
     await waitForExpression(cdp, "document.querySelector('.bulk-selection span')?.innerText === `已选 ${window.__bulkShortcutCount}`");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))");

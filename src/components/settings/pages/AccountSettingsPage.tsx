@@ -142,9 +142,20 @@ export default function AccountSettingsPage({
 
   function updateNewAccountEmail(email: string) {
     setAddAccountError('');
+    const domain = email.trim().toLowerCase().split('@').pop() ?? '';
     const preset = providerPresetForEmail(email);
     if (!preset) {
-      onNewAccountFormChange({ ...newAccountForm, email });
+      if (domain && domain !== email.trim().toLowerCase()) {
+        const isPop = newAccountForm.incoming_protocol === 'pop3';
+        onNewAccountFormChange({
+          ...newAccountForm,
+          email,
+          imap_host: isPop ? `pop.${domain}:995` : `imap.${domain}:993`,
+          smtp_host: `smtp.${domain}:465`,
+        });
+      } else {
+        onNewAccountFormChange({ ...newAccountForm, email });
+      }
       return;
     }
     onNewAccountFormChange({
@@ -160,10 +171,19 @@ export default function AccountSettingsPage({
   function switchNewAccountProtocol(nextProtocol: IncomingProtocol) {
     const preset = providerPresetFor(newAccountForm.provider);
     setAddAccountError('');
+    let nextImapHost = newAccountForm.imap_host;
+    if (!preset) {
+      const domain = newAccountForm.email.trim().toLowerCase().split('@').pop() ?? '';
+      if (domain && domain !== newAccountForm.email.trim().toLowerCase()) {
+        nextImapHost = nextProtocol === 'pop3' ? `pop.${domain}:995` : `imap.${domain}:993`;
+      }
+    } else {
+      nextImapHost = incomingHostForProtocol(preset, nextProtocol);
+    }
     onNewAccountFormChange({
       ...newAccountForm,
       incoming_protocol: nextProtocol,
-      imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : newAccountForm.imap_host,
+      imap_host: nextImapHost,
       auth_type: nextProtocol === 'pop3' && newAccountForm.auth_type === 'oauth2'
         ? 'password'
         : newAccountForm.auth_type,
@@ -250,6 +270,16 @@ export default function AccountSettingsPage({
                 <option value="5min">每 5 分钟</option>
                 <option value="15min">每 15 分钟</option>
                 <option value="30min">每 30 分钟</option>
+              </select>
+            </label>
+            <label>
+              收信协议
+              <select
+                value={newAccountForm.incoming_protocol}
+                onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
+              >
+                <option value="imap">IMAP</option>
+                <option value="pop3">POP3</option>
               </select>
             </label>
           </div>

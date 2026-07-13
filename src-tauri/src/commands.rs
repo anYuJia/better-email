@@ -815,6 +815,7 @@ pub fn copy_attachment_file_to_clipboard(
         ));
     }
 
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     Ok(format!("已复制附件文件：{}", attachment.filename))
 }
 

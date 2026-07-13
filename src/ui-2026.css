@@ -681,6 +681,8 @@ textarea:disabled {
   color: var(--ui-text);
   background: transparent;
   box-shadow: none;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, background-color;
 }
 
 .message-card:hover {

@@ -3302,6 +3302,8 @@ kbd {
   border-bottom: 1px solid rgba(17, 24, 39, 0.07);
   background: transparent;
   padding: 15px 15px 15px 44px;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, background-color;
 }
 
 .message-select {

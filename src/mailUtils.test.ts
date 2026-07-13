@@ -27,15 +27,15 @@ describe('mail UI utilities', () => {
   });
 
   it('groups message dates into stable mailbox sections', () => {
-    const now = new Date('2026-07-11T14:30:00+08:00');
+    const now = new Date(2026, 6, 11, 14, 30, 0);
 
-    expect(messageDateGroup('2026-07-11T01:00:00+08:00', now)).toEqual({ id: 'today', label: '今天' });
-    expect(messageDateGroup('2026-07-10T23:59:00+08:00', now)).toEqual({ id: 'yesterday', label: '昨天' });
-    expect(messageDateGroup('2026-07-08T12:00:00+08:00', now)).toEqual({
+    expect(messageDateGroup(new Date(2026, 6, 11, 1, 0, 0).toString(), now)).toEqual({ id: 'today', label: '今天' });
+    expect(messageDateGroup(new Date(2026, 6, 10, 23, 59, 0).toString(), now)).toEqual({ id: 'yesterday', label: '昨天' });
+    expect(messageDateGroup(new Date(2026, 6, 8, 12, 0, 0).toString(), now)).toEqual({
       id: 'this-week',
       label: '本周早些时候',
     });
-    expect(messageDateGroup('2026-06-30T12:00:00+08:00', now)).toEqual({ id: 'earlier', label: '更早' });
+    expect(messageDateGroup(new Date(2026, 5, 30, 12, 0, 0).toString(), now)).toEqual({ id: 'earlier', label: '更早' });
     expect(messageDateGroup('not-a-date', now)).toEqual({ id: 'unknown', label: '时间未知' });
   });
 

@@ -408,7 +408,11 @@ export default function ReaderPane({
 
   useEffect(() => {
     if (!selected?.id) return;
-    if (selected.is_read) completedReadMessageIdsRef.current.add(selected.id);
+    if (selected.is_read) {
+      completedReadMessageIdsRef.current.add(selected.id);
+    } else {
+      completedReadMessageIdsRef.current.delete(selected.id);
+    }
   }, [selected?.id, selected?.is_read]);
 
   function maybeCompleteReading() {
@@ -516,16 +520,26 @@ export default function ReaderPane({
   }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
 
   useEffect(() => {
+    console.log('[AutoRead] Timer effect check selectedId:', selected?.id, 'is_read:', selected?.is_read, 'isBodyRenderReady:', isBodyRenderReady);
     if (!selected || selected.is_read || !isBodyRenderReady) return undefined;
-    if (completedReadMessageIdsRef.current.has(selected.id)) return undefined;
+    if (completedReadMessageIdsRef.current.has(selected.id)) {
+      console.log('[AutoRead] already completed read, skipping timer setup');
+      return undefined;
+    }
 
+    console.log('[AutoRead] setting 2s timer for message:', selected.id);
     const timerId = window.setTimeout(() => {
-      if (completedReadMessageIdsRef.current.has(selected.id)) return;
+      console.log('[AutoRead] 2s timer fired for message:', selected.id);
+      if (completedReadMessageIdsRef.current.has(selected.id)) {
+        console.log('[AutoRead] timer fired but completedReadMessageIdsRef already has message, skipping');
+        return;
+      }
       completedReadMessageIdsRef.current.add(selected.id);
       onReadComplete(selected);
     }, 2000);
 
     return () => {
+      console.log('[AutoRead] clearing 2s timer for message:', selected?.id);
       window.clearTimeout(timerId);
     };
   }, [selected?.id, isBodyRenderReady, onReadComplete]);

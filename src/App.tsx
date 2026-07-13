@@ -1222,9 +1222,19 @@ export default function App() {
   }, [selected?.id]);
 
   const markMessageReadAfterReading = useCallback((message: Message) => {
-    if (message.is_read) return;
-    if (manualUnreadMessageIdsRef.current.has(message.id)) return;
-    if (autoReadInFlightRef.current.has(message.id)) return;
+    console.log('[AutoRead] markMessageReadAfterReading triggered in App for message:', message.id, 'is_read:', message.is_read);
+    if (message.is_read) {
+      console.log('[AutoRead] message is already read, skipping');
+      return;
+    }
+    if (manualUnreadMessageIdsRef.current.has(message.id)) {
+      console.log('[AutoRead] message was manually marked unread, skipping');
+      return;
+    }
+    if (autoReadInFlightRef.current.has(message.id)) {
+      console.log('[AutoRead] message read update in-flight, skipping');
+      return;
+    }
 
     const selectedMessageId = message.id;
     const selectedAccountId = message.account_id;

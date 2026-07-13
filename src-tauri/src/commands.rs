@@ -119,7 +119,7 @@ pub fn get_account(
 }
 
 #[tauri::command]
-pub fn create_account(
+pub async fn create_account(
     store: State<'_, MailStore>,
     input: AccountCreateInput,
 ) -> MailResult<Account> {
@@ -154,7 +154,7 @@ pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> Mail
 }
 
 #[tauri::command]
-pub fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
+pub async fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
     command_info(format!(
         "[better-email][account] delete command start account_id={account_id}"
     ));
@@ -544,7 +544,7 @@ pub fn render_message_with_remote_images_once(
 }
 
 #[tauri::command]
-pub fn download_attachment(
+pub async fn download_attachment(
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<AttachmentDownload> {
@@ -1416,7 +1416,7 @@ pub fn save_draft(
 }
 
 #[tauri::command]
-pub fn send_message(
+pub async fn send_message(
     store: State<'_, MailStore>,
     input: DraftInput,
     threading: Option<MessageThreadingInput>,
@@ -1657,7 +1657,7 @@ pub fn test_connection(
 }
 
 #[tauri::command]
-pub fn verify_account_credentials(
+pub async fn verify_account_credentials(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<CredentialVerificationReport> {
@@ -1677,7 +1677,7 @@ pub fn verify_account_credentials(
 }
 
 #[tauri::command]
-pub fn verify_account_credentials_with_secret(
+pub async fn verify_account_credentials_with_secret(
     store: State<'_, MailStore>,
     input: CredentialVerificationInput,
 ) -> MailResult<CredentialVerificationReport> {
@@ -1820,7 +1820,7 @@ fn credential_protocol_check(
 }
 
 #[tauri::command]
-pub fn discover_imap_folders(
+pub async fn discover_imap_folders(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<ImapProbeReport> {
@@ -1879,7 +1879,7 @@ pub fn get_sync_schedule_plan(
 }
 
 #[tauri::command]
-pub fn sync_imap_headers(
+pub async fn sync_imap_headers(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
@@ -2026,7 +2026,7 @@ pub fn sync_imap_headers(
 }
 
 #[tauri::command]
-pub fn sync_imap_history(
+pub async fn sync_imap_history(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
@@ -2297,7 +2297,7 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 }
 
 #[tauri::command]
-pub fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
+pub async fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
     command_info(format!(
         "[better-email][body] fetch command start message_id={message_id}"
     ));

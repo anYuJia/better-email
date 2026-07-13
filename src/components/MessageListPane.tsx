@@ -82,7 +82,7 @@ export type MessageListPaneProps = {
   onLoadMore: () => void;
 };
 
-export default function MessageListPane({
+function MessageListPane({
   searchInputRef,
   query,
   searchScope,
@@ -375,3 +375,5 @@ export default function MessageListPane({
     </section>
   );
 }
+
+export default React.memo(MessageListPane);

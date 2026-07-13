@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Edit3,
   Keyboard,
@@ -52,7 +53,7 @@ export type SidebarProps = {
   onOpenCommandPalette: () => void;
 };
 
-export default function Sidebar({
+function Sidebar({
   accountScope,
   accounts,
   folders,
@@ -214,3 +215,5 @@ export default function Sidebar({
     </aside>
   );
 }
+
+export default React.memo(Sidebar);

@@ -347,6 +347,7 @@ export default function App() {
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const loadingMoreRef = useRef(false);
+  const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
@@ -2657,6 +2658,7 @@ export default function App() {
   async function loadMoreMessages() {
     if (loadingMoreRef.current) return;
     loadingMoreRef.current = true;
+    setLoadMoreStatus('正在读取本地缓存...');
     try {
       const nextLimit = messageLimit + messagePageSize;
       const nextMessages = await loadMessagesWithVisibleFallback(
@@ -2688,6 +2690,7 @@ export default function App() {
 
       if (nextMessages.length <= messages.length && targetMailbox) {
         setStatus('正在从服务器同步历史邮件...');
+        setLoadMoreStatus('正在从服务器拉取历史邮件...');
         const run = await syncImapHistoryPage(targetMailbox.account_id);
         const meta = await loadMeta(folderId, accountScope);
         const refreshedMessages = await loadMessagesWithVisibleFallback(
@@ -2706,6 +2709,7 @@ export default function App() {
       }
     } finally {
       loadingMoreRef.current = false;
+      setLoadMoreStatus(null);
     }
   }
 
@@ -3017,6 +3021,7 @@ export default function App() {
         onSelectMessage={setSelectedId}
         onToggleMessageSelection={toggleMessageSelection}
         onLoadMore={() => { loadMoreMessages().catch((error) => setStatus(String(error))); }}
+        loadMoreStatus={loadMoreStatus}
       />
 
       <button

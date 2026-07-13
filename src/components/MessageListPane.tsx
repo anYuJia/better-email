@@ -80,6 +80,7 @@ export type MessageListPaneProps = {
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => void;
+  loadMoreStatus?: string | null;
 };
 
 function MessageListPane({
@@ -130,6 +131,7 @@ function MessageListPane({
   onSelectMessage,
   onToggleMessageSelection,
   onLoadMore,
+  loadMoreStatus,
 }: MessageListPaneProps) {
   const [messageMenu, setMessageMenu] = React.useState<{
     x: number;
@@ -348,6 +350,7 @@ function MessageListPane({
           onClearSearchAndFilter={onClearSearchAndFilter}
           onRefresh={onRefresh}
           onLoadMore={onLoadMore}
+          loadMoreStatus={loadMoreStatus}
         />
       )}
       {threadMenu && (

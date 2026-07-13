@@ -37,6 +37,7 @@ type MessageListViewProps = {
   onClearSearchAndFilter: () => void;
   onRefresh: () => void;
   onLoadMore: () => void;
+  loadMoreStatus?: string | null;
 };
 
 type MessageListCardProps = {
@@ -161,6 +162,7 @@ export default function MessageListView({
   onClearSearchAndFilter,
   onRefresh,
   onLoadMore,
+  loadMoreStatus,
 }: MessageListViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const prevIdsRef = useRef<Set<number>>(new Set());
@@ -408,7 +410,7 @@ export default function MessageListView({
           >
             <span>
               已显示 {messages.length} 封
-              {hasMoreMessages ? ' · 自动同步中...' : ' · 已到底'}
+              {loadMoreStatus ? ` · ${loadMoreStatus}` : (hasMoreMessages ? ' · 自动同步中...' : ' · 已到底')}
             </span>
           </div>
         </div>

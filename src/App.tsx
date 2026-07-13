@@ -2767,6 +2767,7 @@ export default function App() {
   }
 
   function changeAccountScope(value: string) {
+    mailboxRefreshRef.current += 1;
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
     setQuery('');
@@ -2783,6 +2784,7 @@ export default function App() {
   }
 
   function selectFolder(nextFolderId: number) {
+    mailboxRefreshRef.current += 1;
     setQuery('');
     setFilter('all');
     setSearchScope('folder');

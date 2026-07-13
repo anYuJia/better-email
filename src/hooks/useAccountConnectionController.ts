@@ -221,7 +221,7 @@ export default function useAccountConnectionController({
     setStatus,
   ]);
 
-  const createNewAccount = useCallback(async (secret?: string) => {
+  const createNewAccount = useCallback(async (secret?: string, onProgress?: (stage: string) => void) => {
     if (!newAccountForm.email.trim()) {
       setStatus('请先填写新账号邮箱地址');
       accountFlowWarn('create skipped: missing email');
@@ -235,6 +235,7 @@ export default function useAccountConnectionController({
       hasSecret: Boolean(trimmedSecret),
     });
     try {
+      onProgress?.('正在创建本地邮箱账号...');
       const created = await invoke<Account>('create_account', { input: newAccountForm });
       accountFlowLog('create account stored', {
         accountId: created.id,
@@ -243,6 +244,7 @@ export default function useAccountConnectionController({
       });
       let verification: CredentialVerificationReport | null = null;
       if (trimmedSecret) {
+        onProgress?.('正在安全存储本机加密凭据...');
         const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
           input: { account_email: created.email, secret: trimmedSecret },
         });
@@ -270,6 +272,7 @@ export default function useAccountConnectionController({
           }
           throw new Error(credentialResult.message);
         }
+        onProgress?.('正在连接服务器验证登录凭据...');
         verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
           input: {
             account_id: created.id,
@@ -317,6 +320,7 @@ export default function useAccountConnectionController({
           protocol: created.incoming_protocol,
         });
         try {
+          onProgress?.('已成功登录！正在同步服务器邮件列表...');
           const syncRun = await invoke<SyncRun>('sync_imap_headers', {
             accountId: created.id,
           });
@@ -335,6 +339,7 @@ export default function useAccountConnectionController({
           });
         }
       }
+      onProgress?.('已完成邮件同步，正在加载界面数据...');
       const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
       accountFlowLog('metadata loaded after create', {
         accountId: created.id,

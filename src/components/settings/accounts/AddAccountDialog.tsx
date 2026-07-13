@@ -15,6 +15,7 @@ type AddAccountDialogProps = {
   manualConfigOpen: boolean;
   error: string;
   submitting: boolean;
+  submittingStage?: string;
   canSubmit: boolean;
   requiresSecret: boolean;
   secretLabel: string;
@@ -39,6 +40,7 @@ export default function AddAccountDialog({
   manualConfigOpen,
   error,
   submitting,
+  submittingStage,
   canSubmit,
   requiresSecret,
   secretLabel,
@@ -222,6 +224,24 @@ export default function AddAccountDialog({
           <p className="settings-account-add-error" role="alert">
             {error}
           </p>
+        )}
+
+        {submitting && (
+          <div className="settings-account-add-progress" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 12px',
+            background: '#f4f8fc',
+            borderRadius: '6px',
+            border: '1px solid #dbebfa',
+            margin: '0 0 12px 0',
+            fontSize: '11px',
+            color: '#465b70',
+          }}>
+            <div className="deferred-spinner" />
+            <span>{submittingStage || '正在处理中，请稍候...'}</span>
+          </div>
         )}
 
         <footer>

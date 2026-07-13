@@ -21,7 +21,7 @@ type AccountSettingsPageProps = {
   onAccountFormChange: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
-  onCreateNewAccount: (secret?: string) => Promise<void>;
+  onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: () => Promise<void>;
 };
 
@@ -42,6 +42,7 @@ export default function AccountSettingsPage({
   const [newAccountManualConfigOpen, setNewAccountManualConfigOpen] = useState(false);
   const [addAccountError, setAddAccountError] = useState('');
   const [addAccountSubmitting, setAddAccountSubmitting] = useState(false);
+  const [addAccountStage, setAddAccountStage] = useState('');
   const [accountDialogMode, setAccountDialogMode] = useState<AccountDialogMode | null>(null);
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function AccountSettingsPage({
       setNewAccountManualConfigOpen(false);
       setAddAccountError('');
       setAddAccountSubmitting(false);
+      setAddAccountStage('');
     }
   }, [addDialogOpen]);
 
@@ -105,13 +107,15 @@ export default function AccountSettingsPage({
 
     setAddAccountError('');
     setAddAccountSubmitting(true);
+    setAddAccountStage('正在初始化...');
     try {
-      await onCreateNewAccount(newAccountSecret);
+      await onCreateNewAccount(newAccountSecret, (stage) => setAddAccountStage(stage));
       setAddDialogOpen(false);
     } catch (error) {
       setAddAccountError(errorMessage(error));
     } finally {
       setAddAccountSubmitting(false);
+      setAddAccountStage('');
     }
   }
 
@@ -210,6 +214,7 @@ export default function AccountSettingsPage({
           manualConfigOpen={newAccountManualConfigOpen}
           error={addAccountError}
           submitting={addAccountSubmitting}
+          submittingStage={addAccountStage}
           canSubmit={canCreateAccount}
           requiresSecret={requiresNewAccountSecret}
           secretLabel={newAccountSecretLabel}

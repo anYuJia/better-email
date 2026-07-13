@@ -9,6 +9,7 @@ import type {
   SearchScope,
   ThreadSummary,
 } from '../app/types';
+import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
 
 type LoadMetaResult = {
@@ -55,11 +56,11 @@ type MailboxRequests = {
 };
 
 function mailboxFlowLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[mailbox-flow] ${event}`, details);
+  flowInfo('mailbox-flow', event, details);
 }
 
 function mailboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn(`[mailbox-flow] ${event}`, details);
+  flowWarn('mailbox-flow', event, details);
 }
 
 export function buildMailboxRequests(
@@ -219,11 +220,12 @@ export default function useMailboxData({
     setMessageLimit(nextLimit);
     setHasMoreMessages(nextMessages.length > nextLimit);
     setMessages(visibleMessages);
+    const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
     setSelectedMessageIds((current) =>
-      current.filter((id) => visibleMessages.some((message) => message.id === id)),
+      current.filter((id) => visibleMessageIds.has(id)),
     );
     setSelectedId((current) => {
-      if (current && visibleMessages.some((message) => message.id === current)) return current;
+      if (current && visibleMessageIds.has(current)) return current;
       return visibleMessages[0]?.id ?? null;
     });
     if (!frontendReadyRef.current) {

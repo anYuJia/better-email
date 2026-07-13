@@ -7,7 +7,6 @@ import {
   listSortOptions,
 } from '../app/appConfig';
 import type {
-  AccountScope,
   FilterMode,
   Folder,
   Label,
@@ -47,7 +46,6 @@ export type MessageListPaneProps = {
   activeThread: ThreadSummary | null;
   messages: Message[];
   selectedId: number | null;
-  accountScope: AccountScope;
   hasMoreMessages: boolean;
   currentViewLabel: string;
   visibleListSummary: string;
@@ -95,7 +93,6 @@ export default function MessageListPane({
   activeThread,
   messages,
   selectedId,
-  accountScope,
   hasMoreMessages,
   currentViewLabel,
   visibleListSummary,
@@ -141,59 +138,126 @@ export default function MessageListPane({
     thread: ThreadSummary;
     messages: Message[];
   } | null>(null);
-  const selectedMessageSet = new Set(selectedMessageIds);
-  const selectedMessages = messages.filter((message) => selectedMessageSet.has(message.id));
-  const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
+
+  const handleOpenThread = React.useCallback((thread: ThreadSummary) => {
+    setThreadMenu(null);
+    void onOpenThread(thread);
+  }, [onOpenThread]);
+
+  const handleOpenThreadMenu = React.useCallback((thread: ThreadSummary, x: number, y: number) => {
+    setThreadMenu(null);
+    void onOpenThread(thread).then((nextMessages) => {
+      setThreadMenu({ x, y, thread, messages: nextMessages });
+    });
+  }, [onOpenThread]);
+
+  const handleOpenMessageMenu = React.useCallback((message: Message, x: number, y: number, bulk: boolean) => {
+    setMessageMenu({ x, y, message, bulk });
+  }, []);
+
+  const handleCloseMessageMenu = React.useCallback(() => {
+    setMessageMenu(null);
+  }, []);
+
+  const selectedMessageSet = React.useMemo(
+    () => new Set(selectedMessageIds),
+    [selectedMessageIds],
+  );
+  const selectedMessages = React.useMemo(
+    () => messages.filter((message) => selectedMessageSet.has(message.id)),
+    [messages, selectedMessageSet],
+  );
+  const activeSortLabel = React.useMemo(
+    () => listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先',
+    [listSort],
+  );
   const contextMessage = messageMenu?.message;
   const isBulkContext = Boolean(messageMenu?.bulk && selectedMessages.length > 1);
-  const messageContextItems = isBulkContext
-    ? buildBulkMessageContextItems({
-        selectedMessages,
-        folders,
-        labels,
-        onRunBulkAction,
-        onRequestSnooze,
-        onMoveBulkToFolder,
-        onToggleBulkLabel,
-      })
-    : contextMessage
-      ? buildSingleMessageContextItems({
-          message: contextMessage,
+
+  const messageContextItems = React.useMemo(() => {
+    return isBulkContext
+      ? buildBulkMessageContextItems({
+          selectedMessages,
           folders,
           labels,
-          onSelectMessage,
-          onComposeFromMessage,
-          onRunMessageAction,
-          onMoveMessageToFolder,
-          onToggleMessageLabel,
+          onRunBulkAction,
+          onRequestSnooze,
+          onMoveBulkToFolder,
+          onToggleBulkLabel,
         })
-      : [];
-  const threadContextMessages = threadMenu?.messages ?? [];
-  const threadMovableMessages = threadContextMessages.filter(
-    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+      : contextMessage
+        ? buildSingleMessageContextItems({
+            message: contextMessage,
+            folders,
+            labels,
+            onSelectMessage,
+            onComposeFromMessage,
+            onRunMessageAction,
+            onMoveMessageToFolder,
+            onToggleMessageLabel,
+          })
+        : [];
+  }, [
+    isBulkContext,
+    selectedMessages,
+    folders,
+    labels,
+    onRunBulkAction,
+    onRequestSnooze,
+    onMoveBulkToFolder,
+    onToggleBulkLabel,
+    contextMessage,
+    onSelectMessage,
+    onComposeFromMessage,
+    onRunMessageAction,
+    onMoveMessageToFolder,
+    onToggleMessageLabel,
+  ]);
+
+  const threadContextMessages = React.useMemo(
+    () => threadMenu?.messages ?? [],
+    [threadMenu?.messages],
   );
-  const threadContextItems = threadMenu
-    ? (() => {
-      const items = buildBulkMessageContextItems({
-        selectedMessages: threadContextMessages,
-        movableMessages: threadMovableMessages,
-        folders,
-        labels,
-        onRunBulkAction: (action) => onRunThreadAction(threadMenu.thread, threadContextMessages, action),
-        onRequestSnooze,
-        onMoveBulkToFolder: (folder) => onMoveThreadToFolder(threadMenu.thread, threadContextMessages, folder),
-        onToggleBulkLabel: (label) => onToggleThreadLabel(threadMenu.thread, threadContextMessages, label),
-      });
-      items.splice(2, 0, {
-        id: 'thread-mute',
-        label: threadMenu.thread.is_muted ? '取消静音会话' : '静音会话',
-        icon: threadMenu.thread.is_muted ? <Volume2 size={15} /> : <VolumeX size={15} />,
-        separatorBefore: true,
-        onSelect: () => onToggleThreadMute(threadMenu.thread, threadContextMessages),
-      });
-      return items;
-    })()
-    : [];
+  const threadMovableMessages = React.useMemo(
+    () => threadContextMessages.filter(
+      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+    ),
+    [threadContextMessages],
+  );
+
+  const threadContextItems = React.useMemo(() => {
+    if (!threadMenu) return [];
+    const items = buildBulkMessageContextItems({
+      selectedMessages: threadContextMessages,
+      movableMessages: threadMovableMessages,
+      folders,
+      labels,
+      onRunBulkAction: (action) => onRunThreadAction(threadMenu.thread, threadContextMessages, action),
+      onRequestSnooze,
+      onMoveBulkToFolder: (folder) => onMoveThreadToFolder(threadMenu.thread, threadContextMessages, folder),
+      onToggleBulkLabel: (label) => onToggleThreadLabel(threadMenu.thread, threadContextMessages, label),
+    });
+    items.splice(2, 0, {
+      id: 'thread-mute',
+      label: threadMenu.thread.is_muted ? '取消静音会话' : '静音会话',
+      icon: threadMenu.thread.is_muted ? <Volume2 size={15} /> : <VolumeX size={15} />,
+      separatorBefore: true,
+      onSelect: () => onToggleThreadMute(threadMenu.thread, threadContextMessages),
+    });
+    return items;
+  }, [
+    threadMenu,
+    threadContextMessages,
+    threadMovableMessages,
+    folders,
+    labels,
+    onRunThreadAction,
+    onRequestSnooze,
+    onMoveThreadToFolder,
+    onToggleThreadLabel,
+    onToggleThreadMute,
+  ]);
+
   const groupedMessages = React.useMemo(() => {
     const groups: Array<{ id: string; label: string; messages: Message[] }> = [];
     const includeDateGroups = listSort === 'newest' || listSort === 'oldest';
@@ -253,16 +317,8 @@ export default function MessageListPane({
         <ThreadListView
           threads={threads}
           activeThread={activeThread}
-          onOpenThread={(thread) => {
-            setThreadMenu(null);
-            void onOpenThread(thread);
-          }}
-          onOpenThreadMenu={(thread, x, y) => {
-            setThreadMenu(null);
-            void onOpenThread(thread).then((nextMessages) => {
-              setThreadMenu({ x, y, thread, messages: nextMessages });
-            });
-          }}
+          onOpenThread={handleOpenThread}
+          onOpenThreadMenu={handleOpenThreadMenu}
         />
       ) : (
         <MessageListView
@@ -277,10 +333,8 @@ export default function MessageListPane({
           onSelectMessage={onSelectMessage}
           onToggleMessageSelection={onToggleMessageSelection}
           onToggleAllVisible={onToggleAllVisible}
-          onOpenMessageMenu={(message, x, y, bulk) => {
-            setMessageMenu({ x, y, message, bulk });
-          }}
-          onCloseMessageMenu={() => setMessageMenu(null)}
+          onOpenMessageMenu={handleOpenMessageMenu}
+          onCloseMessageMenu={handleCloseMessageMenu}
           onSetDraggingMessageIds={setDraggingMessageIds}
           onClearSearchAndFilter={onClearSearchAndFilter}
           onRefresh={onRefresh}

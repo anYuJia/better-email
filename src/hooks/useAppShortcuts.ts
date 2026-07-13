@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { ListMode, Message, UndoAction } from '../app/types';
 
 type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash';
@@ -34,35 +34,10 @@ type UseAppShortcutsOptions = {
   moveSelected: (role: 'archive' | 'trash') => Promise<void>;
 };
 
-export default function useAppShortcuts({
-  searchInputRef,
-  messages,
-  selected,
-  selectedId,
-  selectedMessages,
-  selectedMessageIds,
-  listMode,
-  undoAction,
-  isComposerOpen,
-  isComposerMinimized,
-  isSettingsOpen,
-  isShortcutsOpen,
-  isCommandPaletteOpen,
-  closeOverlays,
-  clearSelection,
-  setStatus,
-  restoreUndoAction,
-  toggleAllVisibleMessages,
-  openCommandPalette,
-  openShortcuts,
-  composeNew,
-  setSelectedId,
-  runBulkAction,
-  composeFromMessage,
-  toggleStar,
-  toggleRead,
-  moveSelected,
-}: UseAppShortcutsOptions) {
+export default function useAppShortcuts(options: UseAppShortcutsOptions) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   useEffect(() => {
     function isEditableTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false;
@@ -70,6 +45,7 @@ export default function useAppShortcuts({
     }
 
     function selectRelativeMessage(offset: number) {
+      const { messages, selectedId, setSelectedId } = optionsRef.current;
       if (messages.length === 0) return;
       const currentIndex = selectedId ? messages.findIndex((message) => message.id === selectedId) : -1;
       const nextIndex = Math.min(Math.max(currentIndex + offset, 0), messages.length - 1);
@@ -77,10 +53,38 @@ export default function useAppShortcuts({
     }
 
     function runSafely(action: Promise<void>) {
+      const { setStatus } = optionsRef.current;
       action.catch((error) => setStatus(String(error)));
     }
 
     function handleShortcut(event: KeyboardEvent) {
+      const {
+        searchInputRef,
+        messages,
+        selected,
+        selectedMessages,
+        selectedMessageIds,
+        listMode,
+        undoAction,
+        isComposerOpen,
+        isComposerMinimized,
+        isSettingsOpen,
+        isShortcutsOpen,
+        isCommandPaletteOpen,
+        closeOverlays,
+        clearSelection,
+        setStatus,
+        restoreUndoAction,
+        toggleAllVisibleMessages,
+        openCommandPalette,
+        openShortcuts,
+        composeNew,
+        runBulkAction,
+        composeFromMessage,
+        toggleStar,
+        toggleRead,
+        moveSelected,
+      } = optionsRef.current;
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
       const commandModifier = event.metaKey || event.ctrlKey;
@@ -215,33 +219,5 @@ export default function useAppShortcuts({
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [
-    clearSelection,
-    closeOverlays,
-    composeFromMessage,
-    composeNew,
-    isCommandPaletteOpen,
-    isComposerMinimized,
-    isComposerOpen,
-    isSettingsOpen,
-    isShortcutsOpen,
-    listMode,
-    messages,
-    moveSelected,
-    openCommandPalette,
-    openShortcuts,
-    restoreUndoAction,
-    runBulkAction,
-    searchInputRef,
-    selected,
-    selectedId,
-    selectedMessageIds,
-    selectedMessages,
-    setSelectedId,
-    setStatus,
-    toggleAllVisibleMessages,
-    toggleRead,
-    toggleStar,
-    undoAction,
-  ]);
+  }, []);
 }

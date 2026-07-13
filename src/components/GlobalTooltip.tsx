@@ -26,18 +26,36 @@ const OPEN_OVERLAY_SELECTOR = [
   '.settings-mobile-menu',
 ].join(',');
 
-function isTextOnlyButton(element: HTMLElement) {
+export function isTextOnlyTooltipButton(element: HTMLElement) {
   const text = element.textContent?.trim() ?? '';
   return text.length > 0 && element.querySelector('svg') === null;
 }
 
-function getTooltipText(element: HTMLElement) {
+export function getTooltipText(element: HTMLElement) {
   return (
     element.getAttribute('title')
     || element.getAttribute('data-native-title')
     || element.getAttribute('aria-label')
     || ''
   ).trim();
+}
+
+export function shouldShowGlobalTooltip(target: HTMLElement) {
+  const text = getTooltipText(target);
+  if (
+    !text
+    || target.hasAttribute('disabled')
+    || target.getAttribute('aria-disabled') === 'true'
+    || isInsideOpenOverlay(target)
+  ) {
+    return false;
+  }
+
+  return !(
+    target.tagName === 'BUTTON'
+    && isTextOnlyTooltipButton(target)
+    && !target.classList.contains('primary-action')
+  );
 }
 
 function targetFromEvent(event: Event) {
@@ -79,21 +97,11 @@ export default function GlobalTooltip() {
     };
 
     const showTooltip = (target: HTMLElement) => {
+      if (!shouldShowGlobalTooltip(target)) {
+        hideTooltip();
+        return;
+      }
       const text = getTooltipText(target);
-      if (
-        !text
-        || target.hasAttribute('disabled')
-        || target.getAttribute('aria-disabled') === 'true'
-        || isInsideOpenOverlay(target)
-      ) {
-        hideTooltip();
-        return;
-      }
-
-      if (target.tagName === 'BUTTON' && isTextOnlyButton(target) && !target.classList.contains('primary-action')) {
-        hideTooltip();
-        return;
-      }
 
       clearTimer();
       restoreNativeTitle(activeTargetRef.current);

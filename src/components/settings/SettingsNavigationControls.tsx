@@ -10,9 +10,7 @@ import {
   useState,
 } from 'react';
 import {
-  getSettingsNavigationContext,
   settingsNavigationGroups,
-  settingsNavigationItems,
   type SettingsNavigationItem,
   type SettingsSectionId,
 } from './settingsNavigation';

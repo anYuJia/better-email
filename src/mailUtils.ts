@@ -105,6 +105,43 @@ export function plainTextPreview(value: string): string {
     .trim();
 }
 
+const remoteHeaderOnlySnippet = '远端邮件头已同步';
+
+function isMarkupPreviewNoise(value: string): boolean {
+  const normalized = value
+    .replace(/[<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  return normalized === '!doctype html'
+    || normalized.startsWith('!doctype html ')
+    || normalized.startsWith('html ')
+    || normalized.startsWith('body ')
+    || normalized.startsWith('head ')
+    || normalized.startsWith('div style=')
+    || normalized.startsWith('span style=')
+    || normalized.startsWith('table ')
+    || normalized.startsWith('/div')
+    || normalized.startsWith('/html');
+}
+
+export type PreviewableMailboxMessage = {
+  body: string;
+  sanitized_html: string;
+  snippet: string;
+};
+
+export function mailboxListPreview(message: PreviewableMailboxMessage): string {
+  const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
+  if (bodyPreview && !isMarkupPreviewNoise(bodyPreview)) return bodyPreview;
+  if (!message.snippet.includes(remoteHeaderOnlySnippet)) {
+    const snippetPreview = plainTextPreview(message.snippet);
+    return isMarkupPreviewNoise(snippetPreview) ? '' : snippetPreview;
+  }
+  return '';
+}
+
 export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
   const normalized = subject.trim() || '(无主题)';
   const matcher = prefix === 'Re' ? /^(re|回复)\s*:/i : /^(fwd|fw|转发)\s*:/i;
@@ -360,4 +397,19 @@ function timeToMinutes(value: string): number | null {
   const minute = Number(match[2]);
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   return hour * 60 + minute;
+}
+
+export function bodyLooksLikeHtml(body: string): boolean {
+  return /<!doctype\b|<(?:html|body|div|p|table|a|img|span)\b/i.test(body);
+}
+
+export function htmlHasRenderableContent(html: string): boolean {
+  if (/<img\b[^>]*\bsrc\s*=/i.test(html)) return true;
+  return Boolean(plainTextPreview(html));
+}
+
+export function htmlHasRemoteVisualContent(html: string): boolean {
+  return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
 }

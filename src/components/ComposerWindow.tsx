@@ -50,7 +50,7 @@ export type ComposerWindowProps = {
   onMinimize: () => void;
   onRestore: () => void;
   onClose: () => void;
-  onDraftChange: (draft: DraftInput) => void;
+  onDraftChange: React.Dispatch<React.SetStateAction<DraftInput>>;
   onAddContact: (contact: Contact) => void;
   onApplyTemplate: (template: ComposeTemplate) => void;
   onDeleteTemplate: (template: ComposeTemplate) => void;
@@ -117,7 +117,7 @@ export default function ComposerWindow({
     ?? null;
 
   function patchDraft(patch: Partial<DraftInput>) {
-    onDraftChange({ ...draft, ...patch });
+    onDraftChange((current) => ({ ...current, ...patch }));
   }
 
   function beginDrag(event: React.PointerEvent<HTMLElement>) {

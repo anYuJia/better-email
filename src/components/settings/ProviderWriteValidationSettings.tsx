@@ -42,7 +42,7 @@ export default function ProviderWriteValidationSettings({
         <b>
           {status
             ? status.complete
-              ? '核心闭环完成'
+              ? '核心步骤通过'
               : `${status.passedCoreStages}/${status.coreStageCount} 核心步骤`
             : '需手动确认'}
         </b>
@@ -69,7 +69,7 @@ export default function ProviderWriteValidationSettings({
               </span>
               <em>
                 {status.complete
-                  ? 'SMTP、Sent 留档和自发自收均已确认'
+                  ? 'SMTP、Sent 留档和自发自收已确认'
                   : '刷新邮件头后继续检查后续状态'}
               </em>
             </header>

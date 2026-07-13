@@ -120,6 +120,7 @@ export const savedSearchesStorageKey = 'better-email.savedSearches';
 export const composeTemplatesStorageKey = 'better-email.composeTemplates';
 export const composerAutosaveStorageKey = 'better-email.composerAutosave';
 export const appLayoutStorageKey = 'better-email.appLayout.v2';
+export const legacyAppLayoutStorageKey = 'swiftmail.appLayout.v2';
 export const sendUndoDelayStorageKey = 'better-email.sendUndoDelaySeconds';
 export const favoriteFolderKeysStorageKey = 'better-email.favoriteFolderKeys.v1';
 export const listSortStorageKey = 'better-email.listSort.v1';
@@ -129,7 +130,7 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
   [savedSearchesStorageKey]: 'swiftmail.savedSearches',
   [composeTemplatesStorageKey]: 'swiftmail.composeTemplates',
   [composerAutosaveStorageKey]: 'swiftmail.composerAutosave',
-  [appLayoutStorageKey]: 'swiftmail.appLayout.v2',
+  [appLayoutStorageKey]: legacyAppLayoutStorageKey,
   [sendUndoDelayStorageKey]: 'swiftmail.sendUndoDelaySeconds',
   [favoriteFolderKeysStorageKey]: 'swiftmail.favoriteFolderKeys.v1',
   [listSortStorageKey]: 'swiftmail.listSort.v1',

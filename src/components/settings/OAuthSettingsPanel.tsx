@@ -65,7 +65,7 @@ export default function OAuthSettingsPanel({
           <strong>{authType === 'oauth2' ? 'OAuth2 向导' : '授权码模式'}</strong>
           <p>
             {authType === 'oauth2'
-              ? '支持 Gmail/Outlook PKCE 授权、回调授权码、Token 安全存储、自动刷新和 XOAUTH2 登录。'
+              ? '用于 Gmail/Outlook PKCE 授权、回调授权码、Token 安全存储、刷新和 XOAUTH2 登录。'
               : '适用于 QQ、网易和自建邮箱的应用专用密码或授权码，凭据只写入系统安全存储。'}
           </p>
         </div>
@@ -75,7 +75,7 @@ export default function OAuthSettingsPanel({
         <section className="settings-static-section" data-settings-section="auth">
           <header className="settings-static-header">
             <span>
-              <strong>OAuth2 高级流程</strong>
+              <strong>OAuth2 连接流程</strong>
               <em>PKCE、回调、Token 交换与刷新</em>
             </span>
             <b>{sessions.length} 个会话</b>

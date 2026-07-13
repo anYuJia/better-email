@@ -36,6 +36,17 @@ describe('background task coordinator helpers', () => {
     expect(next?.id).toBe(4);
   });
 
+  it('selects the earliest scheduled outbox item without requiring sorted input', () => {
+    const next = nextOutboxWakeItem([
+      outboxItem(1, 'scheduled', '2026-07-10T10:30:00.000Z'),
+      outboxItem(2, 'scheduled', 'not-a-date'),
+      outboxItem(3, 'scheduled', '2026-07-10T10:05:00.000Z'),
+      outboxItem(4, 'scheduled', '2026-07-10T10:10:00.000Z'),
+    ]);
+
+    expect(next?.id).toBe(3);
+  });
+
   it('reports remote archive retry without implying another SMTP send', () => {
     expect(
       outboxFlushMessage([

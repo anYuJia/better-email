@@ -6,6 +6,7 @@ use crate::models::{
 use ammonia::Builder;
 use chrono::{DateTime, Utc};
 use mail_parser::{Address, MessageParser, MimeHeaders};
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
@@ -107,7 +108,7 @@ pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
     if lower.contains("http://") {
         warnings.push("正文包含明文 HTTP 链接，后续应提示潜在风险。".to_string());
     }
-    if lower.contains("<img") && lower.contains("src=\"http") {
+    if html_has_remote_images(&html_body) || html_has_remote_images(&text_body) {
         warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
     }
     warnings.extend(link_risk_warnings(&html_body));
@@ -161,13 +162,7 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
     } else {
         fallback_body.to_string()
     };
-    let snippet_source = if !text_body.trim().is_empty() {
-        text_body.as_str()
-    } else if has_renderable_html {
-        &html_body
-    } else {
-        &body
-    };
+    let snippet = message_body_snippet(&text_body, &html_body, &body);
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
@@ -253,14 +248,7 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
             })
             .unwrap_or_default(),
         subject: preview.subject,
-        snippet: snippet_source
-            .lines()
-            .find(|line| !line.trim().is_empty())
-            .unwrap_or("")
-            .replace(['<', '>'], " ")
-            .chars()
-            .take(120)
-            .collect(),
+        snippet,
         body,
         sanitized_html: if has_renderable_html {
             sanitize_html(&html_body)
@@ -366,10 +354,42 @@ pub(crate) fn format_address_list(addresses: &Address<'_>) -> String {
 fn looks_like_html(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     [
-        "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+        "<!doctype", "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
     ]
     .iter()
     .any(|marker| lower.contains(marker))
+}
+
+pub(crate) fn message_body_snippet(
+    text_body: &str,
+    html_body: &str,
+    fallback_body: &str,
+) -> String {
+    let (source, is_html) = if !text_body.trim().is_empty() {
+        (text_body, looks_like_html(text_body))
+    } else if looks_like_html(html_body) {
+        (html_body, true)
+    } else {
+        (fallback_body, looks_like_html(fallback_body))
+    };
+    let plain = if is_html {
+        let sanitized = sanitize_html(source);
+        decode_basic_entities(&strip_html_tags(&sanitized))
+    } else {
+        decode_basic_entities(source)
+    };
+    let preview_line = plain
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or(&plain);
+
+    preview_line
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(120)
+        .collect()
 }
 
 pub(crate) fn sanitize_html(html: &str) -> String {
@@ -443,18 +463,207 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
     url_schemes.insert("mailto");
     url_schemes.insert("cid");
     if allow_remote_images {
-        url_schemes.insert("http");
         url_schemes.insert("https");
     }
 
-    Builder::default()
+    let limited_html = html.chars().take(30_000).collect::<String>();
+    let prepared_html = if allow_remote_images {
+        promote_https_background_images(&limited_html)
+    } else {
+        limited_html
+    };
+    let cleaned = Builder::default()
         .url_schemes(url_schemes)
         .rm_tags(&["style"])
-        .clean(&html.chars().take(30_000).collect::<String>())
+        .attribute_filter(move |element, attribute, value| {
+            if element.eq_ignore_ascii_case("a") && attribute.eq_ignore_ascii_case("href") {
+                let normalized = value.trim().to_ascii_lowercase();
+                if normalized.starts_with("http://") || normalized.starts_with("https://") {
+                    return None;
+                }
+            }
+            if element.eq_ignore_ascii_case("img") && attribute.eq_ignore_ascii_case("src") {
+                let normalized = value.trim().to_ascii_lowercase();
+                if normalized.starts_with("http://")
+                    || (normalized.starts_with("https://")
+                        && (!allow_remote_images || is_tracking_image_source(&normalized)))
+                {
+                    return None;
+                }
+            }
+            Some(Cow::Borrowed(value))
+        })
+        .clean(&prepared_html)
         .to_string()
         .chars()
         .take(20_000)
-        .collect()
+        .collect::<String>();
+    let cleaned = remove_sourceless_images(&cleaned);
+    if html_has_visible_content(&cleaned) {
+        cleaned
+    } else {
+        String::new()
+    }
+}
+
+pub(crate) fn html_has_remote_images(html: &str) -> bool {
+    let lower = html.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find('<') {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        let tag = &html[start..=tag_end];
+        if extract_attr(tag, "src")
+            .map(|src| {
+                let normalized = src.trim().to_ascii_lowercase();
+                normalized.starts_with("http://") || normalized.starts_with("https://")
+            })
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        if extract_attr(tag, "background")
+            .map(|source| is_remote_image_source(&source))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        if extract_attr(tag, "style")
+            .map(|style| style_has_remote_image(&style))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        cursor = tag_end.saturating_add(1);
+        if cursor >= html.len() {
+            break;
+        }
+    }
+    false
+}
+
+fn is_remote_image_source(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    normalized.starts_with("http://") || normalized.starts_with("https://")
+}
+
+fn style_has_remote_image(style: &str) -> bool {
+    let lower = style.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("url(") {
+        let value_start = cursor + relative_start + 4;
+        let Some(relative_end) = lower[value_start..].find(')') else {
+            break;
+        };
+        let value_end = value_start + relative_end;
+        let value = style[value_start..value_end]
+            .trim()
+            .trim_matches(['"', '\'']);
+        if is_remote_image_source(value) {
+            return true;
+        }
+        cursor = value_end.saturating_add(1);
+    }
+    false
+}
+
+fn is_tracking_image_source(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    let path = normalized.split(['?', '#']).next().unwrap_or(&normalized);
+    path.ends_with("/p/t.gif")
+        || path.ends_with("/beacon.gif")
+        || path.ends_with("/upoint.gif")
+        || path.contains("/beacon/")
+        || path.contains("/tracking/")
+        || path.contains("/tracker/")
+}
+
+fn promote_https_background_images(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut output = String::with_capacity(html.len());
+    let mut cursor = 0;
+
+    while let Some(relative_start) = lower[cursor..].find("<td") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        output.push_str(&html[cursor..=tag_end]);
+        if let Some(source) = extract_attr(&html[start..=tag_end], "background") {
+            let decoded = decode_basic_entities(&source);
+            if decoded.trim().to_ascii_lowercase().starts_with("https://")
+                && !is_tracking_image_source(&decoded)
+            {
+                let escaped = decoded
+                    .replace('&', "&amp;")
+                    .replace('"', "&quot;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                output.push_str(&format!("<img src=\"{escaped}\" alt=\"\">"));
+            }
+        }
+        cursor = tag_end.saturating_add(1);
+        if cursor >= html.len() {
+            break;
+        }
+    }
+
+    output.push_str(&html[cursor..]);
+    output
+}
+
+fn remove_sourceless_images(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut output = String::with_capacity(html.len());
+    let mut cursor = 0;
+
+    while let Some(relative_start) = lower[cursor..].find("<img") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        output.push_str(&html[cursor..start]);
+        let tag = &html[start..=tag_end];
+        if extract_attr(tag, "src")
+            .map(|source| !source.trim().is_empty())
+            .unwrap_or(false)
+        {
+            output.push_str(tag);
+        }
+        cursor = tag_end.saturating_add(1);
+        if cursor >= html.len() {
+            break;
+        }
+    }
+
+    output.push_str(&html[cursor..]);
+    output
+}
+
+fn html_has_visible_content(html: &str) -> bool {
+    let text = decode_basic_entities(&strip_html_tags(html));
+    if text.split_whitespace().next().is_some() {
+        return true;
+    }
+
+    let lower = html.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("<img") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        if extract_attr(&html[start..=tag_end], "src")
+            .map(|source| !source.trim().is_empty())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        cursor = tag_end.saturating_add(1);
+    }
+    false
 }
 
 fn extract_links(html: &str) -> Vec<(String, String)> {
@@ -463,10 +672,9 @@ fn extract_links(html: &str) -> Vec<(String, String)> {
     let mut cursor = 0;
     while let Some(relative_start) = lower[cursor..].find("<a") {
         let start = cursor + relative_start;
-        let Some(tag_end_relative) = lower[start..].find('>') else {
+        let Some(tag_end) = find_tag_end(html, start) else {
             break;
         };
-        let tag_end = start + tag_end_relative;
         let tag = &html[start..=tag_end];
         let href = extract_attr(tag, "href");
         let close_start = tag_end + 1;
@@ -486,25 +694,79 @@ fn extract_links(html: &str) -> Vec<(String, String)> {
     links
 }
 
-fn extract_attr(tag: &str, attr: &str) -> Option<String> {
-    let lower = tag.to_ascii_lowercase();
-    let pattern = format!("{attr}=");
-    let attr_start = lower.find(&pattern)? + pattern.len();
-    let rest = &tag[attr_start..];
-    let mut chars = rest.chars();
-    let first = chars.next()?;
-    if first == '"' || first == '\'' {
-        let value: String = chars.take_while(|ch| *ch != first).collect();
-        return Some(value.trim().to_string());
+fn find_tag_end(html: &str, start: usize) -> Option<usize> {
+    let mut quote: Option<char> = None;
+    for (offset, ch) in html[start..].char_indices() {
+        match (quote, ch) {
+            (Some(active), current) if current == active => quote = None,
+            (None, '"' | '\'') => quote = Some(ch),
+            (None, '>') => return Some(start + offset),
+            _ => {}
+        }
     }
-    Some(
-        rest.split_whitespace()
-            .next()
-            .unwrap_or_default()
-            .trim_matches('>')
-            .trim()
-            .to_string(),
-    )
+    None
+}
+
+fn extract_attr(tag: &str, attr: &str) -> Option<String> {
+    if attr.is_empty() {
+        return None;
+    }
+    let attr_len = attr.len();
+    let mut cursor = 0;
+    let mut quote: Option<char> = None;
+    while cursor < tag.len() {
+        let Some(ch) = tag[cursor..].chars().next() else {
+            break;
+        };
+        if let Some(active_quote) = quote {
+            if ch == active_quote {
+                quote = None;
+            }
+            cursor += ch.len_utf8();
+            continue;
+        }
+        if ch == '"' || ch == '\'' {
+            quote = Some(ch);
+            cursor += ch.len_utf8();
+            continue;
+        }
+
+        let candidate_matches = cursor + attr_len <= tag.len()
+            && tag
+                .get(cursor..cursor + attr_len)
+                .map(|candidate| candidate.eq_ignore_ascii_case(attr))
+                .unwrap_or(false);
+        if candidate_matches {
+            let before = tag[..cursor].chars().next_back();
+            let after = tag[cursor + attr_len..].chars().next();
+            let starts_on_boundary = before
+                .map(|previous| previous.is_whitespace() || matches!(previous, '<' | '/'))
+                .unwrap_or(false);
+            let ends_on_boundary = after
+                .map(|next| next.is_whitespace() || matches!(next, '=' | '>' | '/'))
+                .unwrap_or(false);
+            if starts_on_boundary && ends_on_boundary {
+                let after_attr = &tag[cursor + attr_len..];
+                let rest = after_attr.trim_start().strip_prefix('=')?.trim_start();
+                let mut chars = rest.chars();
+                let first = chars.next()?;
+                if first == '"' || first == '\'' {
+                    let value: String = chars.take_while(|value_ch| *value_ch != first).collect();
+                    return Some(value.trim().to_string());
+                }
+                return Some(
+                    rest.split_whitespace()
+                        .next()
+                        .unwrap_or_default()
+                        .trim_matches('>')
+                        .trim()
+                        .to_string(),
+                );
+            }
+        }
+        cursor += ch.len_utf8();
+    }
+    None
 }
 
 fn strip_html_tags(input: &str) -> String {
@@ -523,6 +785,8 @@ fn strip_html_tags(input: &str) -> String {
 
 fn decode_basic_entities(input: &str) -> String {
     input
+        .replace("&nbsp;", " ")
+        .replace("&NBSP;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -706,6 +970,79 @@ mod tests {
     }
 
     #[test]
+    fn preview_warns_for_single_quoted_remote_images() {
+        let parsed = parse_message_preview(
+            "Subject: Remote image\nContent-Type: text/html\n\n<p>Hi</p><img src = 'https://tracker.example/open.png'>",
+        );
+
+        assert!(parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("远程图片")));
+        assert!(!parsed.sanitized_html.contains("src='http"));
+    }
+
+    #[test]
+    fn remote_image_detection_handles_unquoted_sources() {
+        assert!(html_has_remote_images(
+            "<p>Hi</p><img alt=tracker src=https://tracker.example/open.png>"
+        ));
+        assert!(html_has_remote_images(
+            "<img alt=\"1 > 2\" src=\"https://tracker.example/open.png\">"
+        ));
+        assert!(!html_has_remote_images(
+            "<img data-src=\"https://tracker.example/open.png\" src=\"cid:logo@example.com\">"
+        ));
+        assert!(!html_has_remote_images(
+            "<img alt=\"src=https://tracker.example/open.png\" src=\"cid:logo@example.com\">"
+        ));
+        assert!(!html_has_remote_images(
+            "<img src=\"cid:logo@example.com\">"
+        ));
+        assert!(html_has_remote_images(
+            "<td background=\"https://cdn.example.com/hero.png\"></td>"
+        ));
+        assert!(html_has_remote_images(
+            "<div style=\"background:url('https://cdn.example.com/hero.png')\"></div>"
+        ));
+    }
+
+    #[test]
+    fn remote_background_images_are_blocked_then_promoted_after_confirmation() {
+        let html = "<table><tr><td background=\"https://cdn.example.com/hero.png\"><img width=\"436\" height=\"96\"><a href=\"https://count.mail.163.com/statistics/login.do\">button</a></td></tr></table>";
+        let blocked = sanitize_html(html);
+        assert!(!blocked.contains("cdn.example.com/hero.png"));
+        assert!(!blocked.contains("<img"));
+
+        let allowed = sanitize_html_with_remote_images(html);
+        assert!(allowed.contains("https://cdn.example.com/hero.png"));
+        assert!(!allowed.contains("count.mail.163.com/statistics/login.do"));
+        assert!(!allowed.contains("width=\"436\" height=\"96\"></a>"));
+    }
+
+    #[test]
+    fn html_only_message_snippet_uses_visible_text_not_markup() {
+        let snippet = message_body_snippet(
+            "",
+            "<!doctype html><html><body><div style=\"font-family: system-ui\">你好&nbsp;世界</div></body></html>",
+            "",
+        );
+
+        assert_eq!(snippet, "你好 世界");
+    }
+
+    #[test]
+    fn image_only_message_snippet_is_empty_after_sanitization() {
+        let snippet = message_body_snippet(
+            "",
+            "<!doctype html><html><body><td background=\"https://cdn.example.com/hero.png\"><img src=\"https://mimg.127.net/p/t.gif\"></td></body></html>",
+            "",
+        );
+
+        assert_eq!(snippet, "");
+    }
+
+    #[test]
     fn decodes_mime_encoded_subject_and_addresses() {
         let parsed = parse_message_preview(concat!(
             "Subject: =?utf-8?B?c2E=?=\r\n",
@@ -829,6 +1166,19 @@ mod tests {
     }
 
     #[test]
+    fn remote_image_sanitizer_allows_only_https_remote_urls() {
+        let sanitized = sanitize_html_with_remote_images(
+            "<img src=\"https://cdn.example.com/open.png\"><img src=\"http://tracker.example/open.png\"><a href=\"https://phish.example/login\">https bad</a><a href=\"http://phish.example/login\">http bad</a><a href=\"mailto:a@example.com\">mail</a>",
+        );
+
+        assert!(sanitized.contains("https://cdn.example.com/open.png"));
+        assert!(!sanitized.contains("http://tracker.example/open.png"));
+        assert!(!sanitized.contains("https://phish.example/login"));
+        assert!(!sanitized.contains("http://phish.example/login"));
+        assert!(sanitized.contains("href=\"mailto:a@example.com\""));
+    }
+
+    #[test]
     fn detects_mismatched_and_sensitive_link_domains() {
         let warnings = link_risk_warnings(
             "<a href=\"https://evil.example/login\">https://bank.example</a>\
@@ -843,5 +1193,26 @@ mod tests {
         assert!(warnings
             .iter()
             .any(|warning| warning.contains("登录/验证关键词")));
+    }
+
+    #[test]
+    fn link_risk_detection_handles_angle_brackets_inside_attributes() {
+        let warnings = link_risk_warnings(
+            "<a title=\"1 > 2\" href=\"https://evil.example/login\">https://bank.example</a>",
+        );
+
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("bank.example") && warning.contains("evil.example")));
+    }
+
+    #[test]
+    fn link_risk_detection_ignores_data_href_without_real_href() {
+        let warnings = link_risk_warnings(
+            "<a data-href=\"https://evil.example/login\">https://bank.example</a>\
+             <a title=\"href=https://evil.example/login\">https://bank.example</a>",
+        );
+
+        assert!(warnings.is_empty());
     }
 }

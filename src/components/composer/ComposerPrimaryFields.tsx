@@ -1,8 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
+import {
+  buildContactSearchEntries,
+  datalistContacts as pickDatalistContacts,
+  matchingContacts,
+} from './contactSuggestions';
+import {
+  joinEditableBody,
+  parseOriginalQuote,
+  splitEditableBody,
+} from './composerBody';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -20,57 +30,11 @@ type ComposerPrimaryFieldsProps = {
   onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
 };
 
-const originalMessageMarkerPattern = /\n{0,2}-{2,}\s*(?:原始邮件|original message|forwarded message)\s*-{2,}[\s\S]*$/i;
-const originalMessageMetaPattern = /^\s*(?:发件人|收件人|抄送|时间|日期|主题|from|to|cc|date|subject)\s*[:：]/i;
-
-function splitEditableBody(body: string) {
-  const match = body.match(originalMessageMarkerPattern);
-  if (!match || match.index === undefined) {
-    return { editableBody: body, originalQuote: '' };
-  }
-  return {
-    editableBody: body.slice(0, match.index).trimEnd(),
-    originalQuote: body.slice(match.index).trimStart(),
-  };
-}
-
-function joinEditableBody(editableBody: string, originalQuote: string) {
-  if (!originalQuote) return editableBody;
-  const trimmedEditable = editableBody.trimEnd();
-  return `${trimmedEditable}${trimmedEditable ? '\n\n' : ''}${originalQuote}`;
-}
-
-function stripQuotePrefix(line: string) {
-  return line.replace(/^\s*(?:>\s*)+/, '').trimEnd();
-}
-
-function parseOriginalQuote(originalQuote: string) {
-  const lines = originalQuote.replace(/\r\n?/g, '\n').split('\n');
-  const [, ...rest] = lines;
-  const meta: string[] = [];
-  const content: string[] = [];
-  let sawContent = false;
-
-  for (const line of rest) {
-    if (!sawContent && originalMessageMetaPattern.test(line)) {
-      meta.push(line.trim());
-      continue;
-    }
-    if (!sawContent && !line.trim()) {
-      continue;
-    }
-    sawContent = true;
-    content.push(stripQuotePrefix(line));
-  }
-
-  return {
-    meta,
-    content: content.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
-  };
-}
+const datalistContactLimit = 30;
+const inlineSuggestionLimit = 5;
 
 function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
-  const quote = parseOriginalQuote(originalQuote);
+  const quote = useMemo(() => parseOriginalQuote(originalQuote), [originalQuote]);
 
   return (
     <section className="composer-original-quote" aria-label="原始邮件，只读">
@@ -131,20 +95,39 @@ export default function ComposerPrimaryFields({
   onAttachmentPaste,
 }: ComposerPrimaryFieldsProps) {
   const [recipientFocused, setRecipientFocused] = useState(false);
+  const recipientBlurTimerRef = useRef<number | null>(null);
   const recipientQuery = draft.to.split(/[;,]/).pop()?.trim().toLowerCase() ?? '';
-  const suggestedContacts = useMemo(() => {
-    const pool = recipientQuery
-      ? contacts.filter((contact) => {
-          const name = contact.name.toLowerCase();
-          const email = contact.email.toLowerCase();
-          return name.includes(recipientQuery)
-            || email.includes(recipientQuery)
-            || contact.aliases.some((alias) => alias.toLowerCase().includes(recipientQuery));
-        })
-      : contacts;
-    return pool.slice(0, 5);
-  }, [contacts, recipientQuery]);
-  const { editableBody, originalQuote } = splitEditableBody(draft.body);
+  const contactSearchEntries = useMemo(
+    () => buildContactSearchEntries(contacts),
+    [contacts],
+  );
+  const suggestedContacts = useMemo(
+    () => matchingContacts(contactSearchEntries, recipientQuery, inlineSuggestionLimit),
+    [contactSearchEntries, recipientQuery],
+  );
+  const datalistContacts = useMemo(() => (
+    pickDatalistContacts(
+      contactSearchEntries,
+      recipientQuery,
+      suggestedContacts,
+      datalistContactLimit,
+    )
+  ), [contactSearchEntries, recipientQuery, suggestedContacts]);
+  const showRecipientSuggestions = suggestedContacts.length > 0 && (recipientFocused || !draft.to.trim());
+  const { editableBody, originalQuote } = useMemo(
+    () => splitEditableBody(draft.body),
+    [draft.body],
+  );
+
+  const clearRecipientBlurTimer = () => {
+    if (recipientBlurTimerRef.current === null) return;
+    window.clearTimeout(recipientBlurTimerRef.current);
+    recipientBlurTimerRef.current = null;
+  };
+
+  useEffect(() => () => {
+    clearRecipientBlurTimer();
+  }, []);
 
   return (
     <div className="composer-primary-fields">
@@ -152,15 +135,32 @@ export default function ComposerPrimaryFields({
         <label className="composer-field-row">
           <span>收件人</span>
           <input
+            list="contact-suggestions"
             value={draft.to}
             onChange={(event) => onPatchDraft({ to: event.target.value })}
-            onFocus={() => setRecipientFocused(true)}
-            onBlur={() => window.setTimeout(() => setRecipientFocused(false), 120)}
+            onFocus={() => {
+              clearRecipientBlurTimer();
+              setRecipientFocused(true);
+            }}
+            onBlur={() => {
+              clearRecipientBlurTimer();
+              recipientBlurTimerRef.current = window.setTimeout(() => {
+                recipientBlurTimerRef.current = null;
+                setRecipientFocused(false);
+              }, 120);
+            }}
             placeholder="收件人"
           />
         </label>
+        <datalist id="contact-suggestions">
+          {datalistContacts.map((contact) => (
+            <option key={contact.id} value={contact.email}>
+              {contact.name || contact.email}
+            </option>
+          ))}
+        </datalist>
 
-        {recipientFocused && suggestedContacts.length > 0 && (
+        {showRecipientSuggestions && (
           <div className="recipient-suggestions">
             <span>{recipientQuery ? '匹配联系人' : '常用联系人'}</span>
             {suggestedContacts.map((contact) => (
@@ -209,7 +209,7 @@ export default function ComposerPrimaryFields({
           placeholder="正文"
         />
         {draft.attachments.length > 0 && (
-          <section className="composer-body-attachments" aria-label="附件">
+          <section className="composer-body-attachments composer-attachment-list" aria-label="附件">
             {draft.attachments.map((attachment, index) => {
               const iconMeta = attachmentIconMeta(attachment.filename, attachment.mime_type);
               return (

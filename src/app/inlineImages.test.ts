@@ -35,10 +35,25 @@ describe('CID inline images', () => {
 
     expect(result.html).toContain('src="asset://localhost//tmp/logo.png"');
     expect(result.html).toContain('data-better-email-attachment-id="1"');
+    expect(result.html).toContain('loading="lazy"');
+    expect(result.html).toContain('decoding="async"');
     expect(result.html).toContain('src="https://example.com/remote.png"');
     expect(result.resolvedContentIds).toEqual(['logo@example.com']);
     expect(result.pendingAttachments).toEqual([]);
     expect(result.missingContentIds).toEqual([]);
+  });
+
+  it('preserves existing image loading and decoding hints', () => {
+    const result = resolveCidInlineImages(
+      '<img loading="eager" decoding="sync" src="cid:logo@example.com">',
+      [attachment()],
+      () => 'asset://localhost/logo.png',
+    );
+
+    expect(result.html).toContain('loading="eager"');
+    expect(result.html).toContain('decoding="sync"');
+    expect(result.html.match(/\bloading=/g)).toHaveLength(1);
+    expect(result.html.match(/\bdecoding=/g)).toHaveLength(1);
   });
 
   it('returns pending downloads and hides unresolved CID sources', () => {

@@ -3,32 +3,6 @@
  * A quiet desktop mail surface: flat panes, compact rows, clear hierarchy.
  */
 
-:root {
-  color-scheme: light;
-  --ui-bg: #f3f5f7;
-  --ui-sidebar: #f1f3f6;
-  --ui-list: #fbfcfd;
-  --ui-reader: #ffffff;
-  --ui-surface: #ffffff;
-  --ui-surface-muted: #f5f7f9;
-  --ui-text: #1d242d;
-  --ui-text-secondary: #596574;
-  --ui-text-tertiary: #818b98;
-  --ui-border: #dfe3e8;
-  --ui-border-strong: #cfd5dc;
-  --ui-accent: #087ff5;
-  --ui-accent-hover: #006dd8;
-  --ui-accent-soft: #e9f3ff;
-  --ui-danger: #d92d20;
-  --ui-warning: #a15c00;
-  --ui-warning-bg: #fff8e8;
-  --ui-control-height: 34px;
-  --ui-radius-control: 9px;
-  --ui-shadow-popover: 0 18px 50px rgba(24, 33, 45, 0.16), 0 2px 8px rgba(24, 33, 45, 0.08);
-  --ui-shadow-float: 0 12px 36px rgba(24, 33, 45, 0.18), 0 2px 8px rgba(24, 33, 45, 0.08);
-  --ui-shadow-tooltip: 0 10px 28px rgba(17, 24, 39, 0.16), 0 1px 4px rgba(17, 24, 39, 0.10);
-}
-
 html,
 body,
 #root {
@@ -2191,32 +2165,7 @@ textarea:disabled {
 }
 
 /* Quiet desktop refinement: single visual system, low-noise mail-first hierarchy. */
-:root {
-  --ui-bg: #f4f5f6;
-  --ui-sidebar: #f0f1f3;
-  --ui-list: #fafafa;
-  --ui-reader: #ffffff;
-  --ui-surface: #ffffff;
-  --ui-surface-muted: #f6f7f8;
-  --ui-border: #dedfe3;
-  --ui-border-strong: #c9ccd2;
-  --ui-text: #1f2328;
-  --ui-text-secondary: #5f6670;
-  --ui-text-tertiary: #9299a3;
-  --ui-accent: #0a73d9;
-  --ui-accent-hover: #075fb5;
-  --ui-accent-soft: #eaf2fb;
-  --ui-danger: #c7352e;
-  --ui-warning: #9a6100;
-  --ui-warning-bg: #fff8eb;
-  --ui-radius-control: 7px;
-  --ui-radius-panel: 8px;
-  --ui-radius-modal: 13px;
-  --ui-shadow-popover: 0 14px 38px rgba(20, 26, 34, 0.14), 0 2px 8px rgba(20, 26, 34, 0.08);
-  --ui-shadow-float: var(--ui-shadow-popover);
-  --quiet-row-hover: #f3f5f7;
-  --quiet-row-selected: #e8edf3;
-}
+
 
 html,
 body,
@@ -2990,12 +2939,7 @@ body {
 }
 
 /* Motion cleanup: no wobble, no lift, only quiet hover feedback. */
-:root {
-  --quiet-row-hover: #f7f8fa;
-  --quiet-row-selected: #edf1f5;
-  --quiet-row-selected-border: #cfd8e3;
-  --quiet-row-shadow: 0 1px 3px rgba(31, 35, 40, 0.06);
-}
+
 
 .sidebar *,
 .message-list-panel *,
@@ -3333,8 +3277,7 @@ body {
 }
 
 .saved-search-form input,
-.custom-folder-form input,
-.contact-center > input {
+.custom-folder-form input {
   min-height: 31px;
   border-radius: 6px;
   font-size: 12px;
@@ -3348,7 +3291,6 @@ body {
 }
 
 .saved-search-row > button,
-.contact-row > button,
 .label-row .label-row-main {
   min-height: 31px;
   font-size: 12.5px;
@@ -3487,12 +3429,7 @@ body {
 }
 
 /* Sidebar selection pass: clearer current row, flatter hover. */
-:root {
-  --quiet-row-hover: #f2f4f6;
-  --quiet-row-selected: #e7edf5;
-  --quiet-row-selected-border: #7f9fca;
-  --quiet-row-shadow: none;
-}
+
 
 .sidebar .folder {
   border-radius: 7px;
@@ -4358,4 +4295,132 @@ body {
     opacity: 1;
     filter: blur(0);
   }
+}
+
+/*
+ * Better Email UI/UX Premium Refinements
+ * Overrides for sidebar active indicator, message card states, chips, empty states, and warnings.
+ */
+
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(10, 115, 217, 0.45);
+  outline-offset: 1px;
+}
+
+.settings-modal input:focus,
+.settings-modal select:focus,
+.settings-modal textarea:focus,
+.composer input:focus,
+.composer select:focus,
+.composer textarea:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px rgba(10, 115, 217, 0.15);
+}
+
+.sidebar .folder.active,
+.sidebar .folder.active:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.message-card.is-unread {
+  background: #ffffff;
+}
+
+.message-card.is-read {
+  background: var(--ui-list);
+}
+
+.message-card:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+.message-card.selected,
+.message-card.selected:hover {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 3.5px 0 0 var(--ui-accent);
+}
+
+.message-unread-dot {
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-surface);
+}
+
+.message-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.message-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  gap: 8px;
+  background: var(--ui-list);
+}
+
+.empty-state-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  margin-bottom: 8px;
+  box-shadow: none;
+}
+
+.empty-reader-compose {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+  transition: all 120ms ease;
+}
+
+.empty-reader-compose:hover {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.reader-warning-panel {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning);
+}
+
+.reader-warning-primary-action {
+  border-radius: var(--ui-radius-control);
+  transition: all 120ms ease;
 }

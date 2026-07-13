@@ -6,13 +6,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  Edit3,
-  Inbox,
-  Keyboard,
-  RefreshCw,
-  Settings,
-} from 'lucide-react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
@@ -31,21 +24,20 @@ import useMessageCollectionActions from './hooks/useMessageCollectionActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
+import useReaderActions from './hooks/useReaderActions';
 import {
-  defaultNotificationPolicy,
   formatBytes,
   formatDate,
   type NotificationPolicy,
   prefixedSubject,
   quoteMessage,
   replyThreadingHeaders,
-  remoteImageTrustInput,
+  htmlHasRemoteVisualContent,
   senderDomain,
 } from './mailUtils';
 import { getCurrentWindow, invoke } from './tauriBridge';
 
 import type {
-  SystemFolderRole,
   FolderRole,
   FilterMode,
   ListMode,
@@ -61,7 +53,6 @@ import type {
   Attachment,
   OutboundAttachmentInput,
   DroppedFile,
-  AttachmentDownload,
   Message,
   UndoMessageSnapshot,
   CommandPaletteItem,
@@ -76,10 +67,8 @@ import type {
   LocalBackupSummary,
   StorageUsage,
   CacheClearResult,
-  EndpointCheck,
   ConnectionReport,
   CredentialVerificationReport,
-  ImapFolderProbe,
   ImapProbeReport,
   ImapMailboxState,
   SyncRun,
@@ -114,31 +103,18 @@ import {
   composerAutosaveStorageKey,
   sendUndoDelayStorageKey,
   listSortStorageKey,
-  filterModes,
-  backgroundTaskTitle,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
   loadListSort,
   removeAppStorage,
   loadProviderVerifications,
-  isFilterMode,
   loadSavedSearches,
   loadComposeTemplates,
   isDraftEmpty,
-  normalizeDraftInput,
   loadComposerAutosave,
-  outboxStatusLabel,
-  outboxTimingLabel,
-  canCancelOutboxItem,
-  isCustomFolder,
   movableFoldersForBulk,
   sampleRawMessage,
-  folderIcon,
-  folderIconForRole,
-  primaryFolderRoles,
-  filters,
   messagePageSize,
-  searchShortcuts,
   emptyAccountCreateForm,
 } from './app/appConfig';
 import type {
@@ -150,6 +126,7 @@ import {
   buildForwardAttachmentPlan,
   forwardAttachmentStatus,
 } from './app/forwarding';
+import { flowInfo, flowWarn } from './app/logger';
 import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
@@ -179,11 +156,11 @@ function DeferredSurface({ label }: { label: string }) {
 }
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
-  console.info(`[app-flow] ${event}`, details);
+  flowInfo('app-flow', event, details);
 }
 
 function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  console.warn(`[app-flow] ${event}`, details);
+  flowWarn('app-flow', event, details);
 }
 
 const manualUnreadStorageKey = 'better-email.manual-unread-message-ids';
@@ -249,6 +226,7 @@ export default function App() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
+  const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const [listMode, setListMode] = useState<ListMode>('messages');
@@ -256,7 +234,7 @@ export default function App() {
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<SearchScope>('account');
+  const [searchScope, setSearchScope] = useState<SearchScope>('folder');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const [savedSearchName, setSavedSearchName] = useState('');
@@ -287,13 +265,12 @@ export default function App() {
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
   const [remoteImageTrusts, setRemoteImageTrusts] = useState<RemoteImageTrust[]>([]);
-  const [lastNewMailNotice, setLastNewMailNotice] = useState<string | null>(null);
-  const [notificationStatus, setNotificationStatus] = useState('系统提醒未检查');
-  const [appBadgeStatus, setAppBadgeStatus] = useState('应用角标未同步');
+  const [, setLastNewMailNotice] = useState<string | null>(null);
+  const [, setNotificationStatus] = useState('系统提醒未检查');
+  const [, setAppBadgeStatus] = useState('应用角标未同步');
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
   const {
-    contacts,
     setContacts,
     contactMergeSuggestions,
     setContactMergeSuggestions,
@@ -309,10 +286,7 @@ export default function App() {
     setContactFormAliases,
     mergeSourceContactId,
     setMergeSourceContactId,
-    contactQuery,
-    setContactQuery,
     contactTransferBusy,
-    filteredContacts,
     managedContacts,
     startEditContact,
     createManagedContact,
@@ -588,13 +562,13 @@ export default function App() {
 
   async function focusMailboxRole(role: FolderRole, targetAccountId: number | null, statusMessage: string) {
     const startedAt = performance.now();
-    const nextScope = targetAccountId ?? accountScope;
+    const nextScope = accountScope === 'all' ? 'all' : targetAccountId ?? accountScope;
     appFlowLog('focus mailbox role start', {
       role,
       accountId: targetAccountId,
       scope: nextScope,
     });
-    if (targetAccountId) {
+    if (targetAccountId && accountScope !== 'all') {
       setAccountScope(targetAccountId);
     }
     setSearchScope('folder');
@@ -604,8 +578,12 @@ export default function App() {
     setActiveThread(null);
     setThreadMessages([]);
     const meta = await loadMeta(null, nextScope);
+    const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
     const targetFolder =
-      meta.folders.find((folder) => folder.role === role && (!targetAccountId || folder.account_id === targetAccountId)) ??
+      meta.folders.find((folder) => (
+        folder.role === role
+        && (!shouldMatchTargetAccount || folder.account_id === targetAccountId)
+      )) ??
       meta.folders.find((folder) => folder.role === role);
     if (!targetFolder) {
       appFlowWarn('focus mailbox role missing folder', {
@@ -990,8 +968,6 @@ export default function App() {
     () => messages.filter((message) => selectedMessageSet.has(message.id)),
     [messages, selectedMessageSet],
   );
-  const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
-  const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const unreadTotal = stats?.unread_messages ?? 0;
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
@@ -1005,7 +981,6 @@ export default function App() {
     () => (selected ? senderDomain(selected.sender_email) : ''),
     [selected?.sender_email],
   );
-  const selectedHasImagePreview = Boolean(selected?.sanitized_html.includes('<img'));
   const selectedSenderTrusted = useMemo(
     () =>
       Boolean(
@@ -1022,6 +997,34 @@ export default function App() {
   const selectedHasRemoteImageWarning = Boolean(
     selected?.security_warnings.some((warning) => warning.includes('远程图片')),
   ) && !selectedSenderTrusted;
+
+  const {
+    fetchSelectedBody,
+    renderSelectedWithRemoteImagePolicy,
+    allowRemoteImagesForSelectedOnce,
+    trustRemoteImagesForSelected,
+    blockSelectedSender,
+    downloadAttachment,
+    openAttachment,
+    saveAttachmentAs,
+    exportSelectedMessage,
+  } = useReaderActions({
+    selected,
+    activeThread,
+    folderId,
+    setMessages,
+    setThreadMessages,
+    setAttachments,
+    setRemoteImageTrusts,
+    setRules,
+    setSelectedId,
+    setStatus,
+    visibleFolderIdForRole,
+    loadMeta,
+    loadMessages: (fid) => loadMessages(fid),
+    bodyFetchFailedRef,
+    bodyFetchInFlightRef,
+  });
 
   function rememberManualReadState(messageIds: number[], isRead: boolean) {
     const next = new Set(manualUnreadMessageIdsRef.current);
@@ -1051,26 +1054,32 @@ export default function App() {
     if (manualUnreadMessageIdsRef.current.has(selected.id)) return;
     if (autoReadInFlightRef.current.has(selected.id)) return;
 
+    const selectedMessageId = selected.id;
+    const selectedAccountId = selected.account_id;
+    const selectedRemoteMailbox = selected.remote_mailbox;
+    const selectedRemoteUid = selected.remote_uid;
+    const activeThreadKey = activeThread?.thread_key ?? null;
+
     autoReadInFlightRef.current.add(selected.id);
     appFlowLog('autoMarkRead start', {
-      messageId: selected.id,
-      accountId: selected.account_id,
-      mailbox: selected.remote_mailbox,
-      uid: selected.remote_uid,
+      messageId: selectedMessageId,
+      accountId: selectedAccountId,
+      mailbox: selectedRemoteMailbox,
+      uid: selectedRemoteUid,
     });
-    invoke<RemoteActionReport>('set_message_read', { messageId: selected.id, isRead: true })
+    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
       .then((report) => {
         setMessages((current) => current.map((message) => (
-          message.id === selected.id ? { ...message, is_read: true } : message
+          message.id === selectedMessageId ? { ...message, is_read: true } : message
         )));
-        if (activeThread) {
+        if (activeThreadKey) {
           setThreadMessages((current) => current.map((message) => (
-            message.id === selected.id ? { ...message, is_read: true } : message
+            message.id === selectedMessageId ? { ...message, is_read: true } : message
           )));
-          setActiveThread((current) => current && current.thread_key === activeThread.thread_key
+          setActiveThread((current) => current && current.thread_key === activeThreadKey
             ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
             : current);
-          setThreads((current) => current.map((thread) => thread.thread_key === activeThread.thread_key
+          setThreads((current) => current.map((thread) => thread.thread_key === activeThreadKey
             ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
             : thread));
         }
@@ -1078,20 +1087,50 @@ export default function App() {
           ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
           : current);
         appFlowLog('autoMarkRead done', {
-          messageId: selected.id,
+          messageId: selectedMessageId,
           message: report.message,
         });
       })
       .catch((error) => {
         appFlowWarn('autoMarkRead failed', {
-          messageId: selected.id,
+          messageId: selectedMessageId,
           error: String(error).replace(/^Error:\s*/i, ''),
         });
       })
       .finally(() => {
-        autoReadInFlightRef.current.delete(selected.id);
+        autoReadInFlightRef.current.delete(selectedMessageId);
       });
-  }, [selectedId, selected?.is_read, activeThread]);
+  }, [selectedId, selected?.is_read, activeThread?.thread_key]);
+
+  useEffect(() => {
+    if (!selected || !selectedSenderTrusted) return;
+    if (!htmlHasRemoteVisualContent(selected.body)) return;
+    if (selected.sanitized_html.includes('src="https://')) return;
+    if (trustedRemoteImageRenderRef.current.has(selected.id)) return;
+
+    trustedRemoteImageRenderRef.current.add(selected.id);
+    invoke<Message>('render_message_with_remote_image_policy', { messageId: selected.id })
+      .then((updated) => {
+        setMessages((current) => current.map((message) => (
+          message.id === updated.id ? updated : message
+        )));
+        if (activeThread) {
+          setThreadMessages((current) => current.map((message) => (
+            message.id === updated.id ? updated : message
+          )));
+        }
+      })
+      .catch((error) => {
+        trustedRemoteImageRenderRef.current.delete(selected.id);
+        setStatus(String(error));
+      });
+  }, [
+    activeThread,
+    selected?.id,
+    selected?.body,
+    selected?.sanitized_html,
+    selectedSenderTrusted,
+  ]);
 
   useEffect(() => {
     if (!selected) return;
@@ -1625,13 +1664,18 @@ export default function App() {
   }
 
   async function markFolderRead(folder: Folder) {
+    const visibleUnreadCount = folder.unread_count;
     const report = await invoke<FolderReadReport>('mark_folder_read', {
       folderId: folder.id,
       role: folder.role,
       isVirtual: folder.is_virtual,
     });
     await refreshAll();
-    setStatus(report.message);
+    setStatus(
+      report.updated_count > 0 || visibleUnreadCount <= 0
+        ? report.message
+        : `已将 ${visibleUnreadCount} 封邮件标为已读；本地状态已刷新。`,
+    );
   }
 
   async function snoozeSelected() {
@@ -1889,11 +1933,13 @@ export default function App() {
         threading: replyThreadingHeaders(message),
       });
       setQuickReplyBody('');
-      await focusMailboxRole('sent', message.account_id, `已快速回复：${message.sender_name || message.sender_email}`);
+      await refreshAll();
+      setSelectedId(message.id);
+      setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
       appFlowLog('sendQuickReply done', {
         messageId,
         accountId: message.account_id,
-        targetRole: 'sent',
+        targetRole: 'current',
       });
     } catch (error) {
       const errorMessage = String(error);
@@ -2030,12 +2076,6 @@ export default function App() {
     setStatus('已打开草稿继续编辑');
   }
 
-  function openContactEditor(contact: Contact) {
-    startEditContact(contact);
-    setActiveSettingsSection('contacts');
-    setSettingsOpen(true);
-  }
-
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
     const existing = draft[field]
       .split(/[;,]/)
@@ -2047,7 +2087,7 @@ export default function App() {
       return;
     }
     const nextRecipients = [...existing, contact.email].join(', ');
-    setDraft({ ...draft, [field]: nextRecipients });
+    setDraft((current) => ({ ...current, [field]: nextRecipients }));
     setStatus(`已添加联系人：${contact.name || contact.email}`);
   }
 
@@ -2159,116 +2199,6 @@ export default function App() {
     setStatus(`已导入 EML：${imported.subject || '(无主题)'}`);
   }
 
-  async function fetchSelectedBody() {
-    if (!selected) return;
-    bodyFetchFailedRef.current.delete(selected.id);
-    bodyFetchInFlightRef.current.add(selected.id);
-    appFlowLog('manualFetchBody start', {
-      messageId: selected.id,
-      accountId: selected.account_id,
-      mailbox: selected.remote_mailbox,
-      uid: selected.remote_uid,
-    });
-    try {
-      const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
-      setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-      if (activeThread) {
-        setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-      }
-      const refreshedAttachments = await invoke<Attachment[]>('list_attachments', { messageId: updated.id });
-      setAttachments(refreshedAttachments);
-      appFlowLog('manualFetchBody done', {
-        messageId: updated.id,
-        bodyLength: updated.body.length,
-        htmlLength: updated.sanitized_html.length,
-        attachments: refreshedAttachments.length,
-      });
-      setStatus('远端正文已拉取并缓存到本地');
-    } catch (error) {
-      const message = String(error).replace(/^Error:\s*/i, '');
-      bodyFetchFailedRef.current.add(selected.id);
-      appFlowWarn('manualFetchBody failed', {
-        messageId: selected.id,
-        accountId: selected.account_id,
-        mailbox: selected.remote_mailbox,
-        uid: selected.remote_uid,
-        error: message,
-      });
-      setStatus(`正文拉取失败：${message}`);
-      throw error;
-    } finally {
-      bodyFetchInFlightRef.current.delete(selected.id);
-    }
-  }
-
-  async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
-    if (!messageId) return null;
-    const updated = await invoke<Message>('render_message_with_remote_image_policy', { messageId });
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-    if (activeThread) {
-      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-    }
-    return updated;
-  }
-
-  async function allowRemoteImagesForSelectedOnce() {
-    if (!selected) return;
-    const updated = await invoke<Message>('render_message_with_remote_images_once', { messageId: selected.id });
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-    if (activeThread) {
-      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-    }
-    setStatus('已允许查看当前邮件的远程图片');
-  }
-
-  async function trustRemoteImagesForSelected(scope: 'sender' | 'domain') {
-    if (!selected) return;
-    const input = remoteImageTrustInput(selected.account_id, selected.sender_email, scope);
-    if (!input.value) {
-      setStatus('当前发件人地址不完整，无法加入远程图片信任列表');
-      return;
-    }
-    const trust = await invoke<RemoteImageTrust>('trust_remote_images', { input });
-    setRemoteImageTrusts((current) => {
-      const withoutDuplicate = current.filter((item) => item.id !== trust.id);
-      return [...withoutDuplicate, trust].sort((a, b) => `${a.scope}:${a.value}`.localeCompare(`${b.scope}:${b.value}`));
-    });
-    let updated = await renderSelectedWithRemoteImagePolicy(selected.id);
-    if (
-      updated?.security_warnings.some((warning) => warning.includes('远程图片')) &&
-      selected.remote_uid > 0
-    ) {
-      bodyFetchFailedRef.current.delete(selected.id);
-      await fetchSelectedBody();
-      updated = await renderSelectedWithRemoteImagePolicy(selected.id);
-    }
-    setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任域名远程图片：${trust.value}`);
-  }
-
-  async function blockSelectedSender() {
-    if (!selected?.sender_email.trim()) {
-      setStatus('当前发件人地址不完整，无法阻止');
-      return;
-    }
-    const sender = selected.sender_email.trim().toLowerCase();
-    const saved = await invoke<MailRule>('upsert_rule', {
-      ruleId: null,
-      input: {
-        name: `阻止 ${sender}`,
-        condition: `from contains ${sender}`,
-        action: 'move to spam; stop',
-        enabled: true,
-      },
-    });
-    setRules((current) => [...current.filter((rule) => rule.id !== saved.id), saved]);
-    await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
-    const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
-    await loadMeta(spamFolderId);
-    await loadMessages(spamFolderId);
-    setSelectedId(selected.id);
-    setStatus(`已阻止发件人：${sender}，后续邮件将移入垃圾邮件`);
-  }
-
   async function deleteRemoteImageTrust(trust: RemoteImageTrust) {
     await invoke('delete_remote_image_trust', { trustId: trust.id });
     setRemoteImageTrusts((current) => current.filter((item) => item.id !== trust.id));
@@ -2276,44 +2206,6 @@ export default function App() {
       await renderSelectedWithRemoteImagePolicy(selected.id);
     }
     setStatus(`已移除远程图片信任：${trust.value}`);
-  }
-
-  async function downloadAttachment(attachment: Attachment) {
-    try {
-      const result = await invoke<AttachmentDownload>('download_attachment', { attachmentId: attachment.id });
-      setAttachments((current) =>
-        current.map((item) => (item.id === result.attachment.id ? result.attachment : item)),
-      );
-      setStatus(result.message);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setStatus(`附件下载失败：${message.replace(/^Error:\s*/i, '')}`);
-      throw error;
-    }
-  }
-
-  async function openAttachment(attachment: Attachment) {
-    if (!attachment.is_downloaded) {
-      setStatus('请先下载附件');
-      return;
-    }
-    const message = await invoke<string>('open_attachment', { attachmentId: attachment.id });
-    setStatus(message);
-  }
-
-  async function saveAttachmentAs(attachment: Attachment) {
-    if (!attachment.is_downloaded) {
-      setStatus('请先下载附件');
-      return;
-    }
-    const message = await invoke<string>('save_attachment_as', { attachmentId: attachment.id });
-    setStatus(message);
-  }
-
-  async function exportSelectedMessage() {
-    if (!selected) return;
-    const message = await invoke<string>('export_message_as_eml', { messageId: selected.id });
-    setStatus(message);
   }
 
   async function parseRawMessage() {
@@ -2520,7 +2412,7 @@ export default function App() {
   async function clearSearchAndFilter() {
     setQuery('');
     setFilter('all');
-    setSearchScope('account');
+    setSearchScope('folder');
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
@@ -2532,7 +2424,7 @@ export default function App() {
       mailboxRefreshRef.current,
       folders,
       messagePageSize,
-      'account',
+      'folder',
     );
     setStatus('已清空搜索和筛选');
   }
@@ -2571,26 +2463,6 @@ export default function App() {
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
 
-  async function runLabelSearch(label: Label) {
-    const nextQuery = `label:${label.name}`;
-    setQuery(nextQuery);
-    setFilter('all');
-    setSearchScope('folder');
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessages(
-      folderId,
-      nextQuery,
-      'all',
-      accountScope,
-      mailboxRefreshRef.current,
-      messagePageSize,
-      'folder',
-    );
-    setStatus(`正在查看标签：${label.name}`);
-  }
-
   function saveCurrentSearch() {
     const trimmedQuery = query.trim();
     const trimmedName = savedSearchName.trim() || trimmedQuery;
@@ -2626,7 +2498,9 @@ export default function App() {
   function changeAccountScope(value: string) {
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
-    setSearchScope('account');
+    setQuery('');
+    setFilter('all');
+    setSearchScope('folder');
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);
@@ -2638,6 +2512,8 @@ export default function App() {
   }
 
   function selectFolder(nextFolderId: number) {
+    setQuery('');
+    setFilter('all');
     setSearchScope('folder');
     setFolderId(nextFolderId);
   }
@@ -2749,15 +2625,40 @@ export default function App() {
         folderId={folderId}
         renamingFolderId={renamingFolderId}
         renamingFolderName={renamingFolderName}
+        backgroundSyncStatus={backgroundSyncStatus}
+        backgroundTasks={backgroundTasks}
+        savedSearchName={savedSearchName}
+        savedSearches={savedSearches}
+        customFolderName={customFolderName}
         onAccountScopeChange={changeAccountScope}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
         onCompose={() => {
-          setDraft(emptyDraft);
-          setRichComposer(false);
-          openComposer(emptyDraft);
-          setStatus('已打开新邮件');
+          if (isDraftEmpty(draft) && composerAutosave) {
+            openComposer(undefined, { restoreAutosave: true });
+          } else {
+            setRichComposer(false);
+            openComposer(emptyDraft);
+            setStatus('已打开新邮件');
+          }
+        }}
+        onSyncNow={() => {
+          syncAndRefresh().catch((error) => setStatus(String(error)));
+        }}
+        onResetAppLayout={() => {
+          resetAppLayout();
+          setStatus('已重置布局');
+        }}
+        onSavedSearchNameChange={setSavedSearchName}
+        onSaveCurrentSearch={saveCurrentSearch}
+        onRunSavedSearch={(savedSearch) => {
+          runSavedSearch(savedSearch).catch((error) => setStatus(String(error)));
+        }}
+        onDeleteSavedSearch={deleteSavedSearch}
+        onCustomFolderNameChange={setCustomFolderName}
+        onCreateCustomFolder={() => {
+          createCustomFolder().catch((error) => setStatus(String(error)));
         }}
         onSelectFolder={selectFolder}
         onDropMessagesToFolder={(folder, messageIds) => {
@@ -2801,7 +2702,6 @@ export default function App() {
         activeThread={activeThread}
         messages={messages}
         selectedId={selectedId}
-        accountScope={accountScope}
         hasMoreMessages={hasMoreMessages}
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}
@@ -3245,7 +3145,7 @@ export default function App() {
         onDismissAction={clearUndoAction}
       />
       <GlobalTooltip />
-      <div className="status-live-region" role="status" aria-live="polite">{status}</div>
+      <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );
 }

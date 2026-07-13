@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatDate,
   messageDateGroup,
+  mailboxListPreview,
   newMailNotificationDecision,
   newMailNotificationBody,
   notificationThreadScopeKey,
@@ -14,6 +15,9 @@ import {
   senderDomain,
   syncIntervalMs,
   syncStatusLabel,
+  bodyLooksLikeHtml,
+  htmlHasRenderableContent,
+  htmlHasRemoteVisualContent,
 } from './mailUtils';
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
@@ -54,6 +58,39 @@ describe('mail UI utilities', () => {
     expect(plainTextPreview('&lt;div style=&quot;font-family: system-ui;&quot;&gt;周雪莹王欣答辩PPT&lt;/div&gt;'))
       .toBe('周雪莹王欣答辩PPT');
     expect(plainTextPreview('<script>alert(1)</script><p>正文</p>')).toBe('正文');
+  });
+
+  it('builds mailbox previews without showing remote-header placeholders', () => {
+    expect(mailboxListPreview({
+      body: '<p>完整正文</p>',
+      sanitized_html: '',
+      snippet: '短摘要',
+    })).toBe('完整正文');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '&lt;p&gt;安全正文&lt;/p&gt;',
+      snippet: '短摘要',
+    })).toBe('安全正文');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '远端邮件头已同步，打开邮件后自动获取正文。',
+    })).toBe('');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '普通摘要',
+    })).toBe('普通摘要');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '!doctype html',
+    })).toBe('');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: 'div style="font-family: -apple-system, system-ui;"',
+    })).toBe('');
   });
 
   it('quotes message bodies for reply and forward drafts', () => {
@@ -310,6 +347,36 @@ describe('mail UI utilities', () => {
       account_id: 7,
       scope: 'domain',
       value: 'example.com',
+    });
+  });
+
+  describe('HTML and remote image visual content detection', () => {
+    it('detects if body looks like HTML', () => {
+      expect(bodyLooksLikeHtml('plain text')).toBe(false);
+      expect(bodyLooksLikeHtml('<p>html paragraph</p>')).toBe(true);
+      expect(bodyLooksLikeHtml('<!DOCTYPE html><html>')).toBe(true);
+    });
+
+    it('detects if HTML has renderable content', () => {
+      expect(htmlHasRenderableContent('<img src="cid:abc">')).toBe(true);
+      expect(htmlHasRenderableContent('   ')).toBe(false);
+      expect(htmlHasRenderableContent('some text')).toBe(true);
+      expect(htmlHasRenderableContent('<div>   </div>')).toBe(false);
+    });
+
+    it('detects if HTML has remote visual content like td background or css background-image', () => {
+      // img src
+      expect(htmlHasRemoteVisualContent('<img src="https://example.com/a.png">')).toBe(true);
+      // source src
+      expect(htmlHasRemoteVisualContent('<source src="https://example.com/a.png">')).toBe(true);
+      // td background
+      expect(htmlHasRemoteVisualContent('<td background="https://example.com/bg.png"></td>')).toBe(true);
+      // inline css background-image
+      expect(htmlHasRemoteVisualContent('<div style="background-image: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
+      expect(htmlHasRemoteVisualContent('<div style="background: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
+      // negative cases
+      expect(htmlHasRemoteVisualContent('<img src="cid:local.png">')).toBe(false);
+      expect(htmlHasRemoteVisualContent('<img src="/local/path.png">')).toBe(false);
     });
   });
 });

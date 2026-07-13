@@ -11,6 +11,7 @@ import {
   appLayoutStorageKey,
   clampNumber,
   defaultAppLayout,
+  legacyAppLayoutStorageKey,
   loadAppLayout,
 } from '../app/appConfig';
 
@@ -29,6 +30,12 @@ export default function useAppLayout() {
   const resizeRef = useRef<LayoutResize | null>(null);
 
   useEffect(() => {
+    if (
+      window.localStorage.getItem(appLayoutStorageKey) == null &&
+      window.localStorage.getItem(legacyAppLayoutStorageKey) != null
+    ) {
+      return;
+    }
     window.localStorage.setItem(appLayoutStorageKey, JSON.stringify(appLayout));
   }, [appLayout]);
 

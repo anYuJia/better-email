@@ -30,12 +30,13 @@ type ComposerSelectOption = {
 
 type ComposerInlineSelectProps = {
   label: string;
+  ariaLabel?: string;
   value: number;
   options: ComposerSelectOption[];
   onChange: (value: number) => void;
 };
 
-function ComposerInlineSelect({ label, value, options, onChange }: ComposerInlineSelectProps) {
+function ComposerInlineSelect({ label, ariaLabel, value, options, onChange }: ComposerInlineSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((option) => option.value === value) ?? options[0] ?? null;
@@ -61,6 +62,18 @@ function ComposerInlineSelect({ label, value, options, onChange }: ComposerInlin
   return (
     <div className="composer-from composer-inline-select" ref={rootRef}>
       <span>{label}</span>
+      <select
+        aria-label={ariaLabel ?? label}
+        className="composer-native-select"
+        value={selected?.value ?? 0}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label} {option.meta ? `· ${option.meta}` : ''}
+          </option>
+        ))}
+      </select>
       <div className={`composer-select${open ? ' is-open' : ''}`}>
         <button
           type="button"
@@ -145,12 +158,14 @@ export default function ComposerAdvancedTools({
           <div className="composer-advanced-row composer-route-row">
             <ComposerInlineSelect
               label="账号"
+              ariaLabel="发件账号"
               value={accountId}
               options={accountOptions}
               onChange={(nextAccountId) => onPatchDraft({ account_id: nextAccountId, identity_id: 0 })}
             />
             <ComposerInlineSelect
               label="身份"
+              ariaLabel="发件身份"
               value={identityId}
               options={identityOptions}
               onChange={(nextIdentityId) => onPatchDraft({ identity_id: nextIdentityId })}
@@ -215,7 +230,7 @@ export default function ComposerAdvancedTools({
               onChange={(event) => onTemplateNameChange(event.target.value)}
               placeholder="模板名称"
             />
-            <button type="button" onClick={onSaveTemplate}>保存模板</button>
+            <button type="button" onClick={onSaveTemplate}>保存当前</button>
           </div>
         </section>
       </div>

@@ -10,6 +10,7 @@ import {
 import {
   filters,
   listSortOptions,
+  searchShortcuts,
   searchScopeOptions,
 } from '../app/appConfig';
 import type {
@@ -19,14 +20,10 @@ import type {
   Message,
   SearchScope,
 } from '../app/types';
-
-type SearchSuggestion = {
-  id: 'to' | 'from' | 'attachment' | 'body';
-  label: string;
-  hint: string;
-  count: number;
-  query: string;
-};
+import {
+  buildMessageSearchEntries,
+  buildMessageSearchSuggestions,
+} from './messageListSearchSuggestions';
 
 type MessageListToolbarProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -74,55 +71,34 @@ export default function MessageListToolbar({
   onSortChange,
 }: MessageListToolbarProps) {
   const [searchFocused, setSearchFocused] = React.useState(false);
+  const searchBlurTimerRef = React.useRef<number | null>(null);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
     ?? searchScopeOptions[0];
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
   const trimmedQuery = query.trim();
-  const normalizedQuery = trimmedQuery.toLowerCase();
-  const searchSuggestions = React.useMemo<SearchSuggestion[]>(() => {
-    if (!normalizedQuery || normalizedQuery.includes(':')) return [];
-
-    const includes = (value: string) => value.toLowerCase().includes(normalizedQuery);
-    const countMatches = (predicate: (message: Message) => boolean) =>
-      messages.reduce((count, message) => count + (predicate(message) ? 1 : 0), 0);
-
-    return [
-      {
-        id: 'to',
-        label: '收件人',
-        hint: '收件人、抄送、密送',
-        count: countMatches((message) => (
-          includes(message.recipients) || includes(message.cc) || includes(message.bcc)
-        )),
-        query: `to:${trimmedQuery}`,
-      },
-      {
-        id: 'from',
-        label: '发件人',
-        hint: '姓名或邮箱',
-        count: countMatches((message) => includes(message.sender_name) || includes(message.sender_email)),
-        query: `from:${trimmedQuery}`,
-      },
-      {
-        id: 'attachment',
-        label: '附件',
-        hint: '附件名',
-        count: countMatches((message) => message.has_attachments),
-        query: `filename:${trimmedQuery}`,
-      },
-      {
-        id: 'body',
-        label: '内容',
-        hint: '正文',
-        count: countMatches((message) => includes(message.body) || includes(message.snippet)),
-        query: `body:${trimmedQuery}`,
-      },
-    ];
-  }, [messages, normalizedQuery, trimmedQuery]);
+  const searchEntries = React.useMemo(
+    () => buildMessageSearchEntries(messages),
+    [messages],
+  );
+  const searchSuggestions = React.useMemo(
+    () => buildMessageSearchSuggestions(searchEntries, trimmedQuery),
+    [searchEntries, trimmedQuery],
+  );
   const showSearchSuggestions = searchFocused && searchSuggestions.length > 0;
 
+  function clearSearchBlurTimer() {
+    if (searchBlurTimerRef.current === null) return;
+    window.clearTimeout(searchBlurTimerRef.current);
+    searchBlurTimerRef.current = null;
+  }
+
+  React.useEffect(() => () => {
+    clearSearchBlurTimer();
+  }, []);
+
   function applySuggestedSearch(nextQuery: string) {
+    clearSearchBlurTimer();
     onApplySearchShortcut(nextQuery);
     setSearchFocused(false);
   }
@@ -143,9 +119,16 @@ export default function MessageListToolbar({
               ref={searchInputRef}
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
-              onFocus={() => setSearchFocused(true)}
+              onFocus={() => {
+                clearSearchBlurTimer();
+                setSearchFocused(true);
+              }}
               onBlur={() => {
-                window.setTimeout(() => setSearchFocused(false), 120);
+                clearSearchBlurTimer();
+                searchBlurTimerRef.current = window.setTimeout(() => {
+                  searchBlurTimerRef.current = null;
+                  setSearchFocused(false);
+                }, 120);
               }}
               placeholder="搜索主题、发件人、正文"
             />
@@ -198,6 +181,26 @@ export default function MessageListToolbar({
               ))}
             </div>
           </details>
+          <details className="compact-menu search-options-menu">
+            <summary title="搜索条件" aria-label="搜索条件">
+              <SlidersHorizontal size={15} />
+            </summary>
+            <div>
+              <span className="menu-section-title">搜索条件</span>
+              {searchShortcuts.map((item) => (
+                <button
+                  type="button"
+                  key={item.query}
+                  onClick={(event) => {
+                    onApplySearchShortcut(item.query);
+                    event.currentTarget.closest('details')?.removeAttribute('open');
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
         <button className="icon-button" title="刷新" onClick={onRefresh}>
           <RefreshCw size={17} />
@@ -223,7 +226,7 @@ export default function MessageListToolbar({
             className={listMode === 'threads' ? 'active' : ''}
             onClick={onShowThreads}
           >
-            会话
+            线程
           </button>
           <details className="compact-menu filter-menu">
             <summary className={filter !== 'all' ? 'active' : ''}>

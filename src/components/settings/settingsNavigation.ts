@@ -65,12 +65,12 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
     ],
   },
   {
-    label: '体验与隐私',
+    label: '使用与隐私',
     items: [
       {
         id: 'sending',
         label: '发送',
-        description: '设置撤销发送窗口与发件队列体验。',
+        description: '设置撤销发送窗口与发件队列。',
         icon: TimerReset,
       },
       {
@@ -94,7 +94,7 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
     ],
   },
   {
-    label: '数据与自动化',
+    label: '数据与规则',
     items: [
       {
         id: 'backup',
@@ -117,7 +117,7 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       {
         id: 'rules',
         label: '规则',
-        description: '按发件人、主题和内容自动处理新邮件。',
+        description: '按发件人、主题和内容处理新邮件。',
         icon: Workflow,
       },
       {

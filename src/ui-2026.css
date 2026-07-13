@@ -208,6 +208,7 @@ textarea:disabled {
   border-radius: 8px;
   color: var(--ui-text-secondary);
   background: transparent;
+  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .folder:hover {

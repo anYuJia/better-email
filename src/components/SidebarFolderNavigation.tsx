@@ -367,7 +367,7 @@ export default function SidebarFolderNavigation({
       </nav>
 
       {moreFolders.length > 0 && (
-        <details className="sidebar-disclosure more-mailboxes flat" open={true}>
+        <div className="sidebar-disclosure more-mailboxes flat" open={true}>
           <summary>
             <span>更多邮箱</span>
             <em>{moreFolders.length}</em>
@@ -375,7 +375,7 @@ export default function SidebarFolderNavigation({
           <div className="folded-folder-list">
             <FolderItems folders={moreFolders} {...folderItemProps} />
           </div>
-        </details>
+        </div>
       )}
 
       {children && <div className="sidebar-secondary sidebar-quick-menus">{children}</div>}

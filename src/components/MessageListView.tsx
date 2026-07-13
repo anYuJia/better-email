@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Paperclip,
   Search,
@@ -23,8 +23,11 @@ type MessageListViewProps = {
   filter: FilterMode;
   selectedId: number | null;
   hasMoreMessages: boolean;
+  listStateKey: string;
+  initialScrollTop: number;
   selectedMessageIds: number[];
   draggingMessageIds: number[];
+  onScrollTopChange: (scrollTop: number) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onToggleAllVisible: (checked: boolean) => void;
@@ -144,8 +147,11 @@ export default function MessageListView({
   filter,
   selectedId,
   hasMoreMessages,
+  listStateKey,
+  initialScrollTop,
   selectedMessageIds,
   draggingMessageIds,
+  onScrollTopChange,
   onSelectMessage,
   onToggleMessageSelection,
   onToggleAllVisible,
@@ -156,7 +162,12 @@ export default function MessageListView({
   onRefresh,
   onLoadMore,
 }: MessageListViewProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
   const prevIdsRef = useRef<Set<number>>(new Set());
+  const restoredViewKeyRef = useRef<string | null>(null);
+  const latestScrollTopRef = useRef(initialScrollTop);
+  const lastScrollSaveAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const scrollSaveTimerRef = useRef<number | null>(null);
   const prevIds = prevIdsRef.current;
 
   const newIds = useMemo(() => {
@@ -175,6 +186,41 @@ export default function MessageListView({
     prevIdsRef.current = new Set(messages.map((m) => m.id));
   }, [messages]);
 
+  useEffect(() => () => {
+    if (scrollSaveTimerRef.current !== null) {
+      window.clearTimeout(scrollSaveTimerRef.current);
+    }
+    onScrollTopChange(latestScrollTopRef.current);
+  }, [listStateKey, onScrollTopChange]);
+
+  useLayoutEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+    const isNewView = restoredViewKeyRef.current !== listStateKey;
+    const requestedScrollTop = isNewView ? initialScrollTop : latestScrollTopRef.current;
+    const maxScrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
+    const nextScrollTop = Math.min(Math.max(0, requestedScrollTop), maxScrollTop);
+    listElement.scrollTop = nextScrollTop;
+    latestScrollTopRef.current = nextScrollTop;
+    restoredViewKeyRef.current = listStateKey;
+  }, [listStateKey, initialScrollTop, messages.length]);
+
+  function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
+    const nextScrollTop = event.currentTarget.scrollTop;
+    latestScrollTopRef.current = nextScrollTop;
+    const now = performance.now();
+    if (now - lastScrollSaveAtRef.current < 160) return;
+    lastScrollSaveAtRef.current = now;
+    onScrollTopChange(nextScrollTop);
+    if (scrollSaveTimerRef.current !== null) {
+      window.clearTimeout(scrollSaveTimerRef.current);
+    }
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      scrollSaveTimerRef.current = null;
+      onScrollTopChange(latestScrollTopRef.current);
+    }, 180);
+  }
+
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
     [selectedMessageIds],
@@ -191,7 +237,7 @@ export default function MessageListView({
   );
 
   return (
-    <div className="message-list">
+    <div className="message-list" ref={listRef} onScroll={handleListScroll}>
       {groups.map((group) => (
         <section className="message-date-section" key={group.id}>
           <header className="message-date-header">

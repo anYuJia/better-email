@@ -1,6 +1,8 @@
 import React, {
   lazy,
   Suspense,
+  useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -164,6 +166,114 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
 }
 
 const manualUnreadStorageKey = 'better-email.manual-unread-message-ids';
+const readerAttachmentLoadDelayMs = 120;
+const readerBodyFetchDelayMs = 220;
+const readerTrustedRemoteRenderDelayMs = 180;
+const readerBackgroundIdleTimeoutMs = 1200;
+
+type IdleScheduler = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
+function scheduleReaderBackgroundWork(callback: () => void, delayMs: number): () => void {
+  const scheduler = window as IdleScheduler;
+  let idleHandle: number | null = null;
+  let cancelled = false;
+  const timer = window.setTimeout(() => {
+    const run = () => {
+      if (!cancelled) callback();
+    };
+    if (scheduler.requestIdleCallback) {
+      idleHandle = scheduler.requestIdleCallback(run, { timeout: readerBackgroundIdleTimeoutMs });
+    } else {
+      run();
+    }
+  }, delayMs);
+
+  return () => {
+    cancelled = true;
+    window.clearTimeout(timer);
+    if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
+  };
+}
+export const mailboxListStateStorageKey = 'better-email.mailboxListState.v1';
+
+type MailboxListState = {
+  limit?: number;
+  scrollTop?: number;
+  updatedAt: number;
+};
+
+type MailboxListStatePatch = Omit<Partial<MailboxListState>, 'updatedAt'>;
+
+export function clampMessageLimit(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return messagePageSize;
+  return Math.min(Math.max(Math.trunc(value), messagePageSize), messagePageSize * 20);
+}
+
+export function buildMailboxListStateKey({
+  accountScope,
+  folderId,
+  query,
+  filter,
+  searchScope,
+  listSort,
+}: {
+  accountScope: AccountScope;
+  folderId: number | null;
+  query: string;
+  filter: FilterMode;
+  searchScope: SearchScope;
+  listSort: ListSort;
+}): string {
+  return [
+    `scope=${accountScope}`,
+    `folder=${folderId ?? 'none'}`,
+    `searchScope=${searchScope}`,
+    `query=${query.trim().toLowerCase()}`,
+    `filter=${filter}`,
+    `sort=${listSort}`,
+  ].join('|');
+}
+
+export function loadMailboxListStates(): Record<string, MailboxListState> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(mailboxListStateStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, MailboxListState>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveMailboxListState(key: string, patch: MailboxListStatePatch): void {
+  if (typeof window === 'undefined' || !key) return;
+  try {
+    const states = loadMailboxListStates();
+    const next = {
+      ...states,
+      [key]: {
+        ...states[key],
+        ...patch,
+        updatedAt: Date.now(),
+      },
+    };
+    const entries = Object.entries(next)
+      .sort(([, left], [, right]) => (right.updatedAt || 0) - (left.updatedAt || 0))
+      .slice(0, 80);
+    window.localStorage.setItem(mailboxListStateStorageKey, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    // List state is a convenience cache; storage failures should never block mailbox rendering.
+  }
+}
+
+export function loadMailboxMessageLimit(key: string): number {
+  const saved = loadMailboxListStates()[key]?.limit;
+  return clampMessageLimit(saved);
+}
 
 function loadManualUnreadMessageIds(): Set<number> {
   if (typeof window === 'undefined') return new Set();
@@ -222,7 +332,14 @@ export default function App() {
   const [messageLimit, setMessageLimit] = useState(messagePageSize);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedIdState] = useState<number | null>(null);
+  const setSelectedId = useCallback((value: React.SetStateAction<number | null>) => {
+    const id = typeof value === 'function' ? (value as Function)(selectedId) : value;
+    if (id !== null) {
+      console.time('[Perf] OpenEmail');
+    }
+    setSelectedIdState(value);
+  }, [selectedId]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
@@ -355,7 +472,6 @@ export default function App() {
     listSort,
     folders,
     imapMailboxes,
-    messageLimit,
     setMessages,
     setThreads,
     setMessageLimit,
@@ -367,6 +483,17 @@ export default function App() {
     loadMeta,
     maybeRunBenchmarkSync,
   });
+  const mailboxListStateKey = useMemo(
+    () => buildMailboxListStateKey({
+      accountScope,
+      folderId,
+      query,
+      filter,
+      searchScope,
+      listSort,
+    }),
+    [accountScope, folderId, query, filter, searchScope, listSort],
+  );
   const { enqueueBackgroundTask } = useBackgroundTaskCoordinator({
     account,
     accountScope,
@@ -844,6 +971,23 @@ export default function App() {
   }, [sendUndoDelaySeconds]);
 
   useEffect(() => {
+    function handleGlobalFocus(event: FocusEvent) {
+      if (event.target instanceof HTMLElement) {
+        (window as any).__focusedElement = event.target;
+      }
+    }
+    function handleGlobalBlur() {
+      // Don't clear immediately to allow E2E tests to read it
+    }
+    document.addEventListener('focus', handleGlobalFocus, true);
+    document.addEventListener('blur', handleGlobalBlur, true);
+    return () => {
+      document.removeEventListener('focus', handleGlobalFocus, true);
+      document.removeEventListener('blur', handleGlobalBlur, true);
+    };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(listSortStorageKey, listSort);
   }, [listSort]);
 
@@ -858,6 +1002,11 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(composeTemplatesStorageKey, JSON.stringify(composeTemplates));
   }, [composeTemplates]);
+
+  useEffect(() => {
+    if (!folderId) return;
+    saveMailboxListState(mailboxListStateKey, { limit: messageLimit });
+  }, [folderId, mailboxListStateKey, messageLimit]);
 
   useEffect(() => {
     const dropdownSelector = [
@@ -954,16 +1103,18 @@ export default function App() {
 
   useEffect(() => {
     if (!folderId) return;
-    loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, messagePageSize).catch((error) => setStatus(String(error)));
+    const restoredLimit = loadMailboxMessageLimit(mailboxListStateKey);
+    loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, restoredLimit).catch((error) => setStatus(String(error)));
   }, [folderId, filter, listSort]);
 
   useEffect(() => {
     setQuickReplyBody('');
   }, [selectedId]);
 
+  const readerSelectedId = useDeferredValue(selectedId);
   const selected = useMemo(
-    () => messages.find((message) => message.id === selectedId) ?? null,
-    [messages, selectedId],
+    () => messages.find((message) => message.id === readerSelectedId) ?? null,
+    [messages, readerSelectedId],
   );
   const selectedMessageSet = useMemo(() => new Set(selectedMessageIds), [selectedMessageIds]);
   const selectedMessages = useMemo(
@@ -976,8 +1127,15 @@ export default function App() {
     : `${messages.length} 封`;
   const visibleListSummary = hasMoreMessages ? `${messages.length}+ 封` : `${messages.length} 封`;
   const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
+  const mailboxListScrollTop = useMemo(
+    () => Math.max(0, loadMailboxListStates()[mailboxListStateKey]?.scrollTop ?? 0),
+    [mailboxListStateKey],
+  );
+  const handleMailboxListScrollTopChange = useCallback((scrollTop: number) => {
+    saveMailboxListState(mailboxListStateKey, { scrollTop });
+  }, [mailboxListStateKey]);
   const activeThreadSelected = activeThread
-    ? threadMessages.find((message) => message.id === selectedId) ?? threadMessages[0] ?? selected
+    ? threadMessages.find((message) => message.id === readerSelectedId) ?? threadMessages[0] ?? selected
     : selected;
   const selectedSenderDomain = useMemo(
     () => (selected ? senderDomain(selected.sender_email) : ''),
@@ -1042,43 +1200,57 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!selected) {
-      setAttachments([]);
-      return;
-    }
-    invoke<Attachment[]>('list_attachments', { messageId: selected.id })
-      .then(setAttachments)
-      .catch((error) => setStatus(String(error)));
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!selected || selected.is_read) return;
-    if (manualUnreadMessageIdsRef.current.has(selected.id)) return;
-    if (autoReadInFlightRef.current.has(selected.id)) return;
+    setAttachments([]);
+    if (!selected) return undefined;
 
     const selectedMessageId = selected.id;
-    const selectedAccountId = selected.account_id;
-    const selectedRemoteMailbox = selected.remote_mailbox;
-    const selectedRemoteUid = selected.remote_uid;
+    let cancelled = false;
+    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
+      invoke<Attachment[]>('list_attachments', { messageId: selectedMessageId })
+        .then((items) => {
+          if (!cancelled) React.startTransition(() => setAttachments(items));
+        })
+        .catch((error) => {
+          if (!cancelled) setStatus(String(error));
+        });
+    }, readerAttachmentLoadDelayMs);
+
+    return () => {
+      cancelled = true;
+      cancelScheduledWork();
+    };
+  }, [selected?.id]);
+
+  const markMessageReadAfterReading = useCallback((message: Message) => {
+    if (message.is_read) return;
+    if (manualUnreadMessageIdsRef.current.has(message.id)) return;
+    if (autoReadInFlightRef.current.has(message.id)) return;
+
+    const selectedMessageId = message.id;
+    const selectedAccountId = message.account_id;
+    const selectedRemoteMailbox = message.remote_mailbox;
+    const selectedRemoteUid = message.remote_uid;
     const activeThreadKey = activeThread?.thread_key ?? null;
 
-    // Delay the mark-as-read operation by 800ms to allow the reader view to render smoothly first
-    const timer = setTimeout(() => {
-      autoReadInFlightRef.current.add(selectedMessageId);
-      appFlowLog('autoMarkRead start', {
-        messageId: selectedMessageId,
-        accountId: selectedAccountId,
-        mailbox: selectedRemoteMailbox,
-        uid: selectedRemoteUid,
-      });
-      invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
-        .then((report) => {
-          setMessages((current) => current.map((message) => (
-            message.id === selectedMessageId ? { ...message, is_read: true } : message
+    autoReadInFlightRef.current.add(selectedMessageId);
+    appFlowLog('markReadAfterReading start', {
+      messageId: selectedMessageId,
+      accountId: selectedAccountId,
+      mailbox: selectedRemoteMailbox,
+      uid: selectedRemoteUid,
+    });
+    console.time('[Perf] set_message_read API');
+    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
+      .then((report) => {
+        console.timeEnd('[Perf] set_message_read API');
+        console.time('[Perf] set_message_read React transition');
+        React.startTransition(() => {
+          setMessages((current) => current.map((item) => (
+            item.id === selectedMessageId ? { ...item, is_read: true } : item
           )));
           if (activeThreadKey) {
-            setThreadMessages((current) => current.map((message) => (
-              message.id === selectedMessageId ? { ...message, is_read: true } : message
+            setThreadMessages((current) => current.map((item) => (
+              item.id === selectedMessageId ? { ...item, is_read: true } : item
             )));
             setActiveThread((current) => current && current.thread_key === activeThreadKey
               ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
@@ -1090,49 +1262,64 @@ export default function App() {
           setStats((current) => current
             ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
             : current);
-          appFlowLog('autoMarkRead done', {
-            messageId: selectedMessageId,
-            message: report.message,
+        });
+        setTimeout(() => {
+          console.timeEnd('[Perf] set_message_read React transition');
+        }, 0);
+        appFlowLog('markReadAfterReading done', {
+          messageId: selectedMessageId,
+          message: report.message,
+        });
+      })
+      .catch((error) => {
+        appFlowWarn('markReadAfterReading failed', {
+          messageId: selectedMessageId,
+          error: String(error).replace(/^Error:\s*/i, ''),
+        });
+      })
+      .finally(() => {
+        autoReadInFlightRef.current.delete(selectedMessageId);
+      });
+  }, [activeThread?.thread_key]);
+
+  useEffect(() => {
+    if (!selected || !selectedSenderTrusted) return undefined;
+    if (selected.sanitized_html.includes('src="https://')) return undefined;
+    if (trustedRemoteImageRenderRef.current.has(selected.id)) return undefined;
+
+    const selectedMessageId = selected.id;
+    const selectedBody = selected.body;
+    const activeThreadKey = activeThread?.thread_key ?? null;
+    let cancelled = false;
+    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
+      if (!htmlHasRemoteVisualContent(selectedBody)) return;
+      trustedRemoteImageRenderRef.current.add(selectedMessageId);
+      invoke<Message>('render_message_with_remote_image_policy', { messageId: selectedMessageId })
+        .then((updated) => {
+          if (cancelled) return;
+          React.startTransition(() => {
+            setMessages((current) => current.map((message) => (
+              message.id === updated.id ? updated : message
+            )));
+            if (activeThreadKey) {
+              setThreadMessages((current) => current.map((message) => (
+                message.id === updated.id ? updated : message
+              )));
+            }
           });
         })
         .catch((error) => {
-          appFlowWarn('autoMarkRead failed', {
-            messageId: selectedMessageId,
-            error: String(error).replace(/^Error:\s*/i, ''),
-          });
-        })
-        .finally(() => {
-          autoReadInFlightRef.current.delete(selectedMessageId);
+          trustedRemoteImageRenderRef.current.delete(selectedMessageId);
+          if (!cancelled) setStatus(String(error));
         });
-    }, 800);
+    }, readerTrustedRemoteRenderDelayMs);
 
-    return () => clearTimeout(timer);
-  }, [selectedId, selected?.is_read, activeThread?.thread_key]);
-
-  useEffect(() => {
-    if (!selected || !selectedSenderTrusted) return;
-    if (!htmlHasRemoteVisualContent(selected.body)) return;
-    if (selected.sanitized_html.includes('src="https://')) return;
-    if (trustedRemoteImageRenderRef.current.has(selected.id)) return;
-
-    trustedRemoteImageRenderRef.current.add(selected.id);
-    invoke<Message>('render_message_with_remote_image_policy', { messageId: selected.id })
-      .then((updated) => {
-        setMessages((current) => current.map((message) => (
-          message.id === updated.id ? updated : message
-        )));
-        if (activeThread) {
-          setThreadMessages((current) => current.map((message) => (
-            message.id === updated.id ? updated : message
-          )));
-        }
-      })
-      .catch((error) => {
-        trustedRemoteImageRenderRef.current.delete(selected.id);
-        setStatus(String(error));
-      });
+    return () => {
+      cancelled = true;
+      cancelScheduledWork();
+    };
   }, [
-    activeThread,
+    activeThread?.thread_key,
     selected?.id,
     selected?.body,
     selected?.sanitized_html,
@@ -1140,54 +1327,72 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) return undefined;
     const isHeaderOnlyRemoteMessage =
       selected.remote_uid > 0 &&
       !selected.body.trim() &&
       selected.snippet.includes('远端邮件头已同步');
-    if (!isHeaderOnlyRemoteMessage) return;
-    if (bodyFetchInFlightRef.current.has(selected.id) || bodyFetchFailedRef.current.has(selected.id)) return;
+    if (!isHeaderOnlyRemoteMessage) return undefined;
+    if (bodyFetchInFlightRef.current.has(selected.id) || bodyFetchFailedRef.current.has(selected.id)) return undefined;
 
-    bodyFetchInFlightRef.current.add(selected.id);
-    appFlowLog('autoFetchBody start', {
-      messageId: selected.id,
-      accountId: selected.account_id,
-      mailbox: selected.remote_mailbox,
-      uid: selected.remote_uid,
-    });
-    invoke<Message>('fetch_message_body', { messageId: selected.id })
-      .then((updated) => {
-        bodyFetchFailedRef.current.delete(updated.id);
-        setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-        if (activeThread) {
-          setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
-        }
-        return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
-          if (selectedId === updated.id) setAttachments(items);
-          appFlowLog('autoFetchBody done', {
-            messageId: updated.id,
-            bodyLength: updated.body.length,
-            htmlLength: updated.sanitized_html.length,
-            attachments: items.length,
-          });
-        });
-      })
-      .catch((error) => {
-        bodyFetchFailedRef.current.add(selected.id);
-        const message = String(error).replace(/^Error:\s*/i, '');
-        appFlowWarn('autoFetchBody failed', {
-          messageId: selected.id,
-          accountId: selected.account_id,
-          mailbox: selected.remote_mailbox,
-          uid: selected.remote_uid,
-          error: message,
-        });
-        setStatus(`正文拉取失败：${message}`);
-      })
-      .finally(() => {
-        bodyFetchInFlightRef.current.delete(selected.id);
+    const selectedMessageId = selected.id;
+    const selectedAccountId = selected.account_id;
+    const selectedRemoteMailbox = selected.remote_mailbox;
+    const selectedRemoteUid = selected.remote_uid;
+    const activeThreadKey = activeThread?.thread_key ?? null;
+    let cancelled = false;
+
+    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
+      bodyFetchInFlightRef.current.add(selectedMessageId);
+      appFlowLog('autoFetchBody start', {
+        messageId: selectedMessageId,
+        accountId: selectedAccountId,
+        mailbox: selectedRemoteMailbox,
+        uid: selectedRemoteUid,
       });
-  }, [selectedId, selected?.remote_uid, selected?.body, selected?.snippet, activeThread]);
+      invoke<Message>('fetch_message_body', { messageId: selectedMessageId })
+        .then((updated) => {
+          bodyFetchFailedRef.current.delete(updated.id);
+          if (cancelled) return [];
+          React.startTransition(() => {
+            setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+            if (activeThreadKey) {
+              setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+            }
+          });
+          return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
+            if (!cancelled) React.startTransition(() => setAttachments(items));
+            appFlowLog('autoFetchBody done', {
+              messageId: updated.id,
+              bodyLength: updated.body.length,
+              htmlLength: updated.sanitized_html.length,
+              attachments: items.length,
+            });
+            return items;
+          });
+        })
+        .catch((error) => {
+          bodyFetchFailedRef.current.add(selectedMessageId);
+          const message = String(error).replace(/^Error:\s*/i, '');
+          appFlowWarn('autoFetchBody failed', {
+            messageId: selectedMessageId,
+            accountId: selectedAccountId,
+            mailbox: selectedRemoteMailbox,
+            uid: selectedRemoteUid,
+            error: message,
+          });
+          if (!cancelled) setStatus(`正文拉取失败：${message}`);
+        })
+        .finally(() => {
+          bodyFetchInFlightRef.current.delete(selectedMessageId);
+        });
+    }, readerBodyFetchDelayMs);
+
+    return () => {
+      cancelled = true;
+      cancelScheduledWork();
+    };
+  }, [selected?.id, selected?.remote_uid, selected?.body, selected?.snippet, activeThread?.thread_key]);
 
   useEffect(() => {
     if (!isSettingsOpen || activeSettingsSection !== 'backup') return;
@@ -1204,7 +1409,8 @@ export default function App() {
       filter,
     });
     const meta = await loadMeta(folderId);
-    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, messagePageSize);
+    const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
+    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, refreshLimit);
     if (activeThread) {
       await openThread(activeThread, false);
     }
@@ -1231,6 +1437,7 @@ export default function App() {
       const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
       setSyncRuns((current) => [run, ...current].slice(0, 10));
       const meta = await loadMeta(folderId);
+      const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
       await loadMessagesWithVisibleFallback(
         meta.folderId,
         query,
@@ -1238,7 +1445,7 @@ export default function App() {
         accountScope,
         mailboxRefreshRef.current,
         meta.folders,
-        messageLimit,
+        refreshLimit,
       );
       if (activeThread) {
         await openThread(activeThread, false);
@@ -1280,16 +1487,16 @@ export default function App() {
     return nextMessages;
   }
 
-  function toggleMessageSelection(messageId: number, checked: boolean) {
+  const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
       if (checked) return current.includes(messageId) ? current : [...current, messageId];
       return current.filter((id) => id !== messageId);
     });
-  }
+  }, []);
 
-  function toggleAllVisibleMessages(checked: boolean) {
+  const toggleAllVisibleMessages = useCallback((checked: boolean) => {
     setSelectedMessageIds(checked ? messages.map((message) => message.id) : []);
-  }
+  }, [messages]);
 
   function snapshotMessages(items: Message[]): UndoMessageSnapshot[] {
     return items.map((message) => ({
@@ -2468,7 +2675,18 @@ export default function App() {
     if (nextMessages.length <= messages.length && targetMailbox) {
       setStatus('正在从服务器同步历史邮件...');
       const run = await syncImapHistoryPage(targetMailbox.account_id);
-      setStatus(run.message);
+      const meta = await loadMeta(folderId, accountScope);
+      const refreshedMessages = await loadMessagesWithVisibleFallback(
+        meta.folderId,
+        query,
+        filter,
+        accountScope,
+        mailboxRefreshRef.current,
+        meta.folders,
+        nextLimit,
+        searchScope,
+      );
+      setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
     } else {
       setStatus(`已加载 ${nextMessages.length} 封邮件`);
     }
@@ -2736,6 +2954,9 @@ export default function App() {
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}
         messageListSummary={messageListSummary}
+        listStateKey={mailboxListStateKey}
+        initialScrollTop={mailboxListScrollTop}
+        onScrollTopChange={handleMailboxListScrollTopChange}
         onSearchSubmit={runSearch}
         onQueryChange={setQuery}
         onSearchScopeChange={(nextScope) => {
@@ -2795,7 +3016,7 @@ export default function App() {
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}
         selected={selected}
-        selectedId={selectedId}
+        selectedId={readerSelectedId}
         accountScope={accountScope}
         folders={folders}
         labels={labels}
@@ -2833,6 +3054,7 @@ export default function App() {
         onMoveArchive={() => { moveSelected('archive').catch((error) => setStatus(String(error))); }}
         onMoveTrash={() => { moveSelected('trash').catch((error) => setStatus(String(error))); }}
         onToggleRead={toggleRead}
+        onReadComplete={markMessageReadAfterReading}
         onUnsnooze={unsnoozeSelected}
         onSnooze={snoozeSelected}
         onExportMessage={exportSelectedMessage}

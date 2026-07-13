@@ -66,7 +66,7 @@ export default function useReaderActions({
     return updated;
   }
 
-  async function fetchSelectedBody() {
+  async function fetchSelectedBody(isSilent = false) {
     if (!selected) return;
     bodyFetchFailedRef.current.delete(selected.id);
     bodyFetchInFlightRef.current.add(selected.id);
@@ -90,7 +90,9 @@ export default function useReaderActions({
         htmlLength: updated.sanitized_html.length,
         attachments: refreshedAttachments.length,
       });
-      setStatus('远端正文已拉取并缓存到本地');
+      if (!isSilent) {
+        setStatus('远端正文已拉取并缓存到本地');
+      }
     } catch (error) {
       const message = String(error).replace(/^Error:\s*/i, '');
       bodyFetchFailedRef.current.add(selected.id);
@@ -101,7 +103,9 @@ export default function useReaderActions({
         uid: selected.remote_uid,
         error: message,
       });
-      setStatus(`正文拉取失败：${message}`);
+      if (!isSilent) {
+        setStatus(`正文拉取失败：${message}`);
+      }
       throw error;
     } finally {
       bodyFetchInFlightRef.current.delete(selected.id);
@@ -172,10 +176,14 @@ export default function useReaderActions({
       setAttachments((current) =>
         current.map((item) => (item.id === result.attachment.id ? result.attachment : item)),
       );
-      setStatus(result.message);
+      if (!attachment.is_inline) {
+        setStatus(result.message);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`附件下载失败：${message.replace(/^Error:\s*/i, '')}`);
+      if (!attachment.is_inline) {
+        setStatus(`附件下载失败：${message.replace(/^Error:\s*/i, '')}`);
+      }
       throw error;
     }
   }

@@ -50,6 +50,9 @@ export type MessageListPaneProps = {
   currentViewLabel: string;
   visibleListSummary: string;
   messageListSummary: string;
+  listStateKey: string;
+  initialScrollTop: number;
+  onScrollTopChange: (scrollTop: number) => void;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
   onSearchScopeChange: (scope: SearchScope) => void;
@@ -97,6 +100,9 @@ export default function MessageListPane({
   currentViewLabel,
   visibleListSummary,
   messageListSummary,
+  listStateKey,
+  initialScrollTop,
+  onScrollTopChange,
   onSearchSubmit,
   onQueryChange,
   onSearchScopeChange,
@@ -328,8 +334,11 @@ export default function MessageListPane({
           filter={filter}
           selectedId={selectedId}
           hasMoreMessages={hasMoreMessages}
+          listStateKey={listStateKey}
+          initialScrollTop={initialScrollTop}
           selectedMessageIds={selectedMessageIds}
           draggingMessageIds={draggingMessageIds}
+          onScrollTopChange={onScrollTopChange}
           onSelectMessage={onSelectMessage}
           onToggleMessageSelection={onToggleMessageSelection}
           onToggleAllVisible={onToggleAllVisible}

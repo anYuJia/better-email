@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   Clock,
@@ -47,6 +47,14 @@ import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
 
+const readerBodyRenderDelayMs = 60;
+const readerBodyRenderIdleTimeoutMs = 900;
+
+type IdleScheduler = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
@@ -81,10 +89,11 @@ export type ReaderPaneProps = {
   onMoveArchive: () => void;
   onMoveTrash: () => void;
   onToggleRead: (message: Message) => void;
+  onReadComplete: (message: Message) => void;
   onUnsnooze: () => void;
   onSnooze: () => void;
   onExportMessage: () => void;
-  onFetchBody: () => void | Promise<void>;
+  onFetchBody: (isSilent?: boolean) => void | Promise<void>;
   onMarkNotSpam: () => void;
   onMarkAsSpam: () => void;
   onAllowRemoteImagesOnce: () => void;
@@ -202,6 +211,24 @@ function parsePlainBody(body: string): PlainBodyBlock[] {
   return blocks;
 }
 
+function EmptyMessageBody({
+  title = '无正文',
+  detail,
+  action,
+}: {
+  title?: string;
+  detail?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="body-text reader-empty-body" role="status">
+      <strong>{title}</strong>
+      {detail && <span>{detail}</span>}
+      {action}
+    </div>
+  );
+}
+
 function PlainMessageBody({ body }: { body: string }) {
   const blocks = useMemo(() => parsePlainBody(body), [body]);
   const originalBlockCount = useMemo(
@@ -253,23 +280,6 @@ function PlainMessageBody({ body }: { body: string }) {
   );
 }
 
-function EmptyMessageBody({
-  title = '无正文',
-  detail,
-  action,
-}: {
-  title?: string;
-  detail?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="body-text reader-empty-body" role="status">
-      <strong>{title}</strong>
-      {detail && <span>{detail}</span>}
-      {action}
-    </div>
-  );
-}
 
 export default function ReaderPane({
   activeThread,
@@ -298,6 +308,7 @@ export default function ReaderPane({
   onMoveArchive,
   onMoveTrash,
   onToggleRead,
+  onReadComplete,
   onUnsnooze,
   onSnooze,
   onExportMessage,
@@ -355,6 +366,62 @@ export default function ReaderPane({
 
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
+  const [bodyRenderMessageId, setBodyRenderMessageId] = useState<number | null>(null);
+  const readerRef = useRef<HTMLElement | null>(null);
+  const completedReadMessageIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    setBodyRenderMessageId(null);
+    if (!selectedId) return undefined;
+
+    const scheduler = window as IdleScheduler;
+    let idleHandle: number | null = null;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      const renderBody = () => {
+        if (!cancelled) React.startTransition(() => setBodyRenderMessageId(selectedId));
+      };
+      if (scheduler.requestIdleCallback) {
+        idleHandle = scheduler.requestIdleCallback(renderBody, { timeout: readerBodyRenderIdleTimeoutMs });
+      } else {
+        renderBody();
+      }
+    }, readerBodyRenderDelayMs);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
+    };
+  }, [selectedId]);
+
+  const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
+  const isBodyRenderReady = Boolean(bodySelected);
+
+  useEffect(() => {
+    if (isBodyRenderReady && selected?.id) {
+      try {
+        console.timeEnd('[Perf] OpenEmail');
+      } catch (_) {}
+    }
+  }, [isBodyRenderReady, selected?.id]);
+
+  useEffect(() => {
+    if (!selected?.id) return;
+    if (selected.is_read) completedReadMessageIdsRef.current.add(selected.id);
+  }, [selected?.id, selected?.is_read]);
+
+  function maybeCompleteReading() {
+    if (!selected || selected.is_read || !isBodyRenderReady) return;
+    if (completedReadMessageIdsRef.current.has(selected.id)) return;
+    const readerElement = readerRef.current;
+    if (!readerElement) return;
+    const distanceToBottom = readerElement.scrollHeight - readerElement.scrollTop - readerElement.clientHeight;
+    if (distanceToBottom > 48) return;
+    completedReadMessageIdsRef.current.add(selected.id);
+    onReadComplete(selected);
+  }
+
   const {
     imagePreview,
     setImagePreview,
@@ -397,11 +464,11 @@ export default function ReaderPane({
     isRefreshingInlineImages,
     handleLoadInlineImages,
   } = useInlineImages({
-    selected,
-    attachments,
+    selected: bodySelected,
+    attachments: bodySelected ? attachments : [],
     attachmentErrors,
     setAttachmentErrors,
-    onFetchBody,
+    onFetchBody: () => onFetchBody(true),
     handleAttachmentDownload,
   });
 
@@ -427,22 +494,41 @@ export default function ReaderPane({
   );
   const readerHtml = inlineImageResolution.html;
   const hasRenderableHtml = Boolean(
-    selected?.sanitized_html.trim()
+    bodySelected?.sanitized_html.trim()
       && htmlHasRenderableContent(readerHtml),
   );
-  const selectedBodyLooksLikeHtml = Boolean(selected && bodyLooksLikeHtml(selected.body));
+  const selectedBodyLooksLikeHtml = Boolean(bodySelected && bodyLooksLikeHtml(bodySelected.body));
   const selectedHasRemoteVisualContent = Boolean(
-    selected && htmlHasRemoteVisualContent(selected.body),
+    bodySelected && htmlHasRemoteVisualContent(bodySelected.body),
   );
   const shouldOfferRemoteContent = Boolean(
-    selected
+    bodySelected
       && (selectedHasRemoteImageWarning || selectedHasRemoteVisualContent)
       && !hasRenderableHtml
-      && selected.body.trim(),
+      && bodySelected.body.trim(),
   );
-  const plainBodyForReader = selected && !selected.sanitized_html.trim() && !selectedBodyLooksLikeHtml
-    ? selected.body
+  const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml
+    ? bodySelected.body
     : '';
+
+  useEffect(() => {
+    maybeCompleteReading();
+  }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
+
+  useEffect(() => {
+    if (!selected || selected.is_read || !isBodyRenderReady) return undefined;
+    if (completedReadMessageIdsRef.current.has(selected.id)) return undefined;
+
+    const timerId = window.setTimeout(() => {
+      if (completedReadMessageIdsRef.current.has(selected.id)) return;
+      completedReadMessageIdsRef.current.add(selected.id);
+      onReadComplete(selected);
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [selected?.id, isBodyRenderReady, onReadComplete]);
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());
@@ -781,7 +867,7 @@ export default function ReaderPane({
 
   return (
     <section className="reader-panel">
-      <article className="reader">
+      <article className="reader" ref={readerRef} onScroll={maybeCompleteReading}>
         <header className="reader-header">
           <div className="reader-title-block">
             <h1>{selected.subject || '(无主题)'}</h1>
@@ -866,7 +952,7 @@ export default function ReaderPane({
                 )}
                 <button onClick={onExportMessage}>导出 EML</button>
                 {selected.remote_uid > 0 && !selected.body.trim() && (
-                  <button onClick={onFetchBody}>拉取正文</button>
+                  <button onClick={() => onFetchBody(false)}>拉取正文</button>
                 )}
                 {selected.folder_role === 'spam' ? (
                   <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
@@ -1107,7 +1193,12 @@ export default function ReaderPane({
           </div>
         )}
 
-        {hasRenderableHtml ? (
+        {!isBodyRenderReady ? (
+          <EmptyMessageBody
+            title="正在打开邮件"
+            detail="正文会在界面稳定后显示，滚动和选择操作可立即响应。"
+          />
+        ) : hasRenderableHtml ? (
           <div
             className="reader-html"
             onClick={handleReaderHtmlClick}

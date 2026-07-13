@@ -978,7 +978,7 @@ fn optional_header(name: &str, value: &str) -> String {
 }
 
 #[tauri::command]
-pub fn set_message_read(
+pub async fn set_message_read(
     store: State<'_, MailStore>,
     message_id: i64,
     is_read: bool,
@@ -1077,7 +1077,7 @@ pub fn mark_folder_read(
 }
 
 #[tauri::command]
-pub fn set_message_starred(
+pub async fn set_message_starred(
     store: State<'_, MailStore>,
     message_id: i64,
     is_starred: bool,
@@ -1087,7 +1087,7 @@ pub fn set_message_starred(
 }
 
 #[tauri::command]
-pub fn move_message_to_role(
+pub async fn move_message_to_role(
     store: State<'_, MailStore>,
     message_id: i64,
     role: String,
@@ -1097,7 +1097,7 @@ pub fn move_message_to_role(
 }
 
 #[tauri::command]
-pub fn restore_message_to_inbox(
+pub async fn restore_message_to_inbox(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<RestoreMessageReport> {
@@ -1113,7 +1113,7 @@ pub fn restore_message_to_inbox(
 }
 
 #[tauri::command]
-pub fn delete_message_permanently(
+pub async fn delete_message_permanently(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<RemoteActionReport> {
@@ -1122,7 +1122,7 @@ pub fn delete_message_permanently(
 }
 
 #[tauri::command]
-pub fn empty_trash(
+pub async fn empty_trash(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<TrashActionReport> {

@@ -29,6 +29,41 @@ type ContextMenuProps = {
   detail?: string;
 };
 
+function positionSubmenuForBranch(branch: HTMLElement) {
+  const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
+  const trigger = branch.querySelector<HTMLElement>(':scope > button');
+  if (!submenu || !trigger) return;
+
+  const margin = 8;
+  const gap = 6;
+  const triggerBounds = trigger.getBoundingClientRect();
+  const previousDisplay = submenu.style.display;
+  const previousVisibility = submenu.style.visibility;
+
+  submenu.style.display = 'block';
+  submenu.style.visibility = 'hidden';
+  const width = Math.min(submenu.offsetWidth || 226, window.innerWidth - margin * 2);
+  const height = Math.min(submenu.offsetHeight || submenu.scrollHeight || 0, window.innerHeight - margin * 2);
+
+  let left = triggerBounds.right + gap;
+  if (left + width > window.innerWidth - margin) {
+    left = triggerBounds.left - width - gap;
+  }
+  left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+
+  let top = triggerBounds.top - 5;
+  if (top + height > window.innerHeight - margin) {
+    top = window.innerHeight - height - margin;
+  }
+  top = Math.max(margin, top);
+
+  submenu.style.setProperty('--context-submenu-left', `${left}px`);
+  submenu.style.setProperty('--context-submenu-top', `${top}px`);
+  submenu.style.setProperty('--context-submenu-max-height', `${Math.max(140, window.innerHeight - top - margin)}px`);
+  submenu.style.display = previousDisplay;
+  submenu.style.visibility = previousVisibility;
+}
+
 function MenuItems({
   items,
   onClose,
@@ -36,40 +71,7 @@ function MenuItems({
   items: ContextMenuItem[];
   onClose: () => void;
 }) {
-  function positionSubmenuForBranch(branch: HTMLElement) {
-    const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
-    const trigger = branch.querySelector<HTMLElement>(':scope > button');
-    if (!submenu || !trigger) return;
 
-    const margin = 8;
-    const gap = 6;
-    const triggerBounds = trigger.getBoundingClientRect();
-    const previousDisplay = submenu.style.display;
-    const previousVisibility = submenu.style.visibility;
-
-    submenu.style.display = 'block';
-    submenu.style.visibility = 'hidden';
-    const width = Math.min(submenu.offsetWidth || 226, window.innerWidth - margin * 2);
-    const height = Math.min(submenu.offsetHeight || submenu.scrollHeight || 0, window.innerHeight - margin * 2);
-
-    let left = triggerBounds.right + gap;
-    if (left + width > window.innerWidth - margin) {
-      left = triggerBounds.left - width - gap;
-    }
-    left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
-
-    let top = triggerBounds.top - 5;
-    if (top + height > window.innerHeight - margin) {
-      top = window.innerHeight - height - margin;
-    }
-    top = Math.max(margin, top);
-
-    submenu.style.setProperty('--context-submenu-left', `${left}px`);
-    submenu.style.setProperty('--context-submenu-top', `${top}px`);
-    submenu.style.setProperty('--context-submenu-max-height', `${Math.max(140, window.innerHeight - top - margin)}px`);
-    submenu.style.display = previousDisplay;
-    submenu.style.visibility = previousVisibility;
-  }
 
   function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
     positionSubmenuForBranch(event.currentTarget);
@@ -145,14 +147,18 @@ export default function ContextMenu({
     });
   }, [x, y]);
 
+  const initialFocusRef = useRef(false);
   useEffect(() => {
-    const menu = menuRef.current;
-    menu
+    if (initialFocusRef.current) return;
+    initialFocusRef.current = true;
+    menuRef.current
       ?.querySelector<HTMLButtonElement>(
         '.context-menu-items > div > button:not(:disabled)',
       )
-      ?.focus();
+      ?.focus({ preventScroll: true });
+  }, []);
 
+  useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || closeIgnoreRef?.current?.contains(target)) return;
@@ -207,10 +213,11 @@ export default function ContextMenu({
         const firstChild = submenu?.querySelector<HTMLButtonElement>(
           ':scope > div > button:not(:disabled)',
         );
-        if (firstChild) {
+        if (branch && firstChild) {
           event.preventDefault();
-          branch?.classList.add('is-keyboard-open');
-          firstChild.focus();
+          positionSubmenuForBranch(branch);
+          branch.classList.add('is-keyboard-open');
+          firstChild.focus({ preventScroll: true });
         }
         return;
       }
@@ -220,7 +227,7 @@ export default function ContextMenu({
         if (parentButton) {
           event.preventDefault();
           activeMenu.parentElement?.classList.remove('is-keyboard-open');
-          parentButton.focus();
+          parentButton.focus({ preventScroll: true });
         }
       }
     }
@@ -232,13 +239,11 @@ export default function ContextMenu({
     document.addEventListener('pointerdown', handlePointerDown, true);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('blur', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('blur', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
   }, [closeIgnoreRef, onClose]);

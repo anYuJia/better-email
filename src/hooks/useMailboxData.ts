@@ -1,5 +1,4 @@
 import { useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import { messagePageSize } from '../app/appConfig';
 import type {
   AccountScope,
   FilterMode,
@@ -12,6 +11,7 @@ import type {
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
+import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../App';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -37,7 +37,6 @@ type UseMailboxDataOptions = {
   listSort: ListSort;
   folders: Folder[];
   imapMailboxes: ImapMailboxState[];
-  messageLimit: number;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
   setMessageLimit: Dispatch<SetStateAction<number>>;
@@ -144,7 +143,6 @@ export default function useMailboxData({
   listSort,
   folders,
   imapMailboxes,
-  messageLimit,
   setMessages,
   setThreads,
   setMessageLimit,
@@ -165,7 +163,7 @@ export default function useMailboxData({
     nextFilter = filter,
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
-    nextLimit = messageLimit,
+    nextLimit?: number,
     nextSearchScope = searchScope,
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
@@ -181,6 +179,15 @@ export default function useMailboxData({
       return [];
     }
     const startedAt = performance.now();
+    const stateKey = buildMailboxListStateKey({
+      accountScope: nextScope,
+      folderId: nextFolderId,
+      query: nextQuery,
+      filter: nextFilter,
+      searchScope: nextSearchScope,
+      listSort,
+    });
+    const effectiveLimit = nextLimit ?? loadMailboxMessageLimit(stateKey);
     const requests = buildMailboxRequests(
       nextScope,
       currentAccountId,
@@ -189,7 +196,7 @@ export default function useMailboxData({
       nextQuery,
       nextFilter,
       listSort,
-      nextLimit,
+      effectiveLimit,
     );
     mailboxFlowLog('loadMessages start', {
       scope: nextScope,
@@ -221,8 +228,8 @@ export default function useMailboxData({
     }
     if (refreshId !== mailboxRefreshRef.current) return nextMessages;
     setThreads(nextThreads);
-    const visibleMessages = nextMessages.slice(0, nextLimit);
-    setMessageLimit(nextLimit);
+    const visibleMessages = nextMessages.slice(0, effectiveLimit);
+    setMessageLimit(effectiveLimit);
     const hasMoreRemote = checkHistoryIncomplete(
       nextFolderId,
       nextScope,
@@ -230,7 +237,7 @@ export default function useMailboxData({
       folders,
       imapMailboxes
     );
-    setHasMoreMessages(nextMessages.length > nextLimit || hasMoreRemote);
+    setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
     setMessages(visibleMessages);
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
     setSelectedMessageIds((current) =>
@@ -267,7 +274,7 @@ export default function useMailboxData({
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
     visibleFolders = folders,
-    nextLimit = messageLimit,
+    nextLimit?: number,
     nextSearchScope = searchScope,
   ) {
     const nextMessages = await loadMessages(
@@ -316,7 +323,6 @@ export default function useMailboxData({
   ) {
     const refreshId = mailboxRefreshRef.current + 1;
     mailboxRefreshRef.current = refreshId;
-    setMessageLimit(messagePageSize);
     setHasMoreMessages(false);
     setMessages([]);
     setThreads([]);
@@ -332,7 +338,7 @@ export default function useMailboxData({
       nextScope,
       refreshId,
       meta.folders,
-      messagePageSize,
+      undefined,
       searchScope,
     );
     return nextFolderId;

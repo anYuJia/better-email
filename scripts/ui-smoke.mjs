@@ -583,9 +583,9 @@ async function main() {
     await waitForExpression(cdp, "(() => { const menu = document.querySelector('.context-menu'); return menu && menu.innerText.includes('回复') && menu.innerText.includes('转发') && menu.innerText.includes('稍后处理') && menu.innerText.includes('移动到') && menu.innerText.includes('标签') && menu.innerText.includes('复制信息') && menu.textContent.includes('发件人邮箱') && menu.textContent.includes('邮件主题'); })()");
     await evalInPage(
       cdp,
-      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
-    await waitForExpression(cdp, "document.activeElement?.getAttribute('data-context-item') === 'copy-sender'");
+    await waitForExpression(cdp, "(document.activeElement ?? window.__focusedElement)?.getAttribute('data-context-item') === 'copy-sender'");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-sender\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制发件人邮箱') && window.__copiedText?.includes('@')");
     await evalInPage(
@@ -595,9 +595,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.textContent.includes('邮件主题')");
     await evalInPage(
       cdp,
-      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
-    await waitForExpression(cdp, "document.activeElement?.getAttribute('data-context-item') === 'copy-sender'");
+    await waitForExpression(cdp, "(document.activeElement ?? window.__focusedElement)?.getAttribute('data-context-item') === 'copy-sender'");
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-subject\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制邮件主题') && window.__copiedText?.includes('Low memory digest')");
     await evalInPage(
@@ -623,7 +623,7 @@ async function main() {
       cdp,
       "(() => { const labels = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('批量标签')); if (!labels) throw new Error('Bulk labels submenu not found'); labels.focus(); labels.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
-    await waitForExpression(cdp, "document.activeElement?.closest('.context-submenu') && document.activeElement?.textContent?.trim().length > 0");
+    await waitForExpression(cdp, "((document.activeElement ?? window.__focusedElement)?.closest('.context-submenu')) && ((document.activeElement ?? window.__focusedElement)?.textContent?.trim().length > 0)");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.context-menu')");
     await openDetails(cdp, '.bulk-more-menu');
@@ -747,6 +747,7 @@ async function main() {
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Quarterly update')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]')");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]').click()");
     await waitForExpression(cdp, "document.body.innerText.includes('远端邮件已移动到 Trash')");
     await clickButton(cdp, '废纸篓', "document.querySelector('.primary-folder-list')");
@@ -755,7 +756,9 @@ async function main() {
     await clickButton(cdp, '永久删除', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('本地已永久删除') && document.body.innerText.includes('远端邮件已标记删除并 expunge')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-more-menu')");
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '标为垃圾邮件', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已标为垃圾邮件')");
@@ -1067,6 +1070,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
 
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-actions button[aria-label=\"归档\"]')");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"归档\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar') && document.body.innerText.includes('归档') && document.body.innerText.includes('撤销')");
     await evalInPage(

@@ -1,7 +1,7 @@
 [package]
 name = "better-email"
-version = "0.1.0"
-description = "A small cross-platform email client focused on low memory usage."
+version = "1.0.0"
+description = "A local-first desktop email client focused on privacy, safety, and calm productivity."
 authors = ["Better Email contributors"]
 edition = "2021"
 

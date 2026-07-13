@@ -27,14 +27,24 @@
   --ui-accent-soft: #eaf2fb;
   --ui-danger: #c7352e;
   --ui-warning: #9a6100;
-  --ui-warning-bg: #fff8e8;
+  --ui-warning-bg: #fff8eb;
   --ui-control-height: 34px;
-  --ui-radius-control: 9px;
+
+  /* Radii */
+  --ui-radius-control: 7px;
+  --ui-radius-panel: 8px;
+  --ui-radius-modal: 13px;
   
   /* Shadows */
-  --ui-shadow-popover: 0 18px 50px rgba(24, 33, 45, 0.16), 0 2px 8px rgba(24, 33, 45, 0.08);
-  --ui-shadow-float: 0 12px 36px rgba(24, 33, 45, 0.18), 0 2px 8px rgba(24, 33, 45, 0.08);
+  --ui-shadow-popover: 0 14px 38px rgba(20, 26, 34, 0.14), 0 2px 8px rgba(20, 26, 34, 0.08);
+  --ui-shadow-float: var(--ui-shadow-popover);
   --ui-shadow-tooltip: 0 10px 28px rgba(17, 24, 39, 0.16), 0 1px 4px rgba(17, 24, 39, 0.10);
+
+  /* Quiet Row Tokens */
+  --quiet-row-hover: #f2f4f6;
+  --quiet-row-selected: #e7edf5;
+  --quiet-row-selected-border: #7f9fca;
+  --quiet-row-shadow: none;
 
   /* Legacy / Compatibility Tokens mapped to unified UI tokens */
   --app-bg: var(--ui-bg);

@@ -6,13 +6,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  Edit3,
-  Inbox,
-  Keyboard,
-  RefreshCw,
-  Settings,
-} from 'lucide-react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
@@ -33,20 +26,18 @@ import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import {
-  defaultNotificationPolicy,
   formatBytes,
   formatDate,
   type NotificationPolicy,
   prefixedSubject,
   quoteMessage,
   replyThreadingHeaders,
-  remoteImageTrustInput,
+  htmlHasRemoteVisualContent,
   senderDomain,
 } from './mailUtils';
 import { getCurrentWindow, invoke } from './tauriBridge';
 
 import type {
-  SystemFolderRole,
   FolderRole,
   FilterMode,
   ListMode,
@@ -62,7 +53,6 @@ import type {
   Attachment,
   OutboundAttachmentInput,
   DroppedFile,
-  AttachmentDownload,
   Message,
   UndoMessageSnapshot,
   CommandPaletteItem,
@@ -77,10 +67,8 @@ import type {
   LocalBackupSummary,
   StorageUsage,
   CacheClearResult,
-  EndpointCheck,
   ConnectionReport,
   CredentialVerificationReport,
-  ImapFolderProbe,
   ImapProbeReport,
   ImapMailboxState,
   SyncRun,
@@ -115,31 +103,18 @@ import {
   composerAutosaveStorageKey,
   sendUndoDelayStorageKey,
   listSortStorageKey,
-  filterModes,
-  backgroundTaskTitle,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
   loadListSort,
   removeAppStorage,
   loadProviderVerifications,
-  isFilterMode,
   loadSavedSearches,
   loadComposeTemplates,
   isDraftEmpty,
-  normalizeDraftInput,
   loadComposerAutosave,
-  outboxStatusLabel,
-  outboxTimingLabel,
-  canCancelOutboxItem,
-  isCustomFolder,
   movableFoldersForBulk,
   sampleRawMessage,
-  folderIcon,
-  folderIconForRole,
-  primaryFolderRoles,
-  filters,
   messagePageSize,
-  searchShortcuts,
   emptyAccountCreateForm,
 } from './app/appConfig';
 import type {
@@ -290,13 +265,12 @@ export default function App() {
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
   const [remoteImageTrusts, setRemoteImageTrusts] = useState<RemoteImageTrust[]>([]);
-  const [lastNewMailNotice, setLastNewMailNotice] = useState<string | null>(null);
-  const [notificationStatus, setNotificationStatus] = useState('系统提醒未检查');
-  const [appBadgeStatus, setAppBadgeStatus] = useState('应用角标未同步');
+  const [, setLastNewMailNotice] = useState<string | null>(null);
+  const [, setNotificationStatus] = useState('系统提醒未检查');
+  const [, setAppBadgeStatus] = useState('应用角标未同步');
   const [notificationPolicy, setNotificationPolicy] = useState<NotificationPolicy>(loadNotificationPolicy);
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
   const {
-    contacts,
     setContacts,
     contactMergeSuggestions,
     setContactMergeSuggestions,
@@ -312,10 +286,7 @@ export default function App() {
     setContactFormAliases,
     mergeSourceContactId,
     setMergeSourceContactId,
-    contactQuery,
-    setContactQuery,
     contactTransferBusy,
-    filteredContacts,
     managedContacts,
     startEditContact,
     createManagedContact,
@@ -997,8 +968,6 @@ export default function App() {
     () => messages.filter((message) => selectedMessageSet.has(message.id)),
     [messages, selectedMessageSet],
   );
-  const allVisibleSelected = messages.length > 0 && selectedMessageIds.length === messages.length;
-  const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const unreadTotal = stats?.unread_messages ?? 0;
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
@@ -1056,12 +1025,6 @@ export default function App() {
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   });
-
-  function messageHasRemoteVisualContent(message: Message): boolean {
-    return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(message.body)
-      || /\bbackground\s*=\s*['"]?https?:\/\//i.test(message.body)
-      || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(message.body);
-  }
 
   function rememberManualReadState(messageIds: number[], isRead: boolean) {
     const next = new Set(manualUnreadMessageIdsRef.current);
@@ -1141,7 +1104,7 @@ export default function App() {
 
   useEffect(() => {
     if (!selected || !selectedSenderTrusted) return;
-    if (!messageHasRemoteVisualContent(selected)) return;
+    if (!htmlHasRemoteVisualContent(selected.body)) return;
     if (selected.sanitized_html.includes('src="https://')) return;
     if (trustedRemoteImageRenderRef.current.has(selected.id)) return;
 
@@ -2113,12 +2076,6 @@ export default function App() {
     setStatus('已打开草稿继续编辑');
   }
 
-  function openContactEditor(contact: Contact) {
-    startEditContact(contact);
-    setActiveSettingsSection('contacts');
-    setSettingsOpen(true);
-  }
-
   function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
     const existing = draft[field]
       .split(/[;,]/)
@@ -2506,26 +2463,6 @@ export default function App() {
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
 
-  async function runLabelSearch(label: Label) {
-    const nextQuery = `label:${label.name}`;
-    setQuery(nextQuery);
-    setFilter('all');
-    setSearchScope('folder');
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessages(
-      folderId,
-      nextQuery,
-      'all',
-      accountScope,
-      mailboxRefreshRef.current,
-      messagePageSize,
-      'folder',
-    );
-    setStatus(`正在查看标签：${label.name}`);
-  }
-
   function saveCurrentSearch() {
     const trimmedQuery = query.trim();
     const trimmedName = savedSearchName.trim() || trimmedQuery;
@@ -2765,7 +2702,6 @@ export default function App() {
         activeThread={activeThread}
         messages={messages}
         selectedId={selectedId}
-        accountScope={accountScope}
         hasMoreMessages={hasMoreMessages}
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}

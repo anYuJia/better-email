@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Archive,
   Clock,
@@ -31,7 +31,6 @@ import {
   X,
 } from 'lucide-react';
 import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
-import { resolveCidInlineImages } from '../app/inlineImages';
 import { canSnoozeRole } from '../app/snooze';
 import type {
   AccountScope,
@@ -41,22 +40,16 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, plainTextPreview, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent } from '../mailUtils';
-import { invoke, localFileAssetUrl } from '../tauriBridge';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent } from '../mailUtils';
+import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
+import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
+import useInlineImages from './reader/useInlineImages';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
-type PreviewImage = { src: string; alt: string; attachmentId: number | null };
-type AttachmentContextMenu = { attachment: Attachment; x: number; y: number } | null;
-const IMAGE_PREVIEW_MIN_ZOOM = 0.25;
-const IMAGE_PREVIEW_MAX_ZOOM = 8;
-const IMAGE_PREVIEW_BUTTON_ZOOM_STEP = 0.04;
-const IMAGE_PREVIEW_WHEEL_ZOOM_STEP = 0.025;
-const IMAGE_PREVIEW_KEYBOARD_PAN_STEP = 18;
-const IMAGE_PREVIEW_WHEEL_PAN_RATIO = 0.72;
 type PlainBodyBlock =
   | { type: 'text'; content: string }
   | { type: 'original'; index: number; meta: string[]; content: string };
@@ -329,23 +322,89 @@ export default function ReaderPane({
   );
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
-  const [isDownloadingInlineImages, setIsDownloadingInlineImages] = useState(false);
-  const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
-  const [inlineImageRefreshError, setInlineImageRefreshError] = useState('');
-  const [inlineImageDataUrls, setInlineImageDataUrls] = useState<Record<number, string>>({});
-  const [inlineImageAssetUrls, setInlineImageAssetUrls] = useState<Record<number, string>>({});
-  const [imagePreview, setImagePreview] = useState<PreviewImage | null>(null);
-  const [imagePreviewZoom, setImagePreviewZoom] = useState(1);
-  const [imagePreviewFit, setImagePreviewFit] = useState(true);
-  const [imagePreviewPan, setImagePreviewPan] = useState({ x: 0, y: 0 });
-  const [isImagePreviewPanning, setIsImagePreviewPanning] = useState(false);
+
+  async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
+    if (downloadingAttachmentIds.has(attachment.id)) return false;
+    setAttachmentErrors((current) => {
+      const next = { ...current };
+      delete next[attachment.id];
+      return next;
+    });
+    setDownloadingAttachmentIds((current) => {
+      const next = new Set(current);
+      next.add(attachment.id);
+      return next;
+    });
+    try {
+      await onDownloadAttachment(attachment);
+      return true;
+    } catch (error) {
+      setAttachmentErrors((current) => ({
+        ...current,
+        [attachment.id]: attachmentErrorMessage(error),
+      }));
+      return false;
+    } finally {
+      setDownloadingAttachmentIds((current) => {
+        const next = new Set(current);
+        next.delete(attachment.id);
+        return next;
+      });
+    }
+  }
+
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
-  const imagePreviewDragRef = useRef<{ x: number; y: number } | null>(null);
-  const imagePreviewStageRef = useRef<HTMLDivElement | null>(null);
-  const imagePreviewImageRef = useRef<HTMLImageElement | null>(null);
-  const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
-  const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
+  const {
+    imagePreview,
+    setImagePreview,
+    imagePreviewZoom,
+    imagePreviewFit,
+    imagePreviewPan,
+    imagePreviewStageRef,
+    imagePreviewImageRef,
+    openImagePreview,
+    resetImagePreview,
+    zoomIn,
+    zoomOut,
+    showOriginalSize,
+    handleImageLoad,
+    handleImagePreviewWheel,
+    handleImagePreviewPointerDown,
+    handleImagePreviewPointerMove,
+    stopImagePreviewPanning,
+    downloadImage,
+    saveImageAs,
+    downloadPreviewImage,
+    savePreviewImageAs,
+    copyPreviewImageSource,
+    copyPreviewImageToClipboard,
+    handleReaderHtmlClick,
+    handleReaderHtmlContextMenu,
+  } = useImagePreview(
+    selected,
+    imageContextMenu,
+    setImageContextMenu,
+    attachmentContextMenu,
+    setAttachmentContextMenu,
+  );
+
+  const {
+    inlineImageResolution,
+    inlineImageError,
+    inlineImageRefreshError,
+    isDownloadingInlineImages,
+    isRefreshingInlineImages,
+    handleLoadInlineImages,
+  } = useInlineImages({
+    selected,
+    attachments,
+    attachmentErrors,
+    setAttachmentErrors,
+    onFetchBody,
+    handleAttachmentDownload,
+  });
+
   const regularAttachments = useMemo(
     () => attachments.filter((attachment) => !attachment.is_inline),
     [attachments],
@@ -357,20 +416,6 @@ export default function ReaderPane({
   const regularAttachmentTotalSize = useMemo(
     () => regularAttachments.reduce((sum, item) => sum + item.size_bytes, 0),
     [regularAttachments],
-  );
-  const inlineImageResolution = useMemo(
-    () => resolveCidInlineImages(
-      selected?.sanitized_html ?? '',
-      attachments,
-      (attachment) => inlineImageAssetUrls[attachment.id] ?? inlineImageDataUrls[attachment.id] ?? '',
-    ),
-    [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.sanitized_html],
-  );
-  const inlineImageError = useMemo(
-    () => inlineImageResolution.pendingAttachments
-      .map((attachment) => attachmentErrors[attachment.id])
-      .find(Boolean) ?? '',
-    [attachmentErrors, inlineImageResolution.pendingAttachments],
   );
   const visibleSecurityWarnings = useMemo(
     () => selected?.security_warnings.filter(
@@ -403,146 +448,13 @@ export default function ReaderPane({
     setDownloadingAttachmentIds(new Set());
     setAttachmentErrors({});
     setIsDownloadingAllAttachments(false);
-    setIsDownloadingInlineImages(false);
-    setIsRefreshingInlineImages(false);
-    setInlineImageRefreshError('');
-    setInlineImageDataUrls({});
-    setInlineImageAssetUrls({});
     setImagePreview(null);
-    setImagePreviewZoom(1);
-    setImagePreviewFit(true);
-    setImagePreviewPan({ x: 0, y: 0 });
-    setIsImagePreviewPanning(false);
-    imagePreviewDragRef.current = null;
+    resetImagePreview();
     setImageContextMenu(null);
     setAttachmentContextMenu(null);
-  }, [selectedId]);
+  }, [selectedId, resetImagePreview]);
 
-  useEffect(() => {
-    if (!selected) return;
-    const readyInlineImages = attachments.filter((attachment) =>
-      attachment.is_inline
-      && attachment.is_downloaded
-      && Boolean(attachment.local_path.trim())
-      && Boolean(attachment.content_id.trim())
-      && !inlineImageDataUrls[attachment.id]
-      && !inlineImageAssetUrls[attachment.id]);
-    if (readyInlineImages.length === 0) return;
 
-    let cancelled = false;
-    Promise.all(
-      readyInlineImages.map(async (attachment) => {
-        const assetUrl = await localFileAssetUrl(attachment.local_path);
-        return [attachment.id, assetUrl] as const;
-      }),
-    )
-      .then((entries) => {
-        if (cancelled) return;
-        setInlineImageAssetUrls((current) => {
-          const next = { ...current };
-          entries.forEach(([attachmentId, assetUrl]) => {
-            if (assetUrl.trim()) next[attachmentId] = assetUrl;
-          });
-          return next;
-        });
-      })
-      .catch((error) => {
-        if (!cancelled) setInlineImageRefreshError(attachmentErrorMessage(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const readyInlineImages = attachments.filter((attachment) =>
-      attachment.is_inline
-      && attachment.is_downloaded
-      && Boolean(attachment.local_path.trim())
-      && Boolean(attachment.content_id.trim())
-      && !inlineImageDataUrls[attachment.id]);
-    if (readyInlineImages.length === 0) return;
-
-    let cancelled = false;
-    readyInlineImages.forEach((attachment) => {
-      invoke<string>('read_attachment_data_url', { attachmentId: attachment.id })
-        .then((dataUrl) => {
-          if (cancelled || !dataUrl.trim()) return;
-          setInlineImageDataUrls((current) => ({
-            ...current,
-            [attachment.id]: dataUrl,
-          }));
-        })
-        .catch((error) => {
-          if (cancelled) return;
-          setAttachmentErrors((current) => ({
-            ...current,
-            [attachment.id]: attachmentErrorMessage(error),
-          }));
-        });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments, inlineImageDataUrls, selected?.id]);
-
-  useEffect(() => {
-    if (!selected) return;
-    if (inlineImageResolution.missingContentIds.length === 0) return;
-    if (inlineImageResolution.pendingAttachments.length > 0) return;
-    if (selected.remote_uid <= 0) return;
-    if (inlineImageRefreshAttemptsRef.current.has(selected.id)) return;
-
-    inlineImageRefreshAttemptsRef.current.add(selected.id);
-    setInlineImageRefreshError('');
-    setIsRefreshingInlineImages(true);
-    Promise.resolve(onFetchBody())
-      .catch((error) => {
-        setInlineImageRefreshError(attachmentErrorMessage(error));
-      })
-      .finally(() => {
-        setIsRefreshingInlineImages(false);
-      });
-  }, [
-    inlineImageResolution.missingContentIds.length,
-    inlineImageResolution.pendingAttachments.length,
-    onFetchBody,
-    selected?.id,
-    selected?.remote_uid,
-  ]);
-
-  async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
-    if (downloadingAttachmentIds.has(attachment.id)) return false;
-    setAttachmentErrors((current) => {
-      const next = { ...current };
-      delete next[attachment.id];
-      return next;
-    });
-    setDownloadingAttachmentIds((current) => {
-      const next = new Set(current);
-      next.add(attachment.id);
-      return next;
-    });
-    try {
-      await onDownloadAttachment(attachment);
-      return true;
-    } catch (error) {
-      setAttachmentErrors((current) => ({
-        ...current,
-        [attachment.id]: attachmentErrorMessage(error),
-      }));
-      return false;
-    } finally {
-      setDownloadingAttachmentIds((current) => {
-        const next = new Set(current);
-        next.delete(attachment.id);
-        return next;
-      });
-    }
-  }
 
   async function handleDownloadAllAttachments() {
     if (isDownloadingAllAttachments) return;
@@ -696,313 +608,9 @@ export default function ReaderPane({
     ];
   }
 
-  async function handleLoadInlineImages() {
-    if (isDownloadingInlineImages || inlineImageResolution.pendingAttachments.length === 0) {
-      return;
-    }
-    setIsDownloadingInlineImages(true);
-    try {
-      for (const attachment of inlineImageResolution.pendingAttachments) {
-        await handleAttachmentDownload(attachment);
-      }
-    } finally {
-      setIsDownloadingInlineImages(false);
-    }
-  }
 
-  useEffect(() => {
-    if (!selected) return;
-    if (inlineImageResolution.pendingAttachments.length === 0) return;
-    if (inlineImageError) return;
-    if (isDownloadingInlineImages) return;
-    if (inlineImageDownloadAttemptsRef.current.has(selected.id)) return;
 
-    inlineImageDownloadAttemptsRef.current.add(selected.id);
-    void handleLoadInlineImages();
-  }, [
-    inlineImageError,
-    inlineImageResolution.pendingAttachments.length,
-    isDownloadingInlineImages,
-    selected?.id,
-  ]);
 
-  useEffect(() => {
-    if (!imagePreview && !imageContextMenu && !attachmentContextMenu) return undefined;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setImagePreview(null);
-        setImageContextMenu(null);
-        setAttachmentContextMenu(null);
-      }
-      if (!imagePreview) return;
-      if (event.key === '+' || event.key === '=') {
-        event.preventDefault();
-        zoomImagePreview(IMAGE_PREVIEW_BUTTON_ZOOM_STEP);
-      }
-      if (event.key === '-') {
-        event.preventDefault();
-        zoomImagePreview(-IMAGE_PREVIEW_BUTTON_ZOOM_STEP);
-      }
-      if (event.key === '0') {
-        event.preventDefault();
-        resetImagePreview();
-      }
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-        event.preventDefault();
-        setImagePreviewFit(false);
-        updateImagePreviewPan((pan) => ({
-          x: pan.x + (
-            event.key === 'ArrowLeft'
-              ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP
-              : event.key === 'ArrowRight'
-                ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP
-                : 0
-          ),
-          y: pan.y + (
-            event.key === 'ArrowUp'
-              ? IMAGE_PREVIEW_KEYBOARD_PAN_STEP
-              : event.key === 'ArrowDown'
-                ? -IMAGE_PREVIEW_KEYBOARD_PAN_STEP
-                : 0
-          ),
-        }));
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [imagePreview, imageContextMenu, attachmentContextMenu]);
-
-  useEffect(() => {
-    if (!imageContextMenu) return undefined;
-
-    function closeOnPointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Element && target.closest('.reader-image-context-menu')) return;
-      setImageContextMenu(null);
-    }
-    function closeOnScroll() {
-      setImageContextMenu(null);
-    }
-
-    window.addEventListener('pointerdown', closeOnPointerDown, true);
-    window.addEventListener('scroll', closeOnScroll, true);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnPointerDown, true);
-      window.removeEventListener('scroll', closeOnScroll, true);
-    };
-  }, [imageContextMenu]);
-
-  function imageFromEventTarget(target: EventTarget | null) {
-    const imageElement = target instanceof Element ? target.closest('img') : null;
-    if (!(imageElement instanceof HTMLImageElement)) return null;
-    if (imageElement.dataset.betterEmailInlineCid) return null;
-    const src = imageElement.currentSrc || imageElement.src;
-    if (!src) return null;
-    const attachmentId = Number(imageElement.dataset.betterEmailAttachmentId ?? 0) || null;
-    return {
-      src,
-      alt: imageElement.alt || selected?.subject || '邮件图片',
-      attachmentId,
-    };
-  }
-
-  function handleReaderHtmlClick(event: React.MouseEvent<HTMLDivElement>) {
-    const image = imageFromEventTarget(event.target);
-    if (!image) return;
-
-    event.preventDefault();
-    setImageContextMenu(null);
-    openImagePreview(image);
-  }
-
-  function handleReaderHtmlContextMenu(event: React.MouseEvent<HTMLDivElement>) {
-    const image = imageFromEventTarget(event.target);
-    if (!image) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    setImageContextMenu({
-      ...image,
-      x: Math.min(event.clientX, window.innerWidth - 188),
-      y: Math.min(event.clientY, window.innerHeight - 132),
-    });
-  }
-
-  function openImagePreview(image: PreviewImage) {
-    setImagePreview(image);
-    resetImagePreview();
-  }
-
-  function resetImagePreview() {
-    setImagePreviewZoom(1);
-    setImagePreviewFit(true);
-    setImagePreviewPan({ x: 0, y: 0 });
-    setIsImagePreviewPanning(false);
-    imagePreviewDragRef.current = null;
-  }
-
-  function zoomImagePreview(delta: number) {
-    setImagePreviewFit(false);
-    setImagePreviewZoom((zoom) => {
-      const nextZoom = Math.min(
-        IMAGE_PREVIEW_MAX_ZOOM,
-        Math.max(IMAGE_PREVIEW_MIN_ZOOM, Number((zoom + delta).toFixed(3))),
-      );
-      setImagePreviewPan((pan) => clampImagePreviewPan(pan, nextZoom));
-      return nextZoom;
-    });
-  }
-
-  function clampImagePreviewPan(
-    pan: { x: number; y: number },
-    zoom = imagePreviewZoom,
-  ) {
-    const stage = imagePreviewStageRef.current;
-    const image = imagePreviewImageRef.current;
-    if (!stage || !image) return pan;
-
-    const baseWidth = image.offsetWidth;
-    const baseHeight = image.offsetHeight;
-    const stageWidth = stage.clientWidth;
-    const stageHeight = stage.clientHeight;
-    const maxX = Math.max(0, (baseWidth * zoom - stageWidth) / 2);
-    const maxY = Math.max(0, (baseHeight * zoom - stageHeight) / 2);
-
-    return {
-      x: Math.min(maxX, Math.max(-maxX, pan.x)),
-      y: Math.min(maxY, Math.max(-maxY, pan.y)),
-    };
-  }
-
-  function updateImagePreviewPan(
-    updater: (pan: { x: number; y: number }) => { x: number; y: number },
-  ) {
-    setImagePreviewPan((pan) => clampImagePreviewPan(updater(pan)));
-  }
-
-  function handleImagePreviewWheel(event: React.WheelEvent<HTMLDivElement>) {
-    const shouldZoom = event.metaKey || event.ctrlKey;
-    if (shouldZoom) {
-      event.preventDefault();
-      zoomImagePreview(event.deltaY > 0 ? -IMAGE_PREVIEW_WHEEL_ZOOM_STEP : IMAGE_PREVIEW_WHEEL_ZOOM_STEP);
-      return;
-    }
-
-    if (!imagePreviewFit) {
-      event.preventDefault();
-      updateImagePreviewPan((pan) => ({
-        x: pan.x - event.deltaX * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
-        y: pan.y - event.deltaY * IMAGE_PREVIEW_WHEEL_PAN_RATIO,
-      }));
-    }
-  }
-
-  function handleImagePreviewPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    setImagePreviewFit(false);
-    setIsImagePreviewPanning(true);
-    imagePreviewDragRef.current = { x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function handleImagePreviewPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!isImagePreviewPanning || !imagePreviewDragRef.current) return;
-    const previous = imagePreviewDragRef.current;
-    const dx = event.clientX - previous.x;
-    const dy = event.clientY - previous.y;
-    imagePreviewDragRef.current = { x: event.clientX, y: event.clientY };
-    updateImagePreviewPan((pan) => ({ x: pan.x + dx, y: pan.y + dy }));
-  }
-
-  function stopImagePreviewPanning() {
-    setIsImagePreviewPanning(false);
-    imagePreviewDragRef.current = null;
-  }
-
-  function imageDownloadName(image: PreviewImage) {
-    const cleanAlt = image.alt.trim().replace(/[\\/:*?"<>|]+/g, '-');
-    if (cleanAlt && /\.[a-z0-9]{2,5}$/i.test(cleanAlt)) return cleanAlt;
-    if (cleanAlt) return `${cleanAlt}.png`;
-
-    try {
-      const pathName = new URL(image.src).pathname.split('/').pop() ?? '';
-      const decoded = decodeURIComponent(pathName).replace(/[\\/:*?"<>|]+/g, '-');
-      if (decoded && /\.[a-z0-9]{2,5}$/i.test(decoded)) return decoded;
-    } catch {
-      // Data URLs and local asset URLs can be invalid for URL parsing here.
-    }
-    return '邮件图片.png';
-  }
-
-  function downloadImage(image: PreviewImage) {
-    const link = document.createElement('a');
-    link.href = image.src;
-    link.download = imageDownloadName(image);
-    link.rel = 'noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
-
-  function downloadPreviewImage() {
-    if (!imageContextMenu) return;
-    downloadImage(imageContextMenu);
-    setImageContextMenu(null);
-  }
-
-  async function saveImageAs(image: PreviewImage) {
-    if (image.attachmentId) {
-      await invoke<string>('save_attachment_as', { attachmentId: image.attachmentId });
-      return;
-    }
-    downloadImage(image);
-  }
-
-  async function savePreviewImageAs() {
-    if (!imageContextMenu) return;
-    try {
-      await saveImageAs(imageContextMenu);
-    } finally {
-      setImageContextMenu(null);
-    }
-  }
-
-  async function copyPreviewImageSource() {
-    if (!imageContextMenu) return;
-    try {
-      await navigator.clipboard?.writeText(imageContextMenu.src);
-    } catch {
-      // Clipboard access can be unavailable in some WebView contexts.
-    } finally {
-      setImageContextMenu(null);
-    }
-  }
-
-  async function copyPreviewImageToClipboard() {
-    if (!imageContextMenu) return;
-    try {
-      const clipboard = navigator.clipboard;
-      if (!clipboard || typeof ClipboardItem === 'undefined' || !clipboard.write) {
-        throw new Error('Clipboard image write is unavailable');
-      }
-
-      const response = await fetch(imageContextMenu.src);
-      if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
-      const blob = await response.blob();
-      const mimeType = blob.type || 'image/png';
-      await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
-    } catch {
-      try {
-        await navigator.clipboard?.writeText(imageContextMenu.src);
-      } catch {
-        // Clipboard access can be unavailable in some WebView contexts.
-      }
-    } finally {
-      setImageContextMenu(null);
-    }
-  }
 
   if (activeThread && threadMessages.length > 0) {
     const allThreadRead = threadMessages.every((message) => message.is_read);
@@ -1570,7 +1178,7 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="缩小"
-                onClick={() => zoomImagePreview(-IMAGE_PREVIEW_BUTTON_ZOOM_STEP)}
+                onClick={zoomOut}
               >
                 <ZoomOut size={16} />
               </button>
@@ -1578,7 +1186,7 @@ export default function ReaderPane({
               <button
                 type="button"
                 aria-label="放大"
-                onClick={() => zoomImagePreview(IMAGE_PREVIEW_BUTTON_ZOOM_STEP)}
+                onClick={zoomIn}
               >
                 <ZoomIn size={16} />
               </button>
@@ -1590,11 +1198,7 @@ export default function ReaderPane({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setImagePreviewZoom(1);
-                  setImagePreviewFit(false);
-                  setImagePreviewPan({ x: 0, y: 0 });
-                }}
+                onClick={showOriginalSize}
               >
                 原始
               </button>
@@ -1622,7 +1226,7 @@ export default function ReaderPane({
                 ref={imagePreviewImageRef}
                 src={imagePreview.src}
                 alt={imagePreview.alt}
-                onLoad={() => setImagePreviewPan((pan) => clampImagePreviewPan(pan))}
+                onLoad={handleImageLoad}
                 style={{
                   transform: imagePreviewFit
                     ? undefined

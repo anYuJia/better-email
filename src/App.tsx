@@ -347,6 +347,7 @@ export default function App() {
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const loadingMoreRef = useRef(false);
+  const searchClearTimerRef = useRef<number | null>(null);
   const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
@@ -2981,17 +2982,24 @@ export default function App() {
         onSearchSubmit={runSearch}
         onQueryChange={(val) => {
           setQuery(val);
+          if (searchClearTimerRef.current !== null) {
+            window.clearTimeout(searchClearTimerRef.current);
+            searchClearTimerRef.current = null;
+          }
           if (!val.trim()) {
-            loadMessagesWithVisibleFallback(
-              folderId,
-              '',
-              filter,
-              accountScope,
-              mailboxRefreshRef.current,
-              folders,
-              messagePageSize,
-              searchScope,
-            ).catch((error) => setStatus(String(error)));
+            searchClearTimerRef.current = window.setTimeout(() => {
+              searchClearTimerRef.current = null;
+              loadMessagesWithVisibleFallback(
+                folderId,
+                '',
+                filter,
+                accountScope,
+                mailboxRefreshRef.current,
+                folders,
+                messagePageSize,
+                searchScope,
+              ).catch((error) => setStatus(String(error)));
+            }, 100);
           }
         }}
         onSearchScopeChange={(nextScope) => {

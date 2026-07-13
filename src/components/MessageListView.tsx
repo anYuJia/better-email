@@ -171,6 +171,7 @@ export default function MessageListView({
   const latestScrollTopRef = useRef(initialScrollTop);
   const lastScrollSaveAtRef = useRef(Number.NEGATIVE_INFINITY);
   const scrollSaveTimerRef = useRef<number | null>(null);
+  const rafIdRef = useRef<number | null>(null);
   const prevIds = prevIdsRef.current;
 
   const [scrollTop, setScrollTop] = useState(initialScrollTop);
@@ -273,7 +274,15 @@ export default function MessageListView({
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
-    setScrollTop(nextScrollTop);
+
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      setScrollTop(nextScrollTop);
+    });
 
     const now = performance.now();
     if (now - lastScrollSaveAtRef.current < 160) return;
@@ -294,6 +303,17 @@ export default function MessageListView({
       onLoadMore();
     }
   }, [scrollTop, viewportHeight, totalHeight, hasMoreMessages, onLoadMore]);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+      if (scrollSaveTimerRef.current !== null) {
+        window.clearTimeout(scrollSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),

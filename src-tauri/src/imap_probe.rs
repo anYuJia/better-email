@@ -1597,8 +1597,10 @@ fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
         html_body.clone()
     } else if !text_body.trim().is_empty() {
         text_body.clone()
-    } else {
+    } else if parsed.is_none() {
         fallback_body.clone()
+    } else {
+        String::new()
     };
     let sanitized_html = if has_renderable_html {
         protocol::sanitize_html(&html_body)

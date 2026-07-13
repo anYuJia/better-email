@@ -80,7 +80,13 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
         .as_ref()
         .and_then(|message| message.body_text(0))
         .map(|body| body.into_owned())
-        .unwrap_or_else(|| fallback_body.to_string());
+        .unwrap_or_else(|| {
+            if parsed.is_none() {
+                fallback_body.to_string()
+            } else {
+                String::new()
+            }
+        });
     let html_body = parsed
         .as_ref()
         .and_then(|message| message.body_html(0))
@@ -169,8 +175,10 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
         html_body.clone()
     } else if !text_body.trim().is_empty() {
         text_body.clone()
-    } else {
+    } else if parsed.is_none() {
         fallback_body.to_string()
+    } else {
+        String::new()
     };
     let snippet = message_body_snippet(&text_body, &html_body, &body);
     let from = parsed

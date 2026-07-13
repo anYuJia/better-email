@@ -1009,15 +1009,16 @@ async function main() {
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
     await openSettingsSection(cdp, '账号', 'accounts', '.settings-account-page-accounts');
-    await waitForExpression(cdp, "document.body.innerText.includes('添加邮箱账号') && document.querySelector('.settings-add-account-panel') && !document.querySelector('.add-account-disclosure')?.open");
-    await openDetails(cdp, '.add-account-disclosure');
-    await waitForExpression(cdp, "document.querySelector('.add-account-disclosure')?.open");
-    await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"name@example.com\"]', 'qa-new@better-email.local');
-    await fillInput(cdp, '.settings-add-account-panel input[placeholder=\"留空则使用邮箱地址\"]', 'QA New');
-    await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-add-account-panel')");
-    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-add-account-panel input')].some((input) => input.value === 'smtp.qq.com:587')");
-    await clickButton(cdp, '创建账号', "document.querySelector('.settings-add-account-panel')");
-    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已创建账号：qa-new@better-email.local') && document.querySelector('.settings-account-list')?.innerText.includes('qa-new@better-email.local')");
+    await clickButton(cdp, '添加账号', "document.querySelector('.settings-account-list-header')");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-add-dialog')");
+    await fillInput(cdp, '.settings-account-add-dialog input[placeholder="name@example.com"]', 'qa-new@better-email.local');
+    await clickButton(cdp, '手动配置', "document.querySelector('.settings-account-add-dialog')");
+    await fillInput(cdp, '.settings-account-add-dialog input[placeholder="可选"]', 'QA New');
+    await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-account-add-dialog')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-account-add-dialog input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-account-add-dialog input')].some((input) => input.value === 'smtp.qq.com:587')");
+    await fillInput(cdp, '.settings-account-add-dialog input[autocomplete="new-password"]', 'qa-password-mock');
+    await clickButton(cdp, '添加', "document.querySelector('.settings-account-add-dialog')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('qa-new@better-email.local') && document.querySelector('.settings-account-list')?.innerText.includes('qa-new@better-email.local')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
     await openSettingsSection(cdp, '身份', 'identities', '.settings-identity-panel');
     await waitForExpression(cdp, "document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
@@ -1230,6 +1231,18 @@ async function main() {
       ],
     };
     console.log(JSON.stringify(report, null, 2));
+  } catch (error) {
+    if (cdp) {
+      try {
+        await captureScreenshot(cdp, 'failure-debug');
+        console.error('Captured failure screenshot as ./tmp-ui-qa/failure-debug.png');
+        const text = await evalInPage(cdp, "document.body.innerText");
+        console.error('Page text content on failure:\n', text);
+      } catch (e) {
+        console.error('Failed to capture debug info:', e);
+      }
+    }
+    throw error;
   } finally {
     if (cdp) cdp.close();
     await stopChild(chrome);

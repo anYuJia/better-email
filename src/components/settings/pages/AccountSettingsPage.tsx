@@ -1,4 +1,3 @@
-import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
@@ -7,8 +6,6 @@ import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
 import type { AccountDialogMode } from '../accounts/accountSettingsShared';
-import { protocolLabel } from '../accounts/accountSettingsShared';
-import ProviderPresetGrid from '../ProviderPresetGrid';
 
 function errorMessage(error: unknown) {
   return (error instanceof Error ? error.message : String(error))
@@ -118,27 +115,7 @@ export default function AccountSettingsPage({
     }
   }
 
-  async function handleCreateInlineAccount() {
-    if (addAccountSubmitting) return;
-    if (!newAccountForm.email.trim()) {
-      setAddAccountError('请输入邮箱地址。');
-      return;
-    }
-    if (!newAccountServerReady) {
-      setAddAccountError('请先选择服务商预设，或填写收信和发信服务器。');
-      return;
-    }
 
-    setAddAccountError('');
-    setAddAccountSubmitting(true);
-    try {
-      await onCreateNewAccount();
-    } catch (error) {
-      setAddAccountError(errorMessage(error));
-    } finally {
-      setAddAccountSubmitting(false);
-    }
-  }
 
   function updateNewAccountEmail(email: string) {
     setAddAccountError('');
@@ -223,131 +200,7 @@ export default function AccountSettingsPage({
       />
 
 
-      <details className="add-account-disclosure tool-panel">
-        <summary>
-          <span className="add-account-summary-copy">
-            <strong>添加邮箱账号</strong>
-            <small>选择服务商预设，或手动填写 IMAP/POP3 与 SMTP 服务器</small>
-          </span>
-          <span className="add-account-summary-action">
-            <Plus size={14} />
-            展开
-          </span>
-        </summary>
 
-        <section className="settings-add-account-panel tool-panel" aria-label="添加邮箱账号">
-          <div className="settings-account-form-grid">
-            <label>
-              邮箱地址
-              <input
-                value={newAccountForm.email}
-                onChange={(event) => updateNewAccountEmail(event.target.value)}
-                placeholder="name@example.com"
-                aria-invalid={Boolean(addAccountError)}
-              />
-            </label>
-            <label>
-              显示名称
-              <input
-                value={newAccountForm.display_name}
-                onChange={(event) => onNewAccountFormChange({
-                  ...newAccountForm,
-                  display_name: event.target.value,
-                })}
-                placeholder="留空则使用邮箱地址"
-              />
-            </label>
-            <label>
-              获取新邮件时间
-              <select
-                value={newAccountForm.sync_mode === 'push' ? '5min' : newAccountForm.sync_mode}
-                onChange={(event) => onNewAccountFormChange({
-                  ...newAccountForm,
-                  sync_mode: event.target.value,
-                })}
-              >
-                <option value="manual">手动</option>
-                <option value="5min">每 5 分钟</option>
-                <option value="15min">每 15 分钟</option>
-                <option value="30min">每 30 分钟</option>
-              </select>
-            </label>
-            <label>
-              收信协议
-              <select
-                value={newAccountForm.incoming_protocol}
-                onChange={(event) => switchNewAccountProtocol(event.target.value as IncomingProtocol)}
-              >
-                <option value="imap">IMAP</option>
-                <option value="pop3">POP3</option>
-              </select>
-            </label>
-          </div>
-
-          <ProviderPresetGrid
-            compact
-            activeProvider={newAccountForm.provider}
-            onSelect={(preset) => {
-              setAddAccountError('');
-              onApplyNewAccountPreset(preset);
-            }}
-          />
-
-          <div className="settings-account-form-grid">
-            <label>
-              收信服务器（{protocolLabel(newAccountForm.incoming_protocol)}）
-              <input
-                value={newAccountForm.imap_host}
-                onChange={(event) => onNewAccountFormChange({
-                  ...newAccountForm,
-                  imap_host: event.target.value,
-                })}
-              />
-            </label>
-            <label>
-              发信服务器（SMTP）
-              <input
-                value={newAccountForm.smtp_host}
-                onChange={(event) => onNewAccountFormChange({
-                  ...newAccountForm,
-                  smtp_host: event.target.value,
-                })}
-              />
-            </label>
-            <label>
-              认证方式
-              <select
-                value={newAccountForm.auth_type}
-                onChange={(event) => onNewAccountFormChange({
-                  ...newAccountForm,
-                  auth_type: event.target.value,
-                })}
-              >
-                <option value="password">密码 / 授权码</option>
-                <option value="oauth2">OAuth2 Token</option>
-              </select>
-            </label>
-          </div>
-
-          {addAccountError && (
-            <p className="settings-account-add-error" role="alert">
-              {addAccountError}
-            </p>
-          )}
-
-          <footer>
-            <button
-              type="button"
-              className="settings-account-add-submit"
-              disabled={!newAccountForm.email.trim() || !newAccountServerReady || addAccountSubmitting}
-              onClick={handleCreateInlineAccount}
-            >
-              {!addAccountSubmitting && <Plus size={14} />}
-              {addAccountSubmitting ? '创建中' : '创建账号'}
-            </button>
-          </footer>
-        </section>
-      </details>
 
       {addDialogOpen && (
         <AddAccountDialog

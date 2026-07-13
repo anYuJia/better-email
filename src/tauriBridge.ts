@@ -1081,6 +1081,12 @@ async function mockInvoke<T>(command: string, args?: InvokeArgs): Promise<T> {
       ];
       return created as T;
     }
+    case 'store_account_secret': {
+      return {
+        exists: true,
+        message: '本机凭据已安全保存。',
+      } as T;
+    }
     case 'set_default_account': {
       const accountId = Number(args?.accountId ?? 0);
       const existing = mockAccounts.find((item) => item.id === accountId);

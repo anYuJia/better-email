@@ -52,16 +52,17 @@
 
 ---
 
-## 🚀 1.0.3 版本更新说明
+## 🚀 1.0.4 版本更新说明
 
-Better Email 1.0.3 版本带来了以下更新与提升：
+Better Email 1.0.4 版本带来了以下更新与提升：
 
-1. **修复编译报错**：修复了在 Linux/非 Windows/非 macOS 平台上编译时，因为平台条件宏判定引起 `src-tauri/src/commands.rs` 代码中 `Ok(...)` 返回语句不可达（Unreachable Expression）编译阻断报错。
-2. **修复 GitHub Actions 构建报错**：解决了在 Linux (Ubuntu) 验证环境中因缺少 `gdk-3.0` 等系统依赖导致 Rust 测试编译失败的问题。
-3. **交互体验与视觉精修**：统一了全站 of 输入聚焦焦点外框设计，重塑了侧边栏与邮件卡片在已读、未读、悬停、选中状态下的视觉层级，带来 macOS 原生质感的细腻反馈。
-4. **重构与性能优化**：对 `ReaderPane` 进行了模块化拆分，将图片预览与 `inline-cid` 懒加载逻辑抽离为独立 Hook，并对 `MessageListPane` 的回调和渲染进行了稳定化处理，大幅降低了重复渲染开销。
-5. **完善持续集成与发布**：全新设计并校验了 GitHub Actions 自动化工作流，支持全平台（macOS, Windows, Linux）打包、测试和发布，在 tag 推送时可一键生成发行版。
-6. **测试与质量保证**：已通过全套自动化测试，包含 94 项 Vitest 前端单元测试、93 条 Chrome CDP 自动化 UI Smoke 测试断言，以及 137 项 Rust 后端单元测试。
+1. **移除 Linux 发布目标**：在 CI/CD 自动化部署矩阵中移除了 `ubuntu-22.04` 的编译打包目标以加速 Windows 和 macOS 的构建交付，降低非必要平台的构建开销。
+2. **修复编译报错**：修复了在 Linux/非 Windows/非 macOS 平台上编译时，因为平台条件宏判定引起 `src-tauri/src/commands.rs` 代码中 `Ok(...)` 返回语句不可达（Unreachable Expression）编译阻断报错。
+3. **修复 GitHub Actions 构建报错**：解决了在 Linux (Ubuntu) 验证环境中因缺少 `gdk-3.0` 等系统依赖导致 Rust 测试编译失败的问题。
+4. **交互体验与视觉精修**：统一了全站 of 输入聚焦焦点外框设计，重塑了侧边栏与邮件卡片在已读、未读、悬停、选中状态下的视觉层级，带来 macOS 原生质感的细腻反馈。
+5. **重构与性能优化**：对 `ReaderPane` 进行了模块化拆分，将图片预览与 `inline-cid` 懒加载逻辑抽离为独立 Hook，并对 `MessageListPane` 的回调 and 渲染进行了稳定化处理，大幅降低了重复渲染开销。
+6. **完善持续集成与发布**：全新设计并校验了 GitHub Actions 自动化工作流，支持 macOS 和 Windows 双平台打包、测试和发布，在 tag 推送时可一键生成发行版。
+7. **测试与质量保证**：已通过全套自动化测试，包含 94 项 Vitest 前端单元测试、93 条 Chrome CDP 自动化 UI Smoke 测试断言，以及 137 项 Rust 后端单元测试。
 
 ---
 

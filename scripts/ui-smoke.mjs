@@ -392,11 +392,10 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelector('.brand-mark')?.textContent.trim() === 'B'");
     await waitForExpression(cdp, "document.querySelector('.account-switcher-trigger') && !document.querySelector('.account-switcher select')");
-    await openDetails(cdp, '.more-mailboxes');
-    await waitForExpression(cdp, "(() => { const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect(); const list = document.querySelector('.more-mailboxes[open] > .folded-folder-list')?.getBoundingClientRect(); return sidebar && list && list.left >= sidebar.left && list.right <= sidebar.right + 1; })()");
+    await waitForExpression(cdp, "(() => { const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect(); const list = document.querySelector('.primary-folder-list')?.getBoundingClientRect(); return sidebar && list && list.left >= sidebar.left && list.right <= sidebar.right + 1; })()");
     await evalInPage(
       cdp,
-      "(() => { const folder = document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]'); if (!folder) throw new Error('Spam folder favorite target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 350, button: 2 })); })()",
+      "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"]'); if (!folder) throw new Error('Spam folder favorite target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 350, button: 2 })); })()",
     );
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('固定到常用邮箱')");
     await clickButton(cdp, '固定到常用邮箱', "document.querySelector('.context-menu')");
@@ -409,7 +408,7 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('从常用邮箱移除')");
     await clickButton(cdp, '从常用邮箱移除', "document.querySelector('.context-menu')");
-    await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.more-mailboxes .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已从常用邮箱移除：垃圾邮件') && document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"]') && !JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
 
     await evalInPage(
       cdp,
@@ -420,7 +419,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
     await evalInPage(
       cdp,
-      "(() => { const folder = document.querySelector('.more-mailboxes .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
+      "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
     );
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('清空废纸篓')");
     await clickButton(cdp, '清空废纸篓', "document.querySelector('.context-menu')");
@@ -685,8 +684,7 @@ async function main() {
     await fillInput(cdp, '.custom-folder-form input[placeholder="新建文件夹"]', '客户跟进');
     await clickButton(cdp, '添加', "document.querySelector('.custom-folder-form')");
     await waitForExpression(cdp, "document.body.innerText.includes('已创建文件夹：客户跟进')");
-    await openDetails(cdp, '.more-mailboxes');
-    await waitForExpression(cdp, "document.querySelector('.more-mailboxes').innerText.includes('客户跟进')");
+    await waitForExpression(cdp, "document.querySelector('.primary-folder-list').innerText.includes('客户跟进')");
     await evalInPage(
       cdp,
       "(() => { const folder = [...document.querySelectorAll('.folder')].find((item) => item.textContent.includes('客户跟进')); if (!folder) throw new Error('Folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 420, button: 2 })); })()",
@@ -725,7 +723,7 @@ async function main() {
       }));
     })()`);
     await waitForExpression(cdp, "document.body.innerText.includes('已拖动到 重点客户：1 封邮件') && document.querySelector('.undo-snackbar')");
-    await clickButton(cdp, '重点客户', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '重点客户', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
     await clickButton(cdp, '撤销', "document.querySelector('.undo-snackbar')");
     await waitForExpression(cdp, "document.body.innerText.includes('已撤销：移动到 重点客户') && document.body.innerText.includes('Quarterly update')");
@@ -735,13 +733,11 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.includes('重点客户'))");
     await clickButton(cdp, '重点客户', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已移动到 重点客户')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '重点客户', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '重点客户', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]').click()");
     await waitForExpression(cdp, "document.body.innerText.includes('本地已移动')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '废纸篓', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '废纸篓', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.querySelector('.reader-actions').innerText.includes('恢复')");
     await openDetails(cdp, '.reader-more-menu');
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-more-menu button')].some((item) => item.textContent.includes('永久删除'))");
@@ -753,8 +749,7 @@ async function main() {
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Quarterly update')).click()");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"删除\"]').click()");
     await waitForExpression(cdp, "document.body.innerText.includes('远端邮件已移动到 Trash')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '废纸篓', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '废纸篓', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '永久删除', "document.querySelector('.reader-more-menu')");
@@ -764,8 +759,7 @@ async function main() {
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '标为垃圾邮件', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已标为垃圾邮件')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '垃圾邮件', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.body.innerText.includes('不是垃圾邮件')");
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '不是垃圾邮件', "document.querySelector('.reader-more-menu')");
@@ -1092,8 +1086,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.snooze-dialog') && document.querySelectorAll('[data-snooze-preset]').length === 4 && document.querySelector('input[aria-label=\"自定义稍后处理时间\"]')");
     await evalInPage(cdp, "document.querySelector('[data-snooze-preset=\"tomorrow\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.snooze-dialog') && document.body.innerText.includes('已稍后处理到')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '稍后处理', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '稍后处理', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.body.innerText.includes('稍后到')");
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '取消稍后', "document.querySelector('.reader-more-menu')");
@@ -1128,8 +1121,7 @@ async function main() {
     );
     await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-warning-actions[open]') || document.querySelector('.reader-more-menu[open]')");
     await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com') && document.body.innerText.includes('垃圾邮件')");
-    await openDetails(cdp, '.more-mailboxes');
-    await clickButton(cdp, '垃圾邮件', "document.querySelector('.more-mailboxes')");
+    await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((button) => button.textContent.includes('安全检查清单')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-more-menu') && document.querySelector('.reader-more-menu').textContent.includes('信任发件人')");

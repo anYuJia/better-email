@@ -363,20 +363,8 @@ export default function SidebarFolderNavigation({
     <>
       <div className="sidebar-label">邮箱</div>
       <nav className="folder-list primary-folder-list">
-        <FolderItems folders={primaryFolders} {...folderItemProps} />
+        <FolderItems folders={[...primaryFolders, ...moreFolders]} {...folderItemProps} />
       </nav>
-
-      {moreFolders.length > 0 && (
-        <div className="sidebar-disclosure more-mailboxes flat" open={true}>
-          <summary>
-            <span>更多邮箱</span>
-            <em>{moreFolders.length}</em>
-          </summary>
-          <div className="folded-folder-list">
-            <FolderItems folders={moreFolders} {...folderItemProps} />
-          </div>
-        </div>
-      )}
 
       {children && <div className="sidebar-secondary sidebar-quick-menus">{children}</div>}
 

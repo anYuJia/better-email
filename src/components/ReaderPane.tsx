@@ -41,7 +41,7 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, plainTextPreview } from '../mailUtils';
+import { formatBytes, formatDate, plainTextPreview, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -276,21 +276,6 @@ function EmptyMessageBody({
       {action}
     </div>
   );
-}
-
-function bodyLooksLikeHtml(body: string) {
-  return /<!doctype\b|<(?:html|body|div|p|table|a|img|span)\b/i.test(body);
-}
-
-function htmlHasRenderableContent(html: string) {
-  if (/<img\b[^>]*\bsrc\s*=/i.test(html)) return true;
-  return Boolean(plainTextPreview(html));
-}
-
-function htmlHasRemoteVisualContent(html: string) {
-  return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(html)
-    || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
-    || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
 }
 
 export default function ReaderPane({

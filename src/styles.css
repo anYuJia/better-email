@@ -1,6 +1,8 @@
+@import './design-tokens.css';
+
 :root {
-  color: #20242a;
-  background: #f5f6f8;
+  color: var(--ui-text);
+  background: var(--ui-bg);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
 }

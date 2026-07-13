@@ -398,3 +398,18 @@ function timeToMinutes(value: string): number | null {
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   return hour * 60 + minute;
 }
+
+export function bodyLooksLikeHtml(body: string): boolean {
+  return /<!doctype\b|<(?:html|body|div|p|table|a|img|span)\b/i.test(body);
+}
+
+export function htmlHasRenderableContent(html: string): boolean {
+  if (/<img\b[^>]*\bsrc\s*=/i.test(html)) return true;
+  return Boolean(plainTextPreview(html));
+}
+
+export function htmlHasRemoteVisualContent(html: string): boolean {
+  return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
+}

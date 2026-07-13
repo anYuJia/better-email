@@ -15,6 +15,9 @@ import {
   senderDomain,
   syncIntervalMs,
   syncStatusLabel,
+  bodyLooksLikeHtml,
+  htmlHasRenderableContent,
+  htmlHasRemoteVisualContent,
 } from './mailUtils';
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
@@ -344,6 +347,36 @@ describe('mail UI utilities', () => {
       account_id: 7,
       scope: 'domain',
       value: 'example.com',
+    });
+  });
+
+  describe('HTML and remote image visual content detection', () => {
+    it('detects if body looks like HTML', () => {
+      expect(bodyLooksLikeHtml('plain text')).toBe(false);
+      expect(bodyLooksLikeHtml('<p>html paragraph</p>')).toBe(true);
+      expect(bodyLooksLikeHtml('<!DOCTYPE html><html>')).toBe(true);
+    });
+
+    it('detects if HTML has renderable content', () => {
+      expect(htmlHasRenderableContent('<img src="cid:abc">')).toBe(true);
+      expect(htmlHasRenderableContent('   ')).toBe(false);
+      expect(htmlHasRenderableContent('some text')).toBe(true);
+      expect(htmlHasRenderableContent('<div>   </div>')).toBe(false);
+    });
+
+    it('detects if HTML has remote visual content like td background or css background-image', () => {
+      // img src
+      expect(htmlHasRemoteVisualContent('<img src="https://example.com/a.png">')).toBe(true);
+      // source src
+      expect(htmlHasRemoteVisualContent('<source src="https://example.com/a.png">')).toBe(true);
+      // td background
+      expect(htmlHasRemoteVisualContent('<td background="https://example.com/bg.png"></td>')).toBe(true);
+      // inline css background-image
+      expect(htmlHasRemoteVisualContent('<div style="background-image: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
+      expect(htmlHasRemoteVisualContent('<div style="background: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
+      // negative cases
+      expect(htmlHasRemoteVisualContent('<img src="cid:local.png">')).toBe(false);
+      expect(htmlHasRemoteVisualContent('<img src="/local/path.png">')).toBe(false);
     });
   });
 });

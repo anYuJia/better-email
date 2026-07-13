@@ -40,7 +40,7 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
 import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -405,8 +405,9 @@ export default function ReaderPane({
     };
   }, [selectedId]);
 
+  const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
   const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
-  const isBodyRenderReady = Boolean(bodySelected);
+  const isBodyRenderReady = Boolean(bodySelected) && !isSelectedBodyCorrupted;
 
   useEffect(() => {
     if (isBodyRenderReady && selected?.id) {
@@ -521,7 +522,7 @@ export default function ReaderPane({
       && !hasRenderableHtml
       && bodySelected.body.trim(),
   );
-  const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml
+  const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
 

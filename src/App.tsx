@@ -36,6 +36,7 @@ import {
   replyThreadingHeaders,
   htmlHasRemoteVisualContent,
   senderDomain,
+  isMessageBodyCorrupted,
 } from './mailUtils';
 import { getCurrentWindow, invoke } from './tauriBridge';
 
@@ -1343,8 +1344,8 @@ export default function App() {
     if (!selected) return undefined;
     const isHeaderOnlyRemoteMessage =
       selected.remote_uid > 0 &&
-      !selected.body.trim() &&
-      selected.snippet.includes('远端邮件头已同步');
+      (!selected.body.trim() || isMessageBodyCorrupted(selected.body)) &&
+      (selected.snippet.includes('远端邮件头已同步') || isMessageBodyCorrupted(selected.body));
     if (!isHeaderOnlyRemoteMessage) return undefined;
     if (bodyFetchInFlightRef.current.has(selected.id) || bodyFetchFailedRef.current.has(selected.id)) return undefined;
 

@@ -145,6 +145,7 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
     }
 }
 
+#[allow(dead_code)]
 pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
     parse_imported_eml_bytes(raw.as_bytes())
 }

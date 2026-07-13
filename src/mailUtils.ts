@@ -76,6 +76,11 @@ export function formatBytes(value: number): string {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
+export function isMessageBodyCorrupted(body: string): boolean {
+  const trimmed = body.trim();
+  return trimmed.startsWith('--') && (trimmed.includes('Content-Type:') || trimmed.includes('content-type:'));
+}
+
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&nbsp;/gi, ' ')

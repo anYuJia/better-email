@@ -1607,21 +1607,7 @@ fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
         String::new()
     };
     let security_warnings = reader_security_warnings(raw, &html_body);
-    let snippet_source = if !text_body.trim().is_empty() {
-        text_body.as_str()
-    } else if has_renderable_html {
-        &html_body
-    } else {
-        &fallback_body
-    };
-    let snippet = snippet_source
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .replace(['<', '>'], " ")
-        .chars()
-        .take(120)
-        .collect();
+    let snippet = protocol::message_body_snippet(&text_body, &html_body, &fallback_body);
     let attachments = parsed
         .as_ref()
         .map(remote_attachment_metadata_from_message)
@@ -1760,7 +1746,7 @@ fn infer_image_mime_type_from_part(part: &MessagePart<'_>) -> Option<&'static st
 fn looks_like_html(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     [
-        "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+        "<!doctype", "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
     ]
     .iter()
     .any(|marker| lower.contains(marker))

@@ -162,13 +162,7 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
     } else {
         fallback_body.to_string()
     };
-    let snippet_source = if !text_body.trim().is_empty() {
-        text_body.as_str()
-    } else if has_renderable_html {
-        &html_body
-    } else {
-        &body
-    };
+    let snippet = message_body_snippet(&text_body, &html_body, &body);
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
@@ -254,14 +248,7 @@ pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
             })
             .unwrap_or_default(),
         subject: preview.subject,
-        snippet: snippet_source
-            .lines()
-            .find(|line| !line.trim().is_empty())
-            .unwrap_or("")
-            .replace(['<', '>'], " ")
-            .chars()
-            .take(120)
-            .collect(),
+        snippet,
         body,
         sanitized_html: if has_renderable_html {
             sanitize_html(&html_body)
@@ -367,10 +354,42 @@ pub(crate) fn format_address_list(addresses: &Address<'_>) -> String {
 fn looks_like_html(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     [
-        "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+        "<!doctype", "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
     ]
     .iter()
     .any(|marker| lower.contains(marker))
+}
+
+pub(crate) fn message_body_snippet(
+    text_body: &str,
+    html_body: &str,
+    fallback_body: &str,
+) -> String {
+    let (source, is_html) = if !text_body.trim().is_empty() {
+        (text_body, looks_like_html(text_body))
+    } else if looks_like_html(html_body) {
+        (html_body, true)
+    } else {
+        (fallback_body, looks_like_html(fallback_body))
+    };
+    let plain = if is_html {
+        let sanitized = sanitize_html(source);
+        decode_basic_entities(&strip_html_tags(&sanitized))
+    } else {
+        decode_basic_entities(source)
+    };
+    let preview_line = plain
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or(&plain);
+
+    preview_line
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(120)
+        .collect()
 }
 
 pub(crate) fn sanitize_html(html: &str) -> String {
@@ -447,29 +466,50 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
         url_schemes.insert("https");
     }
 
-    Builder::default()
+    let limited_html = html.chars().take(30_000).collect::<String>();
+    let prepared_html = if allow_remote_images {
+        promote_https_background_images(&limited_html)
+    } else {
+        limited_html
+    };
+    let cleaned = Builder::default()
         .url_schemes(url_schemes)
         .rm_tags(&["style"])
-        .attribute_filter(|element, attribute, value| {
+        .attribute_filter(move |element, attribute, value| {
             if element.eq_ignore_ascii_case("a") && attribute.eq_ignore_ascii_case("href") {
                 let normalized = value.trim().to_ascii_lowercase();
                 if normalized.starts_with("http://") || normalized.starts_with("https://") {
                     return None;
                 }
             }
+            if element.eq_ignore_ascii_case("img") && attribute.eq_ignore_ascii_case("src") {
+                let normalized = value.trim().to_ascii_lowercase();
+                if normalized.starts_with("http://")
+                    || (normalized.starts_with("https://")
+                        && (!allow_remote_images || is_tracking_image_source(&normalized)))
+                {
+                    return None;
+                }
+            }
             Some(Cow::Borrowed(value))
         })
-        .clean(&html.chars().take(30_000).collect::<String>())
+        .clean(&prepared_html)
         .to_string()
         .chars()
         .take(20_000)
-        .collect()
+        .collect::<String>();
+    let cleaned = remove_sourceless_images(&cleaned);
+    if html_has_visible_content(&cleaned) {
+        cleaned
+    } else {
+        String::new()
+    }
 }
 
 pub(crate) fn html_has_remote_images(html: &str) -> bool {
     let lower = html.to_ascii_lowercase();
     let mut cursor = 0;
-    while let Some(relative_start) = lower[cursor..].find("<img") {
+    while let Some(relative_start) = lower[cursor..].find('<') {
         let start = cursor + relative_start;
         let Some(tag_end) = find_tag_end(html, start) else {
             break;
@@ -484,10 +524,144 @@ pub(crate) fn html_has_remote_images(html: &str) -> bool {
         {
             return true;
         }
+        if extract_attr(tag, "background")
+            .map(|source| is_remote_image_source(&source))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        if extract_attr(tag, "style")
+            .map(|style| style_has_remote_image(&style))
+            .unwrap_or(false)
+        {
+            return true;
+        }
         cursor = tag_end.saturating_add(1);
         if cursor >= html.len() {
             break;
         }
+    }
+    false
+}
+
+fn is_remote_image_source(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    normalized.starts_with("http://") || normalized.starts_with("https://")
+}
+
+fn style_has_remote_image(style: &str) -> bool {
+    let lower = style.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("url(") {
+        let value_start = cursor + relative_start + 4;
+        let Some(relative_end) = lower[value_start..].find(')') else {
+            break;
+        };
+        let value_end = value_start + relative_end;
+        let value = style[value_start..value_end]
+            .trim()
+            .trim_matches(['"', '\'']);
+        if is_remote_image_source(value) {
+            return true;
+        }
+        cursor = value_end.saturating_add(1);
+    }
+    false
+}
+
+fn is_tracking_image_source(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_lowercase();
+    let path = normalized.split(['?', '#']).next().unwrap_or(&normalized);
+    path.ends_with("/p/t.gif")
+        || path.ends_with("/beacon.gif")
+        || path.ends_with("/upoint.gif")
+        || path.contains("/beacon/")
+        || path.contains("/tracking/")
+        || path.contains("/tracker/")
+}
+
+fn promote_https_background_images(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut output = String::with_capacity(html.len());
+    let mut cursor = 0;
+
+    while let Some(relative_start) = lower[cursor..].find("<td") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        output.push_str(&html[cursor..=tag_end]);
+        if let Some(source) = extract_attr(&html[start..=tag_end], "background") {
+            let decoded = decode_basic_entities(&source);
+            if decoded.trim().to_ascii_lowercase().starts_with("https://")
+                && !is_tracking_image_source(&decoded)
+            {
+                let escaped = decoded
+                    .replace('&', "&amp;")
+                    .replace('"', "&quot;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                output.push_str(&format!("<img src=\"{escaped}\" alt=\"\">"));
+            }
+        }
+        cursor = tag_end.saturating_add(1);
+        if cursor >= html.len() {
+            break;
+        }
+    }
+
+    output.push_str(&html[cursor..]);
+    output
+}
+
+fn remove_sourceless_images(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut output = String::with_capacity(html.len());
+    let mut cursor = 0;
+
+    while let Some(relative_start) = lower[cursor..].find("<img") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        output.push_str(&html[cursor..start]);
+        let tag = &html[start..=tag_end];
+        if extract_attr(tag, "src")
+            .map(|source| !source.trim().is_empty())
+            .unwrap_or(false)
+        {
+            output.push_str(tag);
+        }
+        cursor = tag_end.saturating_add(1);
+        if cursor >= html.len() {
+            break;
+        }
+    }
+
+    output.push_str(&html[cursor..]);
+    output
+}
+
+fn html_has_visible_content(html: &str) -> bool {
+    let text = decode_basic_entities(&strip_html_tags(html));
+    if text.split_whitespace().next().is_some() {
+        return true;
+    }
+
+    let lower = html.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(relative_start) = lower[cursor..].find("<img") {
+        let start = cursor + relative_start;
+        let Some(tag_end) = find_tag_end(html, start) else {
+            break;
+        };
+        if extract_attr(&html[start..=tag_end], "src")
+            .map(|source| !source.trim().is_empty())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        cursor = tag_end.saturating_add(1);
     }
     false
 }
@@ -611,6 +785,8 @@ fn strip_html_tags(input: &str) -> String {
 
 fn decode_basic_entities(input: &str) -> String {
     input
+        .replace("&nbsp;", " ")
+        .replace("&NBSP;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -823,6 +999,47 @@ mod tests {
         assert!(!html_has_remote_images(
             "<img src=\"cid:logo@example.com\">"
         ));
+        assert!(html_has_remote_images(
+            "<td background=\"https://cdn.example.com/hero.png\"></td>"
+        ));
+        assert!(html_has_remote_images(
+            "<div style=\"background:url('https://cdn.example.com/hero.png')\"></div>"
+        ));
+    }
+
+    #[test]
+    fn remote_background_images_are_blocked_then_promoted_after_confirmation() {
+        let html = "<table><tr><td background=\"https://cdn.example.com/hero.png\"><img width=\"436\" height=\"96\"><a href=\"https://count.mail.163.com/statistics/login.do\">button</a></td></tr></table>";
+        let blocked = sanitize_html(html);
+        assert!(!blocked.contains("cdn.example.com/hero.png"));
+        assert!(!blocked.contains("<img"));
+
+        let allowed = sanitize_html_with_remote_images(html);
+        assert!(allowed.contains("https://cdn.example.com/hero.png"));
+        assert!(!allowed.contains("count.mail.163.com/statistics/login.do"));
+        assert!(!allowed.contains("width=\"436\" height=\"96\"></a>"));
+    }
+
+    #[test]
+    fn html_only_message_snippet_uses_visible_text_not_markup() {
+        let snippet = message_body_snippet(
+            "",
+            "<!doctype html><html><body><div style=\"font-family: system-ui\">你好&nbsp;世界</div></body></html>",
+            "",
+        );
+
+        assert_eq!(snippet, "你好 世界");
+    }
+
+    #[test]
+    fn image_only_message_snippet_is_empty_after_sanitization() {
+        let snippet = message_body_snippet(
+            "",
+            "<!doctype html><html><body><td background=\"https://cdn.example.com/hero.png\"><img src=\"https://mimg.127.net/p/t.gif\"></td></body></html>",
+            "",
+        );
+
+        assert_eq!(snippet, "");
     }
 
     #[test]

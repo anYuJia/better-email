@@ -41,7 +41,7 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate } from '../mailUtils';
+import { formatBytes, formatDate, plainTextPreview } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -216,6 +216,10 @@ function PlainMessageBody({ body }: { body: string }) {
     [blocks],
   );
 
+  if (!body.trim()) {
+    return <EmptyMessageBody />;
+  }
+
   return (
     <div className="body-text">
       {blocks.map((block, index) => {
@@ -254,6 +258,39 @@ function PlainMessageBody({ body }: { body: string }) {
       })}
     </div>
   );
+}
+
+function EmptyMessageBody({
+  title = '无正文',
+  detail,
+  action,
+}: {
+  title?: string;
+  detail?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="body-text reader-empty-body" role="status">
+      <strong>{title}</strong>
+      {detail && <span>{detail}</span>}
+      {action}
+    </div>
+  );
+}
+
+function bodyLooksLikeHtml(body: string) {
+  return /<!doctype\b|<(?:html|body|div|p|table|a|img|span)\b/i.test(body);
+}
+
+function htmlHasRenderableContent(html: string) {
+  if (/<img\b[^>]*\bsrc\s*=/i.test(html)) return true;
+  return Boolean(plainTextPreview(html));
+}
+
+function htmlHasRemoteVisualContent(html: string) {
+  return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
+    || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
 }
 
 export default function ReaderPane({
@@ -358,6 +395,24 @@ export default function ReaderPane({
     ) ?? [],
     [selected?.security_warnings, selectedSenderTrusted],
   );
+  const readerHtml = inlineImageResolution.html;
+  const hasRenderableHtml = Boolean(
+    selected?.sanitized_html.trim()
+      && htmlHasRenderableContent(readerHtml),
+  );
+  const selectedBodyLooksLikeHtml = Boolean(selected && bodyLooksLikeHtml(selected.body));
+  const selectedHasRemoteVisualContent = Boolean(
+    selected && htmlHasRemoteVisualContent(selected.body),
+  );
+  const shouldOfferRemoteContent = Boolean(
+    selected
+      && (selectedHasRemoteImageWarning || selectedHasRemoteVisualContent)
+      && !hasRenderableHtml
+      && selected.body.trim(),
+  );
+  const plainBodyForReader = selected && !selected.sanitized_html.trim() && !selectedBodyLooksLikeHtml
+    ? selected.body
+    : '';
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());
@@ -1420,23 +1475,23 @@ export default function ReaderPane({
           </div>
         )}
 
-        {visibleSecurityWarnings.length > 0 && (
+        {(visibleSecurityWarnings.length > 0 || selectedHasRemoteImageWarning || shouldOfferRemoteContent) && (
           <div className="reader-warning-panel">
             <div className="reader-warning-heading">
               <strong>安全提示</strong>
-              {selectedHasRemoteImageWarning && (
+              {(selectedHasRemoteImageWarning || shouldOfferRemoteContent) && (
                 <span>远程图片默认阻止</span>
               )}
             </div>
             {visibleSecurityWarnings.map((warning) => <p key={warning}>{warning}</p>)}
-            {selectedHasRemoteImageWarning && (
+            {shouldOfferRemoteContent && (
               <div className="reader-warning-action-row">
                 <button
                   type="button"
                   className="reader-warning-primary-action"
                   onClick={onAllowRemoteImagesOnce}
                 >
-                  允许查看本邮件
+                  查看内容
                 </button>
                 <details className="compact-menu reader-warning-actions">
                   <summary><SlidersHorizontal size={15} /> 更多</summary>
@@ -1455,16 +1510,30 @@ export default function ReaderPane({
           </div>
         )}
 
-        {selected.sanitized_html ? (
+        {hasRenderableHtml ? (
           <div
             className="reader-html"
             onClick={handleReaderHtmlClick}
             onContextMenuCapture={handleReaderHtmlContextMenu}
             onContextMenu={handleReaderHtmlContextMenu}
-            dangerouslySetInnerHTML={{ __html: inlineImageResolution.html }}
+            dangerouslySetInnerHTML={{ __html: readerHtml }}
+          />
+        ) : shouldOfferRemoteContent ? (
+          <EmptyMessageBody
+            title="正文主要由远程图片组成"
+            detail="已先阻止自动加载，点击后会显示本邮件中的 HTTPS 图片；外部链接仍不会变成可点击跳转。"
+            action={(
+              <button
+                type="button"
+                className="reader-warning-primary-action"
+                onClick={onAllowRemoteImagesOnce}
+              >
+                查看内容
+              </button>
+            )}
           />
         ) : (
-          <PlainMessageBody body={selected.body} />
+          <PlainMessageBody body={plainBodyForReader} />
         )}
 
         {!isDraft && !isTrash && (

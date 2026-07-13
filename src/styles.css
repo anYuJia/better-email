@@ -395,8 +395,7 @@ button { cursor: pointer; }
   gap: 6px;
   padding: 8px 8px 0;
 }
-.saved-search-form input,
-.contact-center > input {
+.saved-search-form input {
   min-width: 0;
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 6px;
@@ -405,11 +404,9 @@ button { cursor: pointer; }
   padding: 7px 8px;
   font-size: 12px;
 }
-.saved-search-form input::placeholder,
-.contact-center > input::placeholder { color: #9ba8b5; }
+.saved-search-form input::placeholder { color: #9ba8b5; }
 .saved-search-form button,
-.saved-search-row > button,
-.contact-row > button {
+.saved-search-row > button {
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 6px;
   background: rgba(255,255,255,0.08);
@@ -418,19 +415,15 @@ button { cursor: pointer; }
   padding: 0 8px;
   font-size: 12px;
 }
-.saved-search-list,
-.contact-list { display: flex; flex-direction: column; gap: 6px; }
-.saved-search-list small,
-.contact-list small { color: #9ba8b5; font-size: 12px; }
-.saved-search-row,
-.contact-row {
+.saved-search-list { display: flex; flex-direction: column; gap: 6px; }
+.saved-search-list small { color: #9ba8b5; font-size: 12px; }
+.saved-search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 6px;
   align-items: center;
 }
-.saved-search-row > button:first-child,
-.contact-row > button:first-child {
+.saved-search-row > button:first-child {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -440,23 +433,14 @@ button { cursor: pointer; }
   text-align: left;
 }
 .saved-search-row strong,
-.saved-search-row span,
-.contact-row strong,
-.contact-row span {
+.saved-search-row span {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.saved-search-row strong,
-.contact-row strong { font-weight: 600; }
-.saved-search-row span,
-.contact-row span { color: #9ba8b5; font-size: 11px; }
-
-.contact-center {
-  display: grid;
-  gap: 8px;
-}
+.saved-search-row strong { font-weight: 600; }
+.saved-search-row span { color: #9ba8b5; font-size: 11px; }
 
 .contact-tool-row > button {
   width: 100%;
@@ -1373,6 +1357,24 @@ h1 {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
+}
+
+.reader-empty-body {
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  min-height: 88px;
+  color: #68717d;
+}
+
+.reader-empty-body strong {
+  color: #2f3a45;
+}
+
+.reader-empty-body span {
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .composer-backdrop {
@@ -6221,14 +6223,12 @@ h1 {
 }
 
 /* Context-first sidebar actions keep primary navigation visible without button clutter. */
-.saved-search-row,
-.contact-row {
+.saved-search-row {
   grid-template-columns: minmax(0, 1fr) 28px;
   gap: 4px;
 }
 
 .saved-search-row > .row-more-button,
-.contact-row > .row-more-button,
 .folder-actions button {
   width: 28px;
   min-width: 28px;
@@ -6251,15 +6251,12 @@ h1 {
 
 .saved-search-row:hover > .row-more-button,
 .saved-search-row:focus-within > .row-more-button,
-.contact-row:hover > .row-more-button,
-.contact-row:focus-within > .row-more-button,
 .folder:hover .folder-actions button,
 .folder:focus-within .folder-actions button {
   opacity: 1;
 }
 
 .saved-search-row > .row-more-button:hover,
-.contact-row > .row-more-button:hover,
 .folder-actions button:hover {
   color: var(--ink-1);
   background: rgba(31, 41, 55, 0.07);
@@ -6362,7 +6359,6 @@ h1 {
 
 @media (hover: none) {
   .saved-search-row > .row-more-button,
-  .contact-row > .row-more-button,
   .folder-actions button {
     opacity: 1;
   }

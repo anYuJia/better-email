@@ -9,16 +9,10 @@ import type {
   Account,
   AccountScope,
   BackgroundTask,
-  Contact,
   Folder,
   SavedSearch,
 } from '../app/types';
 import AccountSwitcher from './AccountSwitcher';
-import ContextMenu, { type ContextMenuItem } from './ContextMenu';
-import {
-  buildContactSearchEntries,
-  matchingContacts,
-} from './composer/contactSuggestions';
 import SidebarFolderNavigation from './SidebarFolderNavigation';
 
 export type SidebarProps = {
@@ -33,8 +27,6 @@ export type SidebarProps = {
   savedSearchName: string;
   savedSearches: SavedSearch[];
   customFolderName: string;
-  contacts: Contact[];
-  contactQuery: string;
   onAccountScopeChange: (value: string) => void;
   onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
@@ -46,10 +38,6 @@ export type SidebarProps = {
   onDeleteSavedSearch: (savedSearch: SavedSearch) => void;
   onCustomFolderNameChange: (value: string) => void;
   onCreateCustomFolder: () => void;
-  onContactQueryChange: (value: string) => void;
-  onComposeToContact: (contact: Contact) => void;
-  onEditContact: (contact: Contact) => void;
-  onDeleteContact: (contact: Contact) => void;
   onSelectFolder: (folderId: number) => void;
   onDropMessagesToFolder: (folder: Folder, messageIds: number[]) => void;
   onFolderFavoriteChange: (folder: Folder, isFavorite: boolean) => void;
@@ -77,8 +65,6 @@ export default function Sidebar({
   savedSearchName,
   savedSearches,
   customFolderName,
-  contacts,
-  contactQuery,
   onAccountScopeChange,
   onSetDefaultAccount,
   onCompose,
@@ -90,10 +76,6 @@ export default function Sidebar({
   onDeleteSavedSearch,
   onCustomFolderNameChange,
   onCreateCustomFolder,
-  onContactQueryChange,
-  onComposeToContact,
-  onEditContact,
-  onDeleteContact,
   onSelectFolder,
   onDropMessagesToFolder,
   onFolderFavoriteChange,
@@ -108,52 +90,6 @@ export default function Sidebar({
   onOpenShortcuts,
   onOpenCommandPalette,
 }: SidebarProps) {
-  const [contactContextMenu, setContactContextMenu] = React.useState<{
-    x: number;
-    y: number;
-    title: string;
-    detail: string;
-    items: ContextMenuItem[];
-  } | null>(null);
-  const contactSearchEntries = React.useMemo(
-    () => buildContactSearchEntries(contacts),
-    [contacts],
-  );
-  const filteredContacts = React.useMemo(() => {
-    return matchingContacts(contactSearchEntries, contactQuery, 6);
-  }, [contactQuery, contactSearchEntries]);
-
-  function openContactContextMenu(event: React.MouseEvent, contact: Contact) {
-    event.preventDefault();
-    event.stopPropagation();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    setContactContextMenu({
-      x: event.clientX || bounds.right,
-      y: event.clientY || bounds.bottom,
-      title: contact.name || contact.email,
-      detail: contact.email,
-      items: [
-        {
-          id: 'compose-contact',
-          label: '写邮件',
-          onSelect: () => onComposeToContact(contact),
-        },
-        {
-          id: 'edit-contact',
-          label: '编辑联系人',
-          onSelect: () => onEditContact(contact),
-        },
-        {
-          id: 'delete-contact',
-          label: '删除联系人',
-          danger: true,
-          separatorBefore: true,
-          onSelect: () => onDeleteContact(contact),
-        },
-      ],
-    });
-  }
-
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -172,37 +108,6 @@ export default function Sidebar({
       <button className="compose-button" onClick={onCompose}>
         <Edit3 size={17} /> 写邮件
       </button>
-      <section className="contact-center">
-        <input
-          value={contactQuery}
-          placeholder="搜索联系人"
-          onChange={(event) => onContactQueryChange(event.target.value)}
-        />
-        <div className="contact-list">
-          {filteredContacts.length > 0 ? filteredContacts.map((contact) => (
-            <div
-              className="contact-row"
-              key={contact.id}
-              onContextMenu={(event) => openContactContextMenu(event, contact)}
-            >
-              <button type="button" onClick={() => onComposeToContact(contact)}>
-                <strong>{contact.name || contact.email}</strong>
-                <span>{contact.email}</span>
-              </button>
-              <button
-                type="button"
-                className="row-more-button"
-                aria-label={`${contact.name || contact.email} 更多操作`}
-                onClick={(event) => openContactContextMenu(event, contact)}
-              >
-                ···
-              </button>
-            </div>
-          )) : (
-            <small>暂无匹配联系人</small>
-          )}
-        </div>
-      </section>
       <SidebarFolderNavigation
         folders={folders}
         folderId={folderId}
@@ -305,17 +210,6 @@ export default function Sidebar({
           </button>
         </div>
       </div>
-      {contactContextMenu && (
-        <ContextMenu
-          x={contactContextMenu.x}
-          y={contactContextMenu.y}
-          items={contactContextMenu.items}
-          title={contactContextMenu.title}
-          detail={contactContextMenu.detail}
-          ariaLabel="联系人操作"
-          onClose={() => setContactContextMenu(null)}
-        />
-      )}
     </aside>
   );
 }

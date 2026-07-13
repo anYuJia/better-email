@@ -40,7 +40,7 @@ UI 回归通过。
 
 Rust 测试通过。
 
-134 项测试覆盖数据库迁移、账号删除约束、统一邮箱查询、IMAP/SMTP 端点解析、OAuth2 PKCE、OAuth2 回调错误边界、XOAUTH2、MIME 解析、HTML sanitizer、HTTPS-only 远程图片放行、远程图片检测、真实 `src`/`href` 属性边界、引号属性内 `>` 的远程图片/链接风险识别、附件分段下载、远端 UID 绑定、发件箱、草稿、规则、联系人、vCard 异常折行导入、远程图片信任和本地备份。
+137 项测试覆盖数据库迁移、账号删除约束、统一邮箱查询、IMAP/SMTP 端点解析、OAuth2 PKCE、OAuth2 回调错误边界、XOAUTH2、MIME 解析、HTML sanitizer、HTTPS-only 远程图片放行、远程背景图提升、图片型 HTML 摘要清理、远程图片检测、真实 `src`/`href` 属性边界、引号属性内 `>` 的远程图片/链接风险识别、附件分段下载、远端 UID 绑定、发件箱、草稿、规则、联系人、vCard 异常折行导入、远程图片信任和本地备份。
 
 Clippy 通过。
 

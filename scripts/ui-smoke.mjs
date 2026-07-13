@@ -487,22 +487,16 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
     await clickButton(cdp, '季度更新', "document.querySelector('.saved-search-list')");
     await waitForExpression(cdp, "document.querySelector('.search-box input').value === 'Quarterly' && document.body.innerText.includes('Quarterly update') && document.body.innerText.includes('已运行保存搜索：季度更新')");
-    await fillInput(cdp, '.contact-center > input', 'security');
-    await waitForExpression(cdp, "document.querySelector('.contact-list').innerText.includes('security@example.com') && !document.querySelector('.contact-list').innerText.includes('ada@example.com')");
-    await evalInPage(
-      cdp,
-      "(() => { const contact = [...document.querySelectorAll('.contact-list .contact-row')].find((item) => item.textContent.includes('security@example.com')); if (!contact) throw new Error('Contact context target not found'); contact.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 520, button: 2 })); })()",
-    );
-    await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('编辑联系人') && document.querySelector('.context-menu')?.innerText.includes('删除联系人')");
-    await clickButton(cdp, '编辑联系人', "document.querySelector('.context-menu')");
+    await waitForExpression(cdp, "!document.querySelector('.contact-center') && !document.body.innerText.includes('搜索联系人')");
+    await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-nav')");
+    await openSettingsSection(cdp, '联系人', 'contacts', '.settings-contact-panel');
+    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-contact-panel .contact-tool-row')].some((row) => row.innerText.includes('security@example.com'))");
+    await clickButton(cdp, '编辑', "[...document.querySelectorAll('.settings-contact-panel .contact-tool-row')].find((row) => row.innerText.includes('security@example.com'))");
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-contact-panel .contact-edit-form')");
     await clickButton(cdp, '取消', "document.querySelector('.settings-contact-panel .contact-edit-form')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
-    await clickButton(cdp, 'Security Team', "document.querySelector('.contact-list')");
-    await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('security@example.com') && document.body.innerText.includes('正在给 Security Team 写邮件')");
-    await evalInPage(cdp, "(() => { const button = document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]') ?? [...document.querySelectorAll('.composer header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()");
-    await waitForExpression(cdp, "!document.querySelector('.composer')");
     await fillInput(cdp, '.search-box input', '');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
@@ -1128,8 +1122,11 @@ async function main() {
     await captureScreenshot(cdp, 'forward-with-source-attachment');
     await evalInPage(cdp, "document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.composer')");
-    await openDetails(cdp, '.reader-warning-actions');
-    await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-warning-actions')");
+    await evalInPage(
+      cdp,
+      "(() => { const warningMenu = document.querySelector('.reader-warning-actions'); if (warningMenu) { warningMenu.open = true; return; } const moreMenu = document.querySelector('.reader-more-menu'); if (!moreMenu) throw new Error('Reader sender action menu not found'); moreMenu.open = true; })()",
+    );
+    await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-warning-actions[open]') || document.querySelector('.reader-more-menu[open]')");
     await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com') && document.body.innerText.includes('垃圾邮件')");
     await openDetails(cdp, '.more-mailboxes');
     await clickButton(cdp, '垃圾邮件', "document.querySelector('.more-mailboxes')");
@@ -1164,8 +1161,8 @@ async function main() {
         'search works',
         'search scope switches folder account and all accounts',
         'saved search shortcuts work',
-        'contact center search and compose works',
-        'contact context menu opens editor',
+        'sidebar contact search stays removed',
+        'contact settings edit opens',
         'contact command palette compose works',
         'recipient autocomplete works',
         'composer advanced tools stay folded by default',

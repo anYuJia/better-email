@@ -2776,8 +2776,6 @@ export default function App() {
         savedSearchName={savedSearchName}
         savedSearches={savedSearches}
         customFolderName={customFolderName}
-        contacts={managedContacts}
-        contactQuery={contactQuery}
         onAccountScopeChange={changeAccountScope}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
@@ -2807,12 +2805,6 @@ export default function App() {
         onCustomFolderNameChange={setCustomFolderName}
         onCreateCustomFolder={() => {
           createCustomFolder().catch((error) => setStatus(String(error)));
-        }}
-        onContactQueryChange={setContactQuery}
-        onComposeToContact={composeToContact}
-        onEditContact={openContactEditor}
-        onDeleteContact={(contact) => {
-          deleteManagedContact(contact).catch((error) => setStatus(String(error)));
         }}
         onSelectFolder={selectFolder}
         onDropMessagesToFolder={(folder, messageIds) => {

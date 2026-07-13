@@ -3333,8 +3333,7 @@ body {
 }
 
 .saved-search-form input,
-.custom-folder-form input,
-.contact-center > input {
+.custom-folder-form input {
   min-height: 31px;
   border-radius: 6px;
   font-size: 12px;
@@ -3348,7 +3347,6 @@ body {
 }
 
 .saved-search-row > button,
-.contact-row > button,
 .label-row .label-row-main {
   min-height: 31px;
   font-size: 12.5px;

@@ -107,6 +107,25 @@ export function plainTextPreview(value: string): string {
 
 const remoteHeaderOnlySnippet = '远端邮件头已同步';
 
+function isMarkupPreviewNoise(value: string): boolean {
+  const normalized = value
+    .replace(/[<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  return normalized === '!doctype html'
+    || normalized.startsWith('!doctype html ')
+    || normalized.startsWith('html ')
+    || normalized.startsWith('body ')
+    || normalized.startsWith('head ')
+    || normalized.startsWith('div style=')
+    || normalized.startsWith('span style=')
+    || normalized.startsWith('table ')
+    || normalized.startsWith('/div')
+    || normalized.startsWith('/html');
+}
+
 export type PreviewableMailboxMessage = {
   body: string;
   sanitized_html: string;
@@ -115,9 +134,10 @@ export type PreviewableMailboxMessage = {
 
 export function mailboxListPreview(message: PreviewableMailboxMessage): string {
   const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
-  if (bodyPreview) return bodyPreview;
+  if (bodyPreview && !isMarkupPreviewNoise(bodyPreview)) return bodyPreview;
   if (!message.snippet.includes(remoteHeaderOnlySnippet)) {
-    return plainTextPreview(message.snippet);
+    const snippetPreview = plainTextPreview(message.snippet);
+    return isMarkupPreviewNoise(snippetPreview) ? '' : snippetPreview;
   }
   return '';
 }

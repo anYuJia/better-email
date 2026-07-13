@@ -78,6 +78,16 @@ describe('mail UI utilities', () => {
       sanitized_html: '',
       snippet: '普通摘要',
     })).toBe('普通摘要');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: '!doctype html',
+    })).toBe('');
+    expect(mailboxListPreview({
+      body: '',
+      sanitized_html: '',
+      snippet: 'div style="font-family: -apple-system, system-ui;"',
+    })).toBe('');
   });
 
   it('quotes message bodies for reply and forward drafts', () => {

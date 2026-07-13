@@ -378,7 +378,7 @@ pub fn fetch_message_body(
     let raw = fetches
         .iter()
         .find_map(|fetch| fetch.body())
-        .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+        .map(|bytes| bytes.to_vec())
         .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
     let _ = session.logout();
 
@@ -900,7 +900,7 @@ fn fetch_attachment_payload_from_selected(
         fetches
             .iter()
             .find_map(|fetch| fetch.body())
-            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            .map(|bytes| bytes.to_vec())
             .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))
     })?;
     parse_attachment_payload_from_raw(&raw, filename, content_id).ok_or_else(|| {
@@ -1455,14 +1455,12 @@ fn imap_xoauth2_response(user: &str, access_token: &str) -> String {
 }
 
 fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageHeader {
-    let raw_header = fetch
-        .header()
-        .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
-        .unwrap_or_default();
+    let header_bytes = fetch.header().unwrap_or_default();
     let parsed = MessageParser::new()
         .with_minimal_headers()
         .with_message_ids()
-        .parse(raw_header.as_bytes());
+        .parse(header_bytes);
+    let raw_header = String::from_utf8_lossy(header_bytes);
     let subject = parsed
         .as_ref()
         .and_then(|message| message.subject())
@@ -1575,10 +1573,11 @@ fn email_from_address(address: &str) -> String {
     }
 }
 
-fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
-    let parsed = MessageParser::default().parse(raw.as_bytes());
-    let has_html_part = raw.to_ascii_lowercase().contains("content-type: text/html");
-    let fallback_body = raw
+fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
+    let parsed = MessageParser::default().parse(raw);
+    let raw_lossy = String::from_utf8_lossy(raw);
+    let has_html_part = raw_lossy.to_ascii_lowercase().contains("content-type: text/html");
+    let fallback_body = raw_lossy
         .replace("\r\n", "\n")
         .split_once("\n\n")
         .map(|(_, body)| body.to_string())
@@ -1606,7 +1605,7 @@ fn parse_body_from_raw(raw: &str) -> RemoteMessageBody {
     } else {
         String::new()
     };
-    let security_warnings = reader_security_warnings(raw, &html_body);
+    let security_warnings = reader_security_warnings(&raw_lossy, &html_body);
     let snippet = protocol::message_body_snippet(&text_body, &html_body, &fallback_body);
     let attachments = parsed
         .as_ref()
@@ -1780,13 +1779,13 @@ fn reader_security_warnings(raw: &str, html_body: &str) -> Vec<String> {
 }
 
 fn parse_attachment_payload_from_raw(
-    raw: &str,
+    raw: &[u8],
     filename: &str,
     content_id: &str,
 ) -> Option<RemoteAttachmentPayload> {
     let requested = filename.trim();
     let requested_content_id = protocol::normalize_content_id(Some(content_id));
-    let parsed = MessageParser::default().parse(raw.as_bytes())?;
+    let parsed = MessageParser::default().parse(raw)?;
     let attachments = remote_payload_parts(&parsed);
     if requested.is_empty() && requested_content_id.is_empty() {
         let (index, part) = attachments.first()?;
@@ -2120,7 +2119,7 @@ mod tests {
     #[test]
     fn parses_body_from_raw_message() {
         let body = parse_body_from_raw(
-            "Subject: Body\r\nFrom: Ada <ada@example.com>\r\n\r\nHello body.\r\nSecond line.",
+            b"Subject: Body\r\nFrom: Ada <ada@example.com>\r\n\r\nHello body.\r\nSecond line.",
         );
         assert!(body.body.contains("Hello body."));
         assert_eq!(body.snippet, "Hello body.");
@@ -2133,7 +2132,7 @@ mod tests {
     #[test]
     fn parses_and_sanitizes_html_body_from_raw_message() {
         let body = parse_body_from_raw(
-            "Subject: HTML\r\n\
+            b"Subject: HTML\r\n\
              MIME-Version: 1.0\r\n\
              Content-Type: text/html; charset=utf-8\r\n\
              \r\n\
@@ -2152,7 +2151,7 @@ mod tests {
     #[test]
     fn flags_reader_phishing_link_domain_mismatch() {
         let body = parse_body_from_raw(
-            "Subject: HTML\r\n\
+            b"Subject: HTML\r\n\
              MIME-Version: 1.0\r\n\
              Content-Type: text/html; charset=utf-8\r\n\
              \r\n\
@@ -2168,7 +2167,7 @@ mod tests {
     #[test]
     fn parses_attachment_metadata_from_raw_message() {
         let body = parse_body_from_raw(
-            "Subject: Attachment\r\n\
+            b"Subject: Attachment\r\n\
              MIME-Version: 1.0\r\n\
              Content-Type: multipart/mixed; boundary=\"b\"\r\n\
              \r\n\
@@ -2193,7 +2192,7 @@ mod tests {
     #[test]
     fn parses_attachment_payload_from_raw_message() {
         let payload = parse_attachment_payload_from_raw(
-            "Subject: Attachment\r\n\
+            b"Subject: Attachment\r\n\
              MIME-Version: 1.0\r\n\
              Content-Type: multipart/mixed; boundary=\"b\"\r\n\
              \r\n\
@@ -2233,7 +2232,7 @@ mod tests {
             "\r\n",
             "aW1hZ2UgYnl0ZXM=\r\n",
             "--rel--\r\n",
-        ));
+        ).as_bytes());
 
         assert!(body.has_attachments);
         assert_eq!(body.attachments.len(), 1);
@@ -2262,7 +2261,7 @@ mod tests {
                 "\r\n",
                 "aW1hZ2UgYnl0ZXM=\r\n",
                 "--rel--\r\n",
-            ),
+            ).as_bytes(),
             "",
             "IMAGE001@example.com",
         )
@@ -2290,7 +2289,7 @@ mod tests {
             "\r\n",
             "aW1hZ2UgYnl0ZXM=\r\n",
             "--rel--\r\n",
-        ));
+        ).as_bytes());
 
         assert_eq!(body.attachments.len(), 1);
         assert_eq!(body.attachments[0].mime_type, "image/png");
@@ -2366,7 +2365,7 @@ mod tests {
             "--b--\r\n",
         );
 
-        let payload = parse_attachment_payload_from_raw(raw, "logo.png", "RIGHT@example.com")
+        let payload = parse_attachment_payload_from_raw(raw.as_bytes(), "logo.png", "RIGHT@example.com")
             .expect("content id should select the matching inline part");
         assert_eq!(payload.filename, "logo.png");
         assert_eq!(payload.bytes, b"right image");

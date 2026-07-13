@@ -917,8 +917,7 @@ pub fn import_eml_file(
             MAX_EML_IMPORT_BYTES / 1024 / 1024
         )));
     }
-    let raw = String::from_utf8_lossy(&payload);
-    store.import_eml_message(account_id, &raw).map(Some)
+    store.import_eml_message(account_id, &payload).map(Some)
 }
 
 fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {

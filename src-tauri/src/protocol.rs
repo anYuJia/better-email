@@ -38,11 +38,16 @@ pub fn test_endpoints(
 }
 
 pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
+    parse_message_preview_bytes(raw.as_bytes())
+}
+
+pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
     let parsed = MessageParser::new()
         .with_minimal_headers()
         .with_message_ids()
-        .parse(raw.as_bytes());
-    let normalized = raw.replace("\r\n", "\n");
+        .parse(raw);
+    let raw_lossy = String::from_utf8_lossy(raw);
+    let normalized = raw_lossy.replace("\r\n", "\n");
     let (header_block, fallback_body) = normalized
         .split_once("\n\n")
         .unwrap_or((normalized.as_str(), ""));
@@ -135,15 +140,20 @@ pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
 }
 
 pub fn parse_imported_eml(raw: &str) -> ImportedEmlMessage {
+    parse_imported_eml_bytes(raw.as_bytes())
+}
+
+pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
     let parsed = MessageParser::new()
         .with_minimal_headers()
         .with_message_ids()
-        .parse(raw.as_bytes());
-    let normalized = raw.replace("\r\n", "\n");
+        .parse(raw);
+    let raw_lossy = String::from_utf8_lossy(raw);
+    let normalized = raw_lossy.replace("\r\n", "\n");
     let (header_block, fallback_body) = normalized
         .split_once("\n\n")
         .unwrap_or((normalized.as_str(), ""));
-    let preview = parse_message_preview(raw);
+    let preview = parse_message_preview_bytes(raw);
     let text_body = parsed
         .as_ref()
         .and_then(|message| message.body_text(0))

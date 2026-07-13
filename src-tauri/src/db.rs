@@ -1752,8 +1752,8 @@ impl MailStore {
         })
     }
 
-    pub fn import_eml_message(&self, account_id: Option<i64>, raw: &str) -> MailResult<Message> {
-        let imported = protocol::parse_imported_eml(raw);
+    pub fn import_eml_message(&self, account_id: Option<i64>, raw: &[u8]) -> MailResult<Message> {
+        let imported = protocol::parse_imported_eml_bytes(raw);
         let (message_id, attachments) = self.with_conn(move |conn| {
             let account = account_for_conn(conn, account_id)?;
             let folder_id = folder_id_for_account_role(conn, account.id, "inbox")?;
@@ -1860,7 +1860,7 @@ impl MailStore {
         self.with_conn(|conn| {
             let folder_id = folder_id_for_account_role(conn, account_id, "inbox")?;
             for pop_message in messages {
-                let imported = protocol::parse_imported_eml(&pop_message.raw);
+                let imported = protocol::parse_imported_eml_bytes(pop_message.raw.as_bytes());
                 let subject = normalized_subject(&imported.subject);
                 let thread_key = thread_key_for_message(
                     &subject,
@@ -10293,7 +10293,7 @@ mod tests {
             "--mix--\r\n",
         );
 
-        let imported = store.import_eml_message(None, raw).unwrap();
+        let imported = store.import_eml_message(None, raw.as_bytes()).unwrap();
         assert_eq!(imported.folder_role, "inbox");
         assert_eq!(imported.subject, "Local migration sample");
         assert_eq!(imported.sender_email, "migration@example.com");
@@ -10386,7 +10386,7 @@ mod tests {
             "a2VlcCBtZQ==\r\n",
             "--mix--\r\n",
         );
-        let local_message = store.import_eml_message(None, local_raw).unwrap();
+        let local_message = store.import_eml_message(None, local_raw.as_bytes()).unwrap();
         let local_attachment = store.list_attachments(local_message.id).unwrap().remove(0);
         let local_path = PathBuf::from(&local_attachment.local_path);
 

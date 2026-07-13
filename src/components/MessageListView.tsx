@@ -254,7 +254,15 @@ export default function MessageListView({
       let height = 34;
       if (item.type === 'message') {
         const preview = messagePreviewMap.get(item.message.id) ?? '';
-        height = preview.trim() ? 83 : 68;
+        const hasPreview = Boolean(preview.trim());
+        const hasChips = item.message.labels.length > 0 || item.message.attachment_count > 0;
+        if (hasPreview && hasChips) {
+          height = 102;
+        } else if (hasPreview || hasChips) {
+          height = 83;
+        } else {
+          height = 68;
+        }
       }
       layout.push({ top: currentTop, height });
       currentTop += height;

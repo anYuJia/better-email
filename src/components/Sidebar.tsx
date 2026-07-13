@@ -147,53 +147,55 @@ export default function Sidebar({
           </div>
         </details>
 
-        <details className="sidebar-tools">
-          <summary>工具</summary>
-          <div className="sidebar-tool-stack">
-            <form
-              className="saved-search-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onSaveCurrentSearch();
-              }}
-            >
-              <input
-                value={savedSearchName}
-                placeholder="保存当前搜索"
-                onChange={(event) => onSavedSearchNameChange(event.target.value)}
-              />
-              <button type="submit">保存</button>
-            </form>
-            {savedSearches.length > 0 && (
-              <div className="saved-search-list">
-                {savedSearches.map((savedSearch) => (
-                  <span key={savedSearch.id}>
-                    <button type="button" onClick={() => onRunSavedSearch(savedSearch)}>
-                      {savedSearch.name}
-                    </button>
-                    <button type="button" aria-label={`删除保存搜索 ${savedSearch.name}`} onClick={() => onDeleteSavedSearch(savedSearch)}>
-                      删除
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <form
-              className="custom-folder-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onCreateCustomFolder();
-              }}
-            >
-              <input
-                value={customFolderName}
-                placeholder="新建文件夹"
-                onChange={(event) => onCustomFolderNameChange(event.target.value)}
-              />
-              <button type="submit">添加</button>
-            </form>
-          </div>
-        </details>
+        {import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1' && (
+          <details className="sidebar-tools">
+            <summary>工具</summary>
+            <div className="sidebar-tool-stack">
+              <form
+                className="saved-search-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSaveCurrentSearch();
+                }}
+              >
+                <input
+                  value={savedSearchName}
+                  placeholder="保存当前搜索"
+                  onChange={(event) => onSavedSearchNameChange(event.target.value)}
+                />
+                <button type="submit">保存</button>
+              </form>
+              {savedSearches.length > 0 && (
+                <div className="saved-search-list">
+                  {savedSearches.map((savedSearch) => (
+                    <span key={savedSearch.id}>
+                      <button type="button" onClick={() => onRunSavedSearch(savedSearch)}>
+                        {savedSearch.name}
+                      </button>
+                      <button type="button" aria-label={`删除保存搜索 ${savedSearch.name}`} onClick={() => onDeleteSavedSearch(savedSearch)}>
+                        删除
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <form
+                className="custom-folder-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onCreateCustomFolder();
+                }}
+              >
+                <input
+                  value={customFolderName}
+                  placeholder="新建文件夹"
+                  onChange={(event) => onCustomFolderNameChange(event.target.value)}
+                />
+                <button type="submit">添加</button>
+              </form>
+            </div>
+          </details>
+        )}
       </SidebarFolderNavigation>
 
       <div className="sidebar-footer">

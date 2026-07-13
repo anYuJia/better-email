@@ -17,7 +17,7 @@
   <a href="https://github.com/anYuJia/better-email/actions/workflows/release.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/anYuJia/better-email/release.yml?branch=main&style=flat-square&label=Build" alt="GitHub Actions Build Status" />
   </a>
-  <img src="https://img.shields.io/badge/Tauri-v1.0-blueviolet?style=flat-square" alt="Tauri Version" />
+  <img src="https://img.shields.io/badge/Tauri-v2.0-blueviolet?style=flat-square" alt="Tauri Version" />
   <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust Version" />
   <img src="https://img.shields.io/badge/Node-%3E%3D20-green?style=flat-square" alt="Node Version" />
   <a href="https://github.com/anYuJia/better-email/blob/main/LICENSE">
@@ -30,6 +30,50 @@
 ## 📖 项目简介
 
 **Better Email** 是一款专为高效、专注的日常邮件处理而设计的本地优先桌面邮箱客户端。不同于市面上推崇信息流与社交化干扰的传统邮箱工具，Better Email 致力于回归邮件处理的本质，提供一个安全、清爽、响应灵敏的本地化工作台。
+
+> [!NOTE]
+> **Better Email 的核心理念**：避免 Electron 的臃肿，采用 Rust 后端 + 系统原生 WebView；本地离线优先，首屏按需惰性加载，网络流量按需使用，HTML 渲染默认安全。
+
+---
+
+## 🏗️ 架构设计
+
+Better Email 采用前后端分离的现代化桌面应用架构。前端负责极致流畅的 UI 交互与渲染，Rust 后端负责高性能网络协议、后台并发调度与敏感数据本地安全托管。
+
+```mermaid
+graph TD
+    %% Frontend Subsystem
+    subgraph Frontend [前端 UI 层 - Vite / React / TypeScript]
+        App[App.tsx 主框架] --> Sidebar[三栏工作区: Sidebar]
+        App --> MessageList[邮件列表: MessageListPane]
+        App --> Reader[阅读面板: ReaderPane]
+        Reader --> ImagePreview[图片预览 / Inline CID]
+    end
+
+    %% Tauri Bridge IPC
+    TauriIPC{{"Tauri IPC / Commands"}}
+
+    %% Backend Subsystem
+    subgraph Backend [后端内核层 - Rust Core]
+        Cmds[commands.rs 命令分发] --> DB[db.rs SQLite 数据库服务]
+        Cmds --> Crypto[Keychain / Keyring 凭据托管]
+        Cmds --> Engine[protocol.rs 邮件核心引擎]
+        Engine --> IMAP[IMAP 接收协议]
+        Engine --> SMTP[SMTP 发送协议]
+    end
+
+    %% Data & Network Destinations
+    DB[(本地 SQLite 数据库)]
+    Keychain[(系统级安全 Keychain)]
+    Server[("云端邮件服务器 (Gmail, Outlook, QQ 等)")]
+
+    %% Relations
+    App <-->|Tauri API| TauriIPC
+    TauriIPC <--> Cmds
+    Crypto <--> Keychain
+    IMAP <-->|SSL/TLS & OAuth2| Server
+    SMTP <-->|SSL/TLS & OAuth2| Server
+```
 
 ---
 
@@ -52,6 +96,31 @@
 
 ---
 
+## 📂 项目结构
+
+```text
+better-email/
+├── src/                    # 前端 React 项目源码
+│   ├── components/         # 交互组件 (ReaderPane, MessageListView 等)
+│   ├── hooks/              # 自定义 Hooks (useReaderActions, ImagePreview 等)
+│   ├── app/                # 全局配置、内联图片处理及日志管理
+│   ├── App.tsx             # 客户端主入口界面
+│   └── styles.css          # UI 样式与现代质感调色盘
+├── src-tauri/              # Rust 后端内核项目源码
+│   ├── src/
+│   │   ├── commands.rs     # 前端 Command IPC 接口
+│   │   ├── db.rs           # SQLite 本地邮件存储库驱动
+│   │   ├── protocol.rs     # IMAP/SMTP 底层协议连接池与邮件拉取发送逻辑
+│   │   └── main.rs         # 桌面端应用生命周期入口
+│   └── tauri.conf.json     # Tauri 配置文件（权限及窗口配置）
+├── docs/                   # 项目规格文档
+│   ├── DESIGN.md           # 系统架构与设计文档
+│   └── VALIDATION.md       # 测试范围与功能回归校验记录
+└── scripts/                # 本地自动化测试与效能诊断脚本
+```
+
+---
+
 ## 🚀 1.0.7 版本更新说明
 
 Better Email 1.0.7 版本带来了以下更新与提升：
@@ -62,31 +131,10 @@ Better Email 1.0.7 版本带来了以下更新与提升：
 4. **移除 Linux 发布目标**：在 CI/CD 自动化部署矩阵中移除了 `ubuntu-22.04` 的编译打包目标以加速 Windows 和 macOS 的构建交付，降低非必要平台的构建开销。
 5. **修复编译报错**：修复了在 Linux/非 Windows/非 macOS 平台上编译时，因为平台条件宏判定引起 `src-tauri/src/commands.rs` 代码中 `Ok(...)` 返回语句不可达（Unreachable Expression）编译阻断报错。
 6. **修复 GitHub Actions 构建报错**：解决了在 Linux (Ubuntu) 验证环境中因缺少 `gdk-3.0` 等系统依赖导致 Rust 测试编译失败的问题。
-7. **交互体验与视觉精修**：统一了全站 of 输入聚焦焦点外框设计，重塑了侧边栏与邮件卡片在已读、未读、悬停、选中状态下的视觉层级，带来 macOS 原生质感的细腻反馈。
-8. **重构与性能优化**：对 `ReaderPane` 进行了模块化拆分，将图片预览与 `inline-cid` 懒加载逻辑抽离为独立 Hook，并对 `MessageListPane` 的回调 and 渲染进行了稳定化处理，大幅降低了重复渲染开销。
+7. **交互体验与视觉精修**：统一了全站的输入聚焦焦点外框设计，重塑了侧边栏与邮件卡片在已读、未读、悬停、选中状态下的视觉层级，带来 macOS 原生质感的细腻反馈。
+8. **重构与性能优化**：对 `ReaderPane` 进行了模块化拆分，将图片预览与 `inline-cid` 懒加载逻辑抽离为独立 Hook，并对 `MessageListPane` 的回调和渲染进行了稳定化处理，大幅降低了重复渲染开销。
 9. **完善持续集成与发布**：全新设计并校验了 GitHub Actions 自动化工作流，支持 macOS 和 Windows 双平台打包、测试和发布，在 tag 推送时可一键生成发行版。
 10. **测试与质量保证**：已通过全套自动化测试，包含 94 项 Vitest 前端单元测试、93 条 Chrome CDP 自动化 UI Smoke 测试断言，以及 137 项 Rust 后端单元测试。
-
----
-
-## 🛠️ 技术栈与架构
-
-Better Email 采用现代化的桌面客户端开发架构，保证了跨平台兼容性、极速响应与系统安全性。
-
-* **前端框架**：[React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)
-* **桌面外壳**：[Tauri](https://tauri.app/) (安全、小巧的 Rust 跨平台桌面应用构建工具)
-* **后端引擎**：[Rust](https://www.rust-lang.org/) (用于处理高性能 IMAP/SMTP 协议、本地 SQLite 数据库读写和系统 Keychain 安全交互)
-* **存储引擎**：[SQLite](https://www.sqlite.org/) (高效、可靠的本地嵌入式数据库)
-
----
-
-## 📦 下载与安装
-
-您可以直接从 [GitHub Releases](https://github.com/anYuJia/better-email/releases) 页面下载适用于您操作系统的最新安装包：
-
-* **macOS**：支持 Apple Silicon 及 Intel 芯片 of 安装包 (`.dmg` / `.app`)。
-* **Windows**：提供免安装版或标准安装程序 (`.msi` / `.exe`)。
-* **Linux**：提供 `.deb`、`.AppImage` 等多种主流包格式。
 
 ---
 
@@ -135,13 +183,13 @@ Better Email 采用 GitHub Actions 自动化构建与发布。发版步骤如下
 
 1. 本地测试通过后，创建对应版本 tag：
    ```bash
-   git tag v1.0.1
+   git tag v1.0.7
    ```
 2. 将 tag 推送到远端仓库：
    ```bash
-   git push origin v1.0.1
+   git push origin v1.0.7
    ```
-3. GitHub Actions 将自动触发 `Release` 工作流，运行全量验证测试，并在测试通过后自动为 macOS、Windows 和 Linux 构建安装包，并创建 Release 发布。
+3. GitHub Actions 将自动触发 `Release` 工作流，运行全量验证测试，并在测试通过后自动为 macOS 和 Windows 构建安装包，并创建 Release 发布。
 
 ---
 

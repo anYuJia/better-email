@@ -367,7 +367,7 @@ export default function SidebarFolderNavigation({
       </nav>
 
       {moreFolders.length > 0 && (
-        <details className="sidebar-disclosure more-mailboxes">
+        <details className="sidebar-disclosure more-mailboxes flat" open={true}>
           <summary>
             <span>更多邮箱</span>
             <em>{moreFolders.length}</em>

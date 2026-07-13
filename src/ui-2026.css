@@ -305,6 +305,30 @@ textarea:disabled {
   background: rgba(255, 255, 255, 0.58);
 }
 
+.sidebar-disclosure.flat summary::before {
+  display: none !important;
+}
+
+.sidebar-disclosure.flat summary {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+.sidebar-disclosure.flat summary span {
+  grid-column: 1 !important;
+}
+
+.sidebar-disclosure.flat:hover,
+.sidebar-disclosure.flat[open] {
+  background: transparent !important;
+}
+
+.sidebar-disclosure.flat summary:hover {
+  background: transparent !important;
+  color: var(--ui-text-secondary) !important;
+}
+
 .folded-folder-list {
   padding: 3px 0 4px 7px;
 }

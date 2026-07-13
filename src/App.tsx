@@ -2979,7 +2979,21 @@ export default function App() {
         initialScrollTop={mailboxListScrollTop}
         onScrollTopChange={handleMailboxListScrollTopChange}
         onSearchSubmit={runSearch}
-        onQueryChange={setQuery}
+        onQueryChange={(val) => {
+          setQuery(val);
+          if (!val.trim()) {
+            loadMessagesWithVisibleFallback(
+              folderId,
+              '',
+              filter,
+              accountScope,
+              mailboxRefreshRef.current,
+              folders,
+              messagePageSize,
+              searchScope,
+            ).catch((error) => setStatus(String(error)));
+          }
+        }}
         onSearchScopeChange={(nextScope) => {
           changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
         }}

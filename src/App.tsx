@@ -1062,46 +1062,51 @@ export default function App() {
     const selectedRemoteUid = selected.remote_uid;
     const activeThreadKey = activeThread?.thread_key ?? null;
 
-    autoReadInFlightRef.current.add(selected.id);
-    appFlowLog('autoMarkRead start', {
-      messageId: selectedMessageId,
-      accountId: selectedAccountId,
-      mailbox: selectedRemoteMailbox,
-      uid: selectedRemoteUid,
-    });
-    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
-      .then((report) => {
-        setMessages((current) => current.map((message) => (
-          message.id === selectedMessageId ? { ...message, is_read: true } : message
-        )));
-        if (activeThreadKey) {
-          setThreadMessages((current) => current.map((message) => (
+    // Delay the mark-as-read operation by 800ms to allow the reader view to render smoothly first
+    const timer = setTimeout(() => {
+      autoReadInFlightRef.current.add(selectedMessageId);
+      appFlowLog('autoMarkRead start', {
+        messageId: selectedMessageId,
+        accountId: selectedAccountId,
+        mailbox: selectedRemoteMailbox,
+        uid: selectedRemoteUid,
+      });
+      invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
+        .then((report) => {
+          setMessages((current) => current.map((message) => (
             message.id === selectedMessageId ? { ...message, is_read: true } : message
           )));
-          setActiveThread((current) => current && current.thread_key === activeThreadKey
-            ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
+          if (activeThreadKey) {
+            setThreadMessages((current) => current.map((message) => (
+              message.id === selectedMessageId ? { ...message, is_read: true } : message
+            )));
+            setActiveThread((current) => current && current.thread_key === activeThreadKey
+              ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
+              : current);
+            setThreads((current) => current.map((thread) => thread.thread_key === activeThreadKey
+              ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
+              : thread));
+          }
+          setStats((current) => current
+            ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
             : current);
-          setThreads((current) => current.map((thread) => thread.thread_key === activeThreadKey
-            ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
-            : thread));
-        }
-        setStats((current) => current
-          ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
-          : current);
-        appFlowLog('autoMarkRead done', {
-          messageId: selectedMessageId,
-          message: report.message,
+          appFlowLog('autoMarkRead done', {
+            messageId: selectedMessageId,
+            message: report.message,
+          });
+        })
+        .catch((error) => {
+          appFlowWarn('autoMarkRead failed', {
+            messageId: selectedMessageId,
+            error: String(error).replace(/^Error:\s*/i, ''),
+          });
+        })
+        .finally(() => {
+          autoReadInFlightRef.current.delete(selectedMessageId);
         });
-      })
-      .catch((error) => {
-        appFlowWarn('autoMarkRead failed', {
-          messageId: selectedMessageId,
-          error: String(error).replace(/^Error:\s*/i, ''),
-        });
-      })
-      .finally(() => {
-        autoReadInFlightRef.current.delete(selectedMessageId);
-      });
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [selectedId, selected?.is_read, activeThread?.thread_key]);
 
   useEffect(() => {

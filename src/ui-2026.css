@@ -695,6 +695,22 @@ textarea:disabled {
   box-shadow: inset 3px 0 0 var(--ui-accent);
 }
 
+.message-card.is-new {
+  animation: message-card-appear 0.58s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes message-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+    background: #e6f1fc;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .message-avatar {
   position: absolute;
   left: 13px;

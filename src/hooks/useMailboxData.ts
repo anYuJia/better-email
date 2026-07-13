@@ -8,6 +8,7 @@ import type {
   Message,
   SearchScope,
   ThreadSummary,
+  ImapMailboxState,
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
@@ -35,6 +36,8 @@ type UseMailboxDataOptions = {
   filter: FilterMode;
   listSort: ListSort;
   folders: Folder[];
+  imapMailboxes: ImapMailboxState[];
+  messageLimit: number;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
   setMessageLimit: Dispatch<SetStateAction<number>>;
@@ -140,6 +143,8 @@ export default function useMailboxData({
   filter,
   listSort,
   folders,
+  imapMailboxes,
+  messageLimit,
   setMessages,
   setThreads,
   setMessageLimit,
@@ -160,7 +165,7 @@ export default function useMailboxData({
     nextFilter = filter,
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
-    nextLimit = messagePageSize,
+    nextLimit = messageLimit,
     nextSearchScope = searchScope,
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
@@ -218,7 +223,9 @@ export default function useMailboxData({
     setThreads(nextThreads);
     const visibleMessages = nextMessages.slice(0, nextLimit);
     setMessageLimit(nextLimit);
-    setHasMoreMessages(nextMessages.length > nextLimit);
+    const currentMailbox = imapMailboxes?.find((m) => m.local_folder_id === nextFolderId);
+    const hasMoreRemote = currentMailbox ? !currentMailbox.history_complete : false;
+    setHasMoreMessages(nextMessages.length > nextLimit || hasMoreRemote);
     setMessages(visibleMessages);
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
     setSelectedMessageIds((current) =>
@@ -255,7 +262,7 @@ export default function useMailboxData({
     nextScope: AccountScope = accountScope,
     refreshId = mailboxRefreshRef.current,
     visibleFolders = folders,
-    nextLimit = messagePageSize,
+    nextLimit = messageLimit,
     nextSearchScope = searchScope,
   ) {
     const nextMessages = await loadMessages(

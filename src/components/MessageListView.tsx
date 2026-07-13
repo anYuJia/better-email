@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   Paperclip,
   Search,
@@ -42,6 +42,7 @@ type MessageListCardProps = {
   isCurrentMessage: boolean;
   isSelected: boolean;
   isDragging: boolean;
+  isNew: boolean;
   hasBulkSelection: boolean;
   selectedMessageIdsRef: React.MutableRefObject<number[]>;
   onSelectMessage: (messageId: number) => void;
@@ -58,6 +59,7 @@ const MessageListCard = React.memo(function MessageListCard({
   isCurrentMessage,
   isSelected,
   isDragging,
+  isNew,
   hasBulkSelection,
   selectedMessageIdsRef,
   onSelectMessage,
@@ -76,6 +78,7 @@ const MessageListCard = React.memo(function MessageListCard({
         message.is_read ? 'is-read' : 'is-unread',
         isCurrentMessage ? 'selected is-current' : '',
         isDragging ? 'dragging' : '',
+        isNew ? 'is-new' : '',
       ].filter(Boolean).join(' ')}
       draggable
       onClick={() => onSelectMessage(message.id)}
@@ -153,6 +156,25 @@ export default function MessageListView({
   onRefresh,
   onLoadMore,
 }: MessageListViewProps) {
+  const prevIdsRef = useRef<Set<number>>(new Set());
+  const prevIds = prevIdsRef.current;
+
+  const newIds = useMemo(() => {
+    const set = new Set<number>();
+    if (prevIds.size > 0) {
+      for (const message of messages) {
+        if (!prevIds.has(message.id)) {
+          set.add(message.id);
+        }
+      }
+    }
+    return set;
+  }, [messages]);
+
+  useEffect(() => {
+    prevIdsRef.current = new Set(messages.map((m) => m.id));
+  }, [messages]);
+
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
     [selectedMessageIds],
@@ -184,6 +206,7 @@ export default function MessageListView({
               isCurrentMessage={message.id === selectedId}
               isSelected={selectedMessageSet.has(message.id)}
               isDragging={draggingMessageSet.has(message.id)}
+              isNew={newIds.has(message.id)}
               hasBulkSelection={selectedMessageIds.length > 1}
               selectedMessageIdsRef={selectedMessageIdsRef}
               onSelectMessage={onSelectMessage}

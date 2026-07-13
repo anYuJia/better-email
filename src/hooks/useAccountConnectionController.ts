@@ -236,6 +236,7 @@ export default function useAccountConnectionController({
     });
     try {
       onProgress?.('正在创建本地邮箱账号...');
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const created = await invoke<Account>('create_account', { input: newAccountForm });
       accountFlowLog('create account stored', {
         accountId: created.id,
@@ -245,6 +246,7 @@ export default function useAccountConnectionController({
       let verification: CredentialVerificationReport | null = null;
       if (trimmedSecret) {
         onProgress?.('正在安全存储本机加密凭据...');
+        await new Promise((resolve) => setTimeout(resolve, 600));
         const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
           input: { account_email: created.email, secret: trimmedSecret },
         });
@@ -273,6 +275,7 @@ export default function useAccountConnectionController({
           throw new Error(credentialResult.message);
         }
         onProgress?.('正在连接服务器验证登录凭据...');
+        await new Promise((resolve) => setTimeout(resolve, 600));
         verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
           input: {
             account_id: created.id,
@@ -321,6 +324,7 @@ export default function useAccountConnectionController({
         });
         try {
           onProgress?.('已成功登录！正在同步服务器邮件列表...');
+          await new Promise((resolve) => setTimeout(resolve, 600));
           const syncRun = await invoke<SyncRun>('sync_imap_headers', {
             accountId: created.id,
           });
@@ -340,6 +344,7 @@ export default function useAccountConnectionController({
         }
       }
       onProgress?.('已完成邮件同步，正在加载界面数据...');
+      await new Promise((resolve) => setTimeout(resolve, 600));
       const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
       accountFlowLog('metadata loaded after create', {
         accountId: created.id,

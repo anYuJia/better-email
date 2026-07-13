@@ -354,6 +354,8 @@ export default function App() {
     filter,
     listSort,
     folders,
+    imapMailboxes,
+    messageLimit,
     setMessages,
     setThreads,
     setMessageLimit,
@@ -1231,7 +1233,7 @@ export default function App() {
         accountScope,
         mailboxRefreshRef.current,
         meta.folders,
-        messagePageSize,
+        messageLimit,
       );
       if (activeThread) {
         await openThread(activeThread, false);
@@ -2441,7 +2443,14 @@ export default function App() {
       nextLimit,
       searchScope,
     );
-    setStatus(`已加载 ${nextMessages.length} 封邮件`);
+    const currentMailbox = imapMailboxes.find((m) => m.local_folder_id === folderId);
+    if (nextMessages.length <= messages.length && currentMailbox && !currentMailbox.history_complete) {
+      setStatus('正在从服务器同步历史邮件...');
+      const run = await syncImapHistoryPage();
+      setStatus(run.message);
+    } else {
+      setStatus(`已加载 ${nextMessages.length} 封邮件`);
+    }
   }
 
   async function runSavedSearch(savedSearch: SavedSearch) {

@@ -223,8 +223,13 @@ export default function useMailboxData({
     setThreads(nextThreads);
     const visibleMessages = nextMessages.slice(0, nextLimit);
     setMessageLimit(nextLimit);
-    const currentMailbox = imapMailboxes?.find((m) => m.local_folder_id === nextFolderId);
-    const hasMoreRemote = currentMailbox ? !currentMailbox.history_complete : false;
+    const hasMoreRemote = checkHistoryIncomplete(
+      nextFolderId,
+      nextScope,
+      currentAccountId,
+      folders,
+      imapMailboxes
+    );
     setHasMoreMessages(nextMessages.length > nextLimit || hasMoreRemote);
     setMessages(visibleMessages);
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
@@ -339,4 +344,28 @@ export default function useMailboxData({
     loadMessagesWithVisibleFallback,
     refreshMailbox,
   };
+}
+
+function checkHistoryIncomplete(
+  folderId: number | null,
+  accountScope: AccountScope,
+  currentAccountId: number | null,
+  folders: Folder[],
+  imapMailboxes: ImapMailboxState[]
+): boolean {
+  if (!imapMailboxes || imapMailboxes.length === 0) return false;
+  const folder = folders.find((f) => f.id === folderId);
+  const targetAccountId = accountScope === 'all' ? null : currentAccountId;
+  const scopeMailboxes = targetAccountId
+    ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
+    : imapMailboxes;
+
+  if (folder) {
+    if (folder.is_virtual) {
+      return scopeMailboxes.some((m) => m.local_role === folder.role && !m.history_complete);
+    } else {
+      return scopeMailboxes.some((m) => m.local_folder_id === folder.id && !m.history_complete);
+    }
+  }
+  return scopeMailboxes.some((m) => !m.history_complete);
 }

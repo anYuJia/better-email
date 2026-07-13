@@ -671,8 +671,8 @@ export default function useAccountConnectionController({
     return run;
   }, [accountForm?.id, folderId, loadMeta, setStatus, setSyncRuns]);
 
-  const syncImapHistoryPage = useCallback(async () => {
-    const run = await invoke<SyncRun>('sync_imap_history', { accountId: accountForm?.id });
+  const syncImapHistoryPage = useCallback(async (targetAccountId?: number | null) => {
+    const run = await invoke<SyncRun>('sync_imap_history', { accountId: targetAccountId ?? accountForm?.id });
     setSyncRuns((current) => [run, ...current].slice(0, 10));
     await loadMeta(folderId);
     await loadMessages(folderId, query, filter);

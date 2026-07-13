@@ -2443,10 +2443,26 @@ export default function App() {
       nextLimit,
       searchScope,
     );
-    const currentMailbox = imapMailboxes.find((m) => m.local_folder_id === folderId);
-    if (nextMessages.length <= messages.length && currentMailbox && !currentMailbox.history_complete) {
+    const folder = folders.find((f) => f.id === folderId);
+    const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
+    const scopeMailboxes = targetAccountId
+      ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
+      : imapMailboxes;
+
+    let targetMailbox = null;
+    if (folder) {
+      if (folder.is_virtual) {
+        targetMailbox = scopeMailboxes.find((m) => m.local_role === folder.role && !m.history_complete);
+      } else {
+        targetMailbox = scopeMailboxes.find((m) => m.local_folder_id === folder.id && !m.history_complete);
+      }
+    } else {
+      targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
+    }
+
+    if (nextMessages.length <= messages.length && targetMailbox) {
       setStatus('正在从服务器同步历史邮件...');
-      const run = await syncImapHistoryPage();
+      const run = await syncImapHistoryPage(targetMailbox.account_id);
       setStatus(run.message);
     } else {
       setStatus(`已加载 ${nextMessages.length} 封邮件`);

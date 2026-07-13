@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Paperclip,
   Search,
@@ -170,6 +170,9 @@ export default function MessageListView({
   const scrollSaveTimerRef = useRef<number | null>(null);
   const prevIds = prevIdsRef.current;
 
+  const [scrollTop, setScrollTop] = useState(initialScrollTop);
+  const [viewportHeight, setViewportHeight] = useState(600);
+
   const newIds = useMemo(() => {
     const set = new Set<number>();
     if (prevIds.size > 0) {
@@ -202,12 +205,56 @@ export default function MessageListView({
     const nextScrollTop = Math.min(Math.max(0, requestedScrollTop), maxScrollTop);
     listElement.scrollTop = nextScrollTop;
     latestScrollTopRef.current = nextScrollTop;
+    setScrollTop(nextScrollTop);
     restoredViewKeyRef.current = listStateKey;
   }, [listStateKey, initialScrollTop, messages.length]);
+
+  useLayoutEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+    setViewportHeight(listElement.clientHeight);
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setViewportHeight(entry.target.clientHeight);
+        }
+      });
+      observer.observe(listElement);
+      return () => observer.disconnect();
+    }
+  }, []);
+
+  const flatItems = useMemo(() => {
+    const list: (
+      | { type: 'header'; id: string; label: string; count: number }
+      | { type: 'message'; message: Message }
+    )[] = [];
+    for (const group of groups) {
+      list.push({ type: 'header', id: group.id, label: group.label, count: group.messages.length });
+      for (const msg of group.messages) {
+        list.push({ type: 'message', message: msg });
+      }
+    }
+    return list;
+  }, [groups]);
+
+  const { layout, totalHeight } = useMemo(() => {
+    const layout: { top: number; height: number }[] = [];
+    let currentTop = 0;
+    for (const item of flatItems) {
+      const height = item.type === 'header' ? 34 : 83;
+      layout.push({ top: currentTop, height });
+      currentTop += height;
+    }
+    return { layout, totalHeight: currentTop };
+  }, [flatItems]);
 
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
+    setScrollTop(nextScrollTop);
+
     const now = performance.now();
     if (now - lastScrollSaveAtRef.current < 160) return;
     lastScrollSaveAtRef.current = now;
@@ -220,6 +267,13 @@ export default function MessageListView({
       onScrollTopChange(latestScrollTopRef.current);
     }, 180);
   }
+
+  useEffect(() => {
+    const triggerThreshold = 300;
+    if (hasMoreMessages && totalHeight - (scrollTop + viewportHeight) < triggerThreshold) {
+      onLoadMore();
+    }
+  }, [scrollTop, viewportHeight, totalHeight, hasMoreMessages, onLoadMore]);
 
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
@@ -236,35 +290,130 @@ export default function MessageListView({
     [messages],
   );
 
+  const startIdx = useMemo(() => {
+    let low = 0;
+    let high = layout.length - 1;
+    let index = 0;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (layout[mid].top + layout[mid].height >= scrollTop - 200) {
+        index = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+    return Math.max(0, index);
+  }, [layout, scrollTop]);
+
+  const endIdx = useMemo(() => {
+    let low = startIdx;
+    let high = layout.length - 1;
+    let index = layout.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (layout[mid].top <= scrollTop + viewportHeight + 200) {
+        index = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return Math.min(layout.length - 1, index);
+  }, [layout, startIdx, scrollTop, viewportHeight]);
+
+  const visibleItems = useMemo(() => {
+    const items = [];
+    for (let i = startIdx; i <= endIdx && i < flatItems.length; i++) {
+      items.push({
+        index: i,
+        item: flatItems[i],
+        style: {
+          position: 'absolute' as const,
+          top: 0,
+          left: 0,
+          right: 0,
+          height: layout[i].height,
+          transform: `translateY(${layout[i].top}px)`,
+        },
+      });
+    }
+    return items;
+  }, [flatItems, layout, startIdx, endIdx]);
+
   return (
     <div className="message-list" ref={listRef} onScroll={handleListScroll}>
-      {groups.map((group) => (
-        <section className="message-date-section" key={group.id}>
-          <header className="message-date-header">
-            <span>{group.label}</span>
-            <em>{group.messages.length} 封</em>
-          </header>
-          {group.messages.map((message) => (
-            <MessageListCard
-              key={message.id}
-              message={message}
-              preview={messagePreviewMap.get(message.id) ?? ''}
-              isCurrentMessage={message.id === selectedId}
-              isSelected={selectedMessageSet.has(message.id)}
-              isDragging={draggingMessageSet.has(message.id)}
-              isNew={newIds.has(message.id)}
-              hasBulkSelection={selectedMessageIds.length > 1}
-              selectedMessageIdsRef={selectedMessageIdsRef}
-              onSelectMessage={onSelectMessage}
-              onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={onToggleAllVisible}
-              onOpenMessageMenu={onOpenMessageMenu}
-              onCloseMessageMenu={onCloseMessageMenu}
-              onSetDraggingMessageIds={onSetDraggingMessageIds}
-            />
-          ))}
-        </section>
-      ))}
+      {messages.length > 0 && (
+        <div
+          className="message-list-viewport-wrapper"
+          style={{
+            position: 'relative',
+            height: totalHeight + 40,
+            width: '100%',
+          }}
+        >
+          {visibleItems.map(({ index, item, style }) => {
+            if (item.type === 'header') {
+              const borderTop = index > 0 ? '1px solid #edf0f3' : 'none';
+              return (
+                <header
+                  className="message-date-header"
+                  style={{ ...style, borderTop }}
+                  key={`header-${item.id}`}
+                >
+                  <span>{item.label}</span>
+                  <em>{item.count} 封</em>
+                </header>
+              );
+            } else {
+              const message = item.message;
+              return (
+                <div style={style} key={`msg-wrapper-${message.id}`}>
+                  <MessageListCard
+                    message={message}
+                    preview={messagePreviewMap.get(message.id) ?? ''}
+                    isCurrentMessage={message.id === selectedId}
+                    isSelected={selectedMessageSet.has(message.id)}
+                    isDragging={draggingMessageSet.has(message.id)}
+                    isNew={newIds.has(message.id)}
+                    hasBulkSelection={selectedMessageIds.length > 1}
+                    selectedMessageIdsRef={selectedMessageIdsRef}
+                    onSelectMessage={onSelectMessage}
+                    onToggleMessageSelection={onToggleMessageSelection}
+                    onToggleAllVisible={onToggleAllVisible}
+                    onOpenMessageMenu={onOpenMessageMenu}
+                    onCloseMessageMenu={onCloseMessageMenu}
+                    onSetDraggingMessageIds={onSetDraggingMessageIds}
+                  />
+                </div>
+              );
+            }
+          })}
+          <div
+            className="message-list-footer"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              color: '#8b96a4',
+              borderTop: '1px solid #e7ebf0',
+              background: '#fafbfc',
+            }}
+          >
+            <span>
+              已显示 {messages.length} 封
+              {hasMoreMessages ? ' · 自动同步中...' : ' · 已到底'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {messages.length === 0 && (
         <div className="empty-state mailbox-empty-state">
           <div className="empty-state-mark">
@@ -288,16 +437,6 @@ export default function MessageListView({
               刷新邮箱
             </button>
           </div>
-        </div>
-      )}
-      {messages.length > 0 && (
-        <div className="message-list-footer">
-          <span>已显示 {messages.length} 封{hasMoreMessages ? ' · 还有更多' : ' · 已到底'}</span>
-          {hasMoreMessages && (
-            <button type="button" onClick={onLoadMore}>
-              加载更多
-            </button>
-          )}
         </div>
       )}
     </div>

@@ -346,6 +346,7 @@ export default function App() {
   const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
+  const loadingMoreRef = useRef(false);
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
@@ -2654,51 +2655,57 @@ export default function App() {
   }
 
   async function loadMoreMessages() {
-    const nextLimit = messageLimit + messagePageSize;
-    const nextMessages = await loadMessagesWithVisibleFallback(
-      folderId,
-      query,
-      filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      nextLimit,
-      searchScope,
-    );
-    const folder = folders.find((f) => f.id === folderId);
-    const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
-    const scopeMailboxes = targetAccountId
-      ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
-      : imapMailboxes;
-
-    let targetMailbox = null;
-    if (folder) {
-      if (folder.is_virtual) {
-        targetMailbox = scopeMailboxes.find((m) => m.local_role === folder.role && !m.history_complete);
-      } else {
-        targetMailbox = scopeMailboxes.find((m) => m.local_folder_id === folder.id && !m.history_complete);
-      }
-    } else {
-      targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
-    }
-
-    if (nextMessages.length <= messages.length && targetMailbox) {
-      setStatus('正在从服务器同步历史邮件...');
-      const run = await syncImapHistoryPage(targetMailbox.account_id);
-      const meta = await loadMeta(folderId, accountScope);
-      const refreshedMessages = await loadMessagesWithVisibleFallback(
-        meta.folderId,
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    try {
+      const nextLimit = messageLimit + messagePageSize;
+      const nextMessages = await loadMessagesWithVisibleFallback(
+        folderId,
         query,
         filter,
         accountScope,
         mailboxRefreshRef.current,
-        meta.folders,
+        folders,
         nextLimit,
         searchScope,
       );
-      setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
-    } else {
-      setStatus(`已加载 ${nextMessages.length} 封邮件`);
+      const folder = folders.find((f) => f.id === folderId);
+      const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
+      const scopeMailboxes = targetAccountId
+        ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
+        : imapMailboxes;
+
+      let targetMailbox = null;
+      if (folder) {
+        if (folder.is_virtual) {
+          targetMailbox = scopeMailboxes.find((m) => m.local_role === folder.role && !m.history_complete);
+        } else {
+          targetMailbox = scopeMailboxes.find((m) => m.local_folder_id === folder.id && !m.history_complete);
+        }
+      } else {
+        targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
+      }
+
+      if (nextMessages.length <= messages.length && targetMailbox) {
+        setStatus('正在从服务器同步历史邮件...');
+        const run = await syncImapHistoryPage(targetMailbox.account_id);
+        const meta = await loadMeta(folderId, accountScope);
+        const refreshedMessages = await loadMessagesWithVisibleFallback(
+          meta.folderId,
+          query,
+          filter,
+          accountScope,
+          mailboxRefreshRef.current,
+          meta.folders,
+          nextLimit,
+          searchScope,
+        );
+        setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
+      } else {
+        setStatus(`已加载 ${nextMessages.length} 封邮件`);
+      }
+    } finally {
+      loadingMoreRef.current = false;
     }
   }
 

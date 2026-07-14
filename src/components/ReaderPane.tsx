@@ -46,9 +46,15 @@ import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
+import SenderIdentity from './reader/SenderIdentity';
+import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
+import QuickReplySection from './reader/QuickReplySection';
+import { attachmentKind, attachmentIcon, attachmentTypeDescription } from './reader/attachmentUtils';
+import EmailShadowView from './reader/EmailShadowView';
+import EmailReaderSkeleton from './EmailReaderSkeleton';
 
-const readerBodyRenderDelayMs = 60;
-const readerBodyRenderIdleTimeoutMs = 900;
+const readerBodyRenderDelayMs = 0;
+const readerBodyRenderIdleTimeoutMs = 50;
 
 type IdleScheduler = Window & {
   requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
@@ -114,174 +120,9 @@ export type ReaderPaneProps = {
   onSendQuickReply: (message: Message) => void;
 };
 
-function senderInitial(message: Message) {
-  return (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
-}
-
 function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/^Error:\s*/i, '').trim() || '附件下载失败，请重试。';
-}
-
-function SenderIdentity({ message }: { message: Message }) {
-  return (
-    <div className="reader-sender">
-      <span className={`reader-avatar avatar-tone-${Math.abs(message.id) % 6}`} aria-hidden="true">
-        {senderInitial(message)}
-      </span>
-      <span className="reader-sender-copy">
-        <strong>{message.sender_name || message.sender_email}</strong>
-        <span>
-          {message.sender_email}
-          {message.recipients ? ` 发给 ${message.recipients}` : ''}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-const originalMessageMarkerPattern = /^\s*-{2,}\s*(?:原始邮件|original message|forwarded message)\s*-{2,}\s*$/i;
-const originalMessageMetaPattern = /^\s*(?:发件人|收件人|抄送|时间|日期|主题|from|to|cc|date|subject)\s*[:：]/i;
-
-function stripQuotePrefix(line: string) {
-  return line.replace(/^\s*(?:>\s*)+/, '').trimEnd();
-}
-
-function formatPlainTextContent(lines: string[]) {
-  return lines
-    .map((line) => stripQuotePrefix(line))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function parsePlainBody(body: string): PlainBodyBlock[] {
-  const lines = body.replace(/\r\n?/g, '\n').split('\n');
-  const blocks: PlainBodyBlock[] = [];
-  let textBuffer: string[] = [];
-  let originalIndex = 0;
-
-  const flushText = () => {
-    const content = textBuffer.join('\n').trim();
-    if (content) blocks.push({ type: 'text', content });
-    textBuffer = [];
-  };
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!originalMessageMarkerPattern.test(line)) {
-      textBuffer.push(line);
-      continue;
-    }
-
-    flushText();
-    originalIndex += 1;
-
-    const meta: string[] = [];
-    const content: string[] = [];
-    let sawContent = false;
-
-    index += 1;
-    for (; index < lines.length; index += 1) {
-      const nextLine = lines[index];
-      if (originalMessageMarkerPattern.test(nextLine)) {
-        index -= 1;
-        break;
-      }
-      if (!sawContent && originalMessageMetaPattern.test(nextLine)) {
-        meta.push(nextLine.trim());
-        continue;
-      }
-      if (!sawContent && !nextLine.trim()) {
-        continue;
-      }
-      sawContent = true;
-      content.push(nextLine);
-    }
-
-    blocks.push({
-      type: 'original',
-      index: originalIndex,
-      meta,
-      content: formatPlainTextContent(content),
-    });
-  }
-
-  flushText();
-
-  if (blocks.length === 0 && body.trim()) {
-    return [{ type: 'text', content: body.trim() }];
-  }
-  return blocks;
-}
-
-function EmptyMessageBody({
-  title = '无正文',
-  detail,
-  action,
-}: {
-  title?: string;
-  detail?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="body-text reader-empty-body" role="status">
-      <strong>{title}</strong>
-      {detail && <span>{detail}</span>}
-      {action}
-    </div>
-  );
-}
-
-function PlainMessageBody({ body }: { body: string }) {
-  const blocks = useMemo(() => parsePlainBody(body), [body]);
-  const originalBlockCount = useMemo(
-    () => blocks.filter((item) => item.type === 'original').length,
-    [blocks],
-  );
-
-  if (!body.trim()) {
-    return <EmptyMessageBody />;
-  }
-
-  return (
-    <div className="body-text">
-      {blocks.map((block, index) => {
-        if (block.type === 'text') {
-          return (
-            <div className="plain-body-copy" key={`text-${index}`}>
-              {block.content}
-            </div>
-          );
-        }
-
-        return (
-          <section className="original-message-block" key={`original-${block.index}-${index}`}>
-            <header>
-              <span>原始邮件</span>
-              {originalBlockCount > 1 && (
-                <small>{block.index}</small>
-              )}
-            </header>
-            {block.meta.length > 0 && (
-              <dl>
-                {block.meta.map((item) => {
-                  const [label, ...valueParts] = item.split(/[:：]/);
-                  return (
-                    <React.Fragment key={item}>
-                      <dt>{label.trim()}</dt>
-                      <dd>{valueParts.join(':').trim()}</dd>
-                    </React.Fragment>
-                  );
-                })}
-              </dl>
-            )}
-            {block.content && <pre>{block.content}</pre>}
-          </section>
-        );
-      })}
-    </div>
-  );
 }
 
 
@@ -455,7 +296,7 @@ export default function ReaderPane({
         if (!cancelled && isDifferentMessage) {
           setShowPlaceholder(true);
         }
-      }, 180);
+      }, 16);
 
       return () => {
         cancelled = true;
@@ -628,52 +469,6 @@ export default function ReaderPane({
     } finally {
       setIsDownloadingAllAttachments(false);
     }
-  }
-
-  function attachmentKind(attachment: Attachment) {
-    const filename = attachment.filename.toLowerCase();
-    const mimeType = attachment.mime_type.toLowerCase();
-    if (/\.(ppt|pptx|key)$/i.test(filename)) return 'presentation';
-    if (/\.(xls|xlsx|csv|numbers)$/i.test(filename)) return 'spreadsheet';
-    if (/\.(doc|docx|rtf|pdf|txt|md|log)$/i.test(filename)) return 'document';
-    if (mimeType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(filename)) return 'image';
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || /\.(zip|rar|7z|tar|gz)$/i.test(filename)) return 'archive';
-    if (mimeType.includes('presentation') || /\.(ppt|pptx|key)$/i.test(filename)) return 'presentation';
-    if (mimeType.includes('spreadsheet') || /\.(xls|xlsx|csv|numbers)$/i.test(filename)) return 'spreadsheet';
-    if (mimeType.includes('pdf') || mimeType.startsWith('text/') || /\.(pdf|txt|md|log|rtf|doc|docx)$/i.test(filename)) return 'document';
-    return 'file';
-  }
-
-  function attachmentIcon(attachment: Attachment) {
-    const kind = attachmentKind(attachment);
-    const filename = attachment.filename.toLowerCase();
-    if (kind === 'presentation') return <span className="attachment-file-type-mark">PPT</span>;
-    if (kind === 'spreadsheet') return <span className="attachment-file-type-mark">XLS</span>;
-    if (/\.pdf$/i.test(filename)) return <span className="attachment-file-type-mark">PDF</span>;
-    if (/\.(doc|docx|rtf)$/i.test(filename)) return <span className="attachment-file-type-mark">DOC</span>;
-    if (kind === 'archive') return <span className="attachment-file-type-mark">ZIP</span>;
-    if (kind === 'image') return <FileImage size={15} strokeWidth={1.9} />;
-    if (kind === 'audio') return <FileAudio size={15} strokeWidth={1.9} />;
-    if (kind === 'video') return <FileVideo size={15} strokeWidth={1.9} />;
-    if (kind === 'document') return <FileText size={15} strokeWidth={1.9} />;
-    return <File size={15} strokeWidth={1.9} />;
-  }
-
-  function attachmentTypeDescription(attachment: Attachment) {
-    const filename = attachment.filename.toLowerCase();
-    const kind = attachmentKind(attachment);
-    if (/\.pdf$/i.test(filename)) return 'PDF 文档';
-    if (/\.(ppt|pptx|key)$/i.test(filename)) return 'PowerPoint 演示文稿';
-    if (/\.(xls|xlsx|csv|numbers)$/i.test(filename)) return filename.endsWith('.csv') ? 'CSV 表格' : 'Excel 表格';
-    if (/\.(doc|docx|rtf)$/i.test(filename)) return 'Word 文档';
-    if (/\.(zip|rar|7z|tar|gz)$/i.test(filename)) return '压缩文件';
-    if (kind === 'image') return '图片';
-    if (kind === 'audio') return '音频';
-    if (kind === 'video') return '视频';
-    if (kind === 'document') return '文档';
-    return '附件';
   }
 
   async function previewAttachment(attachment: Attachment) {
@@ -1364,18 +1159,15 @@ export default function ReaderPane({
 
         {!isBodyRenderReady ? (
           showPlaceholder ? (
-            <EmptyMessageBody
-              title="正在打开邮件"
-              detail="正文会在界面稳定后显示，滚动和选择操作可立即响应。"
-            />
+            <EmailReaderSkeleton />
           ) : null
         ) : hasRenderableHtml ? (
-          <div
+          <EmailShadowView
             className="reader-html"
+            html={readerHtml}
             onClick={handleReaderHtmlClick}
             onContextMenuCapture={handleReaderHtmlContextMenu}
             onContextMenu={handleReaderHtmlContextMenu}
-            dangerouslySetInnerHTML={{ __html: readerHtml }}
           />
         ) : shouldOfferRemoteContent ? (
           <EmptyMessageBody
@@ -1396,32 +1188,13 @@ export default function ReaderPane({
         )}
 
         {!isDraft && !isTrash && (
-          <section className="quick-reply" aria-label="快速回复">
-            <header>
-              <div>
-                <strong>回复</strong>
-                <span>发给 {selected.sender_name || selected.sender_email}</span>
-              </div>
-              <Reply size={16} />
-            </header>
-            <textarea
-              value={quickReplyBody}
-              onChange={(event) => onQuickReplyChange(event.target.value)}
-              placeholder="输入回复"
-            />
-            <footer>
-              <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : ''}</span>
-              <div>
-                <button type="button" onClick={() => onComposeFromMessage(selected, 'reply')}>写信窗口</button>
-                <button type="button" onClick={() => onQuickReplyChange('')} disabled={!quickReplyBody.trim()}>
-                  清空
-                </button>
-                <button className="quick-reply-send" type="button" onClick={() => onSendQuickReply(selected)} disabled={!quickReplyBody.trim()}>
-                  发送回复
-                </button>
-              </div>
-            </footer>
-          </section>
+          <QuickReplySection
+            selected={selected}
+            quickReplyBody={quickReplyBody}
+            onQuickReplyChange={onQuickReplyChange}
+            onComposeFromMessage={onComposeFromMessage}
+            onSendQuickReply={onSendQuickReply}
+          />
         )}
       </article>
       {imagePreview && (

@@ -15,8 +15,12 @@ body {
   overflow: hidden;
   background: var(--ui-bg);
   color: var(--ui-text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -31,13 +35,7 @@ input,
 select,
 textarea,
 summary {
-  transition:
-    color 120ms ease,
-    border-color 120ms ease,
-    background-color 120ms ease,
-    box-shadow 120ms ease,
-    opacity 120ms ease,
-    transform 120ms ease;
+  /* 移除全局 transition 声明，只有在 hover 或 focus 时局部应用，避免页面滚动/渲染重排性能瓶颈 */
 }
 
 button,
@@ -141,6 +139,8 @@ textarea:disabled {
   border-right: 0;
   box-shadow: none;
   backdrop-filter: none;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width, transform;
 }
 
 .brand {
@@ -1838,6 +1838,8 @@ textarea:disabled {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 28px 80px rgba(18, 26, 36, 0.24), 0 3px 12px rgba(18, 26, 36, 0.12);
   backdrop-filter: blur(18px);
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .settings-modal {
@@ -2084,6 +2086,8 @@ textarea:disabled {
   background: rgba(255, 255, 255, 0.985);
   box-shadow: var(--ui-shadow-float);
   backdrop-filter: blur(18px) saturate(1.08);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .context-menu button {
@@ -2947,6 +2951,8 @@ body {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: var(--ui-shadow-popover);
   backdrop-filter: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .context-menu.account-switcher-menu {
@@ -4791,6 +4797,35 @@ textarea:focus-visible {
   animation: reader-body-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* 局部化 Transition：仅在具体的交互 hover/focus-visible/active 类或状态上应用过渡属性，保障性能 */
+button,
+.btn,
+.icon-button,
+.compose-button,
+.refresh-text-button,
+select,
+input,
+textarea,
+summary {
+  transition:
+    color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 交互微缩放与微调体验 */
+button:active,
+.btn:active,
+.icon-button:active,
+.compose-button:active,
+.refresh-text-button:active,
+summary:active {
+  transform: scale(0.97);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-delay: 0s !important;
@@ -4958,3 +4993,116 @@ textarea:focus-visible {
   font-style: normal;
   margin-left: 4px;
 }
+
+/* EmailReaderSkeleton Styles */
+.email-reader-skeleton-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  width: 100%;
+}
+
+.email-reader-skeleton-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 20px;
+}
+
+.skeleton-title-row {
+  height: 28px;
+  width: 60%;
+  display: flex;
+  align-items: center;
+}
+
+.skeleton-sender-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ui-surface-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-sender-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--ui-surface-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-line::after,
+.skeleton-avatar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 20%,
+    rgba(255, 255, 255, 0.6) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite ease-out;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.skeleton-sender-name {
+  height: 12px;
+  width: 120px;
+}
+
+.skeleton-sender-email {
+  height: 10px;
+  width: 200px;
+}
+
+.email-reader-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skeleton-body-line {
+  height: 13px;
+}
+
+.width-100 { width: 100%; }
+.width-95 { width: 95%; }
+.width-90 { width: 90%; }
+.width-80 { width: 80%; }
+.width-60 { width: 60%; }
+.width-40 { width: 40%; }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+

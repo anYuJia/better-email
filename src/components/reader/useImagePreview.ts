@@ -275,7 +275,8 @@ export default function useImagePreview(
   }, [selected?.subject]);
 
   const handleReaderHtmlClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const image = imageFromEventTarget(event.target);
+    const target = event.nativeEvent.composedPath ? event.nativeEvent.composedPath()[0] : event.target;
+    const image = imageFromEventTarget(target);
     if (!image) return;
 
     event.preventDefault();
@@ -284,7 +285,8 @@ export default function useImagePreview(
   }, [imageFromEventTarget, openImagePreview, setImageContextMenu]);
 
   const handleReaderHtmlContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const image = imageFromEventTarget(event.target);
+    const target = event.nativeEvent.composedPath ? event.nativeEvent.composedPath()[0] : event.target;
+    const image = imageFromEventTarget(target);
     if (!image) return;
 
     event.preventDefault();

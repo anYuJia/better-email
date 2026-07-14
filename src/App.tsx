@@ -142,21 +142,11 @@ const CredentialSecuritySettings = lazy(() => import('./components/settings/Cred
 const DataSafetySettings = lazy(() => import('./components/settings/DataSafetySettings'));
 const SyncOperationsSettings = lazy(() => import('./components/settings/SyncOperationsSettings'));
 const ContactAutomationSettings = lazy(() => import('./components/settings/ContactAutomationSettings'));
+import DeferredSurface from './components/DeferredSurface';
 const RuleAutomationSettings = lazy(() => import('./components/settings/RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./components/settings/SecurityPreviewSettings'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
-
-function DeferredSurface({ label }: { label: string }) {
-  return (
-    <div className="deferred-overlay" role="status" aria-live="polite">
-      <div className="deferred-surface">
-        <span className="deferred-spinner" aria-hidden="true" />
-        <strong>{label}</strong>
-      </div>
-    </div>
-  );
-}
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
   flowInfo('app-flow', event, details);
@@ -167,10 +157,10 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
 }
 
 const manualUnreadStorageKey = 'better-email.manual-unread-message-ids';
-const readerAttachmentLoadDelayMs = 120;
-const readerBodyFetchDelayMs = 220;
-const readerTrustedRemoteRenderDelayMs = 180;
-const readerBackgroundIdleTimeoutMs = 1200;
+const readerAttachmentLoadDelayMs = 0;
+const readerBodyFetchDelayMs = 16;
+const readerTrustedRemoteRenderDelayMs = 16;
+const readerBackgroundIdleTimeoutMs = 100;
 
 type IdleScheduler = Window & {
   requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;

@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
-import MessageListPane, { type MessageContextAction } from './components/MessageListPane';
+import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
@@ -619,7 +619,7 @@ export default function App() {
     setSettingsOpen(true);
   }
 
-  function openComposer(nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) {
+  const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
@@ -629,7 +629,7 @@ export default function App() {
     }
     setComposerMinimized(false);
     setComposerOpen(true);
-  }
+  }, [draft, composerAutosave, setStatus]);
 
   function prepareProviderWriteValidation() {
     const validationDraft = createValidationDraft();
@@ -1206,7 +1206,7 @@ export default function App() {
     bodyFetchInFlightRef,
   });
 
-  function rememberManualReadState(messageIds: number[], isRead: boolean) {
+  const rememberManualReadState = useCallback((messageIds: number[], isRead: boolean) => {
     const next = new Set(manualUnreadMessageIdsRef.current);
     for (const messageId of messageIds) {
       if (isRead) {
@@ -1217,9 +1217,9 @@ export default function App() {
     }
     manualUnreadMessageIdsRef.current = next;
     saveManualUnreadMessageIds(next);
-  }
+  }, []);
 
-  function clearManualUnreadSuppression(messageIds: number[]) {
+  const clearManualUnreadSuppression = useCallback((messageIds: number[]) => {
     if (messageIds.length === 0) return;
     const next = new Set(manualUnreadMessageIdsRef.current);
     let changed = false;
@@ -1229,13 +1229,28 @@ export default function App() {
     if (!changed) return;
     manualUnreadMessageIdsRef.current = next;
     saveManualUnreadMessageIds(next);
-  }
+  }, []);
 
-  function selectMessageForReading(messageId: number) {
+  const addManualUnreadSuppression = useCallback((messageIds: number[]) => {
+    if (messageIds.length === 0) return;
+    const next = new Set(manualUnreadMessageIdsRef.current);
+    let changed = false;
+    for (const messageId of messageIds) {
+      if (!next.has(messageId)) {
+        next.add(messageId);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    manualUnreadMessageIdsRef.current = next;
+    saveManualUnreadMessageIds(next);
+  }, []);
+
+  const selectMessageForReading = useCallback((messageId: number) => {
     clearManualUnreadSuppression([messageId]);
     setSelectedId(messageId);
     setReaderSelectionRevision((current) => current + 1);
-  }
+  }, [clearManualUnreadSuppression, setSelectedId]);
 
   useEffect(() => {
     setAttachments([]);
@@ -1441,7 +1456,23 @@ export default function App() {
     refreshStorageUsage(false).catch((error) => setStatus(String(error)));
   }, [isSettingsOpen, activeSettingsSection]);
 
-  async function refreshAll() {
+  const openThread = useCallback(async (thread: ThreadSummary, announce = true) => {
+    const nextMessages = await invoke<Message[]>('list_thread_messages', {
+      accountId: accountIdForScope(accountScope),
+      threadKey: thread.thread_key,
+      limit: 80,
+    });
+    setActiveThread(thread);
+    setThreadMessages(nextMessages);
+    setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
+    setSelectedMessageIds([]);
+    if (announce) {
+      setStatus(`已打开会话：${thread.subject} · ${nextMessages.length} 封`);
+    }
+    return nextMessages;
+  }, [accountScope, setSelectedId]);
+
+  const refreshAll = useCallback(async () => {
     const startedAt = performance.now();
     appFlowLog('refreshAll start', {
       folderId,
@@ -1461,9 +1492,21 @@ export default function App() {
       durationMs: Math.round(performance.now() - startedAt),
     });
     setStatus('已刷新本地邮箱数据');
-  }
+  }, [
+    folderId,
+    accountScope,
+    searchScope,
+    query,
+    filter,
+    loadMeta,
+    messageLimit,
+    mailboxListStateKey,
+    loadMessagesWithVisibleFallback,
+    activeThread,
+    openThread,
+  ]);
 
-  async function syncAndRefresh() {
+  const syncAndRefresh = useCallback(async () => {
     if (isRefreshing) return;
     const startedAt = performance.now();
     const syncAccountId = accountScope === 'all' ? null : accountScope;
@@ -1529,23 +1572,22 @@ export default function App() {
     } finally {
       setIsRefreshing(false);
     }
-  }
+  }, [
+    isRefreshing,
+    accountScope,
+    folderId,
+    searchScope,
+    query,
+    filter,
+    loadMeta,
+    messageLimit,
+    mailboxListStateKey,
+    loadMessagesWithVisibleFallback,
+    activeThread,
+    openThread,
+  ]);
 
-  async function openThread(thread: ThreadSummary, announce = true) {
-    const nextMessages = await invoke<Message[]>('list_thread_messages', {
-      accountId: accountIdForScope(accountScope),
-      threadKey: thread.thread_key,
-      limit: 80,
-    });
-    setActiveThread(thread);
-    setThreadMessages(nextMessages);
-    setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
-    setSelectedMessageIds([]);
-    if (announce) {
-      setStatus(`已打开会话：${thread.subject} · ${nextMessages.length} 封`);
-    }
-    return nextMessages;
-  }
+
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
@@ -1660,11 +1702,11 @@ export default function App() {
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, `${messagesToMove.length} 封邮件`);
   }
 
-  function requestSnooze(items: Message[]) {
+  const requestSnooze = useCallback((items: Message[]) => {
     const targetMessages = [...new Map(
       items
-        .filter((message) => canSnoozeRole(message.folder_role))
-        .map((message) => [message.id, message]),
+          .filter((message) => canSnoozeRole(message.folder_role))
+          .map((message) => [message.id, message]),
     ).values()];
     if (targetMessages.length === 0) {
       setStatus('所选邮件无法稍后处理');
@@ -1674,10 +1716,10 @@ export default function App() {
     setSnoozeTarget({
       messages: targetMessages,
       label: targetMessages.length === 1
-        ? targetMessages[0].subject || '(无主题)'
-        : `${targetMessages.length} 封邮件`,
+          ? targetMessages[0].subject || '(无主题)'
+          : `${targetMessages.length} 封邮件`,
     });
-  }
+  }, []);
 
   async function confirmSnooze(snoozedUntil: string) {
     const target = snoozeTarget;
@@ -1711,7 +1753,28 @@ export default function App() {
     queueUndoAction('稍后处理', undoSnapshots, count > 1 ? `${count} 封邮件` : undefined);
   }
 
-  async function runMessageAction(message: Message, action: MessageContextAction) {
+  const toggleRead = useCallback(async (message: Message) => {
+    const undoSnapshots = snapshotMessages([message]);
+    const nextRead = !message.is_read;
+    const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: nextRead });
+    rememberManualReadState([message.id], nextRead);
+    await refreshAll();
+    setStatus(report.message);
+    queueUndoAction(message.is_read ? '标为未读' : '标为已读', undoSnapshots);
+  }, [rememberManualReadState, refreshAll, setStatus, queueUndoAction]);
+
+  const toggleStar = useCallback(async (message: Message) => {
+    const undoSnapshots = snapshotMessages([message]);
+    const report = await invoke<RemoteActionReport>('set_message_starred', {
+      messageId: message.id,
+      isStarred: !message.is_starred,
+    });
+    await refreshAll();
+    setStatus(report.message);
+    queueUndoAction(message.is_starred ? '取消星标' : '添加星标', undoSnapshots);
+  }, [refreshAll, setStatus, queueUndoAction]);
+
+  const runMessageAction = useCallback(async (message: Message, action: MessageContextAction) => {
     if (action === 'copy-sender' || action === 'copy-subject') {
       const copySender = action === 'copy-sender';
       const value = copySender ? message.sender_email : message.subject;
@@ -1776,18 +1839,18 @@ export default function App() {
           : '移到废纸篓';
     setStatus(`已${actionLabel}：${message.subject || '(无主题)'}`);
     queueUndoAction(actionLabel, undoSnapshots);
-  }
+  }, [toggleRead, toggleStar, requestSnooze, setSelectedId, refreshAll, setStatus, queueUndoAction]);
 
-  async function moveMessageToFolder(message: Message, folder: Folder) {
+  const moveMessageToFolder = useCallback(async (message: Message, folder: Folder) => {
     const undoSnapshots = snapshotMessages([message]);
     await invoke('move_message_to_role', { messageId: message.id, role: folder.role });
     setSelectedId(null);
     await refreshAll();
     setStatus(`已移动到 ${folder.name}：${message.subject || '(无主题)'}`);
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots);
-  }
+  }, [setSelectedId, refreshAll, setStatus, queueUndoAction]);
 
-  async function toggleMessageLabel(message: Message, label: Label) {
+  const toggleMessageLabel = useCallback(async (message: Message, label: Label) => {
     const undoSnapshots = snapshotMessages([message]);
     const hasLabel = message.labels.includes(label.name);
     await invoke(hasLabel ? 'remove_label_from_message' : 'apply_label_to_message', {
@@ -1797,7 +1860,7 @@ export default function App() {
     await refreshAll();
     setStatus(`${hasLabel ? '已移除' : '已添加'}标签 ${label.name}`);
     queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
-  }
+  }, [refreshAll, setStatus, queueUndoAction]);
 
   async function handleCreateLabel(name: string, color: string) {
     const newLabel = await invoke<Label>('create_label', { name, color });
@@ -1819,26 +1882,7 @@ export default function App() {
     setLabels((current) => current.filter((l) => l.id !== id));
   }
 
-  async function toggleRead(message: Message) {
-    const undoSnapshots = snapshotMessages([message]);
-    const nextRead = !message.is_read;
-    const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: nextRead });
-    rememberManualReadState([message.id], nextRead);
-    await refreshAll();
-    setStatus(report.message);
-    queueUndoAction(message.is_read ? '标为未读' : '标为已读', undoSnapshots);
-  }
 
-  async function toggleStar(message: Message) {
-    const undoSnapshots = snapshotMessages([message]);
-    const report = await invoke<RemoteActionReport>('set_message_starred', {
-      messageId: message.id,
-      isStarred: !message.is_starred,
-    });
-    await refreshAll();
-    setStatus(report.message);
-    queueUndoAction(message.is_starred ? '取消星标' : '添加星标', undoSnapshots);
-  }
 
   async function moveSelected(role: FolderRole) {
     if (!selected) return;
@@ -2325,7 +2369,7 @@ export default function App() {
     setStatus(`已撤回发送：${pending.subject}`);
   }
 
-  async function composeFromMessage(message: Message, mode: 'reply' | 'replyAll' | 'forward') {
+  const composeFromMessage = useCallback(async (message: Message, mode: 'reply' | 'replyAll' | 'forward') => {
     const threading = mode === 'forward' ? null : replyThreadingHeaders(message);
     const replyRecipients = mode === 'forward' ? '' : message.sender_email;
     const includeOriginalRecipients =
@@ -2376,7 +2420,7 @@ export default function App() {
           ? '已创建回复全部草稿'
           : '已创建回复草稿',
     );
-  }
+  }, [account, openComposer, setStatus]);
 
   async function editDraftMessage(message: Message) {
     const draftAttachments = await invoke<Attachment[]>('list_attachments', { messageId: message.id });
@@ -2675,7 +2719,7 @@ export default function App() {
     });
   }
 
-  async function runSearch(event: React.FormEvent) {
+  const runSearch = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
     await loadMessagesWithVisibleFallback(
       folderId,
@@ -2688,9 +2732,17 @@ export default function App() {
       searchScope,
     );
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
-  }
+  }, [
+    loadMessagesWithVisibleFallback,
+    folderId,
+    query,
+    filter,
+    accountScope,
+    folders,
+    searchScope,
+  ]);
 
-  async function changeSearchScope(nextScope: SearchScope) {
+  const changeSearchScope = useCallback(async (nextScope: SearchScope) => {
     setSearchScope(nextScope);
     setListMode('messages');
     setActiveThread(null);
@@ -2707,9 +2759,16 @@ export default function App() {
     );
     const label = nextScope === 'folder' ? '当前文件夹' : nextScope === 'account' ? '当前账号' : '全部账号';
     setStatus(`搜索范围已切换为：${label}`);
-  }
+  }, [
+    loadMessagesWithVisibleFallback,
+    folderId,
+    query,
+    filter,
+    accountScope,
+    folders,
+  ]);
 
-  async function applySearchShortcut(shortcutQuery: string) {
+  const applySearchShortcut = useCallback(async (shortcutQuery: string) => {
     const nextQuery = shortcutQuery.endsWith(':')
       ? `${query.trim()} ${shortcutQuery}`.trim()
       : shortcutQuery;
@@ -2734,9 +2793,17 @@ export default function App() {
     } else {
       setStatus(`已搜索：${nextQuery}`);
     }
-  }
+  }, [
+    query,
+    loadMessagesWithVisibleFallback,
+    folderId,
+    filter,
+    accountScope,
+    folders,
+    searchScope,
+  ]);
 
-  async function clearSearchAndFilter() {
+  const clearSearchAndFilter = useCallback(async () => {
     setQuery('');
     setFilter('all');
     setSearchScope('folder');
@@ -2754,9 +2821,14 @@ export default function App() {
       'folder',
     );
     setStatus('已清空搜索和筛选');
-  }
+  }, [
+    loadMessagesWithVisibleFallback,
+    folderId,
+    accountScope,
+    folders,
+  ]);
 
-  async function loadMoreMessages() {
+  const loadMoreMessages = useCallback(async () => {
     if (loadingMoreRef.current) return;
     loadingMoreRef.current = true;
     setLoadMoreStatus('正在读取本地缓存...');
@@ -2812,7 +2884,21 @@ export default function App() {
       loadingMoreRef.current = false;
       setLoadMoreStatus(null);
     }
-  }
+  }, [
+    messageLimit,
+    loadMessagesWithVisibleFallback,
+    folderId,
+    query,
+    filter,
+    accountScope,
+    folders,
+    searchScope,
+    account,
+    imapMailboxes,
+    messages,
+    syncImapHistoryPage,
+    loadMeta,
+  ]);
 
   async function runSavedSearch(savedSearch: SavedSearch) {
     setQuery(savedSearch.query);
@@ -2979,6 +3065,95 @@ export default function App() {
     moveSelected,
   });
 
+  const handleQueryChange = useCallback((val: string) => {
+    setQuery(val);
+    if (searchClearTimerRef.current !== null) {
+      window.clearTimeout(searchClearTimerRef.current);
+      searchClearTimerRef.current = null;
+    }
+    if (!val.trim()) {
+      searchClearTimerRef.current = window.setTimeout(() => {
+        searchClearTimerRef.current = null;
+        loadMessagesWithVisibleFallback(
+          folderId,
+          '',
+          filter,
+          accountScope,
+          mailboxRefreshRef.current,
+          folders,
+          messagePageSize,
+          searchScope,
+        ).catch((error) => setStatus(String(error)));
+      }, 100);
+    }
+  }, [loadMessagesWithVisibleFallback, folderId, filter, accountScope, folders, searchScope, setStatus]);
+
+  const handleSearchScopeChange = useCallback((nextScope: SearchScope) => {
+    changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
+  }, [changeSearchScope, setStatus]);
+
+  const handleClearSearchAndFilter = useCallback(() => {
+    clearSearchAndFilter().catch((error) => setStatus(String(error)));
+  }, [clearSearchAndFilter, setStatus]);
+
+  const handleApplySearchShortcut = useCallback((nextQuery: string) => {
+    applySearchShortcut(nextQuery).catch((error) => setStatus(String(error)));
+  }, [applySearchShortcut, setStatus]);
+
+  const handleRefresh = useCallback(() => {
+    syncAndRefresh().catch((error) => setStatus(String(error)));
+  }, [syncAndRefresh, setStatus]);
+
+  const handleShowMessages = useCallback(() => {
+    setListMode('messages');
+    setActiveThread(null);
+    setThreadMessages([]);
+  }, []);
+
+  const handleShowThreads = useCallback(() => {
+    setListMode('threads');
+  }, []);
+
+  const handleMoveBulkToFolder = useCallback((folder: Folder) => {
+    moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));
+  }, [moveSelectedMessagesToFolder, setStatus]);
+
+  const handleToggleBulkLabel = useCallback((label: Label) => {
+    toggleBulkLabel(label).catch((error) => setStatus(String(error)));
+  }, [toggleBulkLabel, setStatus]);
+
+  const handleRunMessageAction = useCallback((message: Message, action: MessageContextAction) => {
+    runMessageAction(message, action).catch((error) => setStatus(String(error)));
+  }, [runMessageAction, setStatus]);
+
+  const handleMoveMessageToFolder = useCallback((message: Message, folder: Folder) => {
+    moveMessageToFolder(message, folder).catch((error) => setStatus(String(error)));
+  }, [moveMessageToFolder, setStatus]);
+
+  const handleToggleMessageLabel = useCallback((message: Message, label: Label) => {
+    toggleMessageLabel(message, label).catch((error) => setStatus(String(error)));
+  }, [toggleMessageLabel, setStatus]);
+
+  const handleRunThreadAction = useCallback((thread: ThreadSummary, items: Message[], action: BulkMessageAction) => {
+    runThreadAction(thread, items, action).catch((error) => setStatus(String(error)));
+  }, [runThreadAction, setStatus]);
+
+  const handleMoveThreadToFolder = useCallback((thread: ThreadSummary, items: Message[], folder: Folder) => {
+    moveThreadToFolder(thread, items, folder).catch((error) => setStatus(String(error)));
+  }, [moveThreadToFolder, setStatus]);
+
+  const handleToggleThreadLabel = useCallback((thread: ThreadSummary, items: Message[], label: Label) => {
+    toggleThreadLabel(thread, items, label).catch((error) => setStatus(String(error)));
+  }, [toggleThreadLabel, setStatus]);
+
+  const handleToggleThreadMute = useCallback((thread: ThreadSummary, items: Message[]) => {
+    toggleThreadMuted(thread, items).catch((error) => setStatus(String(error)));
+  }, [toggleThreadMuted, setStatus]);
+
+  const handleLoadMore = useCallback(() => {
+    loadMoreMessages().catch((error) => setStatus(String(error)));
+  }, [loadMoreMessages, setStatus]);
+
   return (
     <main
       className="app-shell"
@@ -3084,69 +3259,32 @@ export default function App() {
         initialScrollTop={mailboxListScrollTop}
         onScrollTopChange={handleMailboxListScrollTopChange}
         onSearchSubmit={runSearch}
-        onQueryChange={(val) => {
-          setQuery(val);
-          if (searchClearTimerRef.current !== null) {
-            window.clearTimeout(searchClearTimerRef.current);
-            searchClearTimerRef.current = null;
-          }
-          if (!val.trim()) {
-            searchClearTimerRef.current = window.setTimeout(() => {
-              searchClearTimerRef.current = null;
-              loadMessagesWithVisibleFallback(
-                folderId,
-                '',
-                filter,
-                accountScope,
-                mailboxRefreshRef.current,
-                folders,
-                messagePageSize,
-                searchScope,
-              ).catch((error) => setStatus(String(error)));
-            }, 100);
-          }
-        }}
-        onSearchScopeChange={(nextScope) => {
-          changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
-        }}
-        onClearSearchAndFilter={() => { clearSearchAndFilter().catch((error) => setStatus(String(error))); }}
-        onApplySearchShortcut={(nextQuery) => { applySearchShortcut(nextQuery).catch((error) => setStatus(String(error))); }}
-        onRefresh={() => {
-          syncAndRefresh().catch((error) => setStatus(String(error)));
-        }}
-        onShowMessages={() => {
-          setListMode('messages');
-          setActiveThread(null);
-          setThreadMessages([]);
-        }}
-        onShowThreads={() => setListMode('threads')}
+        onQueryChange={handleQueryChange}
+        onSearchScopeChange={handleSearchScopeChange}
+        onClearSearchAndFilter={handleClearSearchAndFilter}
+        onApplySearchShortcut={handleApplySearchShortcut}
+        onRefresh={handleRefresh}
+        onShowMessages={handleShowMessages}
+        onShowThreads={handleShowThreads}
         onFilterChange={setFilter}
         onSortChange={setListSort}
         onToggleAllVisible={toggleAllVisibleMessages}
         onRunBulkAction={runBulkAction}
         onRequestSnooze={requestSnooze}
-        onMoveBulkToFolder={(folder) => { moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error))); }}
-        onToggleBulkLabel={(label) => { toggleBulkLabel(label).catch((error) => setStatus(String(error))); }}
-        onRunMessageAction={(message, action) => { runMessageAction(message, action).catch((error) => setStatus(String(error))); }}
-        onMoveMessageToFolder={(message, folder) => { moveMessageToFolder(message, folder).catch((error) => setStatus(String(error))); }}
-        onToggleMessageLabel={(message, label) => { toggleMessageLabel(message, label).catch((error) => setStatus(String(error))); }}
+        onMoveBulkToFolder={handleMoveBulkToFolder}
+        onToggleBulkLabel={handleToggleBulkLabel}
+        onRunMessageAction={handleRunMessageAction}
+        onMoveMessageToFolder={handleMoveMessageToFolder}
+        onToggleMessageLabel={handleToggleMessageLabel}
         onComposeFromMessage={composeFromMessage}
         onOpenThread={openThread}
-        onRunThreadAction={(thread, items, action) => {
-          runThreadAction(thread, items, action).catch((error) => setStatus(String(error)));
-        }}
-        onMoveThreadToFolder={(thread, items, folder) => {
-          moveThreadToFolder(thread, items, folder).catch((error) => setStatus(String(error)));
-        }}
-        onToggleThreadLabel={(thread, items, label) => {
-          toggleThreadLabel(thread, items, label).catch((error) => setStatus(String(error)));
-        }}
-        onToggleThreadMute={(thread, items) => {
-          toggleThreadMuted(thread, items).catch((error) => setStatus(String(error)));
-        }}
+        onRunThreadAction={handleRunThreadAction}
+        onMoveThreadToFolder={handleMoveThreadToFolder}
+        onToggleThreadLabel={handleToggleThreadLabel}
+        onToggleThreadMute={handleToggleThreadMute}
         onSelectMessage={selectMessageForReading}
         onToggleMessageSelection={toggleMessageSelection}
-        onLoadMore={() => { loadMoreMessages().catch((error) => setStatus(String(error))); }}
+        onLoadMore={handleLoadMore}
         loadMoreStatus={loadMoreStatus}
       />
 

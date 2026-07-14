@@ -3,6 +3,7 @@ import type {
   AccountScope,
   FilterMode,
   Folder,
+  ListMode,
   ListSort,
   Message,
   SearchScope,
@@ -34,6 +35,7 @@ type UseMailboxDataOptions = {
   searchScope: SearchScope;
   query: string;
   filter: FilterMode;
+  listMode: ListMode;
   listSort: ListSort;
   folders: Folder[];
   imapMailboxes: ImapMailboxState[];
@@ -114,6 +116,7 @@ export type MailboxDataController = {
     refreshId?: number,
     nextLimit?: number,
     nextSearchScope?: SearchScope,
+    nextIncludeThreads?: boolean,
   ) => Promise<Message[]>;
   loadMessagesWithVisibleFallback: (
     nextFolderId?: number | null,
@@ -124,6 +127,7 @@ export type MailboxDataController = {
     visibleFolders?: Folder[],
     nextLimit?: number,
     nextSearchScope?: SearchScope,
+    nextIncludeThreads?: boolean,
   ) => Promise<Message[]>;
   refreshMailbox: (
     nextScope?: AccountScope,
@@ -140,6 +144,7 @@ export default function useMailboxData({
   searchScope,
   query,
   filter,
+  listMode,
   listSort,
   folders,
   imapMailboxes,
@@ -165,6 +170,7 @@ export default function useMailboxData({
     refreshId = mailboxRefreshRef.current,
     nextLimit?: number,
     nextSearchScope = searchScope,
+    nextIncludeThreads = listMode === 'threads',
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
@@ -212,12 +218,16 @@ export default function useMailboxData({
       requestThreads: requests.threads,
     });
     let nextMessages: Message[];
-    let nextThreads: ThreadSummary[];
+    let nextThreads: ThreadSummary[] = [];
     try {
-      [nextMessages, nextThreads] = await Promise.all([
-        invoke<Message[]>('list_messages', requests.messages),
-        invoke<ThreadSummary[]>('list_threads', requests.threads),
-      ]);
+      if (nextIncludeThreads) {
+        [nextMessages, nextThreads] = await Promise.all([
+          invoke<Message[]>('list_messages', requests.messages),
+          invoke<ThreadSummary[]>('list_threads', requests.threads),
+        ]);
+      } else {
+        nextMessages = await invoke<Message[]>('list_messages', requests.messages);
+      }
     } catch (error) {
       mailboxFlowWarn('loadMessages failed', {
         scope: nextScope,
@@ -239,7 +249,7 @@ export default function useMailboxData({
     );
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
     startTransition(() => {
-      setThreads(nextThreads);
+      setThreads(nextIncludeThreads ? nextThreads : []);
       setMessageLimit(effectiveLimit);
       setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
       setMessages(visibleMessages);
@@ -264,7 +274,8 @@ export default function useMailboxData({
       searchScope: nextSearchScope,
       messageCount: nextMessages.length,
       visibleCount: visibleMessages.length,
-      threadCount: nextThreads.length,
+      threadCount: nextIncludeThreads ? nextThreads.length : 0,
+      includeThreads: nextIncludeThreads,
       selectedId: visibleMessages[0]?.id ?? null,
       durationMs: Math.round(performance.now() - startedAt),
     });
@@ -280,6 +291,7 @@ export default function useMailboxData({
     visibleFolders = folders,
     nextLimit?: number,
     nextSearchScope = searchScope,
+    nextIncludeThreads = listMode === 'threads',
   ) {
     const nextMessages = await loadMessages(
       nextFolderId,
@@ -289,6 +301,7 @@ export default function useMailboxData({
       refreshId,
       nextLimit,
       nextSearchScope,
+      nextIncludeThreads,
     );
     if (
       nextMessages.length > 0
@@ -310,6 +323,8 @@ export default function useMailboxData({
       nextScope,
       refreshId,
       nextLimit,
+      nextSearchScope,
+      nextIncludeThreads,
     );
     if (unreadMessages.length === 0 || refreshId !== mailboxRefreshRef.current) {
       return nextMessages;

@@ -335,6 +335,7 @@ export default function App() {
   const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
   const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const loadingMoreRef = useRef(false);
+  const skipNextFolderEffectLoadRef = useRef(false);
   const searchClearTimerRef = useRef<number | null>(null);
   const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
   const [listMode, setListMode] = useState<ListMode>('messages');
@@ -463,6 +464,7 @@ export default function App() {
     searchScope,
     query,
     filter,
+    listMode,
     listSort,
     folders,
     imapMailboxes,
@@ -658,6 +660,7 @@ export default function App() {
       setStatus(`当前账号没有可用的${role === 'sent' ? '已发送' : '收件箱'}目录`);
       return;
     }
+    skipNextFolderEffectLoadRef.current = true;
     setFolderId(targetFolder.id);
     const nextMessages = await loadMessages(
       targetFolder.id,
@@ -666,6 +669,8 @@ export default function App() {
       targetAccountId,
       mailboxRefreshRef.current,
       messagePageSize,
+      undefined,
+      false,
     );
     const preferredMessageId = role === 'sent'
       ? providerWriteValidationStatus?.sentMessageId
@@ -740,10 +745,11 @@ export default function App() {
         accountId: targetAccountId,
         folderCount: meta.folders.length,
       });
-      await loadMessagesWithVisibleFallback(meta.folderId, '', 'all', nextScope, mailboxRefreshRef.current, meta.folders, messagePageSize, 'folder');
+      await loadMessagesWithVisibleFallback(meta.folderId, '', 'all', nextScope, mailboxRefreshRef.current, meta.folders, messagePageSize, 'folder', false);
       setStatus(statusMessage);
       return;
     }
+    skipNextFolderEffectLoadRef.current = true;
     setFolderId(targetFolder.id);
     await loadMessagesWithVisibleFallback(
       targetFolder.id,
@@ -754,6 +760,7 @@ export default function App() {
       meta.folders,
       messagePageSize,
       'folder',
+      false,
     );
     appFlowLog('focus mailbox role done', {
       role,
@@ -1118,11 +1125,20 @@ export default function App() {
   }, [isComposerOpen]);
 
   useEffect(() => {
-    refreshMailbox(accountScope, null).catch((error) => setStatus(String(error)));
+    skipNextFolderEffectLoadRef.current = true;
+    refreshMailbox(accountScope, null)
+      .catch((error) => setStatus(String(error)))
+      .finally(() => {
+        skipNextFolderEffectLoadRef.current = false;
+      });
   }, [accountScope]);
 
   useEffect(() => {
     if (!folderId) return;
+    if (skipNextFolderEffectLoadRef.current) {
+      skipNextFolderEffectLoadRef.current = false;
+      return;
+    }
     const restoredLimit = loadMailboxMessageLimit(mailboxListStateKey);
     loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, restoredLimit).catch((error) => setStatus(String(error)));
   }, [folderId, filter, listSort]);
@@ -2565,6 +2581,7 @@ export default function App() {
     if (!nextMessages.some((message) => message.id === imported.id)) {
       setMessages((current) => [imported, ...current.filter((message) => message.id !== imported.id)]);
     }
+    skipNextFolderEffectLoadRef.current = true;
     setFolderId(inboxFolderId);
     setSelectedId(imported.id);
     setStatus(`已导入 EML：${imported.subject || '(无主题)'}`);
@@ -2730,6 +2747,7 @@ export default function App() {
       folders,
       messagePageSize,
       searchScope,
+      false,
     );
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
   }, [
@@ -2756,6 +2774,7 @@ export default function App() {
       folders,
       messagePageSize,
       nextScope,
+      false,
     );
     const label = nextScope === 'folder' ? '当前文件夹' : nextScope === 'account' ? '当前账号' : '全部账号';
     setStatus(`搜索范围已切换为：${label}`);
@@ -2785,6 +2804,7 @@ export default function App() {
       folders,
       messagePageSize,
       searchScope,
+      false,
     );
     searchInputRef.current?.focus();
     if (shortcutQuery.endsWith(':')) {
@@ -2819,6 +2839,7 @@ export default function App() {
       folders,
       messagePageSize,
       'folder',
+      false,
     );
     setStatus('已清空搜索和筛选');
   }, [
@@ -2843,6 +2864,7 @@ export default function App() {
         folders,
         nextLimit,
         searchScope,
+        false,
       );
       const folder = folders.find((f) => f.id === folderId);
       const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
@@ -2875,6 +2897,7 @@ export default function App() {
           meta.folders,
           nextLimit,
           searchScope,
+          false,
         );
         setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
       } else {
@@ -2915,6 +2938,7 @@ export default function App() {
       mailboxRefreshRef.current,
       messagePageSize,
       savedSearch.scope,
+      false,
     );
     setStatus(`已运行保存搜索：${savedSearch.name}`);
   }
@@ -2970,6 +2994,7 @@ export default function App() {
 
   function selectFolder(nextFolderId: number) {
     mailboxRefreshRef.current += 1;
+    skipNextFolderEffectLoadRef.current = false;
     setQuery('');
     setFilter('all');
     setSearchScope('folder');
@@ -3014,10 +3039,11 @@ export default function App() {
     snoozeSelected,
     toggleLabel,
     openFolder: async (folder, nextQuery, nextFilter) => {
+      skipNextFolderEffectLoadRef.current = true;
       setFolderId(folder.id);
       setActiveThread(null);
       setThreadMessages([]);
-      await loadMessages(folder.id, nextQuery, nextFilter);
+      await loadMessages(folder.id, nextQuery, nextFilter, undefined, undefined, undefined, undefined, false);
       setStatus(`已打开：${folder.name}`);
     },
   });
@@ -3083,6 +3109,7 @@ export default function App() {
           folders,
           messagePageSize,
           searchScope,
+          false,
         ).catch((error) => setStatus(String(error)));
       }, 100);
     }
@@ -3112,7 +3139,28 @@ export default function App() {
 
   const handleShowThreads = useCallback(() => {
     setListMode('threads');
-  }, []);
+    loadMessagesWithVisibleFallback(
+      folderId,
+      query,
+      filter,
+      accountScope,
+      mailboxRefreshRef.current,
+      folders,
+      messageLimit,
+      searchScope,
+      true,
+    ).catch((error) => setStatus(String(error)));
+  }, [
+    loadMessagesWithVisibleFallback,
+    folderId,
+    query,
+    filter,
+    accountScope,
+    folders,
+    messageLimit,
+    searchScope,
+    setStatus,
+  ]);
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));

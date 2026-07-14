@@ -1369,7 +1369,10 @@ impl MailStore {
 
     pub fn delete_label(&self, id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
-            conn.execute("DELETE FROM message_labels WHERE label_id = ?1", params![id])?;
+            conn.execute(
+                "DELETE FROM message_labels WHERE label_id = ?1",
+                params![id],
+            )?;
             conn.execute("DELETE FROM labels WHERE id = ?1", params![id])?;
             Ok(())
         })
@@ -1458,10 +1461,10 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    map_message_row(conn, row)
+                    map_message_row_base(row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(rows)
+            hydrate_message_list_metadata(conn, rows)
         })
     }
 
@@ -1529,10 +1532,10 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    map_message_row(conn, row)
+                    map_message_row_base(row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(rows)
+            hydrate_message_list_metadata(conn, rows)
         })
     }
 
@@ -5519,6 +5522,13 @@ fn decode_thread_participants(value: &str) -> String {
 }
 
 fn map_message_row(conn: &Connection, row: &Row<'_>) -> rusqlite::Result<Message> {
+    let mut message = map_message_row_base(row)?;
+    message.labels = labels_for_message(conn, message.id)?;
+    message.attachment_count = attachment_count_for_message(conn, message.id)?;
+    Ok(message)
+}
+
+fn map_message_row_base(row: &Row<'_>) -> rusqlite::Result<Message> {
     let message_id: i64 = row.get(0)?;
     Ok(Message {
         id: message_id,
@@ -5541,14 +5551,88 @@ fn map_message_row(conn: &Connection, row: &Row<'_>) -> rusqlite::Result<Message
         is_starred: row.get::<_, i64>(17)? != 0,
         has_attachments: row.get::<_, i64>(18)? != 0,
         snoozed_until: row.get(19)?,
-        labels: labels_for_message(conn, message_id)?,
-        attachment_count: attachment_count_for_message(conn, message_id)?,
+        labels: Vec::new(),
+        attachment_count: 0,
         remote_mailbox: row.get(20)?,
         remote_uid: row.get(21)?,
         message_id_header: row.get(22)?,
         in_reply_to_header: row.get(23)?,
         references_header: row.get(24)?,
     })
+}
+
+fn hydrate_message_list_metadata(
+    conn: &Connection,
+    mut messages: Vec<Message>,
+) -> MailResult<Vec<Message>> {
+    if messages.is_empty() {
+        return Ok(messages);
+    }
+
+    let message_ids = messages
+        .iter()
+        .map(|message| message.id)
+        .collect::<Vec<_>>();
+    let placeholders = std::iter::repeat_n("?", message_ids.len())
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let label_sql = format!(
+        "
+        SELECT ml.message_id, l.name
+        FROM message_labels ml
+        JOIN labels l ON l.id = ml.label_id
+        WHERE ml.message_id IN ({placeholders})
+        ORDER BY ml.message_id, l.name
+        "
+    );
+    let label_params = message_ids
+        .iter()
+        .copied()
+        .map(Value::Integer)
+        .collect::<Vec<_>>();
+    let mut labels_by_message = BTreeMap::<i64, Vec<String>>::new();
+    {
+        let mut stmt = conn.prepare(&label_sql)?;
+        let labels = stmt.query_map(params_from_iter(label_params), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for item in labels {
+            let (message_id, label) = item?;
+            labels_by_message.entry(message_id).or_default().push(label);
+        }
+    }
+
+    let attachment_sql = format!(
+        "
+        SELECT message_id, COUNT(*) AS attachment_count
+        FROM attachments
+        WHERE message_id IN ({placeholders})
+        GROUP BY message_id
+        "
+    );
+    let attachment_params = message_ids
+        .iter()
+        .copied()
+        .map(Value::Integer)
+        .collect::<Vec<_>>();
+    let mut attachment_counts = BTreeMap::<i64, i64>::new();
+    {
+        let mut stmt = conn.prepare(&attachment_sql)?;
+        let counts = stmt.query_map(params_from_iter(attachment_params), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })?;
+        for item in counts {
+            let (message_id, count) = item?;
+            attachment_counts.insert(message_id, count);
+        }
+    }
+
+    for message in &mut messages {
+        message.labels = labels_by_message.remove(&message.id).unwrap_or_default();
+        message.attachment_count = attachment_counts.remove(&message.id).unwrap_or(0);
+    }
+    Ok(messages)
 }
 
 fn message_remote_ref_for_conn(conn: &Connection, message_id: i64) -> MailResult<MessageRemoteRef> {
@@ -6858,8 +6942,8 @@ mod tests {
     fn existing_demo_seed_data_is_removed_by_default() {
         let path = test_database_path("better-email-clean-demo");
         {
-            let seeded = MailStore::open_at_with_seed(path.clone(), true)
-                .expect("seeded store opens");
+            let seeded =
+                MailStore::open_at_with_seed(path.clone(), true).expect("seeded store opens");
             assert!(seeded
                 .list_accounts()
                 .unwrap()
@@ -6874,7 +6958,10 @@ mod tests {
             .unwrap()
             .iter()
             .all(|account| account.email != "demo@better-email.local"));
-        assert_eq!(cleaned.get_stats_for_account(None).unwrap().total_messages, 0);
+        assert_eq!(
+            cleaned.get_stats_for_account(None).unwrap().total_messages,
+            0
+        );
         assert!(cleaned.list_folders_for_account(None).unwrap().is_empty());
         assert!(cleaned.list_labels().unwrap().is_empty());
         assert!(cleaned.list_rules().unwrap().is_empty());
@@ -8487,8 +8574,7 @@ mod tests {
         let path = data_dir.join(DATABASE_FILENAME);
 
         {
-            let store =
-                MailStore::open_at_with_seed(path.clone(), true).expect("test store opens");
+            let store = MailStore::open_at_with_seed(path.clone(), true).expect("test store opens");
             let account = store.get_account().expect("seed account exists");
             assert!(store.delete_account(account.id).unwrap().is_none());
             assert!(store.list_accounts().unwrap().is_empty());
@@ -10550,7 +10636,9 @@ mod tests {
             "a2VlcCBtZQ==\r\n",
             "--mix--\r\n",
         );
-        let local_message = store.import_eml_message(None, local_raw.as_bytes()).unwrap();
+        let local_message = store
+            .import_eml_message(None, local_raw.as_bytes())
+            .unwrap();
         let local_attachment = store.list_attachments(local_message.id).unwrap().remove(0);
         let local_path = PathBuf::from(&local_attachment.local_path);
 

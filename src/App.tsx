@@ -1365,8 +1365,6 @@ export default function App() {
   }, [
     activeThread?.thread_key,
     selected?.id,
-    selected?.body,
-    selected?.sanitized_html,
     selectedSenderTrusted,
   ]);
 
@@ -1436,7 +1434,7 @@ export default function App() {
       cancelled = true;
       cancelScheduledWork();
     };
-  }, [selected?.id, selected?.remote_uid, selected?.body, selected?.snippet, activeThread?.thread_key]);
+  }, [selected?.id, selected?.remote_uid, activeThread?.thread_key]);
 
   useEffect(() => {
     if (!isSettingsOpen || activeSettingsSection !== 'backup') return;

@@ -305,7 +305,7 @@ export default function ReaderPane({
         if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
       };
     }
-  }, [selectedId, selected?.id, selected?.sanitized_html, selected?.body, selected?.attachment_count, bodyRenderMessageId]);
+  }, [selectedId, selected?.id, selected?.attachment_count, bodyRenderMessageId]);
 
   const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
   const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;

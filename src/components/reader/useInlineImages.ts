@@ -51,7 +51,7 @@ export default function useInlineImages({
       attachments,
       (attachment) => inlineImageAssetUrls[attachment.id] ?? inlineImageDataUrls[attachment.id] ?? '',
     ),
-    [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.sanitized_html],
+    [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id],
   );
 
   const inlineImageError = useMemo(

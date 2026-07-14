@@ -362,6 +362,13 @@ export default function useAccountConnectionController({
         email: maskEmailForLog(newAccountForm.email),
         error: error instanceof Error ? error.message : String(error),
       });
+      try {
+        await loadMeta(null);
+      } catch (metaError) {
+        accountFlowWarn('metadata reload on failure failed', {
+          error: metaError instanceof Error ? metaError.message : String(metaError),
+        });
+      }
       throw error;
     }
   }, [

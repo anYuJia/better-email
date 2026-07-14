@@ -1576,7 +1576,9 @@ fn email_from_address(address: &str) -> String {
 fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
     let parsed = MessageParser::default().parse(raw);
     let raw_lossy = String::from_utf8_lossy(raw);
-    let has_html_part = raw_lossy.to_ascii_lowercase().contains("content-type: text/html");
+    let has_html_part = raw_lossy
+        .to_ascii_lowercase()
+        .contains("content-type: text/html");
     let fallback_body = raw_lossy
         .replace("\r\n", "\n")
         .split_once("\n\n")
@@ -1747,7 +1749,15 @@ fn infer_image_mime_type_from_part(part: &MessagePart<'_>) -> Option<&'static st
 fn looks_like_html(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     [
-        "<!doctype", "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+        "<!doctype",
+        "<html",
+        "<body",
+        "<div",
+        "<p",
+        "<table",
+        "<a ",
+        "<img",
+        "<span",
     ]
     .iter()
     .any(|marker| lower.contains(marker))
@@ -2218,23 +2228,26 @@ mod tests {
 
     #[test]
     fn parses_inline_cid_image_without_filename_from_raw_message() {
-        let body = parse_body_from_raw(concat!(
-            "Subject: Inline image\r\n",
-            "MIME-Version: 1.0\r\n",
-            "Content-Type: multipart/related; boundary=\"rel\"\r\n",
-            "\r\n",
-            "--rel\r\n",
-            "Content-Type: text/html; charset=utf-8\r\n",
-            "\r\n",
-            "<p>Hello</p><img src=\"cid:image001@example.com\">\r\n",
-            "--rel\r\n",
-            "Content-Type: image/png\r\n",
-            "Content-Transfer-Encoding: base64\r\n",
-            "Content-ID: <image001@example.com>\r\n",
-            "\r\n",
-            "aW1hZ2UgYnl0ZXM=\r\n",
-            "--rel--\r\n",
-        ).as_bytes());
+        let body = parse_body_from_raw(
+            concat!(
+                "Subject: Inline image\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/related; boundary=\"rel\"\r\n",
+                "\r\n",
+                "--rel\r\n",
+                "Content-Type: text/html; charset=utf-8\r\n",
+                "\r\n",
+                "<p>Hello</p><img src=\"cid:image001@example.com\">\r\n",
+                "--rel\r\n",
+                "Content-Type: image/png\r\n",
+                "Content-Transfer-Encoding: base64\r\n",
+                "Content-ID: <image001@example.com>\r\n",
+                "\r\n",
+                "aW1hZ2UgYnl0ZXM=\r\n",
+                "--rel--\r\n",
+            )
+            .as_bytes(),
+        );
 
         assert!(body.has_attachments);
         assert_eq!(body.attachments.len(), 1);
@@ -2263,7 +2276,8 @@ mod tests {
                 "\r\n",
                 "aW1hZ2UgYnl0ZXM=\r\n",
                 "--rel--\r\n",
-            ).as_bytes(),
+            )
+            .as_bytes(),
             "",
             "IMAGE001@example.com",
         )
@@ -2275,23 +2289,26 @@ mod tests {
 
     #[test]
     fn infers_inline_cid_image_mime_from_content_id_extension() {
-        let body = parse_body_from_raw(concat!(
-            "Subject: Generic inline image\r\n",
-            "MIME-Version: 1.0\r\n",
-            "Content-Type: multipart/related; boundary=\"rel\"\r\n",
-            "\r\n",
-            "--rel\r\n",
-            "Content-Type: text/html; charset=utf-8\r\n",
-            "\r\n",
-            "<img src=\"cid:37053DDF@48E10A4E.2A20536A00000000.png\">\r\n",
-            "--rel\r\n",
-            "Content-Type: application/octet-stream\r\n",
-            "Content-Transfer-Encoding: base64\r\n",
-            "Content-ID: <37053DDF@48E10A4E.2A20536A00000000.png>\r\n",
-            "\r\n",
-            "aW1hZ2UgYnl0ZXM=\r\n",
-            "--rel--\r\n",
-        ).as_bytes());
+        let body = parse_body_from_raw(
+            concat!(
+                "Subject: Generic inline image\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/related; boundary=\"rel\"\r\n",
+                "\r\n",
+                "--rel\r\n",
+                "Content-Type: text/html; charset=utf-8\r\n",
+                "\r\n",
+                "<img src=\"cid:37053DDF@48E10A4E.2A20536A00000000.png\">\r\n",
+                "--rel\r\n",
+                "Content-Type: application/octet-stream\r\n",
+                "Content-Transfer-Encoding: base64\r\n",
+                "Content-ID: <37053DDF@48E10A4E.2A20536A00000000.png>\r\n",
+                "\r\n",
+                "aW1hZ2UgYnl0ZXM=\r\n",
+                "--rel--\r\n",
+            )
+            .as_bytes(),
+        );
 
         assert_eq!(body.attachments.len(), 1);
         assert_eq!(body.attachments[0].mime_type, "image/png");
@@ -2367,8 +2384,9 @@ mod tests {
             "--b--\r\n",
         );
 
-        let payload = parse_attachment_payload_from_raw(raw.as_bytes(), "logo.png", "RIGHT@example.com")
-            .expect("content id should select the matching inline part");
+        let payload =
+            parse_attachment_payload_from_raw(raw.as_bytes(), "logo.png", "RIGHT@example.com")
+                .expect("content id should select the matching inline part");
         assert_eq!(payload.filename, "logo.png");
         assert_eq!(payload.bytes, b"right image");
     }

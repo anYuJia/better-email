@@ -154,7 +154,10 @@ pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> Mail
 }
 
 #[tauri::command]
-pub async fn delete_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Option<Account>> {
+pub async fn delete_account(
+    store: State<'_, MailStore>,
+    account_id: i64,
+) -> MailResult<Option<Account>> {
     command_info(format!(
         "[better-email][account] delete command start account_id={account_id}"
     ));
@@ -245,11 +248,7 @@ pub fn list_labels(store: State<'_, MailStore>) -> MailResult<Vec<Label>> {
 }
 
 #[tauri::command]
-pub fn create_label(
-    store: State<'_, MailStore>,
-    name: String,
-    color: String,
-) -> MailResult<Label> {
+pub fn create_label(store: State<'_, MailStore>, name: String, color: String) -> MailResult<Label> {
     store.create_label(&name, &color)
 }
 
@@ -2320,7 +2319,10 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 }
 
 #[tauri::command]
-pub async fn fetch_message_body(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
+pub async fn fetch_message_body(
+    store: State<'_, MailStore>,
+    message_id: i64,
+) -> MailResult<Message> {
     command_info(format!(
         "[better-email][body] fetch command start message_id={message_id}"
     ));
@@ -3511,12 +3513,14 @@ pub fn save_temp_attachment(
     base64_data: String,
 ) -> MailResult<String> {
     use base64::prelude::*;
-    let bytes = BASE64_STANDARD.decode(base64_data.trim()).map_err(|error| {
-        crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("Base64 解码失败：{error}"),
-        ))
-    })?;
+    let bytes = BASE64_STANDARD
+        .decode(base64_data.trim())
+        .map_err(|error| {
+            crate::db::MailError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Base64 解码失败：{error}"),
+            ))
+        })?;
 
     let data_dir = app.path().app_data_dir().map_err(|error| {
         crate::db::MailError::Io(std::io::Error::new(

@@ -373,7 +373,15 @@ pub(crate) fn format_address_list(addresses: &Address<'_>) -> String {
 fn looks_like_html(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     [
-        "<!doctype", "<html", "<body", "<div", "<p", "<table", "<a ", "<img", "<span",
+        "<!doctype",
+        "<html",
+        "<body",
+        "<div",
+        "<p",
+        "<table",
+        "<a ",
+        "<img",
+        "<span",
     ]
     .iter()
     .any(|marker| lower.contains(marker))

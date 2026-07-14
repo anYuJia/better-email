@@ -103,6 +103,9 @@ export type ReaderPaneProps = {
   onEmptyTrash: () => void;
   onMoveToFolder: (folder: Folder) => void;
   onToggleLabel: (label: Label) => void;
+  onCreateLabel?: (name: string, color: string) => Promise<Label>;
+  onUpdateLabel?: (id: number, name: string, color: string) => Promise<void>;
+  onDeleteLabel?: (id: number) => Promise<void>;
   onOpenAttachment: (attachment: Attachment) => void;
   onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
   onSaveAttachmentAs: (attachment: Attachment) => void;
@@ -322,6 +325,9 @@ export default function ReaderPane({
   onEmptyTrash,
   onMoveToFolder,
   onToggleLabel,
+  onCreateLabel,
+  onUpdateLabel,
+  onDeleteLabel,
   onOpenAttachment,
   onDownloadAttachment,
   onSaveAttachmentAs,
@@ -333,6 +339,40 @@ export default function ReaderPane({
   );
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
+
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#2f7ed8');
+  const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
+  const [editingLabelName, setEditingLabelName] = useState('');
+
+  async function handleCreateLabel() {
+    if (!newLabelName.trim() || !onCreateLabel) return;
+    try {
+      await onCreateLabel(newLabelName.trim(), newLabelColor);
+      setNewLabelName('');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleUpdateLabel(id: number) {
+    if (!editingLabelName.trim() || !onUpdateLabel) return;
+    try {
+      await onUpdateLabel(id, editingLabelName.trim(), newLabelColor);
+      setEditingLabelId(null);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleDeleteLabel(id: number) {
+    if (!onDeleteLabel) return;
+    try {
+      await onDeleteLabel(id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
     if (downloadingAttachmentIds.has(attachment.id)) return false;
@@ -1045,18 +1085,113 @@ export default function ReaderPane({
           })}
           <details className="compact-menu label-menu">
             <summary><Tag size={15} /> 标签</summary>
-            <div>
-              {labels.map((label) => (
-                <button
-                  type="button"
-                  key={label.id}
-                  className={selected.labels.includes(label.name) ? 'active' : ''}
-                  onClick={() => onToggleLabel(label)}
-                >
-                  <span className="label-dot" style={{ background: label.color }} />
-                  {label.name}
-                </button>
-              ))}
+            <div className="label-menu-container">
+              <div className="label-menu-add-section">
+                <input
+                  type="text"
+                  placeholder="新建标签..."
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      await handleCreateLabel();
+                    }
+                  }}
+                />
+                <div className="label-color-selectors">
+                  {['#2f7ed8', '#2da44e', '#d97706', '#8250df', '#cf222e', '#6e7781'].map((c) => (
+                    <button
+                      type="button"
+                      key={c}
+                      className={`color-dot-btn ${newLabelColor === c ? 'active' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setNewLabelColor(c)}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    className="label-add-submit-btn"
+                    disabled={!newLabelName.trim()}
+                    onClick={handleCreateLabel}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="label-menu-list">
+                {labels.length === 0 ? (
+                  <div className="label-menu-empty">
+                    暂无标签，在上方输入名称并点击 + 新建
+                  </div>
+                ) : (
+                  labels.map((label) => {
+                    const isEditing = editingLabelId === label.id;
+                    return (
+                      <div className="label-menu-item-row" key={label.id}>
+                        {isEditing ? (
+                          <div className="label-edit-inline">
+                            <input
+                              type="text"
+                              value={editingLabelName}
+                              onChange={(e) => setEditingLabelName(e.target.value)}
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  await handleUpdateLabel(label.id);
+                                }
+                              }}
+                            />
+                            <div className="label-edit-actions">
+                              <button type="button" onClick={() => handleUpdateLabel(label.id)}>确定</button>
+                              <button type="button" onClick={() => setEditingLabelId(null)}>取消</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`label-select-btn ${selected.labels.includes(label.name) ? 'active' : ''}`}
+                              onClick={() => onToggleLabel(label)}
+                            >
+                              <span className="label-dot" style={{ background: label.color }} />
+                              <span className="label-name-text">{label.name}</span>
+                            </button>
+                            <div className="label-item-actions">
+                              <button
+                                type="button"
+                                className="action-edit"
+                                title="编辑名称"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingLabelId(label.id);
+                                  setEditingLabelName(label.name);
+                                }}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="action-delete"
+                                title="删除标签"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`确定要删除标签 "${label.name}" 吗？`)) {
+                                    await handleDeleteLabel(label.id);
+                                  }
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </details>
         </div>

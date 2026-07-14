@@ -29,7 +29,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
@@ -242,6 +242,30 @@ pub fn delete_custom_folder(store: State<'_, MailStore>, folder_id: i64) -> Mail
 #[tauri::command]
 pub fn list_labels(store: State<'_, MailStore>) -> MailResult<Vec<Label>> {
     store.list_labels()
+}
+
+#[tauri::command]
+pub fn create_label(
+    store: State<'_, MailStore>,
+    name: String,
+    color: String,
+) -> MailResult<Label> {
+    store.create_label(&name, &color)
+}
+
+#[tauri::command]
+pub fn update_label(
+    store: State<'_, MailStore>,
+    id: i64,
+    name: String,
+    color: String,
+) -> MailResult<()> {
+    store.update_label(id, &name, &color)
+}
+
+#[tauri::command]
+pub fn delete_label(store: State<'_, MailStore>, id: i64) -> MailResult<()> {
+    store.delete_label(id)
 }
 
 #[tauri::command]
@@ -3478,4 +3502,42 @@ pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxIt
         started_at.elapsed().as_millis(),
     ));
     Ok(outbox)
+}
+
+#[tauri::command]
+pub fn save_temp_attachment(
+    app: AppHandle,
+    filename: String,
+    base64_data: String,
+) -> MailResult<String> {
+    use base64::prelude::*;
+    let bytes = BASE64_STANDARD.decode(base64_data.trim()).map_err(|error| {
+        crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Base64 解码失败：{error}"),
+        ))
+    })?;
+
+    let data_dir = app.path().app_data_dir().map_err(|error| {
+        crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("获取数据目录失败：{error}"),
+        ))
+    })?;
+
+    let temp_dir = data_dir.join("temp_attachments");
+    std::fs::create_dir_all(&temp_dir)?;
+
+    let unique_filename = format!(
+        "{}_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis(),
+        filename
+    );
+    let file_path = temp_dir.join(unique_filename);
+    std::fs::write(&file_path, bytes)?;
+
+    Ok(file_path.to_string_lossy().into_owned())
 }

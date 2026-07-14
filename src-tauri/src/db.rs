@@ -1341,6 +1341,40 @@ impl MailStore {
         })
     }
 
+    pub fn create_label(&self, name: &str, color: &str) -> MailResult<Label> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO labels(name, color) VALUES (?1, ?2)",
+                params![name, color],
+            )?;
+            let id = conn.last_insert_rowid();
+            Ok(Label {
+                id,
+                name: name.to_string(),
+                color: color.to_string(),
+                message_count: 0,
+            })
+        })
+    }
+
+    pub fn update_label(&self, id: i64, name: &str, color: &str) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "UPDATE labels SET name = ?1, color = ?2 WHERE id = ?3",
+                params![name, color, id],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn delete_label(&self, id: i64) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute("DELETE FROM message_labels WHERE label_id = ?1", params![id])?;
+            conn.execute("DELETE FROM labels WHERE id = ?1", params![id])?;
+            Ok(())
+        })
+    }
+
     pub fn list_labels(&self) -> MailResult<Vec<Label>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(

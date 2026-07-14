@@ -132,19 +132,37 @@ function isMarkupPreviewNoise(value: string): boolean {
 }
 
 export type PreviewableMailboxMessage = {
+  id?: number;
   body: string;
   sanitized_html: string;
   snippet: string;
 };
 
+// 缓存已计算过预览的邮件 id -> preview 映射关系
+const mailboxPreviewCache = new Map<number, string>();
+
 export function mailboxListPreview(message: PreviewableMailboxMessage): string {
-  const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
-  if (bodyPreview && !isMarkupPreviewNoise(bodyPreview)) return bodyPreview;
-  if (!message.snippet.includes(remoteHeaderOnlySnippet)) {
-    const snippetPreview = plainTextPreview(message.snippet);
-    return isMarkupPreviewNoise(snippetPreview) ? '' : snippetPreview;
+  if (message.id !== undefined && mailboxPreviewCache.has(message.id)) {
+    return mailboxPreviewCache.get(message.id)!;
   }
-  return '';
+
+  const calculatePreview = () => {
+    const bodyPreview = plainTextPreview(message.body || message.sanitized_html || '');
+    if (bodyPreview && !isMarkupPreviewNoise(bodyPreview)) return bodyPreview;
+    if (!message.snippet.includes(remoteHeaderOnlySnippet)) {
+      const snippetPreview = plainTextPreview(message.snippet);
+      return isMarkupPreviewNoise(snippetPreview) ? '' : snippetPreview;
+    }
+    return '';
+  };
+
+  const preview = calculatePreview();
+
+  if (message.id !== undefined) {
+    mailboxPreviewCache.set(message.id, preview);
+  }
+
+  return preview;
 }
 
 export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {

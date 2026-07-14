@@ -147,6 +147,48 @@ const MessageListCard = React.memo(function MessageListCard({
   );
 });
 
+type LayoutItem = { top: number; height: number };
+
+function calculateVisibleRange(
+  layout: LayoutItem[],
+  scrollTop: number,
+  viewportHeight: number
+) {
+  if (layout.length === 0) {
+    return { startIdx: 0, endIdx: 0 };
+  }
+
+  let low = 0;
+  let high = layout.length - 1;
+  let index = 0;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (layout[mid].top + layout[mid].height >= scrollTop - 200) {
+      index = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+  const startIdx = Math.max(0, index);
+
+  low = startIdx;
+  high = layout.length - 1;
+  let endIndex = layout.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (layout[mid].top <= scrollTop + viewportHeight + 200) {
+      endIndex = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  const endIdx = Math.min(layout.length - 1, endIndex);
+
+  return { startIdx, endIdx };
+}
+
 export default function MessageListView({
   groups,
   messages,
@@ -179,7 +221,6 @@ export default function MessageListView({
   const rafIdRef = useRef<number | null>(null);
   const prevIds = prevIdsRef.current;
 
-  const [scrollTop, setScrollTop] = useState(initialScrollTop);
   const [viewportHeight, setViewportHeight] = useState(600);
 
   const messagePreviewMap = useMemo(
@@ -210,35 +251,6 @@ export default function MessageListView({
     onScrollTopChange(latestScrollTopRef.current);
   }, [listStateKey, onScrollTopChange]);
 
-  useLayoutEffect(() => {
-    const listElement = listRef.current;
-    if (!listElement) return;
-    const isNewView = restoredViewKeyRef.current !== listStateKey;
-    const requestedScrollTop = isNewView ? initialScrollTop : latestScrollTopRef.current;
-    const maxScrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
-    const nextScrollTop = Math.min(Math.max(0, requestedScrollTop), maxScrollTop);
-    listElement.scrollTop = nextScrollTop;
-    latestScrollTopRef.current = nextScrollTop;
-    setScrollTop(nextScrollTop);
-    restoredViewKeyRef.current = listStateKey;
-  }, [listStateKey, initialScrollTop, messages.length]);
-
-  useLayoutEffect(() => {
-    const listElement = listRef.current;
-    if (!listElement) return;
-    setViewportHeight(listElement.clientHeight);
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          setViewportHeight(entry.target.clientHeight);
-        }
-      });
-      observer.observe(listElement);
-      return () => observer.disconnect();
-    }
-  }, []);
-
   const flatItems = useMemo(() => {
     const list: (
       | { type: 'header'; id: string; label: string; count: number }
@@ -267,6 +279,59 @@ export default function MessageListView({
     return { layout, totalHeight: currentTop };
   }, [flatItems]);
 
+  const [visibleRange, setVisibleRange] = useState(() =>
+    calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight)
+  );
+
+  const visibleRangeRef = useRef(visibleRange);
+  visibleRangeRef.current = visibleRange;
+
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+
+  const viewportHeightRef = useRef(viewportHeight);
+  viewportHeightRef.current = viewportHeight;
+
+  // Synchronize visibleRange when layout or viewportHeight changes
+  const prevLayoutRef = useRef(layout);
+  const prevViewportHeightRef = useRef(viewportHeight);
+  if (layout !== prevLayoutRef.current || viewportHeight !== prevViewportHeightRef.current) {
+    prevLayoutRef.current = layout;
+    prevViewportHeightRef.current = viewportHeight;
+    const nextRange = calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight);
+    setVisibleRange(nextRange);
+  }
+
+  useLayoutEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+    const isNewView = restoredViewKeyRef.current !== listStateKey;
+    const requestedScrollTop = isNewView ? initialScrollTop : latestScrollTopRef.current;
+    const maxScrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
+    const nextScrollTop = Math.min(Math.max(0, requestedScrollTop), maxScrollTop);
+    listElement.scrollTop = nextScrollTop;
+    latestScrollTopRef.current = nextScrollTop;
+    const nextRange = calculateVisibleRange(layout, nextScrollTop, viewportHeight);
+    setVisibleRange(nextRange);
+    restoredViewKeyRef.current = listStateKey;
+  }, [listStateKey, initialScrollTop, messages.length]);
+
+  useLayoutEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+    setViewportHeight(listElement.clientHeight);
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setViewportHeight(entry.target.clientHeight);
+        }
+      });
+      observer.observe(listElement);
+      return () => observer.disconnect();
+    }
+  }, []);
+
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
@@ -277,7 +342,13 @@ export default function MessageListView({
 
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
-      setScrollTop(nextScrollTop);
+      const nextRange = calculateVisibleRange(layoutRef.current, nextScrollTop, viewportHeightRef.current);
+      if (
+        nextRange.startIdx !== visibleRangeRef.current.startIdx ||
+        nextRange.endIdx !== visibleRangeRef.current.endIdx
+      ) {
+        setVisibleRange(nextRange);
+      }
     });
 
     const now = performance.now();
@@ -295,10 +366,10 @@ export default function MessageListView({
 
   useEffect(() => {
     const triggerThreshold = 300;
-    if (hasMoreMessages && !loadMoreStatus && totalHeight - (scrollTop + viewportHeight) < triggerThreshold) {
+    if (hasMoreMessages && !loadMoreStatus && totalHeight - (latestScrollTopRef.current + viewportHeight) < triggerThreshold) {
       onLoadMore();
     }
-  }, [scrollTop, viewportHeight, totalHeight, hasMoreMessages, loadMoreStatus, onLoadMore]);
+  }, [visibleRange, viewportHeight, totalHeight, hasMoreMessages, loadMoreStatus, onLoadMore]);
 
   useEffect(() => {
     return () => {
@@ -322,40 +393,9 @@ export default function MessageListView({
     [draggingMessageIds],
   );
 
-  const startIdx = useMemo(() => {
-    let low = 0;
-    let high = layout.length - 1;
-    let index = 0;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      if (layout[mid].top + layout[mid].height >= scrollTop - 200) {
-        index = mid;
-        high = mid - 1;
-      } else {
-        low = mid + 1;
-      }
-    }
-    return Math.max(0, index);
-  }, [layout, scrollTop]);
-
-  const endIdx = useMemo(() => {
-    let low = startIdx;
-    let high = layout.length - 1;
-    let index = layout.length - 1;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      if (layout[mid].top <= scrollTop + viewportHeight + 200) {
-        index = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-    return Math.min(layout.length - 1, index);
-  }, [layout, startIdx, scrollTop, viewportHeight, flatItems.length]);
-
   const visibleItems = useMemo(() => {
     const items = [];
+    const { startIdx, endIdx } = visibleRange;
     for (let i = startIdx; i <= endIdx && i < flatItems.length; i++) {
       items.push({
         index: i,
@@ -371,7 +411,7 @@ export default function MessageListView({
       });
     }
     return items;
-  }, [flatItems, layout, startIdx, endIdx]);
+  }, [flatItems, layout, visibleRange]);
 
   return (
     <div className="message-list" ref={listRef} onScroll={handleListScroll}>

@@ -336,6 +336,11 @@ export default function MessageListView({
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
 
+    const triggerThreshold = 1000;
+    if (hasMoreMessages && !loadMoreStatus && totalHeight - (nextScrollTop + viewportHeight) < triggerThreshold) {
+      onLoadMore();
+    }
+
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
     }
@@ -363,13 +368,6 @@ export default function MessageListView({
       onScrollTopChange(latestScrollTopRef.current);
     }, 180);
   }
-
-  useEffect(() => {
-    const triggerThreshold = 300;
-    if (hasMoreMessages && !loadMoreStatus && totalHeight - (latestScrollTopRef.current + viewportHeight) < triggerThreshold) {
-      onLoadMore();
-    }
-  }, [visibleRange, viewportHeight, totalHeight, hasMoreMessages, loadMoreStatus, onLoadMore]);
 
   useEffect(() => {
     return () => {

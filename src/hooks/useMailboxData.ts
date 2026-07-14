@@ -1,4 +1,4 @@
-import { useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useRef, startTransition, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type {
   AccountScope,
   FilterMode,
@@ -171,11 +171,13 @@ export default function useMailboxData({
         searchScope: nextSearchScope,
         scope: nextScope,
       });
-      setMessages([]);
-      setThreads([]);
-      setHasMoreMessages(false);
-      setSelectedId(null);
-      setSelectedMessageIds([]);
+      startTransition(() => {
+        setMessages([]);
+        setThreads([]);
+        setHasMoreMessages(false);
+        setSelectedId(null);
+        setSelectedMessageIds([]);
+      });
       return [];
     }
     const startedAt = performance.now();
@@ -227,9 +229,7 @@ export default function useMailboxData({
       throw error;
     }
     if (refreshId !== mailboxRefreshRef.current) return nextMessages;
-    setThreads(nextThreads);
     const visibleMessages = nextMessages.slice(0, effectiveLimit);
-    setMessageLimit(effectiveLimit);
     const hasMoreRemote = checkHistoryIncomplete(
       nextFolderId,
       nextScope,
@@ -237,15 +237,19 @@ export default function useMailboxData({
       folders,
       imapMailboxes
     );
-    setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
-    setMessages(visibleMessages);
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
-    setSelectedMessageIds((current) =>
-      current.filter((id) => visibleMessageIds.has(id)),
-    );
-    setSelectedId((current) => {
-      if (current && visibleMessageIds.has(current)) return current;
-      return visibleMessages[0]?.id ?? null;
+    startTransition(() => {
+      setThreads(nextThreads);
+      setMessageLimit(effectiveLimit);
+      setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
+      setMessages(visibleMessages);
+      setSelectedMessageIds((current) =>
+        current.filter((id) => visibleMessageIds.has(id)),
+      );
+      setSelectedId((current) => {
+        if (current && visibleMessageIds.has(current)) return current;
+        return visibleMessages[0]?.id ?? null;
+      });
     });
     if (!frontendReadyRef.current) {
       frontendReadyRef.current = true;

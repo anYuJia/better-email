@@ -412,11 +412,33 @@ async function main() {
 
     await evalInPage(
       cdp,
+      "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (badge && Number(badge.textContent) > 0) return; const markUnread = document.querySelector('.reader-actions button[aria-label=\"标为未读\"]'); if (!folder || !markUnread) throw new Error('Inbox unread setup target not found'); markUnread.click(); })()",
+    );
+    await waitForExpression(cdp, "Number(document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0");
+    await openDetails(cdp, '.filter-menu');
+    await clickButton(cdp, '未读', "document.querySelector('.filter-menu')");
+    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
+    await evalInPage(
+      cdp,
+      "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadSubject = card.querySelector('.subject')?.textContent.trim() || card.textContent.trim(); window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; card.click(); })()",
+    );
+    await waitForExpression(
+      cdp,
+      "(() => { const subject = window.__autoReadSubject; const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(subject)); return card && document.querySelectorAll('.message-card').length === window.__autoReadCardCountBefore && card.classList.contains('is-read') && !card.querySelector('.message-unread-dot'); })()",
+      5_000,
+    );
+    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"标为未读\"]')?.click()");
+    await waitForExpression(cdp, "Number(document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0 && document.querySelector('.message-card.is-unread')");
+    await evalInPage(
+      cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (!folder || !badge || Number(badge.textContent) <= 0) throw new Error('Inbox unread folder target not found'); window.__folderUnreadBefore = Number(badge.textContent); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 180, button: 2 })); })()",
     );
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('全部标为已读')");
     await clickButton(cdp, '全部标为已读', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
+    await openDetails(cdp, '.filter-menu');
+    await clickButton(cdp, '全部', "document.querySelector('.filter-menu')");
+    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('筛选') && document.body.innerText.includes('已显示')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
@@ -435,8 +457,8 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.shortcut-modal')");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))");
     await waitForExpression(cdp, "document.querySelector('.command-palette') && document.body.innerText.includes('写邮件') && document.body.innerText.includes('刷新邮箱')");
-    await fillInput(cdp, '.command-palette input', '线程');
-    await waitForExpression(cdp, "document.querySelector('.command-palette') && document.body.innerText.includes('显示会话线程')");
+    await fillInput(cdp, '.command-palette input', '会话');
+    await waitForExpression(cdp, "document.querySelector('.command-palette') && document.body.innerText.includes('显示会话')");
     await evalInPage(cdp, "document.querySelector('.command-palette input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.command-palette') && document.querySelector('.thread-list')");
     await clickButton(cdp, '命令');
@@ -447,10 +469,7 @@ async function main() {
     await fillInput(cdp, '.search-box input', 'Quarterly');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
-    await openDetails(cdp, '.search-options-menu');
-    await waitForExpression(cdp, "document.querySelector('.search-options-menu[open]') && document.querySelector('.search-options-menu').innerText.includes('未读') && document.querySelector('.search-options-menu').innerText.includes('附件名') && document.querySelector('.search-options-menu').innerText.includes('发件人') && document.querySelector('.search-options-menu').innerText.includes('邮箱')");
-    await clickButton(cdp, '附件名', "document.querySelector('.search-options-menu')");
-    await waitForExpression(cdp, "document.querySelector('.search-box input').value === 'Quarterly filename:' && document.body.innerText.includes('已插入搜索条件：filename:')");
+
     await fillInput(cdp, '.search-box input', 'filename:security-checklist.pdf');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
@@ -648,8 +667,8 @@ async function main() {
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.bulk-toolbar') && document.body.innerText.includes('已取消邮件选择')");
 
-    await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
-    await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length >= 1 && document.body.innerText.includes('封 · 未读')");
+    await clickButton(cdp, '会话', "document.querySelector('.list-control-actions')");
+    await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length >= 1 && document.body.innerText.includes('封') && document.body.innerText.includes('条未读')");
     await evalInPage(cdp, "document.querySelector('.thread-card').click()");
     await waitForExpression(cdp, "document.querySelector('.thread-reader') && document.querySelectorAll('.thread-message').length >= 1 && document.querySelector('.thread-message:last-child')?.classList.contains('active')");
     await waitForExpression(cdp, "document.querySelector('.thread-reader .reader-actions [title=\"添加整个会话星标\"], .thread-reader .reader-actions [title=\"取消整个会话星标\"]')");
@@ -860,8 +879,9 @@ async function main() {
       mobile: false,
     });
     await waitForExpression(cdp, "window.innerWidth === 1440 && getComputedStyle(document.querySelector('.settings-nav')).display === 'flex' && getComputedStyle(document.querySelector('.settings-nav')).flexDirection === 'column' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'none'");
-    await waitForExpression(cdp, "document.querySelector('select[aria-label=\"撤销发送延迟\"]').value === '10'");
-    await selectValue(cdp, 'select[aria-label="撤销发送延迟"]', '5');
+    await waitForExpression(cdp, "document.querySelector('.settings-send-control .custom-select-menu summary span')?.textContent.includes('10')");
+    await evalInPage(cdp, "document.querySelector('.settings-send-control .custom-select-menu summary')?.click()");
+    await evalInPage(cdp, "[...document.querySelectorAll('.settings-send-control .custom-select-menu .custom-select-dropdown button')].find(b => b.textContent.includes('5'))?.click()");
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-send-panel').innerText.includes('5 秒')");
     await openSettingsSection(cdp, '服务商', 'providers', '.settings-provider-advanced');
     await waitForExpression(cdp, "!document.querySelector('.settings-provider-advanced')?.open && document.querySelector('.settings-page-pagination')?.innerText.includes('账号') && document.querySelector('.settings-page-pagination')?.innerText.includes('认证')");
@@ -1016,7 +1036,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-account-add-dialog')");
     await fillInput(cdp, '.settings-account-add-dialog input[placeholder="name@example.com"]', 'qa-new@better-email.local');
     await clickButton(cdp, '手动配置', "document.querySelector('.settings-account-add-dialog')");
-    await fillInput(cdp, '.settings-account-add-dialog input[placeholder="可选"]', 'QA New');
+    await fillInput(cdp, '.settings-account-add-dialog input[placeholder="默认使用邮箱地址"]', 'QA New');
     await clickButton(cdp, 'QQ 邮箱', "document.querySelector('.settings-account-add-dialog')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-account-add-dialog input')].some((input) => input.value === 'imap.qq.com:993') && [...document.querySelectorAll('.settings-account-add-dialog input')].some((input) => input.value === 'smtp.qq.com:587')");
     await fillInput(cdp, '.settings-account-add-dialog input[autocomplete="new-password"]', 'qa-password-mock');
@@ -1026,7 +1046,7 @@ async function main() {
     await openSettingsSection(cdp, '身份', 'identities', '.settings-identity-panel');
     await waitForExpression(cdp, "document.querySelector('.settings-identity-panel')?.innerText.includes('QA New') && document.querySelector('.settings-identity-panel')?.innerText.includes('1 个身份')");
     await openSettingsSection(cdp, '账号', 'accounts', '.settings-account-page-accounts');
-    await clickButton(cdp, '线程', "document.querySelector('.list-control-actions')");
+    await clickButton(cdp, '会话', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.message-list')");
@@ -1146,6 +1166,7 @@ async function main() {
         'modern account switcher menu works',
         'more mailbox list stays inside sidebar',
         'favorite mailbox pin persists and can be removed',
+        'unread filter auto-read clears unread dot without removing current result',
         'folder context menu marks all messages read',
         'folder context menu empties trash',
         'shortcut help opens from button and keyboard',

@@ -337,6 +337,7 @@ export default function App() {
   const setSelectedId = useCallback((value: React.SetStateAction<number | null>) => {
     setSelectedIdState(value);
   }, []);
+  const [readerSelectionRevision, setReaderSelectionRevision] = useState(0);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
@@ -1228,6 +1229,24 @@ export default function App() {
     saveManualUnreadMessageIds(next);
   }
 
+  function clearManualUnreadSuppression(messageIds: number[]) {
+    if (messageIds.length === 0) return;
+    const next = new Set(manualUnreadMessageIdsRef.current);
+    let changed = false;
+    for (const messageId of messageIds) {
+      if (next.delete(messageId)) changed = true;
+    }
+    if (!changed) return;
+    manualUnreadMessageIdsRef.current = next;
+    saveManualUnreadMessageIds(next);
+  }
+
+  function selectMessageForReading(messageId: number) {
+    clearManualUnreadSuppression([messageId]);
+    setSelectedId(messageId);
+    setReaderSelectionRevision((current) => current + 1);
+  }
+
   useEffect(() => {
     setAttachments([]);
     if (!selected) return undefined;
@@ -1294,6 +1313,11 @@ export default function App() {
           setStats((current) => current
             ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
             : current);
+          setFolders((current) => current.map((folder) => (
+            folder.id === message.folder_id || (folder.is_virtual && folder.role === message.folder_role)
+              ? { ...folder, unread_count: Math.max(0, folder.unread_count - 1) }
+              : folder
+          )));
         });
 
         appFlowLog('markReadAfterReading done', {
@@ -2959,7 +2983,7 @@ export default function App() {
       openComposer(emptyDraft);
       setStatus('已打开新邮件');
     },
-    setSelectedId,
+    setSelectedId: selectMessageForReading,
     runBulkAction,
     composeFromMessage,
     toggleStar,
@@ -3132,7 +3156,7 @@ export default function App() {
         onToggleThreadMute={(thread, items) => {
           toggleThreadMuted(thread, items).catch((error) => setStatus(String(error)));
         }}
-        onSelectMessage={setSelectedId}
+        onSelectMessage={selectMessageForReading}
         onToggleMessageSelection={toggleMessageSelection}
         onLoadMore={() => { loadMoreMessages().catch((error) => setStatus(String(error))); }}
         loadMoreStatus={loadMoreStatus}
@@ -3153,6 +3177,7 @@ export default function App() {
         activeThreadSelected={activeThreadSelected}
         selected={selected}
         selectedId={readerSelectedId}
+        readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}
         folders={folders}
         labels={labels}
@@ -3161,7 +3186,7 @@ export default function App() {
         selectedSenderDomain={selectedSenderDomain}
         selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
         quickReplyBody={quickReplyBody}
-        onSelectMessage={setSelectedId}
+        onSelectMessage={selectMessageForReading}
         onComposeNew={() => {
           setRichComposer(false);
           openComposer(emptyDraft);

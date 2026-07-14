@@ -77,6 +77,7 @@ export type ReaderPaneProps = {
   selectedHasRemoteImageWarning: boolean;
   quickReplyBody: string;
   onSelectMessage: (messageId: number) => void;
+  readTriggerKey: number;
   onComposeNew: () => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
@@ -290,6 +291,7 @@ export default function ReaderPane({
   activeThreadSelected,
   selected,
   selectedId,
+  readTriggerKey,
   accountScope,
   folders,
   labels,
@@ -477,7 +479,7 @@ export default function ReaderPane({
     } else {
       completedReadMessageIdsRef.current.delete(selected.id);
     }
-  }, [selected?.id, selected?.is_read]);
+  }, [selected?.id, selected?.is_read, readTriggerKey]);
 
   function maybeCompleteReading() {
     if (!selected || selected.is_read || !isBodyRenderReady) return;
@@ -600,7 +602,7 @@ export default function ReaderPane({
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [selected?.id, isBodyRenderReady, onReadComplete]);
+  }, [selected?.id, selected?.is_read, isBodyRenderReady, onReadComplete, readTriggerKey]);
 
   useEffect(() => {
     setDownloadingAttachmentIds(new Set());

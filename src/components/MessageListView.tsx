@@ -42,7 +42,6 @@ type MessageListViewProps = {
 
 type MessageListCardProps = {
   message: Message;
-  preview: string;
   isCurrentMessage: boolean;
   isSelected: boolean;
   isDragging: boolean;
@@ -59,7 +58,6 @@ type MessageListCardProps = {
 
 const MessageListCard = React.memo(function MessageListCard({
   message,
-  preview,
   isCurrentMessage,
   isSelected,
   isDragging,
@@ -73,6 +71,7 @@ const MessageListCard = React.memo(function MessageListCard({
   onCloseMessageMenu,
   onSetDraggingMessageIds,
 }: MessageListCardProps) {
+  const preview = useMemo(() => mailboxListPreview(message), [message]);
   const avatarInitial = (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
 
   return (
@@ -223,11 +222,6 @@ export default function MessageListView({
 
   const [viewportHeight, setViewportHeight] = useState(600);
   const [scrollTop, setScrollTop] = useState(initialScrollTop);
-
-  const messagePreviewMap = useMemo(
-    () => new Map(messages.map((message) => [message.id, mailboxListPreview(message)])),
-    [messages],
-  );
 
   const newIds = useMemo(() => {
     const set = new Set<number>();
@@ -441,7 +435,6 @@ export default function MessageListView({
                 <div style={style} key={`msg-wrapper-${message.id}`}>
                   <MessageListCard
                     message={message}
-                    preview={messagePreviewMap.get(message.id) ?? ''}
                     isCurrentMessage={message.id === selectedId}
                     isSelected={selectedMessageSet.has(message.id)}
                     isDragging={draggingMessageSet.has(message.id)}

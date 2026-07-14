@@ -1826,6 +1826,7 @@ textarea:disabled {
   padding: 22px;
   background: rgba(18, 26, 36, 0.34);
   backdrop-filter: blur(12px) saturate(0.92);
+  z-index: 1000;
 }
 
 .settings-modal,

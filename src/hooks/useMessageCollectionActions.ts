@@ -272,7 +272,7 @@ export default function useMessageCollectionActions({
         muted,
       });
       if (updatedScopes <= 0) {
-        setStatus('会话缺少可持久化的线程标识');
+        setStatus('会话缺少可持久化的会话标识');
         return;
       }
       await refreshAll();

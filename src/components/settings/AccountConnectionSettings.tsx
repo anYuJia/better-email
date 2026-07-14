@@ -44,6 +44,7 @@ export type AccountConnectionSettingsProps = {
     patch: Partial<ProviderVerificationRecord>,
   ) => void;
   onSaveProviderVerification: () => void;
+  onSaveAccountSettings?: (account: Account) => Promise<void>;
   onOauthClientIdChange: (value: string) => void;
   onOauthClientSecretChange: (value: string) => void;
   onOauthRedirectUriChange: (value: string) => void;
@@ -102,6 +103,7 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         onApplyNewAccountPreset={props.onApplyNewAccountPreset}
         onCreateNewAccount={props.onCreateNewAccount}
         onRemoveAccount={props.onRemoveAccount}
+        onSaveAccountSettings={props.onSaveAccountSettings}
       />
     );
   } else if (props.section === 'providers') {

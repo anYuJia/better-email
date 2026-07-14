@@ -378,6 +378,9 @@ export default function App() {
   const [ruleBuilderNeedle, setRuleBuilderNeedle] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
   const [status, setStatus] = useState('本地原型已就绪');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const refreshNoticeTimeoutRef = useRef<number | null>(null);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
@@ -579,6 +582,32 @@ export default function App() {
     outbox,
     setStatus,
   });
+
+  useEffect(() => {
+    const handleFocus = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target) return;
+      const isInput = target.tagName === 'INPUT';
+      const isTextarea = target.tagName === 'TEXTAREA';
+      if (isInput || isTextarea) {
+        const input = target as HTMLInputElement | HTMLTextAreaElement;
+        // Exclude email drafting body or main editor where spellcheck is desired
+        const isEmailBody = input.classList.contains('composer-body') ||
+                            input.classList.contains('body-editor') ||
+                            input.closest('.composer-body-container') ||
+                            input.closest('.rich-text-editor') ||
+                            input.getAttribute('name') === 'body';
+        if (!isEmailBody) {
+          input.setAttribute('autocorrect', 'off');
+          input.setAttribute('autocapitalize', 'none');
+          input.setAttribute('spellcheck', 'false');
+          input.spellcheck = false;
+        }
+      }
+    };
+    document.addEventListener('focusin', handleFocus);
+    return () => document.removeEventListener('focusin', handleFocus);
+  }, []);
 
   function accountIdForScope(scope: AccountScope): number | null {
     return scope === 'all' ? null : scope;
@@ -1423,6 +1452,7 @@ export default function App() {
   }
 
   async function syncAndRefresh() {
+    if (isRefreshing) return;
     const startedAt = performance.now();
     const syncAccountId = accountScope === 'all' ? null : accountScope;
     appFlowLog('syncAndRefresh start', {
@@ -1433,6 +1463,11 @@ export default function App() {
       query: query.trim() || null,
       filter,
     });
+    setIsRefreshing(true);
+    if (refreshNoticeTimeoutRef.current !== null) {
+      window.clearTimeout(refreshNoticeTimeoutRef.current);
+    }
+    setRefreshNotice(null);
     setStatus('正在同步服务器邮件...');
     try {
       const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
@@ -1460,6 +1495,12 @@ export default function App() {
         durationMs: Math.round(performance.now() - startedAt),
       });
       setStatus(run.message);
+      
+      const count = run.imported_messages;
+      setRefreshNotice(count > 0 ? `成功获取 ${count} 封` : '已是最新');
+      refreshNoticeTimeoutRef.current = window.setTimeout(() => {
+        setRefreshNotice(null);
+      }, 4000);
     } catch (error) {
       const message = String(error);
       appFlowWarn('syncAndRefresh failed', {
@@ -1468,7 +1509,13 @@ export default function App() {
         durationMs: Math.round(performance.now() - startedAt),
       });
       setStatus(message);
+      setRefreshNotice('获取失败');
+      refreshNoticeTimeoutRef.current = window.setTimeout(() => {
+        setRefreshNotice(null);
+      }, 4000);
       throw error;
+    } finally {
+      setIsRefreshing(false);
     }
   }
 
@@ -1740,6 +1787,26 @@ export default function App() {
     queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
   }
 
+  async function handleCreateLabel(name: string, color: string) {
+    const newLabel = await invoke<Label>('create_label', { name, color });
+    setLabels((current) => [...current, newLabel].sort((a, b) => a.name.localeCompare(b.name)));
+    return newLabel;
+  }
+
+  async function handleUpdateLabel(id: number, name: string, color: string) {
+    await invoke('update_label', { id, name, color });
+    setLabels((current) =>
+      current
+        .map((l) => (l.id === id ? { ...l, name, color } : l))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+  }
+
+  async function handleDeleteLabel(id: number) {
+    await invoke('delete_label', { id });
+    setLabels((current) => current.filter((l) => l.id !== id));
+  }
+
   async function toggleRead(message: Message) {
     const undoSnapshots = snapshotMessages([message]);
     const nextRead = !message.is_read;
@@ -1945,16 +2012,49 @@ export default function App() {
     setStatus(`${statusPrefix} ${validAttachments.length} 个`);
   }
 
-  function attachmentsFromDroppedFiles(files: FileList): OutboundAttachmentInput[] {
-    return Array.from(files).map((file) => {
-      const droppedFile = file as DroppedFile;
-      return {
-        filename: file.name || 'attachment',
-        mime_type: file.type || 'application/octet-stream',
-        size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
-        local_path: droppedFile.path || file.name || 'dropped-attachment',
-      };
-    });
+  async function processDroppedOrPastedFiles(files: FileList, statusPrefix = '已添加附件') {
+    const validFiles = Array.from(files).filter((file) => file.name.trim());
+    if (validFiles.length === 0) return;
+
+    setStatus('正在导入附件...');
+    try {
+      const savedAttachments: OutboundAttachmentInput[] = [];
+      for (const file of validFiles) {
+        // Read file bytes as base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1] || '';
+            resolve(base64);
+          };
+          reader.onerror = () => reject(new Error('读取文件失败'));
+          reader.readAsDataURL(file);
+        });
+
+        // Call backend to save
+        const savedPath = await invoke<string>('save_temp_attachment', {
+          filename: file.name,
+          base64Data,
+        });
+
+        savedAttachments.push({
+          filename: file.name,
+          mime_type: file.type || 'application/octet-stream',
+          size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
+          local_path: savedPath,
+        });
+      }
+
+      setDraft((current) => ({
+        ...current,
+        attachments: [...current.attachments, ...savedAttachments],
+      }));
+      setStatus(`${statusPrefix} ${savedAttachments.length} 个`);
+    } catch (error) {
+      console.error(error);
+      setStatus(`添加附件失败: ${String(error)}`);
+    }
   }
 
   function handleComposerAttachmentDrop(event: React.DragEvent<HTMLElement>) {
@@ -1966,7 +2066,7 @@ export default function App() {
       setStatus('拖拽内容中没有文件');
       return;
     }
-    addDraftAttachments(attachmentsFromDroppedFiles(files), '已拖入附件');
+    void processDroppedOrPastedFiles(files, '已拖入附件');
   }
 
   function handleComposerAttachmentPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -1974,7 +2074,7 @@ export default function App() {
     if (!files || files.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
-    addDraftAttachments(attachmentsFromDroppedFiles(files), '已粘贴附件');
+    void processDroppedOrPastedFiles(files, '已粘贴附件');
   }
 
   function handleComposerAttachmentDragOver(event: React.DragEvent<HTMLElement>) {
@@ -2952,6 +3052,8 @@ export default function App() {
         searchInputRef={searchInputRef}
         query={query}
         searchScope={searchScope}
+        isRefreshing={isRefreshing}
+        refreshNotice={refreshNotice}
         filter={filter}
         listMode={listMode}
         listSort={listSort}
@@ -3102,6 +3204,9 @@ export default function App() {
         onEmptyTrash={emptyCurrentTrash}
         onMoveToFolder={(folder) => { moveSelectedToFolder(folder).catch((error) => setStatus(String(error))); }}
         onToggleLabel={toggleLabel}
+        onCreateLabel={handleCreateLabel}
+        onUpdateLabel={handleUpdateLabel}
+        onDeleteLabel={handleDeleteLabel}
         onOpenAttachment={openAttachment}
         onDownloadAttachment={downloadAttachment}
         onSaveAttachmentAs={saveAttachmentAs}
@@ -3220,6 +3325,16 @@ export default function App() {
               onRemoveAccount={removeCurrentAccount}
               onUpdateProviderVerification={updateProviderVerification}
               onSaveProviderVerification={saveProviderVerification}
+              onSaveAccountSettings={async (updatedAccount) => {
+                const updated = await invoke<Account>('update_account_settings', {
+                  accountId: updatedAccount.id,
+                  input: updatedAccount,
+                });
+                setAccount(updated);
+                setAccountForm(updated);
+                setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+                setStatus('账号配置已保存');
+              }}
               onOauthClientIdChange={setOauthClientId}
               onOauthClientSecretChange={setOauthClientSecret}
               onOauthRedirectUriChange={setOauthRedirectUri}

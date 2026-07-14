@@ -2,6 +2,7 @@ import {
   sendUndoDelayOptions,
   type SendUndoDelaySeconds,
 } from '../../../app/appConfig';
+import { CustomSelect } from '../accounts/CustomSelect';
 
 type SendingSettingsPageProps = {
   sendUndoDelaySeconds: SendUndoDelaySeconds;
@@ -29,15 +30,11 @@ export default function SendingSettingsPage({
           </span>
           <label>
             <span>延迟时间</span>
-            <select
-              aria-label="撤销发送延迟"
-              value={sendUndoDelaySeconds}
-              onChange={(event) => onSendUndoDelayChange(Number(event.target.value) as SendUndoDelaySeconds)}
-            >
-              {sendUndoDelayOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+            <CustomSelect
+              value={String(sendUndoDelaySeconds)}
+              options={sendUndoDelayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
+              onChange={(val) => onSendUndoDelayChange(Number(val) as SendUndoDelaySeconds)}
+            />
           </label>
         </div>
         <p className="settings-send-note">

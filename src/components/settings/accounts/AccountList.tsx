@@ -43,7 +43,7 @@ export default function AccountList({
               <button
                 type="button"
                 className="settings-account-row-main"
-                onClick={() => onOpen(account, 'details')}
+                onClick={() => onOpen(account, 'config')}
               >
                 <span className="settings-account-row-icon" aria-hidden="true">
                   <Mail size={15} />
@@ -58,12 +58,6 @@ export default function AccountList({
                 {account.is_default && <em>默认</em>}
               </span>
               <span className="settings-account-row-actions" aria-label="账号操作">
-                <button type="button" onClick={() => onOpen(account, 'details')}>
-                  详情
-                </button>
-                <button type="button" onClick={() => onOpen(account, 'edit')}>
-                  修改
-                </button>
                 <button type="button" onClick={() => onOpen(account, 'config')}>
                   配置
                 </button>

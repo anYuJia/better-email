@@ -7,6 +7,7 @@ import {
   protocolLabel,
   syncModeOptions,
 } from './accountSettingsShared';
+import { CustomSelect } from './CustomSelect';
 
 type AddAccountDialogProps = {
   form: AccountCreateInput;
@@ -32,6 +33,16 @@ type AddAccountDialogProps = {
   onProtocolChange: (protocol: IncomingProtocol) => void;
   onApplyPreset: (preset: AccountProviderPreset) => void;
 };
+
+const authTypeOptions = [
+  { value: 'password', label: '密码 / 授权码' },
+  { value: 'oauth2', label: 'OAuth2 Token' },
+] as const;
+
+const protocolOptions = [
+  { value: 'imap', label: 'IMAP' },
+  { value: 'pop3', label: 'POP3' },
+] as const;
 
 export default function AddAccountDialog({
   form,
@@ -81,7 +92,7 @@ export default function AddAccountDialog({
           </button>
         </header>
 
-        <div className="settings-account-form-grid">
+        <div className="settings-account-form-grid" style={{ marginBottom: '14px' }}>
           <label>
             邮箱地址
             <input
@@ -115,18 +126,23 @@ export default function AddAccountDialog({
             </span>
           </label>
           <label>
-            获取新邮件时间
-            <select
-              value={form.sync_mode === 'push' ? '5min' : form.sync_mode}
+            显示名称
+            <input
+              value={form.display_name}
               onChange={(event) => onFormChange({
                 ...form,
-                sync_mode: event.target.value,
+                display_name: event.target.value,
               })}
-            >
-              {syncModeOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              placeholder="默认使用邮箱地址"
+            />
+          </label>
+          <label>
+            获取新邮件时间
+            <CustomSelect
+              value={form.sync_mode === 'push' ? '5min' : form.sync_mode}
+              options={syncModeOptions}
+              onChange={(val) => onFormChange({ ...form, sync_mode: val })}
+            />
           </label>
         </div>
 
@@ -148,41 +164,24 @@ export default function AddAccountDialog({
           <>
             <div className="settings-account-form-grid">
               <label>
-                显示名称
-                <input
-                  value={form.display_name}
-                  onChange={(event) => onFormChange({
-                    ...form,
-                    display_name: event.target.value,
-                  })}
-                  placeholder="可选"
+                认证方式
+                <CustomSelect
+                  value={form.auth_type}
+                  options={authTypeOptions}
+                  onChange={(val) => onFormChange({ ...form, auth_type: val })}
                 />
               </label>
-              <label>
-                认证方式
-                <select
-                  value={form.auth_type}
-                  onChange={(event) => onFormChange({
-                    ...form,
-                    auth_type: event.target.value,
-                  })}
-                >
-                  <option value="password">密码 / 授权码</option>
-                  <option value="oauth2">OAuth2 Token</option>
-                </select>
-              </label>
+              <label style={{ display: 'none' }} />
             </div>
 
             <div className="settings-account-protocol-grid" aria-label="邮件协议">
               <label>
                 收信协议
-                <select
+                <CustomSelect
                   value={form.incoming_protocol}
-                  onChange={(event) => onProtocolChange(event.target.value as IncomingProtocol)}
-                >
-                  <option value="imap">IMAP</option>
-                  <option value="pop3">POP3</option>
-                </select>
+                  options={protocolOptions}
+                  onChange={(val) => onProtocolChange(val as IncomingProtocol)}
+                />
               </label>
               <span>
                 {protocolHint(form.incoming_protocol)}

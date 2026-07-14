@@ -110,7 +110,7 @@ export default function useCommandPaletteItems({
       },
       {
         id: 'threads-view',
-        title: '显示会话线程',
+        title: '显示会话列表',
         section: '导航',
         hint: '按会话聚合查看',
         run: () => setListMode('threads'),

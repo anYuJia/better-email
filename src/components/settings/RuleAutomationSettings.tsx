@@ -176,7 +176,7 @@ export default function RuleAutomationSettings({
       </div>
 
       <div className="settings-thread-summary">
-        <strong>最近线程</strong>
+        <strong>最近会话</strong>
         <div>
           {threads.slice(0, 6).map((thread) => (
             <p key={thread.thread_key}>

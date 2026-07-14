@@ -36,6 +36,8 @@ type MessageListToolbarProps = {
   visibleListSummary: string;
   messageListSummary: string;
   messages: Message[];
+  isRefreshing?: boolean;
+  refreshNotice?: string | null;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
   onSearchScopeChange: (scope: SearchScope) => void;
@@ -59,6 +61,8 @@ export default function MessageListToolbar({
   visibleListSummary,
   messageListSummary,
   messages,
+  isRefreshing = false,
+  refreshNotice = null,
   onSearchSubmit,
   onQueryChange,
   onSearchScopeChange,
@@ -181,29 +185,16 @@ export default function MessageListToolbar({
               ))}
             </div>
           </details>
-          <details className="compact-menu search-options-menu">
-            <summary title="搜索条件" aria-label="搜索条件">
-              <SlidersHorizontal size={15} />
-            </summary>
-            <div>
-              <span className="menu-section-title">搜索条件</span>
-              {searchShortcuts.map((item) => (
-                <button
-                  type="button"
-                  key={item.query}
-                  onClick={(event) => {
-                    onApplySearchShortcut(item.query);
-                    event.currentTarget.closest('details')?.removeAttribute('open');
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </details>
         </div>
-        <button className="icon-button" title="刷新" onClick={onRefresh}>
-          <RefreshCw size={17} />
+        <button
+          className={isRefreshing ? 'refresh-text-button refreshing' : 'refresh-text-button'}
+          disabled={isRefreshing}
+          onClick={onRefresh}
+        >
+          <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} style={{ flexShrink: 0 }} />
+          <span>
+            {isRefreshing ? '正在获取...' : refreshNotice ? refreshNotice : '获取新邮件'}
+          </span>
         </button>
       </header>
       <div className="list-control-strip">
@@ -226,7 +217,7 @@ export default function MessageListToolbar({
             className={listMode === 'threads' ? 'active' : ''}
             onClick={onShowThreads}
           >
-            线程
+            会话
           </button>
           <details className="compact-menu filter-menu">
             <summary className={filter !== 'all' ? 'active' : ''}>

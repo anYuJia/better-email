@@ -1,6 +1,6 @@
 import type { IncomingProtocol } from '../../../app/types';
 
-export type AccountDialogMode = 'details' | 'edit' | 'config' | 'delete';
+export type AccountDialogMode = 'config' | 'delete';
 
 export const syncModeOptions = [
   { value: 'manual', label: '手动获取' },
@@ -9,7 +9,7 @@ export const syncModeOptions = [
   { value: '15min', label: '每 15 分钟' },
   { value: '30min', label: '每 30 分钟' },
   { value: '60min', label: '每 60 分钟' },
-];
+] as const;
 
 export function protocolLabel(protocol: string) {
   return protocol === 'pop3' ? 'POP3' : 'IMAP';
@@ -27,8 +27,6 @@ export function syncModeLabel(syncMode: string) {
 }
 
 export function accountDialogTitle(mode: AccountDialogMode) {
-  if (mode === 'details') return '账号详情';
-  if (mode === 'edit') return '修改账号';
   if (mode === 'config') return '账号配置';
   return '删除账号';
 }

@@ -81,6 +81,8 @@ export type MessageListPaneProps = {
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => void;
   loadMoreStatus?: string | null;
+  isRefreshing?: boolean;
+  refreshNotice?: string | null;
 };
 
 function MessageListPane({
@@ -132,6 +134,8 @@ function MessageListPane({
   onToggleMessageSelection,
   onLoadMore,
   loadMoreStatus,
+  isRefreshing = false,
+  refreshNotice = null,
 }: MessageListPaneProps) {
   const [messageMenu, setMessageMenu] = React.useState<{
     x: number;
@@ -306,6 +310,8 @@ function MessageListPane({
         onShowThreads={onShowThreads}
         onFilterChange={onFilterChange}
         onSortChange={onSortChange}
+        isRefreshing={isRefreshing}
+        refreshNotice={refreshNotice}
       />
       {listMode === 'messages' && (
         <MessageBulkToolbar

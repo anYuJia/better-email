@@ -23,6 +23,7 @@ type AccountSettingsPageProps = {
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: () => Promise<void>;
+  onSaveAccountSettings?: (account: Account) => Promise<void>;
 };
 
 export default function AccountSettingsPage({
@@ -35,6 +36,7 @@ export default function AccountSettingsPage({
   onApplyNewAccountPreset,
   onCreateNewAccount,
   onRemoveAccount,
+  onSaveAccountSettings,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newAccountSecret, setNewAccountSecret] = useState('');
@@ -125,23 +127,30 @@ export default function AccountSettingsPage({
     setAddAccountError('');
     const domain = email.trim().toLowerCase().split('@').pop() ?? '';
     const preset = providerPresetForEmail(email);
+    const localPart = email.trim().split('@')[0] || '';
     if (!preset) {
       if (domain && domain !== email.trim().toLowerCase()) {
         const isPop = newAccountForm.incoming_protocol === 'pop3';
         onNewAccountFormChange({
           ...newAccountForm,
           email,
+          display_name: newAccountForm.display_name || localPart,
           imap_host: isPop ? `pop.${domain}:995` : `imap.${domain}:993`,
           smtp_host: `smtp.${domain}:465`,
         });
       } else {
-        onNewAccountFormChange({ ...newAccountForm, email });
+        onNewAccountFormChange({
+          ...newAccountForm,
+          email,
+          display_name: newAccountForm.display_name || localPart,
+        });
       }
       return;
     }
     onNewAccountFormChange({
       ...newAccountForm,
       email,
+      display_name: newAccountForm.display_name || preset.label,
       provider: preset.provider,
       imap_host: incomingHostForProtocol(preset, newAccountForm.incoming_protocol),
       smtp_host: preset.smtp_host,
@@ -245,6 +254,7 @@ export default function AccountSettingsPage({
           onAccountChange={onAccountFormChange}
           onProtocolChange={switchAccountProtocol}
           onRemoveAccount={onRemoveAccount}
+          onSaveAccountSettings={onSaveAccountSettings}
         />
       )}
     </div>

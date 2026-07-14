@@ -222,6 +222,7 @@ export default function MessageListView({
   const prevIds = prevIdsRef.current;
 
   const [viewportHeight, setViewportHeight] = useState(600);
+  const [scrollTop, setScrollTop] = useState(initialScrollTop);
 
   const messagePreviewMap = useMemo(
     () => new Map(messages.map((message) => [message.id, mailboxListPreview(message)])),
@@ -307,11 +308,10 @@ export default function MessageListView({
     if (!listElement) return;
     const isNewView = restoredViewKeyRef.current !== listStateKey;
     const requestedScrollTop = isNewView ? initialScrollTop : latestScrollTopRef.current;
-    const maxScrollTop = Math.max(0, listElement.scrollHeight - listElement.clientHeight);
-    const nextScrollTop = Math.min(Math.max(0, requestedScrollTop), maxScrollTop);
-    listElement.scrollTop = nextScrollTop;
-    latestScrollTopRef.current = nextScrollTop;
-    const nextRange = calculateVisibleRange(layout, nextScrollTop, viewportHeight);
+    listElement.scrollTop = requestedScrollTop;
+    latestScrollTopRef.current = requestedScrollTop;
+    setScrollTop(requestedScrollTop);
+    const nextRange = calculateVisibleRange(layout, requestedScrollTop, viewportHeight);
     setVisibleRange(nextRange);
     restoredViewKeyRef.current = listStateKey;
   }, [listStateKey, initialScrollTop, messages.length]);

@@ -55,7 +55,11 @@ type UseBackgroundTaskCoordinatorOptions = {
   setNotificationStatus: Dispatch<SetStateAction<string>>;
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
-  loadMeta: (nextFolderId?: number | null, nextScope?: AccountScope) => Promise<LoadMetaResult>;
+  loadMeta: (
+    nextFolderId?: number | null,
+    nextScope?: AccountScope,
+    options?: { mode?: 'full' | 'mailbox' },
+  ) => Promise<LoadMetaResult>;
   loadMessages: (
     nextFolderId?: number | null,
     nextQuery?: string,
@@ -280,7 +284,7 @@ export default function useBackgroundTaskCoordinator({
     const items = await invoke<OutboxItem[]>('flush_outbox_dry_run');
     setOutbox(items);
     const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = '发件箱队列已完成本地发送演练';
     setStatus(message);
@@ -292,7 +296,7 @@ export default function useBackgroundTaskCoordinator({
     const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
     setOutbox(items);
     const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = outboxFlushMessage(items);
     outboxFlowLog('manual smtp flush done', {
@@ -317,7 +321,7 @@ export default function useBackgroundTaskCoordinator({
     }
     setOutbox(items);
     const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope);
+    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
     await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
     const message = outboxFlushMessage(items);
     outboxFlowLog('scheduled smtp due done', {
@@ -367,7 +371,7 @@ export default function useBackgroundTaskCoordinator({
       const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
       const released = await current.releaseDueSnoozedMessages();
       setSyncRuns((existing) => [run, ...existing].slice(0, 10));
-      await current.loadMeta(current.folderId, current.accountScope);
+      await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
       const latestMessages = await current.loadMessages(
         current.folderId,
         current.query,

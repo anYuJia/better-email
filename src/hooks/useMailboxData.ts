@@ -19,6 +19,10 @@ type LoadMetaResult = {
   folders: Folder[];
 };
 
+type LoadMetaOptions = {
+  mode?: 'full' | 'mailbox';
+};
+
 type MailboxRequestArgs = {
   accountId: number | null;
   folderId: number | null;
@@ -50,6 +54,7 @@ type UseMailboxDataOptions = {
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
+    options?: LoadMetaOptions,
   ) => Promise<LoadMetaResult>;
   maybeRunBenchmarkSync: () => Promise<void>;
 };
@@ -347,7 +352,7 @@ export default function useMailboxData({
     setThreads([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
-    const meta = await loadMeta(preferredFolderId, nextScope);
+    const meta = await loadMeta(preferredFolderId, nextScope, { mode: 'mailbox' });
     const nextFolderId = meta.folderId;
     if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
     await loadMessagesWithVisibleFallback(

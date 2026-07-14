@@ -198,6 +198,10 @@ type MailboxListState = {
 
 type MailboxListStatePatch = Omit<Partial<MailboxListState>, 'updatedAt'>;
 
+type LoadMetaOptions = {
+  mode?: 'full' | 'mailbox';
+};
+
 export function clampMessageLimit(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return messagePageSize;
   return Math.min(Math.max(Math.trunc(value), messagePageSize), messagePageSize * 20);
@@ -619,6 +623,7 @@ export default function App() {
   function openSettingsHome() {
     setActiveSettingsSection('accounts');
     setSettingsOpen(true);
+    loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
   }
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
@@ -652,7 +657,7 @@ export default function App() {
     setActiveThread(null);
     setThreadMessages([]);
     setSettingsOpen(false);
-    const meta = await loadMeta(null, targetAccountId);
+    const meta = await loadMeta(null, targetAccountId, { mode: 'mailbox' });
     const targetFolder =
       meta.folders.find((folder) => folder.account_id === targetAccountId && folder.role === role) ??
       meta.folders.find((folder) => folder.role === role);
@@ -731,7 +736,7 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    const meta = await loadMeta(null, nextScope);
+    const meta = await loadMeta(null, nextScope, { mode: 'mailbox' });
     const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
     const targetFolder =
       meta.folders.find((folder) => (
@@ -872,18 +877,82 @@ export default function App() {
     return invoke<Message[]>('release_due_snoozed_messages', { now: new Date().toISOString() });
   }
 
-  async function loadMeta(nextFolderId: number | null = folderId, nextScope: AccountScope = accountScope) {
+  async function loadMeta(
+    nextFolderId: number | null = folderId,
+    nextScope: AccountScope = accountScope,
+    options: LoadMetaOptions = {},
+  ) {
     const startedAt = performance.now();
     const nextAccountId = accountIdForScope(nextScope);
+    const mode = options.mode ?? 'full';
     appFlowLog('loadMeta start', {
       requestedFolderId: nextFolderId,
       scope: nextScope,
       accountId: nextAccountId,
+      mode,
     });
     try {
       const released = await releaseDueSnoozedMessages();
       if (released.length > 0) {
         setStatus(`已恢复 ${released.length} 封到期稍后邮件`);
+      }
+      if (mode === 'mailbox') {
+        const [
+          nextAccounts,
+          nextAccount,
+          nextFolders,
+          nextLabels,
+          nextStats,
+          nextSyncRuns,
+          nextIdentities,
+          nextOutbox,
+          nextBackgroundTasks,
+          nextSyncSchedulePlan,
+          nextRemoteImageTrusts,
+          nextImapMailboxes,
+        ] = await Promise.all([
+          invoke<Account[]>('list_accounts'),
+          invoke<Account | null>('get_account', { accountId: nextAccountId }),
+          invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
+          invoke<Label[]>('list_labels'),
+          invoke<MailStats>('get_stats', { accountId: nextAccountId }),
+          invoke<SyncRun[]>('list_sync_runs'),
+          invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
+          invoke<OutboxItem[]>('list_outbox'),
+          invoke<BackgroundTask[]>('list_background_tasks'),
+          invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
+          invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
+          invoke<ImapMailboxState[]>('list_imap_mailboxes'),
+        ]);
+        setAccounts(nextAccounts);
+        setAccount(nextAccount);
+        setAccountForm(nextAccount);
+        setFolders(nextFolders);
+        setLabels(nextLabels);
+        setStats(nextStats);
+        setSyncRuns(nextSyncRuns);
+        setIdentities(nextIdentities);
+        setOutbox(nextOutbox);
+        setBackgroundTasks(nextBackgroundTasks);
+        setSyncSchedulePlan(nextSyncSchedulePlan);
+        setRemoteImageTrusts(nextRemoteImageTrusts);
+        setImapMailboxes(nextImapMailboxes);
+        void updateAppUnreadBadge(nextStats.unread_messages);
+        const resolvedFolderId =
+          nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
+            ? nextFolderId
+            : nextFolders[0]?.id ?? null;
+        setFolderId(resolvedFolderId);
+        appFlowLog('loadMeta done', {
+          accountCount: nextAccounts.length,
+          activeAccountId: nextAccount?.id ?? null,
+          folderCount: nextFolders.length,
+          requestedFolderId: nextFolderId,
+          resolvedFolderId,
+          mode,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        return { folderId: resolvedFolderId, folders: nextFolders };
       }
       const [
         nextAccounts,
@@ -949,6 +1018,7 @@ export default function App() {
         folderCount: nextFolders.length,
         requestedFolderId: nextFolderId,
         resolvedFolderId,
+        mode,
         durationMs: Math.round(performance.now() - startedAt),
       });
       return { folderId: resolvedFolderId, folders: nextFolders };
@@ -1216,7 +1286,7 @@ export default function App() {
     setSelectedId,
     setStatus,
     visibleFolderIdForRole,
-    loadMeta,
+    loadMeta: (fid) => loadMeta(fid, accountScope, { mode: 'mailbox' }),
     loadMessages: (fid) => loadMessages(fid),
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
@@ -1497,7 +1567,7 @@ export default function App() {
       query: query.trim() || null,
       filter,
     });
-    const meta = await loadMeta(folderId);
+    const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
     const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
     await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, refreshLimit);
     if (activeThread) {
@@ -1543,7 +1613,7 @@ export default function App() {
     try {
       const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
       setSyncRuns((current) => [run, ...current].slice(0, 10));
-      const meta = await loadMeta(folderId);
+      const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
       const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
       await loadMessagesWithVisibleFallback(
         meta.folderId,
@@ -1673,7 +1743,7 @@ export default function App() {
     const restoredFolderId = firstSnapshot
       ? visibleFolderIdForRole(firstSnapshot.folder_role, firstSnapshot.account_id) ?? folderId
       : folderId;
-    await loadMeta(restoredFolderId);
+    await loadMeta(restoredFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(restoredFolderId);
     setSelectedId(firstSnapshot?.id ?? null);
     setStatus(`已撤销：${action.title}`);
@@ -1905,7 +1975,7 @@ export default function App() {
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role });
     const targetFolderId = visibleFolderIdForRole(role, selected.account_id) ?? folderId;
-    await loadMeta(targetFolderId);
+    await loadMeta(targetFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(targetFolderId);
     setSelectedId(selected.id);
     setStatus(report.message);
@@ -1916,7 +1986,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role: folder.role });
-    await loadMeta(folder.id);
+    await loadMeta(folder.id, accountScope, { mode: 'mailbox' });
     await loadMessages(folder.id);
     setSelectedId(selected.id);
     setStatus(`已移动到 ${folder.name}`);
@@ -1928,7 +1998,7 @@ export default function App() {
     const undoSnapshots = snapshotMessages([selected]);
     await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
     const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
-    await loadMeta(spamFolderId);
+    await loadMeta(spamFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(spamFolderId);
     setSelectedId(selected.id);
     setStatus('已标为垃圾邮件');
@@ -1940,7 +2010,7 @@ export default function App() {
     const undoSnapshots = snapshotMessages([selected]);
     const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
-    await loadMeta(inboxFolderId);
+    await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
     setSelectedId(result.restored.id);
     setStatus('已移回收件箱，并标记为不是垃圾邮件');
@@ -1952,7 +2022,7 @@ export default function App() {
     const undoSnapshots = snapshotMessages([selected]);
     const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
-    await loadMeta(inboxFolderId);
+    await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
     setSelectedId(result.restored.id);
     setStatus(result.remote.message);
@@ -1985,7 +2055,7 @@ export default function App() {
     }
     const folder = await invoke<Folder>('create_custom_folder', { accountId, name });
     setCustomFolderName('');
-    const { folderId: nextFolderId } = await loadMeta(folderId);
+    const { folderId: nextFolderId } = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
     await loadMessages(nextFolderId);
     setStatus(`已创建文件夹：${folder.name}`);
   }
@@ -2004,7 +2074,7 @@ export default function App() {
     const renamed = await invoke<Folder>('rename_custom_folder', { folderId: folder.id, name });
     setRenamingFolderId(null);
     setRenamingFolderName('');
-    const { folderId: nextFolderId } = await loadMeta(folderId);
+    const { folderId: nextFolderId } = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
     await loadMessages(nextFolderId);
     setStatus(`已重命名文件夹：${renamed.name}`);
   }
@@ -2012,7 +2082,7 @@ export default function App() {
   async function deleteCustomFolder(folder: Folder) {
     await invoke('delete_custom_folder', { folderId: folder.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', folder.account_id);
-    const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
+    const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId, accountScope, { mode: 'mailbox' });
     await loadMessages(nextFolderId);
     setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
   }
@@ -2042,7 +2112,7 @@ export default function App() {
     const undoSnapshots = snapshotMessages([selected]);
     const updated = await invoke<Message>('unsnooze_message', { messageId: selected.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', updated.account_id) ?? folderId;
-    await loadMeta(inboxFolderId);
+    await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
     setSelectedId(updated.id);
     setStatus('已取消稍后处理');
@@ -2371,7 +2441,7 @@ export default function App() {
     const updated = await invoke<OutboxItem>('cancel_outbox_item', { outboxId: item.id });
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
     setPendingSendUndo((current) => (current?.outboxId === item.id ? null : current));
-    await loadMeta(folderId);
+    await loadMeta(folderId, accountScope, { mode: 'mailbox' });
     setStatus('已撤回到草稿箱');
   }
 
@@ -2570,7 +2640,7 @@ export default function App() {
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-    const meta = await loadMeta(null);
+    const meta = await loadMeta(null, accountScope, { mode: 'mailbox' });
     const inboxFolderId =
       meta.folders.find(
         (folder) =>
@@ -2887,7 +2957,7 @@ export default function App() {
         setStatus('正在从服务器同步历史邮件...');
         setLoadMoreStatus('正在从服务器拉取历史邮件...');
         const run = await syncImapHistoryPage(targetMailbox.account_id);
-        const meta = await loadMeta(folderId, accountScope);
+        const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
         const refreshedMessages = await loadMessagesWithVisibleFallback(
           meta.folderId,
           query,

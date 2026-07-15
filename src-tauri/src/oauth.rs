@@ -641,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_token_response_into_keychain_bundle() {
+    fn parses_token_response_into_credential_bundle() {
         let session = OAuthTokenExchangeSession {
             id: 42,
             account_email: "me@example.com".to_string(),

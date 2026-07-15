@@ -170,35 +170,17 @@ export default function ConfirmDialog({
               borderLeft: `3px solid ${danger ? '#ef4444' : '#0ea5e9'}`,
             }}
           >
-            <span
-              style={{
-                fontSize: '14px',
-                color: danger ? '#991b1b' : '#0369a1',
-                fontWeight: 'bold',
-              }}
-            >
+            <span className="confirm-summary-text" style={{ color: danger ? '#991b1b' : '#0369a1' }}>
               {summaryText}
             </span>
           </div>
         )}
-        <p id={descId} style={{ margin: '14px 0', fontSize: '13px', color: '#4b5563', lineHeight: '1.5' }}>
+        <p id={descId} className="confirm-dialog-description">
           {description}
         </p>
         
         {error && (
-          <div
-            style={{
-              margin: '10px 0',
-              padding: '8px 12px',
-              background: '#fef2f2',
-              border: '1px solid #fca5a5',
-              borderRadius: '4px',
-              color: '#991b1b',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              wordBreak: 'break-all'
-            }}
-          >
+          <div className="confirm-dialog-error">
             错误: {error}
           </div>
         )}

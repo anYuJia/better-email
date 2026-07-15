@@ -14,4 +14,7 @@ export default defineConfig({
     target: 'es2020',
     minify: 'esbuild',
   },
+  test: {
+    environment: 'jsdom',
+  },
 });

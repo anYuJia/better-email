@@ -5,6 +5,7 @@ import {
   providerVerificationKey,
   providerVerificationRecordFor,
   shouldRunInitialMailboxSync,
+  handleAccountDeleteFlow,
 } from './useAccountConnectionController';
 
 describe('account connection controller helpers', () => {
@@ -67,43 +68,39 @@ describe('account connection controller helpers', () => {
   });
 
   describe('Credential delete status paths', () => {
-    it('handles status "deleted" by confirming exists is false and status matches', () => {
-      const status = {
-        account_email: 'test@example.com',
-        exists: false,
-        status: 'deleted',
-        message: '本地凭据已删除。'
-      };
-      expect(status.status).toBe('deleted');
-      expect(status.exists).toBe(false);
+    it('handles status "deleted" path calling handleAccountDeleteFlow', () => {
+      const result = handleAccountDeleteFlow('test@example.com', true, { status: 'deleted', message: '已删除。' });
+      expect(result.allowed).toBe(true);
+      expect(result.credentialStatus.exists).toBe(false);
+      expect(result.credentialStatus.status).toBe('deleted');
     });
 
-    it('handles status "not_found" and treats it as a successful scenario allowing account delete', () => {
-      const status = {
-        account_email: 'test@example.com',
-        exists: false,
-        status: 'not_found',
-        message: '本地凭据中未找到对应凭据。'
-      };
-      expect(status.status).toBe('not_found');
-      expect(status.exists).toBe(false);
+    it('handles status "not_found" path calling handleAccountDeleteFlow', () => {
+      const result = handleAccountDeleteFlow('test@example.com', true, { status: 'not_found', message: '未找到。' });
+      expect(result.allowed).toBe(true);
+      expect(result.credentialStatus.exists).toBe(false);
+      expect(result.credentialStatus.status).toBe('not_found');
     });
 
-    it('handles status "failed" causing blocking check', () => {
-      const status = {
-        account_email: 'test@example.com',
-        exists: true,
-        status: 'failed',
-        message: '本地数据库写入拒绝，删除凭据失败。'
-      };
-      expect(status.status).toBe('failed');
-      expect(status.exists).toBe(true);
+    it('handles status "failed" path calling handleAccountDeleteFlow (blocks account delete)', () => {
+      const result = handleAccountDeleteFlow('test@example.com', true, { status: 'failed', message: '删除失败。' });
+      expect(result.allowed).toBe(false);
+      expect(result.credentialStatus.exists).toBe(true);
+      expect(result.credentialStatus.status).toBe('failed');
     });
 
-    it('retains credentials locally when user chooses not to delete', () => {
-      const deleteSecret = false;
-      const finalStatus = deleteSecret ? 'deleted' : 'not_found';
-      expect(finalStatus).toBe('not_found');
+    it('handles status "invalid_input" path calling handleAccountDeleteFlow (blocks account delete)', () => {
+      const result = handleAccountDeleteFlow('test@example.com', true, { status: 'invalid_input', message: '无效输入。' });
+      expect(result.allowed).toBe(false);
+      expect(result.credentialStatus.exists).toBe(true);
+      expect(result.credentialStatus.status).toBe('invalid_input');
+    });
+
+    it('handles preserve credentials path calling handleAccountDeleteFlow when deleteSecret=false', () => {
+      const result = handleAccountDeleteFlow('test@example.com', false, null);
+      expect(result.allowed).toBe(true);
+      expect(result.credentialStatus.exists).toBe(true);
+      expect(result.credentialStatus.status).toBe('exists');
     });
   });
 });

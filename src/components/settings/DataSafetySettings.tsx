@@ -62,7 +62,7 @@ export default function DataSafetySettings({
   return (
     <div className="settings-data-safety">
       <div className="settings-action-bar">
-        <span>敏感凭据只写入系统安全存储，本地数据库仅保存非敏感配置。</span>
+        <span>敏感凭据只写入本地凭据表，本地数据库仅保存非敏感配置。</span>
         <div>
           <button className="secondary" type="button" onClick={onExportDiagnostics}>
             <Download size={14} />
@@ -168,9 +168,9 @@ export default function DataSafetySettings({
               <strong>本地备份与恢复</strong>
               <small>账号配置、邮件、规则、发件箱和同步记录</small>
             </span>
-            <em>{localBackupSummary ? `${localBackupSummary.messages} 封邮件` : '不包含系统凭据'}</em>
+            <em>{localBackupSummary ? `${localBackupSummary.messages} 封邮件` : '不包含本地凭据'}</em>
           </header>
-          <p>密码与 OAuth Token 始终保留在系统安全存储，不会写入备份文件。</p>
+          <p>密码与 OAuth Token 始终保留在本地凭据中，不会写入备份文件。</p>
           <div className="tool-actions settings-backup-actions">
             <button className="secondary" type="button" onClick={onImportEml}>
               <FileInput size={14} />

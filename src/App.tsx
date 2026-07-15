@@ -384,7 +384,7 @@ export default function App() {
   const [confirmDeleteIdentity, setConfirmDeleteIdentity] = useState<MailIdentity | null>(null);
   const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
   const [confirmDeleteLabel, setConfirmDeleteLabel] = useState<Label | null>(null);
-  const [confirmEmptyTrashOpen, setConfirmEmptyTrashOpen] = useState(false);
+  const [confirmEmptyTrashState, setConfirmEmptyTrashState] = useState<{ accountId: number; accountScope: AccountScope; accountName: string } | null>(null);
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<Message | null>(null);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -2067,14 +2067,20 @@ export default function App() {
     setConfirmPermanentlyDelete(message);
   }
 
-  async function emptyCurrentTrashConfirmed() {
-    const report = await invoke<TrashActionReport>('empty_trash', { accountId: accountIdForScope(accountScope) });
+  async function emptyCurrentTrashConfirmed(targetAccountId: number) {
+    const report = await invoke<TrashActionReport>('empty_trash', { accountId: targetAccountId });
     await refreshAll();
     setStatus(report.message);
   }
 
   function emptyCurrentTrash() {
-    setConfirmEmptyTrashOpen(true);
+    const actId = accountIdForScope(accountScope) ?? 0;
+    const act = accounts.find((a) => a.id === actId);
+    setConfirmEmptyTrashState({
+      accountId: actId,
+      accountScope,
+      accountName: act ? `${act.display_name} <${act.email}>` : '当前账号'
+    });
   }
 
   async function createCustomFolder() {
@@ -4059,15 +4065,17 @@ export default function App() {
         onCancel={() => setConfirmDeleteLabel(null)}
       />
       <ConfirmDialog
-        open={confirmEmptyTrashOpen}
+        open={!!confirmEmptyTrashState}
         title="清空废纸篓"
-        summaryText="确认要清空当前账号的废纸篓吗？"
+        summaryText={confirmEmptyTrashState ? `确认要清空账号 "${confirmEmptyTrashState.accountName}" 的废纸篓吗？` : '确认要清空当前账号的废纸篓吗？'}
         description="此操作不可逆。废纸篓中所有已删除的邮件都将被永久从本地和服务器上删除，无法恢复。"
         onConfirm={async () => {
-          await emptyCurrentTrashConfirmed();
-          setConfirmEmptyTrashOpen(false);
+          if (confirmEmptyTrashState) {
+            await emptyCurrentTrashConfirmed(confirmEmptyTrashState.accountId);
+          }
+          setConfirmEmptyTrashState(null);
         }}
-        onCancel={() => setConfirmEmptyTrashOpen(false)}
+        onCancel={() => setConfirmEmptyTrashState(null)}
       />
       <ConfirmDialog
         open={!!confirmPermanentlyDelete}

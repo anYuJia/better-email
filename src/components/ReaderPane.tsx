@@ -41,7 +41,7 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, compareDomains, parseMailtoUrl } from '../mailUtils';
 import ConfirmDialog from './ConfirmDialog';
 import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
@@ -189,7 +189,7 @@ export default function ReaderPane({
   const [newLabelColor, setNewLabelColor] = useState('#2f7ed8');
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
   const [editingLabelName, setEditingLabelName] = useState('');
-  const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
+
   const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
 
   async function handleCreateLabel() {
@@ -832,20 +832,7 @@ export default function ReaderPane({
                 ) : (
                   <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
                 )}
-                {!isDraft && selected.sender_email.trim() && (
-                  <>
-                    <span className="menu-section-title">安全</span>
-                    {!selectedSenderTrusted && (
-                      <button onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
-                    )}
-                    {selectedSenderDomain && !selectedSenderTrusted && (
-                      <button onClick={() => onTrustRemoteImages('domain')}>
-                        信任发件人域名：{selectedSenderDomain}
-                      </button>
-                    )}
-                    <button onClick={onBlockSender}>阻止该发件人</button>
-                  </>
-                )}
+
                 {isTrash && (
                   <>
                     <span className="menu-section-title">删除</span>
@@ -978,7 +965,9 @@ export default function ReaderPane({
                                 title="删除标签"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setLabelToDelete(label);
+                                  if (onDeleteLabel) {
+                                    onDeleteLabel(label.id);
+                                  }
                                 }}
                               >
                                 ✕
@@ -1131,31 +1120,7 @@ export default function ReaderPane({
               )}
             </div>
             {visibleSecurityWarnings.map((warning) => <p key={warning}>{warning}</p>)}
-            {shouldOfferRemoteContent && (
-              <div className="reader-warning-action-row">
-                <button
-                  type="button"
-                  className="reader-warning-primary-action"
-                  onClick={onAllowRemoteImagesOnce}
-                >
-                  查看内容
-                </button>
-                <details className="compact-menu reader-warning-actions">
-                  <summary><SlidersHorizontal size={15} /> 更多</summary>
-                  <div>
-                    {!selectedSenderTrusted && (
-                      <button type="button" onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
-                    )}
-                    {selectedSenderDomain && !selectedSenderTrusted && (
-                      <button type="button" onClick={() => onTrustRemoteImages('domain')}>
-                        信任发件人域名：{selectedSenderDomain}
-                      </button>
-                    )}
-                    <button type="button" onClick={onBlockSender}>阻止该发件人</button>
-                  </div>
-                </details>
-              </div>
-            )}
+
           </div>
         )}
 
@@ -1343,19 +1308,7 @@ export default function ReaderPane({
           ariaLabel="附件操作"
         />
       )}
-      <ConfirmDialog
-        open={!!labelToDelete}
-        title="删除标签"
-        summaryText={labelToDelete ? `确认删除标签 "${labelToDelete.name}" 吗？` : ''}
-        description="删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。"
-        onConfirm={async () => {
-          if (labelToDelete && handleDeleteLabel) {
-            await handleDeleteLabel(labelToDelete.id);
-          }
-          setLabelToDelete(null);
-        }}
-        onCancel={() => setLabelToDelete(null)}
-      />
+
       {clickedLink && createPortal((
         <div
           className="settings-cache-confirm-backdrop"
@@ -1409,12 +1362,17 @@ export default function ReaderPane({
 
                   // Normalize target host
                   let targetHost = linkUrl.hostname.toLowerCase();
-                  targetHost = targetHost.replace(/^www\./, '');
+                  if (targetHost.startsWith('www.')) {
+                    targetHost = targetHost.substring(4);
+                  }
 
-                  // If display text looks like a host/domain name, do exact hostname/subdomain checks
+                  // If display text looks like a host/domain name, do exact hostname/subdomain checks using compareDomains
                   if (displayHost && (displayHost.includes('.') || displayHost.includes(':'))) {
-                    // Exact match check or targetHost ends with "." + displayHost (valid subdomain)
-                    const isMatch = targetHost === displayHost || targetHost.endsWith('.' + displayHost);
+                    let cleanDisplayHost = displayHost;
+                    if (cleanDisplayHost.startsWith('www.')) {
+                      cleanDisplayHost = cleanDisplayHost.substring(4);
+                    }
+                    const isMatch = compareDomains(targetHost, cleanDisplayHost) || targetHost.endsWith('.' + cleanDisplayHost);
                     if (!isMatch) {
                       showDomainWarning = true;
                     }
@@ -1446,9 +1404,9 @@ export default function ReaderPane({
                 type="button"
                 style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 onClick={async () => {
-                  if (clickedLink.href.startsWith('mailto:')) {
-                    // Compose email
-                    onComposeNew?.({ to: clickedLink.href.substring(7) });
+                  if (clickedLink.href.toLowerCase().startsWith('mailto:')) {
+                    const parsed = parseMailtoUrl(clickedLink.href);
+                    onComposeNew?.({ to: parsed.to });
                   } else {
                     await invoke('open_url', { url: clickedLink.href });
                   }

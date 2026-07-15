@@ -73,7 +73,7 @@ function providerCredentialRecommendations(key: ProviderKey, authType: string): 
     return [
       '确认网页版邮箱已开启收信和 SMTP 服务，登录时使用客户端授权码，不使用网页登录密码。',
       '重新生成授权码后等待几分钟再验证，并使用完整邮箱地址作为登录账号。',
-      '撤销曾在聊天、截图或日志中暴露的旧授权码，只在本机系统凭据库中保存新码。',
+      '撤销曾在聊天、截图或日志中暴露的旧授权码，只在本机本地凭据中保存新码。',
     ];
   }
   if (key === 'qq') {
@@ -84,8 +84,7 @@ function providerCredentialRecommendations(key: ProviderKey, authType: string): 
   }
   if (key === 'gmail') {
     return [
-      '推荐切换到 OAuth2；若使用密码模式，需要启用两步验证并创建应用专用密码。',
-      '确认账号未阻止第三方邮件客户端登录。',
+      'Gmail 账号目前只支持 OAuth2 登录，请确认认证方式选择的是 OAuth2。',
     ];
   }
   if (key === 'outlook') {
@@ -178,16 +177,16 @@ export function buildConnectionDiagnosticModel({
     },
     {
       id: 'credential',
-      label: '系统凭据',
+      label: '本地凭据',
       state: credentialState,
       detail: verification?.status === 'credential_error'
-        ? '系统凭据可读取，但服务端拒绝了当前授权信息。'
+        ? '本地凭据可读取，但服务端拒绝了当前授权信息。'
         : verification
-          ? '登录验证已读取系统凭据，未向界面返回敏感内容。'
+          ? '登录验证已读取本地凭据，未向界面返回敏感内容。'
           : !storedCredential
-            ? '尚未检查系统凭据库。'
+            ? '尚未检查本地凭据。'
             : storedCredential.exists
-              ? '授权信息已保存在系统安全存储中。'
+              ? '授权信息已保存在本地凭据中。'
               : '当前账号没有可用凭据，请先保存授权码或 Token。',
     },
     {
@@ -216,7 +215,7 @@ export function buildConnectionDiagnosticModel({
     recommendations.push(
       account.auth_type === 'oauth2'
         ? '完成 OAuth2 授权并保存 Token 后，再运行登录验证。'
-        : '将新生成的应用专用密码或授权码保存到系统凭据库。',
+        : '将新生成的应用专用密码或授权码保存到本地凭据。',
     );
   }
   if (verification?.authenticated) {
@@ -250,7 +249,7 @@ export function buildConnectionDiagnosticModel({
   } else if (network?.ready_for_credentials && storedCredential?.exists) {
     state = 'warning';
     title = '可以开始登录验证';
-    summary = '服务器和系统凭据已准备好，验证过程不会发送邮件。';
+    summary = '服务器和本地凭据已准备好，验证过程不会发送邮件。';
   }
 
   return {

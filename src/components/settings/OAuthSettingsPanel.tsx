@@ -66,7 +66,7 @@ export default function OAuthSettingsPanel({
           <p>
             {authType === 'oauth2'
               ? '用于 Gmail/Outlook PKCE 授权、回调授权码、Token 安全存储、刷新和 XOAUTH2 登录。'
-              : '适用于 QQ、网易和自建邮箱的应用专用密码或授权码，凭据只写入系统安全存储。'}
+              : '适用于 QQ、网易和自建邮箱的应用专用密码或授权码，凭据只写入本地凭据记录中。'}
           </p>
         </div>
       </section>

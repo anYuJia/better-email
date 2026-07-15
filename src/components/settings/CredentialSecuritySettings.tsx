@@ -79,11 +79,11 @@ export default function CredentialSecuritySettings({
     >
       <header className="tool-header">
         <span className="credential-panel-title">
-          <strong>系统凭据库</strong>
+          <strong>本地凭据存储</strong>
           <small>{account.email}</small>
         </span>
         <em className={activeCredentialStatus?.exists ? 'stored' : ''}>
-          {activeCredentialStatus?.exists ? '已安全保存' : '等待本机凭据'}
+          {activeCredentialStatus?.exists ? '已保存到本地' : '等待本地凭据'}
         </em>
       </header>
 
@@ -171,7 +171,7 @@ export default function CredentialSecuritySettings({
         </button>
         <button
           data-credential-primary-action
-          title={hasSecret ? '保存到系统凭据库后立即验证 IMAP 与 SMTP 登录' : '验证已保存的 IMAP 与 SMTP 凭据'}
+          title={hasSecret ? '保存到本地数据库后立即验证 IMAP 与 SMTP 登录' : '验证已保存的 IMAP 与 SMTP 凭据'}
           type="button"
           onClick={hasSecret ? onStoreAndVerifyCredential : onVerifyCredential}
         >

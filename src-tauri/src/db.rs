@@ -169,17 +169,20 @@ impl MailStore {
             path.display(),
             should_seed_demo_data,
         ));
-        let is_new = !path.exists();
         let conn = Connection::open(&path)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if is_new {
-                if let Ok(metadata) = std::fs::metadata(&path) {
-                    let mut permissions = metadata.permissions();
+            if let Ok(metadata) = std::fs::metadata(&path) {
+                let mut permissions = metadata.permissions();
+                if permissions.mode() & 0o777 != 0o600 {
                     permissions.set_mode(0o600); // User read & write only
-                    let _ = std::fs::set_permissions(&path, permissions);
+                    if let Err(error) = std::fs::set_permissions(&path, permissions) {
+                        eprintln!("[better-email][db][warning] Failed to enforce 0o600 database file permissions: {}", error);
+                    }
                 }
+            } else {
+                eprintln!("[better-email][db][warning] Failed to read database metadata to check permissions");
             }
         }
         let store = Self {
@@ -10692,5 +10695,50 @@ mod tests {
         assert!(refreshed.local_path.is_empty());
         assert_eq!(cleared.storage.reclaimable_cache_bytes, 0);
         assert!(cleared.storage.local_attachment_bytes > 0);
+    }
+
+    #[test]
+    fn local_backup_excludes_sensitive_columns_and_credentials_table() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test-backup-safety.sqlite3");
+        let store = MailStore::open_at(db_path).unwrap();
+
+        // 1. Create a mock account to satisfy foreign keys
+        store.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO accounts(id, email, display_name, provider, created_at)
+                 VALUES (999, 'test@example.com', 'Test User', 'gmail', '2026-07-15')",
+                []
+            )?;
+            conn.execute(
+                "INSERT INTO account_credentials(account_email, secret, updated_at) VALUES ('test@example.com', 'SUPER_SECRET_PASSWORD', '2026-07-15')",
+                []
+            )?;
+            conn.execute(
+                "INSERT INTO oauth_sessions(account_id, provider, authorization_url, redirect_uri, state, code_challenge, code_verifier, scopes, authorization_code, status, created_at)
+                 VALUES (999, 'gmail', 'http://url', 'http://127.0.0.1', 'state_val', 'challenge', 'verifier', '[]', 'AUTH_CODE_LEAK', 'completed', '2026-07-15')",
+                []
+            )?;
+            Ok(())
+        }).unwrap();
+
+        // 2. Export local backup
+        let backup = store.export_local_backup().unwrap();
+
+        // 3. Exclude checking account_credentials table entirely
+        assert!(!backup.tables.contains_key("account_credentials"));
+
+        // 4. Check for 'secret' or 'authorization_code' columns in oauth_sessions or accounts
+        if let Some(oauth_rows) = backup.tables.get("oauth_sessions") {
+            for row in oauth_rows {
+                assert!(!row.contains_key("authorization_code"));
+                assert!(!row.contains_key("secret"));
+                for val in row.values() {
+                    let val_str = format!("{:?}", val);
+                    assert!(!val_str.contains("AUTH_CODE_LEAK"));
+                    assert!(!val_str.contains("SUPER_SECRET_PASSWORD"));
+                }
+            }
+        }
     }
 }

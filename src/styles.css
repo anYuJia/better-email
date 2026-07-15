@@ -6385,3 +6385,93 @@ h1 {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ConfirmDialog Styles */
+.settings-cache-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-cache-confirm {
+  width: 440px;
+  max-width: 90vw;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+}
+
+.settings-cache-confirm header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-cache-confirm-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+}
+
+.settings-cache-confirm header span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.settings-cache-confirm header strong {
+  font-size: 15px;
+  color: #111827;
+}
+
+.settings-cache-confirm header small {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.settings-cache-confirm-summary {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-cache-confirm footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.confirm-dialog-description {
+  margin: 14px 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.confirm-dialog-error {
+  margin: 10px 0;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: bold;
+  word-break: break-all;
+}
+
+.confirm-summary-text {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+

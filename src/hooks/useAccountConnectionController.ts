@@ -36,6 +36,92 @@ function maskEmailForLog(value: string) {
   return `${local[0] ?? '*'}***@${domain}`;
 }
 
+export interface DeleteFlowResult {
+  allowed: boolean;
+  credentialStatus: {
+    account_email: string;
+    exists: boolean;
+    status: 'deleted' | 'not_found' | 'failed' | 'invalid_input' | 'exists';
+    message: string;
+  };
+}
+
+export function handleAccountDeleteFlow(
+  email: string,
+  deleteSecret: boolean,
+  backendResult: { status: 'deleted' | 'not_found' | 'failed' | 'invalid_input'; message?: string } | null
+): DeleteFlowResult {
+  if (!deleteSecret) {
+    return {
+      allowed: true,
+      credentialStatus: {
+        account_email: email,
+        exists: true,
+        status: 'exists',
+        message: '账号已成功移除；本地凭据已保留。'
+      }
+    };
+  }
+
+  if (!backendResult) {
+    return {
+      allowed: false,
+      credentialStatus: {
+        account_email: email,
+        exists: true,
+        status: 'failed',
+        message: '本地凭据删除失败：未收到有效的后台响应'
+      }
+    };
+  }
+
+  if (backendResult.status === 'deleted') {
+    return {
+      allowed: true,
+      credentialStatus: {
+        account_email: email,
+        exists: false,
+        status: 'deleted',
+        message: backendResult.message || '账号及本地凭据已成功移除。'
+      }
+    };
+  }
+
+  if (backendResult.status === 'not_found') {
+    return {
+      allowed: true,
+      credentialStatus: {
+        account_email: email,
+        exists: false,
+        status: 'not_found',
+        message: backendResult.message || '账号已移除；本地数据库未找到对应凭据。'
+      }
+    };
+  }
+
+  if (backendResult.status === 'invalid_input') {
+    return {
+      allowed: false,
+      credentialStatus: {
+        account_email: email,
+        exists: true,
+        status: 'invalid_input',
+        message: backendResult.message || '输入无效，操作被阻止。'
+      }
+    };
+  }
+
+  return {
+    allowed: false,
+    credentialStatus: {
+      account_email: email,
+      exists: true,
+      status: 'failed',
+      message: backendResult.message || '本地凭据删除失败，操作被阻止。'
+    }
+  };
+}
+
 function accountFlowLog(event: string, details: Record<string, unknown> = {}) {
   flowInfo('account-flow', event, details);
 }
@@ -245,7 +331,7 @@ export default function useAccountConnectionController({
       });
       let verification: CredentialVerificationReport | null = null;
       if (trimmedSecret) {
-        onProgress?.('正在安全存储本机加密凭据...');
+        onProgress?.('正在保存本机本地凭据...');
         await new Promise((resolve) => setTimeout(resolve, 600));
         const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
           input: { account_email: created.email, secret: trimmedSecret },
@@ -399,31 +485,40 @@ export default function useAccountConnectionController({
       email: maskEmailForLog(removedAccount.email),
       deleteSecret,
     });
+
+    let backendResult: CredentialStatus | null = null;
     if (deleteSecret) {
       try {
-        const result = await invoke<CredentialStatus>('delete_account_secret', { accountEmail: removedAccount.email });
-        if (result.status === 'failed') {
-          throw new Error(result.message || '本地凭据删除失败');
-        }
-        accountFlowLog('credential deleted after account removal', {
-          email: maskEmailForLog(removedAccount.email),
-        });
+        backendResult = await invoke<CredentialStatus>('delete_account_secret', { accountEmail: removedAccount.email });
       } catch (e) {
         const errMsg = String(e);
         accountFlowWarn('failed to delete credential during account removal', {
           email: maskEmailForLog(removedAccount.email),
           error: errMsg,
         });
-        setCredentialStatus({
-          account_email: removedAccount.email,
-          exists: true,
-          status: 'failed',
-          message: `本地凭据移除失败，操作被阻止：${errMsg}`,
-        });
+        const errorResult = handleAccountDeleteFlow(removedAccount.email, deleteSecret, { status: 'failed', message: errMsg });
+        setCredentialStatus(errorResult.credentialStatus);
         setStatus(`凭据删除失败：${errMsg}`);
         throw e; // Block deletion
       }
     }
+
+    const flowResult = handleAccountDeleteFlow(
+      removedAccount.email,
+      deleteSecret,
+      backendResult
+        ? {
+            status: backendResult.status as 'deleted' | 'not_found' | 'failed' | 'invalid_input',
+            message: backendResult.message,
+          }
+        : null
+    );
+    if (!flowResult.allowed) {
+      setCredentialStatus(flowResult.credentialStatus);
+      setStatus(flowResult.credentialStatus.message);
+      throw new Error(flowResult.credentialStatus.message);
+    }
+
     // Perform account database removal
     let nextAccount: Account | null = null;
     try {
@@ -442,12 +537,7 @@ export default function useAccountConnectionController({
       removedAccountId: removedAccount.id,
       nextAccountId: nextAccount?.id ?? null,
     });
-    setCredentialStatus({
-      account_email: removedAccount.email,
-      exists: false,
-      status: deleteSecret ? 'deleted' : 'not_found',
-      message: deleteSecret ? '账号及本地凭据已成功移除。' : '账号已成功移除；本地凭据已保留。',
-    });
+    setCredentialStatus(flowResult.credentialStatus);
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));
     setAccountScope(nextAccount?.id ?? 'all');
     setAccount(nextAccount);

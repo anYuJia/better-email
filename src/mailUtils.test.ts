@@ -18,6 +18,8 @@ import {
   bodyLooksLikeHtml,
   htmlHasRenderableContent,
   htmlHasRemoteVisualContent,
+  parseMailtoUrl,
+  compareDomains,
 } from './mailUtils';
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
@@ -373,10 +375,39 @@ describe('mail UI utilities', () => {
       expect(htmlHasRemoteVisualContent('<td background="https://example.com/bg.png"></td>')).toBe(true);
       // inline css background-image
       expect(htmlHasRemoteVisualContent('<div style="background-image: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
+      // inline css background
       expect(htmlHasRemoteVisualContent('<div style="background: url(\'https://example.com/bg.png\')"></div>')).toBe(true);
       // negative cases
       expect(htmlHasRemoteVisualContent('<img src="cid:local.png">')).toBe(false);
       expect(htmlHasRemoteVisualContent('<img src="/local/path.png">')).toBe(false);
+    });
+  });
+
+  describe('parseMailtoUrl and compareDomains tests', () => {
+    it('parses mailto urls correctly handling multiple query params', () => {
+      const parsed = parseMailtoUrl('mailto:alice@example.com?to=bob@example.com&cc=charlie@example.com&bcc=david@example.com&subject=Hello%20World&body=Hello%20body');
+      expect(parsed.to).toBe('alice@example.com,bob@example.com');
+      expect(parsed.cc).toBe('charlie@example.com');
+      expect(parsed.bcc).toBe('david@example.com');
+      expect(parsed.subject).toBe('Hello World');
+      expect(parsed.body).toBe('Hello body');
+    });
+
+    it('ignores case for mailto scheme', () => {
+      const parsed = parseMailtoUrl('MAILTO:alice@example.com');
+      expect(parsed.to).toBe('alice@example.com');
+    });
+
+    it('clears control characters and tolerates encoding errors', () => {
+      const parsed = parseMailtoUrl('mailto:alice@example.com\x00\x1f?subject=%C2');
+      expect(parsed.to).toBe('alice@example.com');
+      expect(parsed.subject).toBe('%C2');
+    });
+
+    it('compares domains ignoring www differences and avoiding partial matching issues', () => {
+      expect(compareDomains('www.paypal.com', 'paypal.com')).toBe(true);
+      expect(compareDomains('paypal.com', 'paypal.com.evil.example')).toBe(false);
+      expect(compareDomains('paypal.com', 'PAYPAL.COM')).toBe(true);
     });
   });
 });

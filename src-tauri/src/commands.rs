@@ -1761,7 +1761,7 @@ fn verify_incoming_credentials(
 
 fn credential_error_report(account: &Account, error: String) -> CredentialVerificationReport {
     let incoming_name = incoming_protocol_name(account);
-    let message = format!("系统凭据不可用，未发起 {incoming_name}/SMTP 登录验证：{error}");
+    let message = format!("本地凭据不可用，未发起 {incoming_name}/SMTP 登录验证：{error}");
     CredentialVerificationReport {
         account_email: account.email.clone(),
         checked_at: Utc::now().to_rfc3339(),
@@ -1770,13 +1770,13 @@ fn credential_error_report(account: &Account, error: String) -> CredentialVerifi
                 name: incoming_name.to_string(),
                 address: account.imap_host.clone(),
                 authenticated: false,
-                message: "未发起登录：系统凭据不可用。".to_string(),
+                message: "未发起登录：本地凭据不可用。".to_string(),
             },
             CredentialProtocolCheck {
                 name: "SMTP".to_string(),
                 address: account.smtp_host.clone(),
                 authenticated: false,
-                message: "未发起登录：系统凭据不可用。".to_string(),
+                message: "未发起登录：本地凭据不可用。".to_string(),
             },
         ],
         authenticated: false,
@@ -1807,7 +1807,7 @@ fn credential_verification_report(
         ),
         _ => (
             "error",
-            format!("{incoming_name} 与 SMTP 登录均未通过，请先确认系统凭据和服务商设置。"),
+            format!("{incoming_name} 与 SMTP 登录均未通过，请先确认本地凭据和服务商设置。"),
         ),
     };
     CredentialVerificationReport {
@@ -2583,7 +2583,7 @@ fn sync_remote_seen(
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地已更新；无法读取系统凭据，远端已读回写已跳过：{error}"
+                "本地已更新；无法读取本地凭据，远端已读回写已跳过：{error}"
             )));
         }
     };
@@ -2620,7 +2620,7 @@ fn sync_remote_flagged(
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地星标已更新；无法读取系统凭据，远端星标回写已跳过：{error}"
+                "本地星标已更新；无法读取本地凭据，远端星标回写已跳过：{error}"
             )));
         }
     };
@@ -2660,7 +2660,7 @@ fn sync_remote_move(
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地已移动；无法读取系统凭据，远端移动已跳过：{error}"
+                "本地已移动；无法读取本地凭据，远端移动已跳过：{error}"
             )));
         }
     };
@@ -2745,7 +2745,7 @@ fn sync_remote_delete_reference(
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "{local_action}；无法读取系统凭据，远端删除已跳过：{error}"
+                "{local_action}；无法读取本地凭据，远端删除已跳过：{error}"
             )));
         }
     };

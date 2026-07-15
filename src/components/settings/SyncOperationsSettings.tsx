@@ -124,7 +124,7 @@ export default function SyncOperationsSettings({
             </button>
           </header>
           {!imapProbe ? (
-            <p className="settings-empty-state">保存系统凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
+            <p className="settings-empty-state">保存本地凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
           ) : (
             <>
               <div className={imapProbe.status === 'ok' ? 'tool-row ok' : 'tool-row warn'}>

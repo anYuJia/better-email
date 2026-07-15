@@ -436,3 +436,72 @@ export function htmlHasRemoteVisualContent(html: string): boolean {
     || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
     || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
 }
+
+export type MailtoParsed = {
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  body: string;
+};
+
+export function parseMailtoUrl(url: string): MailtoParsed {
+  const result: MailtoParsed = { to: '', cc: '', bcc: '', subject: '', body: '' };
+  
+  const cleanUrl = url.replace(/[\x00-\x1F\x7F]/g, '');
+  if (!cleanUrl.toLowerCase().startsWith('mailto:')) {
+    return result;
+  }
+  
+  const rawParts = cleanUrl.substring(7);
+  const [toPart, queryPart] = rawParts.split('?');
+  
+  if (toPart) {
+    try {
+      result.to = decodeURIComponent(toPart);
+    } catch {
+      result.to = toPart;
+    }
+  }
+  
+  if (queryPart) {
+    const params = queryPart.split('&');
+    for (const param of params) {
+      const [key, value] = param.split('=');
+      if (!key) continue;
+      
+      const cleanKey = key.trim().toLowerCase();
+      let decodedValue = '';
+      try {
+        decodedValue = decodeURIComponent(value || '');
+      } catch {
+        decodedValue = value || '';
+      }
+      
+      if (cleanKey === 'to') {
+        result.to = result.to ? `${result.to},${decodedValue}` : decodedValue;
+      } else if (cleanKey === 'cc') {
+        result.cc = result.cc ? `${result.cc},${decodedValue}` : decodedValue;
+      } else if (cleanKey === 'bcc') {
+        result.bcc = result.bcc ? `${result.bcc},${decodedValue}` : decodedValue;
+      } else if (cleanKey === 'subject') {
+        result.subject = decodedValue;
+      } else if (cleanKey === 'body') {
+        result.body = decodedValue;
+      }
+    }
+  }
+  
+  return result;
+}
+
+export function compareDomains(domainA: string, domainB: string): boolean {
+  const normalize = (domain: string) => {
+    let clean = domain.trim().toLowerCase();
+    if (clean.startsWith('www.')) {
+      clean = clean.substring(4);
+    }
+    return clean;
+  };
+  return normalize(domainA) === normalize(domainB);
+}

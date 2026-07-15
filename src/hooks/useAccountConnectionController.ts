@@ -401,15 +401,27 @@ export default function useAccountConnectionController({
     });
     if (deleteSecret) {
       try {
-        await invoke('delete_account_secret', { accountEmail: removedAccount.email });
+        const result = await invoke<CredentialStatus>('delete_account_secret', { accountEmail: removedAccount.email });
+        if (result.status === 'failed') {
+          throw new Error(result.message || 'Keychain 凭据删除失败');
+        }
         accountFlowLog('credential deleted after account removal', {
           email: maskEmailForLog(removedAccount.email),
         });
       } catch (e) {
+        const errMsg = String(e);
         accountFlowWarn('failed to delete credential during account removal', {
           email: maskEmailForLog(removedAccount.email),
-          error: String(e),
+          error: errMsg,
         });
+        setCredentialStatus({
+          account_email: removedAccount.email,
+          exists: true,
+          status: 'failed',
+          message: `Keychain 凭据移除失败，操作被阻止：${errMsg}`,
+        });
+        setStatus(`凭据删除失败：${errMsg}`);
+        throw e; // Block deletion
       }
     }
     const nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
@@ -420,6 +432,7 @@ export default function useAccountConnectionController({
     setCredentialStatus({
       account_email: removedAccount.email,
       exists: false,
+      status: deleteSecret ? 'deleted' : 'not_found',
       message: deleteSecret ? '账号及 Keychain 凭据已成功移除。' : '账号已成功移除；Keychain 凭据已保留。',
     });
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));

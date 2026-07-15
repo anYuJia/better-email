@@ -34,55 +34,6 @@ export default function ComposerQuickTools({
   return (
     <section className="composer-quick-tools" aria-label="写信常用工具">
       <div className="composer-quick-toolbar">
-        <div className="composer-rich-toggle">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={richComposer}
-              onChange={(event) => onRichComposerChange(event.target.checked)}
-            />
-            富文本 HTML
-          </label>
-          {richComposer && (
-            <div className="rich-toolbar">
-              <button
-                type="button"
-                title="加粗"
-                aria-label="加粗 B"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<strong>加粗文字</strong>`,
-                  body: `${draft.body}加粗文字`,
-                })}
-              >
-                <Bold size={14} />
-                <span>B</span>
-              </button>
-              <button
-                type="button"
-                title="斜体"
-                aria-label="斜体 I"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<em>斜体文字</em>`,
-                  body: `${draft.body}斜体文字`,
-                })}
-              >
-                <Italic size={14} />
-                <span>I</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<ul><li>列表项</li></ul>`,
-                  body: `${draft.body}\n- 列表项`,
-                })}
-              >
-                <List size={14} />
-                列表
-              </button>
-            </div>
-          )}
-        </div>
-
         <div className="composer-signature">
           <button type="button" onClick={onInsertSignature} title={signature || '当前发件身份未设置签名'}>
             <FileSignature size={15} />
@@ -113,15 +64,6 @@ export default function ComposerQuickTools({
           </div>
         </div>
       </div>
-
-      {richComposer && (
-        <textarea
-          className="composer-html-source"
-          value={draft.html_body}
-          onChange={(event) => onPatchDraft({ html_body: event.target.value })}
-          placeholder="HTML 正文，将在保存和发送前清洗"
-        />
-      )}
     </section>
   );
 }

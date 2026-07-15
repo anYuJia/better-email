@@ -14,6 +14,7 @@ import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
+import ConfirmDialog from './components/ConfirmDialog';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
@@ -379,6 +380,11 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const refreshNoticeTimeoutRef = useRef<number | null>(null);
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<Folder | null>(null);
+  const [confirmDeleteIdentity, setConfirmDeleteIdentity] = useState<MailIdentity | null>(null);
+  const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
+  const [confirmEmptyTrashOpen, setConfirmEmptyTrashOpen] = useState(false);
+  const [confirmPermanentlyDeleteOpen, setConfirmPermanentlyDeleteOpen] = useState(false);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
@@ -415,6 +421,8 @@ export default function App() {
     mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
+    confirmDeleteContact: contactToDeleteFromHook,
+    setConfirmDeleteContact: setContactToDeleteFromHook,
   } = useContactManagement({ setStatus, setNotificationPolicy });
   const {
     oauthClientId,
@@ -2041,17 +2049,26 @@ export default function App() {
     queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
   }
 
-  async function permanentlyDeleteSelected() {
+  async function permanentlyDeleteSelectedConfirmed() {
     if (!selected) return;
     const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: selected.id });
     await refreshAll();
     setStatus(report.message);
   }
 
-  async function emptyCurrentTrash() {
+  function permanentlyDeleteSelected() {
+    if (!selected) return;
+    setConfirmPermanentlyDeleteOpen(true);
+  }
+
+  async function emptyCurrentTrashConfirmed() {
     const report = await invoke<TrashActionReport>('empty_trash', { accountId: accountIdForScope(accountScope) });
     await refreshAll();
     setStatus(report.message);
+  }
+
+  function emptyCurrentTrash() {
+    setConfirmEmptyTrashOpen(true);
   }
 
   async function createCustomFolder() {
@@ -2091,12 +2108,16 @@ export default function App() {
     setStatus(`已重命名文件夹：${renamed.name}`);
   }
 
-  async function deleteCustomFolder(folder: Folder) {
+  async function deleteCustomFolderConfirmed(folder: Folder) {
     await invoke('delete_custom_folder', { folderId: folder.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', folder.account_id);
     const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId, accountScope, { mode: 'mailbox' });
     await loadMessages(nextFolderId);
     setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
+  }
+
+  function deleteCustomFolder(folder: Folder) {
+    setConfirmDeleteFolder(folder);
   }
 
   async function markFolderRead(folder: Folder) {
@@ -2286,10 +2307,14 @@ export default function App() {
     setStatus(`正在编辑发件身份：${identity.email}`);
   }
 
-  async function deleteIdentity(identity: MailIdentity) {
+  async function deleteIdentityConfirmed(identity: MailIdentity) {
     await invoke('delete_identity', { identityId: identity.id });
     setIdentities((current) => current.filter((item) => item.id !== identity.id));
     setStatus(`发件身份已删除：${identity.email}`);
+  }
+
+  function deleteIdentity(identity: MailIdentity) {
+    setConfirmDeleteIdentity(identity);
   }
 
   async function saveDraft() {
@@ -2816,7 +2841,7 @@ export default function App() {
     setStatus(`正在编辑规则：${rule.name}`);
   }
 
-  async function removeRule(rule: MailRule) {
+  async function removeRuleConfirmed(rule: MailRule) {
     await invoke('delete_rule', { ruleId: rule.id });
     setRules((current) => current.filter((item) => item.id !== rule.id));
     if (editingRuleId === rule.id) {
@@ -2826,6 +2851,10 @@ export default function App() {
       setRuleBuilderNeedle('');
     }
     setStatus(`规则已删除：${rule.name}`);
+  }
+
+  function removeRule(rule: MailRule) {
+    setConfirmDeleteRule(rule);
   }
 
   function updateRuleConditionField(field: RuleConditionField) {
@@ -3389,12 +3418,18 @@ export default function App() {
           setStatus(isFavorite ? `已固定到常用邮箱：${folder.name}` : `已从常用邮箱移除：${folder.name}`);
         }}
         onRenamingFolderNameChange={setRenamingFolderName}
-        onRenameFolder={(folder) => { renameCustomFolder(folder).catch((error) => setStatus(String(error))); }}
+        onRenameFolder={(folder) => {
+          try {
+            renameCustomFolder(folder).catch((error) => setStatus(String(error)));
+          } catch (error) {
+            setStatus(String(error));
+          }
+        }}
         onCancelRename={() => setRenamingFolderId(null)}
         onStartRename={startRenameCustomFolder}
-        onDeleteFolder={(folder) => { deleteCustomFolder(folder).catch((error) => setStatus(String(error))); }}
+        onDeleteFolder={(folder) => { deleteCustomFolder(folder); }}
         onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
-        onEmptyTrash={() => { emptyCurrentTrash().catch((error) => setStatus(String(error))); }}
+        onEmptyTrash={() => { emptyCurrentTrash(); }}
         onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
@@ -3803,7 +3838,7 @@ export default function App() {
               onStartEditContact={startEditContact}
               onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
               onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
-              onDeleteContact={(contact) => { deleteManagedContact(contact).catch((error) => setStatus(String(error))); }}
+              onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
               onMergeSourceChange={setMergeSourceContactId}
               onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
               onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
@@ -3825,7 +3860,7 @@ export default function App() {
               onSaveRule={() => { saveRule().catch((error) => setStatus(String(error))); }}
               onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
               onEditRule={editRule}
-              onRemoveRule={(rule) => { removeRule(rule).catch((error) => setStatus(String(error))); }}
+              onRemoveRule={(rule) => { removeRule(rule); }}
             />
             )}
             {activeSettingsSection === 'security-preview' && (
@@ -3952,6 +3987,80 @@ export default function App() {
           </section>
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDeleteFolder}
+        title="删除文件夹"
+        summaryText={confirmDeleteFolder ? `确认删除自定义文件夹 "${confirmDeleteFolder.name}" 吗？` : ''}
+        description="该操作不可逆。删除后文件夹内的邮件将被移回到收件箱中，以便保留邮件。"
+        onConfirm={async () => {
+          if (confirmDeleteFolder) {
+            await deleteCustomFolderConfirmed(confirmDeleteFolder);
+          }
+          setConfirmDeleteFolder(null);
+        }}
+        onCancel={() => setConfirmDeleteFolder(null)}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteIdentity}
+        title="删除发件身份"
+        summaryText={confirmDeleteIdentity ? `确认删除身份 "${confirmDeleteIdentity.name} <${confirmDeleteIdentity.email}>" 吗？` : ''}
+        description="该操作不可逆。删除身份后您将不能再使用此身份写信，但不会删除该邮箱账号下的任何邮件。"
+        onConfirm={async () => {
+          if (confirmDeleteIdentity) {
+            await deleteIdentityConfirmed(confirmDeleteIdentity);
+          }
+          setConfirmDeleteIdentity(null);
+        }}
+        onCancel={() => setConfirmDeleteIdentity(null)}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteRule}
+        title="删除规则"
+        summaryText={confirmDeleteRule ? `确认删除邮件规则 "${confirmDeleteRule.name}" 吗？` : ''}
+        description="该操作不可逆。删除后将不会再自动对新邮件执行此规则对应的分类动作。"
+        onConfirm={async () => {
+          if (confirmDeleteRule) {
+            await removeRuleConfirmed(confirmDeleteRule);
+          }
+          setConfirmDeleteRule(null);
+        }}
+        onCancel={() => setConfirmDeleteRule(null)}
+      />
+      <ConfirmDialog
+        open={!!contactToDeleteFromHook}
+        title="删除联系人"
+        summaryText={contactToDeleteFromHook ? `确认删除联系人 "${contactToDeleteFromHook.name || contactToDeleteFromHook.email}" 吗？` : ''}
+        description="该操作不可逆。删除此联系人不会删除与该发件人的往来邮件，但会删除该联系人的备注、别名等数据。"
+        onConfirm={async () => {
+          if (contactToDeleteFromHook) {
+            await deleteManagedContact(contactToDeleteFromHook);
+          }
+          setContactToDeleteFromHook(null);
+        }}
+        onCancel={() => setContactToDeleteFromHook(null)}
+      />
+      <ConfirmDialog
+        open={confirmEmptyTrashOpen}
+        title="清空废纸篓"
+        summaryText="确认要清空当前账号的废纸篓吗？"
+        description="此操作不可逆。废纸篓中所有已删除的邮件都将被永久从本地和服务器上删除，无法恢复。"
+        onConfirm={async () => {
+          await emptyCurrentTrashConfirmed();
+          setConfirmEmptyTrashOpen(false);
+        }}
+        onCancel={() => setConfirmEmptyTrashOpen(false)}
+      />
+      <ConfirmDialog
+        open={confirmPermanentlyDeleteOpen}
+        title="永久删除邮件"
+        summaryText="确认要永久删除选中的这封邮件吗？"
+        description="此操作不可逆。这封邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
+        onConfirm={async () => {
+          await permanentlyDeleteSelectedConfirmed();
+          setConfirmPermanentlyDeleteOpen(false);
+        }}
+        onCancel={() => setConfirmPermanentlyDeleteOpen(false)}
+      />
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );

@@ -8,7 +8,6 @@
     "core:window:allow-set-badge-count",
     "core:window:allow-set-badge-label",
     "dialog:default",
-    "shell:allow-open",
     "notification:default"
   ]
 }

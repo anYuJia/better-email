@@ -2385,6 +2385,7 @@ pub fn store_account_secret(
         Err(error) => CredentialStatus {
             account_email: input.account_email.trim().to_ascii_lowercase(),
             exists: false,
+            status: "failed".to_string(),
             message: error.to_string(),
         },
     };
@@ -2407,6 +2408,7 @@ pub fn check_account_secret(
         Err(error) => CredentialStatus {
             account_email: account_email.trim().to_ascii_lowercase(),
             exists: false,
+            status: "failed".to_string(),
             message: error.to_string(),
         },
     }
@@ -2426,6 +2428,7 @@ pub fn delete_account_secret(
         Err(error) => CredentialStatus {
             account_email: account_email.trim().to_ascii_lowercase(),
             exists: false,
+            status: "failed".to_string(),
             message: error.to_string(),
         },
     };
@@ -2538,8 +2541,18 @@ pub fn refresh_oauth2_token(
 #[tauri::command]
 #[allow(deprecated)]
 pub fn open_url(app: AppHandle, url: String) -> MailResult<()> {
+    let parsed = tauri::Url::parse(&url).map_err(|error| {
+        crate::db::MailError::Imap(format!("无效的 URL 格式：{error}"))
+    })?;
+    let scheme = parsed.scheme().to_ascii_lowercase();
+    if scheme != "http" && scheme != "https" {
+        return Err(crate::db::MailError::Imap(format!(
+            "拒绝打开非安全协议：{}。只允许使用 http 和 https 协议。",
+            scheme
+        )));
+    }
     app.shell()
-        .open(url, None)
+        .open(parsed.as_str().to_string(), None)
         .map_err(|error| crate::db::MailError::Imap(format!("无法打开 URL: {error}")))?;
     Ok(())
 }
@@ -3553,4 +3566,35 @@ pub fn save_temp_attachment(
     std::fs::write(&file_path, bytes)?;
 
     Ok(file_path.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod open_url_tests {
+    use super::*;
+
+    fn validate_url_scheme(url_str: &str) -> Result<String, String> {
+        let parsed = tauri::Url::parse(url_str).map_err(|error| error.to_string())?;
+        let scheme = parsed.scheme().to_ascii_lowercase();
+        if scheme != "http" && scheme != "https" {
+            return Err(format!("Rejected scheme: {scheme}"));
+        }
+        Ok(parsed.as_str().to_string())
+    }
+
+    #[test]
+    fn test_valid_http_https_url() {
+        assert!(validate_url_scheme("http://example.com/").is_ok());
+        assert!(validate_url_scheme("https://paypal.com/login").is_ok());
+        assert!(validate_url_scheme("HTTPS://google.com").is_ok());
+    }
+
+    #[test]
+    fn test_invalid_and_blocked_protocols() {
+        assert!(validate_url_scheme("file:///etc/passwd").is_err());
+        assert!(validate_url_scheme("data:text/html,<html>").is_err());
+        assert!(validate_url_scheme("javascript:alert(1)").is_err());
+        assert!(validate_url_scheme("ftp://ftp.example.com").is_err());
+        assert!(validate_url_scheme("custom://some/path").is_err());
+        assert!(validate_url_scheme("invalid-url-string").is_err());
+    }
 }

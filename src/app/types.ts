@@ -448,6 +448,7 @@ export type OutboxItem = {
 export type CredentialStatus = {
   account_email: string;
   exists: boolean;
+  status: string;
   message: string;
 };
 

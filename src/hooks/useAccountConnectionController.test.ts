@@ -59,4 +59,12 @@ describe('account connection controller helpers', () => {
     expect(shouldRunInitialMailboxSync('imap', true, false)).toBe(false);
     expect(shouldRunInitialMailboxSync('unknown', true, true)).toBe(false);
   });
+
+  it('updates provider verification record maps and keeps status checks', () => {
+    const record = providerVerificationRecordFor('Gmail', {});
+    expect(record.provider_key).toBe('gmail');
+    expect(record.status).toBe('untested');
+  });
 });
+
+

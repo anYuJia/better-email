@@ -6,6 +6,7 @@ interface EmailShadowViewProps {
   onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
   onContextMenuCapture?: (event: React.MouseEvent<HTMLDivElement>) => void;
   className?: string;
+  onLinkClick?: (href: string, text: string) => void;
 }
 
 export default function EmailShadowView({
@@ -14,6 +15,7 @@ export default function EmailShadowView({
   onContextMenu,
   onContextMenuCapture,
   className,
+  onLinkClick,
 }: EmailShadowViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
@@ -71,8 +73,12 @@ export default function EmailShadowView({
     `;
 
     shadowRoot.innerHTML = `<style>${styleContent}</style><div>${html}</div>`;
+  }, [html]);
 
-    // Intercept clicks on links inside Shadow Root to prevent webview navigation
+  useEffect(() => {
+    const shadowRoot = shadowRootRef.current;
+    if (!shadowRoot) return;
+
     const handleLinkClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       const anchor = target.closest('a');
@@ -81,15 +87,9 @@ export default function EmailShadowView({
         if (href) {
           event.preventDefault();
           event.stopPropagation();
-          // Dispatch a custom event on the container so the React app can intercept it
-          container.dispatchEvent(new CustomEvent('email-link-click', {
-            detail: {
-              href,
-              text: anchor.innerText || anchor.textContent || '',
-            },
-            bubbles: true,
-            composed: true,
-          }));
+          if (onLinkClick) {
+            onLinkClick(href, anchor.innerText || anchor.textContent || '');
+          }
         }
       }
     };
@@ -98,7 +98,7 @@ export default function EmailShadowView({
     return () => {
       shadowRoot.removeEventListener('click', handleLinkClick as EventListener);
     };
-  }, [html]);
+  }, [onLinkClick]);
 
   return (
     <div

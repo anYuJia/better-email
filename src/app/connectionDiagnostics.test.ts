@@ -25,6 +25,7 @@ const account: Account = {
 const credentialStatus: CredentialStatus = {
   account_email: account.email,
   exists: true,
+  status: 'exists',
   message: 'credential stored',
 };
 

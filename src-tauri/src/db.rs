@@ -920,6 +920,7 @@ impl MailStore {
                 return Ok(CredentialStatus {
                     account_email: email,
                     exists: false,
+                    status: "invalid_input".to_string(),
                     message: "账号邮箱不能为空。".to_string(),
                 });
             }
@@ -927,6 +928,7 @@ impl MailStore {
                 return Ok(CredentialStatus {
                     account_email: email,
                     exists: false,
+                    status: "invalid_input".to_string(),
                     message: "授权码不能为空。".to_string(),
                 });
             }
@@ -944,6 +946,7 @@ impl MailStore {
             Ok(CredentialStatus {
                 account_email: email,
                 exists: true,
+                status: "exists".to_string(),
                 message: "授权码已保存到本地应用数据。".to_string(),
             })
         })
@@ -963,6 +966,7 @@ impl MailStore {
             Ok(CredentialStatus {
                 account_email: email,
                 exists,
+                status: if exists { "exists".to_string() } else { "not_found".to_string() },
                 message: if exists {
                     "本地应用数据中存在该账号授权码。".to_string()
                 } else {
@@ -975,15 +979,25 @@ impl MailStore {
     pub fn delete_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
         self.with_conn(|conn| {
             let email = account_email.trim().to_ascii_lowercase();
-            conn.execute(
+            let rows_affected = conn.execute(
                 "DELETE FROM account_credentials WHERE account_email = ?1",
                 params![email],
             )?;
-            Ok(CredentialStatus {
-                account_email: email,
-                exists: false,
-                message: "本地授权码已删除。".to_string(),
-            })
+            if rows_affected == 0 {
+                Ok(CredentialStatus {
+                    account_email: email,
+                    exists: false,
+                    status: "not_found".to_string(),
+                    message: "Keychain中未找到对应凭据。".to_string(),
+                })
+            } else {
+                Ok(CredentialStatus {
+                    account_email: email,
+                    exists: false,
+                    status: "deleted".to_string(),
+                    message: "本地授权码已删除。".to_string(),
+                })
+            }
         })
     }
 

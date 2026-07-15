@@ -1072,6 +1072,24 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
       account = mockAccounts.find((item) => item.is_default) ?? mockAccounts[0];
       return account as T;
     }
+    case 'delete_account_secret': {
+      const email = String(args?.accountEmail ?? '').trim().toLowerCase();
+      // Simulating Keychain failure for a specific mock email name to test failure path
+      if (email.startsWith('fail')) {
+        return {
+          account_email: email,
+          exists: true,
+          status: 'failed',
+          message: 'Keychain 访问被拒绝，删除失败。',
+        } as T;
+      }
+      return {
+        account_email: email,
+        exists: false,
+        status: 'deleted',
+        message: '本地授权码已删除。',
+      } as T;
+    }
     case 'delete_account': {
       const accountId = Number(args?.accountId ?? 0);
       const removedAccount = mockAccounts.find((item) => item.id === accountId);

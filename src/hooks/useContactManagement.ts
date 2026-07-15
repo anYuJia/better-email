@@ -32,6 +32,7 @@ export default function useContactManagement({
   const [mergeSourceContactId, setMergeSourceContactId] = useState<number | null>(null);
   const [contactQuery, setContactQuery] = useState('');
   const [contactTransferBusy, setContactTransferBusy] = useState(false);
+  const [confirmDeleteContact, setConfirmDeleteContact] = useState<Contact | null>(null);
 
   const filteredContacts = useMemo(() => {
     const term = contactQuery.trim().toLowerCase();
@@ -267,5 +268,7 @@ export default function useContactManagement({
     mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
+    confirmDeleteContact,
+    setConfirmDeleteContact,
   };
 }

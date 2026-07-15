@@ -42,6 +42,7 @@ import type {
   ThreadSummary,
 } from '../app/types';
 import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
+import ConfirmDialog from './ConfirmDialog';
 import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -1164,30 +1165,7 @@ export default function ReaderPane({
           ) : null
         ) : hasRenderableHtml ? (
           <div
-            ref={(el) => {
-              if (el) {
-                el.addEventListener('email-link-click', ((event: CustomEvent) => {
-                  const { href, text } = event.detail;
-                  // Handle mailto and other non-http(s) schemes directly or ignore
-                  if (href.startsWith('mailto:')) {
-                    // Let the system handle it or ignore, since we want to avoid WebView navigating
-                    // Let's invoke shell open or ignore.
-                    invoke('open_attachment', { local_path: href }).catch(() => undefined); // wait, open_attachment is for local files, let's check what command opens a URL
-                    // Actually we can add an open_url command in Rust, but first let's see how we can handle mailto or simple links.
-                    // For mailto, we can open composer window in our app!
-                    // Wait, our app has a composer window, so we can parse mailto and compose!
-                    // Let's check how mailto can trigger app's compose window.
-                    // Let's set clickedLink to show the dialog first.
-                    setClickedLink({ href, text });
-                  } else if (href.startsWith('http://') || href.startsWith('https://')) {
-                    setClickedLink({ href, text });
-                  } else {
-                    // Prevent unknown protocols (file, javascript, data) completely
-                    console.warn('Blocked navigation to unsafe/unknown protocol:', href);
-                  }
-                }) as EventListener);
-              }
-            }}
+            className="reader-html-container"
           >
             <EmailShadowView
               className="reader-html"
@@ -1195,6 +1173,24 @@ export default function ReaderPane({
               onClick={handleReaderHtmlClick}
               onContextMenuCapture={handleReaderHtmlContextMenu}
               onContextMenu={handleReaderHtmlContextMenu}
+              onLinkClick={(href, text) => {
+                if (href.startsWith('mailto:')) {
+                  try {
+                    const mailtoUrl = new URL(href);
+                    const to = mailtoUrl.pathname || '';
+                    const safeTo = to.replace(/[\r\n]/g, '').trim();
+                    onComposeNew({ to: safeTo });
+                  } catch {
+                    const to = href.replace(/^mailto:/i, '').split('?')[0];
+                    const safeTo = decodeURIComponent(to).replace(/[\r\n]/g, '').trim();
+                    onComposeNew({ to: safeTo });
+                  }
+                } else if (href.startsWith('http://') || href.startsWith('https://')) {
+                  setClickedLink({ href, text });
+                } else {
+                  console.warn('Blocked navigation to unsafe/unknown protocol:', href);
+                }
+              }}
             />
           </div>
         ) : shouldOfferRemoteContent ? (
@@ -1347,69 +1343,19 @@ export default function ReaderPane({
           ariaLabel="附件操作"
         />
       )}
-      {labelToDelete && createPortal((
-        <div
-          className="settings-cache-confirm-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setLabelToDelete(null);
-            }
-          }}
-        >
-          <section
-            className="settings-cache-confirm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="label-confirm-title"
-          >
-            <header>
-              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fee2e2', color: '#dc2626' }}>
-                <Tag size={17} />
-              </span>
-              <span>
-                <strong id="label-confirm-title">删除标签</strong>
-                <small>该操作不可逆，将移除所有此标签的标记</small>
-              </span>
-              <button
-                className="icon-only-action"
-                type="button"
-                title="关闭"
-                aria-label="关闭删除确认"
-                onClick={() => setLabelToDelete(null)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <div className="settings-cache-confirm-summary" style={{ background: '#fef2f2', borderLeft: '3px solid #ef4444' }}>
-              <span style={{ fontSize: '14px', color: '#991b1b', fontWeight: 'bold' }}>
-                确认删除标签 "{labelToDelete.name}" 吗？
-              </span>
-            </div>
-            <p>
-              删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。
-            </p>
-            <footer>
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setLabelToDelete(null)}
-              >
-                取消
-              </button>
-              <button
-                className="danger"
-                type="button"
-                onClick={async () => {
-                  await handleDeleteLabel(labelToDelete.id);
-                  setLabelToDelete(null);
-                }}
-              >
-                确认删除
-              </button>
-            </footer>
-          </section>
-        </div>
-      ), document.body)}
+      <ConfirmDialog
+        open={!!labelToDelete}
+        title="删除标签"
+        summaryText={labelToDelete ? `确认删除标签 "${labelToDelete.name}" 吗？` : ''}
+        description="删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。"
+        onConfirm={async () => {
+          if (labelToDelete && handleDeleteLabel) {
+            await handleDeleteLabel(labelToDelete.id);
+          }
+          setLabelToDelete(null);
+        }}
+        onCancel={() => setLabelToDelete(null)}
+      />
       {clickedLink && createPortal((
         <div
           className="settings-cache-confirm-backdrop"
@@ -1454,15 +1400,27 @@ export default function ReaderPane({
                 let showDomainWarning = false;
                 try {
                   const linkUrl = new URL(linkUrlStr);
-                  const displayDomain = clickedLink.text.trim().toLowerCase();
-                  if (displayDomain && (displayDomain.includes('.') || displayDomain.includes('/'))) {
-                    // Check if the linkText is a domain and is different from target URL host
-                    if (!linkUrl.host.toLowerCase().includes(displayDomain) && !displayDomain.includes(linkUrl.host.toLowerCase())) {
+                  let displayDomain = clickedLink.text.trim().toLowerCase();
+                  // Strip protocol if present in display text
+                  displayDomain = displayDomain.replace(/^(https?:\/\/)?(www\.)?/, '');
+                  // Strip path, query, port, user info in display text if present
+                  const displayHostAndPort = displayDomain.split('/')[0].split('@').pop() || '';
+                  const displayHost = displayHostAndPort.split(':')[0];
+
+                  // Normalize target host
+                  let targetHost = linkUrl.hostname.toLowerCase();
+                  targetHost = targetHost.replace(/^www\./, '');
+
+                  // If display text looks like a host/domain name, do exact hostname/subdomain checks
+                  if (displayHost && (displayHost.includes('.') || displayHost.includes(':'))) {
+                    // Exact match check or targetHost ends with "." + displayHost (valid subdomain)
+                    const isMatch = targetHost === displayHost || targetHost.endsWith('.' + displayHost);
+                    if (!isMatch) {
                       showDomainWarning = true;
                     }
                   }
                 } catch (e) {
-                  // If linkUrl is not a full URL or mailto
+                  // Fallback or ignore
                 }
 
                 if (showDomainWarning) {

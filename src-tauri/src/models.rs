@@ -708,6 +708,7 @@ pub struct CredentialVerificationInput {
 pub struct CredentialStatus {
     pub account_email: String,
     pub exists: bool,
+    pub status: String,
     pub message: String,
 }
 

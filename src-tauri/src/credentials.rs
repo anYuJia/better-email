@@ -33,6 +33,7 @@ mod tests {
         let status = CredentialStatus {
             account_email: "a@example.com".to_string(),
             exists: true,
+            status: "exists".to_string(),
             message: "ok".to_string(),
         };
         assert_eq!(status.account_email, "a@example.com");

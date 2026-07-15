@@ -403,7 +403,7 @@ export default function useAccountConnectionController({
       try {
         const result = await invoke<CredentialStatus>('delete_account_secret', { accountEmail: removedAccount.email });
         if (result.status === 'failed') {
-          throw new Error(result.message || 'Keychain 凭据删除失败');
+          throw new Error(result.message || '本地凭据删除失败');
         }
         accountFlowLog('credential deleted after account removal', {
           email: maskEmailForLog(removedAccount.email),
@@ -418,13 +418,26 @@ export default function useAccountConnectionController({
           account_email: removedAccount.email,
           exists: true,
           status: 'failed',
-          message: `Keychain 凭据移除失败，操作被阻止：${errMsg}`,
+          message: `本地凭据移除失败，操作被阻止：${errMsg}`,
         });
         setStatus(`凭据删除失败：${errMsg}`);
         throw e; // Block deletion
       }
     }
-    const nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
+    // Perform account database removal
+    let nextAccount: Account | null = null;
+    try {
+      nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
+    } catch (e) {
+      const errMsg = String(e);
+      accountFlowWarn('failed to delete account record from db', {
+        accountId: removedAccount.id,
+        error: errMsg,
+      });
+      setStatus(`账号删除失败：${errMsg}`);
+      throw e; // Do NOT swallow database deletion exceptions
+    }
+    
     accountFlowLog('remove account deleted', {
       removedAccountId: removedAccount.id,
       nextAccountId: nextAccount?.id ?? null,
@@ -433,7 +446,7 @@ export default function useAccountConnectionController({
       account_email: removedAccount.email,
       exists: false,
       status: deleteSecret ? 'deleted' : 'not_found',
-      message: deleteSecret ? '账号及 Keychain 凭据已成功移除。' : '账号已成功移除；Keychain 凭据已保留。',
+      message: deleteSecret ? '账号及本地凭据已成功移除。' : '账号已成功移除；本地凭据已保留。',
     });
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));
     setAccountScope(nextAccount?.id ?? 'all');

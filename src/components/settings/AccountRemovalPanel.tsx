@@ -83,9 +83,11 @@ export default function AccountRemovalPanel({
           onChange={(event) => setDeleteSecret(event.target.checked)}
         />
         <span>
-          <strong>删除本机安全的 Keychain 凭据</strong>
+          <strong>同时删除本机保存的登录凭据</strong>
           <small style={{ display: 'block', color: 'var(--settings-text-secondary)', fontSize: '11px' }}>
-            若勾选，将从本机 Keychain 安全存储中彻底清除此账号的登录密码/授权 Token
+            {deleteSecret 
+              ? "若勾选，将从本地 SQLite 凭据表中彻底清除此账号的登录密码/授权 Token。" 
+              : "警告：若不勾选，该账号的登录凭据仍将以明文/密文形式保留在本地 SQLite 数据库中。"}
           </small>
         </span>
       </label>

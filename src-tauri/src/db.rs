@@ -169,7 +169,19 @@ impl MailStore {
             path.display(),
             should_seed_demo_data,
         ));
+        let is_new = !path.exists();
         let conn = Connection::open(&path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if is_new {
+                if let Ok(metadata) = std::fs::metadata(&path) {
+                    let mut permissions = metadata.permissions();
+                    permissions.set_mode(0o600); // User read & write only
+                    let _ = std::fs::set_permissions(&path, permissions);
+                }
+            }
+        }
         let store = Self {
             conn: Mutex::new(conn),
             data_dir,
@@ -696,7 +708,7 @@ impl MailStore {
                     "demo@better-email.local",
                     "HTML 邮件安全策略",
                     "默认阻止远程图片，后续接入 HTML 清洗和钓鱼提示。",
-                    "安全默认值很重要：凭据进入系统 Keychain，HTML 邮件必须清洗，远程图片默认阻止，日志自动脱敏。",
+                    "安全默认值很重要：凭据进入本地 SQLite 凭据表，HTML 邮件必须清洗，远程图片默认阻止，日志自动脱敏。",
                     1,
                     0,
                     1,
@@ -988,14 +1000,14 @@ impl MailStore {
                     account_email: email,
                     exists: false,
                     status: "not_found".to_string(),
-                    message: "Keychain中未找到对应凭据。".to_string(),
+                    message: "本地凭据中未找到对应凭据。".to_string(),
                 })
             } else {
                 Ok(CredentialStatus {
                     account_email: email,
                     exists: false,
                     status: "deleted".to_string(),
-                    message: "本地授权码已删除。".to_string(),
+                    message: "本地凭据已删除。".to_string(),
                 })
             }
         })
@@ -3620,7 +3632,7 @@ impl MailStore {
                 )));
             }
             let now = Utc::now().to_rfc3339();
-            let message = "OAuth2 授权码已接收；下一步执行 token 交换并写入系统 Keychain。";
+            let message = "OAuth2 授权码已接收；下一步执行 token 交换并写入本地 SQLite 凭据。";
             conn.execute(
                 "
                 UPDATE oauth_sessions
@@ -3650,10 +3662,10 @@ impl MailStore {
                 "
                 SELECT s.id, a.email, s.provider, s.redirect_uri, s.code_verifier,
                        s.scopes, s.authorization_code, s.status
-                FROM oauth_sessions s
-                JOIN accounts a ON a.id = s.account_id
-                WHERE s.id = ?1
-                ",
+                 FROM oauth_sessions s
+                 JOIN accounts a ON a.id = s.account_id
+                 WHERE s.id = ?1
+                 ",
                 params![session_id],
                 |row| {
                     let scopes: String = row.get(5)?;
@@ -3704,7 +3716,7 @@ impl MailStore {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
             let now = Utc::now().to_rfc3339();
-            let message = "OAuth2 token 已交换并保存到系统 Keychain。";
+            let message = "OAuth2 token 已交换并保存到本地 SQLite 凭据。";
             conn.execute(
                 "
                 UPDATE oauth_sessions
@@ -4499,7 +4511,11 @@ fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> {
 
 fn export_backup_table(conn: &Connection, table: &str) -> MailResult<Vec<LocalBackupRow>> {
     let columns = table_columns(conn, table)?;
-    let select_columns = columns
+    let filtered_columns: Vec<String> = columns
+        .into_iter()
+        .filter(|col| col != "secret" && col != "authorization_code")
+        .collect();
+    let select_columns = filtered_columns
         .iter()
         .map(|column| quote_identifier(column))
         .collect::<Vec<_>>()
@@ -4512,7 +4528,7 @@ fn export_backup_table(conn: &Connection, table: &str) -> MailResult<Vec<LocalBa
     let rows = stmt
         .query_map([], |row| {
             let mut item = LocalBackupRow::new();
-            for (index, column) in columns.iter().enumerate() {
+            for (index, column) in filtered_columns.iter().enumerate() {
                 item.insert(column.clone(), sql_value_to_json(row.get_ref(index)?));
             }
             Ok(item)

@@ -2534,15 +2534,13 @@ pub fn refresh_oauth2_token(
         provider: refreshed.provider,
         status: "token_refreshed".to_string(),
         expires_at: refreshed.expires_at,
-        message: "OAuth2 token 已刷新并保存到系统 Keychain。".to_string(),
+        message: "OAuth2 token 已刷新并保存到本地 SQLite 凭据。".to_string(),
     })
 }
 
-#[tauri::command]
-#[allow(deprecated)]
-pub fn open_url(app: AppHandle, url: String) -> MailResult<()> {
-    let parsed = tauri::Url::parse(&url).map_err(|error| {
-        crate::db::MailError::Imap(format!("无效的 URL 格式：{error}"))
+pub fn validate_external_url(url: &str) -> MailResult<tauri::Url> {
+    let parsed = tauri::Url::parse(url).map_err(|error| {
+        crate::db::MailError::Imap(format!("无效的 URL 格式或相对地址：{error}"))
     })?;
     let scheme = parsed.scheme().to_ascii_lowercase();
     if scheme != "http" && scheme != "https" {
@@ -2551,6 +2549,13 @@ pub fn open_url(app: AppHandle, url: String) -> MailResult<()> {
             scheme
         )));
     }
+    Ok(parsed)
+}
+
+#[tauri::command]
+#[allow(deprecated)]
+pub fn open_url(app: AppHandle, url: String) -> MailResult<()> {
+    let parsed = validate_external_url(&url)?;
     app.shell()
         .open(parsed.as_str().to_string(), None)
         .map_err(|error| crate::db::MailError::Imap(format!("无法打开 URL: {error}")))?;
@@ -3570,31 +3575,31 @@ pub fn save_temp_attachment(
 
 #[cfg(test)]
 mod open_url_tests {
-    use super::*;
-
-    fn validate_url_scheme(url_str: &str) -> Result<String, String> {
-        let parsed = tauri::Url::parse(url_str).map_err(|error| error.to_string())?;
-        let scheme = parsed.scheme().to_ascii_lowercase();
-        if scheme != "http" && scheme != "https" {
-            return Err(format!("Rejected scheme: {scheme}"));
-        }
-        Ok(parsed.as_str().to_string())
-    }
+    use super::validate_external_url;
 
     #[test]
     fn test_valid_http_https_url() {
-        assert!(validate_url_scheme("http://example.com/").is_ok());
-        assert!(validate_url_scheme("https://paypal.com/login").is_ok());
-        assert!(validate_url_scheme("HTTPS://google.com").is_ok());
+        assert!(validate_external_url("http://example.com/").is_ok());
+        assert!(validate_external_url("https://paypal.com/login").is_ok());
+        assert!(validate_external_url("HTTPS://google.com").is_ok());
+        assert!(validate_external_url("hTtP://yahoo.com").is_ok());
     }
 
     #[test]
     fn test_invalid_and_blocked_protocols() {
-        assert!(validate_url_scheme("file:///etc/passwd").is_err());
-        assert!(validate_url_scheme("data:text/html,<html>").is_err());
-        assert!(validate_url_scheme("javascript:alert(1)").is_err());
-        assert!(validate_url_scheme("ftp://ftp.example.com").is_err());
-        assert!(validate_url_scheme("custom://some/path").is_err());
-        assert!(validate_url_scheme("invalid-url-string").is_err());
+        assert!(validate_external_url("file:///etc/passwd").is_err());
+        assert!(validate_external_url("data:text/html,<html>").is_err());
+        assert!(validate_external_url("javascript:alert(1)").is_err());
+        assert!(validate_external_url("ftp://ftp.example.com").is_err());
+        assert!(validate_external_url("custom://some/path").is_err());
+        assert!(validate_external_url("invalid-url-string").is_err());
+        assert!(validate_external_url("/relative/path/index.html").is_err());
+    }
+
+    #[test]
+    fn test_userinfo_port_ipv6() {
+        assert!(validate_external_url("http://user:pass@example.com:8080/path").is_ok());
+        assert!(validate_external_url("https://[::1]:443/").is_ok());
+        assert!(validate_external_url("https://127.0.0.1:3000/").is_ok());
     }
 }

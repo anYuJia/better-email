@@ -383,8 +383,9 @@ export default function App() {
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<Folder | null>(null);
   const [confirmDeleteIdentity, setConfirmDeleteIdentity] = useState<MailIdentity | null>(null);
   const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
+  const [confirmDeleteLabel, setConfirmDeleteLabel] = useState<Label | null>(null);
   const [confirmEmptyTrashOpen, setConfirmEmptyTrashOpen] = useState(false);
-  const [confirmPermanentlyDeleteOpen, setConfirmPermanentlyDeleteOpen] = useState(false);
+  const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<Message | null>(null);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
@@ -1907,10 +1908,7 @@ export default function App() {
 
     const undoSnapshots = snapshotMessages([message]);
     if (action === 'permanent-delete') {
-      const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
-      setSelectedId(null);
-      await refreshAll();
-      setStatus(report.message);
+      requestPermanentlyDeleteMessage(message);
       return;
     }
 
@@ -1983,9 +1981,16 @@ export default function App() {
     );
   }
 
-  async function handleDeleteLabel(id: number) {
+  async function handleDeleteLabelConfirmed(id: number) {
     await invoke('delete_label', { id });
     setLabels((current) => current.filter((l) => l.id !== id));
+  }
+
+  async function handleDeleteLabel(id: number) {
+    const label = labels.find((l) => l.id === id);
+    if (label) {
+      setConfirmDeleteLabel(label);
+    }
   }
 
 
@@ -2049,16 +2054,17 @@ export default function App() {
     queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
   }
 
-  async function permanentlyDeleteSelectedConfirmed() {
-    if (!selected) return;
-    const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: selected.id });
+  async function permanentlyDeleteMessageConfirmed(message: Message) {
+    const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
+    if (selected?.id === message.id) {
+      setSelectedId(null);
+    }
     await refreshAll();
     setStatus(report.message);
   }
 
-  function permanentlyDeleteSelected() {
-    if (!selected) return;
-    setConfirmPermanentlyDeleteOpen(true);
+  function requestPermanentlyDeleteMessage(message: Message) {
+    setConfirmPermanentlyDelete(message);
   }
 
   async function emptyCurrentTrashConfirmed() {
@@ -3564,7 +3570,7 @@ export default function App() {
         onAllowRemoteImagesOnce={() => { allowRemoteImagesForSelectedOnce().catch((error) => setStatus(String(error))); }}
         onTrustRemoteImages={trustRemoteImagesForSelected}
         onBlockSender={blockSelectedSender}
-        onPermanentlyDelete={permanentlyDeleteSelected}
+        onPermanentlyDelete={() => { if (selected) requestPermanentlyDeleteMessage(selected); }}
         onEmptyTrash={emptyCurrentTrash}
         onMoveToFolder={(folder) => { moveSelectedToFolder(folder).catch((error) => setStatus(String(error))); }}
         onToggleLabel={toggleLabel}
@@ -4040,6 +4046,19 @@ export default function App() {
         onCancel={() => setContactToDeleteFromHook(null)}
       />
       <ConfirmDialog
+        open={!!confirmDeleteLabel}
+        title="删除标签"
+        summaryText={confirmDeleteLabel ? `确认删除标签 "${confirmDeleteLabel.name}" 吗？` : ''}
+        description="该操作不可逆。删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。"
+        onConfirm={async () => {
+          if (confirmDeleteLabel) {
+            await handleDeleteLabelConfirmed(confirmDeleteLabel.id);
+          }
+          setConfirmDeleteLabel(null);
+        }}
+        onCancel={() => setConfirmDeleteLabel(null)}
+      />
+      <ConfirmDialog
         open={confirmEmptyTrashOpen}
         title="清空废纸篓"
         summaryText="确认要清空当前账号的废纸篓吗？"
@@ -4051,15 +4070,17 @@ export default function App() {
         onCancel={() => setConfirmEmptyTrashOpen(false)}
       />
       <ConfirmDialog
-        open={confirmPermanentlyDeleteOpen}
+        open={!!confirmPermanentlyDelete}
         title="永久删除邮件"
-        summaryText="确认要永久删除选中的这封邮件吗？"
+        summaryText={confirmPermanentlyDelete ? `确认要永久删除邮件 "${confirmPermanentlyDelete.subject || '(无主题)'}" 吗？` : '确认要永久删除选中的这封邮件吗？'}
         description="此操作不可逆。这封邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
         onConfirm={async () => {
-          await permanentlyDeleteSelectedConfirmed();
-          setConfirmPermanentlyDeleteOpen(false);
+          if (confirmPermanentlyDelete) {
+            await permanentlyDeleteMessageConfirmed(confirmPermanentlyDelete);
+          }
+          setConfirmPermanentlyDelete(null);
         }}
-        onCancel={() => setConfirmPermanentlyDeleteOpen(false)}
+        onCancel={() => setConfirmPermanentlyDelete(null)}
       />
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>

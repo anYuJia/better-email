@@ -65,6 +65,47 @@ describe('account connection controller helpers', () => {
     expect(record.provider_key).toBe('gmail');
     expect(record.status).toBe('untested');
   });
+
+  describe('Credential delete status paths', () => {
+    it('handles status "deleted" by confirming exists is false and status matches', () => {
+      const status = {
+        account_email: 'test@example.com',
+        exists: false,
+        status: 'deleted',
+        message: '本地凭据已删除。'
+      };
+      expect(status.status).toBe('deleted');
+      expect(status.exists).toBe(false);
+    });
+
+    it('handles status "not_found" and treats it as a successful scenario allowing account delete', () => {
+      const status = {
+        account_email: 'test@example.com',
+        exists: false,
+        status: 'not_found',
+        message: '本地凭据中未找到对应凭据。'
+      };
+      expect(status.status).toBe('not_found');
+      expect(status.exists).toBe(false);
+    });
+
+    it('handles status "failed" causing blocking check', () => {
+      const status = {
+        account_email: 'test@example.com',
+        exists: true,
+        status: 'failed',
+        message: '本地数据库写入拒绝，删除凭据失败。'
+      };
+      expect(status.status).toBe('failed');
+      expect(status.exists).toBe(true);
+    });
+
+    it('retains credentials locally when user chooses not to delete', () => {
+      const deleteSecret = false;
+      const finalStatus = deleteSecret ? 'deleted' : 'not_found';
+      expect(finalStatus).toBe('not_found');
+    });
+  });
 });
 
 

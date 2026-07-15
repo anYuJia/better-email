@@ -1074,20 +1074,20 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
     }
     case 'delete_account_secret': {
       const email = String(args?.accountEmail ?? '').trim().toLowerCase();
-      // Simulating Keychain failure for a specific mock email name to test failure path
+      // Simulating local SQLite credential deletion failure for a specific mock email name to test failure path
       if (email.startsWith('fail')) {
         return {
           account_email: email,
           exists: true,
           status: 'failed',
-          message: 'Keychain 访问被拒绝，删除失败。',
+          message: '本地数据库写入拒绝，删除凭据失败。',
         } as T;
       }
       return {
         account_email: email,
         exists: false,
         status: 'deleted',
-        message: '本地授权码已删除。',
+        message: '本地凭据已删除。',
       } as T;
     }
     case 'delete_account': {

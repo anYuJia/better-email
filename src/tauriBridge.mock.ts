@@ -1441,7 +1441,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
             ...item,
             status: 'token_stored',
             completed_at: now,
-            message: 'UI smoke mock Token 已写入安全存储。',
+            message: 'UI smoke mock Token 已写入本地凭据。',
           }
         : item);
       return {
@@ -1449,7 +1449,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
         provider: session.provider,
         status: 'token_stored',
         expires_at: new Date(Date.parse(now) + 3_600_000).toISOString(),
-        message: 'UI smoke mock Token 已写入安全存储。',
+        message: 'UI smoke mock Token 已写入本地凭据。',
       } as T;
     }
     case 'refresh_oauth2_token': {

@@ -49,7 +49,7 @@ export function buildProviderCredentialGuidance(
       providerLabel,
       credentialLabel: 'OAuth2 Token',
       title: '优先通过 OAuth2 授权流程写入 Token',
-      summary: 'Token 仅写入本机本地凭据，应用数据库、诊断导出和日志都不保存原文。',
+      summary: 'Token 仅写入本机本地凭据，诊断导出和日志不显示完整 Token。',
       placeholder: '粘贴 OAuth2 Token JSON',
       checklist: ['仅保存在本地凭据', '保存后立即清空输入框', '验证使用 XOAUTH2 登录'],
       verificationHint: 'Token 失效时应重新完成 OAuth2 授权，不要在这里输入邮箱网页登录密码。',

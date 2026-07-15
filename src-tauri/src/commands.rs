@@ -3078,7 +3078,7 @@ mod tests {
         assert!(!partial.checks[1].authenticated);
         assert!(partial.checks[1].message.contains("SMTP 登录验证失败"));
 
-        let missing = credential_error_report(&account, "未读取到系统凭据".to_string());
+        let missing = credential_error_report(&account, "未读取到本地凭据".to_string());
         assert_eq!(missing.status, "credential_error");
         assert!(!missing.authenticated);
         assert!(missing.message.contains("未发起"));

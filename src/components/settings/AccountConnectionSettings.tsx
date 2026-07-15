@@ -38,7 +38,7 @@ export type AccountConnectionSettingsProps = {
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string) => Promise<void>;
-  onRemoveAccount: () => Promise<void>;
+  onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onUpdateProviderVerification: (
     providerName: string,
     patch: Partial<ProviderVerificationRecord>,

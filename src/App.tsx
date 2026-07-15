@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Mail, X } from 'lucide-react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
@@ -373,6 +374,7 @@ export default function App() {
   const [ruleBuilderField, setRuleBuilderField] = useState<RuleConditionField>('from');
   const [ruleBuilderNeedle, setRuleBuilderNeedle] = useState('');
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
+  const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [status, setStatus] = useState('本地原型已就绪');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
@@ -700,8 +702,18 @@ export default function App() {
   }
 
   function closeComposer() {
+    if (!isDraftEmpty(draft)) {
+      setComposerCloseConfirmOpen(true);
+      return;
+    }
     setComposerOpen(false);
     setComposerMinimized(false);
+  }
+
+  function forceCloseComposer() {
+    setComposerOpen(false);
+    setComposerMinimized(false);
+    setComposerCloseConfirmOpen(false);
   }
 
   function clearComposerAutosave() {
@@ -2372,37 +2384,81 @@ export default function App() {
       setStatus('请先填写快速回复正文');
       return;
     }
+    const subject = prefixedSubject(message.subject, 'Re');
+    const input = {
+      draft_id: 0,
+      account_id: message.account_id,
+      identity_id: 0,
+      to: message.sender_email,
+      cc: '',
+      bcc: '',
+      subject,
+      body: `${body}${quoteMessage(message)}`,
+      html_body: '',
+      send_at: '',
+      attachments: [],
+    };
+    appFlowLog('sendQuickReply start', {
+      accountId: input.account_id,
+      undoDelaySeconds: sendUndoDelaySeconds,
+    });
+    if (sendUndoDelaySeconds === 0) {
+      try {
+        const messageId = await invoke<number>('send_message', {
+          input,
+          threading: replyThreadingHeaders(message),
+        });
+        setQuickReplyBody('');
+        await refreshAll();
+        setSelectedId(message.id);
+        setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
+        appFlowLog('sendQuickReply done', {
+          messageId,
+          accountId: message.account_id,
+          targetRole: 'current',
+        });
+      } catch (error) {
+        const errorMessage = String(error);
+        setQuickReplyBody('');
+        await focusMailboxRole('outbox', message.account_id, `快速回复发送失败，邮件已留在发件箱：${errorMessage}`);
+        appFlowWarn('sendQuickReply failed', {
+          accountId: message.account_id,
+          error: errorMessage,
+          targetRole: 'outbox',
+        });
+      }
+      return;
+    }
+
     try {
-      const messageId = await invoke<number>('send_message', {
+      const expiresAt = new Date(Date.now() + sendUndoDelaySeconds * 1000).toISOString();
+      const item = await invoke<OutboxItem>('queue_outbox_message', {
         input: {
-          draft_id: 0,
-          account_id: message.account_id,
-          identity_id: 0,
-          to: message.sender_email,
-          cc: '',
-          bcc: '',
-          subject: prefixedSubject(message.subject, 'Re'),
-          body: `${body}${quoteMessage(message)}`,
-          html_body: '',
-          send_at: '',
-          attachments: [],
+          ...input,
+          send_at: expiresAt,
         },
         threading: replyThreadingHeaders(message),
       });
+      setOutbox((current) => [item, ...current.filter((entry) => entry.id !== item.id)]);
+      setPendingSendUndo({
+        outboxId: item.id,
+        subject,
+        expiresAt,
+        delaySeconds: sendUndoDelaySeconds,
+      });
       setQuickReplyBody('');
-      await refreshAll();
-      setSelectedId(message.id);
-      setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
-      appFlowLog('sendQuickReply done', {
-        messageId,
+      await focusMailboxRole('outbox', message.account_id, `快速回复将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回`);
+      appFlowLog('sendQuickReply queued', {
+        outboxId: item.id,
+        messageId: item.message_id,
         accountId: message.account_id,
-        targetRole: 'current',
+        targetRole: 'outbox',
       });
     } catch (error) {
       const errorMessage = String(error);
       setQuickReplyBody('');
-      await focusMailboxRole('outbox', message.account_id, `快速回复发送失败，邮件已留在发件箱：${errorMessage}`);
-      appFlowWarn('sendQuickReply failed', {
+      await focusMailboxRole('outbox', message.account_id, `快速回复排队失败：${errorMessage}`);
+      appFlowWarn('sendQuickReply queue failed', {
         accountId: message.account_id,
         error: errorMessage,
         targetRole: 'outbox',
@@ -3431,9 +3487,13 @@ export default function App() {
         selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
         quickReplyBody={quickReplyBody}
         onSelectMessage={selectMessageForReading}
-        onComposeNew={() => {
+        onComposeNew={(fields) => {
           setRichComposer(false);
-          openComposer(emptyDraft);
+          openComposer({
+            ...emptyDraft,
+            account_id: account?.id ?? accounts[0]?.id ?? 0,
+            to: fields?.to || '',
+          });
           setStatus('已打开新邮件');
         }}
         onComposeFromMessage={composeFromMessage}
@@ -3591,7 +3651,7 @@ export default function App() {
                   throw error;
                 }
               }}
-              onRemoveAccount={removeCurrentAccount}
+              onRemoveAccount={(deleteSecret: boolean) => removeCurrentAccount(deleteSecret)}
               onUpdateProviderVerification={updateProviderVerification}
               onSaveProviderVerification={saveProviderVerification}
               onSaveAccountSettings={async (updatedAccount) => {
@@ -3755,9 +3815,8 @@ export default function App() {
               ruleBuilderField={ruleBuilderField}
               ruleBuilderNeedle={ruleBuilderNeedle}
               editingRuleId={editingRuleId}
-              labels={labels}
               rules={rules}
-              threads={threads}
+              labels={labels}
               onRuleFormChange={setRuleForm}
               onRuleConditionFieldChange={updateRuleConditionField}
               onRuleConditionValueChange={updateRuleConditionValue}
@@ -3815,6 +3874,84 @@ export default function App() {
         onDismissAction={clearUndoAction}
       />
       <GlobalTooltip />
+      {composerCloseConfirmOpen && (
+        <div
+          className="settings-cache-confirm-backdrop"
+          style={{ zIndex: 10000 }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setComposerCloseConfirmOpen(false);
+            }
+          }}
+        >
+          <section
+            className="settings-cache-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="composer-close-confirm-title"
+          >
+            <header>
+              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#e0f2fe', color: '#0284c7' }}>
+                <Mail size={17} />
+              </span>
+              <span>
+                <strong id="composer-close-confirm-title">关闭写信窗口</strong>
+                <small>当前草稿有未保存的修改</small>
+              </span>
+              <button
+                className="icon-only-action"
+                type="button"
+                title="关闭"
+                aria-label="关闭确认"
+                onClick={() => setComposerCloseConfirmOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </header>
+            <div className="settings-cache-confirm-summary" style={{ background: '#f0f9ff', borderLeft: '3px solid #0ea5e9' }}>
+              <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: 'bold' }}>
+                是否保留对当前邮件草稿的修改？
+              </span>
+            </div>
+            <p>
+              您可以选择将草稿保存至本地，以便下次在“草稿箱”中继续编辑，或者舍弃当前修改。
+            </p>
+            <footer>
+              <button
+                className="secondary"
+                type="button"
+                style={{ marginRight: 'auto' }}
+                onClick={() => setComposerCloseConfirmOpen(false)}
+              >
+                继续编辑
+              </button>
+              <button
+                className="secondary"
+                type="button"
+                style={{ borderColor: '#fca5a5', color: '#dc2626' }}
+                onClick={() => {
+                  setDraft(emptyDraft);
+                  clearComposerAutosave();
+                  forceCloseComposer();
+                }}
+              >
+                舍弃草稿
+              </button>
+              <button
+                className="primary"
+                type="button"
+                style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold' }}
+                onClick={async () => {
+                  await saveDraft();
+                  setComposerCloseConfirmOpen(false);
+                }}
+              >
+                保存草稿
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );

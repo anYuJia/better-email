@@ -17,7 +17,7 @@ type AccountManageDialogProps = {
   onClose: () => void;
   onAccountChange: (account: Account) => void;
   onProtocolChange: (protocol: IncomingProtocol) => void;
-  onRemoveAccount: () => Promise<void>;
+  onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onSaveAccountSettings?: (account: Account) => Promise<void>;
 };
 
@@ -86,7 +86,7 @@ export default function AccountManageDialog({
           <div className="settings-account-form-grid-wrapper">
             <div className="settings-account-form-grid settings-account-config-grid" style={{ marginBottom: '16px' }}>
               <label>
-                显示名称
+                显示名
                 <input
                   value={account.display_name}
                   onChange={(event) => onAccountChange({
@@ -171,8 +171,8 @@ export default function AccountManageDialog({
             account={account}
             accountCount={accountCount}
             embedded
-            onRemove={async () => {
-              await onRemoveAccount();
+            onRemove={async (deleteSecret) => {
+              await onRemoveAccount(deleteSecret);
               onClose();
             }}
           />

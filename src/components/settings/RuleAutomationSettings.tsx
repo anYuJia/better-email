@@ -9,7 +9,6 @@ import type {
   Label,
   MailRule,
   MailRuleInput,
-  ThreadSummary,
 } from '../../app/types';
 import './automation-settings.css';
 
@@ -20,7 +19,6 @@ type RuleAutomationSettingsProps = {
   editingRuleId: number | null;
   labels: Label[];
   rules: MailRule[];
-  threads: ThreadSummary[];
   onRuleFormChange: (rule: MailRuleInput) => void;
   onRuleConditionFieldChange: (field: RuleConditionField) => void;
   onRuleConditionValueChange: (value: string) => void;
@@ -39,7 +37,6 @@ export default function RuleAutomationSettings({
   editingRuleId,
   labels,
   rules,
-  threads,
   onRuleFormChange,
   onRuleConditionFieldChange,
   onRuleConditionValueChange,
@@ -173,18 +170,6 @@ export default function RuleAutomationSettings({
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="settings-thread-summary">
-        <strong>最近会话</strong>
-        <div>
-          {threads.slice(0, 6).map((thread) => (
-            <p key={thread.thread_key}>
-              <span>{thread.subject}</span>
-              <small>{thread.message_count} 封 · 未读 {thread.unread_count}</small>
-            </p>
-          ))}
-        </div>
       </div>
     </section>
   );

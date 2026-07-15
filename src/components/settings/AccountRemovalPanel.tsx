@@ -6,7 +6,7 @@ import './account-removal.css';
 type AccountRemovalPanelProps = {
   account: Account;
   accountCount: number;
-  onRemove: () => Promise<void>;
+  onRemove: (deleteSecret: boolean) => Promise<void>;
   embedded?: boolean;
 };
 
@@ -18,6 +18,7 @@ export default function AccountRemovalPanel({
 }: AccountRemovalPanelProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
+  const [deleteSecret, setDeleteSecret] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const canRemove = accountCount > 0;
@@ -26,6 +27,7 @@ export default function AccountRemovalPanel({
   useEffect(() => {
     setDialogOpen(false);
     setConfirmation('');
+    setDeleteSecret(true);
     setPending(false);
     setError('');
   }, [account.id]);
@@ -45,7 +47,7 @@ export default function AccountRemovalPanel({
     setPending(true);
     setError('');
     try {
-      await onRemove();
+      await onRemove(deleteSecret);
       setDialogOpen(false);
     } catch (removeError) {
       setError(String(removeError));
@@ -72,6 +74,20 @@ export default function AccountRemovalPanel({
             setError('');
           }}
         />
+      </label>
+      <label className="checkbox-row" style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input
+          type="checkbox"
+          checked={deleteSecret}
+          disabled={pending}
+          onChange={(event) => setDeleteSecret(event.target.checked)}
+        />
+        <span>
+          <strong>删除本机安全的 Keychain 凭据</strong>
+          <small style={{ display: 'block', color: 'var(--settings-text-secondary)', fontSize: '11px' }}>
+            若勾选，将从本机 Keychain 安全存储中彻底清除此账号的登录密码/授权 Token
+          </small>
+        </span>
       </label>
       {error && <p className="settings-confirm-error">{error}</p>}
       <footer>

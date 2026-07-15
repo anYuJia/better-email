@@ -391,13 +391,27 @@ export default function useAccountConnectionController({
     setStatus,
   ]);
 
-  const removeCurrentAccount = useCallback(async () => {
+  const removeCurrentAccount = useCallback(async (deleteSecret: boolean) => {
     if (!accountForm) return;
     const removedAccount = accountForm;
     accountFlowLog('remove start', {
       accountId: removedAccount.id,
       email: maskEmailForLog(removedAccount.email),
+      deleteSecret,
     });
+    if (deleteSecret) {
+      try {
+        await invoke('delete_account_secret', { accountEmail: removedAccount.email });
+        accountFlowLog('credential deleted after account removal', {
+          email: maskEmailForLog(removedAccount.email),
+        });
+      } catch (e) {
+        accountFlowWarn('failed to delete credential during account removal', {
+          email: maskEmailForLog(removedAccount.email),
+          error: String(e),
+        });
+      }
+    }
     const nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
     accountFlowLog('remove account deleted', {
       removedAccountId: removedAccount.id,
@@ -406,10 +420,7 @@ export default function useAccountConnectionController({
     setCredentialStatus({
       account_email: removedAccount.email,
       exists: false,
-      message: '账号已移除；未自动读取或删除系统凭据。',
-    });
-    accountFlowLog('credential untouched after account removal', {
-      email: maskEmailForLog(removedAccount.email),
+      message: deleteSecret ? '账号及 Keychain 凭据已成功移除。' : '账号已成功移除；Keychain 凭据已保留。',
     });
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));
     setAccountScope(nextAccount?.id ?? 'all');

@@ -22,7 +22,7 @@ type AccountSettingsPageProps = {
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
-  onRemoveAccount: () => Promise<void>;
+  onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onSaveAccountSettings?: (account: Account) => Promise<void>;
 };
 

@@ -71,6 +71,33 @@ export default function EmailShadowView({
     `;
 
     shadowRoot.innerHTML = `<style>${styleContent}</style><div>${html}</div>`;
+
+    // Intercept clicks on links inside Shadow Root to prevent webview navigation
+    const handleLinkClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor) {
+        const href = anchor.getAttribute('href');
+        if (href) {
+          event.preventDefault();
+          event.stopPropagation();
+          // Dispatch a custom event on the container so the React app can intercept it
+          container.dispatchEvent(new CustomEvent('email-link-click', {
+            detail: {
+              href,
+              text: anchor.innerText || anchor.textContent || '',
+            },
+            bubbles: true,
+            composed: true,
+          }));
+        }
+      }
+    };
+
+    shadowRoot.addEventListener('click', handleLinkClick as EventListener);
+    return () => {
+      shadowRoot.removeEventListener('click', handleLinkClick as EventListener);
+    };
   }, [html]);
 
   return (

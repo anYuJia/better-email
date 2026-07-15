@@ -2535,6 +2535,15 @@ pub fn refresh_oauth2_token(
     })
 }
 
+#[tauri::command]
+#[allow(deprecated)]
+pub fn open_url(app: AppHandle, url: String) -> MailResult<()> {
+    app.shell()
+        .open(url, None)
+        .map_err(|error| crate::db::MailError::Imap(format!("无法打开 URL: {error}")))?;
+    Ok(())
+}
+
 fn sync_remote_seen(
     store: &MailStore,
     message_id: i64,

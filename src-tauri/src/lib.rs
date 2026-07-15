@@ -134,8 +134,8 @@ pub fn run() {
             commands::complete_background_task,
             commands::fail_background_task,
             commands::flush_outbox_dry_run,
-            commands::release_due_outbox_items,
             commands::flush_outbox_smtp,
+            commands::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Better Email");

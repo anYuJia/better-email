@@ -29,6 +29,8 @@ import { formatDate } from '../../mailUtils';
 import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
 import './data-settings.css';
 
+import { devMode } from './settingsNavigation';
+
 type SyncOperationsSettingsProps = {
   accountForm: Account;
   imapProbe: ImapProbeReport | null;
@@ -91,74 +93,80 @@ export default function SyncOperationsSettings({
       <section className="settings-section-overview">
         <span>
           <strong>同步与发信高级工具</strong>
-          <em>回写验收、IMAP 发现、同步演练和发件箱队列</em>
+          <em>{devMode ? '回写验收、IMAP 发现、同步演练和发件箱队列' : '管理邮件同步状态与连接'}</em>
         </span>
         <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
       </section>
 
-      <ProviderWriteValidationSettings
-        status={writeValidationStatus}
-        loading={writeValidationLoading}
-        writebackProgress={writebackValidationProgress}
-        onPrepare={onPrepareWriteValidation}
-        onRefresh={onRefreshWriteValidation}
-        onLocate={onLocateWriteValidation}
-        onRunWritebackStep={onRunWritebackValidationStep}
-        onResetWriteback={onResetWritebackValidation}
-      />
+      {devMode && (
+        <ProviderWriteValidationSettings
+          status={writeValidationStatus}
+          loading={writeValidationLoading}
+          writebackProgress={writebackValidationProgress}
+          onPrepare={onPrepareWriteValidation}
+          onRefresh={onRefreshWriteValidation}
+          onLocate={onLocateWriteValidation}
+          onRunWritebackStep={onRunWritebackValidationStep}
+          onResetWriteback={onResetWritebackValidation}
+        />
+      )}
 
-      <section className="tool-panel settings-imap-discovery">
-        <header className="tool-header">
-          <span>
-            <strong>IMAP 文件夹发现</strong>
-            <small>读取远端邮箱文件夹结构并映射本地角色</small>
-          </span>
-          <button type="button" onClick={onDiscoverImapFolders}>
-            <Search size={14} />
-            发现文件夹
-          </button>
-        </header>
-        {!imapProbe ? (
-          <p className="settings-empty-state">保存系统凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
-        ) : (
-          <>
-            <div className={imapProbe.status === 'ok' ? 'tool-row ok' : 'tool-row warn'}>
-              <span>{imapProbe.status}</span>
-              <em>{imapProbe.account_email}</em>
-              <small>{imapProbe.folder_count} 个</small>
-              <p>{imapProbe.message}</p>
-            </div>
-            <div className="settings-folder-grid">
-              {imapProbe.folders.slice(0, 12).map((folder) => (
-                <div className="tool-row" key={folder.name}>
-                  <span>{folder.name}</span>
-                  <em>{folder.delimiter || 'flat'}</em>
-                  <small>{folder.attributes.join(', ')}</small>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+      {devMode && (
+        <section className="tool-panel settings-imap-discovery">
+          <header className="tool-header">
+            <span>
+              <strong>IMAP 文件夹发现</strong>
+              <small>读取远端邮箱文件夹 structure 并映射本地角色</small>
+            </span>
+            <button type="button" onClick={onDiscoverImapFolders}>
+              <Search size={14} />
+              发现文件夹
+            </button>
+          </header>
+          {!imapProbe ? (
+            <p className="settings-empty-state">保存系统凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
+          ) : (
+            <>
+              <div className={imapProbe.status === 'ok' ? 'tool-row ok' : 'tool-row warn'}>
+                <span>{imapProbe.status}</span>
+                <em>{imapProbe.account_email}</em>
+                <small>{imapProbe.folder_count} 个</small>
+                <p>{imapProbe.message}</p>
+              </div>
+              <div className="settings-folder-grid">
+                {imapProbe.folders.slice(0, 12).map((folder) => (
+                  <div className="tool-row" key={folder.name}>
+                    <span>{folder.name}</span>
+                    <em>{folder.delimiter || 'flat'}</em>
+                    <small>{folder.attributes.join(', ')}</small>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="tool-panel settings-sync-panel">
         <header className="tool-header">
           <span>
-            <strong>同步演练</strong>
-            <small>检查调度批次、文件夹状态和增量同步结果</small>
+            <strong>同步设置</strong>
+            <small>{devMode ? '检查调度批次、文件夹状态和增量同步结果' : '同步状态与手动刷新邮件头'}</small>
           </span>
           <div className="tool-actions">
-            <button className="secondary" type="button" onClick={onRunSyncDryRun}>演练</button>
-            <button
-              className="secondary"
-              disabled={pendingHistoryCount === 0}
-              title={pendingHistoryCount === 0 ? '当前账号历史邮件已回填完成' : `为 ${pendingHistoryCount} 个目录各回填一页`}
-              type="button"
-              onClick={onSyncHistory}
-            >
-              <History size={14} />
-              回填一页
-            </button>
+            {devMode && <button className="secondary" type="button" onClick={onRunSyncDryRun}>演练</button>}
+            {devMode && (
+              <button
+                className="secondary"
+                disabled={pendingHistoryCount === 0}
+                title={pendingHistoryCount === 0 ? '当前账号历史邮件已回填完成' : `为 ${pendingHistoryCount} 个目录各回填一页`}
+                type="button"
+                onClick={onSyncHistory}
+              >
+                <History size={14} />
+                回填一页
+              </button>
+            )}
             <button type="button" onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
               <RefreshCw size={14} />
               同步邮件头
@@ -274,22 +282,24 @@ export default function SyncOperationsSettings({
             <strong>发件箱队列</strong>
             <small>查看排队、定时发送、重试和撤回状态</small>
           </span>
-          <div className="tool-actions">
-            <button
-              className="secondary"
-              type="button"
-              onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}
-            >
-              发送演练
-            </button>
-            <button
-              type="button"
-              onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}
-            >
-              <Send size={14} />
-              真实发送
-            </button>
-          </div>
+          {devMode && (
+            <div className="tool-actions">
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}
+              >
+                发送演练
+              </button>
+              <button
+                type="button"
+                onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}
+              >
+                <Send size={14} />
+                真实发送
+              </button>
+            </div>
+          )}
         </header>
         {outbox.length === 0 ? (
           <p className="settings-empty-state">发件箱当前为空。</p>

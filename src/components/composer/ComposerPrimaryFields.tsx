@@ -113,7 +113,7 @@ export default function ComposerPrimaryFields({
       datalistContactLimit,
     )
   ), [contactSearchEntries, recipientQuery, suggestedContacts]);
-  const showRecipientSuggestions = suggestedContacts.length > 0 && (recipientFocused || !draft.to.trim());
+  const showRecipientSuggestions = suggestedContacts.length > 0 && recipientFocused;
   const { editableBody, originalQuote } = useMemo(
     () => splitEditableBody(draft.body),
     [draft.body],

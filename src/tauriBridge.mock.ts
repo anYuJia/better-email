@@ -2320,6 +2320,9 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
     case 'delete_rule':
       rules = rules.filter((rule) => rule.id !== args?.ruleId);
       return undefined as T;
+    case 'open_url':
+      console.log('Mock opening URL:', args?.url);
+      return undefined as T;
     default:
       return (Array.isArray(args) ? [] : undefined) as T;
   }

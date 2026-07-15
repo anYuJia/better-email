@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Archive,
   Clock,
@@ -84,7 +85,7 @@ export type ReaderPaneProps = {
   quickReplyBody: string;
   onSelectMessage: (messageId: number) => void;
   readTriggerKey: number;
-  onComposeNew: () => void;
+  onComposeNew: (fields?: { to?: string }) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
@@ -187,6 +188,8 @@ export default function ReaderPane({
   const [newLabelColor, setNewLabelColor] = useState('#2f7ed8');
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
   const [editingLabelName, setEditingLabelName] = useState('');
+  const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
+  const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
 
   async function handleCreateLabel() {
     if (!newLabelName.trim() || !onCreateLabel) return;
@@ -622,7 +625,7 @@ export default function ReaderPane({
               >
                 <Forward size={17} />
               </button>
-              <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={onComposeNew}>
+              <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
                 <MailPlus size={17} />
               </button>
               <button
@@ -721,7 +724,7 @@ export default function ReaderPane({
             </div>
             <strong>选择一封邮件开始阅读</strong>
             <span>常用动作会保持可见，整理与安全选项按需展开。</span>
-            <button type="button" className="empty-reader-compose" onClick={onComposeNew}>
+            <button type="button" className="empty-reader-compose" onClick={() => onComposeNew()}>
               <MailPlus size={15} />
               新邮件
             </button>
@@ -778,7 +781,7 @@ export default function ReaderPane({
                 >
                   <Forward size={17} />
                 </button>
-                <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={onComposeNew}>
+                <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
                   <MailPlus size={17} />
                 </button>
               </>
@@ -972,11 +975,9 @@ export default function ReaderPane({
                                 type="button"
                                 className="action-delete"
                                 title="删除标签"
-                                onClick={async (e) => {
+                                onClick={(e) => {
                                   e.stopPropagation();
-                                  if (confirm(`确定要删除标签 "${label.name}" 吗？`)) {
-                                    await handleDeleteLabel(label.id);
-                                  }
+                                  setLabelToDelete(label);
                                 }}
                               >
                                 ✕
@@ -1162,13 +1163,40 @@ export default function ReaderPane({
             <EmailReaderSkeleton />
           ) : null
         ) : hasRenderableHtml ? (
-          <EmailShadowView
-            className="reader-html"
-            html={readerHtml}
-            onClick={handleReaderHtmlClick}
-            onContextMenuCapture={handleReaderHtmlContextMenu}
-            onContextMenu={handleReaderHtmlContextMenu}
-          />
+          <div
+            ref={(el) => {
+              if (el) {
+                el.addEventListener('email-link-click', ((event: CustomEvent) => {
+                  const { href, text } = event.detail;
+                  // Handle mailto and other non-http(s) schemes directly or ignore
+                  if (href.startsWith('mailto:')) {
+                    // Let the system handle it or ignore, since we want to avoid WebView navigating
+                    // Let's invoke shell open or ignore.
+                    invoke('open_attachment', { local_path: href }).catch(() => undefined); // wait, open_attachment is for local files, let's check what command opens a URL
+                    // Actually we can add an open_url command in Rust, but first let's see how we can handle mailto or simple links.
+                    // For mailto, we can open composer window in our app!
+                    // Wait, our app has a composer window, so we can parse mailto and compose!
+                    // Let's check how mailto can trigger app's compose window.
+                    // Let's set clickedLink to show the dialog first.
+                    setClickedLink({ href, text });
+                  } else if (href.startsWith('http://') || href.startsWith('https://')) {
+                    setClickedLink({ href, text });
+                  } else {
+                    // Prevent unknown protocols (file, javascript, data) completely
+                    console.warn('Blocked navigation to unsafe/unknown protocol:', href);
+                  }
+                }) as EventListener);
+              }
+            }}
+          >
+            <EmailShadowView
+              className="reader-html"
+              html={readerHtml}
+              onClick={handleReaderHtmlClick}
+              onContextMenuCapture={handleReaderHtmlContextMenu}
+              onContextMenu={handleReaderHtmlContextMenu}
+            />
+          </div>
         ) : shouldOfferRemoteContent ? (
           <EmptyMessageBody
             title="正文主要由远程图片组成"
@@ -1319,6 +1347,162 @@ export default function ReaderPane({
           ariaLabel="附件操作"
         />
       )}
+      {labelToDelete && createPortal((
+        <div
+          className="settings-cache-confirm-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setLabelToDelete(null);
+            }
+          }}
+        >
+          <section
+            className="settings-cache-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="label-confirm-title"
+          >
+            <header>
+              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                <Tag size={17} />
+              </span>
+              <span>
+                <strong id="label-confirm-title">删除标签</strong>
+                <small>该操作不可逆，将移除所有此标签的标记</small>
+              </span>
+              <button
+                className="icon-only-action"
+                type="button"
+                title="关闭"
+                aria-label="关闭删除确认"
+                onClick={() => setLabelToDelete(null)}
+              >
+                <X size={16} />
+              </button>
+            </header>
+            <div className="settings-cache-confirm-summary" style={{ background: '#fef2f2', borderLeft: '3px solid #ef4444' }}>
+              <span style={{ fontSize: '14px', color: '#991b1b', fontWeight: 'bold' }}>
+                确认删除标签 "{labelToDelete.name}" 吗？
+              </span>
+            </div>
+            <p>
+              删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。
+            </p>
+            <footer>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setLabelToDelete(null)}
+              >
+                取消
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={async () => {
+                  await handleDeleteLabel(labelToDelete.id);
+                  setLabelToDelete(null);
+                }}
+              >
+                确认删除
+              </button>
+            </footer>
+          </section>
+        </div>
+      ), document.body)}
+      {clickedLink && createPortal((
+        <div
+          className="settings-cache-confirm-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setClickedLink(null);
+            }
+          }}
+        >
+          <section
+            className="settings-cache-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="link-confirm-title"
+            style={{ width: '480px' }}
+          >
+            <header>
+              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fef3c7', color: '#d97706' }}>
+                <ExternalLink size={17} />
+              </span>
+              <span>
+                <strong id="link-confirm-title">安全链接检查</strong>
+                <small>请确认目标链接与显示的域名一致</small>
+              </span>
+              <button
+                className="icon-only-action"
+                type="button"
+                title="关闭"
+                aria-label="关闭安全检查"
+                onClick={() => setClickedLink(null)}
+              >
+                <X size={16} />
+              </button>
+            </header>
+            <div className="settings-cache-confirm-summary" style={{ background: '#fffbeb', borderLeft: '3px solid #f59e0b', wordBreak: 'break-all' }}>
+              <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>真实目标地址：</div>
+              <strong style={{ fontSize: '13px', color: '#1f2937', display: 'block' }}>{clickedLink.href}</strong>
+            </div>
+            <div style={{ fontSize: '12.5px', color: '#374151', margin: '14px 0', lineHeight: '1.5' }}>
+              {(() => {
+                const linkUrlStr = clickedLink.href;
+                let showDomainWarning = false;
+                try {
+                  const linkUrl = new URL(linkUrlStr);
+                  const displayDomain = clickedLink.text.trim().toLowerCase();
+                  if (displayDomain && (displayDomain.includes('.') || displayDomain.includes('/'))) {
+                    // Check if the linkText is a domain and is different from target URL host
+                    if (!linkUrl.host.toLowerCase().includes(displayDomain) && !displayDomain.includes(linkUrl.host.toLowerCase())) {
+                      showDomainWarning = true;
+                    }
+                  }
+                } catch (e) {
+                  // If linkUrl is not a full URL or mailto
+                }
+
+                if (showDomainWarning) {
+                  return (
+                    <div style={{ padding: '10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b', fontWeight: 'bold' }}>
+                      ⚠️ 风险提示：显示的链接文本与实际指向的域名不一致！这可能是一个钓鱼链接，请谨慎访问。
+                    </div>
+                  );
+                }
+                return '您点击的链接将通过系统默认浏览器打开，请确认该目标地址安全。';
+              })()}
+            </div>
+            <footer>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => setClickedLink(null)}
+              >
+                取消访问
+              </button>
+              <button
+                className="primary"
+                type="button"
+                style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                onClick={async () => {
+                  if (clickedLink.href.startsWith('mailto:')) {
+                    // Compose email
+                    onComposeNew?.({ to: clickedLink.href.substring(7) });
+                  } else {
+                    await invoke('open_url', { url: clickedLink.href });
+                  }
+                  setClickedLink(null);
+                }}
+              >
+                继续访问
+              </button>
+            </footer>
+          </section>
+        </div>
+      ), document.body)}
     </section>
   );
 }

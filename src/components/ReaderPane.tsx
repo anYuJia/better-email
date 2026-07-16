@@ -41,7 +41,7 @@ import type {
   Message,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, compareDomains, parseMailtoUrl } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, shouldWarnForLinkDisplay } from '../mailUtils';
 import ConfirmDialog from './ConfirmDialog';
 import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
@@ -66,6 +66,13 @@ type IdleScheduler = Window & {
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
 type ImageContextMenu = PreviewImage & { x: number; y: number } | null;
+type ComposeNewFields = {
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  body?: string;
+};
 type PlainBodyBlock =
   | { type: 'text'; content: string }
   | { type: 'original'; index: number; meta: string[]; content: string };
@@ -86,7 +93,7 @@ export type ReaderPaneProps = {
   quickReplyBody: string;
   onSelectMessage: (messageId: number) => void;
   readTriggerKey: number;
-  onComposeNew: (fields?: { to?: string }) => void;
+  onComposeNew: (fields?: ComposeNewFields) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
@@ -1139,18 +1146,10 @@ export default function ReaderPane({
               onContextMenuCapture={handleReaderHtmlContextMenu}
               onContextMenu={handleReaderHtmlContextMenu}
               onLinkClick={(href, text) => {
-                if (href.startsWith('mailto:')) {
-                  try {
-                    const mailtoUrl = new URL(href);
-                    const to = mailtoUrl.pathname || '';
-                    const safeTo = to.replace(/[\r\n]/g, '').trim();
-                    onComposeNew({ to: safeTo });
-                  } catch {
-                    const to = href.replace(/^mailto:/i, '').split('?')[0];
-                    const safeTo = decodeURIComponent(to).replace(/[\r\n]/g, '').trim();
-                    onComposeNew({ to: safeTo });
-                  }
-                } else if (href.startsWith('http://') || href.startsWith('https://')) {
+                const lowerHref = href.toLowerCase();
+                if (lowerHref.startsWith('mailto:')) {
+                  onComposeNew(parseMailtoUrl(href));
+                } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
                   setClickedLink({ href, text });
                 } else {
                   console.warn('Blocked navigation to unsafe/unknown protocol:', href);
@@ -1349,37 +1348,7 @@ export default function ReaderPane({
             </div>
             <div style={{ fontSize: '12.5px', color: '#374151', margin: '14px 0', lineHeight: '1.5' }}>
               {(() => {
-                const linkUrlStr = clickedLink.href;
-                let showDomainWarning = false;
-                try {
-                  const linkUrl = new URL(linkUrlStr);
-                  let displayDomain = clickedLink.text.trim().toLowerCase();
-                  // Strip protocol if present in display text
-                  displayDomain = displayDomain.replace(/^(https?:\/\/)?(www\.)?/, '');
-                  // Strip path, query, port, user info in display text if present
-                  const displayHostAndPort = displayDomain.split('/')[0].split('@').pop() || '';
-                  const displayHost = displayHostAndPort.split(':')[0];
-
-                  // Normalize target host
-                  let targetHost = linkUrl.hostname.toLowerCase();
-                  if (targetHost.startsWith('www.')) {
-                    targetHost = targetHost.substring(4);
-                  }
-
-                  // If display text looks like a host/domain name, do exact hostname/subdomain checks using compareDomains
-                  if (displayHost && (displayHost.includes('.') || displayHost.includes(':'))) {
-                    let cleanDisplayHost = displayHost;
-                    if (cleanDisplayHost.startsWith('www.')) {
-                      cleanDisplayHost = cleanDisplayHost.substring(4);
-                    }
-                    const isMatch = compareDomains(targetHost, cleanDisplayHost) || targetHost.endsWith('.' + cleanDisplayHost);
-                    if (!isMatch) {
-                      showDomainWarning = true;
-                    }
-                  }
-                } catch (e) {
-                  // Fallback or ignore
-                }
+                const showDomainWarning = shouldWarnForLinkDisplay(clickedLink.href, clickedLink.text);
 
                 if (showDomainWarning) {
                   return (
@@ -1406,7 +1375,7 @@ export default function ReaderPane({
                 onClick={async () => {
                   if (clickedLink.href.toLowerCase().startsWith('mailto:')) {
                     const parsed = parseMailtoUrl(clickedLink.href);
-                    onComposeNew?.({ to: parsed.to });
+                    onComposeNew?.(parsed);
                   } else {
                     await invoke('open_url', { url: clickedLink.href });
                   }

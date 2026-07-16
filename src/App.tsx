@@ -3540,6 +3540,10 @@ export default function App() {
             ...emptyDraft,
             account_id: account?.id ?? accounts[0]?.id ?? 0,
             to: fields?.to || '',
+            cc: fields?.cc || '',
+            bcc: fields?.bcc || '',
+            subject: fields?.subject || '',
+            body: fields?.body || '',
           });
           setStatus('已打开新邮件');
         }}

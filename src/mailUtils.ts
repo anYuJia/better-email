@@ -445,6 +445,19 @@ export type MailtoParsed = {
   body: string;
 };
 
+function sanitizeMailtoField(value: string): string {
+  return value.replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function decodeMailtoValue(value: string): string {
+  const normalized = value.replace(/\+/g, ' ');
+  try {
+    return sanitizeMailtoField(decodeURIComponent(normalized));
+  } catch {
+    return sanitizeMailtoField(normalized);
+  }
+}
+
 export function parseMailtoUrl(url: string): MailtoParsed {
   const result: MailtoParsed = { to: '', cc: '', bcc: '', subject: '', body: '' };
   
@@ -457,26 +470,19 @@ export function parseMailtoUrl(url: string): MailtoParsed {
   const [toPart, queryPart] = rawParts.split('?');
   
   if (toPart) {
-    try {
-      result.to = decodeURIComponent(toPart);
-    } catch {
-      result.to = toPart;
-    }
+    result.to = decodeMailtoValue(toPart);
   }
   
   if (queryPart) {
     const params = queryPart.split('&');
     for (const param of params) {
-      const [key, value] = param.split('=');
+      const separatorIndex = param.indexOf('=');
+      const key = separatorIndex >= 0 ? param.slice(0, separatorIndex) : param;
+      const value = separatorIndex >= 0 ? param.slice(separatorIndex + 1) : '';
       if (!key) continue;
       
       const cleanKey = key.trim().toLowerCase();
-      let decodedValue = '';
-      try {
-        decodedValue = decodeURIComponent(value || '');
-      } catch {
-        decodedValue = value || '';
-      }
+      const decodedValue = decodeMailtoValue(value || '');
       
       if (cleanKey === 'to') {
         result.to = result.to ? `${result.to},${decodedValue}` : decodedValue;
@@ -504,4 +510,63 @@ export function compareDomains(domainA: string, domainB: string): boolean {
     return clean;
   };
   return normalize(domainA) === normalize(domainB);
+}
+
+function hostFromDisplayText(text: string): string {
+  const trimmed = text.trim().replace(/^<|>$/g, '').replace(/[),.;]+$/g, '');
+  if (!trimmed || /\s/.test(trimmed)) return '';
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : '';
+  } catch {
+    // Plain domains like example.com are handled below.
+  }
+
+  try {
+    if (trimmed.startsWith('//')) {
+      return new URL(`https:${trimmed}`).hostname;
+    }
+  } catch {
+    return '';
+  }
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//i, '');
+  const hostCandidate = withoutProtocol.split('/')[0].split('?')[0].split('#')[0].split('@').pop() || '';
+  const hostWithoutPort = hostCandidate.startsWith('[')
+    ? hostCandidate.replace(/^\[|\](?::\d+)?$/g, '')
+    : hostCandidate.split(':')[0];
+  if (!hostWithoutPort || !hostWithoutPort.includes('.')) return '';
+  return hostWithoutPort;
+}
+
+function displayTextHasSuspiciousUserInfo(text: string): boolean {
+  const trimmed = text.trim().replace(/^<|>$/g, '').replace(/[),.;]+$/g, '');
+  const hasUrlPrefix = /^(https?:)?\/\//i.test(trimmed);
+  const authority = trimmed
+    .replace(/^https?:\/\//i, '')
+    .replace(/^\/\//, '')
+    .split('/')[0]
+    .split('?')[0]
+    .split('#')[0];
+  const atIndex = authority.lastIndexOf('@');
+  if (atIndex <= 0) return false;
+  const userInfo = authority.slice(0, atIndex);
+  return hasUrlPrefix || userInfo.includes('.');
+}
+
+export function shouldWarnForLinkDisplay(targetHref: string, displayText: string): boolean {
+  let targetHost = '';
+  try {
+    const targetUrl = new URL(targetHref);
+    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return false;
+    targetHost = targetUrl.hostname;
+  } catch {
+    return false;
+  }
+
+  if (displayTextHasSuspiciousUserInfo(displayText)) return true;
+  const displayHost = hostFromDisplayText(displayText);
+  if (!displayHost) return false;
+  return !compareDomains(targetHost, displayHost);
 }

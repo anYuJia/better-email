@@ -20,6 +20,7 @@ import {
   htmlHasRemoteVisualContent,
   parseMailtoUrl,
   compareDomains,
+  shouldWarnForLinkDisplay,
 } from './mailUtils';
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
@@ -394,20 +395,34 @@ describe('mail UI utilities', () => {
     });
 
     it('ignores case for mailto scheme', () => {
-      const parsed = parseMailtoUrl('MAILTO:alice@example.com');
+      const parsed = parseMailtoUrl('MAILTO:alice@example.com?CC=team@example.com&SUBJECT=Hello+Team&BODY=First%20line');
       expect(parsed.to).toBe('alice@example.com');
+      expect(parsed.cc).toBe('team@example.com');
+      expect(parsed.subject).toBe('Hello Team');
+      expect(parsed.body).toBe('First line');
     });
 
-    it('clears control characters and tolerates encoding errors', () => {
-      const parsed = parseMailtoUrl('mailto:alice@example.com\x00\x1f?subject=%C2');
+    it('clears raw and decoded control characters and tolerates encoding errors', () => {
+      const parsed = parseMailtoUrl('mailto:alice@example.com\x00\x1f?subject=%C2&body=Hello%0D%0ABcc%3Aevil%40example.com');
       expect(parsed.to).toBe('alice@example.com');
       expect(parsed.subject).toBe('%C2');
+      expect(parsed.body).toBe('Hello Bcc:evil@example.com');
     });
 
     it('compares domains ignoring www differences and avoiding partial matching issues', () => {
       expect(compareDomains('www.paypal.com', 'paypal.com')).toBe(true);
       expect(compareDomains('paypal.com', 'paypal.com.evil.example')).toBe(false);
       expect(compareDomains('paypal.com', 'PAYPAL.COM')).toBe(true);
+    });
+
+    it('warns when displayed link host differs from the real target host', () => {
+      expect(shouldWarnForLinkDisplay('https://paypal.com/login', 'paypal.com')).toBe(false);
+      expect(shouldWarnForLinkDisplay('https://www.paypal.com/login', 'paypal.com')).toBe(false);
+      expect(shouldWarnForLinkDisplay('https://login.paypal.com/', 'paypal.com')).toBe(true);
+      expect(shouldWarnForLinkDisplay('https://paypal.com.evil.example/login', 'paypal.com')).toBe(true);
+      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'https://paypal.com/reset')).toBe(true);
+      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'paypal.com@evil.example')).toBe(true);
+      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'click here')).toBe(false);
     });
   });
 });

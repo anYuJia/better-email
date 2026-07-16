@@ -10,7 +10,6 @@ import {
 import {
   filters,
   listSortOptions,
-  searchShortcuts,
   searchScopeOptions,
 } from '../app/appConfig';
 import type {

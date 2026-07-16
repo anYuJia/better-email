@@ -57,7 +57,6 @@ import type {
   SearchScope,
   Attachment,
   OutboundAttachmentInput,
-  DroppedFile,
   Message,
   UndoMessageSnapshot,
   CommandPaletteItem,
@@ -1332,21 +1331,6 @@ export default function App() {
     let changed = false;
     for (const messageId of messageIds) {
       if (next.delete(messageId)) changed = true;
-    }
-    if (!changed) return;
-    manualUnreadMessageIdsRef.current = next;
-    saveManualUnreadMessageIds(next);
-  }, []);
-
-  const addManualUnreadSuppression = useCallback((messageIds: number[]) => {
-    if (messageIds.length === 0) return;
-    const next = new Set(manualUnreadMessageIdsRef.current);
-    let changed = false;
-    for (const messageId of messageIds) {
-      if (!next.has(messageId)) {
-        next.add(messageId);
-        changed = true;
-      }
     }
     if (!changed) return;
     manualUnreadMessageIdsRef.current = next;

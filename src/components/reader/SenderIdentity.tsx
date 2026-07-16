@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Message } from '../../app/types';
 
 function senderInitial(message: Message) {

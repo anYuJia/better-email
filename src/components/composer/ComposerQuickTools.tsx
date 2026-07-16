@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Bold, FileSignature, Italic, List, Paperclip } from 'lucide-react';
+import { FileSignature, Paperclip } from 'lucide-react';
 import type { DraftInput } from '../../app/types';
 
 type ComposerQuickToolsProps = {
@@ -19,11 +19,8 @@ type ComposerQuickToolsProps = {
 
 export default function ComposerQuickTools({
   draft,
-  richComposer,
   dropActive,
   signature,
-  onPatchDraft,
-  onRichComposerChange,
   onInsertSignature,
   onPickAttachments,
   onAttachmentDrop,

@@ -2371,6 +2371,6 @@ export function mockRequestPermission(): Promise<string> {
   return Promise.resolve('granted');
 }
 
-export function mockSendNotification(notification: { title: string; body?: string }) {
+export function mockSendNotification(_notification: { title: string; body?: string }) {
   return;
 }

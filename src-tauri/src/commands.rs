@@ -3550,8 +3550,7 @@ pub fn save_temp_attachment(
         })?;
 
     let data_dir = app.path().app_data_dir().map_err(|error| {
-        crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        crate::db::MailError::Io(std::io::Error::other(
             format!("获取数据目录失败：{error}"),
         ))
     })?;

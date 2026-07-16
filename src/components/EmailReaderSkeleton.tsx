@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function EmailHeaderSkeleton() {
   return (
     <div className="email-reader-skeleton-header">

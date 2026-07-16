@@ -1,4 +1,4 @@
-import type { ListSort, Message } from './app/types';
+import type { Message } from './app/types';
 
 export type InvokeArgs = Record<string, unknown> | undefined;
 export type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };

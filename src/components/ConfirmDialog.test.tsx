@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -54,7 +53,6 @@ describe('ConfirmDialog Component robust behaviors', () => {
     );
 
     const closeBtn = screen.getByRole('button', { name: '关闭确认' });
-    const cancelBtn = screen.getByRole('button', { name: '取消' });
     const confirmBtn = screen.getByRole('button', { name: '确认' });
 
     // Focus close button

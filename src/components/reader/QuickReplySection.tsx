@@ -1,4 +1,3 @@
-import React from 'react';
 import { Reply } from 'lucide-react';
 import type { Message } from '../../app/types';
 

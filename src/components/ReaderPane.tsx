@@ -7,10 +7,6 @@ import {
   Download,
   ExternalLink,
   File,
-  FileAudio,
-  FileImage,
-  FileText,
-  FileVideo,
   FolderOpen,
   Forward,
   Image as ImageIcon,
@@ -21,7 +17,6 @@ import {
   Reply,
   ReplyAll,
   RotateCcw,
-  SlidersHorizontal,
   Star,
   Tag,
   Trash2,
@@ -42,7 +37,6 @@ import type {
   ThreadSummary,
 } from '../app/types';
 import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, shouldWarnForLinkDisplay } from '../mailUtils';
-import ConfirmDialog from './ConfirmDialog';
 import { invoke } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -73,9 +67,6 @@ type ComposeNewFields = {
   subject?: string;
   body?: string;
 };
-type PlainBodyBlock =
-  | { type: 'text'; content: string }
-  | { type: 'original'; index: number; meta: string[]; content: string };
 
 export type ReaderPaneProps = {
   activeThread: ThreadSummary | null;
@@ -147,7 +138,6 @@ export default function ReaderPane({
   labels,
   attachments,
   selectedSenderTrusted,
-  selectedSenderDomain,
   selectedHasRemoteImageWarning,
   quickReplyBody,
   onSelectMessage,
@@ -171,8 +161,6 @@ export default function ReaderPane({
   onMarkNotSpam,
   onMarkAsSpam,
   onAllowRemoteImagesOnce,
-  onTrustRemoteImages,
-  onBlockSender,
   onPermanentlyDelete,
   onEmptyTrash,
   onMoveToFolder,
@@ -214,15 +202,6 @@ export default function ReaderPane({
     try {
       await onUpdateLabel(id, editingLabelName.trim(), newLabelColor);
       setEditingLabelId(null);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function handleDeleteLabel(id: number) {
-    if (!onDeleteLabel) return;
-    try {
-      await onDeleteLabel(id);
     } catch (e) {
       console.error(e);
     }

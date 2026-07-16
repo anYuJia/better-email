@@ -221,7 +221,7 @@ export default function MessageListView({
   const prevIds = prevIdsRef.current;
 
   const [viewportHeight, setViewportHeight] = useState(600);
-  const [scrollTop, setScrollTop] = useState(initialScrollTop);
+  const [, setScrollTop] = useState(initialScrollTop);
 
   const newIds = useMemo(() => {
     const set = new Set<number>();

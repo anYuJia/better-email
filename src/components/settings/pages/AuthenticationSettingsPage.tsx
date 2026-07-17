@@ -10,6 +10,8 @@ import OAuthSettingsPanel from '../OAuthSettingsPanel';
 
 type AuthenticationSettingsPageProps = {
   accountForm: Account;
+  authTypeChanged: boolean;
+  authTypeChangeNotice: string | null;
   oauthClientId: string;
   oauthClientSecret: string;
   oauthRedirectUri: string;
@@ -35,6 +37,8 @@ type AuthenticationSettingsPageProps = {
 
 export default function AuthenticationSettingsPage({
   accountForm,
+  authTypeChanged,
+  authTypeChangeNotice,
   oauthClientId,
   oauthClientSecret,
   oauthRedirectUri,
@@ -77,6 +81,11 @@ export default function AuthenticationSettingsPage({
             <option value="oauth2">OAuth2 Token</option>
           </select>
         </label>
+        {authTypeChanged && authTypeChangeNotice && (
+          <p className="settings-auth-change-notice" role="status">
+            {authTypeChangeNotice}
+          </p>
+        )}
       </section>
 
       <OAuthSettingsPanel

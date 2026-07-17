@@ -591,8 +591,16 @@ export default function App() {
     activeProviderVerification,
     providerValidationReport,
     providerValidationRunning,
+    isDirty: accountSettingsDirty,
+    authTypeChanged,
+    authTypeChangeNotice,
+    accountSettingsSaving,
+    saveAndVerifyReport,
+    saveAndVerifyRunning,
+    resetSaveAndVerifyReport,
     updateProviderVerification,
     saveSettings,
+    saveAndVerify,
     createNewAccount,
     removeCurrentAccount,
     setDefaultAccount,
@@ -608,6 +616,7 @@ export default function App() {
     runSyncDryRun,
     syncImapHistoryPage,
   } = useAccountConnectionController({
+    accounts,
     accountForm,
     newAccountForm,
     providerVerifications,
@@ -3870,6 +3879,9 @@ export default function App() {
             }
             testConnection().catch((error) => setStatus(String(error)));
           }}
+          isDirty={accountSettingsDirty}
+          isBusy={accountSettingsSaving || saveAndVerifyRunning}
+          connectionSummary={saveAndVerifyReport.summary}
           onSave={() => {
             if (!accountForm) {
               setStatus('请先添加邮箱账号');
@@ -3877,7 +3889,13 @@ export default function App() {
             }
             saveSettings().catch((error) => setStatus(String(error)));
           }}
-          onClose={() => setSettingsOpen(false)}
+          onSaveAndVerify={accountForm ? () => {
+            saveAndVerify().catch((error) => setStatus(String(error)));
+          } : undefined}
+          onClose={() => {
+            resetSaveAndVerifyReport();
+            setSettingsOpen(false);
+          }}
         >
             {(activeSettingsSection === 'accounts'
               || activeSettingsSection === 'providers'
@@ -3901,6 +3919,9 @@ export default function App() {
               oauthExchangeReport={oauthExchangeReport}
               oauthRefreshReport={oauthRefreshReport}
               oauthSessions={oauthSessions}
+              authTypeChanged={authTypeChanged}
+              authTypeChangeNotice={authTypeChangeNotice}
+              saveAndVerifyReport={saveAndVerifyReport}
               onAccountFormChange={setAccountForm}
               onNewAccountFormChange={setNewAccountForm}
               onApplyProviderPreset={applyProviderPreset}
@@ -3944,8 +3965,11 @@ export default function App() {
                 credentialStatus={credentialStatus}
                 connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
                 credentialVerification={
-                  credentialVerification?.account_email === accountForm.email ? credentialVerification : null
+                  !authTypeChanged && credentialVerification?.account_email === accountForm.email
+                    ? credentialVerification
+                    : null
                 }
+                authTypeChangeNotice={authTypeChangeNotice}
                 providerValidationReport={
                   providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null
                 }

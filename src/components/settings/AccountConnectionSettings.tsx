@@ -9,6 +9,7 @@ import type {
   OAuthTokenExchangeReport,
   ProviderVerificationRecord,
 } from '../../app/types';
+import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
 import type { AccountProviderPreset } from '../../providerCatalog';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AuthenticationSettingsPage from './pages/AuthenticationSettingsPage';
@@ -33,6 +34,9 @@ export type AccountConnectionSettingsProps = {
   oauthExchangeReport: OAuthTokenExchangeReport | null;
   oauthRefreshReport: OAuthRefreshReport | null;
   oauthSessions: OAuthSession[];
+  authTypeChanged: boolean;
+  authTypeChangeNotice: string | null;
+  saveAndVerifyReport: SaveAndVerifyReport;
   onAccountFormChange: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
@@ -63,6 +67,15 @@ const connectionSteps = [
   { id: 'auth', index: '03', label: '认证', detail: '密码或 OAuth2' },
 ] as const;
 
+const saveAndVerifyStateLabels = {
+  pending: '等待',
+  running: '进行中',
+  success: '通过',
+  partial: '部分通过',
+  error: '失败',
+  needs_auth: '需要认证',
+} as const;
+
 function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsProps['section'] }) {
   const activeIndex = connectionSteps.findIndex((step) => step.id === section);
 
@@ -89,6 +102,8 @@ function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsP
 }
 
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
+  const showSaveAndVerifyStatus = Boolean(props.accountForm)
+    && props.saveAndVerifyReport.overall !== 'pending';
   let page: React.ReactNode;
 
   if (props.section === 'accounts' || !props.accountForm) {
@@ -122,6 +137,8 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
     page = (
       <AuthenticationSettingsPage
         accountForm={props.accountForm}
+        authTypeChanged={props.authTypeChanged}
+        authTypeChangeNotice={props.authTypeChangeNotice}
         oauthClientId={props.oauthClientId}
         oauthClientSecret={props.oauthClientSecret}
         oauthRedirectUri={props.oauthRedirectUri}
@@ -150,6 +167,34 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
   return (
     <div className="settings-connection-shell">
       <ConnectionFlowHeader section={props.section} />
+      {showSaveAndVerifyStatus && (
+        <section
+          className={`settings-save-verify-status ${props.saveAndVerifyReport.overall}`}
+          aria-label="账号保存与验证状态"
+        >
+          <header>
+            <span>
+              <strong>账号连接状态</strong>
+              <small>{props.saveAndVerifyReport.summary}</small>
+            </span>
+            <em>{saveAndVerifyStateLabels[props.saveAndVerifyReport.overall]}</em>
+          </header>
+          <div className="settings-save-verify-stages">
+            {props.saveAndVerifyReport.stages.map((stage) => (
+              <span className={stage.state} key={stage.id}>
+                <b>{stage.label}</b>
+                <small>{stage.detail}</small>
+              </span>
+            ))}
+          </div>
+          {props.saveAndVerifyReport.technicalDetails.length > 0 && (
+            <details>
+              <summary>技术详情</summary>
+              <pre>{props.saveAndVerifyReport.technicalDetails.join('\n')}</pre>
+            </details>
+          )}
+        </section>
+      )}
       {page}
     </div>
   );

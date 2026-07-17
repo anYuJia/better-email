@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import type React from 'react';
 import {
+  BadgeCheck,
   FlaskConical,
+  LoaderCircle,
   Save,
   X,
 } from 'lucide-react';
@@ -31,16 +33,31 @@ type SettingsFrameProps = {
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
   onSave: () => void;
+  onSaveAndVerify?: () => void;
+  isDirty?: boolean;
+  isBusy?: boolean;
+  connectionSummary?: string;
   onClose: () => void;
 };
 
+const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
+  'accounts',
+  'providers',
+  'auth',
+]);
+
 export default function SettingsFrame({
   title,
+  subtitle,
   activeSection,
   children,
   onNavigate,
   onTestConnection,
   onSave,
+  onSaveAndVerify,
+  isDirty = false,
+  isBusy = false,
+  connectionSummary,
   onClose,
 }: SettingsFrameProps) {
   const {
@@ -48,6 +65,10 @@ export default function SettingsFrame({
     item: activeItem,
     index: activeIndex,
   } = getSettingsNavigationContext(activeSection);
+  const hasConnectionActions = saveAndVerifySettingsSections.has(activeSection) && Boolean(onSaveAndVerify);
+  const shouldShowConnectionSummary = hasConnectionActions
+    && Boolean(connectionSummary)
+    && connectionSummary !== '尚未开始验证';
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -84,10 +105,39 @@ export default function SettingsFrame({
             </span>
             <span className="settings-title-copy">
               <strong>{title}</strong>
+              <small>
+                {subtitle}
+                {hasConnectionActions ? ' · ' + (isDirty ? '有未保存修改' : '已保存') : ''}
+              </small>
             </span>
           </div>
           <div className="settings-header-actions">
-            {connectionSettingsSections.has(activeSection) && (
+            {hasConnectionActions ? (
+              <>
+                <button
+                  type="button"
+                  className="settings-header-button secondary"
+                  aria-label="仅保存设置"
+                  title={isDirty ? '保存当前账号设置，不执行连接验证' : '当前没有未保存修改'}
+                  disabled={!isDirty || isBusy}
+                  onClick={onSave}
+                >
+                  <Save size={15} />
+                  <span>仅保存</span>
+                </button>
+                <button
+                  type="button"
+                  className="settings-header-button primary"
+                  aria-label="保存并验证设置"
+                  title="先保存当前账号设置，再检查服务器和登录认证"
+                  disabled={isBusy}
+                  onClick={onSaveAndVerify}
+                >
+                  {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <BadgeCheck size={15} />}
+                  <span>{isBusy ? '验证中' : '保存并验证'}</span>
+                </button>
+              </>
+            ) : connectionSettingsSections.has(activeSection) ? (
               <button
                 type="button"
                 className="settings-header-button secondary"
@@ -98,17 +148,19 @@ export default function SettingsFrame({
                 <FlaskConical size={15} />
                 <span>测试连接</span>
               </button>
+            ) : (
+              <button
+                type="button"
+                className="settings-header-button primary"
+                aria-label="保存设置"
+                title="保存当前账号设置"
+                disabled={isBusy}
+                onClick={onSave}
+              >
+                <Save size={15} />
+                <span>保存</span>
+              </button>
             )}
-            <button
-              type="button"
-              className="settings-header-button primary"
-              aria-label="保存设置"
-              title="保存当前账号设置"
-              onClick={onSave}
-            >
-              <Save size={15} />
-              <span>保存</span>
-            </button>
             <button
               type="button"
               className="settings-close-button"
@@ -120,6 +172,11 @@ export default function SettingsFrame({
             </button>
           </div>
         </header>
+        {shouldShowConnectionSummary && (
+          <div className="settings-connection-summary" aria-live="polite">
+            {connectionSummary}
+          </div>
+        )}
         <div className="settings-body">
           <SettingsSidebar
             activeSection={activeSection}

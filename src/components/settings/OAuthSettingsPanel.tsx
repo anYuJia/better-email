@@ -55,6 +55,8 @@ export default function OAuthSettingsPanel({
   onWaitForCallback,
   onExchange,
 }: OAuthSettingsPanelProps) {
+  const latestSession = sessions[0] ?? null;
+
   return (
     <>
       <section className="oauth-guide settings-auth-guide" data-settings-section="auth">
@@ -72,6 +74,31 @@ export default function OAuthSettingsPanel({
       </section>
 
       {authType === 'oauth2' && (
+        <>
+          <section className="settings-oauth-primary" data-settings-section="auth">
+            <span>
+              <strong>OAuth2 授权</strong>
+              <small>
+                {latestSession
+                  ? `最近状态：${latestSession.status} · ${formatDate(latestSession.created_at)}`
+                  : '尚未建立授权会话'}
+              </small>
+            </span>
+            <button type="button" onClick={onStart}>
+              <ExternalLink size={14} />
+              {latestSession ? '重新授权' : '开始授权'}
+            </button>
+            {!clientId.trim() && <em>开始前需要在高级设置中填写 OAuth2 Client ID</em>}
+          </section>
+          <details className="settings-disclosure settings-provider-advanced settings-oauth-advanced">
+            <summary>
+              <span>
+                <strong>自带 OAuth 客户端（高级）</strong>
+                <em>Client ID 仅保留到本次应用运行结束，Client Secret 不会持久化</em>
+              </span>
+              <b>{clientId.trim() ? '已配置 Client ID' : '等待配置'}</b>
+            </summary>
+            <div className="settings-provider-advanced-content">
         <section className="settings-static-section" data-settings-section="auth">
           <header className="settings-static-header">
             <span>
@@ -108,10 +135,6 @@ export default function OAuthSettingsPanel({
               </label>
             </div>
             <div className="settings-oauth-actions">
-              <button type="button" onClick={onStart}>
-                <ExternalLink size={14} />
-                打开 OAuth2 授权页
-              </button>
               <button type="button" className="secondary" onClick={onRefresh}>
                 <RefreshCw size={14} />
                 刷新已保存 Token
@@ -183,6 +206,9 @@ export default function OAuthSettingsPanel({
             )}
           </section>
         </section>
+            </div>
+          </details>
+        </>
       )}
     </>
   );

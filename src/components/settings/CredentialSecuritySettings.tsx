@@ -26,6 +26,7 @@ type CredentialSecuritySettingsProps = {
   credentialStatus: CredentialStatus | null;
   connectionReport: ConnectionReport | null;
   credentialVerification: CredentialVerificationReport | null;
+  authTypeChangeNotice?: string | null;
   providerValidationReport: ProviderValidationReport | null;
   providerValidationRunning: boolean;
   onCredentialSecretChange: (value: string) => void;
@@ -43,6 +44,7 @@ export default function CredentialSecuritySettings({
   credentialStatus,
   connectionReport,
   credentialVerification,
+  authTypeChangeNotice,
   providerValidationReport,
   providerValidationRunning,
   onCredentialSecretChange,
@@ -97,6 +99,12 @@ export default function CredentialSecuritySettings({
         </div>
         <span className="credential-provider-tag">{guidance.providerLabel}</span>
       </div>
+
+      {authTypeChangeNotice && (
+        <p className="settings-auth-change-notice" role="status">
+          {authTypeChangeNotice}
+        </p>
+      )}
 
       <label className="credential-field">
         <span>{guidance.credentialLabel}</span>

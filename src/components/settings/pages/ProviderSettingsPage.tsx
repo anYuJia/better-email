@@ -8,6 +8,12 @@ import {
 import {
   providerVerificationLabel,
 } from '../../../app/appConfig';
+import {
+  isCustomProvider,
+  ordinaryProviderOptions,
+  resolveOrdinaryProviderOption,
+  type OrdinaryProviderOptionId,
+} from '../../../app/accountConnectionSettings';
 import type {
   Account,
   IncomingProtocol,
@@ -15,7 +21,6 @@ import type {
   ProviderVerificationStatus,
 } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
-import ProviderPresetGrid from '../ProviderPresetGrid';
 
 type ProviderSettingsPageProps = {
   accountForm: Account;
@@ -49,6 +54,61 @@ export default function ProviderSettingsPage({
   onUpdateProviderVerification,
   onSaveProviderVerification,
 }: ProviderSettingsPageProps) {
+  const providerOption = resolveOrdinaryProviderOption(accountForm.provider);
+  const customProvider = isCustomProvider(accountForm.provider);
+
+  const serverFields = (
+    <div className="settings-account-form-grid">
+      {customProvider && (
+        <label>
+          服务商标识
+          <input
+            value={accountForm.provider}
+            onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
+            placeholder="例如 company-mail"
+          />
+        </label>
+      )}
+      <label>
+        收信协议
+        <select
+          value={accountForm.incoming_protocol}
+          onChange={(event) => {
+            const nextProtocol = event.target.value as IncomingProtocol;
+            const preset = providerCompatibilityMatrix.find(
+              (provider) => provider.provider === accountForm.provider,
+            );
+            onAccountFormChange({
+              ...accountForm,
+              incoming_protocol: nextProtocol,
+              imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : accountForm.imap_host,
+              auth_type: nextProtocol === 'pop3' && accountForm.auth_type === 'oauth2'
+                ? 'password'
+                : accountForm.auth_type,
+            });
+          }}
+        >
+          <option value="imap">IMAP</option>
+          <option value="pop3">POP3</option>
+        </select>
+      </label>
+      <label>
+        收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
+        <input
+          value={accountForm.imap_host}
+          onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
+        />
+      </label>
+      <label>
+        SMTP 服务器
+        <input
+          value={accountForm.smtp_host}
+          onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
+        />
+      </label>
+    </div>
+  );
+
   return (
     <div className="settings-account-stack settings-account-page settings-account-page-providers">
       <section className="tool-panel settings-current-account-panel settings-provider-config-panel">
@@ -60,55 +120,36 @@ export default function ProviderSettingsPage({
           <em>{accountForm.provider}</em>
         </header>
         <label>
-          服务商标识
-          <input
-            value={accountForm.provider}
-            onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
-          />
+          服务商
+          <select
+            value={providerOption}
+            onChange={(event) => {
+              const nextOption = event.target.value as OrdinaryProviderOptionId;
+              if (nextOption === 'custom') {
+                onAccountFormChange({ ...accountForm, provider: 'custom' });
+                return;
+              }
+              const preset = providerCompatibilityMatrix.find((provider) => provider.id === nextOption);
+              if (preset) onApplyProviderPreset(preset);
+            }}
+          >
+            {ordinaryProviderOptions.map((option) => (
+              <option value={option.id} key={option.id}>{option.label}</option>
+            ))}
+          </select>
         </label>
-        <ProviderPresetGrid
-          activeProvider={accountForm.provider}
-          onSelect={onApplyProviderPreset}
-        />
-        <div className="settings-account-form-grid">
-          <label>
-            收信协议
-            <select
-              value={accountForm.incoming_protocol}
-              onChange={(event) => {
-                const nextProtocol = event.target.value as IncomingProtocol;
-                const preset = providerCompatibilityMatrix.find(
-                  (provider) => provider.provider === accountForm.provider,
-                );
-                onAccountFormChange({
-                  ...accountForm,
-                  incoming_protocol: nextProtocol,
-                  imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : accountForm.imap_host,
-                  auth_type: nextProtocol === 'pop3' && accountForm.auth_type === 'oauth2'
-                    ? 'password'
-                    : accountForm.auth_type,
-                });
-              }}
-            >
-              <option value="imap">IMAP</option>
-              <option value="pop3">POP3</option>
-            </select>
-          </label>
-          <label>
-            收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
-            <input
-              value={accountForm.imap_host}
-              onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
-            />
-          </label>
-          <label>
-            SMTP 服务器
-            <input
-              value={accountForm.smtp_host}
-              onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
-            />
-          </label>
-        </div>
+        {customProvider ? serverFields : (
+          <details className="settings-provider-advanced settings-provider-server-advanced">
+            <summary>
+              <span>
+                <strong>高级服务器设置</strong>
+                <em>{protocolLabel(accountForm.incoming_protocol)} 与 SMTP 地址</em>
+              </span>
+              <b>默认隐藏</b>
+            </summary>
+            {serverFields}
+          </details>
+        )}
       </section>
 
       <details

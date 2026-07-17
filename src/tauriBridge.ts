@@ -72,3 +72,11 @@ export function sendNotification(notification: { title: string; body?: string })
   }
   void import('./tauriBridge.prod').then(({ prodSendNotification }) => prodSendNotification(notification));
 }
+
+export async function listen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> {
+  if (mockMode) {
+    return () => {};
+  }
+  const { prodListen } = await import('./tauriBridge.prod');
+  return prodListen<T>(event, handler);
+}

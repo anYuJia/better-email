@@ -40,7 +40,7 @@ import {
   senderDomain,
   isMessageBodyCorrupted,
 } from './mailUtils';
-import { getCurrentWindow, invoke } from './tauriBridge';
+import { getCurrentWindow, invoke, listen } from './tauriBridge';
 
 import type {
   FolderRole,
@@ -1222,6 +1222,38 @@ export default function App() {
         skipNextFolderEffectLoadRef.current = false;
       });
   }, [accountScope]);
+
+  useEffect(() => {
+    let unlistenProgress: (() => void) | undefined;
+
+    listen<{
+      account_email: string;
+      folder_name: string;
+      current_folder_index: number;
+      total_folders: number;
+      scanned_folders: number;
+      imported_messages: number;
+      status_text: string;
+    }>('sync-progress', (event) => {
+      const payload = event.payload;
+      setStatus(payload.status_text);
+      if (payload.folder_name) {
+        setRefreshNotice(`${payload.folder_name} (${payload.current_folder_index}/${payload.total_folders})`);
+      } else {
+        setRefreshNotice('正在连接...');
+      }
+    })
+      .then((nextUnlisten) => {
+        unlistenProgress = nextUnlisten;
+      })
+      .catch((error) => {
+        console.error('Failed to listen to sync-progress event:', error);
+      });
+
+    return () => {
+      unlistenProgress?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!folderId) return;

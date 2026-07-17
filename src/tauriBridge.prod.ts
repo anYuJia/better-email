@@ -64,6 +64,19 @@ export function prodRequestPermission(): Promise<string> {
   return loadNotification().then(({ requestPermission: tauriRequestPermission }) => tauriRequestPermission());
 }
 
+type TauriEvent = typeof import('@tauri-apps/api/event');
+let eventModule: Promise<TauriEvent> | null = null;
+
+function loadEvent() {
+  eventModule ??= import('@tauri-apps/api/event');
+  return eventModule;
+}
+
 export function prodSendNotification(notification: { title: string; body?: string }) {
   void loadNotification().then(({ sendNotification: tauriSendNotification }) => tauriSendNotification(notification));
+}
+
+export async function prodListen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> {
+  const { listen: tauriListen } = await loadEvent();
+  return tauriListen<T>(event, handler);
 }

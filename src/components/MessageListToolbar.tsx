@@ -192,7 +192,7 @@ export default function MessageListToolbar({
         >
           <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} style={{ flexShrink: 0 }} />
           <span>
-            {isRefreshing ? '正在获取...' : refreshNotice ? refreshNotice : '获取新邮件'}
+            {isRefreshing ? (refreshNotice || '正在获取...') : (refreshNotice || '获取新邮件')}
           </span>
         </button>
       </header>

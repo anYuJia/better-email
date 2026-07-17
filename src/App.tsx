@@ -135,6 +135,7 @@ import { flowInfo, flowWarn } from './app/logger';
 import {
   applyMessageMetadataPatch,
   resolveReaderSelectedDetail,
+  senderInitial,
   type MessageMetadataPatch,
 } from './app/messageDetailUtils';
 import { canSnoozeRole } from './app/snooze';

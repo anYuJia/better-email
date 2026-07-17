@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMessageMetadataPatch,
   resolveReaderSelectedDetail,
+  senderInitial,
   type MessageMetadataPatch,
 } from './messageDetailUtils';
 import type { Message } from './types';
@@ -104,5 +105,43 @@ describe('applyMessageMetadataPatch', () => {
     const original = makeMessage({ id: 42 });
     const patched = applyMessageMetadataPatch(original, { is_read: true } as MessageMetadataPatch);
     expect(patched.id).toBe(42);
+  });
+});
+
+describe('senderInitial', () => {
+  it('returns uppercase first letter for English name', () => {
+    expect(senderInitial('Google')).toBe('G');
+  });
+
+  it('returns uppercase first letter for English email when name is empty', () => {
+    expect(senderInitial(null, 'pyu@example.com')).toBe('P');
+  });
+
+  it('returns first character for CJK name', () => {
+    expect(senderInitial('张三')).toBe('张');
+  });
+
+  it('returns "?" when both name and email are empty', () => {
+    expect(senderInitial('', '')).toBe('?');
+    expect(senderInitial(null, null)).toBe('?');
+    expect(senderInitial(undefined, undefined)).toBe('?');
+  });
+
+  it('uses name over email when both available', () => {
+    expect(senderInitial('Alice', 'bob@example.com')).toBe('A');
+  });
+
+  it('handles unusual whitespace gracefully', () => {
+    expect(senderInitial('   GitHub   ')).toBe('G');
+    expect(senderInitial(' ', ' ')).toBe('?');
+  });
+
+  it('is emoji-safe with Array.from()', () => {
+    // "🌟"[0] => '\uD83C' (lone surrogate, not the emoji)
+    // Array.from('🌟')[0] => '🌟' (correct)
+    const result = senderInitial('🌟Star');
+    expect(result).toBe('🌟');
+    // English fallback after emoji still works
+    expect(senderInitial('Hello')).toBe('H');
   });
 });

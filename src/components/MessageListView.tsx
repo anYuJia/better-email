@@ -10,6 +10,7 @@ import type {
 } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
+import { senderInitial } from '../app/messageDetailUtils';
 import Avatar from './Avatar';
 
 type MessageGroup = {
@@ -74,7 +75,7 @@ const MessageListCard = React.memo(function MessageListCard({
   onSetDraggingMessageIds,
 }: MessageListCardProps) {
   const preview = useMemo(() => mailboxListPreview(message), [message]);
-  const avatarInitial = (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
+  const avatarInitial = senderInitial(message.sender_name, message.sender_email);
 
   return (
     <button

@@ -5137,6 +5137,55 @@ summary:active {
   height: 13px;
 }
 
+/* Final avatar hardening: Avatar renders this element as the fixed-size
+   clipping shell, with any remote image nested inside it. */
+.message-avatar {
+  left: 0;
+  top: 5px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  overflow: hidden;
+  border-radius: 9999px;
+  line-height: 1;
+  transform: none;
+}
+
+.message-avatar > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.reader-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  overflow: hidden;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+.reader-avatar > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .width-100 { width: 100%; }
 .width-95 { width: 95%; }
 .width-90 { width: 90%; }
@@ -5149,4 +5198,3 @@ summary:active {
     transform: translateX(100%);
   }
 }
-

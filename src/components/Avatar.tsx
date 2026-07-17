@@ -60,21 +60,22 @@ export default function Avatar({ email, name, className, fallbackInitial }: Avat
 
   if (currentUrl) {
     return (
-      <img
-        src={currentUrl}
-        alt={name}
-        className={className}
-        onError={() => {
-          setCandidateIndex((prev) => prev + 1);
-        }}
-        style={{
-          width: '100%',
-          height: '100%',
-          borderRadius: '50%',
-          objectFit: 'cover',
-          display: 'block'
-        }}
-      />
+      <span className={className}>
+        <img
+          src={currentUrl}
+          alt={name}
+          onError={() => {
+            setCandidateIndex((prev) => prev + 1);
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: 'inherit',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
+      </span>
     );
   }
 

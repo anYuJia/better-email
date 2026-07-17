@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { invoke } from '../../tauriBridge';
 
 export type PlainBodyBlock =
   | { type: 'text'; content: string }
@@ -103,6 +104,40 @@ type PlainMessageBodyProps = {
   body: string;
 };
 
+const URL_REGEX = /(https?:\/\/[^\s<]+[^.,;?\s<])/gi;
+
+function renderTextWithLinks(text: string) {
+  if (!text) return null;
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, index) => {
+    if (part.match(URL_REGEX)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => {
+            e.preventDefault();
+            invoke('open_url', { url: part }).catch((err) =>
+              console.error('Failed to open link:', err)
+            );
+          }}
+          style={{
+            wordBreak: 'break-all',
+            color: 'var(--color-primary, #2563eb)',
+            textDecoration: 'underline',
+            cursor: 'pointer'
+          }}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
   const blocks = useMemo(() => parsePlainBody(body), [body]);
   const originalBlockCount = useMemo(
@@ -120,7 +155,7 @@ export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
         if (block.type === 'text') {
           return (
             <div className="plain-body-copy" key={`text-${index}`}>
-              {block.content}
+              {renderTextWithLinks(block.content)}
             </div>
           );
         }
@@ -146,7 +181,7 @@ export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
                 })}
               </dl>
             )}
-            {block.content && <pre>{block.content}</pre>}
+            {block.content && <pre>{renderTextWithLinks(block.content)}</pre>}
           </section>
         );
       })}

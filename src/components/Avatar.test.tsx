@@ -7,10 +7,10 @@ describe('Avatar', () => {
     cleanup();
   });
 
-  it('renders fallback initial in the fixed-size avatar shell when no image src exists', () => {
+  it('renders fallback initial in the fixed-size avatar shell when no email or image src exists', () => {
     render(
       <Avatar
-        email="google@example.com"
+        email=""
         name="Google"
         className="message-avatar avatar-tone-1"
         fallbackInitial="G"
@@ -22,6 +22,25 @@ describe('Avatar', () => {
     expect(shell.className).toContain('message-avatar');
     expect(shell.className).toContain('avatar-tone-1');
     expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('infers avatar image candidates from sender email before using the fallback initial', () => {
+    render(
+      <Avatar
+        email="google@example.com"
+        name="Google"
+        className="message-avatar avatar-tone-1"
+        fallbackInitial="G"
+      />,
+    );
+
+    const img = screen.getByRole('img', { name: 'Google' });
+    const shell = img.parentElement;
+
+    expect(shell?.tagName).toBe('SPAN');
+    expect(shell?.className).toContain('message-avatar');
+    expect(img.getAttribute('src')).toContain('unavatar.io');
+    expect(screen.queryByText('G')).toBeNull();
   });
 
   it('renders an explicit avatar src inside the fixed-size avatar shell instead of sizing the img itself', () => {
@@ -57,6 +76,26 @@ describe('Avatar', () => {
     );
 
     fireEvent.error(screen.getByRole('img', { name: 'Resend' }));
+
+    const shell = screen.getByText('R');
+    expect(shell.tagName).toBe('SPAN');
+    expect(shell.className).toContain('message-avatar');
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('falls back to the initial only after all inferred avatar candidates fail', () => {
+    render(
+      <Avatar
+        email="resend@example.com"
+        name="Resend"
+        className="message-avatar avatar-tone-4"
+        fallbackInitial="R"
+      />,
+    );
+
+    for (let i = 0; i < 3; i += 1) {
+      fireEvent.error(screen.getByRole('img', { name: 'Resend' }));
+    }
 
     const shell = screen.getByText('R');
     expect(shell.tagName).toBe('SPAN');

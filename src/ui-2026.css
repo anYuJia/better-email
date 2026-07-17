@@ -3808,74 +3808,98 @@ body {
 }
 
 .snackbar-stack {
-  left: 18px;
+  left: 20px;
   right: auto;
-  bottom: 18px;
-  width: min(380px, calc(100vw - 36px));
-  gap: 6px;
+  bottom: 20px;
+  width: min(390px, calc(100vw - 40px));
+  gap: 8px;
   transform: none;
+  z-index: 10000;
 }
 
 .undo-snackbar {
   min-width: 0;
   width: 100%;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 9px;
-  padding: 9px 9px 9px 12px;
-  border: 1px solid rgba(31, 35, 40, 0.14);
-  border-radius: 9px;
-  color: #202833;
-  background: rgba(255, 255, 255, 0.96);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #ffffff;
+  background: rgba(24, 29, 37, 0.95);
   box-shadow:
-    0 12px 28px rgba(20, 26, 34, 0.14),
-    0 1px 4px rgba(20, 26, 34, 0.08);
-  backdrop-filter: none;
+    0 16px 36px rgba(0, 0, 0, 0.22),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .send-undo-snackbar {
-  border-color: rgba(79, 143, 208, 0.22);
+  border-color: rgba(56, 189, 248, 0.25);
 }
 
 .undo-snackbar strong {
-  color: #202833;
-  font-size: 12.5px;
-  font-weight: 650;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
 }
 
 .undo-snackbar span {
-  color: #7d8794;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 11.5px;
+  margin-top: 2px;
+  display: block;
 }
 
 .undo-snackbar button {
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid #d7dde4;
-  border-radius: 7px;
-  color: #394554;
-  background: #f5f7f9;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #38bdf8;
+  background: rgba(255, 255, 255, 0.08);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .undo-snackbar button:hover {
-  color: #1f2a36;
-  background: #edf1f5;
+  color: #7dd3fc;
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-0.5px);
+}
+
+.undo-snackbar button:active {
+  transform: translateY(0.5px);
 }
 
 .undo-snackbar button:last-child {
-  width: 28px;
-  color: #6f7a86;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.45);
   background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
 .undo-snackbar button:last-child:hover {
-  background: #edf1f5;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: none;
 }
 
 .send-undo-progress {
-  height: 2px;
-  background: #6fa4df;
+  height: 3px;
+  background: linear-gradient(90deg, #38bdf8, #00e5ff);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
 }
 
 /* Reader quick reply: quiet inline composer, not a floating card. */

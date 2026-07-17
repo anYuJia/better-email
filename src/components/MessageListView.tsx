@@ -9,6 +9,7 @@ import type {
 } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
+import Avatar from './Avatar';
 
 type MessageGroup = {
   id: string;
@@ -112,9 +113,12 @@ const MessageListCard = React.memo(function MessageListCard({
       }}
     >
       <span className="message-leading" aria-hidden="true">
-        <span className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}>
-          {avatarInitial}
-        </span>
+        <Avatar
+          email={message.sender_email}
+          name={message.sender_name}
+          className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
+          fallbackInitial={avatarInitial}
+        />
         {!message.is_read && <span className="message-unread-dot" aria-label="未读" />}
       </span>
       <span className="message-select" onClick={(event) => event.stopPropagation()}>

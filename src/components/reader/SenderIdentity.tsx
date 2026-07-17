@@ -1,4 +1,5 @@
 import type { Message } from '../../app/types';
+import Avatar from '../Avatar';
 
 function senderInitial(message: Message) {
   return (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
@@ -11,9 +12,12 @@ type SenderIdentityProps = {
 export default function SenderIdentity({ message }: SenderIdentityProps) {
   return (
     <div className="reader-sender">
-      <span className={`reader-avatar avatar-tone-${Math.abs(message.id) % 6}`} aria-hidden="true">
-        {senderInitial(message)}
-      </span>
+      <Avatar
+        email={message.sender_email}
+        name={message.sender_name}
+        className={`reader-avatar avatar-tone-${Math.abs(message.id) % 6}`}
+        fallbackInitial={senderInitial(message)}
+      />
       <span className="reader-sender-copy">
         <strong>{message.sender_name || message.sender_email}</strong>
         <span>

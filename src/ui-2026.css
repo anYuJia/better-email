@@ -3808,10 +3808,10 @@ body {
 }
 
 .snackbar-stack {
-  left: 20px;
-  right: auto;
+  left: auto;
+  right: 20px;
   bottom: 20px;
-  width: min(390px, calc(100vw - 40px));
+  width: min(340px, calc(100vw - 40px));
   gap: 8px;
   transform: none;
   z-index: 10000;
@@ -3822,8 +3822,8 @@ body {
   width: 100%;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   color: #ffffff;

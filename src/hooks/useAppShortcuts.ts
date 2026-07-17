@@ -1,15 +1,15 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { ListMode, Message, UndoAction } from '../app/types';
+import type { ListMode, Message, MessageSummary, UndoAction } from '../app/types';
 
 type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash';
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
 type UseAppShortcutsOptions = {
   searchInputRef: RefObject<HTMLInputElement>;
-  messages: Message[];
-  selected: Message | null;
+  messages: MessageSummary[];
+  selected: MessageSummary | null;
   selectedId: number | null;
-  selectedMessages: Message[];
+  selectedMessages: MessageSummary[];
   selectedMessageIds: number[];
   listMode: ListMode;
   undoAction: UndoAction | null;
@@ -28,9 +28,9 @@ type UseAppShortcutsOptions = {
   composeNew: () => void;
   setSelectedId: (messageId: number) => void;
   runBulkAction: (action: BulkAction) => Promise<void>;
-  composeFromMessage: (message: Message, mode: ComposeMode) => void;
-  toggleStar: (message: Message) => Promise<void>;
-  toggleRead: (message: Message) => Promise<void>;
+  composeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
+  toggleStar: (message: MessageSummary) => Promise<void>;
+  toggleRead: (message: MessageSummary) => Promise<void>;
   moveSelected: (role: 'archive' | 'trash') => Promise<void>;
 };
 

@@ -9,6 +9,7 @@ import type {
   Label,
   ListMode,
   Message,
+  MessageSummary,
 } from '../app/types';
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
@@ -17,7 +18,7 @@ type UseCommandPaletteItemsOptions = {
   commandQuery: string;
   composeTemplates: ComposeTemplate[];
   managedContacts: Contact[];
-  selected: Message | null;
+  selected: MessageSummary | null;
   labels: Label[];
   folders: Folder[];
   filter: FilterMode;
@@ -33,9 +34,9 @@ type UseCommandPaletteItemsOptions = {
   setFilter: (filter: FilterMode) => void;
   applyComposeTemplate: (template: ComposeTemplate) => void;
   composeToContact: (contact: Contact) => void;
-  composeFromMessage: (message: Message, mode: ComposeMode) => void;
-  toggleRead: (message: Message) => Promise<void>;
-  toggleStar: (message: Message) => Promise<void>;
+  composeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
+  toggleRead: (message: MessageSummary) => Promise<void>;
+  toggleStar: (message: MessageSummary) => Promise<void>;
   moveSelected: (role: 'archive' | 'trash') => Promise<void>;
   unsnoozeSelected: () => Promise<void>;
   snoozeSelected: () => Promise<void>;

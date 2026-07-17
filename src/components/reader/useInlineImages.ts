@@ -3,6 +3,9 @@ import { resolveCidInlineImages } from '../../app/inlineImages';
 import { localFileAssetUrl, invoke } from '../../tauriBridge';
 import type { Message, Attachment } from '../../app/types';
 
+/** Max attachment size allowed for Data URL fallback (2 MB). Larger files stay on asset URL path only. */
+const INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES = 2 * 1024 * 1024;
+
 function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/^Error:\s*/i, '').trim() || '附件下载失败，请重试。';
@@ -33,6 +36,8 @@ export default function useInlineImages({
 
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
+  /** Attachments already attempted via Data URL fallback (success or failure) — avoid re-trigger. */
+  const inlineImageDataUrlAttemptsRef = useRef<Set<number>>(new Set());
 
   // Reset states on selection change
   useEffect(() => {
@@ -43,6 +48,7 @@ export default function useInlineImages({
     setIsRefreshingInlineImages(false);
     inlineImageRefreshAttemptsRef.current = new Set();
     inlineImageDownloadAttemptsRef.current = new Set();
+    inlineImageDataUrlAttemptsRef.current = new Set();
   }, [selected?.id]);
 
   const inlineImageResolution = useMemo(
@@ -62,7 +68,8 @@ export default function useInlineImages({
     [attachmentErrors, inlineImageResolution.pendingAttachments],
   );
 
-  // Effect: Resolve Asset URLs when inline images are downloaded
+  // Effect: Resolve Asset URLs when inline images are downloaded; Data URL is a last-resort fallback
+  // only when asset URL fails/returns empty AND the attachment is small enough.
   useEffect(() => {
     if (!selected) return;
     const readyInlineImages = attachments.filter((attachment) =>
@@ -71,69 +78,63 @@ export default function useInlineImages({
       && Boolean(attachment.local_path.trim())
       && Boolean(attachment.content_id.trim())
       && !inlineImageDataUrls[attachment.id]
-      && !inlineImageAssetUrls[attachment.id]);
+      && !inlineImageAssetUrls[attachment.id]
+      && !inlineImageDataUrlAttemptsRef.current.has(attachment.id));
     if (readyInlineImages.length === 0) return;
 
     let cancelled = false;
-    Promise.all(
-      readyInlineImages.map(async (attachment) => {
+    readyInlineImages.forEach(async (attachment) => {
+      try {
         const assetUrl = await localFileAssetUrl(attachment.local_path);
-        return [attachment.id, assetUrl] as const;
-      }),
-    )
-      .then((entries) => {
         if (cancelled) return;
-        setInlineImageAssetUrls((current) => {
-          const next = { ...current };
-          entries.forEach(([attachmentId, assetUrl]) => {
-            if (assetUrl.trim()) next[attachmentId] = assetUrl;
-          });
-          return next;
-        });
-      })
-      .catch((error) => {
-        if (!cancelled) setInlineImageRefreshError(attachmentErrorMessage(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id]);
-
-  // Effect: Resolve Data URLs when inline images are downloaded (fallback)
-  useEffect(() => {
-    if (!selected) return;
-    const readyInlineImages = attachments.filter((attachment) =>
-      attachment.is_inline
-      && attachment.is_downloaded
-      && Boolean(attachment.local_path.trim())
-      && Boolean(attachment.content_id.trim())
-      && !inlineImageDataUrls[attachment.id]);
-    if (readyInlineImages.length === 0) return;
-
-    let cancelled = false;
-    readyInlineImages.forEach((attachment) => {
-      invoke<string>('read_attachment_data_url', { attachmentId: attachment.id })
-        .then((dataUrl) => {
-          if (cancelled || !dataUrl.trim()) return;
-          setInlineImageDataUrls((current) => ({
+        if (assetUrl && assetUrl.trim()) {
+          setInlineImageAssetUrls((current) => ({
             ...current,
-            [attachment.id]: dataUrl,
+            [attachment.id]: assetUrl,
           }));
-        })
-        .catch((error) => {
-          if (cancelled) return;
-          setAttachmentErrors((current) => ({
-            ...current,
-            [attachment.id]: attachmentErrorMessage(error),
-          }));
-        });
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to get local asset URL, falling back to data URL if size allows', e);
+      }
+
+      if (cancelled) return;
+
+      // Only fall back to Data URL for small attachments; skip large ones to avoid bloating React state.
+      if (
+        typeof attachment.size_bytes === 'number'
+        && attachment.size_bytes > INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES
+      ) {
+        inlineImageDataUrlAttemptsRef.current.add(attachment.id);
+        setAttachmentErrors((current) => ({
+          ...current,
+          [attachment.id]: '内嵌图片资源地址不可用，且附件过大无法使用备用预览。',
+        }));
+        return;
+      }
+
+      // Mark attempted so we don't re-trigger fallback for this attachment.
+      inlineImageDataUrlAttemptsRef.current.add(attachment.id);
+      try {
+        const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
+        if (cancelled || !dataUrl.trim()) return;
+        setInlineImageDataUrls((current) => ({
+          ...current,
+          [attachment.id]: dataUrl,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        setAttachmentErrors((current) => ({
+          ...current,
+          [attachment.id]: attachmentErrorMessage(error),
+        }));
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [attachments, inlineImageDataUrls, selected?.id, setAttachmentErrors]);
+  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id, setAttachmentErrors]);
 
   // Effect: Auto-refresh body if inline images have missing content IDs
   useEffect(() => {
@@ -204,3 +205,5 @@ export default function useInlineImages({
     handleLoadInlineImages,
   };
 }
+
+export { INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES };

@@ -16,7 +16,7 @@ import type {
   Folder,
   ImapMailboxState,
   ImapProbeReport,
-  Message,
+  MessageSummary,
   ProviderVerificationRecord,
   SearchScope,
   SyncRun,
@@ -149,7 +149,7 @@ type UseAccountConnectionControllerOptions = {
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
   setNewAccountForm: Dispatch<SetStateAction<AccountCreateInput>>;
   setFolderId: Dispatch<SetStateAction<number | null>>;
-  setMessages: Dispatch<SetStateAction<Message[]>>;
+  setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
@@ -170,7 +170,7 @@ type UseAccountConnectionControllerOptions = {
     refreshId?: number,
     nextLimit?: number,
     nextSearchScope?: SearchScope,
-  ) => Promise<Message[]>;
+  ) => Promise<MessageSummary[]>;
 };
 
 export function providerVerificationKey(providerName: string): string {

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { movableFoldersForBulk } from '../app/appConfig';
 import { canSnoozeRole } from '../app/snooze';
-import type { Folder, Label, Message } from '../app/types';
+import type { Folder, Label, Message, MessageSummary } from '../app/types';
 import type { ContextMenuItem } from './ContextMenu';
 
 export type BulkMessageAction = 'archive' | 'star' | 'unstar' | 'trash' | 'read' | 'unread';
@@ -41,12 +41,12 @@ export type MessageContextAction =
   | 'permanent-delete';
 
 type BulkContextOptions = {
-  selectedMessages: Message[];
-  movableMessages?: Message[];
+  selectedMessages: MessageSummary[];
+  movableMessages?: MessageSummary[];
   folders: Folder[];
   labels: Label[];
   onRunBulkAction: (action: BulkMessageAction) => void;
-  onRequestSnooze: (messages: Message[]) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
 };
@@ -135,14 +135,14 @@ export function buildBulkMessageContextItems({
 }
 
 type SingleContextOptions = {
-  message: Message;
+  message: MessageSummary;
   folders: Folder[];
   labels: Label[];
   onSelectMessage: (messageId: number) => void;
-  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
-  onRunMessageAction: (message: Message, action: MessageContextAction) => void;
-  onMoveMessageToFolder: (message: Message, folder: Folder) => void;
-  onToggleMessageLabel: (message: Message, label: Label) => void;
+  onComposeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
+  onRunMessageAction: (message: MessageSummary, action: MessageContextAction) => void;
+  onMoveMessageToFolder: (message: MessageSummary, folder: Folder) => void;
+  onToggleMessageLabel: (message: MessageSummary, label: Label) => void;
 };
 
 export function buildSingleMessageContextItems({

@@ -17,6 +17,7 @@ import type {
   ListMode,
   ListSort,
   Message,
+  MessageSummary,
   SearchScope,
 } from '../app/types';
 import {
@@ -34,7 +35,7 @@ type MessageListToolbarProps = {
   currentViewLabel: string;
   visibleListSummary: string;
   messageListSummary: string;
-  messages: Message[];
+  messages: MessageSummary[];
   isRefreshing?: boolean;
   refreshNotice?: string | null;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;

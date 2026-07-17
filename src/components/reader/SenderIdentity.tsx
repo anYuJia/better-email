@@ -1,12 +1,12 @@
-import type { Message } from '../../app/types';
+import type { Message, MessageSummary } from '../../app/types';
 import Avatar from '../Avatar';
 
-function senderInitial(message: Message) {
+function senderInitial(message: MessageSummary) {
   return (message.sender_name || message.sender_email || '?').trim().slice(0, 1).toUpperCase();
 }
 
 type SenderIdentityProps = {
-  message: Message;
+  message: MessageSummary;
 };
 
 export default function SenderIdentity({ message }: SenderIdentityProps) {

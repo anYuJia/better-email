@@ -25,7 +25,7 @@ import type {
   BackgroundTaskKind,
   FilterMode,
   Folder,
-  Message,
+  MessageSummary,
   OutboxItem,
   SyncRun,
   SyncSchedulePlan,
@@ -43,7 +43,7 @@ type UseBackgroundTaskCoordinatorOptions = {
   folderId: number | null;
   query: string;
   filter: FilterMode;
-  messages: Message[];
+  messages: MessageSummary[];
   outbox: OutboxItem[];
   notificationPolicy: NotificationPolicy;
   setOutbox: Dispatch<SetStateAction<OutboxItem[]>>;
@@ -65,8 +65,8 @@ type UseBackgroundTaskCoordinatorOptions = {
     nextQuery?: string,
     nextFilter?: FilterMode,
     nextScope?: AccountScope,
-  ) => Promise<Message[]>;
-  releaseDueSnoozedMessages: () => Promise<Message[]>;
+  ) => Promise<MessageSummary[]>;
+  releaseDueSnoozedMessages: () => Promise<{ released_count: number }>;
 };
 
 type CurrentCoordinatorState = Pick<
@@ -219,7 +219,7 @@ export default function useBackgroundTaskCoordinator({
     return tasks;
   }, [setBackgroundTasks]);
 
-  const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: Message[]) => {
+  const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: MessageSummary[]) => {
     const current = currentRef.current;
     const candidates = (latestMessages ?? current.messages)
       .slice(0, Math.max(0, run.imported_messages));
@@ -379,8 +379,8 @@ export default function useBackgroundTaskCoordinator({
         current.accountScope,
       );
       const summary =
-        released.length > 0
-          ? `${syncStatusLabel(run)}；已恢复 ${released.length} 封稍后邮件`
+        released.released_count > 0
+          ? `${syncStatusLabel(run)}；已恢复 ${released.released_count} 封稍后邮件`
           : syncStatusLabel(run);
       setBackgroundSyncStatus(summary);
       await notifyNewMail(run, latestMessages);
@@ -390,12 +390,12 @@ export default function useBackgroundTaskCoordinator({
         status: run.status,
         scannedFolders: run.scanned_folders,
         importedMessages: run.imported_messages,
-        releasedSnoozedMessages: released.length,
+        releasedSnoozedMessages: released.released_count,
         visibleMessages: latestMessages.length,
         durationMs: Math.round(performance.now() - startedAt),
       });
       if (reason === 'manual') {
-        setStatus(released.length > 0 ? `${run.message} 已恢复 ${released.length} 封稍后邮件。` : run.message);
+        setStatus(released.released_count > 0 ? `${run.message} 已恢复 ${released.released_count} 封稍后邮件。` : run.message);
       }
       return summary;
     } catch (error) {

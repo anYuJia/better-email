@@ -13,6 +13,7 @@ import type {
   ListMode,
   ListSort,
   Message,
+  MessageSummary,
   SearchScope,
   ThreadSummary,
 } from '../app/types';
@@ -44,7 +45,7 @@ export type MessageListPaneProps = {
   labels: Label[];
   threads: ThreadSummary[];
   activeThread: ThreadSummary | null;
-  messages: Message[];
+  messages: MessageSummary[];
   selectedId: number | null;
   hasMoreMessages: boolean;
   currentViewLabel: string;
@@ -65,18 +66,18 @@ export type MessageListPaneProps = {
   onSortChange: (sort: ListSort) => void;
   onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
-  onRequestSnooze: (messages: Message[]) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
-  onRunMessageAction: (message: Message, action: MessageContextAction) => void;
-  onMoveMessageToFolder: (message: Message, folder: Folder) => void;
-  onToggleMessageLabel: (message: Message, label: Label) => void;
-  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
-  onOpenThread: (thread: ThreadSummary) => Promise<Message[]>;
-  onRunThreadAction: (thread: ThreadSummary, messages: Message[], action: BulkMessageAction) => void;
-  onMoveThreadToFolder: (thread: ThreadSummary, messages: Message[], folder: Folder) => void;
-  onToggleThreadLabel: (thread: ThreadSummary, messages: Message[], label: Label) => void;
-  onToggleThreadMute: (thread: ThreadSummary, messages: Message[]) => void;
+  onRunMessageAction: (message: MessageSummary, action: MessageContextAction) => void;
+  onMoveMessageToFolder: (message: MessageSummary, folder: Folder) => void;
+  onToggleMessageLabel: (message: MessageSummary, label: Label) => void;
+  onComposeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
+  onOpenThread: (thread: ThreadSummary) => Promise<MessageSummary[]>;
+  onRunThreadAction: (thread: ThreadSummary, messages: MessageSummary[], action: BulkMessageAction) => void;
+  onMoveThreadToFolder: (thread: ThreadSummary, messages: MessageSummary[], folder: Folder) => void;
+  onToggleThreadLabel: (thread: ThreadSummary, messages: MessageSummary[], label: Label) => void;
+  onToggleThreadMute: (thread: ThreadSummary, messages: MessageSummary[]) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => void;
@@ -140,7 +141,7 @@ function MessageListPane({
   const [messageMenu, setMessageMenu] = React.useState<{
     x: number;
     y: number;
-    message: Message;
+    message: MessageSummary;
     bulk: boolean;
   } | null>(null);
   const [draggingMessageIds, setDraggingMessageIds] = React.useState<number[]>([]);
@@ -148,7 +149,7 @@ function MessageListPane({
     x: number;
     y: number;
     thread: ThreadSummary;
-    messages: Message[];
+    messages: MessageSummary[];
   } | null>(null);
 
   const handleOpenThread = React.useCallback((thread: ThreadSummary) => {
@@ -163,7 +164,7 @@ function MessageListPane({
     });
   }, [onOpenThread]);
 
-  const handleOpenMessageMenu = React.useCallback((message: Message, x: number, y: number, bulk: boolean) => {
+  const handleOpenMessageMenu = React.useCallback((message: MessageSummary, x: number, y: number, bulk: boolean) => {
     setMessageMenu({ x, y, message, bulk });
   }, []);
 
@@ -271,7 +272,7 @@ function MessageListPane({
   ]);
 
   const groupedMessages = React.useMemo(() => {
-    const groups: Array<{ id: string; label: string; messages: Message[] }> = [];
+    const groups: Array<{ id: string; label: string; messages: MessageSummary[] }> = [];
     const includeDateGroups = listSort === 'newest' || listSort === 'oldest';
     for (const message of messages) {
       const group = includeDateGroups

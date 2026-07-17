@@ -4,6 +4,7 @@ import type {
   Folder,
   Label,
   Message,
+  MessageSummary,
   ThreadSummary,
   UndoMessageSnapshot,
 } from '../app/types';
@@ -12,12 +13,12 @@ import { invoke } from '../tauriBridge';
 
 type MessageCollectionActionOptions = {
   folders: Folder[];
-  selectedMessages: Message[];
+  selectedMessages: MessageSummary[];
   refreshAll: () => Promise<void>;
   setActiveThread: React.Dispatch<React.SetStateAction<ThreadSummary | null>>;
   setSelectedMessageIds: React.Dispatch<React.SetStateAction<number[]>>;
   setStatus: React.Dispatch<React.SetStateAction<string>>;
-  snapshotMessages: (messages: Message[]) => UndoMessageSnapshot[];
+  snapshotMessages: (messages: MessageSummary[]) => UndoMessageSnapshot[];
   queueUndoAction: (
     title: string,
     snapshots: UndoMessageSnapshot[],
@@ -26,11 +27,11 @@ type MessageCollectionActionOptions = {
   onReadStateChange?: (messageIds: number[], isRead: boolean) => void;
 };
 
-function uniqueMessages(items: Message[]) {
+function uniqueMessages(items: MessageSummary[]) {
   return [...new Map(items.map((message) => [message.id, message])).values()];
 }
 
-function threadMessagesForAction(items: Message[], action: BulkMessageAction) {
+function threadMessagesForAction(items: MessageSummary[], action: BulkMessageAction) {
   if (action === 'archive') {
     return items.filter(
       (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
@@ -44,7 +45,7 @@ function threadMessagesForAction(items: Message[], action: BulkMessageAction) {
   return items;
 }
 
-function threadMovableMessages(items: Message[]) {
+function threadMovableMessages(items: MessageSummary[]) {
   return items.filter(
     (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
   );
@@ -63,7 +64,7 @@ export default function useMessageCollectionActions({
 }: MessageCollectionActionOptions) {
   return React.useMemo(() => {
     async function runMessageCollectionAction(
-      items: Message[],
+      items: MessageSummary[],
       action: BulkMessageAction,
       context: 'bulk' | 'thread',
       threadTitle = '',
@@ -128,7 +129,7 @@ export default function useMessageCollectionActions({
 
     async function runThreadAction(
       thread: ThreadSummary,
-      items: Message[],
+      items: MessageSummary[],
       action: BulkMessageAction,
     ) {
       await runMessageCollectionAction(
@@ -140,7 +141,7 @@ export default function useMessageCollectionActions({
     }
 
     async function moveMessageCollectionToFolder(
-      items: Message[],
+      items: MessageSummary[],
       folder: Folder,
       context: 'bulk' | 'thread',
       threadTitle = '',
@@ -187,7 +188,7 @@ export default function useMessageCollectionActions({
 
     async function moveThreadToFolder(
       thread: ThreadSummary,
-      items: Message[],
+      items: MessageSummary[],
       folder: Folder,
     ) {
       await moveMessageCollectionToFolder(
@@ -199,7 +200,7 @@ export default function useMessageCollectionActions({
     }
 
     async function toggleMessageCollectionLabel(
-      items: Message[],
+      items: MessageSummary[],
       label: Label,
       context: 'bulk' | 'thread',
       threadTitle = '',
@@ -254,13 +255,13 @@ export default function useMessageCollectionActions({
 
     async function toggleThreadLabel(
       thread: ThreadSummary,
-      items: Message[],
+      items: MessageSummary[],
       label: Label,
     ) {
       await toggleMessageCollectionLabel(items, label, 'thread', thread.subject);
     }
 
-    async function toggleThreadMuted(thread: ThreadSummary, items: Message[]) {
+    async function toggleThreadMuted(thread: ThreadSummary, items: MessageSummary[]) {
       const targetMessages = uniqueMessages(items);
       if (targetMessages.length === 0) {
         setStatus('会话中没有可静音的邮件');

@@ -108,6 +108,8 @@ export type Message = {
   references_header?: string;
 };
 
+export type MessageSummary = Omit<Message, 'body' | 'sanitized_html'>;
+
 export type UndoMessageSnapshot = {
   id: number;
   subject: string;

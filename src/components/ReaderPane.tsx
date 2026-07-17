@@ -34,10 +34,11 @@ import type {
   Folder,
   Label,
   Message,
+  MessageSummary,
   ThreadSummary,
 } from '../app/types';
 import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, shouldWarnForLinkDisplay } from '../mailUtils';
-import { invoke } from '../tauriBridge';
+import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
@@ -70,7 +71,7 @@ type ComposeNewFields = {
 
 export type ReaderPaneProps = {
   activeThread: ThreadSummary | null;
-  threadMessages: Message[];
+  threadMessages: MessageSummary[];
   activeThreadSelected: Message | null;
   selected: Message | null;
   selectedId: number | null;
@@ -467,9 +468,9 @@ export default function ReaderPane({
       if (!downloaded) return;
     }
     if (attachmentKind(attachment) === 'image') {
-      const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
+      const assetUrl = await localFileAssetUrl(attachment.local_path);
       openImagePreview({
-        src: dataUrl,
+        src: assetUrl,
         alt: attachment.filename,
         attachmentId: attachment.id,
       });
@@ -687,7 +688,7 @@ export default function ReaderPane({
                   <SenderIdentity message={message} />
                   <time>{formatDate(message.received_at)}</time>
                 </header>
-                <p>{message.snippet || message.body}</p>
+                <p>{message.snippet}</p>
                 <div className="message-chips">
                   <span>{message.folder_role}</span>
                   {message.labels.map((label) => <span key={label}>{label}</span>)}

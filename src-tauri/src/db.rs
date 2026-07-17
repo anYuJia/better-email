@@ -4,9 +4,9 @@ use crate::models::{
     ContactMergeSuggestion, CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
     ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, ImapReconcileResult, Label, LocalBackup,
     LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
-    MailStats, Message, MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    MailStats, Message, MessageSummary, MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
+    ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
     SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
@@ -1440,7 +1440,7 @@ impl MailStore {
         query: Option<String>,
         filter: Option<String>,
         limit: i64,
-    ) -> MailResult<Vec<Message>> {
+    ) -> MailResult<Vec<MessageSummary>> {
         self.list_messages_for_scope_sorted(account_id, folder_id, query, filter, None, limit)
     }
 
@@ -1452,7 +1452,7 @@ impl MailStore {
         filter: Option<String>,
         sort: Option<String>,
         limit: i64,
-    ) -> MailResult<Vec<Message>> {
+    ) -> MailResult<Vec<MessageSummary>> {
         self.with_conn(|conn| {
             let limit = limit.clamp(1, 200);
             let search = query
@@ -1479,7 +1479,7 @@ impl MailStore {
                 scope_conditions.push("m.account_id = ?".to_string());
                 query_params.push(Value::Integer(account_id));
             }
-            let sql = build_message_query(
+            let sql = build_message_summary_query(
                 &search_criteria,
                 &filter,
                 &scope_conditions.join(" AND "),
@@ -1490,10 +1490,10 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    map_message_row_base(row)
+                    map_message_summary_row_base(row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
-            hydrate_message_list_metadata(conn, rows)
+            hydrate_message_summary_list_metadata(conn, rows)
         })
     }
 
@@ -1532,7 +1532,7 @@ impl MailStore {
         account_id: Option<i64>,
         thread_key: String,
         limit: i64,
-    ) -> MailResult<Vec<Message>> {
+    ) -> MailResult<Vec<MessageSummary>> {
         self.with_conn(|conn| {
             let limit = limit.clamp(1, 200);
             let mut scope_conditions = vec!["m.thread_key = ?".to_string()];
@@ -1545,7 +1545,7 @@ impl MailStore {
             let sql = format!(
                 "
                 SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
-                       m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
+                       m.cc, m.bcc, m.subject, m.snippet, m.security_warnings,
                        m.received_at, m.is_read, m.is_starred, m.has_attachments,
                        m.snoozed_until, m.remote_mailbox, m.remote_uid,
                        m.message_id_header, m.in_reply_to_header, m.references_header
@@ -1561,10 +1561,10 @@ impl MailStore {
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {
-                    map_message_row_base(row)
+                    map_message_summary_row_base(row)
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
-            hydrate_message_list_metadata(conn, rows)
+            hydrate_message_summary_list_metadata(conn, rows)
         })
     }
 
@@ -2422,7 +2422,7 @@ impl MailStore {
         })
     }
 
-    pub fn release_due_snoozed_messages(&self, now: &str) -> MailResult<Vec<Message>> {
+    pub fn release_due_snoozed_messages(&self, now: &str) -> MailResult<ReleasedSnoozedCount> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "
@@ -2439,7 +2439,7 @@ impl MailStore {
                 .collect::<Result<Vec<_>, _>>()?;
             let due_ids = due_snoozed_message_ids(now, rows);
             if due_ids.is_empty() {
-                return Ok(Vec::new());
+                return Ok(ReleasedSnoozedCount { released_count: 0 });
             }
             for message_id in &due_ids {
                 let folder_id = folder_id_for_message_role(conn, *message_id, "inbox")?;
@@ -2448,10 +2448,9 @@ impl MailStore {
                     params![folder_id, message_id],
                 )?;
             }
-            due_ids
-                .into_iter()
-                .map(|message_id| message_for_conn(conn, message_id))
-                .collect()
+            Ok(ReleasedSnoozedCount {
+                released_count: due_ids.len() as i64,
+            })
         })
     }
 
@@ -4805,6 +4804,7 @@ impl SearchCriteria {
     }
 }
 
+#[allow(dead_code)]
 fn build_message_query(
     search: &SearchCriteria,
     filter: &str,
@@ -4815,6 +4815,45 @@ fn build_message_query(
         "
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
+                       m.received_at, m.is_read, m.is_starred, m.has_attachments,
+                       m.snoozed_until, m.remote_mailbox, m.remote_uid,
+                       m.message_id_header, m.in_reply_to_header, m.references_header
+        FROM messages m
+        JOIN accounts a ON a.id = m.account_id
+        JOIN folders f ON f.id = m.folder_id
+        ",
+    );
+    let filter_clause = build_message_filter_clause(search, filter);
+    let mut conditions = Vec::new();
+    let trimmed_scope = scope_condition.trim();
+    if !trimmed_scope.is_empty() {
+        conditions.push(trimmed_scope.to_string());
+    }
+    let trimmed_filter = filter_clause.trim().trim_start_matches("AND").trim();
+    if !trimmed_filter.is_empty() {
+        conditions.push(trimmed_filter.to_string());
+    }
+    if !conditions.is_empty() {
+        sql.push_str("WHERE ");
+        sql.push_str(&conditions.join(" AND "));
+        sql.push(' ');
+    }
+    sql.push_str("ORDER BY ");
+    sql.push_str(message_order_clause(sort));
+    sql.push_str(" LIMIT ?");
+    sql
+}
+
+fn build_message_summary_query(
+    search: &SearchCriteria,
+    filter: &str,
+    scope_condition: &str,
+    sort: Option<&str>,
+) -> String {
+    let mut sql = String::from(
+        "
+        SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
+               m.cc, m.bcc, m.subject, m.snippet, m.security_warnings,
                        m.received_at, m.is_read, m.is_starred, m.has_attachments,
                        m.snoozed_until, m.remote_mailbox, m.remote_uid,
                        m.message_id_header, m.in_reply_to_header, m.references_header
@@ -5594,10 +5633,116 @@ fn map_message_row_base(row: &Row<'_>) -> rusqlite::Result<Message> {
     })
 }
 
+#[allow(dead_code)]
 fn hydrate_message_list_metadata(
     conn: &Connection,
     mut messages: Vec<Message>,
 ) -> MailResult<Vec<Message>> {
+    if messages.is_empty() {
+        return Ok(messages);
+    }
+
+    let message_ids = messages
+        .iter()
+        .map(|message| message.id)
+        .collect::<Vec<_>>();
+    let placeholders = std::iter::repeat_n("?", message_ids.len())
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let label_sql = format!(
+        "
+        SELECT ml.message_id, l.name
+        FROM message_labels ml
+        JOIN labels l ON l.id = ml.label_id
+        WHERE ml.message_id IN ({placeholders})
+        ORDER BY ml.message_id, l.name
+        "
+    );
+    let label_params = message_ids
+        .iter()
+        .copied()
+        .map(Value::Integer)
+        .collect::<Vec<_>>();
+    let mut labels_by_message = BTreeMap::<i64, Vec<String>>::new();
+    {
+        let mut stmt = conn.prepare(&label_sql)?;
+        let labels = stmt.query_map(params_from_iter(label_params), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for item in labels {
+            let (message_id, label) = item?;
+            labels_by_message.entry(message_id).or_default().push(label);
+        }
+    }
+
+    let attachment_sql = format!(
+        "
+        SELECT message_id, COUNT(*) AS attachment_count
+        FROM attachments
+        WHERE message_id IN ({placeholders})
+        GROUP BY message_id
+        "
+    );
+    let attachment_params = message_ids
+        .iter()
+        .copied()
+        .map(Value::Integer)
+        .collect::<Vec<_>>();
+    let mut attachment_counts = BTreeMap::<i64, i64>::new();
+    {
+        let mut stmt = conn.prepare(&attachment_sql)?;
+        let counts = stmt.query_map(params_from_iter(attachment_params), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })?;
+        for item in counts {
+            let (message_id, count) = item?;
+            attachment_counts.insert(message_id, count);
+        }
+    }
+
+    for message in &mut messages {
+        message.labels = labels_by_message.remove(&message.id).unwrap_or_default();
+        message.attachment_count = attachment_counts.remove(&message.id).unwrap_or(0);
+    }
+    Ok(messages)
+}
+
+fn map_message_summary_row_base(row: &Row<'_>) -> rusqlite::Result<MessageSummary> {
+    let message_id: i64 = row.get(0)?;
+    Ok(MessageSummary {
+        id: message_id,
+        account_id: row.get(1)?,
+        account_email: row.get(2)?,
+        folder_id: row.get(3)?,
+        folder_role: row.get(4)?,
+        sender_name: protocol::decode_address_header_value(&row.get::<_, String>(5)?),
+        sender_email: row.get(6)?,
+        recipients: protocol::decode_address_header_value(&row.get::<_, String>(7)?),
+        cc: protocol::decode_address_header_value(&row.get::<_, String>(8)?),
+        bcc: protocol::decode_address_header_value(&row.get::<_, String>(9)?),
+        subject: protocol::decode_mime_header_value(&row.get::<_, String>(10)?),
+        snippet: row.get(11)?,
+        security_warnings: warning_lines_from_text(row.get(12)?),
+        received_at: row.get(13)?,
+        is_read: row.get::<_, i64>(14)? != 0,
+        is_starred: row.get::<_, i64>(15)? != 0,
+        has_attachments: row.get::<_, i64>(16)? != 0,
+        snoozed_until: row.get(17)?,
+        labels: Vec::new(),
+        attachment_count: 0,
+        remote_mailbox: row.get(18)?,
+        remote_uid: row.get(19)?,
+        message_id_header: row.get(20)?,
+        in_reply_to_header: row.get(21)?,
+        references_header: row.get(22)?,
+    })
+}
+
+fn hydrate_message_summary_list_metadata(
+    conn: &Connection,
+    mut messages: Vec<MessageSummary>,
+) -> MailResult<Vec<MessageSummary>> {
     if messages.is_empty() {
         return Ok(messages);
     }
@@ -7152,7 +7297,7 @@ mod tests {
             .unwrap();
         assert!(body_matches
             .iter()
-            .any(|message| message.body.contains("SQLite FTS5")));
+            .any(|message| store.get_message(message.id).unwrap().body.contains("SQLite FTS5")));
         let from_matches = store
             .list_messages_for_scope(None, inbox.id, Some("from:security".to_string()), None, 50)
             .unwrap();
@@ -7508,10 +7653,22 @@ mod tests {
         let released = store
             .release_due_snoozed_messages("2026-07-11T09:00:00+08:00")
             .unwrap();
-        assert_eq!(released.len(), 1);
-        assert_eq!(released[0].id, due);
-        assert_eq!(released[0].folder_role, "inbox");
-        assert!(released[0].snoozed_until.is_empty());
+        assert_eq!(released.released_count, 1);
+        // Verify the released message is now in inbox by querying separately
+        let inbox_folder = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let inbox_messages = store
+            .list_messages_for_scope(None, inbox_folder.id, None, None, 10)
+            .unwrap();
+        assert!(inbox_messages.iter().any(|m| m.id == due));
+        assert!(inbox_messages
+            .iter()
+            .find(|m| m.id == due)
+            .map_or(false, |m| m.snoozed_until.is_empty()));
 
         let snoozed_folder = store
             .list_folders_for_account(Some(account_id))
@@ -7764,7 +7921,7 @@ mod tests {
             .unwrap();
         assert_eq!(outbox_message.sender_name, "Demo Support");
         assert_eq!(outbox_message.sender_email, "support@better-email.local");
-        assert!(outbox_message.body.contains("Support signature"));
+        assert!(store.get_message(queued.message_id).unwrap().body.contains("Support signature"));
 
         let outbound = store
             .pending_outbox_messages()
@@ -7805,18 +7962,13 @@ mod tests {
                 attachments: Vec::new(),
             })
             .unwrap();
-        let drafts = store
+        let _ignore = store
             .list_folders_for_account(Some(account.id))
             .unwrap()
             .into_iter()
             .find(|folder| folder.role == "drafts")
             .unwrap();
-        let saved_draft = store
-            .list_messages_for_scope(None, drafts.id, Some("HTML Draft".to_string()), None, 10)
-            .unwrap()
-            .into_iter()
-            .find(|message| message.id == draft_id)
-            .unwrap();
+        let saved_draft = store.get_message(draft_id).unwrap();
         assert!(saved_draft
             .sanitized_html
             .contains("<strong>Hello</strong>"));
@@ -7884,7 +8036,7 @@ mod tests {
         assert!(draft_attachments[0].is_downloaded);
         assert_eq!(draft_attachments[0].local_path, "/tmp/proposal.pdf");
 
-        let drafts = store
+        let _ignore = store
             .list_folders_for_account(Some(store.get_account().unwrap().id))
             .unwrap()
             .into_iter()
@@ -7893,7 +8045,7 @@ mod tests {
         let saved_draft = store
             .list_messages_for_scope(
                 None,
-                drafts.id,
+                _ignore.id,
                 Some("Attachment draft".to_string()),
                 None,
                 10,

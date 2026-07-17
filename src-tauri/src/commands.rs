@@ -9,11 +9,11 @@ use crate::models::{
     CredentialVerificationInput, CredentialVerificationReport, DiagnosticAccount, DiagnosticExport,
     DiagnosticOAuthSession, DiagnosticOutboxItem, DraftInput, DraftSaveReport, Folder,
     FolderReadReport, ImapMailboxState, ImapProbeReport, Label, LocalBackup, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageSummary,
     MessageThreadingInput, OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput,
     OAuthRefreshInput, OAuthRefreshReport, OAuthSession, OAuthStartInput, OAuthStartReport,
     OAuthTokenExchangeInput, OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage,
-    OutboxItem, ParsedMessagePreview, RawMessageInput, RemoteActionReport, RemoteImageTrust,
+    OutboxItem, ParsedMessagePreview, RawMessageInput, ReleasedSnoozedCount, RemoteActionReport, RemoteImageTrust,
     RemoteImageTrustInput, RestoreMessageReport, StorageUsage, SyncRun, SyncSchedulePlan,
     ThreadSummary, TrashActionReport,
 };
@@ -276,7 +276,7 @@ pub fn list_messages(
     filter: Option<String>,
     sort: Option<String>,
     limit: i64,
-) -> MailResult<Vec<Message>> {
+) -> MailResult<Vec<MessageSummary>> {
     store.list_messages_for_scope_sorted(
         account_id,
         folder_id.unwrap_or_default(),
@@ -302,8 +302,16 @@ pub fn list_thread_messages(
     account_id: Option<i64>,
     thread_key: String,
     limit: i64,
-) -> MailResult<Vec<Message>> {
+) -> MailResult<Vec<MessageSummary>> {
     store.list_thread_messages(account_id, thread_key, limit)
+}
+
+#[tauri::command]
+pub fn get_message_detail(
+    store: State<'_, MailStore>,
+    message_id: i64,
+) -> MailResult<Message> {
+    store.get_message(message_id)
 }
 
 #[tauri::command]
@@ -1242,7 +1250,7 @@ pub fn unsnooze_message(store: State<'_, MailStore>, message_id: i64) -> MailRes
 pub fn release_due_snoozed_messages(
     store: State<'_, MailStore>,
     now: String,
-) -> MailResult<Vec<Message>> {
+) -> MailResult<ReleasedSnoozedCount> {
     store.release_due_snoozed_messages(&now)
 }
 

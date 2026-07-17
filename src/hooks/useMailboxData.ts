@@ -6,6 +6,7 @@ import type {
   ListMode,
   ListSort,
   Message,
+  MessageSummary,
   SearchScope,
   ThreadSummary,
   ImapMailboxState,
@@ -43,7 +44,7 @@ type UseMailboxDataOptions = {
   listSort: ListSort;
   folders: Folder[];
   imapMailboxes: ImapMailboxState[];
-  setMessages: Dispatch<SetStateAction<Message[]>>;
+  setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
   setMessageLimit: Dispatch<SetStateAction<number>>;
   setHasMoreMessages: Dispatch<SetStateAction<boolean>>;
@@ -122,7 +123,7 @@ export type MailboxDataController = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
-  ) => Promise<Message[]>;
+  ) => Promise<MessageSummary[]>;
   loadMessagesWithVisibleFallback: (
     nextFolderId?: number | null,
     nextQuery?: string,
@@ -133,7 +134,7 @@ export type MailboxDataController = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
-  ) => Promise<Message[]>;
+  ) => Promise<MessageSummary[]>;
   refreshMailbox: (
     nextScope?: AccountScope,
     preferredFolderId?: number | null,
@@ -222,16 +223,16 @@ export default function useMailboxData({
       requestMessages: requests.messages,
       requestThreads: requests.threads,
     });
-    let nextMessages: Message[];
+    let nextMessages: MessageSummary[];
     let nextThreads: ThreadSummary[] = [];
     try {
       if (nextIncludeThreads) {
         [nextMessages, nextThreads] = await Promise.all([
-          invoke<Message[]>('list_messages', requests.messages),
+          invoke<MessageSummary[]>('list_messages', requests.messages),
           invoke<ThreadSummary[]>('list_threads', requests.threads),
         ]);
       } else {
-        nextMessages = await invoke<Message[]>('list_messages', requests.messages);
+        nextMessages = await invoke<MessageSummary[]>('list_messages', requests.messages);
       }
     } catch (error) {
       mailboxFlowWarn('loadMessages failed', {

@@ -1,6 +1,7 @@
 import { type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import type {
   Message,
+  MessageSummary,
   ThreadSummary,
   Attachment,
   AttachmentDownload,
@@ -20,12 +21,20 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
   flowWarn('app-flow', event, details);
 }
 
+function toSummary(msg: Message): MessageSummary {
+  const { body, sanitized_html, ...rest } = msg;
+  return rest;
+}
+
 type UseReaderActionsOptions = {
-  selected: Message | null;
+  selected: MessageSummary | null;
+  selectedDetail: Message | null;
+  setSelectedDetail: Dispatch<SetStateAction<Message | null>>;
+  onUpdateCache: (message: Message) => void;
   activeThread: ThreadSummary | null;
   folderId: number | null;
-  setMessages: Dispatch<SetStateAction<Message[]>>;
-  setThreadMessages: Dispatch<SetStateAction<Message[]>>;
+  setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
+  setThreadMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   setRemoteImageTrusts: Dispatch<SetStateAction<RemoteImageTrust[]>>;
   setRules: Dispatch<SetStateAction<MailRule[]>>;
@@ -40,6 +49,9 @@ type UseReaderActionsOptions = {
 
 export default function useReaderActions({
   selected,
+  selectedDetail,
+  setSelectedDetail,
+  onUpdateCache,
   activeThread,
   folderId,
   setMessages,
@@ -59,10 +71,15 @@ export default function useReaderActions({
   async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
     if (!messageId) return null;
     const updated = await invoke<Message>('render_message_with_remote_image_policy', { messageId });
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    const summary = toSummary(updated);
+    setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     if (activeThread) {
-      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+      setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     }
+    if (selectedDetail && selectedDetail.id === updated.id) {
+      setSelectedDetail(updated);
+    }
+    onUpdateCache(updated);
     return updated;
   }
 
@@ -78,10 +95,15 @@ export default function useReaderActions({
     });
     try {
       const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
-      setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+      const summary = toSummary(updated);
+      setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
       if (activeThread) {
-        setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+        setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
       }
+      if (selectedDetail && selectedDetail.id === updated.id) {
+        setSelectedDetail(updated);
+      }
+      onUpdateCache(updated);
       const refreshedAttachments = await invoke<Attachment[]>('list_attachments', { messageId: updated.id });
       setAttachments(refreshedAttachments);
       appFlowLog('manualFetchBody done', {
@@ -115,10 +137,15 @@ export default function useReaderActions({
   async function allowRemoteImagesForSelectedOnce() {
     if (!selected) return;
     const updated = await invoke<Message>('render_message_with_remote_images_once', { messageId: selected.id });
-    setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+    const summary = toSummary(updated);
+    setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     if (activeThread) {
-      setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+      setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     }
+    if (selectedDetail && selectedDetail.id === updated.id) {
+      setSelectedDetail(updated);
+    }
+    onUpdateCache(updated);
     setStatus('已允许查看当前邮件的远程图片');
   }
 

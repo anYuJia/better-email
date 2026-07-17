@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Message } from '../app/types';
+import type { MessageSummary } from '../app/types';
 import {
   buildMessageSearchEntries,
   buildMessageSearchSuggestions,
 } from './messageListSearchSuggestions';
 
-function message(overrides: Partial<Message>): Message {
+function message(overrides: Partial<MessageSummary>): MessageSummary {
   return {
     id: 1,
     account_id: 1,
@@ -19,8 +19,6 @@ function message(overrides: Partial<Message>): Message {
     bcc: '',
     subject: '',
     snippet: '',
-    body: '',
-    sanitized_html: '',
     security_warnings: [],
     received_at: '',
     is_read: false,
@@ -41,7 +39,7 @@ describe('message list search suggestions', () => {
       message({
         recipients: 'Ada Lovelace <ada@example.com>',
         sender_name: 'Grace Hopper',
-        body: 'Quarterly roadmap attached',
+        subject: 'Quarterly roadmap attached',
         has_attachments: true,
       }),
       message({
@@ -64,10 +62,18 @@ describe('message list search suggestions', () => {
 
   it('keeps scoped search syntax out of shortcut suggestions', () => {
     const entries = buildMessageSearchEntries([
-      message({ body: 'hello' }),
+      message({ snippet: 'hello' }),
     ]);
 
     expect(buildMessageSearchSuggestions(entries, '')).toEqual([]);
     expect(buildMessageSearchSuggestions(entries, 'from:ada')).toEqual([]);
+  });
+
+  it('does not depend on message body/html fields for summary-only lists', () => {
+    const entries = buildMessageSearchEntries([
+      message({ subject: 'Invoice', snippet: 'Please review the invoice' }),
+    ]);
+    expect(entries[0].body).toContain('invoice');
+    expect(entries[0].body).not.toContain('undefined');
   });
 });

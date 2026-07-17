@@ -133,8 +133,8 @@ function isMarkupPreviewNoise(value: string): boolean {
 
 export type PreviewableMailboxMessage = {
   id?: number;
-  body: string;
-  sanitized_html: string;
+  body?: string;
+  sanitized_html?: string;
   snippet: string;
 };
 
@@ -159,6 +159,12 @@ export function mailboxListPreview(message: PreviewableMailboxMessage): string {
   const preview = calculatePreview();
 
   if (message.id !== undefined) {
+    if (!mailboxPreviewCache.has(message.id) && mailboxPreviewCache.size >= 1000) {
+      const firstKey = mailboxPreviewCache.keys().next().value;
+      if (firstKey !== undefined) {
+        mailboxPreviewCache.delete(firstKey);
+      }
+    }
     mailboxPreviewCache.set(message.id, preview);
   }
 

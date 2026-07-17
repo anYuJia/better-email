@@ -58,6 +58,7 @@ import type {
   Attachment,
   OutboundAttachmentInput,
   Message,
+  MessageSummary,
   UndoMessageSnapshot,
   CommandPaletteItem,
   RemoteImageTrust,
@@ -131,6 +132,11 @@ import {
   forwardAttachmentStatus,
 } from './app/forwarding';
 import { flowInfo, flowWarn } from './app/logger';
+import {
+  applyMessageMetadataPatch,
+  resolveReaderSelectedDetail,
+  type MessageMetadataPatch,
+} from './app/messageDetailUtils';
 import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
@@ -196,6 +202,56 @@ type MailboxListState = {
   scrollTop?: number;
   updatedAt: number;
 };
+
+class MessageDetailLRU {
+  private cache = new Map<number, Message>();
+  private limit: number;
+
+  constructor(limit = 5) {
+    this.limit = limit;
+  }
+
+  get(id: number): Message | undefined {
+    if (!this.cache.has(id)) return undefined;
+    const val = this.cache.get(id)!;
+    this.cache.delete(id);
+    this.cache.set(id, val);
+    return val;
+  }
+
+  peek(id: number): Message | undefined {
+    return this.cache.get(id);
+  }
+
+  set(id: number, message: Message): void {
+    if (this.cache.has(id)) {
+      this.cache.delete(id);
+    } else if (this.cache.size >= this.limit) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+    this.cache.set(id, message);
+  }
+
+  patch(id: number, patch: Partial<Message>): Message | undefined {
+    const existing = this.cache.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...patch, id: existing.id };
+    this.cache.delete(id);
+    this.cache.set(id, updated);
+    return updated;
+  }
+
+  delete(id: number): void {
+    this.cache.delete(id);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
 
 type MailboxListStatePatch = Omit<Partial<MailboxListState>, 'updatedAt'>;
 
@@ -324,7 +380,7 @@ export default function App() {
   const [imapProbe, setImapProbe] = useState<ImapProbeReport | null>(null);
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageSummary[]>([]);
   const [messageLimit, setMessageLimit] = useState(messagePageSize);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -346,7 +402,11 @@ export default function App() {
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
-  const [threadMessages, setThreadMessages] = useState<Message[]>([]);
+  const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
+  const [selectedDetail, setSelectedDetail] = useState<Message | null>(null);
+  const messageDetailCacheRef = useRef(new MessageDetailLRU(5));
+  const selectedIdRef = useRef<number | null>(null);
+  const selectedDetailRef = useRef<Message | null>(null);
   const [query, setQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('folder');
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -364,7 +424,7 @@ export default function App() {
   const [commandQuery, setCommandQuery] = useState('');
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [snoozeTarget, setSnoozeTarget] = useState<{
-    messages: Message[];
+    messages: MessageSummary[];
     label: string;
   } | null>(null);
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
@@ -384,7 +444,7 @@ export default function App() {
   const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
   const [confirmDeleteLabel, setConfirmDeleteLabel] = useState<Label | null>(null);
   const [confirmEmptyTrashState, setConfirmEmptyTrashState] = useState<{ accountId: number; accountScope: AccountScope; accountName: string } | null>(null);
-  const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<Message | null>(null);
+  const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
@@ -894,7 +954,8 @@ export default function App() {
   }
 
   async function releaseDueSnoozedMessages() {
-    return invoke<Message[]>('release_due_snoozed_messages', { now: new Date().toISOString() });
+    const result = await invoke<{ released_count: number }>('release_due_snoozed_messages', { now: new Date().toISOString() });
+    return result;
   }
 
   async function loadMeta(
@@ -913,8 +974,8 @@ export default function App() {
     });
     try {
       const released = await releaseDueSnoozedMessages();
-      if (released.length > 0) {
-        setStatus(`已恢复 ${released.length} 封到期稍后邮件`);
+      if (released.released_count > 0) {
+        setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
       }
       if (mode === 'mailbox') {
         const [
@@ -1269,10 +1330,76 @@ export default function App() {
     setQuickReplyBody('');
   }, [selectedId]);
 
+  selectedIdRef.current = selectedId;
+  selectedDetailRef.current = selectedDetail;
+
   const readerSelectedId = useDeferredValue(selectedId);
+
+  const patchSelectedDetailMetadata = useCallback((messageId: number, patch: MessageMetadataPatch) => {
+    messageDetailCacheRef.current.patch(messageId, patch);
+    setSelectedDetail((current) => {
+      if (!current || current.id !== messageId) return current;
+      return applyMessageMetadataPatch(current, patch);
+    });
+  }, []);
+
+  const invalidateSelectedDetail = useCallback((messageId: number) => {
+    messageDetailCacheRef.current.delete(messageId);
+    setSelectedDetail((current) => (current?.id === messageId ? null : current));
+  }, []);
+
+  const clearSelectedDetailIf = useCallback((messageId: number) => {
+    messageDetailCacheRef.current.delete(messageId);
+    if (selectedIdRef.current === messageId) {
+      setSelectedId(null);
+    }
+    setSelectedDetail((current) => (current?.id === messageId ? null : current));
+  }, [setSelectedId]);
+
+  useEffect(() => {
+    if (!readerSelectedId) {
+      setSelectedDetail(null);
+      return;
+    }
+    const cached = messageDetailCacheRef.current.get(readerSelectedId);
+    if (cached) {
+      setSelectedDetail(cached);
+      return;
+    }
+    // 无 cache 时立即清空旧详情，避免 reader 显示上一封邮件
+    setSelectedDetail(null);
+    let cancelled = false;
+    invoke<Message>('get_message_detail', { messageId: readerSelectedId })
+      .then((detail) => {
+        if (cancelled) return;
+        messageDetailCacheRef.current.set(readerSelectedId, detail);
+        setSelectedDetail(detail);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to load message detail:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readerSelectedId]);
+
+  useEffect(() => {
+    messageDetailCacheRef.current.clear();
+    setSelectedDetail(null);
+  }, [accountScope, folderId, query, filter]);
+
+  // 派生值：确保 reader 只收到与当前 readerSelectedId 匹配的详情，防止 stale
+  const readerSelectedDetail = useMemo(
+    () => resolveReaderSelectedDetail(selectedDetail, readerSelectedId),
+    [selectedDetail, readerSelectedId],
+  );
   const selected = useMemo(
-    () => messages.find((message) => message.id === readerSelectedId) ?? null,
-    [messages, readerSelectedId],
+    () =>
+      messages.find((message) => message.id === readerSelectedId)
+      ?? threadMessages.find((message) => message.id === readerSelectedId)
+      ?? null,
+    [messages, threadMessages, readerSelectedId],
   );
   const selectedMessageSet = useMemo(() => new Set(selectedMessageIds), [selectedMessageIds]);
   const selectedMessages = useMemo(
@@ -1292,28 +1419,26 @@ export default function App() {
   const handleMailboxListScrollTopChange = useCallback((scrollTop: number) => {
     saveMailboxListState(mailboxListStateKey, { scrollTop });
   }, [mailboxListStateKey]);
-  const activeThreadSelected = activeThread
-    ? threadMessages.find((message) => message.id === readerSelectedId) ?? threadMessages[0] ?? selected
-    : selected;
+  const activeThreadSelected = readerSelectedDetail;
   const selectedSenderDomain = useMemo(
-    () => (selected ? senderDomain(selected.sender_email) : ''),
-    [selected?.sender_email],
+    () => (readerSelectedDetail ? senderDomain(readerSelectedDetail.sender_email) : ''),
+    [readerSelectedDetail?.sender_email],
   );
   const selectedSenderTrusted = useMemo(
     () =>
       Boolean(
-        selected &&
+        readerSelectedDetail &&
           remoteImageTrusts.some(
             (trust) =>
-              trust.account_id === selected.account_id &&
-              ((trust.scope === 'sender' && trust.value === selected.sender_email.trim().toLowerCase()) ||
+              trust.account_id === readerSelectedDetail.account_id &&
+              ((trust.scope === 'sender' && trust.value === readerSelectedDetail.sender_email.trim().toLowerCase()) ||
                 (trust.scope === 'domain' && trust.value === selectedSenderDomain)),
           ),
       ),
-    [remoteImageTrusts, selected?.account_id, selected?.sender_email, selectedSenderDomain],
+    [remoteImageTrusts, readerSelectedDetail?.account_id, readerSelectedDetail?.sender_email, selectedSenderDomain],
   );
   const selectedHasRemoteImageWarning = Boolean(
-    selected?.security_warnings.some((warning) => warning.includes('远程图片')),
+    readerSelectedDetail?.security_warnings.some((warning) => warning.includes('远程图片')),
   ) && !selectedSenderTrusted;
 
   const {
@@ -1328,6 +1453,11 @@ export default function App() {
     exportSelectedMessage,
   } = useReaderActions({
     selected,
+    selectedDetail,
+    setSelectedDetail,
+    onUpdateCache: (msg) => {
+      messageDetailCacheRef.current.set(msg.id, msg);
+    },
     activeThread,
     folderId,
     setMessages,
@@ -1397,7 +1527,7 @@ export default function App() {
     };
   }, [selected?.id]);
 
-  const markMessageReadAfterReading = useCallback((message: Message) => {
+  const markMessageReadAfterReading = useCallback((message: MessageSummary) => {
     if (message.is_read) {
       return;
     }
@@ -1465,12 +1595,12 @@ export default function App() {
   }, [activeThread?.thread_key]);
 
   useEffect(() => {
-    if (!selected || !selectedSenderTrusted) return undefined;
-    if (selected.sanitized_html.includes('src="https://')) return undefined;
-    if (trustedRemoteImageRenderRef.current.has(selected.id)) return undefined;
+    if (!readerSelectedDetail || !selectedSenderTrusted) return undefined;
+    if (readerSelectedDetail.sanitized_html.includes('src="https://')) return undefined;
+    if (trustedRemoteImageRenderRef.current.has(readerSelectedDetail.id)) return undefined;
 
-    const selectedMessageId = selected.id;
-    const selectedBody = selected.body;
+    const selectedMessageId = readerSelectedDetail.id;
+    const selectedBody = readerSelectedDetail.body;
     const activeThreadKey = activeThread?.thread_key ?? null;
     let cancelled = false;
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
@@ -1480,14 +1610,19 @@ export default function App() {
         .then((updated) => {
           if (cancelled) return;
           React.startTransition(() => {
+            const { body, sanitized_html, ...summary } = updated;
             setMessages((current) => current.map((message) => (
-              message.id === updated.id ? updated : message
+              message.id === updated.id ? summary : message
             )));
             if (activeThreadKey) {
               setThreadMessages((current) => current.map((message) => (
-                message.id === updated.id ? updated : message
+                message.id === updated.id ? summary : message
               )));
             }
+            if (selectedDetail?.id === updated.id) {
+              setSelectedDetail(updated);
+            }
+            messageDetailCacheRef.current.set(updated.id, updated);
           });
         })
         .catch((error) => {
@@ -1502,23 +1637,23 @@ export default function App() {
     };
   }, [
     activeThread?.thread_key,
-    selected?.id,
+    readerSelectedDetail?.id,
     selectedSenderTrusted,
   ]);
 
   useEffect(() => {
-    if (!selected) return undefined;
+    if (!readerSelectedDetail) return undefined;
     const isHeaderOnlyRemoteMessage =
-      selected.remote_uid > 0 &&
-      (!selected.body.trim() || isMessageBodyCorrupted(selected.body)) &&
-      (selected.snippet.includes('远端邮件头已同步') || isMessageBodyCorrupted(selected.body));
+      readerSelectedDetail.remote_uid > 0 &&
+      (!readerSelectedDetail.body.trim() || isMessageBodyCorrupted(readerSelectedDetail.body)) &&
+      (readerSelectedDetail.snippet.includes('远端邮件头已同步') || isMessageBodyCorrupted(readerSelectedDetail.body));
     if (!isHeaderOnlyRemoteMessage) return undefined;
-    if (bodyFetchInFlightRef.current.has(selected.id) || bodyFetchFailedRef.current.has(selected.id)) return undefined;
+    if (bodyFetchInFlightRef.current.has(readerSelectedDetail.id) || bodyFetchFailedRef.current.has(readerSelectedDetail.id)) return undefined;
 
-    const selectedMessageId = selected.id;
-    const selectedAccountId = selected.account_id;
-    const selectedRemoteMailbox = selected.remote_mailbox;
-    const selectedRemoteUid = selected.remote_uid;
+    const selectedMessageId = readerSelectedDetail.id;
+    const selectedAccountId = readerSelectedDetail.account_id;
+    const selectedRemoteMailbox = readerSelectedDetail.remote_mailbox;
+    const selectedRemoteUid = readerSelectedDetail.remote_uid;
     const activeThreadKey = activeThread?.thread_key ?? null;
     let cancelled = false;
 
@@ -1535,10 +1670,15 @@ export default function App() {
           bodyFetchFailedRef.current.delete(updated.id);
           if (cancelled) return [];
           React.startTransition(() => {
-            setMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+            const { body, sanitized_html, ...summary } = updated;
+            setMessages((current) => current.map((message) => (message.id === updated.id ? summary : message)));
             if (activeThreadKey) {
-              setThreadMessages((current) => current.map((message) => (message.id === updated.id ? updated : message)));
+              setThreadMessages((current) => current.map((message) => (message.id === updated.id ? summary : message)));
             }
+            if (selectedDetail && selectedDetail.id === updated.id) {
+              setSelectedDetail(updated);
+            }
+            messageDetailCacheRef.current.set(updated.id, updated);
           });
           return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
             if (!cancelled) React.startTransition(() => setAttachments(items));
@@ -1572,7 +1712,7 @@ export default function App() {
       cancelled = true;
       cancelScheduledWork();
     };
-  }, [selected?.id, selected?.remote_uid, activeThread?.thread_key]);
+  }, [readerSelectedDetail?.id, readerSelectedDetail?.remote_uid, activeThread?.thread_key]);
 
   useEffect(() => {
     if (!isSettingsOpen || activeSettingsSection !== 'backup') return;
@@ -1580,7 +1720,7 @@ export default function App() {
   }, [isSettingsOpen, activeSettingsSection]);
 
   const openThread = useCallback(async (thread: ThreadSummary, announce = true) => {
-    const nextMessages = await invoke<Message[]>('list_thread_messages', {
+    const nextMessages = await invoke<MessageSummary[]>('list_thread_messages', {
       accountId: accountIdForScope(accountScope),
       threadKey: thread.thread_key,
       limit: 80,
@@ -1723,7 +1863,7 @@ export default function App() {
     setSelectedMessageIds(checked ? messages.map((message) => message.id) : []);
   }, [messages]);
 
-  function snapshotMessages(items: Message[]): UndoMessageSnapshot[] {
+  function snapshotMessages(items: MessageSummary[]): UndoMessageSnapshot[] {
     return items.map((message) => ({
       id: message.id,
       subject: message.subject || '(无主题)',
@@ -1825,7 +1965,7 @@ export default function App() {
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, `${messagesToMove.length} 封邮件`);
   }
 
-  const requestSnooze = useCallback((items: Message[]) => {
+  const requestSnooze = useCallback((items: MessageSummary[]) => {
     const targetMessages = [...new Map(
       items
           .filter((message) => canSnoozeRole(message.folder_role))
@@ -1860,7 +2000,13 @@ export default function App() {
     const targetIds = new Set(target.messages.map((message) => message.id));
     setSnoozeTarget(null);
     setSelectedMessageIds((current) => current.filter((messageId) => !targetIds.has(messageId)));
-    if (selectedId !== null && targetIds.has(selectedId)) setSelectedId(null);
+    if (selectedId !== null && targetIds.has(selectedId)) {
+      clearSelectedDetailIf(selectedId);
+      setSelectedId(null);
+    }
+    for (const messageId of targetIds) {
+      invalidateSelectedDetail(messageId);
+    }
     if (threadMessages.some((message) => targetIds.has(message.id))) {
       setActiveThread(null);
       setThreadMessages([]);
@@ -1876,28 +2022,30 @@ export default function App() {
     queueUndoAction('稍后处理', undoSnapshots, count > 1 ? `${count} 封邮件` : undefined);
   }
 
-  const toggleRead = useCallback(async (message: Message) => {
+  const toggleRead = useCallback(async (message: MessageSummary) => {
     const undoSnapshots = snapshotMessages([message]);
     const nextRead = !message.is_read;
     const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: nextRead });
     rememberManualReadState([message.id], nextRead);
+    patchSelectedDetailMetadata(message.id, { is_read: nextRead });
     await refreshAll();
     setStatus(report.message);
     queueUndoAction(message.is_read ? '标为未读' : '标为已读', undoSnapshots);
-  }, [rememberManualReadState, refreshAll, setStatus, queueUndoAction]);
+  }, [rememberManualReadState, patchSelectedDetailMetadata, refreshAll, setStatus, queueUndoAction]);
 
-  const toggleStar = useCallback(async (message: Message) => {
+  const toggleStar = useCallback(async (message: MessageSummary) => {
     const undoSnapshots = snapshotMessages([message]);
     const report = await invoke<RemoteActionReport>('set_message_starred', {
       messageId: message.id,
       isStarred: !message.is_starred,
     });
+    patchSelectedDetailMetadata(message.id, { is_starred: !message.is_starred });
     await refreshAll();
     setStatus(report.message);
     queueUndoAction(message.is_starred ? '取消星标' : '添加星标', undoSnapshots);
-  }, [refreshAll, setStatus, queueUndoAction]);
+  }, [patchSelectedDetailMetadata, refreshAll, setStatus, queueUndoAction]);
 
-  const runMessageAction = useCallback(async (message: Message, action: MessageContextAction) => {
+  const runMessageAction = useCallback(async (message: MessageSummary, action: MessageContextAction) => {
     if (action === 'copy-sender' || action === 'copy-subject') {
       const copySender = action === 'copy-sender';
       const value = copySender ? message.sender_email : message.subject;
@@ -1930,6 +2078,7 @@ export default function App() {
 
     if (action === 'restore' || action === 'not-spam') {
       const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: message.id });
+      clearSelectedDetailIf(message.id);
       setSelectedId(null);
       await refreshAll();
       const actionLabel = action === 'restore' ? '恢复到收件箱' : '标记为不是垃圾邮件';
@@ -1940,6 +2089,7 @@ export default function App() {
 
     if (action === 'unsnooze') {
       await invoke<Message>('unsnooze_message', { messageId: message.id });
+      clearSelectedDetailIf(message.id);
       setSelectedId(null);
       await refreshAll();
       setStatus(`已取消稍后处理：${message.subject || '(无主题)'}`);
@@ -1949,6 +2099,7 @@ export default function App() {
 
     const targetRole = action === 'spam' ? 'spam' : action;
     await invoke('move_message_to_role', { messageId: message.id, role: targetRole });
+    clearSelectedDetailIf(message.id);
     setSelectedId(null);
     await refreshAll();
     const actionLabel =
@@ -1961,26 +2112,32 @@ export default function App() {
     queueUndoAction(actionLabel, undoSnapshots);
   }, [toggleRead, toggleStar, requestSnooze, setSelectedId, refreshAll, setStatus, queueUndoAction]);
 
-  const moveMessageToFolder = useCallback(async (message: Message, folder: Folder) => {
+  const moveMessageToFolder = useCallback(async (message: MessageSummary, folder: Folder) => {
     const undoSnapshots = snapshotMessages([message]);
     await invoke('move_message_to_role', { messageId: message.id, role: folder.role });
+    clearSelectedDetailIf(message.id);
     setSelectedId(null);
     await refreshAll();
     setStatus(`已移动到 ${folder.name}：${message.subject || '(无主题)'}`);
     queueUndoAction(`移动到 ${folder.name}`, undoSnapshots);
-  }, [setSelectedId, refreshAll, setStatus, queueUndoAction]);
+  }, [clearSelectedDetailIf, setSelectedId, refreshAll, setStatus, queueUndoAction]);
 
-  const toggleMessageLabel = useCallback(async (message: Message, label: Label) => {
+  const toggleMessageLabel = useCallback(async (message: MessageSummary, label: Label) => {
     const undoSnapshots = snapshotMessages([message]);
     const hasLabel = message.labels.includes(label.name);
     await invoke(hasLabel ? 'remove_label_from_message' : 'apply_label_to_message', {
       messageId: message.id,
       labelId: label.id,
     });
+    // 同步更新 selectedDetail 和 cache 中的 labels
+    const nextLabels = hasLabel
+      ? message.labels.filter((l) => l !== label.name)
+      : [...message.labels, label.name];
+    patchSelectedDetailMetadata(message.id, { labels: nextLabels });
     await refreshAll();
     setStatus(`${hasLabel ? '已移除' : '已添加'}标签 ${label.name}`);
     queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
-  }, [refreshAll, setStatus, queueUndoAction]);
+  }, [patchSelectedDetailMetadata, refreshAll, setStatus, queueUndoAction]);
 
   async function handleCreateLabel(name: string, color: string) {
     const newLabel = await invoke<Label>('create_label', { name, color });
@@ -2015,6 +2172,8 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role });
+    // 移动后目标文件夹会继续展示该邮件，更新 metadata；body 保持原样
+    patchSelectedDetailMetadata(selected.id, { folder_role: role });
     const targetFolderId = visibleFolderIdForRole(role, selected.account_id) ?? folderId;
     await loadMeta(targetFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(targetFolderId);
@@ -2027,6 +2186,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role: folder.role });
+    patchSelectedDetailMetadata(selected.id, { folder_id: folder.id, folder_role: folder.role });
     await loadMeta(folder.id, accountScope, { mode: 'mailbox' });
     await loadMessages(folder.id);
     setSelectedId(selected.id);
@@ -2038,6 +2198,7 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
+    patchSelectedDetailMetadata(selected.id, { folder_role: 'spam' });
     const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
     await loadMeta(spamFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(spamFolderId);
@@ -2050,6 +2211,14 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+    patchSelectedDetailMetadata(selected.id, {
+      folder_id: result.restored.folder_id,
+      folder_role: result.restored.folder_role,
+      is_read: result.restored.is_read,
+      is_starred: result.restored.is_starred,
+      labels: result.restored.labels,
+      snoozed_until: result.restored.snoozed_until,
+    });
     const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
@@ -2062,6 +2231,14 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+    patchSelectedDetailMetadata(selected.id, {
+      folder_id: result.restored.folder_id,
+      folder_role: result.restored.folder_role,
+      is_read: result.restored.is_read,
+      is_starred: result.restored.is_starred,
+      labels: result.restored.labels,
+      snoozed_until: result.restored.snoozed_until,
+    });
     const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
     await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
@@ -2070,8 +2247,9 @@ export default function App() {
     queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
   }
 
-  async function permanentlyDeleteMessageConfirmed(message: Message) {
+  async function permanentlyDeleteMessageConfirmed(message: MessageSummary) {
     const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
+    clearSelectedDetailIf(message.id);
     if (selected?.id === message.id) {
       setSelectedId(null);
     }
@@ -2079,7 +2257,7 @@ export default function App() {
     setStatus(report.message);
   }
 
-  function requestPermanentlyDeleteMessage(message: Message) {
+  function requestPermanentlyDeleteMessage(message: MessageSummary) {
     setConfirmPermanentlyDelete(message);
   }
 
@@ -2172,6 +2350,12 @@ export default function App() {
     if (!selected) return;
     const undoSnapshots = snapshotMessages([selected]);
     const updated = await invoke<Message>('unsnooze_message', { messageId: selected.id });
+    patchSelectedDetailMetadata(selected.id, {
+      folder_id: updated.folder_id,
+      folder_role: updated.folder_role,
+      is_read: updated.is_read,
+      snoozed_until: updated.snoozed_until,
+    });
     const inboxFolderId = visibleFolderIdForRole('inbox', updated.account_id) ?? folderId;
     await loadMeta(inboxFolderId, accountScope, { mode: 'mailbox' });
     await loadMessages(inboxFolderId);
@@ -2188,6 +2372,10 @@ export default function App() {
       messageId: selected.id,
       labelId: label.id,
     });
+    const nextLabels = hasLabel
+      ? selected.labels.filter((l) => l !== label.name)
+      : [...selected.labels, label.name];
+    patchSelectedDetailMetadata(selected.id, { labels: nextLabels });
     await refreshAll();
     setStatus(hasLabel ? `已移除标签：${label.name}` : `已添加标签：${label.name}`);
     queueUndoAction(hasLabel ? `移除标签 ${label.name}` : `添加标签 ${label.name}`, undoSnapshots);
@@ -2564,44 +2752,50 @@ export default function App() {
     setStatus(`已撤回发送：${pending.subject}`);
   }
 
-  const composeFromMessage = useCallback(async (message: Message, mode: 'reply' | 'replyAll' | 'forward') => {
-    const threading = mode === 'forward' ? null : replyThreadingHeaders(message);
-    const replyRecipients = mode === 'forward' ? '' : message.sender_email;
+  const composeFromMessage = useCallback(async (message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward') => {
+    let fullMessage: Message;
+    if ('body' in message && typeof (message as any).body === 'string') {
+      fullMessage = message as Message;
+    } else {
+      fullMessage = await invoke<Message>('get_message_detail', { messageId: message.id });
+    }
+    const threading = mode === 'forward' ? null : replyThreadingHeaders(fullMessage);
+    const replyRecipients = mode === 'forward' ? '' : fullMessage.sender_email;
     const includeOriginalRecipients =
       mode === 'replyAll'
-        ? message.recipients
+        ? fullMessage.recipients
             .split(/[;,]/)
             .map((recipient) => recipient.trim())
             .filter((recipient) => recipient && recipient !== account?.email)
             .join(', ')
         : '';
     let forwardPlan = buildForwardAttachmentPlan([]);
-    if (mode === 'forward' && message.has_attachments) {
+    if (mode === 'forward' && fullMessage.has_attachments) {
       try {
         const sourceAttachments = await invoke<Attachment[]>('list_attachments', {
-          messageId: message.id,
+          messageId: fullMessage.id,
         });
         forwardPlan = buildForwardAttachmentPlan(
           sourceAttachments,
-          message.attachment_count,
+          fullMessage.attachment_count,
         );
       } catch {
         forwardPlan = {
           attachments: [],
-          unavailableCount: message.attachment_count,
-          totalCount: message.attachment_count,
+          unavailableCount: fullMessage.attachment_count,
+          totalCount: fullMessage.attachment_count,
         };
       }
     }
     openComposer({
       draft_id: 0,
-      account_id: message.account_id,
+      account_id: fullMessage.account_id,
       identity_id: 0,
       to: replyRecipients,
       cc: includeOriginalRecipients,
       bcc: '',
-      subject: prefixedSubject(message.subject, mode === 'forward' ? 'Fwd' : 'Re'),
-      body: quoteMessage(message),
+      subject: prefixedSubject(fullMessage.subject, mode === 'forward' ? 'Fwd' : 'Re'),
+      body: quoteMessage(fullMessage),
       html_body: '',
       send_at: '',
       attachments: mode === 'forward' ? forwardPlan.attachments : [],
@@ -3353,31 +3547,31 @@ export default function App() {
     toggleBulkLabel(label).catch((error) => setStatus(String(error)));
   }, [toggleBulkLabel, setStatus]);
 
-  const handleRunMessageAction = useCallback((message: Message, action: MessageContextAction) => {
+  const handleRunMessageAction = useCallback((message: MessageSummary, action: MessageContextAction) => {
     runMessageAction(message, action).catch((error) => setStatus(String(error)));
   }, [runMessageAction, setStatus]);
 
-  const handleMoveMessageToFolder = useCallback((message: Message, folder: Folder) => {
+  const handleMoveMessageToFolder = useCallback((message: MessageSummary, folder: Folder) => {
     moveMessageToFolder(message, folder).catch((error) => setStatus(String(error)));
   }, [moveMessageToFolder, setStatus]);
 
-  const handleToggleMessageLabel = useCallback((message: Message, label: Label) => {
+  const handleToggleMessageLabel = useCallback((message: MessageSummary, label: Label) => {
     toggleMessageLabel(message, label).catch((error) => setStatus(String(error)));
   }, [toggleMessageLabel, setStatus]);
 
-  const handleRunThreadAction = useCallback((thread: ThreadSummary, items: Message[], action: BulkMessageAction) => {
+  const handleRunThreadAction = useCallback((thread: ThreadSummary, items: MessageSummary[], action: BulkMessageAction) => {
     runThreadAction(thread, items, action).catch((error) => setStatus(String(error)));
   }, [runThreadAction, setStatus]);
 
-  const handleMoveThreadToFolder = useCallback((thread: ThreadSummary, items: Message[], folder: Folder) => {
+  const handleMoveThreadToFolder = useCallback((thread: ThreadSummary, items: MessageSummary[], folder: Folder) => {
     moveThreadToFolder(thread, items, folder).catch((error) => setStatus(String(error)));
   }, [moveThreadToFolder, setStatus]);
 
-  const handleToggleThreadLabel = useCallback((thread: ThreadSummary, items: Message[], label: Label) => {
+  const handleToggleThreadLabel = useCallback((thread: ThreadSummary, items: MessageSummary[], label: Label) => {
     toggleThreadLabel(thread, items, label).catch((error) => setStatus(String(error)));
   }, [toggleThreadLabel, setStatus]);
 
-  const handleToggleThreadMute = useCallback((thread: ThreadSummary, items: Message[]) => {
+  const handleToggleThreadMute = useCallback((thread: ThreadSummary, items: MessageSummary[]) => {
     toggleThreadMuted(thread, items).catch((error) => setStatus(String(error)));
   }, [toggleThreadMuted, setStatus]);
 
@@ -3538,7 +3732,7 @@ export default function App() {
         activeThread={activeThread}
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}
-        selected={selected}
+        selected={readerSelectedDetail}
         selectedId={readerSelectedId}
         readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}

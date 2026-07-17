@@ -7,18 +7,19 @@ import type {
   Folder,
   Label,
   Message,
+  MessageSummary,
 } from '../app/types';
 import type { BulkMessageAction } from './messageContextMenu';
 
 type MessageBulkToolbarProps = {
   visibleMessageCount: number;
   selectedMessageIds: number[];
-  selectedMessages: Message[];
+  selectedMessages: MessageSummary[];
   folders: Folder[];
   labels: Label[];
   onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
-  onRequestSnooze: (messages: Message[]) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
 };

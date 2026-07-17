@@ -783,7 +783,7 @@ export function listMessages(args: InvokeArgs) {
   const accountId = Number(args?.accountId ?? 0);
   const folderId = Number(args?.folderId ?? 0);
   const folder = folders.find((entry) => entry.id === folderId);
-  return messages.filter((message) => {
+  const list = messages.filter((message) => {
     if (accountId > 0 && message.account_id !== accountId) return false;
     if (folder) {
       if (folder.is_virtual) {
@@ -852,6 +852,10 @@ export function listMessages(args: InvokeArgs) {
     }
     return true;
   }).sort((left, right) => compareMessagesBySort(left, right, sort)).slice(0, limit);
+  return list.map((message: any) => {
+    const { body, sanitized_html, ...rest } = message;
+    return rest;
+  });
 }
 
 export function normalizedThreadSubject(subject: string) {
@@ -883,10 +887,14 @@ export function messageThreadKey(message: MockMessage) {
 export function listThreadMessages(args: InvokeArgs) {
   const threadKey = String(args?.threadKey ?? args?.thread_key ?? '').trim();
   const accountId = Number(args?.accountId ?? 0);
-  return messages
+  const list = messages
     .filter((message) => messageThreadKey(message) === threadKey)
     .filter((message) => accountId <= 0 || message.account_id === accountId)
     .sort((left, right) => left.received_at.localeCompare(right.received_at));
+  return list.map((message: any) => {
+    const { body, sanitized_html, ...rest } = message;
+    return rest;
+  });
 }
 
 export function listThreads(args?: InvokeArgs) {
@@ -970,22 +978,21 @@ export function renderMessageWithPolicy(messageId: number) {
 
 export function releaseDueSnoozedMessages(nowInput: string) {
   const nowMs = Date.parse(nowInput);
-  if (Number.isNaN(nowMs)) return [];
-  const released: MockMessage[] = [];
+  if (Number.isNaN(nowMs)) return { released_count: 0 };
+  let count = 0;
   messages = messages.map((message) => {
     if (message.folder_role !== 'snoozed' || !message.snoozed_until) return message;
     const dueMs = Date.parse(message.snoozed_until);
     if (Number.isNaN(dueMs) || dueMs > nowMs) return message;
-    const updated = {
+    count += 1;
+    return {
       ...message,
       folder_role: 'inbox',
       folder_id: folderIdForRole('inbox'),
       snoozed_until: '',
     };
-    released.push(updated);
-    return updated;
   });
-  return released;
+  return { released_count: count };
 }
 
 export async function mockInvoke<T>(command: string, args?: Record<string, any>): Promise<T> {
@@ -1487,6 +1494,8 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
       return false as T;
     case 'list_attachments':
       return attachments.filter((attachment) => attachment.message_id === args?.messageId) as T;
+    case 'get_message_detail':
+      return messages.find((message) => message.id === args?.messageId) as T;
     case 'set_message_read':
       {
       const target = messages.find((message) => message.id === args?.messageId);

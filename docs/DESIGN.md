@@ -177,7 +177,7 @@ SQLite local store + OS keychain
 - IMAP 邮件头同步将新邮件增量与历史回填分离：新邮件从最高 UID 向前每页最多 25 封，历史邮件从最低 UID 向后每个目录每轮最多 25 封；首次同步只取最近一页，后续后台同步或手动“回填一页”逐步补齐，避免长连接和瞬时内存峰值。
 - 每次目录同步额外使用同一 IMAP 会话读取最近 50 封的 `UID FLAGS` 快照，只传输 UID 和标志位；本地据此更新 `\\Seen`/`\\Flagged`，并移除快照明确覆盖范围内已从服务器删除的邮件，不拉正文、不扩大常驻内存。
 - 阅读面板按需拉正文，附件只存元数据，点击才下载。
-- `multipart/related` 内嵌图片保留规范化 Content-ID 与 inline 标记；前端只替换 HTML 中实际引用的 `cid:` 图片，已下载文件通过限定在应用附件目录的 asset protocol 渲染，未下载资源按用户操作顺序拉取，不把二进制或 Base64 常驻前端内存。普通附件列表和转发计划默认排除装饰性 inline 图片。
+- `multipart/related` 内嵌图片保留规范化 Content-ID 与 inline 标记；前端只替换 HTML 中实际引用的 `cid:` 图片，已下载文件优先通过限定在应用附件目录的 asset protocol 渲染，只有当 asset protocol 返回空且附件不超过 2 MB 时降级为非持久 Base64 Data URL。未下载资源按用户操作顺序拉取。普通附件列表和转发计划默认排除装饰性 inline 图片。
 - 附件下载先按元数据做大小保护，最终解码文件默认 25 MB 上限；真实 IMAP 下载优先用 BODYSTRUCTURE 定位 MIME part 与传输编码，再通过 `BODY.PEEK[part]<offset.count>` 以 256 KB 块写入最多 100 MB 的编码临时文件。完成后流式解码 Base64、Quoted-Printable 或直通内容到独立临时文件并原子替换到本地附件目录，找不到 part 时仅对上限内小附件回退整封解析。
 - SQLite 查询只返回 UI 必需字段，正文搜索走 FTS。
 - 同步任务串行限流，避免一次性解析大量邮件。

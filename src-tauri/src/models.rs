@@ -58,6 +58,35 @@ pub struct Message {
     pub references_header: String,
 }
 
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct MessageSummary {
+    pub id: i64,
+    pub account_id: i64,
+    pub account_email: String,
+    pub folder_id: i64,
+    pub folder_role: String,
+    pub sender_name: String,
+    pub sender_email: String,
+    pub recipients: String,
+    pub cc: String,
+    pub bcc: String,
+    pub subject: String,
+    pub snippet: String,
+    pub security_warnings: Vec<String>,
+    pub received_at: String,
+    pub is_read: bool,
+    pub is_starred: bool,
+    pub has_attachments: bool,
+    pub snoozed_until: String,
+    pub labels: Vec<String>,
+    pub attachment_count: i64,
+    pub remote_mailbox: String,
+    pub remote_uid: i64,
+    pub message_id_header: String,
+    pub in_reply_to_header: String,
+    pub references_header: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct RemoteImageTrust {
     pub id: i64,
@@ -276,6 +305,12 @@ pub struct CacheClearResult {
     pub reset_attachment_count: i64,
     pub released_bytes: i64,
     pub storage: StorageUsage,
+}
+
+/// Lightweight result for releasing due snoozed messages — avoids serializing full Message bodies.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReleasedSnoozedCount {
+    pub released_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

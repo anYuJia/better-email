@@ -1,4 +1,4 @@
-import type { Message } from '../app/types';
+import type { MessageSummary } from '../app/types';
 
 export type SearchSuggestion = {
   id: 'to' | 'from' | 'attachment' | 'body';
@@ -19,11 +19,12 @@ function normalizeSearchText(...values: string[]) {
   return values.join('\n').toLowerCase();
 }
 
-export function buildMessageSearchEntries(messages: Message[]): MessageSearchEntry[] {
+export function buildMessageSearchEntries(messages: MessageSummary[]): MessageSearchEntry[] {
   return messages.map((message) => ({
     to: normalizeSearchText(message.recipients, message.cc, message.bcc),
     from: normalizeSearchText(message.sender_name, message.sender_email),
-    body: normalizeSearchText(message.body, message.snippet),
+    // MessageSummary 不含 body/html；搜索建议只基于轻量字段（subject + snippet）
+    body: normalizeSearchText(message.subject, message.snippet),
     hasAttachments: message.has_attachments,
   }));
 }

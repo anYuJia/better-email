@@ -16,6 +16,7 @@ import type {
   MailIdentityInput,
   MailRuleInput,
   Message,
+  MessageSummary,
   OutboxItem,
   ProviderVerificationRecord,
   ProviderVerificationStatus,
@@ -470,7 +471,7 @@ export function isMovableMessageFolder(folder: Folder): boolean {
   return !folder.is_virtual && folder.role !== 'snoozed';
 }
 
-export function movableFoldersForMessage(folders: Folder[], message?: Message | null): Folder[] {
+export function movableFoldersForMessage(folders: Folder[], message?: MessageSummary | null): Folder[] {
   return folders.filter((folder) => {
     if (!isMovableMessageFolder(folder)) return false;
     if (message && folder.account_id !== message.account_id) return false;
@@ -478,7 +479,7 @@ export function movableFoldersForMessage(folders: Folder[], message?: Message | 
   });
 }
 
-export function movableFoldersForBulk(folders: Folder[], selectedMessages: Message[]): Folder[] {
+export function movableFoldersForBulk(folders: Folder[], selectedMessages: MessageSummary[]): Folder[] {
   if (selectedMessages.length === 0) return [];
   const accountIds = new Set(selectedMessages.map((message) => message.account_id));
   if (accountIds.size !== 1) return [];

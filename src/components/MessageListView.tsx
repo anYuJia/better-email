@@ -6,6 +6,7 @@ import {
 import type {
   FilterMode,
   Message,
+  MessageSummary,
 } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
@@ -14,12 +15,12 @@ import Avatar from './Avatar';
 type MessageGroup = {
   id: string;
   label: string;
-  messages: Message[];
+  messages: MessageSummary[];
 };
 
 type MessageListViewProps = {
   groups: MessageGroup[];
-  messages: Message[];
+  messages: MessageSummary[];
   query: string;
   filter: FilterMode;
   selectedId: number | null;
@@ -32,7 +33,7 @@ type MessageListViewProps = {
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onToggleAllVisible: (checked: boolean) => void;
-  onOpenMessageMenu: (message: Message, x: number, y: number, bulk: boolean) => void;
+  onOpenMessageMenu: (message: MessageSummary, x: number, y: number, bulk: boolean) => void;
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
   onClearSearchAndFilter: () => void;
@@ -42,7 +43,7 @@ type MessageListViewProps = {
 };
 
 type MessageListCardProps = {
-  message: Message;
+  message: MessageSummary;
   isCurrentMessage: boolean;
   isSelected: boolean;
   isDragging: boolean;
@@ -52,7 +53,7 @@ type MessageListCardProps = {
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onToggleAllVisible: (checked: boolean) => void;
-  onOpenMessageMenu: (message: Message, x: number, y: number, bulk: boolean) => void;
+  onOpenMessageMenu: (message: MessageSummary, x: number, y: number, bulk: boolean) => void;
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
 };
@@ -253,7 +254,7 @@ export default function MessageListView({
   const flatItems = useMemo(() => {
     const list: (
       | { type: 'header'; id: string; label: string; count: number }
-      | { type: 'message'; message: Message }
+      | { type: 'message'; message: MessageSummary }
     )[] = [];
     for (const group of groups) {
       list.push({ type: 'header', id: group.id, label: group.label, count: group.messages.length });

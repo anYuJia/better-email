@@ -639,7 +639,7 @@ export default function useComposerController({
 
   const composeFromMessage = useCallback(async (message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward') => {
     let fullMessage: Message;
-    if ('body' in message && typeof (message as any).body === 'string') {
+    if ('body' in message && typeof (message as Message).body === 'string') {
       fullMessage = message as Message;
     } else {
       fullMessage = await invoke<Message>('get_message_detail', { messageId: message.id });

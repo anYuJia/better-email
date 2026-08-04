@@ -833,7 +833,7 @@ export default function App() {
   useEffect(() => {
     function handleGlobalFocus(event: FocusEvent) {
       if (event.target instanceof HTMLElement) {
-        (window as any).__focusedElement = event.target;
+        (window as Window & { __focusedElement?: EventTarget | null }).__focusedElement = event.target;
       }
     }
     function handleGlobalBlur() {

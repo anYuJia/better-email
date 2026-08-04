@@ -41,6 +41,8 @@ import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/u
 import useMailboxSync from './hooks/useMailboxSync';
 import useRuleManagement from './hooks/useRuleManagement';
 import useSnoozeController from './hooks/useSnoozeController';
+import useMessageUndoActions from './hooks/useMessageUndoActions';
+import useSelectedMessageActions from './hooks/useSelectedMessageActions';
 import useSingleMessageActions from './hooks/useSingleMessageActions';
 import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
@@ -798,22 +800,8 @@ export default function App() {
   const {
     restoreUndoAction,
     moveMessagesToFolderByIds,
-    runMessageAction,
-    moveMessageToFolder,
-    toggleMessageLabel,
-    toggleRead,
-    toggleStar,
-    moveSelected,
-    moveSelectedToFolder,
-    markSelectedAsSpam,
-    markSelectedNotSpam,
-    restoreSelectedFromTrash,
-    permanentlyDeleteMessageConfirmed,
-    unsnoozeSelected,
-    toggleLabel,
-  } = useSingleMessageActions({
+  } = useMessageUndoActions({
     folders,
-    selected,
     selectedId,
     messages,
     labels,
@@ -827,12 +815,52 @@ export default function App() {
     snapshotMessages,
     queueUndoAction,
     consumeUndoAction,
+    visibleFolderIdForRole,
+  });
+  const {
+    runMessageAction,
+    moveMessageToFolder,
+    toggleMessageLabel,
+    toggleRead,
+    toggleStar,
+  } = useSingleMessageActions({
+    folders,
+    selected,
+    refreshAll,
+    setSelectedId,
+    setStatus,
+    snapshotMessages,
+    queueUndoAction,
     onReadStateChange: rememberManualReadState,
     clearSelectedDetailIf,
     patchSelectedDetailMetadata,
-    visibleFolderIdForRole,
     onRequestSnooze: requestSnooze,
     onRequestPermanentDelete: requestPermanentlyDeleteMessage,
+  });
+  const {
+    moveSelected,
+    moveSelectedToFolder,
+    markSelectedAsSpam,
+    markSelectedNotSpam,
+    restoreSelectedFromTrash,
+    permanentlyDeleteMessageConfirmed,
+    unsnoozeSelected,
+    toggleLabel,
+  } = useSelectedMessageActions({
+    selected,
+    folders,
+    labels,
+    folderId,
+    refreshAll,
+    loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
+    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    setSelectedId,
+    setStatus,
+    snapshotMessages,
+    queueUndoAction,
+    clearSelectedDetailIf,
+    patchSelectedDetailMetadata,
+    visibleFolderIdForRole,
   });
 
   const {

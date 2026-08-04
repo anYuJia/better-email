@@ -429,7 +429,7 @@ export default function useComposerController({
     });
     setDraft(emptyDraft);
     clearComposerAutosave();
-    closeComposer();
+    forceCloseComposer();
     await refreshAll();
     setStatus(report.message);
   }
@@ -456,7 +456,7 @@ export default function useComposerController({
         });
         setDraft(emptyDraft);
         clearComposerAutosave();
-        closeComposer();
+        forceCloseComposer();
         await focusMailboxRole('sent', input.account_id || account?.id || null, '邮件已发送并进入已发送');
         composerFlowLog('sendDraft done', {
           messageId,
@@ -494,7 +494,7 @@ export default function useComposerController({
     });
     setDraft(emptyDraft);
     clearComposerAutosave();
-    closeComposer();
+    forceCloseComposer();
     await focusMailboxRole('outbox', item.message_id ? input.account_id || account?.id || null : null, `邮件将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回`);
     composerFlowLog('sendDraft queued', {
       outboxId: item.id,
@@ -609,7 +609,7 @@ export default function useComposerController({
     });
     setDraft(emptyDraft);
     clearComposerAutosave();
-    closeComposer();
+    forceCloseComposer();
     await focusMailboxRole('outbox', input.account_id || account?.id || null, sendAt ? `邮件已安排稍后发送：${formatDate(input.send_at)}` : '邮件已加入发件箱队列');
     composerFlowLog('queueDraft done', {
       outboxId: item.id,

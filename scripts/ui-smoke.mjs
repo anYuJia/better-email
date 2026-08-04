@@ -259,7 +259,7 @@ async function clickButton(cdp, text, scope = 'document') {
 async function closeComposer(cdp) {
   await evalInPage(
     cdp,
-    "(() => { const button = document.querySelector('.composer header button[aria-label=\"关闭写信窗口\"]') ?? [...document.querySelectorAll('.composer header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()",
+    "(() => { const composer = document.querySelector('.composer'); if (!composer) return; const button = composer.querySelector('header button[aria-label=\"关闭写信窗口\"]') ?? [...composer.querySelectorAll('header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()",
   );
   await waitForExpression(cdp, "!document.querySelector('.composer') || document.querySelector('.settings-cache-confirm')");
   await evalInPage(

@@ -128,7 +128,7 @@ async function openCdp(debugPort, pageUrl) {
     ws.addEventListener('error', reject, { once: true });
   });
 
-  function send(method, params = {}) {
+  function sendOnce(method, params = {}) {
     if (ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
     }
@@ -146,7 +146,36 @@ async function openCdp(debugPort, pageUrl) {
   ws.addEventListener('error', () => failPending(new Error('Chrome CDP socket error')));
   ws.addEventListener('close', () => failPending(new Error('Chrome CDP socket closed')));
 
+  function send(method, params = {}) {
+    return sendWithRetry(sendOnce, method, params);
+  }
+
   return { send, events, close: () => ws.close() };
+}
+
+function isTransientCdpError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return message.includes('Timed out waiting for Chrome CDP response')
+    || message.includes('CDP socket');
+}
+
+function isTransientPageError(error) {
+  const message = String(error?.message ?? error ?? '');
+  return message.includes('Cannot read properties of null')
+    || message.includes('Cannot read properties of undefined');
+}
+
+async function sendWithRetry(sendOnce, method, params, retries = 1) {
+  let lastError = null;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await sendOnce(method, params);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !isTransientCdpError(error)) throw error;
+      await sleep(250);
+    }
+  }
 }
 
 async function waitForExpression(cdp, expression, timeoutMs = 10_000) {
@@ -166,17 +195,32 @@ async function waitForExpression(cdp, expression, timeoutMs = 10_000) {
 }
 
 async function evalInPage(cdp, expression) {
-  const result = await cdp.send('Runtime.evaluate', {
-    expression,
-    awaitPromise: true,
-    returnByValue: true,
-  });
-  if (result.exceptionDetails) {
-    const exception = result.exceptionDetails.exception;
-    const description = exception?.description || exception?.value || result.exceptionDetails.text;
-    throw new Error(description ?? 'Page evaluation failed');
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await sleep(200);
+    try {
+      const result = await cdp.send('Runtime.evaluate', {
+        expression,
+        awaitPromise: true,
+        returnByValue: true,
+      });
+      if (result.exceptionDetails) {
+        const exception = result.exceptionDetails.exception;
+        const description = exception?.description || exception?.value || result.exceptionDetails.text;
+        lastError = new Error(description ?? 'Page evaluation failed');
+        if (attempt === 0 && isTransientPageError(lastError)) continue;
+        throw lastError;
+      }
+      return result.result?.value;
+    } catch (error) {
+      if (attempt === 0 && isTransientCdpError(error)) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
   }
-  return result.result?.value;
+  throw lastError ?? new Error('Page evaluation failed');
 }
 
 async function captureScreenshot(cdp, name) {

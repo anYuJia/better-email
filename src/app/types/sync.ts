@@ -1,0 +1,74 @@
+import type { Account } from './account';
+
+export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
+export type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed';
+
+
+export type LocalBackupSummary = {
+  path: string;
+  exported_at: string;
+  app_version: string;
+  schema_version: number;
+  accounts: number;
+  messages: number;
+  labels: number;
+  rules: number;
+  outbox_items: number;
+  size_bytes: number;
+  credentials_included: boolean;
+};
+
+
+export type StorageUsage = {
+  database_bytes: number;
+  reclaimable_cache_bytes: number;
+  reclaimable_file_count: number;
+  cached_attachment_count: number;
+  local_attachment_bytes: number;
+  local_attachment_file_count: number;
+  partial_download_bytes: number;
+  partial_download_count: number;
+  total_managed_bytes: number;
+};
+
+
+export type CacheClearResult = {
+  removed_file_count: number;
+  reset_attachment_count: number;
+  released_bytes: number;
+  storage: StorageUsage;
+};
+
+
+export type SyncRun = {
+  id: number;
+  started_at: string;
+  finished_at: string;
+  status: string;
+  scanned_folders: number;
+  imported_messages: number;
+  message: string;
+};
+
+
+export type SyncSchedulePlan = {
+  max_accounts_per_batch: number;
+  total_accounts: number;
+  batch_accounts: Account[];
+  delayed_accounts: Account[];
+  strategy: string;
+};
+
+
+export type BackgroundTask = {
+  id: number;
+  kind: BackgroundTaskKind;
+  title: string;
+  source: 'manual' | 'timer';
+  status: BackgroundTaskStatus;
+  message: string;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+};
+

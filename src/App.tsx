@@ -29,11 +29,17 @@ import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
 import useComposerController from './hooks/useComposerController';
+import useCredentialManagement from './hooks/useCredentialManagement';
+import useFolderManagement from './hooks/useFolderManagement';
+import useIdentityManagement from './hooks/useIdentityManagement';
+import useLabelManagement from './hooks/useLabelManagement';
 import useMailboxSelectionController from './hooks/useMailboxSelectionController';
 import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/useMailboxSearchController';
+import useRuleManagement from './hooks/useRuleManagement';
+import useSnoozeController from './hooks/useSnoozeController';
+import useStorageManagement from './hooks/useStorageManagement';
+import useTrashController from './hooks/useTrashController';
 import {
-  formatBytes,
-  formatDate,
   type NotificationPolicy,
 } from './mailUtils';
 import { invoke, listen } from './tauriBridge';
@@ -47,7 +53,6 @@ import type {
   Account,
   AccountCreateInput,
   Folder,
-  FolderReadReport,
   Label,
   SavedSearch,
   SearchScope,
@@ -57,23 +62,17 @@ import type {
   UndoMessageSnapshot,
   RemoteImageTrust,
   MailIdentity,
-  MailIdentityInput,
   MailStats,
-  LocalBackupSummary,
-  StorageUsage,
-  CacheClearResult,
   ConnectionReport,
   CredentialVerificationReport,
   ImapProbeReport,
   ImapMailboxState,
   SyncRun,
   SyncSchedulePlan,
-  TrashActionReport,
   ParsedMessagePreview,
   Contact,
   ContactMergeSuggestion,
   MailRule,
-  MailRuleInput,
   ThreadSummary,
   OutboxItem,
   CredentialStatus,
@@ -83,12 +82,6 @@ import type {
 } from './app/types';
 import {
   emptyDraft,
-  emptyIdentityForm,
-  emptyRuleForm,
-  parseRuleCondition,
-  buildRuleCondition,
-  ruleActionParts,
-  setRuleActionPart,
   notificationPolicyStorageKey,
   providerVerificationStorageKey,
   sendUndoDelayStorageKey,
@@ -101,12 +94,10 @@ import {
   emptyAccountCreateForm,
 } from './app/appConfig';
 import type {
-  RuleConditionField,
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { flowInfo, flowWarn } from './app/logger';
 import { buildMailboxContextKey } from './app/mailboxContext';
-import { canSnoozeRole } from './app/snooze';
 import './ui-2026.css';
 
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
@@ -145,28 +136,20 @@ export default function App() {
   const [accountForm, setAccountForm] = useState<Account | null>(null);
   const [newAccountForm, setNewAccountForm] = useState<AccountCreateInput>(emptyAccountCreateForm);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [customFolderName, setCustomFolderName] = useState('');
-  const [renamingFolderId, setRenamingFolderId] = useState<number | null>(null);
-  const [renamingFolderName, setRenamingFolderName] = useState('');
   const [labels, setLabels] = useState<Label[]>([]);
   const [stats, setStats] = useState<MailStats | null>(null);
   const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
   const [credentialVerification, setCredentialVerification] = useState<CredentialVerificationReport | null>(null);
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
-  const [identityForm, setIdentityForm] = useState<MailIdentityInput>(emptyIdentityForm);
   const [rules, setRules] = useState<MailRule[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [diagnosticExport, setDiagnosticExport] = useState<string | null>(null);
-  const [localBackupSummary, setLocalBackupSummary] = useState<LocalBackupSummary | null>(null);
-  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
-  const [storageBusy, setStorageBusy] = useState(false);
+  const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | null>(null);
   const [providerVerifications, setProviderVerifications] = useState<Record<string, ProviderVerificationRecord>>(loadProviderVerifications);
   const [rawMessage, setRawMessage] = useState(sampleRawMessage);
   const [parsedPreview, setParsedPreview] = useState<ParsedMessagePreview | null>(null);
-  const [credentialSecret, setCredentialSecret] = useState('');
-  const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | null>(null);
   const [imapProbe, setImapProbe] = useState<ImapProbeReport | null>(null);
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -179,14 +162,6 @@ export default function App() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
-  const [snoozeTarget, setSnoozeTarget] = useState<{
-    messages: MessageSummary[];
-    label: string;
-  } | null>(null);
-  const [ruleForm, setRuleForm] = useState<MailRuleInput>(emptyRuleForm);
-  const [ruleBuilderField, setRuleBuilderField] = useState<RuleConditionField>('from');
-  const [ruleBuilderNeedle, setRuleBuilderNeedle] = useState('');
-  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
   const [status, setStatus] = useState('本地原型已就绪');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
@@ -242,11 +217,6 @@ export default function App() {
     setThreadMessages,
     setStatus,
   });
-  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<Folder | null>(null);
-  const [confirmDeleteIdentity, setConfirmDeleteIdentity] = useState<MailIdentity | null>(null);
-  const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
-  const [confirmDeleteLabel, setConfirmDeleteLabel] = useState<Label | null>(null);
-  const [confirmEmptyTrashState, setConfirmEmptyTrashState] = useState<{ accountId: number; accountScope: AccountScope; accountName: string } | null>(null);
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -1097,23 +1067,27 @@ export default function App() {
     }));
   }
 
-  const requestSnooze = useCallback((items: MessageSummary[]) => {
-    const targetMessages = [...new Map(
-      items
-          .filter((message) => canSnoozeRole(message.folder_role))
-          .map((message) => [message.id, message]),
-    ).values()];
-    if (targetMessages.length === 0) {
-      setStatus('所选邮件无法稍后处理');
-      return;
-    }
-    setSnoozeTarget({
-      messages: targetMessages,
-      label: targetMessages.length === 1
-          ? targetMessages[0].subject || '(无主题)'
-          : `${targetMessages.length} 封邮件`,
-    });
-  }, []);
+  const {
+    snoozeTarget,
+    setSnoozeTarget,
+    requestSnooze,
+    confirmSnooze,
+    snoozeSelected,
+  } = useSnoozeController({
+    selected,
+    selectedId,
+    threadMessages,
+    snapshotMessages,
+    setSelectedId,
+    setSelectedMessageIds,
+    setActiveThread,
+    setThreadMessages,
+    setStatus,
+    clearSelectedDetailIf,
+    invalidateSelectedDetail,
+    refreshAll,
+    queueUndoAction,
+  });
 
   function requestPermanentlyDeleteMessage(message: MessageSummary) {
     setConfirmPermanentlyDelete(message);
@@ -1168,275 +1142,119 @@ export default function App() {
     onRequestPermanentDelete: requestPermanentlyDeleteMessage,
   });
 
-  async function confirmSnooze(snoozedUntil: string) {
-    const target = snoozeTarget;
-    const timestamp = Date.parse(snoozedUntil);
-    if (!target || Number.isNaN(timestamp) || timestamp <= Date.now()) {
-      setStatus('请选择一个晚于当前时间的稍后处理时间');
-      return;
-    }
-
-    const undoSnapshots = snapshotMessages(target.messages);
-    for (const message of target.messages) {
-      await invoke<Message>('snooze_message', { messageId: message.id, snoozedUntil });
-    }
-
-    const targetIds = new Set(target.messages.map((message) => message.id));
-    setSnoozeTarget(null);
-    setSelectedMessageIds((current) => current.filter((messageId) => !targetIds.has(messageId)));
-    if (selectedId !== null && targetIds.has(selectedId)) {
-      clearSelectedDetailIf(selectedId);
-      setSelectedId(null);
-    }
-    for (const messageId of targetIds) {
-      invalidateSelectedDetail(messageId);
-    }
-    if (threadMessages.some((message) => targetIds.has(message.id))) {
-      setActiveThread(null);
-      setThreadMessages([]);
-    }
-    await refreshAll();
-
-    const count = target.messages.length;
-    setStatus(
-      count === 1
-        ? `已稍后处理到 ${formatDate(snoozedUntil)}`
-        : `已将 ${count} 封邮件稍后处理到 ${formatDate(snoozedUntil)}`,
-    );
-    queueUndoAction('稍后处理', undoSnapshots, count > 1 ? `${count} 封邮件` : undefined);
-  }
-
-  async function handleCreateLabel(name: string, color: string) {
-    const newLabel = await invoke<Label>('create_label', { name, color });
-    setLabels((current) => [...current, newLabel].sort((a, b) => a.name.localeCompare(b.name)));
-    return newLabel;
-  }
-
-  async function handleUpdateLabel(id: number, name: string, color: string) {
-    await invoke('update_label', { id, name, color });
-    setLabels((current) =>
-      current
-        .map((l) => (l.id === id ? { ...l, name, color } : l))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    );
-  }
-
-  async function handleDeleteLabelConfirmed(id: number) {
-    await invoke('delete_label', { id });
-    setLabels((current) => current.filter((l) => l.id !== id));
-  }
-
-  async function handleDeleteLabel(id: number) {
-    const label = labels.find((l) => l.id === id);
-    if (label) {
-      setConfirmDeleteLabel(label);
-    }
-  }
-
-  async function emptyCurrentTrashConfirmed(targetAccountId: number) {
-    const report = await invoke<TrashActionReport>('empty_trash', { accountId: targetAccountId });
-    await refreshAll();
-    setStatus(report.message);
-  }
-
-  function emptyCurrentTrash() {
-    const actId = accountIdForScope(accountScope) ?? 0;
-    const act = accounts.find((a) => a.id === actId);
-    setConfirmEmptyTrashState({
-      accountId: actId,
-      accountScope,
-      accountName: act ? `${act.display_name} <${act.email}>` : '当前账号'
-    });
-  }
-
-  async function createCustomFolder() {
-    const name = customFolderName.trim();
-    if (!name) {
-      setStatus('请输入自定义文件夹名称');
-      return;
-    }
-    const accountId = currentFolderAccountId();
-    if (!accountId) {
-      setStatus('请先创建或选择邮箱账号');
-      return;
-    }
-    const folder = await invoke<Folder>('create_custom_folder', { accountId, name });
-    setCustomFolderName('');
-    const { folderId: nextFolderId } = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
-    await loadMessages(nextFolderId);
-    setStatus(`已创建文件夹：${folder.name}`);
-  }
-
-  function startRenameCustomFolder(folder: Folder) {
-    setRenamingFolderId(folder.id);
-    setRenamingFolderName(folder.name);
-  }
-
-  async function renameCustomFolder(folder: Folder) {
-    const name = renamingFolderName.trim();
-    if (!name) {
-      setStatus('请输入新的文件夹名称');
-      return;
-    }
-    const renamed = await invoke<Folder>('rename_custom_folder', { folderId: folder.id, name });
-    setRenamingFolderId(null);
-    setRenamingFolderName('');
-    const { folderId: nextFolderId } = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
-    await loadMessages(nextFolderId);
-    setStatus(`已重命名文件夹：${renamed.name}`);
-  }
-
-  async function deleteCustomFolderConfirmed(folder: Folder) {
-    await invoke('delete_custom_folder', { folderId: folder.id });
-    const inboxFolderId = visibleFolderIdForRole('inbox', folder.account_id);
-    const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId, accountScope, { mode: 'mailbox' });
-    await loadMessages(nextFolderId);
-    setStatus(`已删除文件夹：${folder.name}，其中邮件已移回收件箱`);
-  }
-
-  function deleteCustomFolder(folder: Folder) {
-    setConfirmDeleteFolder(folder);
-  }
-
-  async function markFolderRead(folder: Folder) {
-    const visibleUnreadCount = folder.unread_count;
-    const report = await invoke<FolderReadReport>('mark_folder_read', {
-      folderId: folder.id,
-      role: folder.role,
-      isVirtual: folder.is_virtual,
-    });
-    await refreshAll();
-    setStatus(
-      report.updated_count > 0 || visibleUnreadCount <= 0
-        ? report.message
-        : `已将 ${visibleUnreadCount} 封邮件标为已读；本地状态已刷新。`,
-    );
-  }
-
-  async function snoozeSelected() {
-    if (!selected) return;
-    requestSnooze([selected]);
-  }
-
-  async function saveIdentity() {
-    if (!accountForm) return;
-    const saved = await invoke<MailIdentity>('upsert_identity', {
-      input: { ...identityForm, account_id: accountForm.id },
-    });
-    setIdentities((current) => {
-      const scoped = current.filter((identity) => identity.account_id !== saved.account_id || identity.id !== saved.id);
-      const updated = saved.is_default
-        ? scoped.map((identity) =>
-            identity.account_id === saved.account_id ? { ...identity, is_default: false } : identity,
-          )
-        : scoped;
-      return [...updated, saved].sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.id - b.id);
-    });
-    setIdentityForm(emptyIdentityForm);
-    setStatus(`发件身份已保存：${saved.name} <${saved.email}>`);
-  }
-
-  function editIdentity(identity: MailIdentity) {
-    setIdentityForm({
-      id: identity.id,
-      account_id: identity.account_id,
-      name: identity.name,
-      email: identity.email,
-      reply_to: identity.reply_to,
-      signature: identity.signature,
-      is_default: identity.is_default,
-    });
-    setStatus(`正在编辑发件身份：${identity.email}`);
-  }
-
-  async function deleteIdentityConfirmed(identity: MailIdentity) {
-    await invoke('delete_identity', { identityId: identity.id });
-    setIdentities((current) => current.filter((item) => item.id !== identity.id));
-    setStatus(`发件身份已删除：${identity.email}`);
-  }
-
-  function deleteIdentity(identity: MailIdentity) {
-    setConfirmDeleteIdentity(identity);
-  }
-
-  async function exportDiagnostics() {
-    const payload = await invoke<string>('export_diagnostics');
-    setDiagnosticExport(payload);
-    try {
-      await navigator.clipboard.writeText(payload);
-      setStatus('脱敏诊断 JSON 已生成并复制到剪贴板');
-    } catch {
-      setStatus('脱敏诊断 JSON 已生成，当前环境无法自动复制');
-    }
-  }
-
-  async function exportLocalBackup() {
-    const summary = await invoke<LocalBackupSummary>('export_local_backup');
-    setLocalBackupSummary(summary);
-    setStatus(`本地备份已导出：${summary.messages} 封邮件，${summary.accounts} 个账号`);
-  }
-
-  async function previewLocalBackup() {
-    const summary = await invoke<LocalBackupSummary | null>('preview_local_backup');
-    if (!summary) {
-      setStatus('已取消选择备份文件');
-      return;
-    }
-    setLocalBackupSummary(summary);
-    setStatus(`已读取备份预览：${summary.messages} 封邮件，${summary.accounts} 个账号`);
-  }
-
-  async function importLocalBackup() {
-    const summary = await invoke<LocalBackupSummary | null>('import_local_backup');
-    if (!summary) {
-      setStatus('已取消恢复本地备份');
-      return;
-    }
-    setLocalBackupSummary(summary);
-    const { folderId: nextFolderId } = await loadMeta(null);
-    await loadMessages(nextFolderId);
-    setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号`);
-  }
-
-  async function refreshStorageUsage(announce = true) {
-    setStorageBusy(true);
-    try {
-      const usage = await invoke<StorageUsage>('get_storage_usage');
-      setStorageUsage(usage);
-      if (announce) {
-          setStatus(`本地存储已刷新：共 ${formatBytes(usage.total_managed_bytes)}`);
-      }
-    } catch (error) {
-      setStatus(`读取本地存储失败：${String(error).replace(/^Error:\s*/i, '')}`);
-      throw error;
-    } finally {
-      setStorageBusy(false);
-    }
-  }
-
-  async function clearAttachmentCache() {
-    setStorageBusy(true);
-    try {
-      const result = await invoke<CacheClearResult>('clear_attachment_cache');
-      setStorageUsage(result.storage);
-      if (selected) {
-        const refreshedAttachments = await invoke<Attachment[]>('list_attachments', {
-          messageId: selected.id,
-        });
-        setAttachments(refreshedAttachments);
-      }
-      setStatus(
-        result.released_bytes > 0
-          ? `已释放 ${formatBytes(result.released_bytes)}，${result.reset_attachment_count} 个远端附件可按需重新下载`
-          : '当前没有可清理的远端附件缓存',
-      );
-    } catch (error) {
-      setStatus(`清理附件缓存失败：${String(error).replace(/^Error:\s*/i, '')}`);
-      throw error;
-    } finally {
-      setStorageBusy(false);
-    }
-  }
+  const {
+    confirmDeleteLabel,
+    setConfirmDeleteLabel,
+    handleCreateLabel,
+    handleUpdateLabel,
+    handleDeleteLabelConfirmed,
+    handleDeleteLabel,
+  } = useLabelManagement({ labels, setLabels, setStatus });
+  const {
+    customFolderName,
+    setCustomFolderName,
+    renamingFolderId,
+    setRenamingFolderId,
+    renamingFolderName,
+    setRenamingFolderName,
+    confirmDeleteFolder,
+    setConfirmDeleteFolder,
+    createCustomFolder,
+    startRenameCustomFolder,
+    renameCustomFolder,
+    deleteCustomFolderConfirmed,
+    deleteCustomFolder,
+    markFolderRead,
+  } = useFolderManagement({
+    folderId,
+    currentFolderAccountId,
+    visibleFolderIdForRole,
+    loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
+    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    refreshAll,
+    setStatus,
+  });
+  const {
+    confirmEmptyTrashState,
+    setConfirmEmptyTrashState,
+    emptyCurrentTrash,
+    emptyCurrentTrashConfirmed,
+  } = useTrashController({
+    accounts,
+    accountScope,
+    setStatus,
+    refreshAll,
+  });
+  const {
+    identityForm,
+    setIdentityForm,
+    confirmDeleteIdentity,
+    setConfirmDeleteIdentity,
+    saveIdentity,
+    editIdentity,
+    deleteIdentityConfirmed,
+    deleteIdentity,
+  } = useIdentityManagement({
+    accountForm,
+    identities,
+    setIdentities,
+    setStatus,
+  });
+  const {
+    ruleForm,
+    setRuleForm,
+    ruleBuilderField,
+    setRuleBuilderField,
+    ruleBuilderNeedle,
+    setRuleBuilderNeedle,
+    editingRuleId,
+    setEditingRuleId,
+    confirmDeleteRule,
+    setConfirmDeleteRule,
+    saveRule,
+    toggleRule,
+    editRule,
+    removeRuleConfirmed,
+    removeRule,
+    updateRuleConditionField,
+    updateRuleConditionValue,
+    toggleRuleAction,
+    updateRuleLabelAction,
+  } = useRuleManagement({ rules, setRules, setStatus });
+  const {
+    credentialSecret,
+    setCredentialSecret,
+    storeCredential,
+    storeAndVerifyCredential,
+    checkCredential,
+    deleteCredential,
+  } = useCredentialManagement({
+    account,
+    credentialStatus,
+    setCredentialStatus,
+    setCredentialVerification,
+    setStatus,
+    verifyAccountCredentials,
+  });
+  const {
+    localBackupSummary,
+    storageUsage,
+    storageBusy,
+    exportDiagnostics,
+    exportLocalBackup,
+    previewLocalBackup,
+    importLocalBackup,
+    refreshStorageUsage,
+    clearAttachmentCache,
+  } = useStorageManagement({
+    selected,
+    diagnosticExport,
+    setDiagnosticExport,
+    setAttachments,
+    loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
+    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    setStatus,
+  });
 
   async function importEmlFile() {
     const imported = await invoke<Message | null>('import_eml_file', {
@@ -1483,142 +1301,6 @@ export default function App() {
     });
     setParsedPreview(preview);
     setStatus(preview.warning_count > 0 ? `发现 ${preview.warning_count} 个安全提示` : '原始邮件预览解析完成');
-  }
-
-  async function storeCredential() {
-    if (!account?.email) {
-      setStatus('账号尚未加载，无法保存凭据');
-      return null;
-    }
-    if (!credentialSecret.trim()) {
-      setStatus(account.auth_type === 'oauth2' ? '请输入 OAuth2 访问/刷新 Token' : '请输入应用专用密码或授权码');
-      return null;
-    }
-    const result = await invoke<CredentialStatus>('store_account_secret', {
-      input: { account_email: account.email, secret: credentialSecret },
-    });
-    setCredentialStatus(result);
-    setCredentialVerification(null);
-    setCredentialSecret('');
-    setStatus(result.message);
-    return result;
-  }
-
-  async function storeAndVerifyCredential() {
-    const result = await storeCredential();
-    if (!result?.exists) return;
-    await verifyAccountCredentials();
-  }
-
-  async function checkCredential() {
-    if (!account?.email) return;
-    const result = await invoke<CredentialStatus>('check_account_secret', {
-      accountEmail: account.email,
-    });
-    setCredentialStatus(result);
-    setStatus(result.message);
-  }
-
-  async function deleteCredential() {
-    if (!account?.email) return;
-    const result = await invoke<CredentialStatus>('delete_account_secret', {
-      accountEmail: account.email,
-    });
-    setCredentialStatus(result);
-    setCredentialVerification(null);
-    setCredentialSecret('');
-    setStatus(result.message);
-  }
-
-  async function saveRule() {
-    if (!ruleForm.name.trim() || !ruleForm.condition.trim() || !ruleForm.action.trim()) {
-      setStatus('请填写规则名称、条件和动作');
-      return;
-    }
-    const saved = await invoke<MailRule>('upsert_rule', {
-      ruleId: editingRuleId,
-      input: ruleForm,
-    });
-    setRules((current) => {
-      const exists = current.some((rule) => rule.id === saved.id);
-      return exists ? current.map((rule) => (rule.id === saved.id ? saved : rule)) : [...current, saved];
-    });
-    setRuleForm(emptyRuleForm);
-    setEditingRuleId(null);
-    setStatus(`规则已保存：${saved.name}`);
-  }
-
-  async function toggleRule(rule: MailRule) {
-    const updated = await invoke<MailRule>('set_rule_enabled', {
-      ruleId: rule.id,
-      enabled: !rule.enabled,
-    });
-    setRules((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    setStatus(updated.enabled ? `规则已启用：${updated.name}` : `规则已停用：${updated.name}`);
-  }
-
-  function editRule(rule: MailRule) {
-    const parsed = parseRuleCondition(rule.condition);
-    setEditingRuleId(rule.id);
-    setRuleBuilderField(parsed.field);
-    setRuleBuilderNeedle(parsed.value);
-    setRuleForm({
-      name: rule.name,
-      condition: rule.condition,
-      action: rule.action,
-      enabled: rule.enabled,
-    });
-    setStatus(`正在编辑规则：${rule.name}`);
-  }
-
-  async function removeRuleConfirmed(rule: MailRule) {
-    await invoke('delete_rule', { ruleId: rule.id });
-    setRules((current) => current.filter((item) => item.id !== rule.id));
-    if (editingRuleId === rule.id) {
-      setEditingRuleId(null);
-      setRuleForm(emptyRuleForm);
-      setRuleBuilderField('from');
-      setRuleBuilderNeedle('');
-    }
-    setStatus(`规则已删除：${rule.name}`);
-  }
-
-  function removeRule(rule: MailRule) {
-    setConfirmDeleteRule(rule);
-  }
-
-  function updateRuleConditionField(field: RuleConditionField) {
-    setRuleBuilderField(field);
-    setRuleForm((current) => ({ ...current, condition: buildRuleCondition(field, ruleBuilderNeedle) }));
-  }
-
-  function updateRuleConditionValue(value: string) {
-    setRuleBuilderNeedle(value);
-    setRuleForm((current) => ({ ...current, condition: buildRuleCondition(ruleBuilderField, value) }));
-  }
-
-  function toggleRuleAction(action: string) {
-    const normalizedAction = action.toLowerCase();
-    setRuleForm((current) => {
-      const parts = ruleActionParts(current.action);
-      const exists = parts.some((part) => part.toLowerCase() === normalizedAction);
-      return {
-        ...current,
-        action: (exists
-          ? parts.filter((part) => part.toLowerCase() !== normalizedAction)
-          : [...parts, action]
-        ).join('; '),
-      };
-    });
-  }
-
-  function updateRuleLabelAction(labelName: string) {
-    setRuleForm((current) => {
-      return {
-        ...current,
-        action: setRuleActionPart(current.action, 'apply label ', labelName ? `apply label ${labelName}` : ''),
-      };
-    });
   }
 
   function changeAccountScope(value: string) {

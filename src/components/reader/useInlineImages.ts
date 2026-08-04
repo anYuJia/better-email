@@ -6,7 +6,7 @@ import type { Message, Attachment } from '../../app/types';
 /** Max attachment size allowed for Data URL fallback (2 MB). Larger files stay on asset URL path only. */
 const INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES = 2 * 1024 * 1024;
 
-function attachmentErrorMessage(error: unknown) {
+export function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/^Error:\s*/i, '').trim() || '附件下载失败，请重试。';
 }

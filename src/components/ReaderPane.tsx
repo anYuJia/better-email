@@ -26,6 +26,7 @@ import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
+import useReaderAttachments from '../hooks/useReaderAttachments';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import QuickReplySection from './reader/QuickReplySection';
 import { attachmentKind, attachmentIcon } from './reader/attachmentUtils';
@@ -163,43 +164,10 @@ export default function ReaderPane({
   onQuickReplyChange,
   onSendQuickReply,
 }: ReaderPaneProps) {
-  const [downloadingAttachmentIds, setDownloadingAttachmentIds] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
-  const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
-
   const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
 
-  async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
-    if (downloadingAttachmentIds.has(attachment.id)) return false;
-    setAttachmentErrors((current) => {
-      const next = { ...current };
-      delete next[attachment.id];
-      return next;
-    });
-    setDownloadingAttachmentIds((current) => {
-      const next = new Set(current);
-      next.add(attachment.id);
-      return next;
-    });
-    try {
-      await onDownloadAttachment(attachment);
-      return true;
-    } catch (error) {
-      setAttachmentErrors((current) => ({
-        ...current,
-        [attachment.id]: attachmentErrorMessage(error),
-      }));
-      return false;
-    } finally {
-      setDownloadingAttachmentIds((current) => {
-        const next = new Set(current);
-        next.delete(attachment.id);
-        return next;
-      });
-    }
-  }
+
+
 
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
@@ -322,6 +290,31 @@ export default function ReaderPane({
   );
 
   const {
+    downloadingAttachmentIds,
+    attachmentErrors,
+    setAttachmentErrors,
+    isDownloadingAllAttachments,
+    regularAttachments,
+    pendingAttachmentCount,
+    regularAttachmentTotalSize,
+    handleAttachmentDownload,
+    handleDownloadAllAttachments,
+    previewAttachment,
+    revealAttachmentInFinder,
+    copyAttachmentToClipboard,
+    attachmentMenuItems,
+    resetAttachmentState,
+  } = useReaderAttachments({
+    attachments,
+    selectedId,
+    onDownloadAttachment,
+    onOpenAttachment,
+    onSaveAttachmentAs,
+    openImagePreview,
+  });
+
+
+  const {
     inlineImageResolution,
     inlineImageError,
     inlineImageRefreshError,
@@ -337,18 +330,6 @@ export default function ReaderPane({
     handleAttachmentDownload,
   });
 
-  const regularAttachments = useMemo(
-    () => attachments.filter((attachment) => !attachment.is_inline),
-    [attachments],
-  );
-  const pendingAttachmentCount = useMemo(
-    () => regularAttachments.filter((attachment) => !attachment.is_downloaded).length,
-    [regularAttachments],
-  );
-  const regularAttachmentTotalSize = useMemo(
-    () => regularAttachments.reduce((sum, item) => sum + item.size_bytes, 0),
-    [regularAttachments],
-  );
   const visibleSecurityWarnings = useMemo(
     () => selected?.security_warnings.filter(
       (warning) =>
@@ -399,123 +380,9 @@ export default function ReaderPane({
     };
   }, [selected?.id, selected?.is_read, isBodyRenderReady, onReadComplete, readTriggerKey]);
 
-  useEffect(() => {
-    setDownloadingAttachmentIds(new Set());
-    setAttachmentErrors({});
-    setIsDownloadingAllAttachments(false);
-    setImagePreview(null);
-    resetImagePreview();
-    setImageContextMenu(null);
-    setAttachmentContextMenu(null);
-  }, [selectedId, resetImagePreview]);
 
 
 
-  async function handleDownloadAllAttachments() {
-    if (isDownloadingAllAttachments) return;
-    const pending = regularAttachments.filter((attachment) => !attachment.is_downloaded);
-    if (pending.length === 0) return;
-    setIsDownloadingAllAttachments(true);
-    try {
-      for (const attachment of pending) {
-        await handleAttachmentDownload(attachment);
-      }
-    } finally {
-      setIsDownloadingAllAttachments(false);
-    }
-  }
-
-  async function previewAttachment(attachment: Attachment) {
-    if (!attachment.is_downloaded) {
-      const downloaded = await handleAttachmentDownload(attachment);
-      if (!downloaded) return;
-    }
-    if (attachmentKind(attachment) === 'image') {
-      const assetUrl = await localFileAssetUrl(attachment.local_path);
-      openImagePreview({
-        src: assetUrl,
-        alt: attachment.filename,
-        attachmentId: attachment.id,
-      });
-      return;
-    }
-    onOpenAttachment(attachment);
-  }
-
-  async function revealAttachmentInFinder(attachment: Attachment) {
-    if (!attachment.is_downloaded) {
-      const downloaded = await handleAttachmentDownload(attachment);
-      if (!downloaded) return;
-    }
-    await invoke<string>('reveal_attachment_in_finder', { attachmentId: attachment.id });
-  }
-
-  async function copyAttachmentToClipboard(attachment: Attachment) {
-    if (!attachment.is_downloaded) {
-      const downloaded = await handleAttachmentDownload(attachment);
-      if (!downloaded) return;
-    }
-
-    try {
-      await invoke<string>('copy_attachment_file_to_clipboard', { attachmentId: attachment.id });
-    } catch (error) {
-      setAttachmentErrors((current) => ({
-        ...current,
-        [attachment.id]: attachmentErrorMessage(error) || '复制附件文件失败，请重新下载后再试。',
-      }));
-    }
-  }
-
-  function attachmentMenuItems(attachment: Attachment): ContextMenuItem[] {
-    const downloaded = attachment.is_downloaded;
-    const downloading = downloadingAttachmentIds.has(attachment.id);
-    const canPreview = attachmentKind(attachment) === 'image';
-    return [
-      ...(canPreview ? [{
-        id: 'preview',
-        label: '预览',
-        icon: <ImageIcon size={14} />,
-        disabled: downloading,
-        onSelect: () => { previewAttachment(attachment).catch(() => undefined); },
-      }] : []),
-      {
-        id: 'open',
-        label: '打开',
-        icon: <ExternalLink size={14} />,
-        disabled: !downloaded || downloading,
-        onSelect: () => onOpenAttachment(attachment),
-      },
-      {
-        id: 'open-with',
-        label: '选择 App 打开',
-        detail: downloaded ? '在 Finder 中定位后选择应用' : '先下载并定位文件',
-        icon: <FolderOpen size={14} />,
-        disabled: downloading,
-        onSelect: () => { revealAttachmentInFinder(attachment).catch(() => undefined); },
-      },
-      {
-        id: 'download',
-        label: downloaded ? '重新下载' : '下载',
-        icon: <Download size={14} />,
-        disabled: downloading,
-        onSelect: () => { handleAttachmentDownload(attachment).catch(() => undefined); },
-      },
-      {
-        id: 'save-as',
-        label: '另存为…',
-        icon: <Download size={14} />,
-        disabled: !downloaded || downloading,
-        onSelect: () => onSaveAttachmentAs(attachment),
-      },
-      {
-        id: 'copy',
-        label: '复制文件',
-        icon: <Copy size={14} />,
-        separatorBefore: true,
-        onSelect: () => { copyAttachmentToClipboard(attachment).catch(() => undefined); },
-      },
-    ];
-  }
 
 
 

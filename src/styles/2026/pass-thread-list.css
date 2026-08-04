@@ -15,7 +15,7 @@
   display: grid;
   gap: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.015), 0 4px 12px rgba(0, 0, 0, 0.005) !important;
-  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
   min-width: 0;
   box-sizing: border-box !important;
 }

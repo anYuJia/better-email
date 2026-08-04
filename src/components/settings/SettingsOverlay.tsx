@@ -1,4 +1,4 @@
-import React, { Suspense, type Dispatch, type SetStateAction } from 'react';
+import React, { Suspense, lazy, type Dispatch, type SetStateAction } from 'react';
 import type {
   Account,
   AccountCreateInput,
@@ -47,15 +47,16 @@ import type { NotificationPolicy } from '../../mailUtils';
 import type { SettingsSectionId } from './SettingsFrame';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
-import AccountConnectionSettings from './AccountConnectionSettings';
-import CredentialSecuritySettings from './CredentialSecuritySettings';
-import ExperienceSettings from './ExperienceSettings';
-import DataSafetySettings from './DataSafetySettings';
-import SyncOperationsSettings from './SyncOperationsSettings';
-import ContactAutomationSettings from './ContactAutomationSettings';
-import RuleAutomationSettings from './RuleAutomationSettings';
-import SecurityPreviewSettings from './SecurityPreviewSettings';
 import { invoke } from '../../tauriBridge';
+
+const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));
+const CredentialSecuritySettings = lazy(() => import('./CredentialSecuritySettings'));
+const ExperienceSettings = lazy(() => import('./ExperienceSettings'));
+const DataSafetySettings = lazy(() => import('./DataSafetySettings'));
+const SyncOperationsSettings = lazy(() => import('./SyncOperationsSettings'));
+const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings'));
+const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
+const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
 
 type SettingsOverlayProps = {
   accountForm: Account | null;
@@ -376,6 +377,7 @@ export default function SettingsOverlay({
         onSaveAndVerify={onSaveAndVerify}
         onClose={onClose}
       >
+        <Suspense fallback={<div className="settings-page-loading" role="status">正在加载设置页面…</div>}>
         {(activeSettingsSection === 'accounts'
           || activeSettingsSection === 'providers'
           || activeSettingsSection === 'auth') && (
@@ -571,6 +573,7 @@ export default function SettingsOverlay({
           onParseRawMessage={onParseRawMessage}
         />
         )}
+        </Suspense>
       </SettingsFrame>
     </Suspense>
   );

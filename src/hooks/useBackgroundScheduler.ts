@@ -35,6 +35,8 @@ export default function useBackgroundScheduler({
   enqueueBackgroundTask,
 }: BackgroundSchedulerOptions) {
   const outboxScheduleTimerRef = useRef<number | null>(null);
+  const enqueueBackgroundTaskRef = useRef(enqueueBackgroundTask);
+  enqueueBackgroundTaskRef.current = enqueueBackgroundTask;
 
   useEffect(() => {
     isPermissionGranted()
@@ -109,7 +111,7 @@ export default function useBackgroundScheduler({
         accountId: account?.id ?? null,
         syncMode: account?.sync_mode ?? 'manual',
       });
-      enqueueBackgroundTask('sync', 'timer').catch((error) => {
+      enqueueBackgroundTaskRef.current('sync', 'timer').catch((error) => {
         fetchTimerWarn('enqueue failed', {
           accountId: account?.id ?? null,
           error: error instanceof Error ? error.message : String(error),
@@ -128,7 +130,6 @@ export default function useBackgroundScheduler({
     account?.email,
     account?.id,
     account?.sync_mode,
-    enqueueBackgroundTask,
     setBackgroundSyncStatus,
     setStatus,
   ]);

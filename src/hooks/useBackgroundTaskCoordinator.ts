@@ -139,9 +139,17 @@ export default function useBackgroundTaskCoordinator({
     releaseDueSnoozedMessages,
   };
 
+  const getCurrentMessages = useCallback(() => currentRef.current.messages, []);
+
+  const refreshMailboxContext = useCallback(async () => {
+    const current = currentRef.current;
+    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
+    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
+  }, []);
+
   const { notifyNewMail } = useNewMailNotifier({
     notificationPolicy,
-    getCurrentMessages: () => currentRef.current.messages,
+    getCurrentMessages,
     setLastNewMailNotice,
     setNotificationStatus,
   });
@@ -152,11 +160,7 @@ export default function useBackgroundTaskCoordinator({
   } = useOutboxFlush({
     setOutbox,
     setStatus,
-    refreshMailboxContext: async () => {
-      const current = currentRef.current;
-      const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
-      await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
-    },
+    refreshMailboxContext,
   });
 
   const refreshBackgroundTasks = useCallback(async () => {

@@ -8,6 +8,10 @@ import type {
 import MessageListCard from './MessageListCard';
 import { calculateVisibleRange } from './messageListLayout';
 
+const SCROLL_SAVE_DEBOUNCE_MS = 220;
+const NEW_MESSAGE_ANIMATION_LIMIT = 5;
+const NEW_MESSAGE_ABSORB_DELAY_MS = 800;
+
 type MessageGroup = {
   id: string;
   label: string;
@@ -62,32 +66,38 @@ export default function MessageListView({
   loadMoreStatus,
 }: MessageListViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const prevIdsRef = useRef<Set<number>>(new Set());
   const restoredViewKeyRef = useRef<string | null>(null);
   const latestScrollTopRef = useRef(initialScrollTop);
-  const lastScrollSaveAtRef = useRef(Number.NEGATIVE_INFINITY);
   const scrollSaveTimerRef = useRef<number | null>(null);
   const rafIdRef = useRef<number | null>(null);
-  const prevIds = prevIdsRef.current;
+  const listStateKeyRef = useRef<string | null>(null);
+  const baselineMessageIdsRef = useRef<Set<number>>(new Set());
+  const newMessageExceededRef = useRef(false);
 
   const [viewportHeight, setViewportHeight] = useState(600);
   const [, setScrollTop] = useState(initialScrollTop);
 
   const newIds = useMemo(() => {
     const set = new Set<number>();
-    if (prevIds.size > 0) {
-      for (const message of messages) {
-        if (!prevIds.has(message.id)) {
-          set.add(message.id);
-        }
-      }
+    if (listStateKeyRef.current !== listStateKey) {
+      newMessageExceededRef.current = false;
+      return set;
     }
+    const baseline = baselineMessageIdsRef.current;
+    if (baseline.size === 0) return set;
+    let count = 0;
+    for (const message of messages) {
+      if (baseline.has(message.id)) continue;
+      count += 1;
+      if (count > NEW_MESSAGE_ANIMATION_LIMIT) {
+        newMessageExceededRef.current = true;
+        return set;
+      }
+      set.add(message.id);
+    }
+    newMessageExceededRef.current = false;
     return set;
-  }, [messages]);
-
-  useEffect(() => {
-    prevIdsRef.current = new Set(messages.map((m) => m.id));
-  }, [messages]);
+  }, [messages, listStateKey]);
 
   useEffect(() => () => {
     if (scrollSaveTimerRef.current !== null) {
@@ -137,15 +147,15 @@ export default function MessageListView({
   const viewportHeightRef = useRef(viewportHeight);
   viewportHeightRef.current = viewportHeight;
 
-  // Synchronize visibleRange when layout or viewportHeight changes
-  const prevLayoutRef = useRef(layout);
-  const prevViewportHeightRef = useRef(viewportHeight);
-  if (layout !== prevLayoutRef.current || viewportHeight !== prevViewportHeightRef.current) {
-    prevLayoutRef.current = layout;
-    prevViewportHeightRef.current = viewportHeight;
+  // Synchronize visibleRange when layout or viewportHeight changes (layout effect, not render phase)
+  useLayoutEffect(() => {
     const nextRange = calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight);
-    setVisibleRange(nextRange);
-  }
+    setVisibleRange((current) => (
+      nextRange.startIdx === current.startIdx && nextRange.endIdx === current.endIdx
+        ? current
+        : nextRange
+    ));
+  }, [layout, viewportHeight]);
 
   useLayoutEffect(() => {
     const listElement = listRef.current;
@@ -158,7 +168,24 @@ export default function MessageListView({
     const nextRange = calculateVisibleRange(layout, requestedScrollTop, viewportHeight);
     setVisibleRange(nextRange);
     restoredViewKeyRef.current = listStateKey;
+    if (isNewView) {
+      listStateKeyRef.current = listStateKey;
+      baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
+    } else if (newMessageExceededRef.current) {
+      baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
+    }
   }, [listStateKey, initialScrollTop, messages.length]);
+
+  // Absorb newly added ids after their appearance animation has finished, so
+  // the is-new highlight is not replayed when virtualized cards remount.
+  useLayoutEffect(() => {
+    if (newIds.size === 0) return undefined;
+    const absorb = () => {
+      baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
+    };
+    const timer = window.setTimeout(absorb, NEW_MESSAGE_ABSORB_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [newIds, messages, listStateKey]);
 
   useLayoutEffect(() => {
     const listElement = listRef.current;
@@ -200,17 +227,13 @@ export default function MessageListView({
       }
     });
 
-    const now = performance.now();
-    if (now - lastScrollSaveAtRef.current < 160) return;
-    lastScrollSaveAtRef.current = now;
-    onScrollTopChange(nextScrollTop);
     if (scrollSaveTimerRef.current !== null) {
       window.clearTimeout(scrollSaveTimerRef.current);
     }
     scrollSaveTimerRef.current = window.setTimeout(() => {
       scrollSaveTimerRef.current = null;
       onScrollTopChange(latestScrollTopRef.current);
-    }, 180);
+    }, SCROLL_SAVE_DEBOUNCE_MS);
   }
 
   useEffect(() => {

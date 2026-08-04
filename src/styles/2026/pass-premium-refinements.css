@@ -103,7 +103,7 @@ textarea:focus-visible {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);
   color: var(--ui-text);
-  transition: all 120ms ease;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 
 .empty-reader-compose:hover {
@@ -123,5 +123,5 @@ textarea:focus-visible {
 
 .reader-warning-primary-action {
   border-radius: var(--ui-radius-control);
-  transition: all 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }

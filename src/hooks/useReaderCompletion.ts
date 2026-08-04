@@ -9,6 +9,7 @@ type IdleScheduler = Window & {
 
 const readerBodyRenderDelayMs = 16;
 const readerBodyRenderIdleTimeoutMs = 100;
+const readerPlaceholderDelayMs = 260;
 
 type ReaderCompletionOptions = {
   selected: Message | null;
@@ -29,14 +30,14 @@ export default function useReaderCompletion({
   const readerRef = useRef<HTMLElement | null>(null);
   const completedReadMessageIdsRef = useRef<Set<number>>(new Set());
   const prevIdRef = useRef<number | null>(null);
+  const lastRenderedBodyRef = useRef<Message | null>(null);
 
   useEffect(() => {
     const currentId = selected?.id ?? null;
     const isDifferentMessage = currentId !== prevIdRef.current;
     prevIdRef.current = currentId;
 
-    if (isDifferentMessage) {
-      setBodyRenderMessageId(null);
+    if (bodyRenderMessageId === selectedId) {
       setShowPlaceholder(false);
     }
 
@@ -67,11 +68,14 @@ export default function useReaderCompletion({
         }
       }, readerBodyRenderDelayMs);
 
+      // Only show the loading placeholder after a short grace period: while the
+      // next body is being prepared we keep the previously rendered body on
+      // screen instead of flashing an empty area or a skeleton.
       const placeholderTimer = window.setTimeout(() => {
-        if (!cancelled && isDifferentMessage) {
+        if (!cancelled && isDifferentMessage && bodyRenderMessageId !== selectedId) {
           setShowPlaceholder(true);
         }
-      }, 16);
+      }, readerPlaceholderDelayMs);
 
       return () => {
         cancelled = true;
@@ -82,9 +86,17 @@ export default function useReaderCompletion({
     }
   }, [selectedId, selected?.id, selected?.attachment_count, bodyRenderMessageId]);
 
+  // Cache the most recently rendered body so it can stay on screen while the
+  // next message's body is being prepared.
+  if (bodyRenderMessageId === selected?.id && selected) {
+    lastRenderedBodyRef.current = selected;
+  }
+
   const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
-  const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
-  const isBodyRenderReady = Boolean(bodySelected) && !isSelectedBodyCorrupted;
+  const bodySelected = bodyRenderMessageId === selected?.id
+    ? selected
+    : lastRenderedBodyRef.current;
+  const isBodyRenderReady = bodyRenderMessageId === selected?.id && Boolean(bodySelected) && !isSelectedBodyCorrupted;
 
   useEffect(() => {
     if (!selected?.id) return;

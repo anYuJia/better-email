@@ -320,6 +320,34 @@
   display: none;
 }
 
+.settings-modal .settings-page-loading {
+  width: min(100%, 840px);
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--settings-text-muted, #7c8794);
+}
+
+.settings-modal .settings-page-loading::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 135, 148, 0.25);
+  border-top-color: var(--settings-accent, #3b82f6);
+  animation: settings-page-spin 700ms linear infinite;
+}
+
+@keyframes settings-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .settings-modal .settings-page {
   width: min(100%, 840px);
   min-width: 0;

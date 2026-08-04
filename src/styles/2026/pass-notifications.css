@@ -36,7 +36,7 @@
     0 1px 3px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(20px);
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .send-undo-snackbar {
@@ -66,7 +66,7 @@
   background: rgba(255, 255, 255, 0.08);
   font-size: 12px;
   font-weight: 550;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
 }
 

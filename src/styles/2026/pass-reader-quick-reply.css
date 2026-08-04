@@ -189,7 +189,7 @@
   font-weight: 600;
   box-shadow: none;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
 .label-tools .label-menu summary::-webkit-details-marker {
@@ -261,7 +261,7 @@
   border: 1px solid transparent;
   cursor: pointer;
   padding: 0;
-  transition: all 120ms ease;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .color-dot-btn:hover {
@@ -288,7 +288,7 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: all 120ms ease;
+  transition: background-color 120ms ease, opacity 120ms ease, transform 120ms ease;
 }
 
 .label-add-submit-btn:disabled {

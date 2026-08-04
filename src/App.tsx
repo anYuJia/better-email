@@ -106,17 +106,8 @@ import './ui-2026.css';
 
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
-const SettingsFrame = lazy(() => import('./components/settings/SettingsFrame'));
-const ExperienceSettings = lazy(() => import('./components/settings/ExperienceSettings'));
-const AccountConnectionSettings = lazy(() => import('./components/settings/AccountConnectionSettings'));
-const CredentialSecuritySettings = lazy(() => import('./components/settings/CredentialSecuritySettings'));
-const DataSafetySettings = lazy(() => import('./components/settings/DataSafetySettings'));
-const SyncOperationsSettings = lazy(() => import('./components/settings/SyncOperationsSettings'));
-const ContactAutomationSettings = lazy(() => import('./components/settings/ContactAutomationSettings'));
 import DeferredSurface from './components/DeferredSurface';
 import SettingsOverlay from './components/settings/SettingsOverlay';
-const RuleAutomationSettings = lazy(() => import('./components/settings/RuleAutomationSettings'));
-const SecurityPreviewSettings = lazy(() => import('./components/settings/SecurityPreviewSettings'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {

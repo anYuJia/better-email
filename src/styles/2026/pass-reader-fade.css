@@ -10,8 +10,8 @@
   }
 }
 
-.reader-html,
-.body-text,
+/* Empty states animate on mount; the reader body itself must not, otherwise
+   every message switch re-triggers a full fade from blank. */
 .empty-state,
 .empty-reader {
   animation: reader-body-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;

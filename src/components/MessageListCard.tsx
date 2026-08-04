@@ -39,9 +39,14 @@ export default React.memo(function MessageListCard({
 }: MessageListCardProps) {
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const avatarInitial = senderInitial(message.sender_name, message.sender_email);
+  const cardLabel = [
+    `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
+    message.subject || '无主题',
+    message.is_read ? '' : '，未读',
+  ].join('');
 
   return (
-    <button
+    <div
       className={[
         'message-card',
         message.is_read ? 'is-read' : 'is-unread',
@@ -77,6 +82,15 @@ export default React.memo(function MessageListCard({
         onOpenMessageMenu(message, event.clientX, event.clientY, useBulkContext);
       }}
     >
+      <button
+        type="button"
+        className="message-card-main"
+        aria-label={cardLabel}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelectMessage(message.id);
+        }}
+      />
       <span className="message-leading" aria-hidden="true">
         <Avatar
           email={message.sender_email}
@@ -84,7 +98,7 @@ export default React.memo(function MessageListCard({
           className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
           fallbackInitial={avatarInitial}
         />
-        {!message.is_read && <span className="message-unread-dot" aria-label="未读" />}
+        {!message.is_read && <span className="message-unread-dot" />}
       </span>
       <span className="message-select" onClick={(event) => event.stopPropagation()}>
         <input
@@ -111,6 +125,6 @@ export default React.memo(function MessageListCard({
         )}
         {message.attachment_count > 0 && <span title={`${message.attachment_count} 个附件`}><Paperclip size={12} /> {message.attachment_count}</span>}
       </div>
-    </button>
+    </div>
   );
 });

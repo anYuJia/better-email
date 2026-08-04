@@ -84,7 +84,7 @@
   background: var(--ui-surface);
   font-size: 11.5px;
   font-weight: 600;
-  transition: all 150ms ease;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
   cursor: pointer;
   white-space: nowrap;
   box-sizing: border-box;
@@ -390,14 +390,33 @@
   opacity: 0;
 }
 
+.message-card-main {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.message-card-main:focus-visible {
+  outline: 2px solid var(--ui-accent, #2f6fed);
+  outline-offset: -2px;
+}
+
 .message-card:hover .message-select,
-.message-card:focus-visible .message-select,
+.message-card:has(.message-card-main:focus-visible) .message-select,
 .message-card:has(.message-select input:checked) .message-select {
   opacity: 1;
 }
 
 .message-card:hover .message-avatar,
-.message-card:focus-visible .message-avatar,
+.message-card:has(.message-card-main:focus-visible) .message-avatar,
 .message-card:has(.message-select input:checked) .message-avatar {
   opacity: 0;
 }

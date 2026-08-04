@@ -55,7 +55,7 @@
 }
 
 .message-card:hover .message-avatar,
-.message-card:focus-visible .message-avatar,
+.message-card:has(.message-card-main:focus-visible) .message-avatar,
 .message-card:has(.message-select input:checked) .message-avatar {
   opacity: 1;
 }
@@ -96,14 +96,14 @@
 }
 
 .message-card:hover .message-select,
-.message-card:focus-visible .message-select,
+.message-card:has(.message-card-main:focus-visible) .message-select,
 .message-card:has(.message-select input:checked) .message-select {
   opacity: 1;
 }
 
 .message-card.is-current .message-select,
 .message-card.is-current:hover .message-select,
-.message-card.is-current:focus-visible .message-select {
+.message-card.is-current:has(.message-card-main:focus-visible) .message-select {
   display: none;
 }
 

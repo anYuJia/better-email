@@ -33,8 +33,16 @@ export default function ReaderBodyContent({
   onLinkClick,
   setClickedLink,
 }: ReaderBodyContentProps) {
+  // While the next message's body is being prepared, keep the previously
+  // rendered body on screen for at most the placeholder grace period; once the
+  // loading placeholder is due, show the skeleton instead so a slow or failed
+  // body can never leave stale content from the previous message on screen.
   if (!isBodyRenderReady) {
-    return showPlaceholder ? <EmailReaderSkeleton /> : null;
+    if (showPlaceholder) {
+      return <EmailReaderSkeleton />;
+    }
+    const hasRenderedContent = Boolean(readerHtml.trim() || plainBodyForReader.trim());
+    if (!hasRenderedContent) return null;
   }
   if (hasRenderableHtml) {
     return (

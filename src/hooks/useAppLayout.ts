@@ -28,8 +28,12 @@ type LayoutResize = {
 export default function useAppLayout() {
   const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
   const resizeRef = useRef<LayoutResize | null>(null);
+  const resizeRafRef = useRef<number | null>(null);
+  const resizeActiveRef = useRef(false);
+  const latestClientXRef = useRef(0);
 
   useEffect(() => {
+    if (resizeActiveRef.current) return;
     if (
       window.localStorage.getItem(appLayoutStorageKey) == null &&
       window.localStorage.getItem(legacyAppLayoutStorageKey) != null
@@ -39,10 +43,31 @@ export default function useAppLayout() {
     window.localStorage.setItem(appLayoutStorageKey, JSON.stringify(appLayout));
   }, [appLayout]);
 
+  const applyResize = useCallback((resize: LayoutResize, clientX: number) => {
+    const delta = clientX - resize.startX;
+    if (resize.pane === 'sidebar') {
+      setAppLayout({
+        ...resize.origin,
+        sidebar: clampNumber(resize.origin.sidebar + delta, 228, 320),
+      });
+      return;
+    }
+    setAppLayout({
+      ...resize.origin,
+      list: clampNumber(resize.origin.list + delta, 340, 500),
+    });
+  }, []);
+
   const finishResize = useCallback(() => {
     const resize = resizeRef.current;
     if (!resize) return;
     resizeRef.current = null;
+    resizeActiveRef.current = false;
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current = null;
+    }
+    applyResize(resize, latestClientXRef.current);
     document.body.classList.remove('pane-resizing');
     if (
       resize.captureTarget
@@ -51,7 +76,7 @@ export default function useAppLayout() {
     ) {
       resize.captureTarget.releasePointerCapture(resize.pointerId);
     }
-  }, []);
+  }, [applyResize]);
 
   useEffect(() => () => {
     finishResize();
@@ -64,6 +89,7 @@ export default function useAppLayout() {
     captureTarget: HTMLButtonElement | null = null,
     pointerId: number | null = null,
   ) => {
+    latestClientXRef.current = clientX;
     resizeRef.current = {
       pane,
       startX: clientX,
@@ -71,6 +97,7 @@ export default function useAppLayout() {
       captureTarget,
       pointerId,
     };
+    resizeActiveRef.current = true;
     document.body.classList.add('pane-resizing');
   }, [appLayout]);
 
@@ -95,19 +122,16 @@ export default function useAppLayout() {
   const moveResize = useCallback((clientX: number) => {
     const resize = resizeRef.current;
     if (!resize) return;
-    const delta = clientX - resize.startX;
-    if (resize.pane === 'sidebar') {
-      setAppLayout({
-        ...resize.origin,
-        sidebar: clampNumber(resize.origin.sidebar + delta, 228, 320),
-      });
-      return;
-    }
-    setAppLayout({
-      ...resize.origin,
-      list: clampNumber(resize.origin.list + delta, 340, 500),
+    latestClientXRef.current = clientX;
+    if (resizeRafRef.current !== null) return;
+    resizeRafRef.current = requestAnimationFrame(() => {
+      resizeRafRef.current = null;
+      const currentResize = resizeRef.current;
+      if (currentResize) {
+        applyResize(currentResize, latestClientXRef.current);
+      }
     });
-  }, []);
+  }, [applyResize]);
 
   const moveLayoutResize = useCallback((event: PointerEvent<HTMLElement>) => {
     moveResize(event.clientX);

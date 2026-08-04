@@ -76,11 +76,12 @@ export default function MessageListToolbar({
 }: MessageListToolbarProps) {
   const [searchFocused, setSearchFocused] = React.useState(false);
   const searchBlurTimerRef = React.useRef<number | null>(null);
+  const deferredQuery = React.useDeferredValue(query);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
     ?? searchScopeOptions[0];
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const activeSortLabel = listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先';
-  const trimmedQuery = query.trim();
+  const trimmedQuery = deferredQuery.trim();
   const searchEntries = React.useMemo(
     () => buildMessageSearchEntries(messages),
     [messages],
@@ -89,7 +90,7 @@ export default function MessageListToolbar({
     () => buildMessageSearchSuggestions(searchEntries, trimmedQuery),
     [searchEntries, trimmedQuery],
   );
-  const showSearchSuggestions = searchFocused && searchSuggestions.length > 0;
+  const showSearchSuggestions = searchFocused && trimmedQuery.length >= 2 && searchSuggestions.length > 0;
 
   function clearSearchBlurTimer() {
     if (searchBlurTimerRef.current === null) return;
@@ -137,7 +138,7 @@ export default function MessageListToolbar({
               placeholder="搜索主题、发件人、正文"
             />
             {(query.trim() || filter !== 'all') && (
-              <button type="button" className="search-clear-button" title="清空搜索和筛选" onClick={onClearSearchAndFilter}>
+              <button type="button" className="search-clear-button" title="清空搜索和筛选" aria-label="清空搜索和筛选" onClick={onClearSearchAndFilter}>
                 <X size={14} />
               </button>
             )}

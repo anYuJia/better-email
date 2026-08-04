@@ -7,12 +7,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Mail, X } from 'lucide-react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
+import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
+import ConfirmationDialogs from './components/ConfirmationDialogs';
 import ConfirmDialog from './components/ConfirmDialog';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
@@ -27,6 +28,7 @@ import useOAuthFlow from './hooks/useOAuthFlow';
 import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
+import useAppGlobalEffects from './hooks/useAppGlobalEffects';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
 import useComposerController from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
@@ -35,6 +37,7 @@ import useIdentityManagement from './hooks/useIdentityManagement';
 import useLabelManagement from './hooks/useLabelManagement';
 import useMailboxSelectionController from './hooks/useMailboxSelectionController';
 import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/useMailboxSearchController';
+import useMailboxSync from './hooks/useMailboxSync';
 import useRuleManagement from './hooks/useRuleManagement';
 import useSnoozeController from './hooks/useSnoozeController';
 import useStorageManagement from './hooks/useStorageManagement';
@@ -42,7 +45,7 @@ import useTrashController from './hooks/useTrashController';
 import {
   type NotificationPolicy,
 } from './mailUtils';
-import { invoke, listen } from './tauriBridge';
+import { invoke } from './tauriBridge';
 
 import type {
   FolderRole,
@@ -82,9 +85,6 @@ import type {
 } from './app/types';
 import {
   emptyDraft,
-  notificationPolicyStorageKey,
-  providerVerificationStorageKey,
-  sendUndoDelayStorageKey,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
   loadProviderVerifications,
@@ -110,6 +110,7 @@ const DataSafetySettings = lazy(() => import('./components/settings/DataSafetySe
 const SyncOperationsSettings = lazy(() => import('./components/settings/SyncOperationsSettings'));
 const ContactAutomationSettings = lazy(() => import('./components/settings/ContactAutomationSettings'));
 import DeferredSurface from './components/DeferredSurface';
+import SettingsOverlay from './components/settings/SettingsOverlay';
 const RuleAutomationSettings = lazy(() => import('./components/settings/RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./components/settings/SecurityPreviewSettings'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
@@ -163,9 +164,6 @@ export default function App() {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
-  const refreshNoticeTimeoutRef = useRef<number | null>(null);
   const mailboxRefreshRef = useRef(0);
   const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
   const {
@@ -406,6 +404,14 @@ export default function App() {
     }),
     [accountScope, folderId, query, filter, searchScope, listSort],
   );
+  useAppGlobalEffects({
+    notificationPolicy,
+    sendUndoDelaySeconds,
+    providerVerifications,
+    folderId,
+    mailboxListStateKey,
+    messageLimit,
+  });
   const { enqueueBackgroundTask } = useBackgroundTaskCoordinator({
     account,
     accountScope,
@@ -506,32 +512,6 @@ export default function App() {
     outbox,
     setStatus,
   });
-
-  useEffect(() => {
-    const handleFocus = (event: FocusEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target) return;
-      const isInput = target.tagName === 'INPUT';
-      const isTextarea = target.tagName === 'TEXTAREA';
-      if (isInput || isTextarea) {
-        const input = target as HTMLInputElement | HTMLTextAreaElement;
-        // Exclude email drafting body or main editor where spellcheck is desired
-        const isEmailBody = input.classList.contains('composer-body') ||
-                            input.classList.contains('body-editor') ||
-                            input.closest('.composer-body-container') ||
-                            input.closest('.rich-text-editor') ||
-                            input.getAttribute('name') === 'body';
-        if (!isEmailBody) {
-          input.setAttribute('autocorrect', 'off');
-          input.setAttribute('autocapitalize', 'none');
-          input.setAttribute('spellcheck', 'false');
-          input.spellcheck = false;
-        }
-      }
-    };
-    document.addEventListener('focusin', handleFocus);
-    return () => document.removeEventListener('focusin', handleFocus);
-  }, []);
 
   function accountIdForScope(scope: AccountScope): number | null {
     return scope === 'all' ? null : scope;
@@ -671,76 +651,6 @@ export default function App() {
 
 
   useEffect(() => {
-    window.localStorage.setItem(notificationPolicyStorageKey, JSON.stringify(notificationPolicy));
-  }, [notificationPolicy]);
-
-  useEffect(() => {
-    window.localStorage.setItem(sendUndoDelayStorageKey, String(sendUndoDelaySeconds));
-  }, [sendUndoDelaySeconds]);
-
-  useEffect(() => {
-    function handleGlobalFocus(event: FocusEvent) {
-      if (event.target instanceof HTMLElement) {
-        (window as Window & { __focusedElement?: EventTarget | null }).__focusedElement = event.target;
-      }
-    }
-    function handleGlobalBlur() {
-      // Don't clear immediately to allow E2E tests to read it
-    }
-    document.addEventListener('focus', handleGlobalFocus, true);
-    document.addEventListener('blur', handleGlobalBlur, true);
-    return () => {
-      document.removeEventListener('focus', handleGlobalFocus, true);
-      document.removeEventListener('blur', handleGlobalBlur, true);
-    };
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(providerVerificationStorageKey, JSON.stringify(providerVerifications));
-  }, [providerVerifications]);
-
-  useEffect(() => {
-    if (!folderId) return;
-    saveMailboxListState(mailboxListStateKey, { limit: messageLimit });
-  }, [folderId, mailboxListStateKey, messageLimit]);
-
-  useEffect(() => {
-    const dropdownSelector = [
-      'details.compact-menu',
-      'details.sidebar-disclosure',
-      'details.composer-advanced',
-      'details.rule-advanced',
-    ].join(',');
-
-    function closestDropdown(target: EventTarget | null) {
-      return target instanceof Element
-        ? target.closest<HTMLDetailsElement>(dropdownSelector)
-        : null;
-    }
-
-    function closeOpenDropdowns(except: HTMLDetailsElement | null = null) {
-      document.querySelectorAll<HTMLDetailsElement>(`${dropdownSelector}[open]`).forEach((details) => {
-        if (details !== except) details.open = false;
-      });
-    }
-
-    function handleGlobalPointerDown(event: PointerEvent) {
-      closeOpenDropdowns(closestDropdown(event.target));
-    }
-
-    function handleGlobalKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') closeOpenDropdowns();
-    }
-
-    document.addEventListener('pointerdown', handleGlobalPointerDown, true);
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-    };
-  }, []);
-
-  useEffect(() => {
     skipNextFolderEffectLoadRef.current = true;
     refreshMailbox(accountScope, null)
       .catch((error) => setStatus(String(error)))
@@ -748,38 +658,6 @@ export default function App() {
         skipNextFolderEffectLoadRef.current = false;
       });
   }, [accountScope]);
-
-  useEffect(() => {
-    let unlistenProgress: (() => void) | undefined;
-
-    listen<{
-      account_email: string;
-      folder_name: string;
-      current_folder_index: number;
-      total_folders: number;
-      scanned_folders: number;
-      imported_messages: number;
-      status_text: string;
-    }>('sync-progress', (event) => {
-      const payload = event.payload;
-      setStatus(payload.status_text);
-      if (payload.folder_name) {
-        setRefreshNotice(`${payload.folder_name} (${payload.current_folder_index}/${payload.total_folders})`);
-      } else {
-        setRefreshNotice('正在连接...');
-      }
-    })
-      .then((nextUnlisten) => {
-        unlistenProgress = nextUnlisten;
-      })
-      .catch((error) => {
-        console.error('Failed to listen to sync-progress event:', error);
-      });
-
-    return () => {
-      unlistenProgress?.();
-    };
-  }, []);
 
   useEffect(() => {
     if (!folderId) return;
@@ -866,120 +744,27 @@ export default function App() {
     return nextMessages;
   }, [accountScope, setSelectedId]);
 
-  const refreshAll = useCallback(async () => {
-    const startedAt = performance.now();
-    appFlowLog('refreshAll start', {
-      folderId,
-      scope: accountScope,
-      searchScope,
-      query: query.trim() || null,
-      filter,
-    });
-    const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
-    const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
-    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, refreshLimit);
-    if (activeThread) {
-      await openThread(activeThread, false);
-    }
-    appFlowLog('refreshAll done', {
-      resolvedFolderId: meta.folderId,
-      durationMs: Math.round(performance.now() - startedAt),
-    });
-    setStatus('已刷新本地邮箱数据');
-  }, [
-    folderId,
-    accountScope,
-    searchScope,
-    query,
-    filter,
-    loadMeta,
-    messageLimit,
-    mailboxListStateKey,
-    loadMessagesWithVisibleFallback,
-    activeThread,
-    openThread,
-  ]);
-
-  const syncAndRefresh = useCallback(async () => {
-    if (isRefreshing) return;
-    const startedAt = performance.now();
-    const syncAccountId = accountScope === 'all' ? null : accountScope;
-    appFlowLog('syncAndRefresh start', {
-      accountId: syncAccountId,
-      folderId,
-      scope: accountScope,
-      searchScope,
-      query: query.trim() || null,
-      filter,
-    });
-    setIsRefreshing(true);
-    if (refreshNoticeTimeoutRef.current !== null) {
-      window.clearTimeout(refreshNoticeTimeoutRef.current);
-    }
-    setRefreshNotice(null);
-    setStatus('正在同步服务器邮件...');
-    try {
-      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
-      setSyncRuns((current) => [run, ...current].slice(0, 10));
-      const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
-      const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
-      await loadMessagesWithVisibleFallback(
-        meta.folderId,
-        query,
-        filter,
-        accountScope,
-        mailboxRefreshRef.current,
-        meta.folders,
-        refreshLimit,
-      );
-      if (activeThread) {
-        await openThread(activeThread, false);
-      }
-      appFlowLog('syncAndRefresh done', {
-        accountId: syncAccountId,
-        status: run.status,
-        scannedFolders: run.scanned_folders,
-        importedMessages: run.imported_messages,
-        resolvedFolderId: meta.folderId,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-      setStatus(run.message);
-      
-      const count = run.imported_messages;
-      setRefreshNotice(count > 0 ? `成功获取 ${count} 封` : '已是最新');
-      refreshNoticeTimeoutRef.current = window.setTimeout(() => {
-        setRefreshNotice(null);
-      }, 4000);
-    } catch (error) {
-      const message = String(error);
-      appFlowWarn('syncAndRefresh failed', {
-        accountId: syncAccountId,
-        error: message,
-        durationMs: Math.round(performance.now() - startedAt),
-      });
-      setStatus(message);
-      setRefreshNotice('获取失败');
-      refreshNoticeTimeoutRef.current = window.setTimeout(() => {
-        setRefreshNotice(null);
-      }, 4000);
-      throw error;
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [
+  const {
     isRefreshing,
-    accountScope,
+    refreshNotice,
+    refreshAll,
+    syncAndRefresh,
+  } = useMailboxSync({
     folderId,
+    accountScope,
     searchScope,
     query,
     filter,
-    loadMeta,
     messageLimit,
     mailboxListStateKey,
-    loadMessagesWithVisibleFallback,
     activeThread,
+    mailboxRefreshRef,
+    loadMeta: (nextFolderId, nextScope, options) => loadMeta(nextFolderId, nextScope, options),
+    loadMessagesWithVisibleFallback,
     openThread,
-  ]);
+    setSyncRuns,
+    setStatus,
+  });
 
   const {
     draft,
@@ -1682,12 +1467,76 @@ export default function App() {
       )}
 
       {isSettingsOpen && (accountForm || activeSettingsSection === 'accounts') && (
-        <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
-          <SettingsFrame
-          title="设置"
-          subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
-          activeSection={activeSettingsSection}
+        <SettingsOverlay
+          accountForm={accountForm}
+          accounts={accounts}
+          newAccountForm={newAccountForm}
+          activeSettingsSection={activeSettingsSection}
+          accountSettingsDirty={accountSettingsDirty}
+          accountSettingsSaving={accountSettingsSaving}
+          saveAndVerifyRunning={saveAndVerifyRunning}
+          saveAndVerifyReport={saveAndVerifyReport}
+          providerVerifications={providerVerifications}
+          activeProviderVerification={activeProviderVerification}
+          oauthClientId={oauthClientId}
+          oauthClientSecret={oauthClientSecret}
+          oauthRedirectUri={oauthRedirectUri}
+          oauthCallbackState={oauthCallbackState}
+          oauthCallbackCode={oauthCallbackCode}
+          oauthReport={oauthReport}
+          oauthCallbackReport={oauthCallbackReport}
+          oauthExchangeReport={oauthExchangeReport}
+          oauthRefreshReport={oauthRefreshReport}
+          oauthSessions={oauthSessions}
+          authTypeChanged={authTypeChanged}
+          authTypeChangeNotice={authTypeChangeNotice}
+          connectionReport={connectionReport}
+          credentialVerification={credentialVerification}
+          providerValidationReport={providerValidationReport}
+          providerValidationRunning={providerValidationRunning}
+          credentialSecret={credentialSecret}
+          credentialStatus={credentialStatus}
+          notificationPolicy={notificationPolicy}
+          sendUndoDelaySeconds={sendUndoDelaySeconds}
+          remoteImageTrusts={remoteImageTrusts}
+          identities={identities}
+          identityForm={identityForm}
+          diagnosticExport={diagnosticExport}
+          localBackupSummary={localBackupSummary}
+          storageUsage={storageUsage}
+          storageBusy={storageBusy}
+          imapProbe={imapProbe}
+          syncSchedulePlan={syncSchedulePlan}
+          imapMailboxes={imapMailboxes}
+          folders={folders}
+          syncRuns={syncRuns}
+          outbox={outbox}
+          labels={labels}
+          rules={rules}
+          ruleForm={ruleForm}
+          ruleBuilderField={ruleBuilderField}
+          ruleBuilderNeedle={ruleBuilderNeedle}
+          editingRuleId={editingRuleId}
+          rawMessage={rawMessage}
+          parsedPreview={parsedPreview}
+          mergeSuggestions={contactMergeSuggestions}
+          contactForm={contactForm}
+          contactFormAliases={contactFormAliases}
+          contacts={managedContacts}
+          editingContactId={editingContactId}
+          contactEditName={contactEditName}
+          contactEditAliases={contactEditAliases}
+          mergeSourceContactId={mergeSourceContactId}
+          contactTransferBusy={contactTransferBusy}
+          providerWriteValidationStatus={providerWriteValidationStatus}
+          providerWriteValidationLoading={providerWriteValidationLoading}
+          providerWritebackValidationProgress={providerWritebackValidationProgress}
+          setStatus={setStatus}
           onNavigate={scrollSettingsSection}
+          onClose={() => {
+            resetSaveAndVerifyReport();
+            setSettingsOpen(false);
+          }}
           onTestConnection={() => {
             if (!accountForm) {
               setStatus('请先添加邮箱账号');
@@ -1695,9 +1544,6 @@ export default function App() {
             }
             testConnection().catch((error) => setStatus(String(error)));
           }}
-          isDirty={accountSettingsDirty}
-          isBusy={accountSettingsSaving || saveAndVerifyRunning}
-          connectionSummary={saveAndVerifyReport.summary}
           onSave={() => {
             if (!accountForm) {
               setStatus('请先添加邮箱账号');
@@ -1708,238 +1554,116 @@ export default function App() {
           onSaveAndVerify={accountForm ? () => {
             saveAndVerify().catch((error) => setStatus(String(error)));
           } : undefined}
-          onClose={() => {
-            resetSaveAndVerifyReport();
-            setSettingsOpen(false);
+          onAccountFormChange={setAccountForm}
+          onNewAccountFormChange={setNewAccountForm}
+          onApplyProviderPreset={applyProviderPreset}
+          onApplyNewAccountPreset={applyNewAccountPreset}
+          onCreateNewAccount={async (secret) => {
+            try {
+              await createNewAccount(secret);
+            } catch (error) {
+              setStatus(String(error));
+              throw error;
+            }
           }}
-        >
-            {(activeSettingsSection === 'accounts'
-              || activeSettingsSection === 'providers'
-              || activeSettingsSection === 'auth') && (
-            <>
-            <AccountConnectionSettings
-              section={activeSettingsSection}
-              accounts={accounts}
-              accountForm={accountForm}
-              accountCount={accounts.length}
-              newAccountForm={newAccountForm}
-              providerVerifications={providerVerifications}
-              activeProviderVerification={activeProviderVerification}
-              oauthClientId={oauthClientId}
-              oauthClientSecret={oauthClientSecret}
-              oauthRedirectUri={oauthRedirectUri}
-              oauthCallbackState={oauthCallbackState}
-              oauthCallbackCode={oauthCallbackCode}
-              oauthReport={oauthReport}
-              oauthCallbackReport={oauthCallbackReport}
-              oauthExchangeReport={oauthExchangeReport}
-              oauthRefreshReport={oauthRefreshReport}
-              oauthSessions={oauthSessions}
-              authTypeChanged={authTypeChanged}
-              authTypeChangeNotice={authTypeChangeNotice}
-              saveAndVerifyReport={saveAndVerifyReport}
-              onAccountFormChange={setAccountForm}
-              onNewAccountFormChange={setNewAccountForm}
-              onApplyProviderPreset={applyProviderPreset}
-              onApplyNewAccountPreset={applyNewAccountPreset}
-              onCreateNewAccount={async (secret) => {
-                try {
-                  await createNewAccount(secret);
-                } catch (error) {
-                  setStatus(String(error));
-                  throw error;
-                }
-              }}
-              onRemoveAccount={(deleteSecret: boolean) => removeCurrentAccount(deleteSecret)}
-              onUpdateProviderVerification={updateProviderVerification}
-              onSaveProviderVerification={saveProviderVerification}
-              onSaveAccountSettings={async (updatedAccount) => {
-                const updated = await invoke<Account>('update_account_settings', {
-                  accountId: updatedAccount.id,
-                  input: updatedAccount,
-                });
-                setAccount(updated);
-                setAccountForm(updated);
-                setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-                setStatus('账号配置已保存');
-              }}
-              onOauthClientIdChange={setOauthClientId}
-              onOauthClientSecretChange={setOauthClientSecret}
-              onOauthRedirectUriChange={setOauthRedirectUri}
-              onOauthCallbackStateChange={setOauthCallbackState}
-              onOauthCallbackCodeChange={setOauthCallbackCode}
-              onStartOAuth2Pkce={() => { startOAuth2Pkce().catch((error) => setStatus(String(error))); }}
-              onRefreshOAuth2Token={() => { refreshOAuth2Token().catch((error) => setStatus(String(error))); }}
-              onCompleteOAuth2Callback={() => { completeOAuth2Callback().catch((error) => setStatus(String(error))); }}
-              onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
-              onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
-            />
-            {activeSettingsSection === 'auth' && accountForm && (
-              <CredentialSecuritySettings
-                account={accountForm}
-                credentialSecret={credentialSecret}
-                credentialStatus={credentialStatus}
-                connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
-                credentialVerification={
-                  !authTypeChanged && credentialVerification?.account_email === accountForm.email
-                    ? credentialVerification
-                    : null
-                }
-                authTypeChangeNotice={authTypeChangeNotice}
-                providerValidationReport={
-                  providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null
-                }
-                providerValidationRunning={
-                  providerValidationRunning && providerValidationReport?.account_email === accountForm.email
-                }
-                onCredentialSecretChange={setCredentialSecret}
-                onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
-                onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
-                onRunProviderValidation={() => {
-                  runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
-                }}
-                onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
-                onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
-                onStoreAndVerifyCredential={() => {
-                  storeAndVerifyCredential().catch((error) => setStatus(String(error)));
-                }}
-              />
-            )}
-            </>
-            )}
-            {(activeSettingsSection === 'sending'
-              || activeSettingsSection === 'notifications'
-              || activeSettingsSection === 'privacy'
-              || activeSettingsSection === 'identities') && accountForm && (
-            <ExperienceSettings
-              section={activeSettingsSection}
-              accountForm={accountForm}
-              accounts={accounts}
-              notificationPolicy={notificationPolicy}
-              sendUndoDelaySeconds={sendUndoDelaySeconds}
-              remoteImageTrusts={remoteImageTrusts}
-              identities={identities}
-              identityForm={identityForm}
-              onAccountFormChange={setAccountForm}
-              onNotificationPolicyChange={setNotificationPolicy}
-              onSendUndoDelayChange={setSendUndoDelaySeconds}
-              onDeleteRemoteImageTrust={deleteRemoteImageTrust}
-              onIdentityFormChange={setIdentityForm}
-              onEditIdentity={editIdentity}
-              onDeleteIdentity={deleteIdentity}
-              onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
-            />
-            )}
-            {activeSettingsSection === 'backup' && (
-            <DataSafetySettings
-              diagnosticExport={diagnosticExport}
-              localBackupSummary={localBackupSummary}
-              connectionReport={connectionReport}
-              storageUsage={storageUsage}
-              storageBusy={storageBusy}
-              onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
-              onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
-              onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
-              onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
-              onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
-              onRefreshStorage={() => refreshStorageUsage()}
-              onClearAttachmentCache={() => clearAttachmentCache()}
-            />
-            )}
-            {activeSettingsSection === 'sync' && accountForm && (
-            <SyncOperationsSettings
-              accountForm={accountForm}
-              imapProbe={imapProbe}
-              syncSchedulePlan={syncSchedulePlan}
-              imapMailboxes={imapMailboxes}
-              folders={folders}
-              syncRuns={syncRuns}
-              outbox={outbox}
-              writeValidationStatus={providerWriteValidationStatus}
-              writeValidationLoading={providerWriteValidationLoading}
-              writebackValidationProgress={providerWritebackValidationProgress}
-              onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
-              onPrepareWriteValidation={prepareProviderWriteValidation}
-              onRefreshWriteValidation={() => {
-                refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
-              }}
-              onLocateWriteValidation={(role) => {
-                locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
-              }}
-              onRunWritebackValidationStep={(step) => {
-                runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
-              }}
-              onResetWritebackValidation={resetProviderWritebackValidation}
-              onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
-              onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
-              onMapImapMailbox={(mailbox, targetFolderId) => {
-                mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
-              }}
-              onCreateAndMapImapMailbox={(mailbox) => {
-                createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
-              }}
-              onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
-              onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
-            />
-            )}
-            {activeSettingsSection === 'contacts' && (
-            <ContactAutomationSettings
-              mergeSuggestions={contactMergeSuggestions}
-              contactForm={contactForm}
-              contactFormAliases={contactFormAliases}
-              contacts={managedContacts}
-              editingContactId={editingContactId}
-              editName={contactEditName}
-              editAliases={contactEditAliases}
-              mergeSourceContactId={mergeSourceContactId}
-              transferBusy={contactTransferBusy}
-              onContactFormChange={setContactForm}
-              onContactFormAliasesChange={setContactFormAliases}
-              onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
-              onMergeSuggested={(suggestion) => { mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error))); }}
-              onEditNameChange={setContactEditName}
-              onEditAliasesChange={setContactEditAliases}
-              onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}
-              onCancelEdit={() => setEditingContactId(null)}
-              onComposeToContact={composeToContact}
-              onStartEditContact={startEditContact}
-              onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
-              onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
-              onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
-              onMergeSourceChange={setMergeSourceContactId}
-              onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
-              onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
-            />
-            )}
-            {activeSettingsSection === 'rules' && (
-            <RuleAutomationSettings
-              ruleForm={ruleForm}
-              ruleBuilderField={ruleBuilderField}
-              ruleBuilderNeedle={ruleBuilderNeedle}
-              editingRuleId={editingRuleId}
-              rules={rules}
-              labels={labels}
-              onRuleFormChange={setRuleForm}
-              onRuleConditionFieldChange={updateRuleConditionField}
-              onRuleConditionValueChange={updateRuleConditionValue}
-              onRuleLabelActionChange={updateRuleLabelAction}
-              onToggleRuleAction={toggleRuleAction}
-              onSaveRule={() => { saveRule().catch((error) => setStatus(String(error))); }}
-              onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
-              onEditRule={editRule}
-              onRemoveRule={(rule) => { removeRule(rule); }}
-            />
-            )}
-            {activeSettingsSection === 'security-preview' && (
-            <SecurityPreviewSettings
-              rawMessage={rawMessage}
-              parsedPreview={parsedPreview}
-              onRawMessageChange={setRawMessage}
-              onParseRawMessage={parseRawMessage}
-            />
-            )}
-          </SettingsFrame>
-        </Suspense>
+          onRemoveAccount={(deleteSecret) => removeCurrentAccount(deleteSecret)}
+          onUpdateProviderVerification={updateProviderVerification}
+          onSaveProviderVerification={saveProviderVerification}
+          onSaveAccountSettings={async (updatedAccount) => {
+            const updated = await invoke<Account>('update_account_settings', {
+              accountId: updatedAccount.id,
+              input: updatedAccount,
+            });
+            setAccount(updated);
+            setAccountForm(updated);
+            setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+            setStatus('账号配置已保存');
+          }}
+          onOauthClientIdChange={setOauthClientId}
+          onOauthClientSecretChange={setOauthClientSecret}
+          onOauthRedirectUriChange={setOauthRedirectUri}
+          onOauthCallbackStateChange={setOauthCallbackState}
+          onOauthCallbackCodeChange={setOauthCallbackCode}
+          onStartOAuth2Pkce={() => { startOAuth2Pkce().catch((error) => setStatus(String(error))); }}
+          onRefreshOAuth2Token={() => { refreshOAuth2Token().catch((error) => setStatus(String(error))); }}
+          onCompleteOAuth2Callback={() => { completeOAuth2Callback().catch((error) => setStatus(String(error))); }}
+          onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
+          onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
+          onCredentialSecretChange={setCredentialSecret}
+          onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
+          onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
+          onRunProviderValidation={() => {
+            runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
+          }}
+          onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
+          onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
+          onStoreAndVerifyCredential={() => {
+            storeAndVerifyCredential().catch((error) => setStatus(String(error)));
+          }}
+          onNotificationPolicyChange={setNotificationPolicy}
+          onSendUndoDelayChange={setSendUndoDelaySeconds}
+          onDeleteRemoteImageTrust={deleteRemoteImageTrust}
+          onIdentityFormChange={setIdentityForm}
+          onEditIdentity={editIdentity}
+          onDeleteIdentity={deleteIdentity}
+          onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
+          onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
+          onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
+          onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
+          onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
+          onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
+          onRefreshStorage={() => refreshStorageUsage()}
+          onClearAttachmentCache={() => clearAttachmentCache()}
+          onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
+          onPrepareWriteValidation={prepareProviderWriteValidation}
+          onRefreshWriteValidation={() => {
+            refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
+          }}
+          onLocateWriteValidation={(role) => {
+            locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
+          }}
+          onRunWritebackValidationStep={(step) => {
+            runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
+          }}
+          onResetWritebackValidation={resetProviderWritebackValidation}
+          onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
+          onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
+          onMapImapMailbox={(mailbox, targetFolderId) => {
+            mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
+          }}
+          onCreateAndMapImapMailbox={(mailbox) => {
+            createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
+          }}
+          onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
+          onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
+          onContactFormChange={setContactForm}
+          onContactFormAliasesChange={setContactFormAliases}
+          onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
+          onMergeSuggested={(suggestion) => { mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error))); }}
+          onEditNameChange={setContactEditName}
+          onEditAliasesChange={setContactEditAliases}
+          onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}
+          onCancelEdit={() => setEditingContactId(null)}
+          onComposeToContact={composeToContact}
+          onStartEditContact={startEditContact}
+          onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
+          onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
+          onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
+          onMergeSourceChange={setMergeSourceContactId}
+          onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
+          onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
+          onRuleFormChange={setRuleForm}
+          onRuleConditionFieldChange={updateRuleConditionField}
+          onRuleConditionValueChange={updateRuleConditionValue}
+          onRuleLabelActionChange={updateRuleLabelAction}
+          onToggleRuleAction={toggleRuleAction}
+          onSaveRule={() => { saveRule().catch((error) => setStatus(String(error))); }}
+          onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
+          onEditRule={editRule}
+          onRemoveRule={(rule) => { removeRule(rule); }}
+          onRawMessageChange={setRawMessage}
+          onParseRawMessage={parseRawMessage}
+        />
       )}
       {isShortcutsOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>
@@ -1963,173 +1687,39 @@ export default function App() {
       />
       <GlobalTooltip />
       {composerCloseConfirmOpen && (
-        <div
-          className="settings-cache-confirm-backdrop"
-          style={{ zIndex: 10000 }}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setComposerCloseConfirmOpen(false);
-            }
+        <ComposerCloseConfirmDialog
+          setOpen={setComposerCloseConfirmOpen}
+          onClose={() => setComposerCloseConfirmOpen(false)}
+          onDiscard={() => {
+            setDraft(emptyDraft);
+            clearComposerAutosave();
+            forceCloseComposer();
           }}
-        >
-          <section
-            className="settings-cache-confirm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="composer-close-confirm-title"
-          >
-            <header>
-              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#e0f2fe', color: '#0284c7' }}>
-                <Mail size={17} />
-              </span>
-              <span>
-                <strong id="composer-close-confirm-title">关闭写信窗口</strong>
-                <small>当前草稿有未保存的修改</small>
-              </span>
-              <button
-                className="icon-only-action"
-                type="button"
-                title="关闭"
-                aria-label="关闭确认"
-                onClick={() => setComposerCloseConfirmOpen(false)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <div className="settings-cache-confirm-summary" style={{ background: '#f0f9ff', borderLeft: '3px solid #0ea5e9' }}>
-              <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: 'bold' }}>
-                是否保留对当前邮件草稿的修改？
-              </span>
-            </div>
-            <p>
-              您可以选择将草稿保存至本地，以便下次在“草稿箱”中继续编辑，或者舍弃当前修改。
-            </p>
-            <footer>
-              <button
-                className="secondary"
-                type="button"
-                style={{ marginRight: 'auto' }}
-                onClick={() => setComposerCloseConfirmOpen(false)}
-              >
-                继续编辑
-              </button>
-              <button
-                className="secondary"
-                type="button"
-                style={{ borderColor: '#fca5a5', color: '#dc2626' }}
-                onClick={() => {
-                  setDraft(emptyDraft);
-                  clearComposerAutosave();
-                  forceCloseComposer();
-                }}
-              >
-                舍弃草稿
-              </button>
-              <button
-                className="primary"
-                type="button"
-                style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold' }}
-                onClick={async () => {
-                  await saveDraft();
-                  setComposerCloseConfirmOpen(false);
-                }}
-              >
-                保存草稿
-              </button>
-            </footer>
-          </section>
-        </div>
+          onSaveDraft={saveDraft}
+        />
       )}
-      <ConfirmDialog
-        open={!!confirmDeleteFolder}
-        title="删除文件夹"
-        summaryText={confirmDeleteFolder ? `确认删除自定义文件夹 "${confirmDeleteFolder.name}" 吗？` : ''}
-        description="该操作不可逆。删除后文件夹内的邮件将被移回到收件箱中，以便保留邮件。"
-        onConfirm={async () => {
-          if (confirmDeleteFolder) {
-            await deleteCustomFolderConfirmed(confirmDeleteFolder);
-          }
-          setConfirmDeleteFolder(null);
-        }}
-        onCancel={() => setConfirmDeleteFolder(null)}
-      />
-      <ConfirmDialog
-        open={!!confirmDeleteIdentity}
-        title="删除发件身份"
-        summaryText={confirmDeleteIdentity ? `确认删除身份 "${confirmDeleteIdentity.name} <${confirmDeleteIdentity.email}>" 吗？` : ''}
-        description="该操作不可逆。删除身份后您将不能再使用此身份写信，但不会删除该邮箱账号下的任何邮件。"
-        onConfirm={async () => {
-          if (confirmDeleteIdentity) {
-            await deleteIdentityConfirmed(confirmDeleteIdentity);
-          }
-          setConfirmDeleteIdentity(null);
-        }}
-        onCancel={() => setConfirmDeleteIdentity(null)}
-      />
-      <ConfirmDialog
-        open={!!confirmDeleteRule}
-        title="删除规则"
-        summaryText={confirmDeleteRule ? `确认删除邮件规则 "${confirmDeleteRule.name}" 吗？` : ''}
-        description="该操作不可逆。删除后将不会再自动对新邮件执行此规则对应的分类动作。"
-        onConfirm={async () => {
-          if (confirmDeleteRule) {
-            await removeRuleConfirmed(confirmDeleteRule);
-          }
-          setConfirmDeleteRule(null);
-        }}
-        onCancel={() => setConfirmDeleteRule(null)}
-      />
-      <ConfirmDialog
-        open={!!contactToDeleteFromHook}
-        title="删除联系人"
-        summaryText={contactToDeleteFromHook ? `确认删除联系人 "${contactToDeleteFromHook.name || contactToDeleteFromHook.email}" 吗？` : ''}
-        description="该操作不可逆。删除此联系人不会删除与该发件人的往来邮件，但会删除该联系人的备注、别名等数据。"
-        onConfirm={async () => {
-          if (contactToDeleteFromHook) {
-            await deleteManagedContact(contactToDeleteFromHook);
-          }
-          setContactToDeleteFromHook(null);
-        }}
-        onCancel={() => setContactToDeleteFromHook(null)}
-      />
-      <ConfirmDialog
-        open={!!confirmDeleteLabel}
-        title="删除标签"
-        summaryText={confirmDeleteLabel ? `确认删除标签 "${confirmDeleteLabel.name}" 吗？` : ''}
-        description="该操作不可逆。删除该标签后，所有已归类到此标签的邮件将不再显示该标签标记，但邮件正文及其他分类属性仍会完整保留。"
-        onConfirm={async () => {
-          if (confirmDeleteLabel) {
-            await handleDeleteLabelConfirmed(confirmDeleteLabel.id);
-          }
-          setConfirmDeleteLabel(null);
-        }}
-        onCancel={() => setConfirmDeleteLabel(null)}
-      />
-      <ConfirmDialog
-        open={!!confirmEmptyTrashState}
-        title="清空废纸篓"
-        summaryText={confirmEmptyTrashState ? `确认要清空账号 "${confirmEmptyTrashState.accountName}" 的废纸篓吗？` : '确认要清空当前账号的废纸篓吗？'}
-        description="此操作不可逆。废纸篓中所有已删除的邮件都将被永久从本地和服务器上删除，无法恢复。"
-        onConfirm={async () => {
-          if (confirmEmptyTrashState) {
-            await emptyCurrentTrashConfirmed(confirmEmptyTrashState.accountId);
-          }
-          setConfirmEmptyTrashState(null);
-        }}
-        onCancel={() => setConfirmEmptyTrashState(null)}
-      />
-      <ConfirmDialog
-        open={!!confirmPermanentlyDelete}
-        title="永久删除邮件"
-        summaryText={confirmPermanentlyDelete ? `确认要永久删除邮件 "${confirmPermanentlyDelete.subject || '(无主题)'}" 吗？` : '确认要永久删除选中的这封邮件吗？'}
-        description="此操作不可逆。这封邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
-        onConfirm={async () => {
-          if (confirmPermanentlyDelete) {
-            await permanentlyDeleteMessageConfirmed(confirmPermanentlyDelete);
-          }
-          setConfirmPermanentlyDelete(null);
-        }}
-        onCancel={() => setConfirmPermanentlyDelete(null)}
+      <ConfirmationDialogs
+        confirmDeleteFolder={confirmDeleteFolder}
+        confirmDeleteIdentity={confirmDeleteIdentity}
+        confirmDeleteRule={confirmDeleteRule}
+        confirmDeleteContact={contactToDeleteFromHook}
+        confirmDeleteLabel={confirmDeleteLabel}
+        confirmEmptyTrashState={confirmEmptyTrashState}
+        confirmPermanentlyDelete={confirmPermanentlyDelete}
+        setConfirmDeleteFolder={setConfirmDeleteFolder}
+        setConfirmDeleteIdentity={setConfirmDeleteIdentity}
+        setConfirmDeleteRule={setConfirmDeleteRule}
+        setConfirmDeleteContact={setContactToDeleteFromHook}
+        setConfirmDeleteLabel={setConfirmDeleteLabel}
+        setConfirmEmptyTrashState={setConfirmEmptyTrashState}
+        setConfirmPermanentlyDelete={setConfirmPermanentlyDelete}
+        onDeleteFolderConfirmed={deleteCustomFolderConfirmed}
+        onDeleteIdentityConfirmed={deleteIdentityConfirmed}
+        onDeleteRuleConfirmed={removeRuleConfirmed}
+        onDeleteContactConfirmed={deleteManagedContact}
+        onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
+        onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
+        onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
       />
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>

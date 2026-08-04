@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Edit3,
   Keyboard,
-  Search,
   Settings,
 } from 'lucide-react';
 import type {
@@ -50,7 +49,6 @@ export type SidebarProps = {
   onEmptyTrash: () => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
-  onOpenCommandPalette: () => void;
 };
 
 function Sidebar({
@@ -88,7 +86,6 @@ function Sidebar({
   onEmptyTrash,
   onOpenSettings,
   onOpenShortcuts,
-  onOpenCommandPalette,
 }: SidebarProps) {
   return (
     <aside className="sidebar">
@@ -206,9 +203,6 @@ function Sidebar({
           </button>
           <button className="settings-button shortcut-help-button" title="快捷键" onClick={onOpenShortcuts}>
             <Keyboard size={17} /> <span>快捷键</span>
-          </button>
-          <button className="settings-button command-palette-button" title="命令" onClick={onOpenCommandPalette}>
-            <Search size={17} /> <span>命令</span>
           </button>
         </div>
       </div>

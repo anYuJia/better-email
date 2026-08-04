@@ -41,12 +41,6 @@ export const emptyDraft: DraftInput = {
   references: '',
 };
 
-export function normalizeCommandSearchText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[：:·,，。.\s]+/g, '')
-    .trim();
-}
 export const emptyIdentityForm: MailIdentityInput = {
   id: 0,
   account_id: 0,
@@ -519,7 +513,6 @@ export const shortcutGroups = [
   {
     title: '导航',
     items: [
-      { keys: ['⌘/Ctrl', 'K'], label: '聚焦搜索' },
       { keys: ['/'], label: '快速搜索' },
       { keys: ['⌘/Ctrl', 'A'], label: '选择当前列表全部邮件' },
       { keys: ['J', '↓'], label: '下一封' },

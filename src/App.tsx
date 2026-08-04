@@ -21,7 +21,6 @@ import useAppLayout from './hooks/useAppLayout';
 import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
-import useCommandPaletteItems from './hooks/useCommandPaletteItems';
 import useContactManagement from './hooks/useContactManagement';
 import useMailboxData from './hooks/useMailboxData';
 import useMessageCollectionActions from './hooks/useMessageCollectionActions';
@@ -60,7 +59,6 @@ import type {
   Message,
   MessageSummary,
   UndoMessageSnapshot,
-  CommandPaletteItem,
   RemoteImageTrust,
   MailIdentity,
   MailIdentityInput,
@@ -153,7 +151,6 @@ const ContactAutomationSettings = lazy(() => import('./components/settings/Conta
 import DeferredSurface from './components/DeferredSurface';
 const RuleAutomationSettings = lazy(() => import('./components/settings/RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./components/settings/SecurityPreviewSettings'));
-const CommandPalette = lazy(() => import('./components/CommandPalette'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -421,8 +418,6 @@ export default function App() {
   const [isComposerDropActive, setComposerDropActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
-  const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [commandQuery, setCommandQuery] = useState('');
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [snoozeTarget, setSnoozeTarget] = useState<{
     messages: MessageSummary[];
@@ -1985,7 +1980,6 @@ export default function App() {
       setStatus('所选邮件无法稍后处理');
       return;
     }
-    setCommandPaletteOpen(false);
     setSnoozeTarget({
       messages: targetMessages,
       label: targetMessages.length === 1
@@ -3388,53 +3382,6 @@ export default function App() {
     setFolderId(nextFolderId);
   }
 
-  async function runCommandPaletteItem(item: CommandPaletteItem) {
-    if (item.disabled) return;
-    setCommandPaletteOpen(false);
-    setCommandQuery('');
-    await item.run();
-  }
-
-  const filteredCommandItems = useCommandPaletteItems({
-    commandQuery,
-    composeTemplates,
-    managedContacts,
-    selected,
-    labels,
-    folders,
-    filter,
-    query,
-    isComposerOpen,
-    searchInputRef,
-    openComposer: () => openComposer(),
-    refreshAll: syncAndRefresh,
-    setListMode,
-    clearActiveThread: () => {
-      setActiveThread(null);
-      setThreadMessages([]);
-    },
-    openSettings: openSettingsHome,
-    openShortcuts: () => setShortcutsOpen(true),
-    setFilter,
-    applyComposeTemplate,
-    composeToContact,
-    composeFromMessage,
-    toggleRead,
-    toggleStar,
-    moveSelected,
-    unsnoozeSelected,
-    snoozeSelected,
-    toggleLabel,
-    openFolder: async (folder, nextQuery, nextFilter) => {
-      skipNextFolderEffectLoadRef.current = true;
-      setFolderId(folder.id);
-      setActiveThread(null);
-      setThreadMessages([]);
-      await loadMessages(folder.id, nextQuery, nextFilter, undefined, undefined, undefined, undefined, false);
-      setStatus(`已打开：${folder.name}`);
-    },
-  });
-
   useAppShortcuts({
     searchInputRef,
     messages,
@@ -3448,21 +3395,15 @@ export default function App() {
     isComposerMinimized,
     isSettingsOpen,
     isShortcutsOpen,
-    isCommandPaletteOpen,
     closeOverlays: () => {
       closeComposer();
       setSettingsOpen(false);
       setShortcutsOpen(false);
-      setCommandPaletteOpen(false);
     },
     clearSelection: () => setSelectedMessageIds([]),
     setStatus,
     restoreUndoAction,
     toggleAllVisibleMessages,
-    openCommandPalette: () => {
-      setCommandPaletteOpen(true);
-      setCommandQuery('');
-    },
     openShortcuts: () => setShortcutsOpen(true),
     composeNew: () => {
       setDraft(emptyDraft);
@@ -3664,7 +3605,6 @@ export default function App() {
         onEmptyTrash={() => { emptyCurrentTrash(); }}
         onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
-        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       />
 
       <button
@@ -4130,20 +4070,6 @@ export default function App() {
           <ShortcutHelpModal
             open
             onClose={() => setShortcutsOpen(false)}
-          />
-        </Suspense>
-      )}
-      {isCommandPaletteOpen && (
-        <Suspense fallback={<DeferredSurface label="正在打开命令面板" />}>
-          <CommandPalette
-            open
-            query={commandQuery}
-            items={filteredCommandItems}
-            onQueryChange={setCommandQuery}
-            onRun={(item) => {
-              runCommandPaletteItem(item).catch((error) => setStatus(String(error)));
-            }}
-            onClose={() => setCommandPaletteOpen(false)}
           />
         </Suspense>
       )}

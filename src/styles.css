@@ -2678,140 +2678,6 @@ input[type="checkbox"]:checked::before {
   border-color: rgba(10, 132, 255, 0.24);
 }
 
-.command-palette-backdrop {
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: min(14vh, 120px);
-}
-
-.command-palette {
-  width: min(640px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 80px));
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(28px) saturate(1.2);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.command-palette header {
-  min-height: 58px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  background: rgba(248, 250, 253, 0.88);
-}
-
-.command-palette input {
-  min-width: 0;
-  height: 42px;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 15px;
-}
-
-.command-palette input::placeholder {
-  color: var(--muted);
-}
-
-.command-palette header button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
-  color: var(--text-soft);
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
-
-.command-palette header button:hover {
-  background: #fff;
-  color: var(--accent-strong);
-}
-
-.command-list {
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  overflow: auto;
-}
-
-.command-list button {
-  min-height: 54px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  grid-template-areas:
-    "section title"
-    "section hint";
-  align-items: center;
-  column-gap: 10px;
-  padding: 8px 10px;
-  text-align: left;
-}
-
-.command-list button:hover,
-.command-list button:focus-visible {
-  background: rgba(10, 132, 255, 0.09);
-  outline: none;
-}
-
-.command-list button:disabled {
-  opacity: 0.42;
-  cursor: default;
-}
-
-.command-list span {
-  grid-area: section;
-  justify-self: start;
-  border: 1px solid rgba(10, 132, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(10, 132, 255, 0.08);
-  color: var(--accent-strong);
-  font-size: 11px;
-  font-weight: 780;
-  padding: 4px 8px;
-}
-
-.command-list strong {
-  grid-area: title;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 760;
-}
-
-.command-list em {
-  grid-area: hint;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.command-list p {
-  margin: 24px 0;
-  color: var(--muted);
-  text-align: center;
-}
-
 .shortcut-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5251,16 +5117,14 @@ h1 {
 }
 
 .composer-backdrop,
-.shortcut-backdrop,
-.command-palette-backdrop {
+.shortcut-backdrop {
   background: rgba(15, 23, 42, 0.20);
   backdrop-filter: blur(14px) saturate(1.05);
 }
 
 .composer,
 .settings-modal,
-.shortcut-modal,
-.command-palette {
+.shortcut-modal {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
@@ -5269,8 +5133,7 @@ h1 {
 
 .composer header,
 .settings-modal header,
-.shortcut-modal header,
-.command-palette header {
+.shortcut-modal header {
   border-bottom-color: rgba(18, 28, 45, 0.07);
   background: rgba(255, 255, 255, 0.68);
 }

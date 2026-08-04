@@ -128,15 +128,6 @@ export type UndoAction = {
   snapshots: UndoMessageSnapshot[];
 };
 
-export type CommandPaletteItem = {
-  id: string;
-  title: string;
-  section: string;
-  hint: string;
-  disabled?: boolean;
-  run: () => void | Promise<void>;
-};
-
 export type RemoteImageTrust = {
   id: number;
   account_id: number;

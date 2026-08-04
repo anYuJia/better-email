@@ -17,13 +17,11 @@ type UseAppShortcutsOptions = {
   isComposerMinimized: boolean;
   isSettingsOpen: boolean;
   isShortcutsOpen: boolean;
-  isCommandPaletteOpen: boolean;
   closeOverlays: () => void;
   clearSelection: () => void;
   setStatus: (status: string) => void;
   restoreUndoAction: () => Promise<void>;
   toggleAllVisibleMessages: (checked: boolean) => void;
-  openCommandPalette: () => void;
   openShortcuts: () => void;
   composeNew: () => void;
   setSelectedId: (messageId: number) => void;
@@ -70,13 +68,11 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         isComposerMinimized,
         isSettingsOpen,
         isShortcutsOpen,
-        isCommandPaletteOpen,
         closeOverlays,
         clearSelection,
         setStatus,
         restoreUndoAction,
         toggleAllVisibleMessages,
-        openCommandPalette,
         openShortcuts,
         composeNew,
         runBulkAction,
@@ -89,7 +85,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const editable = isEditableTarget(event.target);
       const commandModifier = event.metaKey || event.ctrlKey;
 
-      if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen || isCommandPaletteOpen)) {
+      if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen)) {
         event.preventDefault();
         closeOverlays();
         return;
@@ -98,7 +94,6 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
 
       const hasBlockingOverlay = isSettingsOpen
         || isShortcutsOpen
-        || isCommandPaletteOpen
         || (isComposerOpen && !isComposerMinimized);
       if (hasBlockingOverlay) return;
 
@@ -123,12 +118,6 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         event.preventDefault();
         toggleAllVisibleMessages(true);
         setStatus(`已选择当前列表 ${messages.length} 封邮件`);
-        return;
-      }
-
-      if (commandModifier && key === 'k') {
-        event.preventDefault();
-        openCommandPalette();
         return;
       }
 

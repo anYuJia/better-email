@@ -1847,7 +1847,6 @@ textarea:disabled {
 
 .settings-modal,
 .shortcut-modal,
-.command-palette,
 .composer {
   border: 1px solid rgba(207, 213, 220, 0.92);
   border-radius: 12px;
@@ -2041,8 +2040,7 @@ textarea:disabled {
 .settings-modal textarea,
 .composer input,
 .composer select,
-.composer textarea,
-.command-palette input {
+.composer textarea {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   color: var(--ui-text);
@@ -2071,8 +2069,7 @@ textarea:disabled {
 
 .settings-modal button,
 .composer button,
-.shortcut-modal button,
-.command-palette button {
+.shortcut-modal button {
   border-radius: 8px;
 }
 

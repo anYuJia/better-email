@@ -1,33 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
-  Archive,
-  Clock,
   Copy,
   Download,
   ExternalLink,
-  File,
   FolderOpen,
-  Forward,
   Image as ImageIcon,
   Mail,
   MailPlus,
-  MailOpen,
-  MoreHorizontal,
-  Reply,
-  ReplyAll,
-  RotateCcw,
-  Star,
-  Tag,
-  Trash2,
-  Volume2,
-  VolumeX,
   ZoomIn,
   ZoomOut,
   X,
 } from 'lucide-react';
-import { movableFoldersForBulk, movableFoldersForMessage } from '../app/appConfig';
-import { canSnoozeRole } from '../app/snooze';
 import type {
   AccountScope,
   Attachment,
@@ -37,18 +20,23 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, shouldWarnForLinkDisplay } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
-import SenderIdentity from './reader/SenderIdentity';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import QuickReplySection from './reader/QuickReplySection';
-import { attachmentKind, attachmentIcon, attachmentTypeDescription } from './reader/attachmentUtils';
+import { attachmentKind, attachmentIcon } from './reader/attachmentUtils';
 import EmailShadowView from './reader/EmailShadowView';
 import EmailReaderSkeleton from './EmailReaderSkeleton';
+import AttachmentList from './reader/AttachmentList';
+import LinkSafetyDialog from './reader/LinkSafetyDialog';
+import ReaderLabelMenu from './reader/ReaderLabelMenu';
+import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
+import ReaderToolbar from './reader/ReaderToolbar';
+import ThreadReaderList from './reader/ThreadReaderList';
 
 const readerBodyRenderDelayMs = 0;
 const readerBodyRenderIdleTimeoutMs = 50;
@@ -181,32 +169,7 @@ export default function ReaderPane({
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
 
-  const [newLabelName, setNewLabelName] = useState('');
-  const [newLabelColor, setNewLabelColor] = useState('#2f7ed8');
-  const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
-  const [editingLabelName, setEditingLabelName] = useState('');
-
   const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
-
-  async function handleCreateLabel() {
-    if (!newLabelName.trim() || !onCreateLabel) return;
-    try {
-      await onCreateLabel(newLabelName.trim(), newLabelColor);
-      setNewLabelName('');
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function handleUpdateLabel(id: number) {
-    if (!editingLabelName.trim() || !onUpdateLabel) return;
-    try {
-      await onUpdateLabel(id, editingLabelName.trim(), newLabelColor);
-      setEditingLabelId(null);
-    } catch (e) {
-      console.error(e);
-    }
-  }
 
   async function handleAttachmentDownload(attachment: Attachment): Promise<boolean> {
     if (downloadingAttachmentIds.has(attachment.id)) return false;
@@ -559,144 +522,24 @@ export default function ReaderPane({
 
 
   if (activeThread && threadMessages.length > 0) {
-    const allThreadRead = threadMessages.every((message) => message.is_read);
-    const allThreadStarred = threadMessages.every((message) => message.is_starred);
-    const threadMovableMessages = threadMessages.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
-    );
-    const threadArchiveCount = threadMessages.filter(
-      (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
-    ).length;
-    const threadTrashCount = threadMessages.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
-    ).length;
-    const threadMoveFolders = movableFoldersForBulk(folders, threadMovableMessages);
-
     return (
       <section className="reader-panel">
         <article className="reader thread-reader">
-          <header className="reader-header">
-            <div className="reader-title-block">
-              <h1>{activeThread.subject || '(无主题)'}</h1>
-              <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
-            </div>
-            <div className="reader-actions">
-              <button
-                className="icon-only-action"
-                title={allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-                aria-label={allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-                onClick={() => onRunThreadAction(allThreadStarred ? 'unstar' : 'star')}
-              >
-                <Star size={17} fill={allThreadStarred ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                className="primary-action"
-                title="回复最新邮件"
-                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'reply')}
-              >
-                <Reply size={16} />
-                <span>回复</span>
-              </button>
-              <button
-                className="icon-only-action"
-                title="回复全部"
-                aria-label="回复全部"
-                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll')}
-              >
-                <ReplyAll size={17} />
-              </button>
-              <button
-                className="icon-only-action"
-                title="转发最新邮件"
-                aria-label="转发最新邮件"
-                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
-              >
-                <Forward size={17} />
-              </button>
-              <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
-                <MailPlus size={17} />
-              </button>
-              <button
-                className="icon-only-action"
-                title="归档会话中的收件邮件"
-                aria-label="归档会话中的收件邮件"
-                disabled={threadArchiveCount === 0}
-                onClick={() => onRunThreadAction('archive')}
-              >
-                <Archive size={16} />
-              </button>
-              <button
-                className="icon-only-action"
-                title={allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-                aria-label={allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-                onClick={() => onRunThreadAction(allThreadRead ? 'unread' : 'read')}
-              >
-                {allThreadRead ? <Mail size={16} /> : <MailOpen size={16} />}
-              </button>
-              <button
-                className="icon-only-action danger-action"
-                title="将会话移到废纸篓"
-                aria-label="将会话移到废纸篓"
-                disabled={threadTrashCount === 0}
-                onClick={() => onRunThreadAction('trash')}
-              >
-                <Trash2 size={16} />
-              </button>
-              <details className="reader-more-menu compact-menu">
-                <summary className="icon-only-summary" title="更多会话操作" aria-label="更多会话操作">
-                  <MoreHorizontal size={17} />
-                </summary>
-                <div>
-                  <span className="menu-section-title">会话</span>
-                  <button type="button" onClick={onToggleThreadMute}>
-                    {activeThread.is_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                    {activeThread.is_muted ? '取消静音会话' : '静音会话'}
-                  </button>
-                  <span className="menu-section-title">标签</span>
-                  {labels.map((label) => (
-                    <button
-                      type="button"
-                      key={label.id}
-                      className={threadMessages.every((message) => message.labels.includes(label.name)) ? 'active' : ''}
-                      onClick={() => onToggleThreadLabel(label)}
-                    >
-                      <span className="label-dot" style={{ background: label.color }} />
-                      {label.name}
-                    </button>
-                  ))}
-                  <span className="menu-section-title">移动到</span>
-                  {threadMoveFolders.map((folder) => (
-                    <button type="button" key={folder.id} onClick={() => onMoveThreadToFolder(folder)}>
-                      {folder.name}
-                    </button>
-                  ))}
-                  {threadMoveFolders.length === 0 && (
-                    <span className="menu-empty-note">多账号会话或当前邮件不可移动</span>
-                  )}
-                </div>
-              </details>
-            </div>
-          </header>
-          <div className="thread-stack">
-            {threadMessages.map((message) => (
-              <section
-                className={message.id === selectedId ? 'thread-message active' : 'thread-message'}
-                key={message.id}
-                onClick={() => onSelectMessage(message.id)}
-              >
-                <header>
-                  <SenderIdentity message={message} />
-                  <time>{formatDate(message.received_at)}</time>
-                </header>
-                <p>{message.snippet}</p>
-                <div className="message-chips">
-                  <span>{message.folder_role}</span>
-                  {message.labels.map((label) => <span key={label}>{label}</span>)}
-                  {message.attachment_count > 0 && <span><File size={12} /> {message.attachment_count}</span>}
-                </div>
-              </section>
-            ))}
-          </div>
+          <ThreadReaderList
+            activeThread={activeThread}
+            threadMessages={threadMessages}
+            activeThreadSelected={activeThreadSelected}
+            selectedId={selectedId}
+            folders={folders}
+            labels={labels}
+            onSelectMessage={onSelectMessage}
+            onRunThreadAction={onRunThreadAction}
+            onComposeNew={onComposeNew}
+            onComposeFromMessage={onComposeFromMessage}
+            onMoveThreadToFolder={onMoveThreadToFolder}
+            onToggleThreadLabel={onToggleThreadLabel}
+            onToggleThreadMute={onToggleThreadMute}
+          />
         </article>
       </section>
     );
@@ -728,117 +571,27 @@ export default function ReaderPane({
   return (
     <section className="reader-panel">
       <article className="reader" ref={readerRef} onScroll={maybeCompleteReading}>
-        <header className="reader-header">
-          <div className="reader-title-block">
-            <h1>{selected.subject || '(无主题)'}</h1>
-            <SenderIdentity message={selected} />
-          </div>
-          <div className="reader-actions" aria-label="邮件操作">
-            <button
-              className="icon-only-action"
-              title={selected.is_starred ? '取消星标' : '添加星标'}
-              aria-label={selected.is_starred ? '取消星标' : '添加星标'}
-              onClick={() => onToggleStar(selected)}
-            >
-              <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
-            </button>
-            {isDraft ? (
-              <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
-                <MailOpen size={16} />
-                <span>继续编辑</span>
-              </button>
-            ) : (
-              <>
-                <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
-                  <Reply size={16} />
-                  <span>回复</span>
-                </button>
-                <button
-                  className="icon-only-action"
-                  title="回复全部"
-                  aria-label="回复全部"
-                  onClick={() => onComposeFromMessage(selected, 'replyAll')}
-                >
-                  <ReplyAll size={17} />
-                </button>
-                <button
-                  className="icon-only-action"
-                  title="转发"
-                  aria-label="转发"
-                  onClick={() => onComposeFromMessage(selected, 'forward')}
-                >
-                  <Forward size={17} />
-                </button>
-                <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
-                  <MailPlus size={17} />
-                </button>
-              </>
-            )}
-            {isTrash ? (
-              <button title="恢复邮件" onClick={onRestoreFromTrash}>
-                <RotateCcw size={16} />
-                <span>恢复</span>
-              </button>
-            ) : !isDraft && (
-              <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
-                <Archive size={16} />
-              </button>
-            )}
-            {!isDraft && (
-              <button
-                className="icon-only-action"
-                aria-label={selected.is_read ? '标为未读' : '标为已读'}
-                title={selected.is_read ? '标为未读' : '标为已读'}
-                onClick={() => onToggleRead(selected)}
-              >
-                <Mail size={16} />
-              </button>
-            )}
-            {!isTrash && (
-              <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
-                <Trash2 size={16} />
-              </button>
-            )}
-            <details className="reader-more-menu compact-menu">
-              <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
-                <MoreHorizontal size={17} />
-              </summary>
-              <div>
-                <span className="menu-section-title">整理</span>
-                {selected.folder_role === 'snoozed' ? (
-                  <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
-                ) : canSnoozeRole(selected.folder_role) && (
-                  <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
-                )}
-                <button onClick={onExportMessage}>导出 EML</button>
-                {selected.remote_uid > 0 && !selected.body.trim() && (
-                  <button onClick={() => onFetchBody(false)}>拉取正文</button>
-                )}
-                {selected.folder_role === 'spam' ? (
-                  <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
-                ) : (
-                  <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
-                )}
-
-                {isTrash && (
-                  <>
-                    <span className="menu-section-title">删除</span>
-                    <button className="danger-menu-item" onClick={onPermanentlyDelete}>
-                      <Trash2 size={16} /> 永久删除
-                    </button>
-                    <button className="danger-menu-item" onClick={onEmptyTrash}>清空废纸篓</button>
-                  </>
-                )}
-                <span className="menu-section-title">移动到</span>
-                {movableFoldersForMessage(folders, selected).map((folder) => (
-                  <button type="button" key={folder.id} onClick={() => onMoveToFolder(folder)}>
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-            </details>
-          </div>
-        </header>
+        <ReaderToolbar
+          selected={selected}
+          folders={folders}
+          onToggleStar={onToggleStar}
+          onEditDraft={onEditDraft}
+          onComposeFromMessage={onComposeFromMessage}
+          onComposeNew={onComposeNew}
+          onRestoreFromTrash={onRestoreFromTrash}
+          onMoveArchive={onMoveArchive}
+          onToggleRead={onToggleRead}
+          onMoveTrash={onMoveTrash}
+          onUnsnooze={onUnsnooze}
+          onSnooze={onSnooze}
+          onExportMessage={onExportMessage}
+          onFetchBody={onFetchBody}
+          onMarkNotSpam={onMarkNotSpam}
+          onMarkAsSpam={onMarkAsSpam}
+          onPermanentlyDelete={onPermanentlyDelete}
+          onEmptyTrash={onEmptyTrash}
+          onMoveToFolder={onMoveToFolder}
+        />
 
         <div className="reader-meta">
           <span>{formatDate(selected.received_at)}</span>
@@ -847,218 +600,29 @@ export default function ReaderPane({
           {selected.has_attachments && <span>含附件</span>}
         </div>
 
-        <div className="label-tools">
-          {selected.labels.length === 0 && <span className="label-empty">无标签</span>}
-          {selected.labels.map((labelName) => {
-            const label = labels.find((item) => item.name === labelName);
-            return (
-              <span className="active-label-chip" key={labelName}>
-                <span className="label-dot" style={{ background: label?.color ?? '#8b95a1' }} />
-                {labelName}
-              </span>
-            );
-          })}
-          <details className="compact-menu label-menu">
-            <summary><Tag size={15} /> 标签</summary>
-            <div className="label-menu-container">
-              <div className="label-menu-add-section">
-                <input
-                  type="text"
-                  placeholder="新建标签..."
-                  value={newLabelName}
-                  onChange={(e) => setNewLabelName(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      await handleCreateLabel();
-                    }
-                  }}
-                />
-                <div className="label-color-selectors">
-                  {['#2f7ed8', '#2da44e', '#d97706', '#8250df', '#cf222e', '#6e7781'].map((c) => (
-                    <button
-                      type="button"
-                      key={c}
-                      className={`color-dot-btn ${newLabelColor === c ? 'active' : ''}`}
-                      style={{ background: c }}
-                      onClick={() => setNewLabelColor(c)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    className="label-add-submit-btn"
-                    disabled={!newLabelName.trim()}
-                    onClick={handleCreateLabel}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="label-menu-list">
-                {labels.length === 0 ? (
-                  <div className="label-menu-empty">
-                    暂无标签，在上方输入名称并点击 + 新建
-                  </div>
-                ) : (
-                  labels.map((label) => {
-                    const isEditing = editingLabelId === label.id;
-                    return (
-                      <div className="label-menu-item-row" key={label.id}>
-                        {isEditing ? (
-                          <div className="label-edit-inline">
-                            <input
-                              type="text"
-                              value={editingLabelName}
-                              onChange={(e) => setEditingLabelName(e.target.value)}
-                              onKeyDown={async (e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  await handleUpdateLabel(label.id);
-                                }
-                              }}
-                            />
-                            <div className="label-edit-actions">
-                              <button type="button" onClick={() => handleUpdateLabel(label.id)}>确定</button>
-                              <button type="button" onClick={() => setEditingLabelId(null)}>取消</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              className={`label-select-btn ${selected.labels.includes(label.name) ? 'active' : ''}`}
-                              onClick={() => onToggleLabel(label)}
-                            >
-                              <span className="label-dot" style={{ background: label.color }} />
-                              <span className="label-name-text">{label.name}</span>
-                            </button>
-                            <div className="label-item-actions">
-                              <button
-                                type="button"
-                                className="action-edit"
-                                title="编辑名称"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingLabelId(label.id);
-                                  setEditingLabelName(label.name);
-                                }}
-                              >
-                                ✎
-                              </button>
-                              <button
-                                type="button"
-                                className="action-delete"
-                                title="删除标签"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onDeleteLabel) {
-                                    onDeleteLabel(label.id);
-                                  }
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </details>
-        </div>
+        <ReaderLabelMenu
+          selectedLabels={selected.labels}
+          labels={labels}
+          onToggleLabel={onToggleLabel}
+          onCreateLabel={onCreateLabel}
+          onUpdateLabel={onUpdateLabel}
+          onDeleteLabel={onDeleteLabel}
+        />
 
         {regularAttachments.length > 0 && (
-          <div className="attachment-section">
-            <header className="attachment-section-header">
-              <span>
-                <strong>附件</strong>
-                <small>{regularAttachments.length} 个 · {formatBytes(regularAttachmentTotalSize)}</small>
-              </span>
-              {pendingAttachmentCount > 0 && (
-                <button
-                  type="button"
-                  disabled={isDownloadingAllAttachments}
-                  aria-busy={isDownloadingAllAttachments}
-                  onClick={handleDownloadAllAttachments}
-                >
-                  <Download size={14} />
-                  {isDownloadingAllAttachments
-                    ? '顺序下载中…'
-                    : `下载全部 ${pendingAttachmentCount} 个`}
-                </button>
-              )}
-            </header>
-            <div className="attachments">
-              {regularAttachments.map((attachment) => {
-                const downloading = downloadingAttachmentIds.has(attachment.id);
-                const transferError = attachmentErrors[attachment.id] ?? '';
-                const kind = attachmentKind(attachment);
-                const canPreview = kind === 'image';
-                return (
-                  <div
-                    className={`attachment-item ${transferError ? 'attachment-download-failed' : ''}`}
-                    key={attachment.id}
-                    onDoubleClick={() => {
-                      if (attachment.is_downloaded) onOpenAttachment(attachment);
-                      else handleAttachmentDownload(attachment).catch(() => undefined);
-                    }}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      setAttachmentContextMenu({ attachment, x: event.clientX, y: event.clientY });
-                    }}
-                  >
-                    <span className={`attachment-file-icon attachment-file-icon-${kind}`} aria-hidden="true">
-                      {attachmentIcon(attachment)}
-                    </span>
-                    <span className="attachment-copy">
-                      <strong>{attachment.filename}</strong>
-                      <small>
-                        {attachmentTypeDescription(attachment)} · {formatBytes(attachment.size_bytes)}
-                        {attachment.is_downloaded ? ' · 已下载' : ' · 未下载'}
-                      </small>
-                    </span>
-                    <div className="attachment-actions">
-                      {canPreview && (
-                        <button
-                          type="button"
-                          className="attachment-preview-button"
-                          title={attachment.local_path || attachment.filename}
-                          disabled={downloading}
-                          aria-busy={downloading}
-                          onClick={() => previewAttachment(attachment).catch(() => undefined)}
-                        >
-                          预览
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="attachment-primary-button"
-                        title={attachment.local_path || attachment.filename}
-                        disabled={downloading}
-                        aria-busy={downloading}
-                        onClick={() => attachment.is_downloaded
-                          ? onOpenAttachment(attachment)
-                          : handleAttachmentDownload(attachment)}
-                      >
-                        {attachment.is_downloaded
-                          ? '打开'
-                          : downloading ? '下载中…' : transferError ? '重试' : '下载'}
-                      </button>
-                    </div>
-                    {transferError && (
-                      <small className="attachment-transfer-status" role="status">
-                        {transferError}
-                      </small>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <AttachmentList
+            attachments={regularAttachments}
+            pendingAttachmentCount={pendingAttachmentCount}
+            totalSize={regularAttachmentTotalSize}
+            downloadingIds={downloadingAttachmentIds}
+            errors={attachmentErrors}
+            isDownloadingAll={isDownloadingAllAttachments}
+            onDownloadAll={handleDownloadAllAttachments}
+            onDownload={handleAttachmentDownload}
+            onPreview={previewAttachment}
+            onOpen={onOpenAttachment}
+            onContextMenu={setAttachmentContextMenu}
+          />
         )}
 
         {(inlineImageResolution.pendingAttachments.length > 0
@@ -1098,18 +662,10 @@ export default function ReaderPane({
           </div>
         )}
 
-        {(visibleSecurityWarnings.length > 0 || selectedHasRemoteImageWarning || shouldOfferRemoteContent) && (
-          <div className="reader-warning-panel">
-            <div className="reader-warning-heading">
-              <strong>安全提示</strong>
-              {(selectedHasRemoteImageWarning || shouldOfferRemoteContent) && (
-                <span>远程图片默认阻止</span>
-              )}
-            </div>
-            {visibleSecurityWarnings.map((warning) => <p key={warning}>{warning}</p>)}
-
-          </div>
-        )}
+        <ReaderSecurityBanner
+          warnings={visibleSecurityWarnings}
+          showRemoteImageNote={selectedHasRemoteImageWarning || shouldOfferRemoteContent}
+        />
 
         {!isBodyRenderReady ? (
           showPlaceholder ? (
@@ -1288,86 +844,13 @@ export default function ReaderPane({
         />
       )}
 
-      {clickedLink && createPortal((
-        <div
-          className="settings-cache-confirm-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setClickedLink(null);
-            }
-          }}
-        >
-          <section
-            className="settings-cache-confirm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="link-confirm-title"
-            style={{ width: '480px' }}
-          >
-            <header>
-              <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fef3c7', color: '#d97706' }}>
-                <ExternalLink size={17} />
-              </span>
-              <span>
-                <strong id="link-confirm-title">安全链接检查</strong>
-                <small>请确认目标链接与显示的域名一致</small>
-              </span>
-              <button
-                className="icon-only-action"
-                type="button"
-                title="关闭"
-                aria-label="关闭安全检查"
-                onClick={() => setClickedLink(null)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <div className="settings-cache-confirm-summary" style={{ background: '#fffbeb', borderLeft: '3px solid #f59e0b', wordBreak: 'break-all' }}>
-              <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>真实目标地址：</div>
-              <strong style={{ fontSize: '13px', color: '#1f2937', display: 'block' }}>{clickedLink.href}</strong>
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#374151', margin: '14px 0', lineHeight: '1.5' }}>
-              {(() => {
-                const showDomainWarning = shouldWarnForLinkDisplay(clickedLink.href, clickedLink.text);
-
-                if (showDomainWarning) {
-                  return (
-                    <div style={{ padding: '10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b', fontWeight: 'bold' }}>
-                      ⚠️ 风险提示：显示的链接文本与实际指向的域名不一致！这可能是一个钓鱼链接，请谨慎访问。
-                    </div>
-                  );
-                }
-                return '您点击的链接将通过系统默认浏览器打开，请确认该目标地址安全。';
-              })()}
-            </div>
-            <footer>
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setClickedLink(null)}
-              >
-                取消访问
-              </button>
-              <button
-                className="primary"
-                type="button"
-                style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                onClick={async () => {
-                  if (clickedLink.href.toLowerCase().startsWith('mailto:')) {
-                    const parsed = parseMailtoUrl(clickedLink.href);
-                    onComposeNew?.(parsed);
-                  } else {
-                    await invoke('open_url', { url: clickedLink.href });
-                  }
-                  setClickedLink(null);
-                }}
-              >
-                继续访问
-              </button>
-            </footer>
-          </section>
-        </div>
-      ), document.body)}
+      {clickedLink && (
+        <LinkSafetyDialog
+          link={clickedLink}
+          onClose={() => setClickedLink(null)}
+          onComposeNew={onComposeNew}
+        />
+      )}
     </section>
   );
 }

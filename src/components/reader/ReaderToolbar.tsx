@@ -1,0 +1,181 @@
+import {
+  Archive,
+  Clock,
+  Forward,
+  Mail,
+  MailOpen,
+  MailPlus,
+  MoreHorizontal,
+  Reply,
+  ReplyAll,
+  RotateCcw,
+  Star,
+  Trash2,
+} from 'lucide-react';
+import { movableFoldersForMessage } from '../../app/appConfig';
+import { canSnoozeRole } from '../../app/snooze';
+import type { Folder, Message } from '../../app/types';
+import SenderIdentity from './SenderIdentity';
+
+export type ComposeMode = 'reply' | 'replyAll' | 'forward';
+
+type ReaderToolbarProps = {
+  selected: Message;
+  folders: Folder[];
+  onToggleStar: (message: Message) => void;
+  onEditDraft: (message: Message) => void;
+  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
+  onComposeNew: () => void;
+  onRestoreFromTrash: () => void;
+  onMoveArchive: () => void;
+  onToggleRead: (message: Message) => void;
+  onMoveTrash: () => void;
+  onUnsnooze: () => void;
+  onSnooze: () => void;
+  onExportMessage: () => void;
+  onFetchBody: (isSilent?: boolean) => void | Promise<void>;
+  onMarkNotSpam: () => void;
+  onMarkAsSpam: () => void;
+  onPermanentlyDelete: () => void;
+  onEmptyTrash: () => void;
+  onMoveToFolder: (folder: Folder) => void;
+};
+
+export default function ReaderToolbar({
+  selected,
+  folders,
+  onToggleStar,
+  onEditDraft,
+  onComposeFromMessage,
+  onComposeNew,
+  onRestoreFromTrash,
+  onMoveArchive,
+  onToggleRead,
+  onMoveTrash,
+  onUnsnooze,
+  onSnooze,
+  onExportMessage,
+  onFetchBody,
+  onMarkNotSpam,
+  onMarkAsSpam,
+  onPermanentlyDelete,
+  onEmptyTrash,
+  onMoveToFolder,
+}: ReaderToolbarProps) {
+  const isDraft = selected.folder_role === 'drafts';
+  const isTrash = selected.folder_role === 'trash';
+
+  return (
+    <header className="reader-header">
+      <div className="reader-title-block">
+        <h1>{selected.subject || '(无主题)'}</h1>
+        <SenderIdentity message={selected} />
+      </div>
+      <div className="reader-actions" aria-label="邮件操作">
+        <button
+          className="icon-only-action"
+          title={selected.is_starred ? '取消星标' : '添加星标'}
+          aria-label={selected.is_starred ? '取消星标' : '添加星标'}
+          onClick={() => onToggleStar(selected)}
+        >
+          <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
+        </button>
+        {isDraft ? (
+          <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
+            <MailOpen size={16} />
+            <span>继续编辑</span>
+          </button>
+        ) : (
+          <>
+            <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
+              <Reply size={16} />
+              <span>回复</span>
+            </button>
+            <button
+              className="icon-only-action"
+              title="回复全部"
+              aria-label="回复全部"
+              onClick={() => onComposeFromMessage(selected, 'replyAll')}
+            >
+              <ReplyAll size={17} />
+            </button>
+            <button
+              className="icon-only-action"
+              title="转发"
+              aria-label="转发"
+              onClick={() => onComposeFromMessage(selected, 'forward')}
+            >
+              <Forward size={17} />
+            </button>
+            <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
+              <MailPlus size={17} />
+            </button>
+          </>
+        )}
+        {isTrash ? (
+          <button title="恢复邮件" onClick={onRestoreFromTrash}>
+            <RotateCcw size={16} />
+            <span>恢复</span>
+          </button>
+        ) : !isDraft && (
+          <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
+            <Archive size={16} />
+          </button>
+        )}
+        {!isDraft && (
+          <button
+            className="icon-only-action"
+            aria-label={selected.is_read ? '标为未读' : '标为已读'}
+            title={selected.is_read ? '标为未读' : '标为已读'}
+            onClick={() => onToggleRead(selected)}
+          >
+            <Mail size={16} />
+          </button>
+        )}
+        {!isTrash && (
+          <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
+            <Trash2 size={16} />
+          </button>
+        )}
+        <details className="reader-more-menu compact-menu">
+          <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
+            <MoreHorizontal size={17} />
+          </summary>
+          <div>
+            <span className="menu-section-title">整理</span>
+            {selected.folder_role === 'snoozed' ? (
+              <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
+            ) : canSnoozeRole(selected.folder_role) && (
+              <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
+            )}
+            <button onClick={onExportMessage}>导出 EML</button>
+            {selected.remote_uid > 0 && !selected.body.trim() && (
+              <button onClick={() => onFetchBody(false)}>拉取正文</button>
+            )}
+            {selected.folder_role === 'spam' ? (
+              <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
+            ) : (
+              <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
+            )}
+
+            {isTrash && (
+              <>
+                <span className="menu-section-title">删除</span>
+                <button className="danger-menu-item" onClick={onPermanentlyDelete}>
+                  <Trash2 size={16} /> 永久删除
+                </button>
+                <button className="danger-menu-item" onClick={onEmptyTrash}>清空废纸篓</button>
+              </>
+            )}
+            <span className="menu-section-title">移动到</span>
+            {movableFoldersForMessage(folders, selected).map((folder) => (
+              <button type="button" key={folder.id} onClick={() => onMoveToFolder(folder)}>
+                {folder.name}
+              </button>
+            ))}
+          </div>
+        </details>
+      </div>
+    </header>
+  );
+}

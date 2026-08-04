@@ -13,6 +13,7 @@ import {
   loadListSort,
   messagePageSize,
 } from '../app/appConfig';
+import useMailboxLoadMore from './useMailboxLoadMore';
 import useSavedSearches from './useSavedSearches';
 import type {
   Account,
@@ -91,10 +92,6 @@ export default function useMailboxSearchController({
   const [filter, setFilter] = useState<FilterMode>('all');
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
-  const [messageLimit, setMessageLimit] = useState(messagePageSize);
-  const [hasMoreMessages, setHasMoreMessages] = useState(false);
-  const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
-  const loadingMoreRef = useRef(false);
   const searchClearTimerRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -110,6 +107,28 @@ export default function useMailboxSearchController({
     saveCurrentSearch,
     deleteSavedSearch,
   } = useSavedSearches({ setStatus });
+
+  const {
+    messageLimit,
+    setMessageLimit,
+    hasMoreMessages,
+    setHasMoreMessages,
+    loadMoreStatus,
+    loadMoreMessages,
+  } = useMailboxLoadMore({
+    account,
+    accountScope,
+    folderId,
+    query,
+    filter,
+    searchScope,
+    folders,
+    imapMailboxes,
+    messages,
+    mailboxRefreshRef,
+    loadersRef,
+    setStatus,
+  });
 
   const runSearch = useCallback(async (event: FormEvent) => {
     event.preventDefault();
@@ -247,81 +266,6 @@ export default function useMailboxSearchController({
     setStatus,
   ]);
 
-  const loadMoreMessages = useCallback(async () => {
-    const loaders = loadersRef.current;
-    if (!loaders) return;
-    if (loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadMoreStatus('正在读取本地缓存...');
-    try {
-      const nextLimit = messageLimit + messagePageSize;
-      const nextMessages = await loaders.loadMessagesWithVisibleFallback(
-        folderId,
-        query,
-        filter,
-        accountScope,
-        mailboxRefreshRef.current,
-        folders,
-        nextLimit,
-        searchScope,
-        false,
-      );
-      const folder = folders.find((f) => f.id === folderId);
-      const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
-      const scopeMailboxes = targetAccountId
-        ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
-        : imapMailboxes;
-
-      let targetMailbox = null;
-      if (folder) {
-        if (folder.is_virtual) {
-          targetMailbox = scopeMailboxes.find((m) => m.local_role === folder.role && !m.history_complete);
-        } else {
-          targetMailbox = scopeMailboxes.find((m) => m.local_folder_id === folder.id && !m.history_complete);
-        }
-      } else {
-        targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
-      }
-
-      if (nextMessages.length <= messages.length && targetMailbox) {
-        setStatus('正在从服务器同步历史邮件...');
-        setLoadMoreStatus('正在从服务器拉取历史邮件...');
-        const run = await loaders.syncImapHistoryPage(targetMailbox.account_id);
-        const meta = await loaders.loadMeta(folderId, accountScope, { mode: 'mailbox' });
-        const refreshedMessages = await loaders.loadMessagesWithVisibleFallback(
-          meta.folderId,
-          query,
-          filter,
-          accountScope,
-          mailboxRefreshRef.current,
-          meta.folders,
-          nextLimit,
-          searchScope,
-          false,
-        );
-        setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
-      } else {
-        setStatus(`已加载 ${nextMessages.length} 封邮件`);
-      }
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadMoreStatus(null);
-    }
-  }, [
-    loadersRef,
-    messageLimit,
-    folderId,
-    query,
-    filter,
-    accountScope,
-    mailboxRefreshRef,
-    folders,
-    searchScope,
-    account,
-    imapMailboxes,
-    messages,
-    setStatus,
-  ]);
 
   const runSavedSearch = useCallback(async (savedSearch: SavedSearch) => {
     const loaders = loadersRef.current;

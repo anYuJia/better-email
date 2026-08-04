@@ -785,7 +785,6 @@ export default function App() {
     isComposerMinimized,
     setComposerMinimized,
     isComposerDropActive,
-    setComposerDropActive,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,
     openComposer,

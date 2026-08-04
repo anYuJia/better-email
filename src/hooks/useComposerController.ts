@@ -3,8 +3,6 @@ import {
   emptyDraft,
   isDraftEmpty,
   loadComposerAutosave,
-  loadComposeTemplates,
-  composeTemplatesStorageKey,
   composerAutosaveStorageKey,
   removeAppStorage,
   type SendUndoDelaySeconds,
@@ -13,7 +11,6 @@ import type {
   Account,
   AccountScope,
   Attachment,
-  ComposeTemplate,
   ComposerAutosave,
   Contact,
   DraftInput,
@@ -34,11 +31,20 @@ import {
   replyThreadingHeaders,
 } from '../mailUtils';
 import { flowInfo, flowWarn } from '../app/logger';
-import { getCurrentWindow, invoke } from '../tauriBridge';
+import { invoke } from '../tauriBridge';
 import {
   buildForwardAttachmentPlan,
   forwardAttachmentStatus,
 } from '../app/forwarding';
+import {
+  accountForDraft,
+  draftInputForCurrentAccount,
+  identityForDraft,
+  threadingForDraft,
+} from '../app/composerDraftHelpers';
+import useComposerTemplates from './useComposerTemplates';
+import useComposerAttachments from './useComposerAttachments';
+
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -87,13 +93,50 @@ export default function useComposerController({
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(false);
-  const [composeTemplates, setComposeTemplates] = useState<ComposeTemplate[]>(loadComposeTemplates);
-  const [templateName, setTemplateName] = useState('');
   const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
-  const [isComposerDropActive, setComposerDropActive] = useState(false);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
+  const {
+    composeTemplates,
+    setComposeTemplates,
+    templateName,
+    setTemplateName,
+    applyComposeTemplate,
+    saveDraftAsTemplate,
+    deleteComposeTemplate,
+  } = useComposerTemplates({ draft, setDraft, setRichComposer, setStatus });
+
+  const onAttachmentsReady = useCallback((
+    newAttachments: OutboundAttachmentInput[],
+    statusPrefix = '已添加附件',
+  ) => {
+    const validAttachments = newAttachments.filter((attachment) => attachment.filename.trim());
+    if (validAttachments.length === 0) {
+      setStatus('没有可添加的附件');
+      return;
+    }
+    setDraft((current) => ({
+      ...current,
+      attachments: [...current.attachments, ...validAttachments],
+    }));
+    setStatus(`${statusPrefix} ${validAttachments.length} 个`);
+  }, [setStatus]);
+
+  const {
+    isComposerDropActive,
+    pickDraftAttachments,
+    processDroppedOrPastedFiles,
+    handleComposerAttachmentDrop,
+    handleComposerAttachmentPaste,
+    handleComposerAttachmentDragOver,
+    handleComposerAttachmentDragEnter,
+    handleComposerAttachmentDragLeave,
+  } = useComposerAttachments({
+    isComposerOpen,
+    setStatus,
+    onAttachmentsReady,
+  });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
     if (nextDraft) {
@@ -194,47 +237,6 @@ export default function useComposerController({
     setStatus('已插入当前发件身份签名');
   }
 
-  function applyComposeTemplate(template: ComposeTemplate) {
-    setDraft((current) => ({
-      ...current,
-      subject: template.subject,
-      body: template.body,
-      html_body: template.html_body,
-    }));
-    if (template.html_body.trim()) {
-      setRichComposer(true);
-    }
-    setStatus(`已插入模板：${template.name}`);
-  }
-
-  function saveDraftAsTemplate() {
-    const hasContent = draft.subject.trim() || draft.body.trim() || draft.html_body.trim();
-    if (!hasContent) {
-      setStatus('请先填写主题或正文后再保存模板');
-      return;
-    }
-    const name = templateName.trim() || draft.subject.trim() || '未命名模板';
-    const nextTemplate: ComposeTemplate = {
-      id: crypto.randomUUID(),
-      name,
-      subject: draft.subject,
-      body: draft.body,
-      html_body: draft.html_body,
-    };
-    setComposeTemplates((current) => [nextTemplate, ...current.filter((item) => item.name !== name)].slice(0, 12));
-    setTemplateName('');
-    setStatus(`模板已保存：${name}`);
-  }
-
-  function deleteComposeTemplate(template: ComposeTemplate) {
-    setComposeTemplates((current) => current.filter((item) => item.id !== template.id));
-    setStatus(`模板已删除：${template.name}`);
-  }
-
-  useEffect(() => {
-    window.localStorage.setItem(composeTemplatesStorageKey, JSON.stringify(composeTemplates));
-  }, [composeTemplates]);
-
   useEffect(() => {
     if (!isComposerOpen || isDraftEmpty(draft)) return;
     const autosave: ComposerAutosave = {
@@ -247,153 +249,8 @@ export default function useComposerController({
   }, [draft, isRichComposer, isComposerOpen]);
 
   useEffect(() => {
-    if (!isComposerOpen) return undefined;
-    let active = true;
-    let unlisten: (() => void) | undefined;
-
-    getCurrentWindow().onDragDropEvent(async (event) => {
-      if (!active) return;
-      if (event.type === 'enter' || event.type === 'over') {
-        setComposerDropActive(true);
-        return;
-      }
-      if (event.type === 'leave') {
-        setComposerDropActive(false);
-        return;
-      }
-      setComposerDropActive(false);
-      const paths = event.paths.filter((path) => path.trim());
-      if (paths.length === 0) {
-        setStatus('拖拽内容中没有文件');
-        return;
-      }
-      try {
-        const newAttachments = await invoke<OutboundAttachmentInput[]>('outbound_attachments_from_paths', { paths });
-        addDraftAttachments(newAttachments, '已拖入附件');
-      } catch (error) {
-        setStatus(`附件拖入失败：${String(error)}`);
-      }
-    })
-      .then((nextUnlisten) => {
-        unlisten = nextUnlisten;
-      })
-      .catch((error) => {
-        setStatus(`附件拖拽不可用：${String(error)}`);
-      });
-
-    return () => {
-      active = false;
-      setComposerDropActive(false);
-      unlisten?.();
-    };
-  }, [isComposerOpen]);
-
-  useEffect(() => {
     setQuickReplyBody('');
   }, [selectedId]);
-
-  function addDraftAttachments(newAttachments: OutboundAttachmentInput[], statusPrefix = '已添加附件') {
-    const validAttachments = newAttachments.filter((attachment) => attachment.filename.trim());
-    if (validAttachments.length === 0) {
-      setStatus('没有可添加的附件');
-      return;
-    }
-    setDraft((current) => ({
-      ...current,
-      attachments: [...current.attachments, ...validAttachments],
-    }));
-    setStatus(`${statusPrefix} ${validAttachments.length} 个`);
-  }
-
-  async function pickDraftAttachments() {
-    const newAttachments = await invoke<OutboundAttachmentInput[]>('pick_outbound_attachments');
-    if (newAttachments.length === 0) {
-      setStatus('已取消选择附件');
-      return;
-    }
-    addDraftAttachments(newAttachments, '已添加附件');
-  }
-
-  async function processDroppedOrPastedFiles(files: FileList, statusPrefix = '已添加附件') {
-    const validFiles = Array.from(files).filter((file) => file.name.trim());
-    if (validFiles.length === 0) return;
-
-    setStatus('正在导入附件...');
-    try {
-      const savedAttachments: OutboundAttachmentInput[] = [];
-      for (const file of validFiles) {
-        // Read file bytes as base64
-        const base64Data = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            const base64 = result.split(',')[1] || '';
-            resolve(base64);
-          };
-          reader.onerror = () => reject(new Error('读取文件失败'));
-          reader.readAsDataURL(file);
-        });
-
-        // Call backend to save
-        const savedPath = await invoke<string>('save_temp_attachment', {
-          filename: file.name,
-          base64Data,
-        });
-
-        savedAttachments.push({
-          filename: file.name,
-          mime_type: file.type || 'application/octet-stream',
-          size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
-          local_path: savedPath,
-        });
-      }
-
-      setDraft((current) => ({
-        ...current,
-        attachments: [...current.attachments, ...savedAttachments],
-      }));
-      setStatus(`${statusPrefix} ${savedAttachments.length} 个`);
-    } catch (error) {
-      console.error(error);
-      setStatus(`添加附件失败: ${String(error)}`);
-    }
-  }
-
-  function handleComposerAttachmentDrop(event: React.DragEvent<HTMLElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    setComposerDropActive(false);
-    const files = event.dataTransfer.files;
-    if (!files || files.length === 0) {
-      setStatus('拖拽内容中没有文件');
-      return;
-    }
-    void processDroppedOrPastedFiles(files, '已拖入附件');
-  }
-
-  function handleComposerAttachmentPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = event.clipboardData.files;
-    if (!files || files.length === 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    void processDroppedOrPastedFiles(files, '已粘贴附件');
-  }
-
-  function handleComposerAttachmentDragOver(event: React.DragEvent<HTMLElement>) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-  }
-
-  function handleComposerAttachmentDragEnter(event: React.DragEvent<HTMLElement>) {
-    event.preventDefault();
-    setComposerDropActive(true);
-  }
-
-  function handleComposerAttachmentDragLeave(event: React.DragEvent<HTMLElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setComposerDropActive(false);
-    }
-  }
 
   function removeDraftAttachment(index: number) {
     setDraft((current) => ({
@@ -720,7 +577,6 @@ export default function useComposerController({
     });
     setStatus('已打开草稿继续编辑');
   }
-
   return {
     draft,
     setDraft,
@@ -739,7 +595,6 @@ export default function useComposerController({
     isComposerMinimized,
     setComposerMinimized,
     isComposerDropActive,
-    setComposerDropActive,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,
     openComposer,
@@ -749,13 +604,11 @@ export default function useComposerController({
     draftInputForCurrentAccount,
     threadingForDraft,
     accountForDraft,
-    identitiesForDraftAccount,
     identityForDraft,
     insertSignatureIntoDraft,
     applyComposeTemplate,
     saveDraftAsTemplate,
     deleteComposeTemplate,
-    addDraftAttachments,
     pickDraftAttachments,
     processDroppedOrPastedFiles,
     handleComposerAttachmentDrop,

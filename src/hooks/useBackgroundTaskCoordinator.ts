@@ -23,12 +23,7 @@ import {
   fetchTimerWarn,
   nextOutboxWakeItem,
   outboxFlowLog,
-  outboxFlowWarn,
-  outboxFlushMessage,
-  outboxStatusCounts,
-  runDueOutboxSmtp,
   syncModeStatus,
-  type OutboxInvoke,
 } from '../app/backgroundTaskFlow';
 import type {
   Account,
@@ -44,6 +39,8 @@ import type {
 } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
 import useBackgroundScheduler from './useBackgroundScheduler';
+import useNewMailNotifier from './useNewMailNotifier';
+import useOutboxFlush from './useOutboxFlush';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -142,125 +139,31 @@ export default function useBackgroundTaskCoordinator({
     releaseDueSnoozedMessages,
   };
 
+  const { notifyNewMail } = useNewMailNotifier({
+    notificationPolicy,
+    getCurrentMessages: () => currentRef.current.messages,
+    setLastNewMailNotice,
+    setNotificationStatus,
+  });
+  const {
+    flushOutboxDryRun,
+    flushOutboxSmtp,
+    sendDueOutboxItems,
+  } = useOutboxFlush({
+    setOutbox,
+    setStatus,
+    refreshMailboxContext: async () => {
+      const current = currentRef.current;
+      const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
+      await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
+    },
+  });
+
   const refreshBackgroundTasks = useCallback(async () => {
     const tasks = await invoke<BackgroundTask[]>('list_background_tasks');
     setBackgroundTasks(tasks);
     return tasks;
   }, [setBackgroundTasks]);
-
-  const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: MessageSummary[]) => {
-    const current = currentRef.current;
-    const candidates = (latestMessages ?? current.messages)
-      .slice(0, Math.max(0, run.imported_messages));
-    const accountIds = [...new Set(
-      candidates
-        .map((message) => message.account_id)
-        .filter((accountId) => accountId > 0),
-    )];
-    const mutedThreadScopes = (
-      await Promise.all(accountIds.map(async (accountId) => {
-        const threadKeys = await invoke<string[]>('list_muted_thread_keys', { accountId });
-        return threadKeys.map((threadKey) => notificationThreadScopeKey({
-          account_id: accountId,
-          thread_key: threadKey,
-          sender_email: '',
-          sender_name: '',
-          subject: '',
-        }));
-      }))
-    ).flat();
-    const decision = newMailNotificationDecision(
-      run,
-      current.notificationPolicy,
-      latestMessages ?? current.messages,
-      new Date(),
-      mutedThreadScopes,
-    );
-    const body = decision.body;
-    setLastNewMailNotice(body);
-    if (!body) {
-      if (decision.reason === 'quiet-hours') setNotificationStatus('免打扰时段已静音');
-      if (decision.reason === 'vip-only-no-match') setNotificationStatus('VIP 策略已过滤');
-      if (decision.reason === 'account-muted') setNotificationStatus('账号静音已过滤');
-      if (decision.reason === 'thread-muted') setNotificationStatus('静音会话已过滤');
-      return;
-    }
-
-    try {
-      let granted = await isPermissionGranted();
-      if (!granted) {
-        const permission = await requestPermission();
-        granted = permission === 'granted';
-      }
-      if (!granted) {
-        setNotificationStatus('系统提醒未授权');
-        return;
-      }
-      sendNotification({ title: 'Better Email', body });
-      setNotificationStatus(
-        decision.vipMatches > 0
-          ? 'VIP 系统提醒已发送'
-          : decision.priorityMatches > 0
-            ? '重点账号提醒已发送'
-            : '系统提醒已发送',
-      );
-    } catch {
-      setNotificationStatus('系统提醒不可用');
-    }
-  }, [setLastNewMailNotice, setNotificationStatus]);
-
-  const flushOutboxDryRun = useCallback(async (): Promise<string> => {
-    const items = await invoke<OutboxItem[]>('flush_outbox_dry_run');
-    setOutbox(items);
-    const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
-    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
-    const message = '发件箱队列已完成本地发送演练';
-    setStatus(message);
-    return message;
-  }, [setOutbox, setStatus]);
-
-  const flushOutboxSmtp = useCallback(async (): Promise<string> => {
-    outboxFlowLog('manual smtp flush start');
-    const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
-    setOutbox(items);
-    const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
-    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
-    const message = outboxFlushMessage(items);
-    outboxFlowLog('manual smtp flush done', {
-      outboxItems: items.length,
-      statuses: outboxStatusCounts(items),
-      message,
-    });
-    setStatus(message);
-    return message;
-  }, [setOutbox, setStatus]);
-
-  const sendDueOutboxItems = useCallback(async (): Promise<string> => {
-    outboxFlowLog('scheduled smtp due start');
-    let items: OutboxItem[];
-    try {
-      items = await runDueOutboxSmtp();
-    } catch (error) {
-      outboxFlowWarn('scheduled smtp due failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-    setOutbox(items);
-    const current = currentRef.current;
-    const meta = await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
-    await current.loadMessages(meta.folderId, current.query, current.filter, current.accountScope);
-    const message = outboxFlushMessage(items);
-    outboxFlowLog('scheduled smtp due done', {
-      outboxItems: items.length,
-      statuses: outboxStatusCounts(items),
-      message,
-    });
-    setStatus(message);
-    return message;
-  }, [setOutbox, setStatus]);
 
   const runBackgroundSync = useCallback(async (reason: 'manual' | 'timer'): Promise<string> => {
     if (backgroundSyncRef.current) {

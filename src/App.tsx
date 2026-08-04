@@ -49,7 +49,7 @@ import useTrashController from './hooks/useTrashController';
 import {
   type NotificationPolicy,
 } from './mailUtils';
-import { invoke } from './tauriBridge';
+import { getCurrentWindow, invoke, listen } from './tauriBridge';
 
 import type {
   FolderRole,
@@ -719,6 +719,57 @@ export default function App() {
     focusMailboxRole,
   });
 
+  useEffect(() => {
+    let active = true;
+    const unlisteners: Array<() => void> = [];
+
+    async function registerTrayListeners() {
+      try {
+        const unlistenCompose = await listen('tray://compose', () => {
+          if (!active) return;
+          setRichComposer(false);
+          openComposer(emptyDraft);
+          setStatus('已打开新邮件');
+        });
+        unlisteners.push(unlistenCompose);
+
+        const unlistenSync = await listen('tray://sync', () => {
+          if (!active) return;
+          syncAndRefresh().catch((error) => setStatus(String(error)));
+        });
+        unlisteners.push(unlistenSync);
+
+        const unlistenUnread = await listen('tray://open-unread', () => {
+          if (!active) return;
+          const inboxFolder = folders.find((f) => f.role === 'inbox');
+          if (inboxFolder) {
+            setFolderId(inboxFolder.id);
+          }
+          setActiveThread(null);
+          setThreadMessages([]);
+          setListMode('messages');
+          setFilter('unread');
+        });
+        unlisteners.push(unlistenUnread);
+
+        const unlistenSettings = await listen('tray://settings', () => {
+          if (!active) return;
+          setSettingsOpen(true);
+        });
+        unlisteners.push(unlistenSettings);
+      } catch (error) {
+        console.error('Failed to register tray listeners:', error);
+      }
+    }
+
+    void registerTrayListeners();
+
+    return () => {
+      active = false;
+      unlisteners.forEach((unlisten) => unlisten());
+    };
+  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus]);
+
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
       if (checked) return current.includes(messageId) ? current : [...current, messageId];
@@ -1055,6 +1106,57 @@ export default function App() {
   const handleRefresh = useCallback(() => {
     syncAndRefresh().catch((error) => setStatus(String(error)));
   }, [syncAndRefresh, setStatus]);
+
+  useEffect(() => {
+    let active = true;
+    const unlisteners: Array<() => void> = [];
+
+    async function registerTrayListeners() {
+      try {
+        const unlistenCompose = await listen('tray://compose', () => {
+          if (!active) return;
+          setRichComposer(false);
+          openComposer(emptyDraft);
+          setStatus('已打开新邮件');
+        });
+        unlisteners.push(unlistenCompose);
+
+        const unlistenSync = await listen('tray://sync', () => {
+          if (!active) return;
+          syncAndRefresh().catch((error) => setStatus(String(error)));
+        });
+        unlisteners.push(unlistenSync);
+
+        const unlistenUnread = await listen('tray://open-unread', () => {
+          if (!active) return;
+          const inboxFolder = folders.find((folder) => folder.role === 'inbox');
+          if (inboxFolder) {
+            setFolderId(inboxFolder.id);
+          }
+          setActiveThread(null);
+          setThreadMessages([]);
+          setListMode('messages');
+          setFilter('unread');
+        });
+        unlisteners.push(unlistenUnread);
+
+        const unlistenSettings = await listen('tray://settings', () => {
+          if (!active) return;
+          setSettingsOpen(true);
+        });
+        unlisteners.push(unlistenSettings);
+      } catch (error) {
+        console.error('Failed to register tray listeners:', error);
+      }
+    }
+
+    void registerTrayListeners();
+
+    return () => {
+      active = false;
+      unlisteners.forEach((unlisten) => unlisten());
+    };
+  }, [openComposer, syncAndRefresh, folders, setFolderId, setFilter, setListMode, setSettingsOpen, setActiveThread, setThreadMessages, setRichComposer, setStatus, emptyDraft]);
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));

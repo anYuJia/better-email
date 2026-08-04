@@ -47,12 +47,7 @@ button {
     background 160ms ease,
     border-color 160ms ease,
     color 160ms ease,
-    box-shadow 160ms ease,
-    transform 120ms ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
+    box-shadow 160ms ease;
 }
 
 button:active {

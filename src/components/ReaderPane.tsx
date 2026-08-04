@@ -133,6 +133,7 @@ export default function ReaderPane({
   labels,
   attachments,
   selectedSenderTrusted,
+  selectedSenderDomain,
   selectedHasRemoteImageWarning,
   quickReplyBody,
   onSelectMessage,
@@ -156,6 +157,8 @@ export default function ReaderPane({
   onMarkNotSpam,
   onMarkAsSpam,
   onAllowRemoteImagesOnce,
+  onTrustRemoteImages,
+  onBlockSender,
   onPermanentlyDelete,
   onEmptyTrash,
   onMoveToFolder,
@@ -364,6 +367,10 @@ export default function ReaderPane({
         <ReaderToolbar
           selected={selected}
           folders={folders}
+          selectedSenderTrusted={selectedSenderTrusted}
+          selectedSenderDomain={selectedSenderDomain}
+          onTrustRemoteImages={onTrustRemoteImages}
+          onBlockSender={onBlockSender}
           onToggleStar={onToggleStar}
           onEditDraft={onEditDraft}
           onComposeFromMessage={onComposeFromMessage}

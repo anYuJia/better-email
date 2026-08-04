@@ -101,7 +101,6 @@ body {
 
 .compose-button:hover {
   background: linear-gradient(180deg, #1b8fff, #076bd0);
-  transform: translateY(-1px);
 }
 
 .folder-list {

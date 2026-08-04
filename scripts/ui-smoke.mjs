@@ -420,7 +420,7 @@ async function dragElement(cdp, selector, deltaX) {
 
 async function main() {
   const vite = spawnLogged('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
-    env: { ...process.env, VITE_BETTER_EMAIL_UI_MOCK: '1' },
+    env: { ...process.env, VITE_BETTER_EMAIL_UI_MOCK: '1', VITE_BETTER_EMAIL_SEED_MOCK_DATA: '1' },
   });
   const profileDir = mkdtempSync(join(tmpdir(), 'better-email-ui-smoke-'));
   let chrome;
@@ -1320,6 +1320,17 @@ async function main() {
     await clickContextMenuItem(cdp, '不是垃圾邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('已标记为不是垃圾邮件：安全检查清单')");
 
+    await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-more-menu')");
+    await openDetails(cdp, '.reader-more-menu');
+    await clickButton(cdp, '信任发件人', "document.querySelector('.reader-more-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已信任发件人远程图片：security@example.com')");
+    await openDetails(cdp, '.reader-more-menu');
+    await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-more-menu')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com')");
+
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);
 
     const report = {
@@ -1370,6 +1381,7 @@ async function main() {
         'trash restore syncs the remote inbox',
         'permanent delete syncs remote expunge',
         'manual spam and not-spam correction works',
+        'reader sender trust and block actions work',
         'outbox queue and cancel works',
         'settings modal opens',
         'settings navigation renders one page at a time',

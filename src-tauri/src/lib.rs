@@ -13,6 +13,161 @@ mod vcard;
 use db::MailStore;
 pub use provider_probe::{list_provider_probe_accounts, run_provider_probe};
 use tauri::Manager;
+use tauri::Emitter;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::Wry;
+
+pub struct TrayState {
+    pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
+    pub unread_item: Mutex<Option<MenuItem<Wry>>>,
+    pub is_quitting: AtomicBool,
+}
+
+#[tauri::command]
+fn set_tray_unread_count(
+    unread_count: u64,
+    state: tauri::State<'_, TrayState>,
+) -> Result<(), String> {
+    if let Some(ref item) = *state.unread_item.lock().unwrap() {
+        let text = if unread_count == 0 {
+            "没有未读邮件".to_string()
+        } else {
+            format!("未读邮件：{}", unread_count)
+        };
+        let _ = item.set_text(text);
+    }
+
+    if let Some(ref tray) = *state.tray.lock().unwrap() {
+        let tooltip = if unread_count == 0 {
+            "Better Email".to_string()
+        } else {
+            format!("Better Email · {} 未读", unread_count)
+        };
+        let _ = tray.set_tooltip(Some(tooltip));
+
+        #[cfg(target_os = "macos")]
+        {
+            let title = if unread_count == 0 {
+                "".to_string()
+            } else if unread_count > 99 {
+                "99+".to_string()
+            } else {
+                unread_count.to_string()
+            };
+            let _ = tray.set_title(Some(title));
+        }
+    }
+
+    Ok(())
+}
+
+fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let unread_item = MenuItem::with_id(app, "tray_unread_label", "没有未读邮件", false, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "tray_show", "打开 Better Email", true, None::<&str>)?;
+    let hide_item = MenuItem::with_id(app, "tray_hide", "隐藏窗口", true, None::<&str>)?;
+    let compose_item = MenuItem::with_id(app, "tray_compose", "写邮件", true, None::<&str>)?;
+    let sync_item = MenuItem::with_id(app, "tray_sync", "获取新邮件", true, None::<&str>)?;
+    let unread_goto_item = MenuItem::with_id(app, "tray_unread", "打开未读", true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(app, "tray_settings", "设置", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "tray_quit", "退出 Better Email", true, None::<&str>)?;
+
+    let menu = Menu::with_items(app, &[
+        &unread_item,
+        &tauri::menu::PredefinedMenuItem::separator(app)?,
+        &show_item,
+        &hide_item,
+        &tauri::menu::PredefinedMenuItem::separator(app)?,
+        &compose_item,
+        &sync_item,
+        &unread_goto_item,
+        &settings_item,
+        &tauri::menu::PredefinedMenuItem::separator(app)?,
+        &quit_item,
+    ])?;
+
+    let icon = app.default_window_icon().cloned().ok_or("failed to get default window icon")?;
+
+    let tray = TrayIconBuilder::new()
+        .icon(icon)
+        .menu(&menu)
+        .tooltip("Better Email")
+        .on_menu_event(move |app_handle, event| {
+            let id = event.id.as_ref();
+            match id {
+                "tray_show" => {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }
+                "tray_hide" => {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                }
+                "tray_compose" => {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                    let _ = app_handle.emit("tray://compose", ());
+                }
+                "tray_sync" => {
+                    let _ = app_handle.emit("tray://sync", ());
+                }
+                "tray_unread" => {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                    let _ = app_handle.emit("tray://open-unread", ());
+                }
+                "tray_settings" => {
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                    let _ = app_handle.emit("tray://settings", ());
+                }
+                "tray_quit" => {
+                    if let Some(state) = app_handle.try_state::<TrayState>() {
+                        state.is_quitting.store(true, Ordering::SeqCst);
+                    }
+                    app_handle.exit(0);
+                }
+                _ => {}
+            }
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event {
+                if let Some(window) = tray.app_handle().get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }
+        })
+        .build(app)?;
+
+    app.manage(TrayState {
+        tray: Mutex::new(Some(tray)),
+        unread_item: Mutex::new(Some(unread_item)),
+        is_quitting: AtomicBool::new(false),
+    });
+
+    Ok(())
+}
 
 pub fn run() {
     tauri::Builder::default()
@@ -22,9 +177,24 @@ pub fn run() {
         .setup(|app| {
             let store = MailStore::open(app.handle())?;
             app.manage(store);
+            if let Err(e) = setup_tray(app) {
+                eprintln!("Failed to setup tray: {:?}", e);
+            }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app_handle = window.app_handle();
+                if let Some(state) = app_handle.try_state::<TrayState>() {
+                    if !state.is_quitting.load(Ordering::SeqCst) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            set_tray_unread_count,
             commands::list_accounts,
             commands::get_account,
             commands::create_account,

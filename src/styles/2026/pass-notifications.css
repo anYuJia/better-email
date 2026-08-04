@@ -73,11 +73,6 @@
 .undo-snackbar button:hover {
   color: #7dd3fc;
   background: rgba(255, 255, 255, 0.14);
-  transform: translateY(-0.5px);
-}
-
-.undo-snackbar button:active {
-  transform: translateY(0.5px);
 }
 
 .undo-snackbar button:last-child {

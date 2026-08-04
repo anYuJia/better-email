@@ -96,10 +96,6 @@
     inset 0 1px rgba(255, 255, 255, 0.28);
 }
 
-.compose-button:hover {
-  transform: translateY(-1px);
-}
-
 .folder-list {
   gap: 3px;
 }

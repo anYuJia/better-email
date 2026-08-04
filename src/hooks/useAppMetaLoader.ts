@@ -263,6 +263,12 @@ export default function useAppMetaLoader({
     } catch {
       setAppBadgeStatus('当前平台不支持应用角标');
     }
+
+    try {
+      await invoke('set_tray_unread_count', { unreadCount });
+    } catch (error) {
+      console.warn('Failed to update tray unread count:', error);
+    }
   }
 
   async function maybeRunBenchmarkSync(runSyncDryRun: () => Promise<SyncRun>) {

@@ -169,17 +169,17 @@
   border: 1px solid rgba(31, 41, 55, 0.10);
   border-radius: 8px;
   color: #ffffff;
-  background: rgba(31, 36, 43, 0.94);
+  background: #1f242b;
   box-shadow: var(--ui-shadow-tooltip);
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.35;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
   letter-spacing: 0;
   pointer-events: none;
-  transform: translateX(-50%);
   animation: global-tooltip-in 90ms ease-out both;
-  backdrop-filter: blur(14px) saturate(1.15);
   white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 .global-tooltip::after {
@@ -191,10 +191,6 @@
   background: inherit;
   content: "";
   transform: translateX(-50%) rotate(45deg);
-}
-
-.global-tooltip.is-top {
-  transform: translate(-50%, -100%);
 }
 
 .global-tooltip.is-top::after {
@@ -212,11 +208,9 @@
 @keyframes global-tooltip-in {
   from {
     opacity: 0;
-    filter: blur(1px);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
   }
 }

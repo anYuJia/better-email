@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 type TooltipState = {
   text: string;
-  x: number;
-  y: number;
   placement: 'top' | 'bottom';
+  targetLeft: number;
+  targetTop: number;
+  targetWidth: number;
+  targetBottom: number;
 };
 
 const TOOLTIP_SELECTOR = [
@@ -71,6 +73,37 @@ export default function GlobalTooltip() {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
   const timerRef = useRef<number | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ left: number; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!tooltip) {
+      setCoords(null);
+      return;
+    }
+    const elem = tooltipRef.current;
+    if (!elem) return;
+
+    const width = elem.offsetWidth;
+    const height = elem.offsetHeight;
+
+    let left = tooltip.targetLeft + tooltip.targetWidth / 2 - width / 2;
+    let top = tooltip.placement === 'top'
+      ? tooltip.targetTop - height - 8
+      : tooltip.targetBottom + 8;
+
+    left = Math.round(left);
+    top = Math.round(top);
+
+    const padding = 12;
+    const maxLeft = window.innerWidth - width - padding;
+    left = Math.max(padding, Math.min(left, maxLeft));
+
+    const maxTop = window.innerHeight - height - padding;
+    top = Math.max(padding, Math.min(top, Math.max(padding, maxTop)));
+
+    setCoords({ left, top });
+  }, [tooltip]);
 
   useEffect(() => {
     const clearTimer = () => {
@@ -119,9 +152,11 @@ export default function GlobalTooltip() {
         const placement = rect.top > 48 ? 'top' : 'bottom';
         setTooltip({
           text,
-          x: rect.left + rect.width / 2,
-          y: placement === 'top' ? rect.top - 8 : rect.bottom + 8,
           placement,
+          targetLeft: rect.left,
+          targetTop: rect.top,
+          targetWidth: rect.width,
+          targetBottom: rect.bottom,
         });
       }, 120);
     };
@@ -178,11 +213,13 @@ export default function GlobalTooltip() {
 
   return (
     <div
+      ref={tooltipRef}
       className={`global-tooltip is-${tooltip.placement}`}
       role="tooltip"
       style={{
-        left: tooltip.x,
-        top: tooltip.y,
+        left: coords ? coords.left : -9999,
+        top: coords ? coords.top : -9999,
+        visibility: coords ? 'visible' : 'hidden',
       }}
     >
       {tooltip.text}

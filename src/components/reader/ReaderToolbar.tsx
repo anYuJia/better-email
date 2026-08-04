@@ -22,6 +22,10 @@ export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type ReaderToolbarProps = {
   selected: Message;
   folders: Folder[];
+  selectedSenderTrusted: boolean;
+  selectedSenderDomain: string;
+  onTrustRemoteImages: (scope: 'sender' | 'domain') => void;
+  onBlockSender: () => void;
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
@@ -44,6 +48,10 @@ type ReaderToolbarProps = {
 export default function ReaderToolbar({
   selected,
   folders,
+  selectedSenderTrusted,
+  selectedSenderDomain,
+  onTrustRemoteImages,
+  onBlockSender,
   onToggleStar,
   onEditDraft,
   onComposeFromMessage,
@@ -156,6 +164,21 @@ export default function ReaderToolbar({
               <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
             ) : (
               <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
+            )}
+
+            {!isDraft && selected.sender_email.trim() && (
+              <>
+                <span className="menu-section-title">安全</span>
+                {!selectedSenderTrusted && (
+                  <button onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
+                )}
+                {selectedSenderDomain && !selectedSenderTrusted && (
+                  <button onClick={() => onTrustRemoteImages('domain')}>
+                    信任 {selectedSenderDomain}
+                  </button>
+                )}
+                <button onClick={onBlockSender}>阻止该发件人</button>
+              </>
             )}
 
             {isTrash && (

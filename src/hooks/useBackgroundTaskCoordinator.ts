@@ -43,6 +43,7 @@ import type {
   SyncSchedulePlan,
 } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
+import useBackgroundScheduler from './useBackgroundScheduler';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -116,7 +117,6 @@ export default function useBackgroundTaskCoordinator({
   loadMessages,
   releaseDueSnoozedMessages,
 }: UseBackgroundTaskCoordinatorOptions) {
-  const outboxScheduleTimerRef = useRef<number | null>(null);
   const backgroundSyncRef = useRef(false);
   const backgroundTaskWorkerRef = useRef(false);
   const currentRef = useRef<CurrentCoordinatorState>({
@@ -416,102 +416,18 @@ export default function useBackgroundTaskCoordinator({
     void drainBackgroundTaskQueue();
   }, [drainBackgroundTaskQueue, refreshBackgroundTasks, setBackgroundSyncStatus]);
 
-  useEffect(() => {
-    isPermissionGranted()
-      .then((granted) => setNotificationStatus(granted ? '系统提醒已启用' : '系统提醒待授权'))
-      .catch(() => setNotificationStatus('系统提醒不可用'));
-  }, [setNotificationStatus]);
 
-  useEffect(() => {
-    if (outboxScheduleTimerRef.current) {
-      window.clearTimeout(outboxScheduleTimerRef.current);
-      outboxScheduleTimerRef.current = null;
-    }
-
-    const nextScheduledItem = nextOutboxWakeItem(outbox);
-    if (!nextScheduledItem) return;
-
-    const maxTimerDelay = 2_147_000_000;
-    const dueAt = Date.parse(nextScheduledItem.next_attempt_at);
-    const timerDelay = Math.min(Math.max(dueAt - Date.now(), 0), maxTimerDelay);
-    outboxScheduleTimerRef.current = window.setTimeout(() => {
-      outboxScheduleTimerRef.current = null;
-      if (dueAt > Date.now()) {
-        setOutbox((current) => [...current]);
-        return;
-      }
-      setPendingSendUndo((current) => (
-        current?.outboxId === nextScheduledItem.id ? null : current
-      ));
-      outboxFlowLog('scheduled smtp timer fired', {
-        outboxId: nextScheduledItem.id,
-        messageId: nextScheduledItem.message_id,
-        dueAt: nextScheduledItem.next_attempt_at,
-      });
-      sendDueOutboxItems().catch((error) => setStatus(String(error)));
-    }, timerDelay);
-
-    return () => {
-      if (outboxScheduleTimerRef.current) {
-        window.clearTimeout(outboxScheduleTimerRef.current);
-        outboxScheduleTimerRef.current = null;
-      }
-    };
-  }, [
+  useBackgroundScheduler({
+    account,
     outbox,
-    sendDueOutboxItems,
     setOutbox,
     setPendingSendUndo,
-    setStatus,
-  ]);
-
-  useEffect(() => {
-    const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
-    if (!intervalMs) {
-      fetchTimerLog('disabled', {
-        accountId: account?.id ?? null,
-        email: account?.email ?? null,
-        syncMode: account?.sync_mode ?? 'manual',
-      });
-      setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
-      return;
-    }
-    fetchTimerLog('enabled', {
-      accountId: account?.id ?? null,
-      email: account?.email ?? null,
-      syncMode: account?.sync_mode ?? 'manual',
-      intervalMs,
-      nextRunAt: new Date(Date.now() + intervalMs).toISOString(),
-    });
-    setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
-    const timer = window.setInterval(() => {
-      fetchTimerLog('timer fired', {
-        accountId: account?.id ?? null,
-        syncMode: account?.sync_mode ?? 'manual',
-      });
-      enqueueBackgroundTask('sync', 'timer').catch((error) => {
-        fetchTimerWarn('enqueue failed', {
-          accountId: account?.id ?? null,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        setStatus(String(error));
-      });
-    }, intervalMs);
-    return () => {
-      fetchTimerLog('cleared', {
-        accountId: account?.id ?? null,
-        syncMode: account?.sync_mode ?? 'manual',
-      });
-      window.clearInterval(timer);
-    };
-  }, [
-    account?.email,
-    account?.id,
-    account?.sync_mode,
-    enqueueBackgroundTask,
+    setNotificationStatus,
     setBackgroundSyncStatus,
     setStatus,
-  ]);
+    sendDueOutboxItems,
+    enqueueBackgroundTask,
+  });
 
   return { enqueueBackgroundTask };
 }

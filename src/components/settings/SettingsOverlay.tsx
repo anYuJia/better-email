@@ -57,6 +57,8 @@ const SyncOperationsSettings = lazy(() => import('./SyncOperationsSettings'));
 const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings'));
 const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
+const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
+const TemplateSettings = lazy(() => import('./TemplateSettings'));
 
 type SettingsOverlayProps = {
   accountForm: Account | null;
@@ -199,6 +201,8 @@ type SettingsOverlayProps = {
   onMergeSourceChange: Dispatch<SetStateAction<number | null>>;
   onImportContacts: () => void;
   onExportContacts: () => void;
+  onRefreshContacts: () => Promise<Contact[]>;
+  onStatus: Dispatch<SetStateAction<string>>;
   onRuleFormChange: Dispatch<SetStateAction<MailRuleInput>>;
   onRuleConditionFieldChange: (field: RuleConditionField) => void;
   onRuleConditionValueChange: (value: string) => void;
@@ -350,6 +354,8 @@ export default function SettingsOverlay({
   onMergeSourceChange,
   onImportContacts,
   onExportContacts,
+  onRefreshContacts,
+  onStatus,
   onRuleFormChange,
   onRuleConditionFieldChange,
   onRuleConditionValueChange,
@@ -544,6 +550,8 @@ export default function SettingsOverlay({
           onMergeSourceChange={onMergeSourceChange}
           onImportContacts={onImportContacts}
           onExportContacts={onExportContacts}
+          onRefreshContacts={onRefreshContacts}
+          onStatus={onStatus}
         />
         )}
         {activeSettingsSection === 'rules' && (
@@ -572,6 +580,12 @@ export default function SettingsOverlay({
           onRawMessageChange={onRawMessageChange}
           onParseRawMessage={onParseRawMessage}
         />
+        )}
+        {activeSettingsSection === 'ai' && (
+        <AiServiceSettings />
+        )}
+        {activeSettingsSection === 'templates' && (
+        <TemplateSettings />
         )}
         </Suspense>
       </SettingsFrame>

@@ -700,7 +700,7 @@ async function main() {
     await fillInput(cdp, '.composer input[placeholder=\"主题\"]', 'Smoke Template Mutated');
     await fillInput(cdp, '.composer textarea[placeholder=\"正文\"]', '模板覆盖前正文');
     await clickButton(cdp, 'Smoke 模板', "document.querySelector('.composer-template-list')");
-    await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"主题\"]').value === 'Smoke Draft Flow' && document.querySelector('.composer textarea[placeholder=\"正文\"]').value === '保存草稿路径验证' && document.body.innerText.includes('已插入模板：Smoke 模板')");
+    await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"主题\"]').value === 'Smoke Template Mutated' && document.querySelector('.composer textarea[placeholder=\"正文\"]').value.includes('模板覆盖前正文') && document.querySelector('.composer textarea[placeholder=\"正文\"]').value.includes('保存草稿路径验证') && document.body.innerText.includes('已插入模板：Smoke 模板') && document.body.innerText.includes('主题已保留')");
     await evalInPage(cdp, `(() => {
       const target = document.querySelector('.composer-attachments');
       if (!target) throw new Error('Composer attachment drop zone not found');
@@ -934,7 +934,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-section > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置页面\"]') && document.querySelector('.settings-page-pagination')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-section > button').length === 14 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置页面\"]') && document.querySelector('.settings-page-pagination')");
     await evalInPage(
       cdp,
       `(() => {
@@ -948,7 +948,7 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-section > button').length === 1 && document.querySelector('.settings-nav-section > button')?.innerText.includes('隐私')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-section > button').length === 12");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-section > button').length === 14");
     await evalInPage(cdp, "document.querySelector('.settings-page-pagination-button.next').click()");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'providers' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '服务商'");
     await evalInPage(cdp, "document.querySelector('.settings-page-pagination-button.previous').click()");
@@ -1006,7 +1006,7 @@ async function main() {
     await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'block' && document.querySelector('.settings-page-picker[aria-label=\"切换设置页面\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-page-picker')?.innerText.includes('发送') && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
     await waitForExpression(cdp, "(() => { const content = document.querySelector('.settings-content'); const toolbar = document.querySelector('.settings-mobile-toolbar'); const page = document.querySelector('.settings-page'); return content && toolbar && page && getComputedStyle(page).overflowY === 'auto' && Math.abs(content.clientHeight - toolbar.offsetHeight - page.clientHeight) <= 2; })()");
     await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 12 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
+    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 14 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
     await captureScreenshot(cdp, 'settings-page-picker-narrow');
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
     await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page')?.dataset.settingsPage === 'sending'");
@@ -1119,11 +1119,20 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm') && document.querySelector('.settings-cache-confirm')?.innerText.includes('删除联系人')");
     await clickButton(cdp, '确认', "document.querySelector('.settings-cache-confirm')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('联系人已删除：Delete Me') && !document.querySelector('.settings-modal').innerText.includes('delete-me@example.com')");
-    await clickButton(cdp, '导入 vCard', "document.querySelector('.settings-contact-panel .contact-transfer-actions')");
-    await waitForExpression(
-      cdp,
-      "document.querySelector('.status-line')?.textContent.includes('联系人 vCard 已导入：新增 1、合并 1、跳过 0') && document.querySelector('.settings-contact-panel')?.innerText.includes('vCard Person') && document.querySelector('.settings-contact-panel')?.innerText.includes('vcard.person@example.com') && JSON.parse(localStorage.getItem('better-email.notificationPolicy')).vipSenders.includes('vcard.person@example.com')",
-    );
+    await clickButton(cdp, '导入联系人', "document.querySelector('.settings-contact-panel .contact-transfer-actions')");
+    await waitForExpression(cdp, "document.querySelector('.contact-import-preview') && document.querySelector('.contact-import-preview')?.innerText.includes('导入预览') && document.querySelector('.contact-import-preview')?.innerText.includes('新增 1') && document.querySelector('.contact-import-preview')?.innerText.includes('可合并 1')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.contact-import-preview-row')].some((row) => row.innerText.includes('import.new@example.com'))");
+    await clickButton(cdp, '确认导入', "document.querySelector('.contact-import-preview')");
+    await sleep(1000);
+    const impDbg = await evalInPage(cdp, "JSON.stringify({ status: document.querySelector('.status-line')?.textContent, panel: document.querySelector('.settings-contact-panel')?.innerText.slice(0, 400), previewOpen: Boolean(document.querySelector('.contact-import-preview')), invocations: (window.__betterEmailMockInvocations || []).filter((e) => e.command.includes('contact_import')).slice(-4).map((e) => e.command + ':' + JSON.stringify(e.args)) })");
+    console.error('IMPORT-DEBUG:', impDbg);
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('联系人导入完成：新增 1、合并 1、跳过 0') && document.querySelector('.settings-contact-panel')?.innerText.includes('import.new@example.com') && !document.querySelector('.contact-import-preview')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.contact-history-toggle'); if (!button) throw new Error('Import history toggle not found'); button.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.contact-import-history') && document.querySelector('.contact-import-history')?.innerText.includes('import-contacts.vcf') && document.querySelector('.contact-import-history')?.innerText.includes('新增 1')");
+    await clickButton(cdp, '撤销本批新增', "document.querySelector('.contact-import-history')");
+    await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm')?.innerText.includes('撤销导入批次')");
+    await clickButton(cdp, '确认撤销', "document.querySelector('.settings-cache-confirm')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已撤销导入批次：删除 1 位新增联系人') && !document.querySelector('.settings-contact-panel')?.innerText.includes('import.new@example.com')");
     await clickButton(cdp, '导出 vCard', "document.querySelector('.settings-contact-panel .contact-transfer-actions')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已导出') && document.querySelector('.status-line')?.textContent.includes('/tmp/better-email-contacts.vcf')");
 
@@ -1331,6 +1340,66 @@ async function main() {
     await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com')");
 
+    await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Low memory digest 01')).click()");
+    await waitForExpression(cdp, "!document.querySelector('.reader-translate-action')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false })); location.reload()");
+    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
+    await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[aria-label=\"翻译为中文\"]'); if (!button) throw new Error('Translate button not found'); button.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文') && !document.querySelector('.reader-translation-panel')?.innerText.includes('Design review')");
+    await clickButton(cdp, '查看原文', "document.querySelector('.reader-translation-header')");
+    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('已翻译为中文')");
+    await clickButton(cdp, '显示译文', "document.querySelector('.reader-translation-banner')");
+    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文')");
+
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[title=\"回复\"]') ?? document.querySelector('.reader-actions button[aria-label=\"回复\"]'); if (!button) throw new Error('Reply button not found'); button.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('alice@partner.example.com')");
+    await waitForExpression(cdp, "!document.querySelector('.composer-risk-banner')");
+    await openDetails(cdp, '.composer-advanced');
+    await evalInPage(cdp, "(() => { const select = document.querySelector('.composer select[aria-label=\"发件账号\"]'); const option = [...select.options].find((item) => item.value === '2'); if (!option) throw new Error('Account option 2 not found'); select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
+    await waitForExpression(cdp, "document.querySelector('.composer-risk-banner')?.innerText.includes('正在回复其他账号的邮件')");
+    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm')?.innerText.includes('跨邮箱发送风险')");
+    await clickButton(cdp, '返回修改', "document.querySelector('.settings-cache-confirm')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-cache-confirm') && document.querySelector('.composer')");
+    await evalInPage(cdp, "(() => { const select = document.querySelector('.composer select[aria-label=\"发件账号\"]'); const option = [...select.options].find((item) => item.value === '1'); if (!option) throw new Error('Account option 1 not found'); select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
+    await waitForExpression(cdp, "!document.querySelector('.composer-risk-banner')");
+    await closeComposer(cdp);
+
+    await clickButton(cdp, '设置');
+    await waitForExpression(cdp, "document.querySelector('.settings-modal')");
+    await openSettingsSection(cdp, 'AI 服务', 'ai', '.settings-ai-panel');
+    await sleep(800);
+    await evalInPage(cdp, "(() => { const checkbox = document.querySelector('.settings-ai-enabled input'); if (!checkbox) throw new Error('AI enable checkbox not found'); if (!checkbox.checked) checkbox.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-ai-enabled input').checked");
+    await evalInPage(cdp, "(() => { const radio = [...document.querySelectorAll('.settings-ai-service-option input')].find((item) => item.value === 'mock'); if (!radio) throw new Error('Mock radio not found'); radio.click(); })()");
+    await clickButton(cdp, '测试连接', "document.querySelector('.settings-ai-panel')");
+    await waitForExpression(cdp, "document.querySelector('.settings-ai-test-result.ok')?.innerText.includes('模拟 AI 服务连接正常')");
+    await openSettingsSection(cdp, '模板', 'templates', '.settings-template-panel');
+    await clickButton(cdp, '新建模板', "document.querySelector('.settings-template-panel')");
+    await waitForExpression(cdp, "document.querySelector('.template-editor')");
+    await fillInput(cdp, '.template-editor input[placeholder=\"模板名称\"]', 'Smoke 设置模板');
+    await fillInput(cdp, '.template-editor input[placeholder^=\"邮件主题\"]', '你好 {{contact.name}}');
+    await fillInput(cdp, '.template-editor textarea', '您好 {{contact.name}}，\n\n这是模板正文。\n\n{{signature}}');
+    await clickButton(cdp, '保存模板', "document.querySelector('.template-editor')");
+    await waitForExpression(cdp, "document.querySelector('.settings-template-panel')?.innerText.includes('Smoke 设置模板') && document.querySelector('.settings-inline-status')?.textContent.includes('模板已保存：Smoke 设置模板')");
+    await fillInput(cdp, '.template-ai-generator input[placeholder^=\"描述模板用途\"]', '向新客户介绍产品');
+    await clickButton(cdp, 'AI 生成', "document.querySelector('.template-ai-generator')");
+    await sleep(1000);
+    await waitForExpression(cdp, "document.querySelector('.template-ai-preview textarea')?.value.includes('{{contact.name}}') && document.querySelector('.template-ai-preview input')?.value.includes('跟进')");
+    await clickButton(cdp, '保存为模板', "document.querySelector('.template-ai-preview')");
+    await waitForExpression(cdp, "document.querySelector('.settings-template-panel')?.innerText.includes('AI 生成的模板已保存') && document.querySelector('.settings-template-panel')?.innerText.includes('向新客户介绍产品模板')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
+
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);
 
     const report = {
@@ -1382,6 +1451,10 @@ async function main() {
         'permanent delete syncs remote expunge',
         'manual spam and not-spam correction works',
         'reader sender trust and block actions work',
+        'reader translation offered only for foreign mails and toggles original/translated',
+        'cross-account send risk banner and confirm dialog work',
+        'ai service settings save and test connection',
+        'template settings manage and ai-generate templates',
         'outbox queue and cancel works',
         'settings modal opens',
         'settings navigation renders one page at a time',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   emptyDraft,
   isDraftEmpty,
@@ -7,6 +7,10 @@ import {
   removeAppStorage,
   type SendUndoDelaySeconds,
 } from '../app/appConfig';
+import {
+  analyzeCrossAccountRisks,
+  type CrossAccountRiskItem,
+} from '../app/crossAccountRisk';
 import type {
   Account,
   AccountScope,
@@ -96,6 +100,8 @@ export default function useComposerController({
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
+  const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
+  const [sendRiskConfirm, setSendRiskConfirm] = useState<CrossAccountRiskItem[] | null>(null);
   const {
     composeTemplates,
     setComposeTemplates,
@@ -168,6 +174,8 @@ export default function useComposerController({
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
+    setComposerContextAccountId(null);
+    setSendRiskConfirm(null);
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
@@ -179,13 +187,48 @@ export default function useComposerController({
     setComposerOpen(true);
   }, [draft, composerAutosave, setStatus]);
   const {
-    composeFromMessage,
-    editDraftMessage,
+    composeFromMessage: rawComposeFromMessage,
+    editDraftMessage: rawEditDraftMessage,
   } = useComposeFromMessage({
     account,
     openComposer,
     setStatus,
   });
+  const composeFromMessage = useCallback(async (message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward') => {
+    await rawComposeFromMessage(message, mode);
+    setComposerContextAccountId(message.account_id);
+    setSendRiskConfirm(null);
+  }, [rawComposeFromMessage]);
+  const editDraftMessage = useCallback(async (message: Message) => {
+    await rawEditDraftMessage(message);
+    setComposerContextAccountId(message.account_id);
+    setSendRiskConfirm(null);
+  }, [rawEditDraftMessage]);
+
+  const crossAccountRisks = useMemo(
+    () => analyzeCrossAccountRisks(draft, accounts, {
+      originalMessageAccountId: composerContextAccountId,
+      contextAccountId: null,
+    }),
+    [draft, accounts, composerContextAccountId],
+  );
+
+  const requestSend = useCallback(async () => {
+    const risks = analyzeCrossAccountRisks(draft, accounts, {
+      originalMessageAccountId: composerContextAccountId,
+      contextAccountId: null,
+    });
+    if (risks.length > 0) {
+      setSendRiskConfirm(risks);
+      return;
+    }
+    await sendDraft();
+  }, [draft, accounts, composerContextAccountId, sendDraft]);
+
+  const confirmSendRisk = useCallback(async () => {
+    setSendRiskConfirm(null);
+    await sendDraft();
+  }, [sendDraft]);
 
 
   function composeToContact(contact: Contact) {
@@ -195,9 +238,7 @@ export default function useComposerController({
       to: contact.email,
     });
     setStatus(`正在给 ${contact.name || contact.email} 写邮件`);
-  }
-
-  function closeComposer() {
+  }  function closeComposer() {
     if (!isDraftEmpty(draft)) {
       setComposerCloseConfirmOpen(true);
       return;
@@ -355,6 +396,12 @@ export default function useComposerController({
     editDraftMessage,
     saveDraft,
     sendDraft,
+    requestSend,
+    confirmSendRisk,
+    sendRiskConfirm,
+    setSendRiskConfirm,
+    crossAccountRisks,
+    composerContextAccountId,
     sendQuickReply,
     queueDraft,
     cancelOutboxItem,

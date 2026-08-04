@@ -33,6 +33,7 @@ export let account = {
   sync_mode: 'manual',
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
+  cross_account_risk_warning: true,
   is_default: true,
 };
 
@@ -182,7 +183,39 @@ export let messages: MockMessage[] = [
     labels: [],
     attachment_count: 0,
     remote_mailbox: 'INBOX',
-    remote_uid: 43,
+    remote_uid: 42,
+    message_id_header: '<mock-1-1@better-email.local>',
+    in_reply_to_header: '',
+    references_header: '',
+  },
+  {
+    id: 50,
+    account_id: 1,
+    account_email: account.email,
+    folder_id: 101,
+    folder_role: 'inbox',
+    sender_name: 'Alice Zhang',
+    sender_email: 'alice@partner.example.com',
+    recipients: account.email,
+    cc: '',
+    bcc: '',
+    subject: 'Design review invitation',
+    snippet: 'Please review the attached design proposal before our meeting on Friday.',
+    body: 'Hi there,\n\nWe would love to invite you to review the new design proposal. Please find the details below and let us know your availability.\n\nBest regards,\nAlice\n--\nSent from Better Email',
+    sanitized_html: '',
+    security_warnings: [],
+    received_at: '2026-07-08T08:00:00+08:00',
+    is_read: true,
+    is_starred: false,
+    has_attachments: false,
+    snoozed_until: '',
+    labels: [],
+    attachment_count: 0,
+    remote_mailbox: 'INBOX',
+    remote_uid: 62,
+    message_id_header: '<mock-1-2@better-email.local>',
+    in_reply_to_header: '',
+    references_header: '',
   },
   {
     id: 51,
@@ -272,7 +305,7 @@ export let messages: MockMessage[] = [
 
 messages = [
   ...messages,
-  ...Array.from({ length: 48 }, (_, index) => {
+  ...Array.from({ length: 47 }, (_, index) => {
     const id = index + 3;
     return {
       id,
@@ -420,6 +453,17 @@ export let remoteImageTrusts: Array<{
 export let backgroundTasks: MockBackgroundTask[] = [];
 export let syncRuns: MockSyncRun[] = [];
 export let oauthSessions: MockOAuthSession[] = [];
+export let contactImportBatches: Array<{
+  id: number;
+  file_name: string;
+  total_count: number;
+  created_count: number;
+  merged_count: number;
+  skipped_count: number;
+  scope: string;
+  created_at: string;
+}> = [];
+export let nextContactImportBatchId = 1;
 export let nextFolderId = 1001;
 export let nextSyncRunId = 1;
 export let nextOAuthSessionId = 1;
@@ -774,6 +818,7 @@ export function createMockAccount(args?: InvokeArgs) {
     sync_mode: normalizeMockSyncMode(input.sync_mode),
     remote_images_allowed: Boolean(input.remote_images_allowed),
     signature: String(input.signature ?? ''),
+    cross_account_risk_warning: input.cross_account_risk_warning !== false,
     is_default: isFirstAccount,
   };
   mockAccounts = [...mockAccounts, created];
@@ -1762,6 +1807,136 @@ export function importMockContactsVCard(args?: InvokeArgs) {
     updated: 1,
     skipped: 0,
     size_bytes: 428,
+  };
+}
+
+export function mockPickContactImportFile(args?: InvokeArgs) {
+  if (args?.cancel === true) return null;
+  return '/mock/import-contacts.vcf';
+}
+
+export function mockPreviewContactImport(args?: InvokeArgs) {
+  const path = String(args?.path ?? '/mock/import-contacts.vcf');
+  const file_name = path.split('/').pop() || 'import-contacts.vcf';
+  const seeded = [
+    {
+      email: 'import.new@example.com',
+      name: 'Import New',
+      aliases: [] as string[],
+      vip: false,
+      status: 'new',
+      existing_contact_id: null,
+      existing_name: '',
+      reason: '新联系人',
+    },
+    {
+      email: 'ada@example.com',
+      name: 'Ada Imported',
+      aliases: ['ada.import@example.com'] as string[],
+      vip: false,
+      status: 'merge',
+      existing_contact_id: 1,
+      existing_name: 'Ada',
+      reason: '已有联系人，可合并补充字段',
+    },
+    {
+      email: 'ada@example.com',
+      name: 'Ada',
+      aliases: [] as string[],
+      vip: false,
+      status: 'duplicate',
+      existing_contact_id: 1,
+      existing_name: 'Ada',
+      reason: '与已有联系人完全相同',
+    },
+    {
+      email: 'not-an-email',
+      name: 'Broken',
+      aliases: [] as string[],
+      vip: false,
+      status: 'invalid',
+      existing_contact_id: null,
+      existing_name: '',
+      reason: '邮箱地址无效',
+    },
+  ];
+  return {
+    file_name,
+    path,
+    total_count: 4,
+    new_count: 1,
+    merge_count: 1,
+    duplicate_count: 1,
+    invalid_count: 1,
+    entries: seeded,
+  };
+}
+
+export function mockCommitContactImport(args?: InvokeArgs) {
+  const path = String(args?.path ?? '/mock/import-contacts.vcf');
+  const file_name = path.split('/').pop() || 'import-contacts.vcf';
+  const selections = Array.isArray(args?.selections) ? (args.selections as Array<{ email: string; action: string }>) : [];
+  const actionByEmail = new Map(selections.map((item) => [item.email.toLowerCase(), item.action]));
+  let created = 0;
+  let merged = 0;
+  let skipped = 0;
+  const applyEmail = (email: string) => {
+    const action = actionByEmail.get(email.toLowerCase()) ?? 'create';
+    if (action === 'skip') {
+      skipped += 1;
+      return;
+    }
+    const existing = contacts.find((contact) => contact.email === email);
+    if (action === 'merge' && existing) {
+      contacts = contacts.map((contact) => (
+        contact.id === existing.id
+          ? { ...contact, aliases: [...new Set([...contact.aliases, 'import.alias@example.com'])] }
+          : contact
+      ));
+      merged += 1;
+    } else if (!existing) {
+      contacts = [
+        { id: nextContactId++, name: 'Import New', email, aliases: ['import.alias@example.com'], vip: false, message_count: 0, last_seen_at: now },
+        ...contacts,
+      ];
+      created += 1;
+    }
+  };
+  applyEmail('import.new@example.com');
+  applyEmail('ada@example.com');
+  const batchId = nextContactImportBatchId++;
+  contactImportBatches = [
+    {
+      id: batchId,
+      file_name,
+      total_count: 1,
+      created_count: created,
+      merged_count: merged,
+      skipped_count: skipped,
+      scope: String(args?.scope ?? 'global'),
+      created_at: now,
+    },
+    ...contactImportBatches,
+  ];
+  return { batch_id: batchId, created, merged, skipped };
+}
+
+export function mockListContactImportBatches() {
+  return contactImportBatches.map((batch) => ({ ...batch }));
+}
+
+export function mockUndoContactImportBatch(args?: InvokeArgs) {
+  const batchId = Number(args?.batchId ?? 0);
+  const batch = contactImportBatches.find((item) => item.id === batchId);
+  if (!batch) throw new Error('未找到该导入批次。');
+  const removed = batch.created_count;
+  const importEmail = 'import.new@example.com';
+  contacts = contacts.filter((contact) => contact.email !== importEmail);
+  batch.created_count = 0;
+  return {
+    removed,
+    remaining_created: 0,
+    note: '已删除该批次新增的联系人；合并/更新已有联系人的变更不可回滚。',
   };
 }
 

@@ -36,13 +36,25 @@ export function loadComposeTemplates(): ComposeTemplate[] {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => item && typeof item.name === 'string')
-      .map((item) => ({
-        id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
-        name: item.name,
-        subject: typeof item.subject === 'string' ? item.subject : '',
-        body: typeof item.body === 'string' ? item.body : '',
-        html_body: typeof item.html_body === 'string' ? item.html_body : '',
-      }))
+      .map((item) => {
+        const id = typeof item.id === 'string' ? item.id : crypto.randomUUID();
+        const now = new Date().toISOString();
+        return {
+          id,
+          name: item.name,
+          subject: typeof item.subject === 'string' ? item.subject : '',
+          body: typeof item.body === 'string' ? item.body : '',
+          html_body: typeof item.html_body === 'string' ? item.html_body : '',
+          category: typeof item.category === 'string' ? item.category : '',
+          tags: Array.isArray(item.tags)
+            ? item.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
+            : [],
+          account_id: typeof item.account_id === 'number' ? item.account_id : 0,
+          is_favorite: item.is_favorite === true,
+          created_at: typeof item.created_at === 'string' ? item.created_at : now,
+          updated_at: typeof item.updated_at === 'string' ? item.updated_at : now,
+        };
+      })
       .filter((item) => item.name.trim() && (item.subject.trim() || item.body.trim() || item.html_body.trim()));
   } catch {
     return [];

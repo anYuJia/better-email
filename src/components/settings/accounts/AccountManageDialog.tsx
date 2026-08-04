@@ -143,6 +143,23 @@ export default function AccountManageDialog({
               </label>
             </div>
 
+            <div className="settings-account-risk-toggle">
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={account.cross_account_risk_warning !== false}
+                  onChange={(event) => onAccountChange({
+                    ...account,
+                    cross_account_risk_warning: event.target.checked,
+                  })}
+                />
+                <span>
+                  <strong>跨邮箱发送风险提示</strong>
+                  <small>回复其他账号的邮件、收件人包含自己其他账号、快捷写信账号不一致时，在发送前提醒。</small>
+                </span>
+              </label>
+            </div>
+
             {error && (
               <p className="settings-account-add-error" role="alert" style={{ margin: '0 0 12px 0' }}>
                 {error}

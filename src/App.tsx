@@ -247,6 +247,7 @@ export default function App() {
     mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
+    refreshManagedContacts,
     confirmDeleteContact: contactToDeleteFromHook,
     setConfirmDeleteContact: setContactToDeleteFromHook,
   } = useContactManagement({ setStatus, setNotificationPolicy });
@@ -698,6 +699,12 @@ export default function App() {
     editDraftMessage,
     saveDraft,
     sendDraft,
+    requestSend,
+    confirmSendRisk,
+    sendRiskConfirm,
+    setSendRiskConfirm,
+    crossAccountRisks,
+    composerContextAccountId,
     sendQuickReply,
     queueDraft,
     cancelOutboxItem,
@@ -1457,7 +1464,11 @@ export default function App() {
           onAttachmentPaste={handleComposerAttachmentPaste}
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
-          onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}
+          onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
+          onSendRiskConfirm={confirmSendRisk}
+          onSendRiskCancel={() => setSendRiskConfirm(null)}
+          sendRiskConfirm={sendRiskConfirm}
+          crossAccountRisks={crossAccountRisks}
           />
         </Suspense>
       )}
@@ -1659,6 +1670,8 @@ export default function App() {
           onMergeSourceChange={setMergeSourceContactId}
           onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
           onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
+          onRefreshContacts={refreshManagedContacts}
+          onStatus={setStatus}
           onRuleFormChange={setRuleForm}
           onRuleConditionFieldChange={updateRuleConditionField}
           onRuleConditionValueChange={updateRuleConditionValue}

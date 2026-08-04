@@ -14,6 +14,7 @@ pub struct Account {
     pub sync_mode: String,
     pub remote_images_allowed: bool,
     pub signature: String,
+    pub cross_account_risk_warning: bool,
     pub is_default: bool,
 }
 
@@ -190,6 +191,8 @@ pub struct AccountSettingsInput {
     pub sync_mode: String,
     pub remote_images_allowed: bool,
     pub signature: String,
+    #[serde(default = "default_true")]
+    pub cross_account_risk_warning: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -204,6 +207,12 @@ pub struct AccountCreateInput {
     pub sync_mode: String,
     pub remote_images_allowed: bool,
     pub signature: String,
+    #[serde(default = "default_true")]
+    pub cross_account_risk_warning: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -625,10 +634,129 @@ pub struct ContactImportSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ContactImportPreviewEntry {
+    pub email: String,
+    pub name: String,
+    pub aliases: Vec<String>,
+    pub vip: bool,
+    pub status: String,
+    pub existing_contact_id: Option<i64>,
+    pub existing_name: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactImportPreview {
+    pub file_name: String,
+    pub path: String,
+    pub total_count: i64,
+    pub new_count: i64,
+    pub merge_count: i64,
+    pub duplicate_count: i64,
+    pub invalid_count: i64,
+    pub entries: Vec<ContactImportPreviewEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactImportSelection {
+    pub email: String,
+    pub action: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactImportCommitSummary {
+    pub batch_id: i64,
+    pub created: i64,
+    pub merged: i64,
+    pub skipped: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactImportBatch {
+    pub id: i64,
+    pub file_name: String,
+    pub total_count: i64,
+    pub created_count: i64,
+    pub merged_count: i64,
+    pub skipped_count: i64,
+    pub scope: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactImportUndoReport {
+    pub removed: i64,
+    pub remaining_created: i64,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ContactExportSummary {
     pub path: String,
     pub contacts: i64,
     pub size_bytes: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AiSettingsView {
+    pub enabled: bool,
+    pub service_type: String,
+    pub endpoint: String,
+    pub model: String,
+    pub timeout_seconds: i64,
+    pub privacy_acknowledged: bool,
+    pub has_api_key: bool,
+    pub api_key_masked: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AiSettingsInput {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub service_type: String,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default = "default_timeout_seconds")]
+    pub timeout_seconds: i64,
+    #[serde(default)]
+    pub privacy_acknowledged: bool,
+    #[serde(default)]
+    pub api_key: String,
+}
+
+fn default_timeout_seconds() -> i64 {
+    30
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AiRequestInput {
+    pub operation: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub target_language: String,
+    #[serde(default)]
+    pub prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AiRequestResult {
+    pub operation: String,
+    pub content: String,
+    pub service_type: String,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AiConnectionReport {
+    pub ok: bool,
+    pub service_type: String,
+    pub message: String,
+    pub latency_ms: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -831,4 +959,10 @@ pub struct OAuthRefreshReport {
     pub status: String,
     pub expires_at: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiChatCompletionInput {
+    pub role: String,
+    pub content: String,
 }

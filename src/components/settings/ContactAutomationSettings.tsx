@@ -1,19 +1,25 @@
 import {
+  Check,
   FileDown,
   FileUp,
+  History,
   LoaderCircle,
   Merge,
   Pencil,
   Send,
   Star,
   Trash2,
+  Undo2,
   UserPlus,
+  X,
 } from 'lucide-react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   Contact,
   ContactCreateInput,
   ContactMergeSuggestion,
 } from '../../app/types';
+import useContactImportManager from '../../hooks/useContactImportManager';
 import './automation-settings.css';
 
 type ContactAutomationSettingsProps = {
@@ -42,6 +48,8 @@ type ContactAutomationSettingsProps = {
   onMergeSourceChange: (contactId: number | null) => void;
   onImportContacts: () => void;
   onExportContacts: () => void;
+  onRefreshContacts: () => Promise<Contact[]>;
+  onStatus: Dispatch<SetStateAction<string>>;
 };
 
 export default function ContactAutomationSettings({
@@ -70,7 +78,37 @@ export default function ContactAutomationSettings({
   onMergeSourceChange,
   onImportContacts,
   onExportContacts,
+  onRefreshContacts,
+  onStatus,
 }: ContactAutomationSettingsProps) {
+  const {
+    preview,
+    selectionMap,
+    setSelection,
+    setAllSelection,
+    previewing,
+    importing,
+    startImport,
+    commitImport,
+    cancelImport,
+    batches,
+    refreshBatches,
+    undoBatch,
+    undoingBatchId,
+    confirmUndoBatch,
+    setConfirmUndoBatch,
+  } = useContactImportManager({ setStatus: onStatus });
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    void refreshBatches();
+  }, [refreshBatches]);
+
+  async function handleCommitImport() {
+    await commitImport();
+    await onRefreshContacts();
+  }
+
   return (
     <section className="tool-panel settings-contact-panel" data-settings-section="contacts">
       <header className="tool-header">
@@ -80,16 +118,106 @@ export default function ContactAutomationSettings({
         </span>
         <div className="contact-transfer-actions">
           <em>{contacts.length} 位联系人</em>
-          <button type="button" onClick={onImportContacts} disabled={transferBusy}>
-            {transferBusy ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
-            导入 vCard
+          <button type="button" onClick={startImport} disabled={transferBusy || previewing}>
+            {previewing ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
+            导入联系人
           </button>
           <button type="button" onClick={onExportContacts} disabled={transferBusy || contacts.length === 0}>
             <FileUp size={14} />
             导出 vCard
           </button>
+          <button
+            type="button"
+            className="contact-history-toggle"
+            title="最近导入记录"
+            onClick={() => setHistoryOpen((current) => !current)}
+          >
+            <History size={14} />
+          </button>
         </div>
       </header>
+
+      {preview && (
+        <section className="contact-import-preview" data-import-preview>
+          <header>
+            <span>
+              <strong>导入预览：{preview.file_name}</strong>
+              <em>
+                共 {preview.total_count} 条 · 新增 {preview.new_count} · 可合并 {preview.merge_count} ·
+                重复/无效 {preview.duplicate_count + preview.invalid_count}
+              </em>
+            </span>
+          </header>
+          <div className="contact-import-selection-toolbar">
+            <span>批量选择：</span>
+            <button type="button" onClick={() => setAllSelection('create')}>全部新增</button>
+            <button type="button" onClick={() => setAllSelection('merge')}>全部合并</button>
+            <button type="button" onClick={() => setAllSelection('skip')}>全部跳过</button>
+          </div>
+          <div className="contact-import-preview-list">
+            {preview.entries.map((entry) => (
+              <div className="contact-import-preview-row" key={`${entry.email}-${entry.status}`}>
+                <span className={`contact-import-status ${entry.status}`}>{entry.status === 'new' ? '新增' : entry.status === 'merge' ? '合并' : entry.status === 'duplicate' ? '重复' : '无效'}</span>
+                <span className="contact-import-identity">
+                  <strong>{entry.name || entry.email}</strong>
+                  <em>{entry.email}{entry.aliases.length ? `（别名 ${entry.aliases.length}）` : ''}</em>
+                </span>
+                <small>{entry.existing_name ? `已有：${entry.existing_name}` : entry.reason}</small>
+                <select
+                  value={selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')}
+                  onChange={(event) => setSelection(`${entry.email}|${entry.status}`, event.target.value as 'create' | 'merge' | 'skip')}
+                  disabled={entry.status === 'invalid'}
+                >
+                  <option value="create">新增</option>
+                  <option value="merge" disabled={entry.status === 'new'}>合并到已有</option>
+                  <option value="skip">跳过</option>
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="contact-import-preview-actions">
+            <button type="button" onClick={cancelImport} disabled={importing}>
+              <X size={14} /> 取消
+            </button>
+            <button type="button" className="primary" onClick={handleCommitImport} disabled={importing}>
+              {importing ? <LoaderCircle className="spinning" size={14} /> : <Check size={14} />}
+              确认导入（{preview.entries.filter((entry) => (selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')) !== 'skip' && entry.status !== 'invalid').length} 条）
+            </button>
+          </div>
+        </section>
+      )}
+
+      {historyOpen && (
+        <section className="contact-import-history" data-import-history>
+          <header>
+            <span>
+              <strong>最近导入记录</strong>
+              <em>{batches.length} 批次</em>
+            </span>
+          </header>
+          {batches.length === 0 && <p className="settings-empty-hint">暂无导入记录。</p>}
+          {batches.map((batch) => (
+            <div className="contact-import-history-row" key={batch.id}>
+              <span>
+                <strong>{batch.file_name}</strong>
+                <em>
+                  {new Date(batch.created_at).toLocaleString()} · 新增 {batch.created_count} ·
+                  合并 {batch.merged_count} · 跳过 {batch.skipped_count}
+                </em>
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={batch.created_count === 0 || undoingBatchId === batch.id}
+                onClick={() => setConfirmUndoBatch(batch)}
+              >
+                <Undo2 size={13} />
+                {batch.created_count > 0 ? '撤销本批新增' : '无可撤销'}
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {mergeSuggestions.length > 0 && (
         <section className="contact-suggestion-panel">
@@ -237,6 +365,29 @@ export default function ContactAutomationSettings({
           ))}
         </select>
       </label>
+
+      {confirmUndoBatch && (
+        <div className="settings-cache-confirm-backdrop">
+          <div className="settings-cache-confirm" role="dialog" aria-modal="true">
+            <strong>撤销导入批次</strong>
+            <p>
+              将删除「{confirmUndoBatch.file_name}」批次新增的 {confirmUndoBatch.created_count} 位联系人。
+              合并/更新已有联系人的变更不可回滚。
+            </p>
+            <div>
+              <button type="button" onClick={() => setConfirmUndoBatch(null)}>取消</button>
+              <button
+                type="button"
+                className="danger-action"
+                disabled={undoingBatchId === confirmUndoBatch.id}
+                onClick={() => { void undoBatch(confirmUndoBatch.id); void onRefreshContacts(); }}
+              >
+                {undoingBatchId === confirmUndoBatch.id ? '撤销中…' : '确认撤销'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

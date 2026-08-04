@@ -48,7 +48,7 @@ pub fn list_provider_probe_accounts(
         .prepare(
             "SELECT id, email, display_name, provider, imap_host, smtp_host,
                     incoming_protocol, auth_type, sync_mode, remote_images_allowed,
-                    signature, is_default
+                    signature, cross_account_risk_warning, is_default
              FROM accounts ORDER BY is_default DESC, id",
         )
         .map_err(|error| format!("读取账号列表失败：{error}"))?;
@@ -262,7 +262,7 @@ fn load_account(database_path: &Path, account_id: i64) -> Result<Account, String
         .query_row(
             "SELECT id, email, display_name, provider, imap_host, smtp_host,
                     incoming_protocol, auth_type, sync_mode, remote_images_allowed,
-                    signature, is_default
+                    signature, cross_account_risk_warning, is_default
              FROM accounts WHERE id = ?1",
             [account_id],
             map_account,
@@ -285,6 +285,7 @@ fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         sync_mode: row.get(8)?,
         remote_images_allowed: row.get::<_, i64>(9)? != 0,
         signature: row.get(10)?,
+        cross_account_risk_warning: row.get::<_, i64>(11)? != 0,
         is_default: row.get::<_, i64>(11)? != 0,
     })
 }
@@ -374,12 +375,13 @@ mod tests {
                     sync_mode TEXT NOT NULL,
                     remote_images_allowed INTEGER NOT NULL,
                     signature TEXT NOT NULL,
+                    cross_account_risk_warning INTEGER NOT NULL DEFAULT 1,
                     is_default INTEGER NOT NULL
                 );
                 INSERT INTO accounts VALUES(
                     7, 'reader@example.com', 'Reader', 'custom',
                     'imap.example.com:993', 'smtp.example.com:465',
-                    'imap', 'password', 'manual', 0, '', 1
+                    'imap', 'password', 'manual', 0, '', 1, 1
                 );",
             )
             .unwrap();

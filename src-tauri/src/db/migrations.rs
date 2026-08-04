@@ -188,6 +188,37 @@ impl MailStore {
                     UNIQUE(account_id, remote_name)
                 );
 
+                CREATE TABLE IF NOT EXISTS ai_settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    service_type TEXT NOT NULL DEFAULT 'mock',
+                    endpoint TEXT NOT NULL DEFAULT '',
+                    api_key TEXT NOT NULL DEFAULT '',
+                    model TEXT NOT NULL DEFAULT '',
+                    timeout_seconds INTEGER NOT NULL DEFAULT 30,
+                    privacy_acknowledged INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT ''
+                );
+
+                CREATE TABLE IF NOT EXISTS contact_import_batches (
+                    id INTEGER PRIMARY KEY,
+                    file_name TEXT NOT NULL,
+                    total_count INTEGER NOT NULL,
+                    created_count INTEGER NOT NULL,
+                    merged_count INTEGER NOT NULL,
+                    skipped_count INTEGER NOT NULL,
+                    scope TEXT NOT NULL DEFAULT 'global',
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS contact_import_entries (
+                    id INTEGER PRIMARY KEY,
+                    batch_id INTEGER NOT NULL REFERENCES contact_import_batches(id) ON DELETE CASCADE,
+                    contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE,
+                    email TEXT NOT NULL,
+                    action TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS oauth_sessions (
                     id INTEGER PRIMARY KEY,
                     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -260,6 +291,12 @@ impl MailStore {
                 "INTEGER NOT NULL DEFAULT 0",
             )?;
             add_column_if_missing(conn, "accounts", "signature", "TEXT NOT NULL DEFAULT ''")?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "cross_account_risk_warning",
+                "INTEGER NOT NULL DEFAULT 1",
+            )?;
             add_column_if_missing(
                 conn,
                 "accounts",

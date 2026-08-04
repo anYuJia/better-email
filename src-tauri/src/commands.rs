@@ -5,6 +5,7 @@
 //! and `commands::sync_imap_headers` keep resolving unchanged.
 
 mod accounts;
+mod ai;
 mod attachments;
 mod background;
 mod benchmark;
@@ -17,6 +18,7 @@ mod settings_data;
 mod sync;
 
 pub use accounts::*;
+pub use ai::*;
 pub use attachments::*;
 pub use background::*;
 pub use benchmark::*;

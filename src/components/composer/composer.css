@@ -205,6 +205,36 @@
   background: #fafbfc;
 }
 
+.composer-risk-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(250, 204, 21, 0.28);
+  background: rgba(250, 204, 21, 0.09);
+  color: #b45309;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.composer-risk-banner > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #d97706;
+}
+
+.composer-risk-banner p {
+  margin: 0 0 4px;
+}
+
+.composer-risk-banner p:last-child {
+  margin-bottom: 0;
+}
+
+.composer-risk-banner strong {
+  font-weight: 600;
+}
+
 .composer-quick-toolbar {
   min-height: 45px;
   display: flex;

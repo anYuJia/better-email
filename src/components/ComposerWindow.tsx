@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
+  AlertTriangle,
   Mail,
   Maximize2,
   Minus,
@@ -17,6 +18,8 @@ import type {
   MailIdentity,
 } from '../app/types';
 import { formatDate } from '../mailUtils';
+import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
+import ConfirmDialog from './ConfirmDialog';
 import ComposerAdvancedTools from './composer/ComposerAdvancedTools';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools from './composer/ComposerQuickTools';
@@ -68,6 +71,10 @@ export type ComposerWindowProps = {
   onSaveDraft: () => void;
   onQueueDraft: () => void;
   onSendDraft: () => void;
+  onSendRiskConfirm: () => void;
+  onSendRiskCancel: () => void;
+  sendRiskConfirm: CrossAccountRiskItem[] | null;
+  crossAccountRisks: CrossAccountRiskItem[];
 };
 
 export default function ComposerWindow({
@@ -104,6 +111,10 @@ export default function ComposerWindow({
   onSaveDraft,
   onQueueDraft,
   onSendDraft,
+  onSendRiskConfirm,
+  onSendRiskCancel,
+  sendRiskConfirm,
+  crossAccountRisks,
 }: ComposerWindowProps) {
   const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
   const dragRef = useRef<ComposerDragState | null>(null);
@@ -210,6 +221,19 @@ export default function ComposerWindow({
           </div>
         </header>
 
+        {crossAccountRisks.length > 0 && (
+          <div className="composer-risk-banner" role="alert">
+            <AlertTriangle size={15} />
+            <div>
+              {crossAccountRisks.map((risk) => (
+                <p key={risk.id}>
+                  <strong>{risk.message}</strong>：{risk.detail}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
         <ComposerPrimaryFields
           draft={draft}
           contacts={contacts}
@@ -276,6 +300,18 @@ export default function ComposerWindow({
           </div>
         </footer>
       </section>
+
+      <ConfirmDialog
+        open={sendRiskConfirm !== null}
+        title="跨邮箱发送风险"
+        description="发送前请确认以下风险。你可以返回修改发件账号或收件人。"
+        summaryText={sendRiskConfirm?.map((risk) => `• ${risk.message}：${risk.detail}`).join('\n') ?? ''}
+        danger
+        confirmText="继续发送"
+        cancelText="返回修改"
+        onConfirm={onSendRiskConfirm}
+        onCancel={onSendRiskCancel}
+      />
     </div>
   );
 }

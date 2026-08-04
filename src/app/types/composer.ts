@@ -33,6 +33,12 @@ export type ComposeTemplate = {
   subject: string;
   body: string;
   html_body: string;
+  category: string;
+  tags: string[];
+  account_id: number;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 

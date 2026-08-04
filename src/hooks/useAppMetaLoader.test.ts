@@ -28,6 +28,7 @@ const account: Account = {
   sync_mode: 'manual',
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
+  cross_account_risk_warning: true,
   is_default: true,
 };
 

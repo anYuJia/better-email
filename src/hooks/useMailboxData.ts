@@ -52,14 +52,6 @@ type UseMailboxDataOptions = {
   maybeRunBenchmarkSync: () => Promise<void>;
 };
 
-function mailboxFlowLog(event: string, details: Record<string, unknown> = {}) {
-  flowInfo('mailbox-flow', event, details);
-}
-
-function mailboxFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  flowWarn('mailbox-flow', event, details);
-}
-
 export type MailboxDataController = {
   mailboxRefreshRef: MutableRefObject<number>;
   loadMessages: (

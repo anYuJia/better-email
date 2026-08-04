@@ -12,15 +12,14 @@ import {
 import { invoke } from '../tauriBridge';
 import {
   MessageDetailLRU,
-  loadManualUnreadMessageIds,
   readerAttachmentLoadDelayMs,
   readerBodyFetchDelayMs,
   readerFlowLog,
   readerFlowWarn,
   readerTrustedRemoteRenderDelayMs,
   scheduleReaderBackgroundWork,
-  saveManualUnreadMessageIds,
 } from './readerSelectionState';
+import useReaderReadState from './useReaderReadState';
 import {
   htmlHasRemoteVisualContent,
   isMessageBodyCorrupted,
@@ -79,6 +78,20 @@ export default function useMailboxSelectionController({
   setAttachments,
   setStatus,
 }: UseMailboxSelectionControllerOptions) {
+  const {
+    rememberManualReadState,
+    clearManualUnreadSuppression,
+    markMessageReadAfterReading,
+  } = useReaderReadState({
+    activeThread,
+    setActiveThread,
+    setFolders,
+    setMessages,
+    setStats,
+    setThreadMessages,
+    setThreads,
+  });
+
   const [selectedId, setSelectedIdState] = useState<number | null>(null);
   const setSelectedId = useCallback((value: SetStateAction<number | null>) => {
     setSelectedIdState(value);
@@ -91,8 +104,6 @@ export default function useMailboxSelectionController({
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
   const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
-  const manualUnreadMessageIdsRef = useRef<Set<number>>(loadManualUnreadMessageIds());
-  const autoReadInFlightRef = useRef<Set<number>>(new Set());
   const detailContextKeyRef = useRef(mailboxContextKey);
 
   selectedIdRef.current = selectedId;
@@ -191,31 +202,6 @@ export default function useMailboxSelectionController({
     [remoteImageTrusts, readerSelectedDetail?.account_id, readerSelectedDetail?.sender_email, selectedSenderDomain],
   );
 
-  const rememberManualReadState = useCallback((messageIds: number[], isRead: boolean) => {
-    const next = new Set(manualUnreadMessageIdsRef.current);
-    for (const messageId of messageIds) {
-      if (isRead) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-    }
-    manualUnreadMessageIdsRef.current = next;
-    saveManualUnreadMessageIds(next);
-  }, []);
-
-  const clearManualUnreadSuppression = useCallback((messageIds: number[]) => {
-    if (messageIds.length === 0) return;
-    const next = new Set(manualUnreadMessageIdsRef.current);
-    let changed = false;
-    for (const messageId of messageIds) {
-      if (next.delete(messageId)) changed = true;
-    }
-    if (!changed) return;
-    manualUnreadMessageIdsRef.current = next;
-    saveManualUnreadMessageIds(next);
-  }, []);
-
   const selectMessageForReading = useCallback((messageId: number) => {
     clearManualUnreadSuppression([messageId]);
     setSelectedId(messageId);
@@ -243,73 +229,6 @@ export default function useMailboxSelectionController({
       cancelScheduledWork();
     };
   }, [selected?.id]);
-
-  const markMessageReadAfterReading = useCallback((message: MessageSummary) => {
-    if (message.is_read) {
-      return;
-    }
-    if (manualUnreadMessageIdsRef.current.has(message.id)) {
-      return;
-    }
-    if (autoReadInFlightRef.current.has(message.id)) {
-      return;
-    }
-
-    const selectedMessageId = message.id;
-    const selectedAccountId = message.account_id;
-    const selectedRemoteMailbox = message.remote_mailbox;
-    const selectedRemoteUid = message.remote_uid;
-    const activeThreadKey = activeThread?.thread_key ?? null;
-
-    autoReadInFlightRef.current.add(selectedMessageId);
-    readerFlowLog('markReadAfterReading start', {
-      messageId: selectedMessageId,
-      accountId: selectedAccountId,
-      mailbox: selectedRemoteMailbox,
-      uid: selectedRemoteUid,
-    });
-    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
-      .then((report) => {
-        startTransition(() => {
-          setMessages((current) => current.map((item) => (
-            item.id === selectedMessageId ? { ...item, is_read: true } : item
-          )));
-          if (activeThreadKey) {
-            setThreadMessages((current) => current.map((item) => (
-              item.id === selectedMessageId ? { ...item, is_read: true } : item
-            )));
-            setActiveThread((current) => current && current.thread_key === activeThreadKey
-              ? { ...current, unread_count: Math.max(0, current.unread_count - 1) }
-              : current);
-            setThreads((current) => current.map((thread) => thread.thread_key === activeThreadKey
-              ? { ...thread, unread_count: Math.max(0, thread.unread_count - 1) }
-              : thread));
-          }
-          setStats((current) => current
-            ? { ...current, unread_messages: Math.max(0, current.unread_messages - 1) }
-            : current);
-          setFolders((current) => current.map((folder) => (
-            folder.id === message.folder_id || (folder.is_virtual && folder.role === message.folder_role)
-              ? { ...folder, unread_count: Math.max(0, folder.unread_count - 1) }
-              : folder
-          )));
-        });
-
-        readerFlowLog('markReadAfterReading done', {
-          messageId: selectedMessageId,
-          message: report.message,
-        });
-      })
-      .catch((error) => {
-        readerFlowWarn('markReadAfterReading failed', {
-          messageId: selectedMessageId,
-          error: String(error).replace(/^Error:\s*/i, ''),
-        });
-      })
-      .finally(() => {
-        autoReadInFlightRef.current.delete(selectedMessageId);
-      });
-  }, [activeThread?.thread_key]);
 
   useEffect(() => {
     if (!readerSelectedDetail || !selectedSenderTrusted) return undefined;

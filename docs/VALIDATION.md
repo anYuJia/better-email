@@ -28,7 +28,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
 前端构建通过。
 
-Vite 和 TypeScript 生产构建正常。前端按首屏与低频模块拆分：三栏、列表和阅读面直接加载，写信、设置、命令面板和快捷键帮助按需加载。
+Vite 和 TypeScript 生产构建正常。前端按首屏与低频模块拆分：三栏、列表和阅读面直接加载，写信、设置和快捷键帮助按需加载。
 
 前端单元测试通过。
 

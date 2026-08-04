@@ -166,45 +166,6 @@ impl SearchCriteria {
         params
     }
 }
-#[allow(dead_code)]
-pub(super) fn build_message_query(
-    search: &SearchCriteria,
-    filter: &str,
-    scope_condition: &str,
-    sort: Option<&str>,
-) -> String {
-    let mut sql = String::from(
-        "
-        SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
-               m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
-                       m.received_at, m.is_read, m.is_starred, m.has_attachments,
-                       m.snoozed_until, m.remote_mailbox, m.remote_uid,
-                       m.message_id_header, m.in_reply_to_header, m.references_header
-        FROM messages m
-        JOIN accounts a ON a.id = m.account_id
-        JOIN folders f ON f.id = m.folder_id
-        ",
-    );
-    let filter_clause = build_message_filter_clause(search, filter);
-    let mut conditions = Vec::new();
-    let trimmed_scope = scope_condition.trim();
-    if !trimmed_scope.is_empty() {
-        conditions.push(trimmed_scope.to_string());
-    }
-    let trimmed_filter = filter_clause.trim().trim_start_matches("AND").trim();
-    if !trimmed_filter.is_empty() {
-        conditions.push(trimmed_filter.to_string());
-    }
-    if !conditions.is_empty() {
-        sql.push_str("WHERE ");
-        sql.push_str(&conditions.join(" AND "));
-        sql.push(' ');
-    }
-    sql.push_str("ORDER BY ");
-    sql.push_str(message_order_clause(sort));
-    sql.push_str(" LIMIT ?");
-    sql
-}
 pub(super) fn build_message_summary_query(
     search: &SearchCriteria,
     filter: &str,

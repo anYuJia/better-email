@@ -28,6 +28,7 @@ import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from '
 import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
 import InlineImageNotice from './reader/InlineImageNotice';
+import ReaderBodyContent from './ReaderBodyContent';
 import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
@@ -430,49 +431,22 @@ export default function ReaderPane({
           showRemoteImageNote={selectedHasRemoteImageWarning || shouldOfferRemoteContent}
         />
 
-        {!isBodyRenderReady ? (
-          showPlaceholder ? (
-            <EmailReaderSkeleton />
-          ) : null
-        ) : hasRenderableHtml ? (
-          <div
-            className="reader-html-container"
-          >
-            <EmailShadowView
-              className="reader-html"
-              html={readerHtml}
-              onClick={handleReaderHtmlClick}
-              onContextMenuCapture={handleReaderHtmlContextMenu}
-              onContextMenu={handleReaderHtmlContextMenu}
-              onLinkClick={(href, text) => {
-                const lowerHref = href.toLowerCase();
-                if (lowerHref.startsWith('mailto:')) {
-                  onComposeNew(parseMailtoUrl(href));
-                } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
-                  setClickedLink({ href, text });
-                } else {
-                  console.warn('Blocked navigation to unsafe/unknown protocol:', href);
-                }
-              }}
-            />
-          </div>
-        ) : shouldOfferRemoteContent ? (
-          <EmptyMessageBody
-            title="正文主要由远程图片组成"
-            detail="已先阻止自动加载，点击后会显示本邮件中的 HTTPS 图片；外部链接仍不会变成可点击跳转。"
-            action={(
-              <button
-                type="button"
-                className="reader-warning-primary-action"
-                onClick={onAllowRemoteImagesOnce}
-              >
-                查看内容
-              </button>
-            )}
-          />
-        ) : (
-          <PlainMessageBody body={plainBodyForReader} />
-        )}
+        <ReaderBodyContent
+          isBodyRenderReady={isBodyRenderReady}
+          showPlaceholder={showPlaceholder}
+          hasRenderableHtml={hasRenderableHtml}
+          shouldOfferRemoteContent={shouldOfferRemoteContent}
+          readerHtml={readerHtml}
+          plainBodyForReader={plainBodyForReader}
+          handleReaderHtmlClick={handleReaderHtmlClick}
+          handleReaderHtmlContextMenu={handleReaderHtmlContextMenu}
+          onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
+          onComposeNew={onComposeNew}
+          onLinkClick={(href, text) => setClickedLink({ href, text })}
+          setClickedLink={setClickedLink}
+        />
+
+
 
         {!isDraft && !isTrash && (
           <QuickReplySection

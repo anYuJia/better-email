@@ -12,7 +12,7 @@
     "bench:sync": "tauri build --no-bundle && node scripts/benchmark.mjs --sample-app --sample-sync",
     "probe:provider": "cargo run --manifest-path src-tauri/Cargo.toml --example provider_probe --",
     "test:ui": "node scripts/ui-smoke.mjs",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "node scripts/tauri-dev.mjs",
     "tauri:build": "tauri build",
     "tauri": "tauri",
     "test": "vitest run",

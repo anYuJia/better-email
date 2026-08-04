@@ -6,7 +6,7 @@ import {
   providerVerificationRecordFor,
   shouldRunInitialMailboxSync,
   handleAccountDeleteFlow,
-} from './useAccountConnectionController';
+} from '../app/accountConnectionFlows';
 
 describe('account connection controller helpers', () => {
   it('normalizes known and empty provider keys', () => {

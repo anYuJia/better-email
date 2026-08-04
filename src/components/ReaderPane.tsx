@@ -27,6 +27,9 @@ import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
+import InlineImageNotice from './reader/InlineImageNotice';
+import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
+import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import QuickReplySection from './reader/QuickReplySection';
@@ -411,42 +414,16 @@ export default function ReaderPane({
           />
         )}
 
-        {(inlineImageResolution.pendingAttachments.length > 0
-          || inlineImageResolution.missingContentIds.length > 0) && (
-          <div className="inline-image-notice" role="status">
-            <span className="inline-image-notice-icon" aria-hidden="true">
-              <ImageIcon size={16} />
-            </span>
-            <span className="inline-image-notice-copy">
-              <strong>
-                {isRefreshingInlineImages
-                  ? '正在读取内嵌图片'
-                  : inlineImageResolution.pendingAttachments.length > 0
-                    ? `正文包含 ${inlineImageResolution.pendingAttachments.length} 张内嵌图片`
-                    : '部分内嵌图片不可用'}
-              </strong>
-              <small>
-                {inlineImageError
-                  || inlineImageRefreshError
-                  || (isRefreshingInlineImages
-                    ? '正在从服务器重新获取附件信息'
-                    : inlineImageResolution.missingContentIds.length > 0
-                      ? `${inlineImageResolution.missingContentIds.length} 张图片暂未匹配到附件`
-                      : '按需加载，减少内存和网络占用')}
-              </small>
-            </span>
-            {inlineImageResolution.pendingAttachments.length > 0 && (
-              <button
-                type="button"
-                disabled={isDownloadingInlineImages}
-                aria-busy={isDownloadingInlineImages}
-                onClick={handleLoadInlineImages}
-              >
-                {isDownloadingInlineImages ? '加载中…' : inlineImageError ? '重试' : '显示图片'}
-              </button>
-            )}
-          </div>
-        )}
+        <InlineImageNotice
+          inlineImageResolution={inlineImageResolution}
+          inlineImageError={inlineImageError}
+          inlineImageRefreshError={inlineImageRefreshError}
+          isDownloadingInlineImages={isDownloadingInlineImages}
+          isRefreshingInlineImages={isRefreshingInlineImages}
+          onLoadInlineImages={handleLoadInlineImages}
+        />
+
+
 
         <ReaderSecurityBanner
           warnings={visibleSecurityWarnings}
@@ -508,115 +485,37 @@ export default function ReaderPane({
         )}
       </article>
       {imagePreview && (
-        <div
-          className="reader-image-preview-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="图片预览"
-          onClick={() => setImagePreview(null)}
-        >
-          <figure
-            className={`reader-image-preview ${imagePreviewFit ? 'is-fit' : 'is-zoomed'}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="reader-image-preview-toolbar" aria-label="图片预览工具">
-              <button
-                type="button"
-                aria-label="缩小"
-                onClick={zoomOut}
-              >
-                <ZoomOut size={16} />
-              </button>
-              <span>{Math.round((imagePreviewFit ? 1 : imagePreviewZoom) * 100)}%</span>
-              <button
-                type="button"
-                aria-label="放大"
-                onClick={zoomIn}
-              >
-                <ZoomIn size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={resetImagePreview}
-              >
-                适配
-              </button>
-              <button
-                type="button"
-                onClick={showOriginalSize}
-              >
-                原始
-              </button>
-              <button type="button" onClick={() => saveImageAs(imagePreview)}>
-                另存为
-              </button>
-              <button type="button" aria-label="下载图片" onClick={() => downloadImage(imagePreview)}>
-                <Download size={16} />
-              </button>
-              <button type="button" aria-label="关闭图片预览" onClick={() => setImagePreview(null)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div
-              className="reader-image-preview-stage"
-              ref={imagePreviewStageRef}
-              onWheel={handleImagePreviewWheel}
-              onPointerDown={handleImagePreviewPointerDown}
-              onPointerMove={handleImagePreviewPointerMove}
-              onPointerUp={stopImagePreviewPanning}
-              onPointerCancel={stopImagePreviewPanning}
-              onPointerLeave={stopImagePreviewPanning}
-            >
-              <img
-                ref={imagePreviewImageRef}
-                src={imagePreview.src}
-                alt={imagePreview.alt}
-                onLoad={handleImageLoad}
-                style={{
-                  transform: imagePreviewFit
-                    ? undefined
-                    : `translate(${imagePreviewPan.x}px, ${imagePreviewPan.y}px) scale(${imagePreviewZoom})`,
-                }}
-                draggable={false}
-              />
-            </div>
-          </figure>
-        </div>
+        <ImagePreviewOverlay
+          imagePreview={imagePreview}
+          imagePreviewFit={imagePreviewFit}
+          imagePreviewZoom={imagePreviewZoom}
+          imagePreviewPan={imagePreviewPan}
+          imagePreviewStageRef={imagePreviewStageRef}
+          imagePreviewImageRef={imagePreviewImageRef}
+          zoomIn={zoomIn}
+          zoomOut={zoomOut}
+          showOriginalSize={showOriginalSize}
+          resetImagePreview={resetImagePreview}
+          saveImageAs={saveImageAs}
+          downloadImage={downloadImage}
+          handleImageLoad={handleImageLoad}
+          handleImagePreviewWheel={handleImagePreviewWheel}
+          handleImagePreviewPointerDown={handleImagePreviewPointerDown}
+          handleImagePreviewPointerMove={handleImagePreviewPointerMove}
+          stopImagePreviewPanning={stopImagePreviewPanning}
+          onClose={() => setImagePreview(null)}
+        />
       )}
       {imageContextMenu && (
-        <div
-          className="reader-image-context-menu"
-          style={{ left: imageContextMenu.x, top: imageContextMenu.y }}
-          role="menu"
-          aria-label="图片操作"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              openImagePreview({
-                src: imageContextMenu.src,
-                alt: imageContextMenu.alt,
-                attachmentId: imageContextMenu.attachmentId,
-              });
-              setImageContextMenu(null);
-            }}
-          >
-            查看大图
-          </button>
-          <button type="button" role="menuitem" onClick={savePreviewImageAs}>
-            另存为…
-          </button>
-          <button type="button" role="menuitem" onClick={downloadPreviewImage}>
-            下载图片
-          </button>
-          <button type="button" role="menuitem" onClick={copyPreviewImageToClipboard}>
-            复制图片
-          </button>
-          <button type="button" role="menuitem" onClick={copyPreviewImageSource}>
-            复制图片地址
-          </button>
-        </div>
+        <ImageContextMenuOverlay
+          imageContextMenu={imageContextMenu}
+          openImagePreview={openImagePreview}
+          setImageContextMenu={setImageContextMenu}
+          savePreviewImageAs={savePreviewImageAs}
+          downloadPreviewImage={downloadPreviewImage}
+          copyPreviewImageToClipboard={copyPreviewImageToClipboard}
+          copyPreviewImageSource={copyPreviewImageSource}
+        />
       )}
       {attachmentContextMenu && (
         <ContextMenu

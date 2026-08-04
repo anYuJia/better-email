@@ -13,7 +13,7 @@ import type {
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
-import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../App';
+import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../app/mailboxListState';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -52,6 +52,7 @@ type UseMailboxDataOptions = {
   setSelectedMessageIds: Dispatch<SetStateAction<number[]>>;
   setFilter: Dispatch<SetStateAction<FilterMode>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  mailboxRefreshRef?: MutableRefObject<number>;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -162,11 +163,12 @@ export default function useMailboxData({
   setSelectedMessageIds,
   setFilter,
   setStatus,
+  mailboxRefreshRef: mailboxRefreshRefProp,
   loadMeta,
   maybeRunBenchmarkSync,
 }: UseMailboxDataOptions): MailboxDataController {
   const frontendReadyRef = useRef(false);
-  const mailboxRefreshRef = useRef(0);
+  const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
 
   async function loadMessages(
     nextFolderId = folderId,

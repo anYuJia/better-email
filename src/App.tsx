@@ -30,6 +30,7 @@ import useReaderActions from './hooks/useReaderActions';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
 import useComposerController from './hooks/useComposerController';
 import useMailboxSelectionController from './hooks/useMailboxSelectionController';
+import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/useMailboxSearchController';
 import {
   formatBytes,
   formatDate,
@@ -92,14 +93,10 @@ import {
   setRuleActionPart,
   notificationPolicyStorageKey,
   providerVerificationStorageKey,
-  savedSearchesStorageKey,
   sendUndoDelayStorageKey,
-  listSortStorageKey,
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
-  loadListSort,
   loadProviderVerifications,
-  loadSavedSearches,
   isDraftEmpty,
   movableFoldersForBulk,
   sampleRawMessage,
@@ -138,83 +135,12 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
   flowWarn('app-flow', event, details);
 }
 
-export const mailboxListStateStorageKey = 'better-email.mailboxListState.v1';
-
-type MailboxListState = {
-  limit?: number;
-  scrollTop?: number;
-  updatedAt: number;
-};
-
-type MailboxListStatePatch = Omit<Partial<MailboxListState>, 'updatedAt'>;
-
-export function clampMessageLimit(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return messagePageSize;
-  return Math.min(Math.max(Math.trunc(value), messagePageSize), messagePageSize * 20);
-}
-
-export function buildMailboxListStateKey({
-  accountScope,
-  folderId,
-  query,
-  filter,
-  searchScope,
-  listSort,
-}: {
-  accountScope: AccountScope;
-  folderId: number | null;
-  query: string;
-  filter: FilterMode;
-  searchScope: SearchScope;
-  listSort: ListSort;
-}): string {
-  return [
-    `scope=${accountScope}`,
-    `folder=${folderId ?? 'none'}`,
-    `searchScope=${searchScope}`,
-    `query=${query.trim().toLowerCase()}`,
-    `filter=${filter}`,
-    `sort=${listSort}`,
-  ].join('|');
-}
-
-export function loadMailboxListStates(): Record<string, MailboxListState> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(mailboxListStateStorageKey);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, MailboxListState>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveMailboxListState(key: string, patch: MailboxListStatePatch): void {
-  if (typeof window === 'undefined' || !key) return;
-  try {
-    const states = loadMailboxListStates();
-    const next = {
-      ...states,
-      [key]: {
-        ...states[key],
-        ...patch,
-        updatedAt: Date.now(),
-      },
-    };
-    const entries = Object.entries(next)
-      .sort(([, left], [, right]) => (right.updatedAt || 0) - (left.updatedAt || 0))
-      .slice(0, 80);
-    window.localStorage.setItem(mailboxListStateStorageKey, JSON.stringify(Object.fromEntries(entries)));
-  } catch {
-    // List state is a convenience cache; storage failures should never block mailbox rendering.
-  }
-}
-
-export function loadMailboxMessageLimit(key: string): number {
-  const saved = loadMailboxListStates()[key]?.limit;
-  return clampMessageLimit(saved);
-}
+import {
+  buildMailboxListStateKey,
+  loadMailboxListStates,
+  loadMailboxMessageLimit,
+  saveMailboxListState,
+} from './app/mailboxListState';
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -249,23 +175,11 @@ export default function App() {
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageSummary[]>([]);
-  const [messageLimit, setMessageLimit] = useState(messagePageSize);
-  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
-  const loadingMoreRef = useRef(false);
   const skipNextFolderEffectLoadRef = useRef(false);
-  const searchClearTimerRef = useRef<number | null>(null);
-  const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
-  const [listMode, setListMode] = useState<ListMode>('messages');
-  const [listSort, setListSort] = useState<ListSort>(loadListSort);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
-  const [query, setQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<SearchScope>('folder');
-  const [filter, setFilter] = useState<FilterMode>('all');
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
-  const [savedSearchName, setSavedSearchName] = useState('');
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
@@ -281,6 +195,57 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const refreshNoticeTimeoutRef = useRef<number | null>(null);
+  const mailboxRefreshRef = useRef(0);
+  const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
+  const {
+    query,
+    setQuery,
+    searchScope,
+    setSearchScope,
+    filter,
+    setFilter,
+    listMode,
+    setListMode,
+    listSort,
+    setListSort,
+    savedSearches,
+    setSavedSearches,
+    savedSearchName,
+    setSavedSearchName,
+    messageLimit,
+    setMessageLimit,
+    hasMoreMessages,
+    setHasMoreMessages,
+    loadMoreStatus,
+    searchInputRef,
+    runSearch,
+    changeSearchScope,
+    applySearchShortcut,
+    clearSearchAndFilter,
+    loadMoreMessages,
+    runSavedSearch,
+    saveCurrentSearch,
+    deleteSavedSearch,
+    resetSearch,
+    handleQueryChange,
+    handleSearchScopeChange,
+    handleClearSearchAndFilter,
+    handleApplySearchShortcut,
+    handleShowMessages,
+    handleShowThreads,
+  } = useMailboxSearchController({
+    account,
+    accountScope,
+    folderId,
+    folders,
+    imapMailboxes,
+    messages,
+    mailboxRefreshRef,
+    loadersRef: searchLoadersRef,
+    setActiveThread,
+    setThreadMessages,
+    setStatus,
+  });
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<Folder | null>(null);
   const [confirmDeleteIdentity, setConfirmDeleteIdentity] = useState<MailIdentity | null>(null);
   const [confirmDeleteRule, setConfirmDeleteRule] = useState<MailRule | null>(null);
@@ -366,7 +331,6 @@ export default function App() {
     queueUndoAction,
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const {
     loadMeta,
     releaseDueSnoozedMessages,
@@ -439,7 +403,6 @@ export default function App() {
     setStatus,
   });
   const {
-    mailboxRefreshRef,
     loadMessages,
     loadMessagesWithVisibleFallback,
     refreshMailbox,
@@ -462,6 +425,7 @@ export default function App() {
     setSelectedMessageIds,
     setFilter,
     setStatus,
+    mailboxRefreshRef,
     loadMeta,
     maybeRunBenchmarkSync: () => maybeRunBenchmarkSync(runSyncDryRun),
   });
@@ -556,6 +520,12 @@ export default function App() {
     loadMeta,
     loadMessages,
   });
+  searchLoadersRef.current = {
+    loadMessagesWithVisibleFallback,
+    loadMessages,
+    loadMeta,
+    syncImapHistoryPage,
+  };
   const {
     activeValidationId,
     validationStatus: providerWriteValidationStatus,
@@ -680,12 +650,7 @@ export default function App() {
     if (targetAccountId && accountScope !== 'all') {
       setAccountScope(targetAccountId);
     }
-    setSearchScope('folder');
-    setQuery('');
-    setFilter('all');
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
+    resetSearch();
     const meta = await loadMeta(null, nextScope, { mode: 'mailbox' });
     const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
     const targetFolder =
@@ -765,16 +730,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(listSortStorageKey, listSort);
-  }, [listSort]);
-
-  useEffect(() => {
     window.localStorage.setItem(providerVerificationStorageKey, JSON.stringify(providerVerifications));
   }, [providerVerifications]);
-
-  useEffect(() => {
-    window.localStorage.setItem(savedSearchesStorageKey, JSON.stringify(savedSearches));
-  }, [savedSearches]);
 
   useEffect(() => {
     if (!folderId) return;
@@ -1951,253 +1908,11 @@ export default function App() {
     });
   }
 
-  const runSearch = useCallback(async (event: React.FormEvent) => {
-    event.preventDefault();
-    await loadMessagesWithVisibleFallback(
-      folderId,
-      query,
-      filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      messagePageSize,
-      searchScope,
-      listMode === 'threads',
-    );
-    setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
-  }, [
-    loadMessagesWithVisibleFallback,
-    folderId,
-    query,
-    filter,
-    accountScope,
-    folders,
-    searchScope,
-    listMode,
-  ]);
-
-  const changeSearchScope = useCallback(async (nextScope: SearchScope) => {
-    setSearchScope(nextScope);
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(
-      folderId,
-      query,
-      filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      messagePageSize,
-      nextScope,
-      false,
-    );
-    const label = nextScope === 'folder' ? '当前文件夹' : nextScope === 'account' ? '当前账号' : '全部账号';
-    setStatus(`搜索范围已切换为：${label}`);
-  }, [
-    loadMessagesWithVisibleFallback,
-    folderId,
-    query,
-    filter,
-    accountScope,
-    folders,
-  ]);
-
-  const applySearchShortcut = useCallback(async (shortcutQuery: string) => {
-    const nextQuery = shortcutQuery.endsWith(':')
-      ? `${query.trim()} ${shortcutQuery}`.trim()
-      : shortcutQuery;
-    setQuery(nextQuery);
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(
-      folderId,
-      nextQuery,
-      filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      messagePageSize,
-      searchScope,
-      false,
-    );
-    searchInputRef.current?.focus();
-    if (shortcutQuery.endsWith(':')) {
-      searchInputRef.current?.setSelectionRange(nextQuery.length, nextQuery.length);
-      setStatus(`已插入搜索条件：${shortcutQuery}`);
-    } else {
-      setStatus(`已搜索：${nextQuery}`);
-    }
-  }, [
-    query,
-    loadMessagesWithVisibleFallback,
-    folderId,
-    filter,
-    accountScope,
-    folders,
-    searchScope,
-  ]);
-
-  const clearSearchAndFilter = useCallback(async () => {
-    setQuery('');
-    setFilter('all');
-    setSearchScope('folder');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessagesWithVisibleFallback(
-      folderId,
-      '',
-      'all',
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      messagePageSize,
-      'folder',
-      listMode === 'threads',
-    );
-    setStatus('已清空搜索和筛选');
-  }, [
-    loadMessagesWithVisibleFallback,
-    folderId,
-    accountScope,
-    folders,
-    listMode,
-  ]);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadMoreStatus('正在读取本地缓存...');
-    try {
-      const nextLimit = messageLimit + messagePageSize;
-      const nextMessages = await loadMessagesWithVisibleFallback(
-        folderId,
-        query,
-        filter,
-        accountScope,
-        mailboxRefreshRef.current,
-        folders,
-        nextLimit,
-        searchScope,
-        false,
-      );
-      const folder = folders.find((f) => f.id === folderId);
-      const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
-      const scopeMailboxes = targetAccountId
-        ? imapMailboxes.filter((m) => m.account_id === targetAccountId)
-        : imapMailboxes;
-
-      let targetMailbox = null;
-      if (folder) {
-        if (folder.is_virtual) {
-          targetMailbox = scopeMailboxes.find((m) => m.local_role === folder.role && !m.history_complete);
-        } else {
-          targetMailbox = scopeMailboxes.find((m) => m.local_folder_id === folder.id && !m.history_complete);
-        }
-      } else {
-        targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
-      }
-
-      if (nextMessages.length <= messages.length && targetMailbox) {
-        setStatus('正在从服务器同步历史邮件...');
-        setLoadMoreStatus('正在从服务器拉取历史邮件...');
-        const run = await syncImapHistoryPage(targetMailbox.account_id);
-        const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
-        const refreshedMessages = await loadMessagesWithVisibleFallback(
-          meta.folderId,
-          query,
-          filter,
-          accountScope,
-          mailboxRefreshRef.current,
-          meta.folders,
-          nextLimit,
-          searchScope,
-          false,
-        );
-        setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
-      } else {
-        setStatus(`已加载 ${nextMessages.length} 封邮件`);
-      }
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadMoreStatus(null);
-    }
-  }, [
-    messageLimit,
-    loadMessagesWithVisibleFallback,
-    folderId,
-    query,
-    filter,
-    accountScope,
-    folders,
-    searchScope,
-    account,
-    imapMailboxes,
-    messages,
-    syncImapHistoryPage,
-    loadMeta,
-  ]);
-
-  async function runSavedSearch(savedSearch: SavedSearch) {
-    setQuery(savedSearch.query);
-    setFilter(savedSearch.filter);
-    setSearchScope(savedSearch.scope);
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    await loadMessages(
-      folderId,
-      savedSearch.query,
-      savedSearch.filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      messagePageSize,
-      savedSearch.scope,
-      false,
-    );
-    setStatus(`已运行保存搜索：${savedSearch.name}`);
-  }
-
-  function saveCurrentSearch() {
-    const trimmedQuery = query.trim();
-    const trimmedName = savedSearchName.trim() || trimmedQuery;
-    if (!trimmedQuery) {
-      setStatus('请输入搜索条件后再保存');
-      return;
-    }
-    setSavedSearches((current) => {
-      const withoutDuplicate = current.filter(
-        (item) => item.name !== trimmedName
-          && !(item.query === trimmedQuery && item.filter === filter && item.scope === searchScope),
-      );
-      return [
-        ...withoutDuplicate,
-        {
-          id: crypto.randomUUID(),
-          name: trimmedName,
-          query: trimmedQuery,
-          filter,
-          scope: searchScope,
-        },
-      ];
-    });
-    setSavedSearchName('');
-    setStatus(`已保存搜索：${trimmedName}`);
-  }
-
-  function deleteSavedSearch(savedSearch: SavedSearch) {
-    setSavedSearches((current) => current.filter((item) => item.id !== savedSearch.id));
-    setStatus(`已删除保存搜索：${savedSearch.name}`);
-  }
-
   function changeAccountScope(value: string) {
     mailboxRefreshRef.current += 1;
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
-    setQuery('');
-    setFilter('all');
-    setSearchScope('folder');
+    resetSearch();
     setFolderId(null);
     setMessages([]);
     setSelectedId(null);
@@ -2211,9 +1926,7 @@ export default function App() {
   function selectFolder(nextFolderId: number) {
     mailboxRefreshRef.current += 1;
     skipNextFolderEffectLoadRef.current = false;
-    setQuery('');
-    setFilter('all');
-    setSearchScope('folder');
+    resetSearch();
     setFolderId(nextFolderId);
   }
 
@@ -2254,76 +1967,9 @@ export default function App() {
     moveSelected,
   });
 
-  const handleQueryChange = useCallback((val: string) => {
-    setQuery(val);
-    if (searchClearTimerRef.current !== null) {
-      window.clearTimeout(searchClearTimerRef.current);
-      searchClearTimerRef.current = null;
-    }
-    if (!val.trim()) {
-      searchClearTimerRef.current = window.setTimeout(() => {
-        searchClearTimerRef.current = null;
-        loadMessagesWithVisibleFallback(
-          folderId,
-          '',
-          filter,
-          accountScope,
-          mailboxRefreshRef.current,
-          folders,
-          messagePageSize,
-          searchScope,
-          false,
-        ).catch((error) => setStatus(String(error)));
-      }, 100);
-    }
-  }, [loadMessagesWithVisibleFallback, folderId, filter, accountScope, folders, searchScope, setStatus]);
-
-  const handleSearchScopeChange = useCallback((nextScope: SearchScope) => {
-    changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
-  }, [changeSearchScope, setStatus]);
-
-  const handleClearSearchAndFilter = useCallback(() => {
-    clearSearchAndFilter().catch((error) => setStatus(String(error)));
-  }, [clearSearchAndFilter, setStatus]);
-
-  const handleApplySearchShortcut = useCallback((nextQuery: string) => {
-    applySearchShortcut(nextQuery).catch((error) => setStatus(String(error)));
-  }, [applySearchShortcut, setStatus]);
-
   const handleRefresh = useCallback(() => {
     syncAndRefresh().catch((error) => setStatus(String(error)));
   }, [syncAndRefresh, setStatus]);
-
-  const handleShowMessages = useCallback(() => {
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-  }, []);
-
-  const handleShowThreads = useCallback(() => {
-    setListMode('threads');
-    loadMessagesWithVisibleFallback(
-      folderId,
-      query,
-      filter,
-      accountScope,
-      mailboxRefreshRef.current,
-      folders,
-      messageLimit,
-      searchScope,
-      true,
-    ).catch((error) => setStatus(String(error)));
-  }, [
-    loadMessagesWithVisibleFallback,
-    folderId,
-    query,
-    filter,
-    accountScope,
-    folders,
-    messageLimit,
-    searchScope,
-    setStatus,
-  ]);
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));

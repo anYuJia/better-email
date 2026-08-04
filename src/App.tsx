@@ -23,7 +23,7 @@ import useAccountConnectionController from './hooks/useAccountConnectionControll
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useContactManagement from './hooks/useContactManagement';
 import useMailboxData from './hooks/useMailboxData';
-import useMessageCollectionActions from './hooks/useMessageCollectionActions';
+import useBulkMessageActions from './hooks/useBulkMessageActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
@@ -40,6 +40,7 @@ import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/u
 import useMailboxSync from './hooks/useMailboxSync';
 import useRuleManagement from './hooks/useRuleManagement';
 import useSnoozeController from './hooks/useSnoozeController';
+import useSingleMessageActions from './hooks/useSingleMessageActions';
 import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
 import {
@@ -886,6 +887,18 @@ export default function App() {
     toggleBulkLabel,
     toggleThreadLabel,
     toggleThreadMuted,
+  } = useBulkMessageActions({
+    folders,
+    selectedMessages,
+    refreshAll,
+    setActiveThread,
+    setSelectedMessageIds,
+    setStatus,
+    snapshotMessages,
+    queueUndoAction,
+    onReadStateChange: rememberManualReadState,
+  });
+  const {
     restoreUndoAction,
     moveMessagesToFolderByIds,
     runMessageAction,
@@ -901,9 +914,8 @@ export default function App() {
     permanentlyDeleteMessageConfirmed,
     unsnoozeSelected,
     toggleLabel,
-  } = useMessageCollectionActions({
+  } = useSingleMessageActions({
     folders,
-    selectedMessages,
     selected,
     selectedId,
     messages,
@@ -912,7 +924,6 @@ export default function App() {
     refreshAll,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     loadMessages: (nextFolderId) => loadMessages(nextFolderId),
-    setActiveThread,
     setSelectedMessageIds,
     setSelectedId,
     setStatus,

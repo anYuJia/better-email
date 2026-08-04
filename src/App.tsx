@@ -115,6 +115,7 @@ import type {
 } from './app/appConfig';
 import { copyTextToClipboard } from './app/clipboard';
 import { flowInfo, flowWarn } from './app/logger';
+import { buildMailboxContextKey } from './app/mailboxContext';
 import {
   applyMessageMetadataPatch,
   resolveReaderSelectedDetail,
@@ -976,18 +977,32 @@ export default function App() {
     setSelectedDetail((current) => (current?.id === messageId ? null : current));
   }, [setSelectedId]);
 
+  const mailboxContextKey = useMemo(
+    () => buildMailboxContextKey({ accountScope, folderId, query, filter, listMode }),
+    [accountScope, folderId, query, filter, listMode],
+  );
+  const detailContextKeyRef = useRef(mailboxContextKey);
+
   useEffect(() => {
+    const contextChanged = detailContextKeyRef.current !== mailboxContextKey;
+    detailContextKeyRef.current = mailboxContextKey;
     if (!readerSelectedId) {
       setSelectedDetail(null);
       return;
     }
-    const cached = messageDetailCacheRef.current.get(readerSelectedId);
-    if (cached) {
-      setSelectedDetail(cached);
-      return;
+    if (contextChanged) {
+      // 邮箱上下文变化后旧缓存不再可信：即使选中 id 未变也要重新拉取
+      messageDetailCacheRef.current.clear();
+      setSelectedDetail(null);
+    } else {
+      const cached = messageDetailCacheRef.current.get(readerSelectedId);
+      if (cached) {
+        setSelectedDetail(cached);
+        return;
+      }
+      // 无 cache 时立即清空旧详情，避免 reader 显示上一封邮件
+      setSelectedDetail(null);
     }
-    // 无 cache 时立即清空旧详情，避免 reader 显示上一封邮件
-    setSelectedDetail(null);
     let cancelled = false;
     invoke<Message>('get_message_detail', { messageId: readerSelectedId })
       .then((detail) => {
@@ -1002,12 +1017,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [readerSelectedId]);
-
-  useEffect(() => {
-    messageDetailCacheRef.current.clear();
-    setSelectedDetail(null);
-  }, [accountScope, folderId, query, filter]);
+  }, [readerSelectedId, mailboxContextKey]);
 
   // 派生值：确保 reader 只收到与当前 readerSelectedId 匹配的详情，防止 stale
   const readerSelectedDetail = useMemo(

@@ -4,7 +4,7 @@ import {
   nextOutboxWakeItem,
   outboxFlushMessage,
   runDueOutboxSmtp,
-} from './useBackgroundTaskCoordinator';
+} from '../app/backgroundTaskFlow';
 
 function outboxItem(
   id: number,

@@ -1,0 +1,43 @@
+import type { InvokeArgs, MockCommandHandler } from './types';
+import {
+  contacts,
+  rules,
+  remoteImageTrusts,
+  contactMergeSuggestions,
+  renderMessageWithPolicy,
+  createMockContact,
+  updateMockContact,
+  deleteMockContact,
+  mergeMockContacts,
+  importMockContactsVCard,
+  upsertMockRule,
+  setMockRuleEnabled,
+  deleteMockRule,
+  trustMockRemoteImages,
+  deleteMockRemoteImageTrust,
+  renderMockMessageWithRemoteImagesOnce,
+} from './state';
+
+export const handlers: Record<string, MockCommandHandler> = {
+  'list_contacts': () => contacts,
+  'list_contact_merge_suggestions': () => contactMergeSuggestions(),
+  'create_contact': createMockContact,
+  'update_contact': updateMockContact,
+  'delete_contact': deleteMockContact,
+  'merge_contacts': mergeMockContacts,
+  'import_contacts_vcard': importMockContactsVCard,
+  'export_contacts_vcard': () => ({
+    path: '/tmp/better-email-contacts.vcf',
+    contacts: contacts.length,
+    size_bytes: contacts.length * 180,
+  }),
+  'list_rules': () => rules,
+  'upsert_rule': upsertMockRule,
+  'set_rule_enabled': setMockRuleEnabled,
+  'delete_rule': deleteMockRule,
+  'list_remote_image_trusts': () => remoteImageTrusts,
+  'trust_remote_images': trustMockRemoteImages,
+  'delete_remote_image_trust': deleteMockRemoteImageTrust,
+  'render_message_with_remote_image_policy': (args) => renderMessageWithPolicy(Number(args?.messageId)),
+  'render_message_with_remote_images_once': renderMockMessageWithRemoteImagesOnce,
+};

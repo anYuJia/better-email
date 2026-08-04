@@ -10,15 +10,8 @@ import {
   type SetStateAction,
 } from 'react';
 import { invoke } from '../tauriBridge';
-import {
-  MessageDetailLRU,
-  readerAttachmentLoadDelayMs,
-  readerBodyFetchDelayMs,
-  readerFlowLog,
-  readerFlowWarn,
-  readerTrustedRemoteRenderDelayMs,
-  scheduleReaderBackgroundWork,
-} from './readerSelectionState';
+import { MessageDetailLRU } from './readerSelectionState';
+import useReaderBodyLoading from './useReaderBodyLoading';
 import useReaderReadState from './useReaderReadState';
 import {
   htmlHasRemoteVisualContent,
@@ -101,9 +94,6 @@ export default function useMailboxSelectionController({
   const messageDetailCacheRef = useRef(new MessageDetailLRU(5));
   const selectedIdRef = useRef<number | null>(null);
   const selectedDetailRef = useRef<Message | null>(null);
-  const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
-  const bodyFetchFailedRef = useRef<Set<number>>(new Set());
-  const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
   const detailContextKeyRef = useRef(mailboxContextKey);
 
   selectedIdRef.current = selectedId;
@@ -202,153 +192,31 @@ export default function useMailboxSelectionController({
     [remoteImageTrusts, readerSelectedDetail?.account_id, readerSelectedDetail?.sender_email, selectedSenderDomain],
   );
 
+  const {
+    bodyFetchFailedRef,
+    bodyFetchInFlightRef,
+  } = useReaderBodyLoading({
+    selected,
+    readerSelectedDetail,
+    selectedDetail,
+    selectedSenderTrusted,
+    activeThread,
+    messageDetailCacheRef,
+    setAttachments,
+    setMessages,
+    setSelectedDetail,
+    setStatus,
+    setThreadMessages,
+  });
+
   const selectMessageForReading = useCallback((messageId: number) => {
     clearManualUnreadSuppression([messageId]);
     setSelectedId(messageId);
     setReaderSelectionRevision((current) => current + 1);
   }, [clearManualUnreadSuppression, setSelectedId]);
 
-  useEffect(() => {
-    setAttachments([]);
-    if (!selected) return undefined;
 
-    const selectedMessageId = selected.id;
-    let cancelled = false;
-    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
-      invoke<Attachment[]>('list_attachments', { messageId: selectedMessageId })
-        .then((items) => {
-          if (!cancelled) startTransition(() => setAttachments(items));
-        })
-        .catch((error) => {
-          if (!cancelled) setStatus(String(error));
-        });
-    }, readerAttachmentLoadDelayMs);
 
-    return () => {
-      cancelled = true;
-      cancelScheduledWork();
-    };
-  }, [selected?.id]);
-
-  useEffect(() => {
-    if (!readerSelectedDetail || !selectedSenderTrusted) return undefined;
-    if (readerSelectedDetail.sanitized_html.includes('src="https://')) return undefined;
-    if (trustedRemoteImageRenderRef.current.has(readerSelectedDetail.id)) return undefined;
-
-    const selectedMessageId = readerSelectedDetail.id;
-    const selectedBody = readerSelectedDetail.body;
-    const activeThreadKey = activeThread?.thread_key ?? null;
-    let cancelled = false;
-    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
-      if (!htmlHasRemoteVisualContent(selectedBody)) return;
-      trustedRemoteImageRenderRef.current.add(selectedMessageId);
-      invoke<Message>('render_message_with_remote_image_policy', { messageId: selectedMessageId })
-        .then((updated) => {
-          if (cancelled) return;
-          startTransition(() => {
-            const { body, sanitized_html, ...summary } = updated;
-            setMessages((current) => current.map((message) => (
-              message.id === updated.id ? summary : message
-            )));
-            if (activeThreadKey) {
-              setThreadMessages((current) => current.map((message) => (
-                message.id === updated.id ? summary : message
-              )));
-            }
-            if (selectedDetail?.id === updated.id) {
-              setSelectedDetail(updated);
-            }
-            messageDetailCacheRef.current.set(updated.id, updated);
-          });
-        })
-        .catch((error) => {
-          trustedRemoteImageRenderRef.current.delete(selectedMessageId);
-          if (!cancelled) setStatus(String(error));
-        });
-    }, readerTrustedRemoteRenderDelayMs);
-
-    return () => {
-      cancelled = true;
-      cancelScheduledWork();
-    };
-  }, [
-    activeThread?.thread_key,
-    readerSelectedDetail?.id,
-    selectedSenderTrusted,
-  ]);
-
-  useEffect(() => {
-    if (!readerSelectedDetail) return undefined;
-    const isHeaderOnlyRemoteMessage =
-      readerSelectedDetail.remote_uid > 0 &&
-      (!readerSelectedDetail.body.trim() || isMessageBodyCorrupted(readerSelectedDetail.body)) &&
-      (readerSelectedDetail.snippet.includes('远端邮件头已同步') || isMessageBodyCorrupted(readerSelectedDetail.body));
-    if (!isHeaderOnlyRemoteMessage) return undefined;
-    if (bodyFetchInFlightRef.current.has(readerSelectedDetail.id) || bodyFetchFailedRef.current.has(readerSelectedDetail.id)) return undefined;
-
-    const selectedMessageId = readerSelectedDetail.id;
-    const selectedAccountId = readerSelectedDetail.account_id;
-    const selectedRemoteMailbox = readerSelectedDetail.remote_mailbox;
-    const selectedRemoteUid = readerSelectedDetail.remote_uid;
-    const activeThreadKey = activeThread?.thread_key ?? null;
-    let cancelled = false;
-
-    const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
-      bodyFetchInFlightRef.current.add(selectedMessageId);
-      readerFlowLog('autoFetchBody start', {
-        messageId: selectedMessageId,
-        accountId: selectedAccountId,
-        mailbox: selectedRemoteMailbox,
-        uid: selectedRemoteUid,
-      });
-      invoke<Message>('fetch_message_body', { messageId: selectedMessageId })
-        .then((updated) => {
-          bodyFetchFailedRef.current.delete(updated.id);
-          if (cancelled) return [];
-          startTransition(() => {
-            const { body, sanitized_html, ...summary } = updated;
-            setMessages((current) => current.map((message) => (message.id === updated.id ? summary : message)));
-            if (activeThreadKey) {
-              setThreadMessages((current) => current.map((message) => (message.id === updated.id ? summary : message)));
-            }
-            if (selectedDetail && selectedDetail.id === updated.id) {
-              setSelectedDetail(updated);
-            }
-            messageDetailCacheRef.current.set(updated.id, updated);
-          });
-          return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
-            if (!cancelled) startTransition(() => setAttachments(items));
-            readerFlowLog('autoFetchBody done', {
-              messageId: updated.id,
-              bodyLength: updated.body.length,
-              htmlLength: updated.sanitized_html.length,
-              attachments: items.length,
-            });
-            return items;
-          });
-        })
-        .catch((error) => {
-          bodyFetchFailedRef.current.add(selectedMessageId);
-          const message = String(error).replace(/^Error:\s*/i, '');
-          readerFlowWarn('autoFetchBody failed', {
-            messageId: selectedMessageId,
-            accountId: selectedAccountId,
-            mailbox: selectedRemoteMailbox,
-            uid: selectedRemoteUid,
-            error: message,
-          });
-          if (!cancelled) setStatus(`正文拉取失败：${message}`);
-        })
-        .finally(() => {
-          bodyFetchInFlightRef.current.delete(selectedMessageId);
-        });
-    }, readerBodyFetchDelayMs);
-
-    return () => {
-      cancelled = true;
-      cancelScheduledWork();
-    };
-  }, [readerSelectedDetail?.id, readerSelectedDetail?.remote_uid, activeThread?.thread_key]);
 
   return {
     selectedId,

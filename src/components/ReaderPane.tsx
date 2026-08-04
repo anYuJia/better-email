@@ -27,6 +27,7 @@ import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
+import useReaderCompletion from '../hooks/useReaderCompletion';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import QuickReplySection from './reader/QuickReplySection';
 import { attachmentKind, attachmentIcon } from './reader/attachmentUtils';
@@ -165,95 +166,29 @@ export default function ReaderPane({
   onSendQuickReply,
 }: ReaderPaneProps) {
   const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
+  const {
+    readerRef,
+    bodySelected,
+    isBodyRenderReady,
+    showPlaceholder,
+    maybeCompleteReading,
+  } = useReaderCompletion({
+    selected,
+    selectedId,
+    readTriggerKey,
+    onReadComplete,
+  });
+
+
 
 
 
 
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenu>(null);
   const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
-  const [bodyRenderMessageId, setBodyRenderMessageId] = useState<number | null>(null);
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
-  const readerRef = useRef<HTMLElement | null>(null);
-  const completedReadMessageIdsRef = useRef<Set<number>>(new Set());
-  const prevIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const currentId = selected?.id ?? null;
-    const isDifferentMessage = currentId !== prevIdRef.current;
-    prevIdRef.current = currentId;
-
-    if (isDifferentMessage) {
-      setBodyRenderMessageId(null);
-      setShowPlaceholder(false);
-    }
-
-    if (!selectedId || !selected) return undefined;
-
-    const isPlainText = !selected.sanitized_html?.trim() &&
-                        !bodyLooksLikeHtml(selected.body) &&
-                        selected.attachment_count === 0;
-
-    if (isPlainText) {
-      setBodyRenderMessageId(selectedId);
-      return undefined;
-    }
-
-    const scheduler = window as IdleScheduler;
-    let idleHandle: number | null = null;
-    let cancelled = false;
-    
-    if (bodyRenderMessageId !== selectedId) {
-      const timer = window.setTimeout(() => {
-        const renderBody = () => {
-          if (!cancelled) React.startTransition(() => setBodyRenderMessageId(selectedId));
-        };
-        if (scheduler.requestIdleCallback) {
-          idleHandle = scheduler.requestIdleCallback(renderBody, { timeout: readerBodyRenderIdleTimeoutMs });
-        } else {
-          renderBody();
-        }
-      }, readerBodyRenderDelayMs);
-
-      const placeholderTimer = window.setTimeout(() => {
-        if (!cancelled && isDifferentMessage) {
-          setShowPlaceholder(true);
-        }
-      }, 16);
-
-      return () => {
-        cancelled = true;
-        window.clearTimeout(timer);
-        window.clearTimeout(placeholderTimer);
-        if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
-      };
-    }
-  }, [selectedId, selected?.id, selected?.attachment_count, bodyRenderMessageId]);
-
-  const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
-  const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
-  const isBodyRenderReady = Boolean(bodySelected) && !isSelectedBodyCorrupted;
 
 
 
-  useEffect(() => {
-    if (!selected?.id) return;
-    if (selected.is_read) {
-      completedReadMessageIdsRef.current.add(selected.id);
-    } else {
-      completedReadMessageIdsRef.current.delete(selected.id);
-    }
-  }, [selected?.id, selected?.is_read, readTriggerKey]);
-
-  function maybeCompleteReading() {
-    if (!selected || selected.is_read || !isBodyRenderReady) return;
-    if (completedReadMessageIdsRef.current.has(selected.id)) return;
-    const readerElement = readerRef.current;
-    if (!readerElement) return;
-    const distanceToBottom = readerElement.scrollHeight - readerElement.scrollTop - readerElement.clientHeight;
-    if (distanceToBottom > 48) return;
-    completedReadMessageIdsRef.current.add(selected.id);
-    onReadComplete(selected);
-  }
 
   const {
     imagePreview,
@@ -353,6 +288,7 @@ export default function ReaderPane({
       && !hasRenderableHtml
       && bodySelected.body.trim(),
   );
+  const isSelectedBodyCorrupted = Boolean(bodySelected && isMessageBodyCorrupted(bodySelected.body));
   const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
@@ -361,24 +297,7 @@ export default function ReaderPane({
     maybeCompleteReading();
   }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
 
-  useEffect(() => {
-    if (!selected || selected.is_read || !isBodyRenderReady) return undefined;
-    if (completedReadMessageIdsRef.current.has(selected.id)) {
-      return undefined;
-    }
 
-    const timerId = window.setTimeout(() => {
-      if (completedReadMessageIdsRef.current.has(selected.id)) {
-        return;
-      }
-      completedReadMessageIdsRef.current.add(selected.id);
-      onReadComplete(selected);
-    }, 2000);
-
-    return () => {
-      window.clearTimeout(timerId);
-    };
-  }, [selected?.id, selected?.is_read, isBodyRenderReady, onReadComplete, readTriggerKey]);
 
 
 

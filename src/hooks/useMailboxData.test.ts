@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMailboxRequests } from './useMailboxData';
+import { buildMailboxRequests } from './mailboxDataRequests';
 
 describe('buildMailboxRequests', () => {
   it('keeps message and thread queries in the same scoped mailbox view', () => {

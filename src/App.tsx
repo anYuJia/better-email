@@ -1245,7 +1245,7 @@ export default function App() {
           setStatus('已重置布局');
         }}
         onSavedSearchNameChange={setSavedSearchName}
-        onSaveCurrentSearch={saveCurrentSearch}
+        onSaveCurrentSearch={() => saveCurrentSearch(query, filter, searchScope)}
         onRunSavedSearch={(savedSearch) => {
           runSavedSearch(savedSearch).catch((error) => setStatus(String(error)));
         }}

@@ -337,7 +337,7 @@ describe('useMailboxSearchController', () => {
 
   it('saveCurrentSearch rejects an empty query', () => {
     const { result, setStatus } = renderController();
-    act(() => result.current.saveCurrentSearch());
+    act(() => result.current.saveCurrentSearch('', 'all', 'folder'));
     expect(setStatus).toHaveBeenCalledWith('请输入搜索条件后再保存');
     expect(result.current.savedSearches).toEqual([]);
   });
@@ -350,14 +350,14 @@ describe('useMailboxSearchController', () => {
       result.current.setSearchScope('all');
       result.current.setSavedSearchName('发票');
     });
-    act(() => result.current.saveCurrentSearch());
+    act(() => result.current.saveCurrentSearch('invoice', 'starred', 'all'));
     act(() => {
       result.current.setSavedSearchName('发票');
-      result.current.saveCurrentSearch();
+      result.current.saveCurrentSearch('invoice', 'starred', 'all');
     });
     act(() => {
       result.current.setSavedSearchName('');
-      result.current.saveCurrentSearch();
+      result.current.saveCurrentSearch('invoice', 'starred', 'all');
     });
     expect(result.current.savedSearches).toHaveLength(1);
     expect(result.current.savedSearches[0]).toMatchObject({

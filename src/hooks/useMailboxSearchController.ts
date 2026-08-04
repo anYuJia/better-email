@@ -11,10 +11,9 @@ import {
 import {
   listSortStorageKey,
   loadListSort,
-  loadSavedSearches,
   messagePageSize,
-  savedSearchesStorageKey,
 } from '../app/appConfig';
+import useSavedSearches from './useSavedSearches';
 import type {
   Account,
   AccountScope,
@@ -92,8 +91,6 @@ export default function useMailboxSearchController({
   const [filter, setFilter] = useState<FilterMode>('all');
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
-  const [savedSearchName, setSavedSearchName] = useState('');
   const [messageLimit, setMessageLimit] = useState(messagePageSize);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
@@ -105,9 +102,14 @@ export default function useMailboxSearchController({
     window.localStorage.setItem(listSortStorageKey, listSort);
   }, [listSort]);
 
-  useEffect(() => {
-    window.localStorage.setItem(savedSearchesStorageKey, JSON.stringify(savedSearches));
-  }, [savedSearches]);
+  const {
+    savedSearches,
+    setSavedSearches,
+    savedSearchName,
+    setSavedSearchName,
+    saveCurrentSearch,
+    deleteSavedSearch,
+  } = useSavedSearches({ setStatus });
 
   const runSearch = useCallback(async (event: FormEvent) => {
     event.preventDefault();
@@ -351,38 +353,6 @@ export default function useMailboxSearchController({
     setThreadMessages,
     setStatus,
   ]);
-
-  const saveCurrentSearch = useCallback(() => {
-    const trimmedQuery = query.trim();
-    const trimmedName = savedSearchName.trim() || trimmedQuery;
-    if (!trimmedQuery) {
-      setStatus('请输入搜索条件后再保存');
-      return;
-    }
-    setSavedSearches((current) => {
-      const withoutDuplicate = current.filter(
-        (item) => item.name !== trimmedName
-          && !(item.query === trimmedQuery && item.filter === filter && item.scope === searchScope),
-      );
-      return [
-        ...withoutDuplicate,
-        {
-          id: crypto.randomUUID(),
-          name: trimmedName,
-          query: trimmedQuery,
-          filter,
-          scope: searchScope,
-        },
-      ];
-    });
-    setSavedSearchName('');
-    setStatus(`已保存搜索：${trimmedName}`);
-  }, [query, savedSearchName, filter, searchScope, setStatus]);
-
-  const deleteSavedSearch = useCallback((savedSearch: SavedSearch) => {
-    setSavedSearches((current) => current.filter((item) => item.id !== savedSearch.id));
-    setStatus(`已删除保存搜索：${savedSearch.name}`);
-  }, [setStatus]);
 
   const resetSearch = useCallback(() => {
     setQuery('');

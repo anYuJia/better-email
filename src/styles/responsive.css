@@ -1,0 +1,8 @@
+@media (max-width: 980px) {
+  .app-shell { grid-template-columns: 76px 330px minmax(360px, 1fr); }
+  .brand div:not(.brand-mark), .compose-button, .settings-button, .folder .badge, .sidebar-section { display: none; }
+  .folder { justify-content: center; }
+  .folder-name { font-size: 0; }
+  .shortcut-grid { grid-template-columns: 1fr; }
+  .shortcut-modal { width: calc(100vw - 28px); }
+}

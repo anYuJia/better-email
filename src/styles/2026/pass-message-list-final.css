@@ -1,0 +1,222 @@
+/* Message list final layout: keep the avatar stable, move bulk select aside,
+   and keep previews compact with a native one-line ellipsis. */
+.message-card {
+  min-height: 76px;
+  padding: 9px 12px 9px 66px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.message-card:hover {
+  background: #f6f8fb;
+  box-shadow: inset 0 0 0 1px rgba(86, 103, 123, 0.08);
+}
+
+.message-card.selected,
+.message-card.selected:hover {
+  background: #edf3f9;
+  box-shadow: inset 2px 0 0 #8aa7c8;
+}
+
+.message-leading {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 40px;
+  height: 50px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.message-avatar {
+  left: 4px;
+  top: 4px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  opacity: 1;
+  transform: none;
+}
+
+/* Avatar images inside the container get clipped to a perfect circle */
+.message-avatar > img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.message-card:hover .message-avatar,
+.message-card:focus-visible .message-avatar,
+.message-card:has(.message-select input:checked) .message-avatar {
+  opacity: 1;
+}
+
+.message-unread-dot {
+  left: 21px;
+  top: 43px;
+  width: 5px;
+  height: 5px;
+  background: #2d73c8;
+  box-shadow: 0 0 0 2px #fff;
+  transform: translateX(-50%);
+}
+
+.message-select {
+  left: 6px;
+  top: 6px;
+  z-index: 3;
+  opacity: 0;
+  transform: none;
+}
+
+.message-select input {
+  box-sizing: border-box;
+  flex: 0 0 14px;
+  inline-size: 14px;
+  block-size: 14px;
+  width: 14px;
+  min-width: 14px;
+  max-width: 14px;
+  height: 14px;
+  min-height: 14px;
+  max-height: 14px;
+  margin: 0;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
+}
+
+.message-card:hover .message-select,
+.message-card:focus-visible .message-select,
+.message-card:has(.message-select input:checked) .message-select {
+  opacity: 1;
+}
+
+.message-card.is-current .message-select,
+.message-card.is-current:hover .message-select,
+.message-card.is-current:focus-visible .message-select {
+  display: none;
+}
+
+.message-card > .message-topline,
+.message-card > .subject,
+.message-card > p {
+  grid-column: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.sender {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject {
+  margin-top: 2px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-card p {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-card time {
+  flex: 0 0 auto;
+}
+
+.message-list,
+.message-date-section {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.message-chips {
+  display: none;
+}
+
+.global-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 6px 9px;
+  border: 1px solid rgba(31, 41, 55, 0.10);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(31, 36, 43, 0.94);
+  box-shadow: var(--ui-shadow-tooltip);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.35;
+  letter-spacing: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: global-tooltip-in 90ms ease-out both;
+  backdrop-filter: blur(14px) saturate(1.15);
+  white-space: nowrap;
+}
+
+.global-tooltip::after {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border: inherit;
+  background: inherit;
+  content: "";
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.global-tooltip.is-top {
+  transform: translate(-50%, -100%);
+}
+
+.global-tooltip.is-top::after {
+  bottom: -5px;
+  border-top: 0;
+  border-left: 0;
+}
+
+.global-tooltip.is-bottom::after {
+  top: -5px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+@keyframes global-tooltip-in {
+  from {
+    opacity: 0;
+    filter: blur(1px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}

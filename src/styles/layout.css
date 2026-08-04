@@ -1,0 +1,55 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 236px 6px 386px 6px minmax(420px, 1fr);
+  height: 100vh;
+  width: 100vw;
+  background: #f5f6f8;
+}
+
+.sidebar {
+  background: #1f2933;
+  color: #f6f8fb;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #3aa675;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.brand strong { display: block; font-size: 16px; }
+.brand span { color: #b6c0ca; font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+.compose-button, .settings-button {
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #3aa675;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.settings-button { margin-top: auto; background: rgba(255,255,255,0.12); }
+.layout-reset-button {
+  min-height: 32px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.10);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}

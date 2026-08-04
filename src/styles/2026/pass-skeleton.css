@@ -1,0 +1,98 @@
+/* EmailReaderSkeleton Styles */
+.email-reader-skeleton-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  width: 100%;
+}
+
+.email-reader-skeleton-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 20px;
+}
+
+.skeleton-title-row {
+  height: 28px;
+  width: 60%;
+  display: flex;
+  align-items: center;
+}
+
+.skeleton-sender-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ui-surface-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-sender-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--ui-surface-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-line::after,
+.skeleton-avatar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 20%,
+    rgba(255, 255, 255, 0.6) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite ease-out;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.skeleton-sender-name {
+  height: 12px;
+  width: 120px;
+}
+
+.skeleton-sender-email {
+  height: 10px;
+  width: 200px;
+}
+
+.email-reader-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skeleton-body-line {
+  height: 13px;
+}

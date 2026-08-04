@@ -1,0 +1,99 @@
+/*
+ * 2026 interface layer
+ * A quiet desktop mail surface: flat panes, compact rows, clear hierarchy.
+ */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  letter-spacing: 0;
+}
+
+button,
+input,
+select,
+textarea,
+summary {
+  /* 移除全局 transition 声明，只有在 hover 或 focus 时局部应用，避免页面滚动/渲染重排性能瓶颈 */
+}
+
+button,
+summary,
+select,
+input[type="checkbox"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(8, 127, 245, 0.2);
+  outline-offset: 1px;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ui-accent);
+}
+
+select {
+  min-height: var(--ui-control-height);
+  color: var(--ui-text);
+  background-color: var(--ui-surface);
+  font-weight: 560;
+}
+
+select:disabled,
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+* {
+  scrollbar-color: #c7cdd5 transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #c7cdd5;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

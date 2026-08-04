@@ -1,0 +1,68 @@
+@media (min-width: 1440px) {
+  .reader-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .reader-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 1180px) {
+  .reader {
+    padding-inline: 28px;
+  }
+
+  .reader-actions button {
+    padding-inline: 8px;
+  }
+
+  .reader-actions .icon-only-action,
+  .reader-actions .icon-only-summary {
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: minmax(228px, 25vw) 5px minmax(340px, 38vw) 5px minmax(360px, 1fr) !important;
+  }
+
+  .pane-resizer {
+    display: block;
+  }
+
+  .sidebar-footer-actions .settings-button span {
+    display: none;
+  }
+
+  .reader {
+    padding-inline: 22px;
+  }
+
+  .settings-body {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+
+  .settings-nav .settings-nav-group,
+  .settings-nav > strong,
+  .settings-nav > span:not(.settings-nav-group) {
+    display: none;
+  }
+
+  .settings-nav button {
+    padding: 0 5px;
+    text-align: center;
+    font-size: 10.5px;
+  }
+
+  .settings-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-action-bar > div {
+    justify-content: flex-end;
+  }
+}

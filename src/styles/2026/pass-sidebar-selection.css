@@ -1,0 +1,36 @@
+/* Sidebar selection pass: clearer current row, flatter hover. */
+
+
+.sidebar .folder {
+  border-radius: 7px;
+}
+
+.sidebar .folder:hover,
+.sidebar .folder:focus-within {
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+.sidebar .folder.active,
+.sidebar .folder.active:hover {
+  color: #17202b;
+  background: var(--quiet-row-selected);
+  box-shadow: none;
+}
+
+.sidebar .folder.active .folder-main {
+  font-weight: 680;
+}
+
+.sidebar .folder.active .folder-name svg {
+  color: #3f6594;
+}
+
+.sidebar .folder:not(.active):hover .folder-main {
+  font-weight: 540;
+}
+
+.sidebar-footer-actions .settings-button:hover,
+.settings-button:hover {
+  box-shadow: none;
+}

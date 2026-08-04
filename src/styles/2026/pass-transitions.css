@@ -1,0 +1,18 @@
+/* 局部化 Transition：仅在具体的交互 hover/focus-visible/active 类或状态上应用过渡属性，保障性能 */
+button,
+.btn,
+.icon-button,
+.compose-button,
+.refresh-text-button,
+select,
+input,
+textarea,
+summary {
+  transition:
+    color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}

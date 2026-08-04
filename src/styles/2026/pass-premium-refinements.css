@@ -1,0 +1,127 @@
+/*
+ * Better Email UI/UX Premium Refinements
+ * Overrides for sidebar active indicator, message card states, chips, empty states, and warnings.
+ */
+
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(10, 115, 217, 0.45);
+  outline-offset: 1px;
+}
+
+.settings-modal input:focus,
+.settings-modal select:focus,
+.settings-modal textarea:focus,
+.composer input:focus,
+.composer select:focus,
+.composer textarea:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px rgba(10, 115, 217, 0.15);
+}
+
+.sidebar .folder.active,
+.sidebar .folder.active:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.message-card.is-unread {
+  background: #ffffff;
+}
+
+.message-card.is-read {
+  background: var(--ui-list);
+}
+
+.message-card:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+.message-card.selected,
+.message-card.selected:hover {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 3.5px 0 0 var(--ui-accent);
+}
+
+.message-unread-dot {
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-surface);
+}
+
+.message-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.message-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  gap: 8px;
+  background: var(--ui-list);
+}
+
+.empty-state-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  margin-bottom: 8px;
+  box-shadow: none;
+}
+
+.empty-reader-compose {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+  transition: all 120ms ease;
+}
+
+.empty-reader-compose:hover {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.reader-warning-panel {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning);
+}
+
+.reader-warning-primary-action {
+  border-radius: var(--ui-radius-control);
+  transition: all 120ms ease;
+}

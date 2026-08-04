@@ -2384,7 +2384,7 @@ export default function App() {
       folders,
       messagePageSize,
       searchScope,
-      false,
+      listMode === 'threads',
     );
     setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
   }, [
@@ -2395,6 +2395,7 @@ export default function App() {
     accountScope,
     folders,
     searchScope,
+    listMode,
   ]);
 
   const changeSearchScope = useCallback(async (nextScope: SearchScope) => {
@@ -2464,7 +2465,6 @@ export default function App() {
     setQuery('');
     setFilter('all');
     setSearchScope('folder');
-    setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
     await loadMessagesWithVisibleFallback(
@@ -2476,7 +2476,7 @@ export default function App() {
       folders,
       messagePageSize,
       'folder',
-      false,
+      listMode === 'threads',
     );
     setStatus('已清空搜索和筛选');
   }, [
@@ -2484,6 +2484,7 @@ export default function App() {
     folderId,
     accountScope,
     folders,
+    listMode,
   ]);
 
   const loadMoreMessages = useCallback(async () => {

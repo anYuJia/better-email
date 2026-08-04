@@ -835,15 +835,13 @@ async function main() {
     await openDetails(cdp, '.reader-more-menu');
     await clickButton(cdp, '取消静音会话', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已取消静音会话') && !document.querySelector('.thread-card .thread-muted-indicator')");
-    await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
-    await waitForExpression(cdp, "document.querySelector('.message-list') && document.querySelectorAll('.message-card').length >= 1");
     await fillInput(cdp, '.search-box input', '安全检查清单');
     await evalInPage(cdp, "document.querySelector('.search-box').requestSubmit()");
-    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length === 1 && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
+    await waitForExpression(cdp, "document.querySelectorAll('.thread-card').length === 1 && [...document.querySelectorAll('.thread-card')].some((item) => item.textContent.includes('安全检查清单'))");
     await evalInPage(cdp, "document.querySelector('.search-clear-button').click()");
-    await waitForExpression(cdp, "document.querySelector('.message-list') && !document.querySelector('.thread-list') && document.querySelectorAll('.message-card').length >= 1");
+    await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length >= 1");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
-    await waitForExpression(cdp, "document.querySelector('.message-list')");
+    await waitForExpression(cdp, "document.querySelector('.message-list') && document.querySelectorAll('.message-card').length >= 1");
 
     await openDetails(cdp, '.sidebar-tools');
     await fillInput(cdp, '.custom-folder-form input[placeholder="新建文件夹"]', '客户跟进');

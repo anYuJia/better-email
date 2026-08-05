@@ -48,14 +48,6 @@ export default function ReaderTranslationPanel({
           <button type="button" onClick={onToggle}>显示译文</button>
         </div>
       )}
-      {state.status === 'idle' && needsTranslation && (
-        <div className="reader-translation-banner">
-          <span>检测到外语邮件</span>
-          <button type="button" className="reader-translate-action" onClick={onTranslate}>
-            <Languages size={13} /> 翻译为中文
-          </button>
-        </div>
-      )}
     </div>
   );
 }

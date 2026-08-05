@@ -6,6 +6,8 @@ type ReaderSecurityBannerProps = {
   selectedSenderDomain: string;
   selectedSenderIsExternal: boolean;
   selectedExternalBlocked: boolean;
+  showHttpLinkAction: boolean;
+  onViewHttpLinks: () => void;
   onAllowRemoteImagesOnce: () => void;
   onTrustSender: () => void;
   onTrustDomain: () => void;
@@ -19,15 +21,23 @@ export default function ReaderSecurityBanner({
   selectedSenderDomain,
   selectedSenderIsExternal,
   selectedExternalBlocked,
+  showHttpLinkAction,
+  onViewHttpLinks,
   onAllowRemoteImagesOnce,
   onTrustSender,
   onTrustDomain,
 }: ReaderSecurityBannerProps) {
-  if (warnings.length === 0 && !showRemoteImageNote && !selectedExternalBlocked) return null;
+  if (warnings.length === 0 && !showRemoteImageNote && !selectedExternalBlocked && !showHttpLinkAction) {
+    return null;
+  }
 
   const externalBlockNote = selectedExternalBlocked
     ? '发件人来自外部邮箱，已按账号策略拦截远程图片等远程内容。'
     : null;
+  const showImageAction = showRemoteImageNote && hasRenderableHtml;
+  const showActionRow = Boolean(
+    !selectedExternalBlocked && (showHttpLinkAction || showImageAction),
+  );
 
   return (
     <div className="reader-warning-panel">
@@ -39,16 +49,27 @@ export default function ReaderSecurityBanner({
       </div>
       {warnings.map((warning) => <p key={warning}>{warning}</p>)}
       {externalBlockNote && <p>{externalBlockNote}</p>}
-      {showRemoteImageNote && hasRenderableHtml && !selectedExternalBlocked && (
+      {showActionRow && (
         <div className="reader-warning-action-row">
-          <button
-            type="button"
-            className="reader-warning-primary-action"
-            onClick={onAllowRemoteImagesOnce}
-          >
-            显示本封图片
-          </button>
-          {!selectedSenderTrusted && (
+          {showHttpLinkAction && (
+            <button
+              type="button"
+              className="reader-warning-primary-action"
+              onClick={onViewHttpLinks}
+            >
+              查看链接
+            </button>
+          )}
+          {showImageAction && (
+            <button
+              type="button"
+              className="reader-warning-primary-action"
+              onClick={onAllowRemoteImagesOnce}
+            >
+              显示本封图片
+            </button>
+          )}
+          {showImageAction && !selectedSenderTrusted && (
             <>
               <button type="button" className="reader-warning-secondary-action" onClick={onTrustSender}>
                 信任发件人

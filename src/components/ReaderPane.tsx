@@ -20,7 +20,7 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, extractPlainHttpLinks } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -28,6 +28,7 @@ import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from '
 import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
 import InlineImageNotice from './reader/InlineImageNotice';
+import HttpLinkListDialog from './reader/HttpLinkListDialog';
 import ReaderBodyContent from './ReaderBodyContent';
 import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
@@ -183,6 +184,7 @@ export default function ReaderPane({
   onSendQuickReply,
 }: ReaderPaneProps) {
   const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
+  const [httpLinkListOpen, setHttpLinkListOpen] = useState(false);
   const {
     readerRef,
     bodySelected,
@@ -290,6 +292,11 @@ export default function ReaderPane({
     ) ?? [],
     [selected?.security_warnings, selectedSenderTrusted],
   );
+  const plainHttpLinks = useMemo(() => {
+    if (!bodySelected?.body.trim()) return [];
+    if (!bodySelected.security_warnings.some((warning) => warning.includes('明文 HTTP 链接'))) return [];
+    return extractPlainHttpLinks(bodySelected.body);
+  }, [bodySelected?.body, bodySelected?.security_warnings]);
   const readerHtml = inlineImageResolution.html;
   const hasRenderableHtml = Boolean(
     bodySelected?.sanitized_html.trim()
@@ -381,6 +388,7 @@ if (activeThread && threadMessages.length > 0) {
           onBlockSender={onBlockSender}
           needsTranslation={needsTranslation}
           translationActive={translationState.status === 'success' && translationState.showTranslation}
+          translationCompleted={translationState.status === 'success'}
           translationLoading={translationState.status === 'translating'}
           onTranslateMessage={translateMessage}
           onToggleTranslation={toggleTranslation}
@@ -454,6 +462,8 @@ if (activeThread && threadMessages.length > 0) {
           selectedSenderDomain={selectedSenderDomain}
           selectedSenderIsExternal={selectedSenderIsExternal}
           selectedExternalBlocked={selectedExternalBlocked}
+          showHttpLinkAction={plainHttpLinks.length > 0}
+          onViewHttpLinks={() => setHttpLinkListOpen(true)}
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onTrustSender={() => onTrustRemoteImages('sender')}
           onTrustDomain={() => onTrustRemoteImages('domain')}
@@ -537,6 +547,17 @@ if (activeThread && threadMessages.length > 0) {
           items={attachmentMenuItems(attachmentContextMenu.attachment)}
           onClose={() => setAttachmentContextMenu(null)}
           ariaLabel="附件操作"
+        />
+      )}
+
+      {httpLinkListOpen && (
+        <HttpLinkListDialog
+          links={plainHttpLinks}
+          onClose={() => setHttpLinkListOpen(false)}
+          onOpenLink={(href, text) => {
+            setHttpLinkListOpen(false);
+            setClickedLink({ href, text });
+          }}
         />
       )}
 

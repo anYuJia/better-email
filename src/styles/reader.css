@@ -61,6 +61,38 @@ h1 {
   gap: 6px;
   white-space: nowrap;
 }
+.reader-actions .reader-translate-action {
+  width: auto;
+  min-width: 92px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #bad8f7;
+  border-radius: 8px;
+  color: #0a7aff;
+  background: #eef6ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.reader-actions .reader-translate-action:hover {
+  color: #ffffff;
+  border-color: #0a7aff;
+  background: #0a7aff;
+}
+.reader-actions .reader-translate-action.active {
+  color: #ffffff;
+  border-color: #0a7aff;
+  background: #0a7aff;
+}
+.reader-actions .reader-translate-action:disabled {
+  color: #68717d;
+  border-color: #d8dde4;
+  background: #f4f6f8;
+  cursor: default;
+}
 .reader-more-menu > div {
   width: 248px;
 }

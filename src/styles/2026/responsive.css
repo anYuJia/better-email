@@ -41,6 +41,16 @@
     padding-inline: 22px;
   }
 
+  .reader-actions .reader-translate-action span {
+    display: none;
+  }
+
+  .reader-actions .reader-translate-action {
+    width: 32px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
   .settings-body {
     grid-template-columns: 78px minmax(0, 1fr);
   }

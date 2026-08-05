@@ -377,6 +377,39 @@ export function senderDomain(senderEmail: string): string {
   return domain.trim();
 }
 
+export type PlainHttpLink = { href: string; text: string };
+
+const HTTP_ANCHOR_PATTERN = /<a\s+[^>]*href=["'](http:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+const HTTP_ANCHOR_STRIP_PATTERN = /<a\s+[^>]*href=["'](http:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/a>/gi;
+const BARE_HTTP_URL_PATTERN = /(^|[\s([{（「])(http:\/\/[^\s<>"'）)\]}>]+)/gi;
+
+function plainTextFor(htmlFragment: string): string {
+  return htmlFragment
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function extractPlainHttpLinks(content: string): PlainHttpLink[] {
+  const links: PlainHttpLink[] = [];
+  const seen = new Set<string>();
+  const push = (href: string, text: string) => {
+    if (seen.has(href)) return;
+    seen.add(href);
+    links.push({ href, text });
+  };
+  let match: RegExpExecArray | null;
+  while ((match = HTTP_ANCHOR_PATTERN.exec(content)) !== null) {
+    const text = plainTextFor(match[2]) || match[1];
+    push(match[1], text);
+  }
+  const withoutAnchors = content.replace(HTTP_ANCHOR_STRIP_PATTERN, '');
+  while ((match = BARE_HTTP_URL_PATTERN.exec(withoutAnchors)) !== null) {
+    push(match[2], match[2]);
+  }
+  return links;
+}
+
 export function remoteImageTrustInput(
   accountId: number,
   senderEmail: string,

@@ -31,6 +31,7 @@ type ReaderToolbarProps = {
   onBlockSender: () => void;
   needsTranslation: boolean;
   translationActive: boolean;
+  translationCompleted: boolean;
   translationLoading: boolean;
   onTranslateMessage: () => void;
   onToggleTranslation: () => void;
@@ -63,6 +64,7 @@ export default function ReaderToolbar({
   onBlockSender,
   needsTranslation,
   translationActive,
+  translationCompleted,
   translationLoading,
   onTranslateMessage,
   onToggleTranslation,
@@ -132,17 +134,6 @@ export default function ReaderToolbar({
             <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
               <MailPlus size={17} />
             </button>
-            {needsTranslation && (
-              <button
-                className={`icon-only-action reader-translate-action${translationActive ? ' active' : ''}`}
-                title={translationActive ? '显示原文' : '翻译为中文'}
-                aria-label={translationActive ? '显示原文' : '翻译为中文'}
-                onClick={translationActive ? onToggleTranslation : onTranslateMessage}
-                disabled={translationLoading}
-              >
-                {translationLoading ? <Loader2 size={16} className="reader-translation-spinner" /> : <Languages size={16} />}
-              </button>
-            )}
           </>
         )}
         {isTrash ? (
@@ -223,6 +214,23 @@ export default function ReaderToolbar({
             ))}
           </div>
         </details>
+        {!isDraft && needsTranslation && (
+          <button
+            type="button"
+            className={`reader-translate-action${translationActive ? ' active' : ''}`}
+            title="检测到外语邮件，点击翻译为中文"
+            aria-label={translationActive ? '显示原文' : '翻译为中文'}
+            onClick={translationCompleted ? onToggleTranslation : onTranslateMessage}
+            disabled={translationLoading}
+          >
+            {translationLoading ? (
+              <Loader2 size={15} className="reader-translation-spinner" />
+            ) : (
+              <Languages size={15} />
+            )}
+            <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
+          </button>
+        )}
       </div>
     </header>
   );

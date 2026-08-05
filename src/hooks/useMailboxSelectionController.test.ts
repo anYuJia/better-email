@@ -347,4 +347,42 @@ describe('useMailboxSelectionController', () => {
       expect(setters.setAttachments).toHaveBeenCalledWith([]);
     });
   });
+
+  it('fetches the remote body when message detail has no cached body content', async () => {
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_message_detail') {
+        return Promise.resolve(message(1, {
+          body: '',
+          sanitized_html: '',
+          snippet: 'Server-side preview only',
+          remote_uid: 123,
+        }));
+      }
+      if (command === 'fetch_message_body') {
+        return Promise.resolve(message(1, {
+          body: 'Fetched remote body',
+          sanitized_html: '',
+          snippet: 'Server-side preview only',
+          remote_uid: 123,
+        }));
+      }
+      return Promise.resolve([]);
+    }) as never);
+    const { result, setters } = renderController();
+
+    act(() => {
+      result.current.setSelectedId(1);
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('get_message_detail', { messageId: 1 });
+    });
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('fetch_message_body', { messageId: 1 });
+    });
+    await waitFor(() => {
+      expect(result.current.readerSelectedDetail?.body).toBe('Fetched remote body');
+    });
+    expect(setters.setMessages).toHaveBeenCalled();
+  });
 });

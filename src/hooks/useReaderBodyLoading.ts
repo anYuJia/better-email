@@ -125,10 +125,13 @@ export default function useReaderBodyLoading({
 
   useEffect(() => {
     if (!readerSelectedDetail) return undefined;
+    const hasCachedBody = Boolean(
+      readerSelectedDetail.body.trim() ||
+        readerSelectedDetail.sanitized_html.trim(),
+    );
     const isHeaderOnlyRemoteMessage =
       readerSelectedDetail.remote_uid > 0 &&
-      (!readerSelectedDetail.body.trim() || isMessageBodyCorrupted(readerSelectedDetail.body)) &&
-      (readerSelectedDetail.snippet.includes('远端邮件头已同步') || isMessageBodyCorrupted(readerSelectedDetail.body));
+      (!hasCachedBody || isMessageBodyCorrupted(readerSelectedDetail.body));
     if (!isHeaderOnlyRemoteMessage) return undefined;
     if (bodyFetchInFlightRef.current.has(readerSelectedDetail.id) || bodyFetchFailedRef.current.has(readerSelectedDetail.id)) return undefined;
 

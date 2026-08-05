@@ -1863,6 +1863,7 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
   return {
     file_name,
     path,
+    format: file_name.toLowerCase().endsWith('.csv') ? 'csv' : 'vcard',
     total_count: 4,
     new_count: 1,
     merge_count: 1,

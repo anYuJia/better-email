@@ -2,7 +2,7 @@ use super::common::MAX_VCARD_IMPORT_BYTES;
 use crate::db::{MailResult, MailStore};
 use crate::models::{
     Contact, ContactCreateInput, ContactExportSummary, ContactImportBatch,
-    ContactImportCommitSummary, ContactImportPreview, ContactImportPreviewEntry,
+    ContactImportCommitSummary, ContactImportPreview,
     ContactImportSelection, ContactImportSummary, ContactImportUndoReport, ContactInput,
     ContactMergeSuggestion, MailRule, MailRuleInput,
 };
@@ -71,11 +71,12 @@ pub fn preview_contact_import(path: String, store: State<'_, MailStore>) -> Mail
     Ok(ContactImportPreview {
         file_name,
         path,
+        format: parsed.format,
         total_count: parsed.total,
         new_count,
         merge_count,
         duplicate_count,
-        invalid_count,
+        invalid_count: invalid_count + parsed.skipped,
         entries,
     })
 }

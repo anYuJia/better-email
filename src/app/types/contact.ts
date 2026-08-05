@@ -55,6 +55,7 @@ export type ContactImportPreviewEntry = {
 export type ContactImportPreview = {
   file_name: string;
   path: string;
+  format: string;
   total_count: number;
   new_count: number;
   merge_count: number;

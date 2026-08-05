@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
   FileText,
@@ -73,9 +73,9 @@ export default function TemplateSettings() {
   const [aiPreview, setAiPreview] = useState<{ subject: string; body: string } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     void invoke<Account[]>('list_accounts').then(setAccounts).catch(() => undefined);
-  });
+  }, []);
 
   const categories = useMemo(() => (
     [...new Set(templates.map((template) => template.category).filter(Boolean))]

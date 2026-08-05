@@ -1123,9 +1123,6 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.contact-import-preview') && document.querySelector('.contact-import-preview')?.innerText.includes('导入预览') && document.querySelector('.contact-import-preview')?.innerText.includes('新增 1') && document.querySelector('.contact-import-preview')?.innerText.includes('可合并 1')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.contact-import-preview-row')].some((row) => row.innerText.includes('import.new@example.com'))");
     await clickButton(cdp, '确认导入', "document.querySelector('.contact-import-preview')");
-    await sleep(1000);
-    const impDbg = await evalInPage(cdp, "JSON.stringify({ status: document.querySelector('.status-line')?.textContent, panel: document.querySelector('.settings-contact-panel')?.innerText.slice(0, 400), previewOpen: Boolean(document.querySelector('.contact-import-preview')), invocations: (window.__betterEmailMockInvocations || []).filter((e) => e.command.includes('contact_import')).slice(-4).map((e) => e.command + ':' + JSON.stringify(e.args)) })");
-    console.error('IMPORT-DEBUG:', impDbg);
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('联系人导入完成：新增 1、合并 1、跳过 0') && document.querySelector('.settings-contact-panel')?.innerText.includes('import.new@example.com') && !document.querySelector('.contact-import-preview')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.contact-history-toggle'); if (!button) throw new Error('Import history toggle not found'); button.click(); })()");
     await waitForExpression(cdp, "document.querySelector('.contact-import-history') && document.querySelector('.contact-import-history')?.innerText.includes('import-contacts.vcf') && document.querySelector('.contact-import-history')?.innerText.includes('新增 1')");

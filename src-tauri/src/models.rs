@@ -649,6 +649,7 @@ pub struct ContactImportPreviewEntry {
 pub struct ContactImportPreview {
     pub file_name: String,
     pub path: String,
+    pub format: String,
     pub total_count: i64,
     pub new_count: i64,
     pub merge_count: i64,
@@ -695,68 +696,6 @@ pub struct ContactExportSummary {
     pub path: String,
     pub contacts: i64,
     pub size_bytes: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AiSettingsView {
-    pub enabled: bool,
-    pub service_type: String,
-    pub endpoint: String,
-    pub model: String,
-    pub timeout_seconds: i64,
-    pub privacy_acknowledged: bool,
-    pub has_api_key: bool,
-    pub api_key_masked: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AiSettingsInput {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub service_type: String,
-    #[serde(default)]
-    pub endpoint: String,
-    #[serde(default)]
-    pub model: String,
-    #[serde(default = "default_timeout_seconds")]
-    pub timeout_seconds: i64,
-    #[serde(default)]
-    pub privacy_acknowledged: bool,
-    #[serde(default)]
-    pub api_key: String,
-}
-
-fn default_timeout_seconds() -> i64 {
-    30
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AiRequestInput {
-    pub operation: String,
-    #[serde(default)]
-    pub text: String,
-    #[serde(default)]
-    pub target_language: String,
-    #[serde(default)]
-    pub prompt: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AiRequestResult {
-    pub operation: String,
-    pub content: String,
-    pub service_type: String,
-    pub truncated: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AiConnectionReport {
-    pub ok: bool,
-    pub service_type: String,
-    pub message: String,
-    pub latency_ms: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

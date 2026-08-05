@@ -297,6 +297,7 @@ pub fn run() {
             commands::commit_contact_import,
             commands::list_contact_import_batches,
             commands::undo_contact_import_batch,
+            commands::pick_contact_import_file,
             commands::ai_chat_request,
             commands::ai_request,
             commands::test_ai_connection,

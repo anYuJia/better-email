@@ -103,6 +103,28 @@
     box-shadow 120ms ease;
 }
 
+/* The shared dropdown trigger (CustomSelect) keeps its own border from the
+ * global dropdown stylesheet; do not collapse it to transparent. */
+.settings-modal .settings-page-content .custom-select-summary {
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface);
+  color: var(--st-text);
+}
+
+.settings-modal .settings-page-content .custom-select-summary:hover {
+  border-color: var(--st-border-strong);
+}
+
+.settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--st-focus-border);
+  box-shadow: var(--st-focus-ring);
+}
+
+.settings-modal .settings-page-content .custom-select-summary:disabled {
+  opacity: 0.55;
+}
+
 .settings-modal button:disabled {
   cursor: not-allowed;
   opacity: 0.55;

@@ -11,6 +11,7 @@ import type {
   ProviderWritebackValidationProgress,
   ProviderWritebackValidationStepId,
 } from '../../app/providerWriteValidation';
+import { SettingsButton } from './shared';
 
 type ProviderWritebackValidationPanelProps = {
   progress: ProviderWritebackValidationProgress;
@@ -54,16 +55,15 @@ export default function ProviderWritebackValidationPanel({
         </span>
         <div>
           <b>{progress.passedSteps}/{progress.totalSteps}</b>
-          <button
-            className="secondary"
+          <SettingsButton
+            size="sm"
             disabled={!hasResults || progress.steps.some((step) => step.state === 'running')}
             title="清除本机记录，从已读步骤重新验收"
-            type="button"
+            icon={<RotateCcw size={13} />}
             onClick={onReset}
           >
-            <RotateCcw size={13} />
             重置
-          </button>
+          </SettingsButton>
         </div>
       </header>
       {progress.blockedReason && (

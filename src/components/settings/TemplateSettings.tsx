@@ -25,7 +25,15 @@ import {
 import { aiErrorMessage, generateTemplate } from '../../app/aiService';
 import { loadAiServiceConfig } from '../../app/aiServiceConfig';
 import type { AiRequestError } from '../../app/types/ai';
-import './ai-settings.css';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsField,
+  SettingsNotice,
+  SettingsSection,
+  SettingsSwitch,
+} from './shared';
 
 type TemplateEditor = {
   id: string;
@@ -222,313 +230,295 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
   }
 
   return (
-    <div className="settings-experience-stack">
-      <section className="tool-panel settings-template-panel" data-settings-section="templates">
-        <header className="tool-header">
-          <span>
-            <strong>模板管理</strong>
-            <small>维护常用写信模板，支持变量与 AI 辅助生成。</small>
-          </span>
-          <em>{templates.length} 个模板</em>
-        </header>
-
-        <div className="template-toolbar">
-          <div className="template-search">
-            <Search size={14} aria-hidden="true" />
-            <input
-              type="text"
-              placeholder="搜索模板名称、主题或标签"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-          <button
-            type="button"
-            className={`template-filter-button secondary${favoritesOnly ? ' active' : ''}`}
-            aria-pressed={favoritesOnly}
-            onClick={() => setFavoritesOnly((current) => !current)}
-          >
-            <Star size={14} /> 常用
-          </button>
-          <button type="button" className="secondary" onClick={openAiGenerator}>
-            <Sparkles size={14} /> AI 生成
-          </button>
-          <button type="button" className="primary" onClick={startCreate}>
-            <Plus size={14} /> 新建模板
-          </button>
+    <SettingsSection
+      title="模板管理"
+      description="维护常用写信模板，支持变量与 AI 辅助生成。"
+      badge={<SettingsBadge tone="neutral">{templates.length} 个模板</SettingsBadge>}
+      dataSection="templates"
+    >
+      <div className="template-toolbar">
+        <div className="template-search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="text"
+            placeholder="搜索模板名称、主题或标签"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </div>
+        <SettingsButton
+          className={`template-filter-button${favoritesOnly ? ' active' : ''}`}
+          aria-pressed={favoritesOnly}
+          icon={<Star size={14} />}
+          onClick={() => setFavoritesOnly((current) => !current)}
+        >
+          常用
+        </SettingsButton>
+        <SettingsButton icon={<Sparkles size={14} />} onClick={openAiGenerator}>
+          AI 生成
+        </SettingsButton>
+        <SettingsButton variant="primary" icon={<Plus size={14} />} onClick={startCreate}>
+          新建模板
+        </SettingsButton>
+      </div>
 
-        {status && <div className="settings-inline-status">{status}</div>}
+      {status && <div className="settings-inline-status">{status}</div>}
 
-        <div className={`template-ai-generator${aiOpen ? '' : ' is-collapsed'}`}>
-          <button
-            type="button"
-            className="template-ai-toggle"
-            aria-label="AI 辅助生成模板"
-            aria-expanded={aiOpen}
-            onClick={() => setAiOpen((current) => !current)}
-          >
-            <Wand2 size={15} aria-hidden="true" />
-            <strong>AI 辅助生成模板</strong>
-            <small>描述用途后自动生成主题与正文，可编辑后保存。</small>
-            <ChevronDown size={14} className="template-ai-chevron" aria-hidden="true" />
-          </button>
-          {aiOpen && (
-            <div className="template-ai-body">
-              {!aiEnabled && (
-                <div className="template-ai-disabled-hint">
-                  提示：AI 服务尚未开启。请先在「AI 服务」设置中配置并开启，才能使用模板生成。
-                  {onNavigateToAi && (
-                    <button type="button" onClick={onNavigateToAi}>前往 AI 服务设置</button>
-                  )}
+      <div className={`template-ai-generator${aiOpen ? '' : ' is-collapsed'}`}>
+        <button
+          type="button"
+          className="template-ai-toggle"
+          aria-label="AI 辅助生成模板"
+          aria-expanded={aiOpen}
+          onClick={() => setAiOpen((current) => !current)}
+        >
+          <Wand2 size={15} aria-hidden="true" />
+          <strong>AI 辅助生成模板</strong>
+          <small>描述用途后自动生成主题与正文，可编辑后保存。</small>
+          <ChevronDown size={14} className="template-ai-chevron" aria-hidden="true" />
+        </button>
+        {aiOpen && (
+          <div className="template-ai-body">
+            {!aiEnabled && (
+              <SettingsNotice tone="warning" title="提示：AI 服务尚未开启" action={
+                onNavigateToAi ? (
+                  <SettingsButton size="sm" onClick={onNavigateToAi}>前往 AI 服务设置</SettingsButton>
+                ) : undefined
+              }>
+                <p>请先在「AI 服务」设置中配置并开启，才能使用模板生成。</p>
+              </SettingsNotice>
+            )}
+            <div className="template-ai-row">
+              <input
+                className="settings-text-input"
+                type="text"
+                placeholder="描述模板用途，如：给新客户发送产品介绍与报价"
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+              />
+              <SettingsButton
+                variant="primary"
+                disabled={aiBusy || !aiPrompt.trim()}
+                icon={<Sparkles size={14} />}
+                onClick={runAiGenerate}
+              >
+                {aiBusy ? '生成中…' : 'AI 生成'}
+              </SettingsButton>
+            </div>
+            {aiPreview && (
+              <div className="template-ai-preview">
+                <SettingsField label="生成的主题">
+                  <input
+                    className="settings-text-input"
+                    type="text"
+                    value={aiPreview.subject}
+                    onChange={(event) => setAiPreview({ ...aiPreview, subject: event.target.value })}
+                  />
+                </SettingsField>
+                <SettingsField label="生成的正文">
+                  <textarea
+                    className="settings-textarea"
+                    rows={6}
+                    value={aiPreview.body}
+                    onChange={(event) => setAiPreview({ ...aiPreview, body: event.target.value })}
+                  />
+                </SettingsField>
+                <div className="st-actions">
+                  <SettingsButton onClick={() => setAiPreview(null)}>放弃</SettingsButton>
+                  <SettingsButton variant="primary" icon={<Pencil size={14} />} onClick={saveAiPreview}>
+                    保存为模板
+                  </SettingsButton>
                 </div>
-              )}
-              <div className="template-ai-row">
-                <input
-                  className="settings-text-input"
-                  type="text"
-                  placeholder="描述模板用途，如：给新客户发送产品介绍与报价"
-                  value={aiPrompt}
-                  onChange={(event) => setAiPrompt(event.target.value)}
-                />
-                <button type="button" onClick={runAiGenerate} disabled={aiBusy || !aiPrompt.trim()}>
-                  <Sparkles size={14} /> {aiBusy ? '生成中…' : 'AI 生成'}
-                </button>
               </div>
-              {aiPreview && (
-                <div className="template-ai-preview">
-                  <div className="settings-field">
-                    <span className="settings-field-label">生成的主题</span>
-                    <input
-                      className="settings-text-input"
-                      type="text"
-                      value={aiPreview.subject}
-                      onChange={(event) => setAiPreview({ ...aiPreview, subject: event.target.value })}
-                    />
-                  </div>
-                  <div className="settings-field">
-                    <span className="settings-field-label">生成的正文</span>
-                    <textarea
-                      className="settings-textarea"
-                      rows={6}
-                      value={aiPreview.body}
-                      onChange={(event) => setAiPreview({ ...aiPreview, body: event.target.value })}
-                    />
-                  </div>
-                  <div className="template-editor-actions">
-                    <button type="button" className="secondary" onClick={() => setAiPreview(null)}>
-                      放弃
-                    </button>
-                    <button type="button" className="primary" onClick={saveAiPreview}>
-                      <Pencil size={14} /> 保存为模板
-                    </button>
-                  </div>
-                </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <div className="template-editor">
+          <div className="template-editor-header">
+            <h3>{editor.id ? '编辑模板' : '新建模板'}</h3>
+            <SettingsButton size="sm" icon={<Sparkles size={13} />} onClick={openAiGenerator}>
+              用 AI 生成
+            </SettingsButton>
+          </div>
+          <SettingsField label="名称">
+            <input
+              className="settings-text-input"
+              type="text"
+              aria-label="模板名称"
+              placeholder="模板名称"
+              value={editor.name}
+              onChange={(event) => setEditor({ ...editor, name: event.target.value })}
+            />
+          </SettingsField>
+          <SettingsField label="邮件主题">
+            <input
+              className="settings-text-input"
+              type="text"
+              aria-label="邮件主题"
+              placeholder="邮件主题（可插入 {{contact.name}} 等变量）"
+              value={editor.subject}
+              onFocus={() => setActiveVariableField('subject')}
+              onChange={(event) => setEditor({ ...editor, subject: event.target.value })}
+            />
+          </SettingsField>
+          <SettingsField label="正文">
+            <textarea
+              className="settings-textarea"
+              rows={7}
+              aria-label="正文"
+              placeholder="邮件正文（可插入 {{today}}、{{contact.name}} 等变量）"
+              value={editor.body}
+              onFocus={() => setActiveVariableField('body')}
+              onChange={(event) => setEditor({ ...editor, body: event.target.value })}
+            />
+          </SettingsField>
+          <SettingsField label="分类">
+            <input
+              className="settings-text-input"
+              type="text"
+              aria-label="分类"
+              placeholder="如：商务 / 跟进 / 感谢（留空为未分类）"
+              value={editor.category}
+              onChange={(event) => setEditor({ ...editor, category: event.target.value })}
+            />
+          </SettingsField>
+          <SettingsField label="标签（逗号分隔）">
+            <input
+              className="settings-text-input"
+              type="text"
+              aria-label="标签"
+              placeholder="如：销售, 客户"
+              value={editor.tags}
+              onChange={(event) => setEditor({ ...editor, tags: event.target.value })}
+            />
+          </SettingsField>
+          <SettingsField label="适用账号">
+            <select
+              className="settings-text-input"
+              aria-label="适用账号"
+              value={editor.account_id}
+              onChange={(event) => setEditor({ ...editor, account_id: Number(event.target.value) || 0 })}
+            >
+              <option value={0}>全局（所有账号）</option>
+              {accounts.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  仅 {entry.display_name || entry.email}（{entry.email}）
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+          <SettingsSwitch
+            label="设为常用模板"
+            description="在写信时优先展示，并可通过「常用」筛选快速查找。"
+            checked={editor.is_favorite}
+            onChange={(checked) => setEditor({ ...editor, is_favorite: checked })}
+          />
+
+          <div className="template-variable-hints">
+            <strong>变量（点击插入到{activeVariableField === 'subject' ? '主题' : '正文'}）</strong>
+            {TEMPLATE_VARIABLES.map((variable) => (
+              <button
+                type="button"
+                key={variable.name}
+                className="template-variable-chip"
+                title={variable.description}
+                onClick={() => insertVariable(variable.name)}
+              >
+                <code>{variable.name}</code>
+                <small>{variable.label}</small>
+              </button>
+            ))}
+            <small>无法解析的变量会保留原样，不会静默删除。</small>
+          </div>
+
+          {(editor.subject.trim() || editor.body.trim()) && (
+            <div className="template-preview">
+              <strong>预览（使用示例联系人）</strong>
+              {editor.subject.trim() && (
+                <p className="template-preview-subject">{renderTemplatePreview(editor.subject)}</p>
               )}
+              {editor.body.trim() && (
+                <pre className="template-preview-body">{renderTemplatePreview(editor.body)}</pre>
+              )}
+              <small>实际发送时按真实联系人、日期与签名渲染。</small>
             </div>
           )}
+
+          <div className="st-actions">
+            <SettingsButton onClick={() => setEditing(false)}>取消</SettingsButton>
+            <SettingsButton variant="primary" icon={<Pencil size={14} />} onClick={saveEditor}>
+              保存模板
+            </SettingsButton>
+          </div>
         </div>
+      )}
 
-        {editing && (
-          <div className="template-editor">
-            <div className="template-editor-header">
-              <h3>{editor.id ? '编辑模板' : '新建模板'}</h3>
-              <button type="button" className="template-editor-ai-entry" onClick={openAiGenerator}>
-                <Sparkles size={13} /> 用 AI 生成
-              </button>
+      {isEmptyList ? (
+        <SettingsEmptyState
+          actions={
+            <div className="st-actions">
+              <SettingsButton variant="primary" icon={<Plus size={14} />} onClick={startCreate}>
+                新建模板
+              </SettingsButton>
+              <SettingsButton icon={<Sparkles size={14} />} onClick={openAiGenerator}>
+                AI 生成
+              </SettingsButton>
             </div>
-            <div className="settings-field">
-              <span className="settings-field-label">名称</span>
-              <input
-                className="settings-text-input"
-                type="text"
-                aria-label="模板名称"
-                placeholder="模板名称"
-                value={editor.name}
-                onChange={(event) => setEditor({ ...editor, name: event.target.value })}
-              />
-            </div>
-            <div className="settings-field">
-              <span className="settings-field-label">邮件主题</span>
-              <input
-                className="settings-text-input"
-                type="text"
-                aria-label="邮件主题"
-                placeholder="邮件主题（可插入 {{contact.name}} 等变量）"
-                value={editor.subject}
-                onFocus={() => setActiveVariableField('subject')}
-                onChange={(event) => setEditor({ ...editor, subject: event.target.value })}
-              />
-            </div>
-            <div className="settings-field">
-              <span className="settings-field-label">正文</span>
-              <textarea
-                className="settings-textarea"
-                rows={7}
-                aria-label="正文"
-                placeholder="邮件正文（可插入 {{today}}、{{contact.name}} 等变量）"
-                value={editor.body}
-                onFocus={() => setActiveVariableField('body')}
-                onChange={(event) => setEditor({ ...editor, body: event.target.value })}
-              />
-            </div>
-            <div className="settings-field">
-              <span className="settings-field-label">分类</span>
-              <input
-                className="settings-text-input"
-                type="text"
-                aria-label="分类"
-                placeholder="如：商务 / 跟进 / 感谢（留空为未分类）"
-                value={editor.category}
-                onChange={(event) => setEditor({ ...editor, category: event.target.value })}
-              />
-            </div>
-            <div className="settings-field">
-              <span className="settings-field-label">标签（逗号分隔）</span>
-              <input
-                className="settings-text-input"
-                type="text"
-                aria-label="标签"
-                placeholder="如：销售, 客户"
-                value={editor.tags}
-                onChange={(event) => setEditor({ ...editor, tags: event.target.value })}
-              />
-            </div>
-            <div className="settings-field">
-              <span className="settings-field-label">适用账号</span>
-              <select
-                className="settings-text-input"
-                aria-label="适用账号"
-                value={editor.account_id}
-                onChange={(event) => setEditor({ ...editor, account_id: Number(event.target.value) || 0 })}
-              >
-                <option value={0}>全局（所有账号）</option>
-                {accounts.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    仅 {entry.display_name || entry.email}（{entry.email}）
-                  </option>
-                ))}
-              </select>
-            </div>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={editor.is_favorite}
-                onChange={(event) => setEditor({ ...editor, is_favorite: event.target.checked })}
-              />
-              <span>
-                <strong>设为常用模板</strong>
-                <small>在写信时优先展示，并可通过「常用」筛选快速查找。</small>
-              </span>
-            </label>
-
-            <div className="template-variable-hints">
-              <strong>变量（点击插入到{activeVariableField === 'subject' ? '主题' : '正文'}）</strong>
-              {TEMPLATE_VARIABLES.map((variable) => (
-                <button
-                  type="button"
-                  key={variable.name}
-                  className="template-variable-chip"
-                  title={variable.description}
-                  onClick={() => insertVariable(variable.name)}
-                >
-                  <code>{variable.name}</code>
-                  <small>{variable.label}</small>
-                </button>
-              ))}
-              <small>无法解析的变量会保留原样，不会静默删除。</small>
-            </div>
-
-            {(editor.subject.trim() || editor.body.trim()) && (
-              <div className="template-preview">
-                <strong>预览（使用示例联系人）</strong>
-                {editor.subject.trim() && (
-                  <p className="template-preview-subject">{renderTemplatePreview(editor.subject)}</p>
-                )}
-                {editor.body.trim() && (
-                  <pre className="template-preview-body">{renderTemplatePreview(editor.body)}</pre>
-                )}
-                <small>实际发送时按真实联系人、日期与签名渲染。</small>
+          }
+        >
+          <span className="template-empty-icon" aria-hidden="true"><FileText size={20} /></span>
+          <strong>暂无模板</strong>
+          <small>新建一个模板，或使用 AI 辅助生成。</small>
+        </SettingsEmptyState>
+      ) : (
+        <div className="template-list">
+          {filtered.length === 0 && (
+            <p className="settings-empty-hint">没有符合条件的模板。</p>
+          )}
+          {filtered.map((template) => (
+            <div className="template-row" key={template.id}>
+              <div className="template-row-main">
+                <strong>
+                  {template.is_favorite && <Star size={13} className="template-favorite" />}
+                  {template.name}
+                </strong>
+                <small>{template.subject || '（无主题）'}</small>
+                {template.category && <em className="template-category">{template.category}</em>}
+                {template.tags.map((tag) => <em key={tag} className="template-tag">{tag}</em>)}
+                <span className="template-updated">更新于 {new Date(template.updated_at).toLocaleDateString()}</span>
               </div>
-            )}
-
-            <div className="template-editor-actions">
-              <button type="button" className="secondary" onClick={() => setEditing(false)}>
-                取消
-              </button>
-              <button type="button" className="primary" onClick={saveEditor}>
-                <Pencil size={14} /> 保存模板
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isEmptyList ? (
-          <div className="template-empty-state">
-            <span className="template-empty-icon" aria-hidden="true"><FileText size={20} /></span>
-            <strong>暂无模板</strong>
-            <small>新建一个模板，或使用 AI 辅助生成。</small>
-            <div className="template-empty-actions">
-              <button type="button" className="primary" onClick={startCreate}>
-                <Plus size={14} /> 新建模板
-              </button>
-              <button type="button" className="secondary" onClick={openAiGenerator}>
-                <Sparkles size={14} /> AI 生成
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="template-list">
-            {filtered.length === 0 && (
-              <p className="settings-empty-hint">没有符合条件的模板。</p>
-            )}
-            {filtered.map((template) => (
-              <div className="template-row" key={template.id}>
-                <div className="template-row-main">
-                  <strong>
-                    {template.is_favorite && <Star size={13} className="template-favorite" />}
-                    {template.name}
-                  </strong>
-                  <small>{template.subject || '（无主题）'}</small>
-                  {template.category && <em className="template-category">{template.category}</em>}
-                  {template.tags.map((tag) => <em key={tag} className="template-tag">{tag}</em>)}
-                  <span className="template-updated">更新于 {new Date(template.updated_at).toLocaleDateString()}</span>
-                </div>
-                <div className="template-row-actions">
-                  <button type="button" title="编辑" aria-label={`编辑 ${template.name}`} onClick={() => startEdit(template)}>
-                    <Pencil size={14} />
-                  </button>
-                  <button type="button" title="复制" aria-label={`复制 ${template.name}`} onClick={() => duplicate(template)}>
-                    <Copy size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="danger-action"
-                    title="删除"
-                    aria-label={`删除 ${template.name}`}
-                    onClick={() => setConfirmDeleteId(template.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {confirmDeleteId && (
-          <div className="settings-cache-confirm-backdrop">
-            <div className="settings-cache-confirm" role="dialog" aria-modal="true">
-              <strong>删除模板</strong>
-              <p>确定删除该模板吗？此操作不可恢复。</p>
-              <div>
-                <button type="button" onClick={() => setConfirmDeleteId(null)}>取消</button>
-                <button type="button" className="danger-action" onClick={removeTemplate}>确认</button>
+              <div className="template-row-actions">
+                <SettingsButton size="sm" variant="ghost" title="编辑" aria-label={`编辑 ${template.name}`} icon={<Pencil size={14} />} onClick={() => startEdit(template)} />
+                <SettingsButton size="sm" variant="ghost" title="复制" aria-label={`复制 ${template.name}`} icon={<Copy size={14} />} onClick={() => duplicate(template)} />
+                <SettingsButton
+                  size="sm"
+                  variant="danger-secondary"
+                  title="删除"
+                  aria-label={`删除 ${template.name}`}
+                  icon={<Trash2 size={14} />}
+                  onClick={() => setConfirmDeleteId(template.id)}
+                />
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="settings-cache-confirm-backdrop">
+          <div className="settings-cache-confirm" role="dialog" aria-modal="true">
+            <strong>删除模板</strong>
+            <p>确定删除该模板吗？此操作不可恢复。</p>
+            <div className="st-actions">
+              <SettingsButton onClick={() => setConfirmDeleteId(null)}>取消</SettingsButton>
+              <SettingsButton variant="danger" onClick={removeTemplate}>确认</SettingsButton>
+            </div>
           </div>
-        )}
-      </section>
-    </div>
+        </div>
+      )}
+    </SettingsSection>
   );
 }

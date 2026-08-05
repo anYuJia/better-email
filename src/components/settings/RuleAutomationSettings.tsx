@@ -10,7 +10,14 @@ import type {
   MailRule,
   MailRuleInput,
 } from '../../app/types';
-import './automation-settings.css';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsField,
+  SettingsSection,
+  SettingsSwitch,
+} from './shared';
 
 type RuleAutomationSettingsProps = {
   ruleForm: MailRuleInput;
@@ -48,21 +55,20 @@ export default function RuleAutomationSettings({
   onRemoveRule,
 }: RuleAutomationSettingsProps) {
   return (
-    <section className="tool-panel settings-rule-panel" data-settings-section="rules">
-      <header className="tool-header">
-        <span>
-          <strong>处理规则</strong>
-          <small>按发件人、主题、正文或收件人处理新邮件</small>
-        </span>
-        <em>{rules.length} 条规则</em>
-      </header>
-
+    <SettingsSection
+      title="处理规则"
+      description="按发件人、主题、正文或收件人处理新邮件"
+      badge={<SettingsBadge tone="neutral">{rules.length} 条规则</SettingsBadge>}
+      dataSection="rules"
+    >
       <div className="rule-editor settings-rule-editor">
-        <input
-          value={ruleForm.name}
-          onChange={(event) => onRuleFormChange({ ...ruleForm, name: event.target.value })}
-          placeholder="规则名称"
-        />
+        <SettingsField label="规则名称">
+          <input
+            value={ruleForm.name}
+            onChange={(event) => onRuleFormChange({ ...ruleForm, name: event.target.value })}
+            placeholder="规则名称"
+          />
+        </SettingsField>
         <div className="rule-builder">
           <label>
             <span>如果</span>
@@ -131,46 +137,46 @@ export default function RuleAutomationSettings({
           />
         </details>
         <div className="settings-rule-footer">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={ruleForm.enabled}
-              onChange={(event) => onRuleFormChange({ ...ruleForm, enabled: event.target.checked })}
-            />
-            <span>
-              <strong>启用规则</strong>
-              <small>保存后立即参与新邮件处理</small>
-            </span>
-          </label>
-          <button type="button" onClick={onSaveRule}>
-            <Plus size={14} />
+          <SettingsSwitch
+            label="启用规则"
+            description="保存后立即参与新邮件处理"
+            checked={ruleForm.enabled}
+            onChange={(checked) => onRuleFormChange({ ...ruleForm, enabled: checked })}
+          />
+          <SettingsButton variant="primary" icon={<Plus size={14} />} onClick={onSaveRule}>
             {editingRuleId ? '更新规则' : '新增规则'}
-          </button>
+          </SettingsButton>
         </div>
       </div>
 
-      <div className="settings-rule-list">
-        {rules.map((rule) => (
-          <div className="rule-item" key={rule.id}>
-            <span>
-              <strong>{rule.name}</strong>
-              <small>{rule.condition} → {rule.action}</small>
-            </span>
-            <em className={rule.enabled ? 'active' : ''}>{rule.enabled ? '启用' : '停用'}</em>
-            <div>
-              <button type="button" onClick={() => onToggleRule(rule)}>{rule.enabled ? '停用' : '启用'}</button>
-              <button type="button" onClick={() => onEditRule(rule)}>
-                <Pencil size={13} />
-                编辑
-              </button>
-              <button type="button" className="danger" onClick={() => onRemoveRule(rule)}>
-                <Trash2 size={13} />
-                删除
-              </button>
+      {rules.length === 0 ? (
+        <SettingsEmptyState>还没有规则。创建一条规则，按条件自动处理新邮件。</SettingsEmptyState>
+      ) : (
+        <div className="settings-rule-list">
+          {rules.map((rule) => (
+            <div className="rule-item" key={rule.id}>
+              <span>
+                <strong>{rule.name}</strong>
+                <small>{rule.condition} → {rule.action}</small>
+              </span>
+              <SettingsBadge tone={rule.enabled ? 'success' : 'neutral'}>
+                {rule.enabled ? '启用' : '停用'}
+              </SettingsBadge>
+              <div className="st-actions">
+                <SettingsButton size="sm" onClick={() => onToggleRule(rule)}>
+                  {rule.enabled ? '停用' : '启用'}
+                </SettingsButton>
+                <SettingsButton size="sm" icon={<Pencil size={13} />} onClick={() => onEditRule(rule)}>
+                  编辑
+                </SettingsButton>
+                <SettingsButton size="sm" variant="danger-secondary" icon={<Trash2 size={13} />} onClick={() => onRemoveRule(rule)}>
+                  删除
+                </SettingsButton>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </section>
+          ))}
+        </div>
+      )}
+    </SettingsSection>
   );
 }

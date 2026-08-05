@@ -20,7 +20,14 @@ import type {
   ContactMergeSuggestion,
 } from '../../app/types';
 import useContactImportManager from '../../hooks/useContactImportManager';
-import './automation-settings.css';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsField,
+  SettingsSection,
+  SettingsSwitch,
+} from './shared';
 
 type ContactAutomationSettingsProps = {
   mergeSuggestions: ContactMergeSuggestion[];
@@ -110,33 +117,36 @@ export default function ContactAutomationSettings({
   }
 
   return (
-    <section className="tool-panel settings-contact-panel" data-settings-section="contacts">
-      <header className="tool-header">
-        <span>
-          <strong>联系人管理</strong>
-          <small>别名、VIP、重复合并和快捷写信</small>
-        </span>
+    <SettingsSection
+      title="联系人管理"
+      description="别名、VIP、重复合并和快捷写信"
+      actions={
         <div className="contact-transfer-actions">
-          <em>{contacts.length} 位联系人</em>
-          <button type="button" onClick={startImport} disabled={transferBusy || previewing}>
-            {previewing ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
-            导入联系人
-          </button>
-          <button type="button" onClick={onExportContacts} disabled={transferBusy || contacts.length === 0}>
-            <FileUp size={14} />
-            导出 vCard
-          </button>
-          <button
-            type="button"
-            className="contact-history-toggle"
-            title="最近导入记录"
-            onClick={() => setHistoryOpen((current) => !current)}
+          <SettingsBadge tone="neutral">{contacts.length} 位联系人</SettingsBadge>
+          <SettingsButton
+            size="sm"
+            disabled={transferBusy || previewing}
+            icon={previewing ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
+            onClick={startImport}
           >
-            <History size={14} />
-          </button>
+            导入联系人
+          </SettingsButton>
+          <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileUp size={14} />} onClick={onExportContacts}>
+            导出 vCard
+          </SettingsButton>
+          <SettingsButton
+            size="sm"
+            variant="ghost"
+            className="contact-history-toggle"
+            aria-label="最近导入记录"
+            title="最近导入记录"
+            icon={<History size={14} />}
+            onClick={() => setHistoryOpen((current) => !current)}
+          />
         </div>
-      </header>
-
+      }
+      dataSection="contacts"
+    >
       {preview && (
         <section className="contact-import-preview" data-import-preview>
           <header>
@@ -150,9 +160,9 @@ export default function ContactAutomationSettings({
           </header>
           <div className="contact-import-selection-toolbar">
             <span>批量选择：</span>
-            <button type="button" onClick={() => setAllSelection('create')}>全部新增</button>
-            <button type="button" onClick={() => setAllSelection('merge')}>全部合并</button>
-            <button type="button" onClick={() => setAllSelection('skip')}>全部跳过</button>
+            <SettingsButton size="sm" onClick={() => setAllSelection('create')}>全部新增</SettingsButton>
+            <SettingsButton size="sm" onClick={() => setAllSelection('merge')}>全部合并</SettingsButton>
+            <SettingsButton size="sm" onClick={() => setAllSelection('skip')}>全部跳过</SettingsButton>
           </div>
           <div className="contact-import-preview-list">
             {preview.entries.map((entry) => (
@@ -176,13 +186,12 @@ export default function ContactAutomationSettings({
             ))}
           </div>
           <div className="contact-import-preview-actions">
-            <button type="button" onClick={cancelImport} disabled={importing}>
-              <X size={14} /> 取消
-            </button>
-            <button type="button" className="primary" onClick={handleCommitImport} disabled={importing}>
-              {importing ? <LoaderCircle className="spinning" size={14} /> : <Check size={14} />}
+            <SettingsButton icon={<X size={14} />} onClick={cancelImport} disabled={importing}>
+              取消
+            </SettingsButton>
+            <SettingsButton variant="primary" icon={importing ? <LoaderCircle className="spinning" size={14} /> : <Check size={14} />} onClick={handleCommitImport} disabled={importing}>
               确认导入（{preview.entries.filter((entry) => (selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')) !== 'skip' && entry.status !== 'invalid').length} 条）
-            </button>
+            </SettingsButton>
           </div>
         </section>
       )}
@@ -205,15 +214,14 @@ export default function ContactAutomationSettings({
                   合并 {batch.merged_count} · 跳过 {batch.skipped_count}
                 </em>
               </span>
-              <button
-                type="button"
-                className="secondary"
+              <SettingsButton
+                size="sm"
                 disabled={batch.created_count === 0 || undoingBatchId === batch.id}
+                icon={<Undo2 size={13} />}
                 onClick={() => setConfirmUndoBatch(batch)}
               >
-                <Undo2 size={13} />
                 {batch.created_count > 0 ? '撤销本批新增' : '无可撤销'}
-              </button>
+              </SettingsButton>
             </div>
           ))}
         </section>
@@ -234,125 +242,130 @@ export default function ContactAutomationSettings({
                 <em>合并到 {suggestion.target.name || suggestion.target.email}</em>
                 <small>{suggestion.reason} · {suggestion.shared_keys.join(', ')}</small>
               </span>
-              <button type="button" onClick={() => onMergeSuggested(suggestion)}>
-                <Merge size={14} />
+              <SettingsButton size="sm" variant="primary" icon={<Merge size={14} />} onClick={() => onMergeSuggested(suggestion)}>
                 合并建议
-              </button>
+              </SettingsButton>
             </div>
           ))}
         </section>
       )}
 
       <div className="contact-create-form settings-contact-create">
-        <input
-          value={contactForm.name}
-          onChange={(event) => onContactFormChange({ ...contactForm, name: event.target.value })}
-          placeholder="联系人名称"
-        />
-        <input
-          value={contactForm.email}
-          onChange={(event) => onContactFormChange({ ...contactForm, email: event.target.value })}
-          placeholder="邮箱地址"
-        />
-        <textarea
-          value={contactFormAliases}
-          onChange={(event) => onContactFormAliasesChange(event.target.value)}
-          placeholder="别名邮箱，逗号或换行分隔"
-        />
-        <label className="checkbox-row">
+        <SettingsField label="联系人名称">
           <input
-            type="checkbox"
-            checked={contactForm.vip}
-            onChange={(event) => onContactFormChange({ ...contactForm, vip: event.target.checked })}
+            value={contactForm.name}
+            onChange={(event) => onContactFormChange({ ...contactForm, name: event.target.value })}
+            placeholder="联系人名称"
           />
-          <span>
-            <strong>设为 VIP</strong>
-            <small>可配合通知策略只提醒重要联系人</small>
-          </span>
-        </label>
-        <button type="button" onClick={onCreateContact}>
-          <UserPlus size={14} />
+        </SettingsField>
+        <SettingsField label="邮箱地址">
+          <input
+            value={contactForm.email}
+            onChange={(event) => onContactFormChange({ ...contactForm, email: event.target.value })}
+            placeholder="邮箱地址"
+          />
+        </SettingsField>
+        <SettingsField label="别名邮箱">
+          <textarea
+            value={contactFormAliases}
+            onChange={(event) => onContactFormAliasesChange(event.target.value)}
+            placeholder="别名邮箱，逗号或换行分隔"
+          />
+        </SettingsField>
+        <SettingsSwitch
+          label="设为 VIP"
+          description="可配合通知策略只提醒重要联系人"
+          checked={contactForm.vip}
+          onChange={(checked) => onContactFormChange({ ...contactForm, vip: checked })}
+        />
+        <SettingsButton variant="primary" icon={<UserPlus size={14} />} onClick={onCreateContact}>
           新增联系人
-        </button>
+        </SettingsButton>
       </div>
 
-      <div className="settings-contact-list">
-        {contacts.slice(0, 6).map((contact) => (
-          <div className="tool-row contact-tool-row" key={contact.id}>
-            {editingContactId === contact.id ? (
-              <div className="contact-edit-form">
-                <input
-                  value={editName}
-                  onChange={(event) => onEditNameChange(event.target.value)}
-                  placeholder="联系人名称"
-                />
-                <textarea
-                  value={editAliases}
-                  onChange={(event) => onEditAliasesChange(event.target.value)}
-                  placeholder="别名邮箱，逗号或换行分隔"
-                />
-                <div>
-                  <button type="button" onClick={() => onSaveContactOverride(contact)}>保存</button>
-                  <button type="button" className="secondary" onClick={onCancelEdit}>取消</button>
+      {contacts.length === 0 ? (
+        <SettingsEmptyState>还没有联系人。可以手动新增，或从 vCard 文件导入。</SettingsEmptyState>
+      ) : (
+        <div className="settings-contact-list">
+          {contacts.slice(0, 6).map((contact) => (
+            <div className="st-data-row contact-tool-row" key={contact.id}>
+              {editingContactId === contact.id ? (
+                <div className="contact-edit-form">
+                  <input
+                    value={editName}
+                    onChange={(event) => onEditNameChange(event.target.value)}
+                    placeholder="联系人名称"
+                  />
+                  <textarea
+                    value={editAliases}
+                    onChange={(event) => onEditAliasesChange(event.target.value)}
+                    placeholder="别名邮箱，逗号或换行分隔"
+                  />
+                  <div className="st-actions">
+                    <SettingsButton size="sm" variant="primary" onClick={() => onSaveContactOverride(contact)}>保存</SettingsButton>
+                    <SettingsButton size="sm" onClick={onCancelEdit}>取消</SettingsButton>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <button type="button" className="settings-contact-main" onClick={() => onComposeToContact(contact)}>
-                  <Send size={14} />
-                  <span>
-                    <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                    <em>{contact.email}{contact.aliases.length ? ` · 别名 ${contact.aliases.length}` : ''}</em>
-                    <small>{contact.message_count} 封往来</small>
-                  </span>
-                </button>
-                <div className="contact-tool-actions">
-                  <button
-                    type="button"
-                    aria-label={`编辑 ${contact.name || contact.email}`}
-                    title="编辑联系人"
-                    onClick={() => onStartEditContact(contact)}
-                  >
-                    <Pencil size={13} />
-                    <span className="contact-action-label">编辑</span>
+              ) : (
+                <>
+                  <button type="button" className="settings-contact-main" onClick={() => onComposeToContact(contact)}>
+                    <Send size={14} />
+                    <span>
+                      <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
+                      <em>{contact.email}{contact.aliases.length ? ` · 别名 ${contact.aliases.length}` : ''}</em>
+                      <small>{contact.message_count} 封往来</small>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`${contact.vip ? '取消 VIP' : '设为 VIP'} ${contact.name || contact.email}`}
-                    title={contact.vip ? '取消 VIP' : '设为 VIP'}
-                    onClick={() => onToggleContactVip(contact)}
-                  >
-                    <Star size={13} />
-                    <span className="contact-action-label">{contact.vip ? '取消 VIP' : '设为 VIP'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`合并 ${contact.name || contact.email}`}
-                    title="合并联系人"
-                    onClick={() => onMergeContact(contact)}
-                  >
-                    <Merge size={13} />
-                    <span className="contact-action-label">合并</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="danger"
-                    aria-label={`删除 ${contact.name || contact.email}`}
-                    title="删除联系人"
-                    onClick={() => onDeleteContact(contact)}
-                  >
-                    <Trash2 size={13} />
-                    <span className="contact-action-label">删除</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
+                  <div className="contact-tool-actions">
+                    <SettingsButton
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`编辑 ${contact.name || contact.email}`}
+                      title="编辑联系人"
+                      icon={<Pencil size={13} />}
+                      onClick={() => onStartEditContact(contact)}
+                    >
+                      <span className="contact-action-label">编辑</span>
+                    </SettingsButton>
+                    <SettingsButton
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${contact.vip ? '取消 VIP' : '设为 VIP'} ${contact.name || contact.email}`}
+                      title={contact.vip ? '取消 VIP' : '设为 VIP'}
+                      icon={<Star size={13} />}
+                      onClick={() => onToggleContactVip(contact)}
+                    >
+                      <span className="contact-action-label">{contact.vip ? '取消 VIP' : '设为 VIP'}</span>
+                    </SettingsButton>
+                    <SettingsButton
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`合并 ${contact.name || contact.email}`}
+                      title="合并联系人"
+                      icon={<Merge size={13} />}
+                      onClick={() => onMergeContact(contact)}
+                    >
+                      <span className="contact-action-label">合并</span>
+                    </SettingsButton>
+                    <SettingsButton
+                      size="sm"
+                      variant="danger-secondary"
+                      aria-label={`删除 ${contact.name || contact.email}`}
+                      title="删除联系人"
+                      icon={<Trash2 size={13} />}
+                      onClick={() => onDeleteContact(contact)}
+                    >
+                      <span className="contact-action-label">删除</span>
+                    </SettingsButton>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <label className="contact-merge-picker">
-        合并来源
+      <SettingsField label="合并来源">
         <select
           value={mergeSourceContactId ?? ''}
           onChange={(event) => onMergeSourceChange(event.target.value ? Number(event.target.value) : null)}
@@ -364,7 +377,7 @@ export default function ContactAutomationSettings({
             </option>
           ))}
         </select>
-      </label>
+      </SettingsField>
 
       {confirmUndoBatch && (
         <div className="settings-cache-confirm-backdrop">
@@ -374,20 +387,19 @@ export default function ContactAutomationSettings({
               将删除「{confirmUndoBatch.file_name}」批次新增的 {confirmUndoBatch.created_count} 位联系人。
               合并/更新已有联系人的变更不可回滚。
             </p>
-            <div>
-              <button type="button" onClick={() => setConfirmUndoBatch(null)}>取消</button>
-              <button
-                type="button"
-                className="danger-action"
+            <div className="st-actions">
+              <SettingsButton onClick={() => setConfirmUndoBatch(null)}>取消</SettingsButton>
+              <SettingsButton
+                variant="danger"
                 disabled={undoingBatchId === confirmUndoBatch.id}
                 onClick={() => { void undoBatch(confirmUndoBatch.id); void onRefreshContacts(); }}
               >
                 {undoingBatchId === confirmUndoBatch.id ? '撤销中…' : '确认撤销'}
-              </button>
+              </SettingsButton>
             </div>
           </div>
         </div>
       )}
-    </section>
+    </SettingsSection>
   );
 }

@@ -5,7 +5,7 @@ type SettingsSectionProps = {
   description?: React.ReactNode;
   badge?: React.ReactNode;
   actions?: React.ReactNode;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   dataSection?: string;
 };
@@ -43,7 +43,7 @@ export default function SettingsSection({
           )}
         </header>
       )}
-      <div className="st-section-body">{children}</div>
+      {children != null && <div className="st-section-body">{children}</div>}
     </section>
   );
 }

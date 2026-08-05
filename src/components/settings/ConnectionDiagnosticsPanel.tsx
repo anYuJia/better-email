@@ -22,7 +22,7 @@ import type {
   CredentialVerificationReport,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
-import './connection-diagnostics.css';
+import { SettingsBadge, SettingsButton } from './shared';
 
 type ConnectionDiagnosticsPanelProps = {
   account: Account;
@@ -86,18 +86,18 @@ export default function ConnectionDiagnosticsPanel({
           <p>{model.summary}</p>
         </div>
         <div className="connection-diagnostics-actions">
-          <em>{model.providerLabel}</em>
-          <button
-            type="button"
+          <SettingsBadge tone="info">{model.providerLabel}</SettingsBadge>
+          <SettingsButton
+            size="sm"
             disabled={providerValidationRunning}
             title="依次检查服务器、登录、文件夹发现和邮件头同步；不会发送邮件"
-            onClick={onRunProviderValidation}
-          >
-            {providerValidationRunning
+            icon={providerValidationRunning
               ? <LoaderCircle className="connection-spinner" size={13} />
               : <PlayCircle size={13} />}
+            onClick={onRunProviderValidation}
+          >
             {providerValidationRunning ? '验收中' : '只读验收'}
-          </button>
+          </SettingsButton>
         </div>
       </header>
 

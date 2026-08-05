@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import type { Account } from '../../app/types';
-import './account-removal.css';
+import { SettingsButton, SettingsEmptyState, SettingsSwitch } from './shared';
 
 type AccountRemovalPanelProps = {
   account: Account;
@@ -61,8 +61,8 @@ export default function AccountRemovalPanel({
         <strong>{account.display_name || account.email}</strong>
         <span>{account.email}</span>
       </div>
-      <label>
-        输入完整邮箱地址以确认
+      <label className="st-field">
+        <span className="st-field-label">输入完整邮箱地址以确认</span>
         <input
           autoFocus
           value={confirmation}
@@ -75,27 +75,20 @@ export default function AccountRemovalPanel({
           }}
         />
       </label>
-      <label className="checkbox-row" style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <input
-          type="checkbox"
-          checked={deleteSecret}
-          disabled={pending}
-          onChange={(event) => setDeleteSecret(event.target.checked)}
-        />
-        <span>
-          <strong>同时删除本机保存的登录凭据</strong>
-          <small style={{ display: 'block', color: 'var(--settings-text-secondary)', fontSize: '11px' }}>
-            {deleteSecret 
-              ? "若勾选，将从本地 SQLite 凭据记录中删除此账号的登录密码/授权 Token。" 
-              : "提示：若不勾选，该账号的登录凭据仍将保留在本地 SQLite 数据库的凭据表中。"}
-          </small>
-        </span>
-      </label>
+      <SettingsSwitch
+        label="同时删除本机保存的登录凭据"
+        description={
+          deleteSecret
+            ? '若勾选，将从本地 SQLite 凭据记录中删除此账号的登录密码/授权 Token。'
+            : '提示：若不勾选，该账号的登录凭据仍将保留在本地 SQLite 数据库的凭据表中。'
+        }
+        checked={deleteSecret}
+        disabled={pending}
+        onChange={setDeleteSecret}
+      />
       {error && <p className="settings-confirm-error">{error}</p>}
-      <footer>
-        <button
-          type="button"
-          className="settings-dialog-cancel"
+      <footer className="st-actions">
+        <SettingsButton
           disabled={pending}
           onClick={() => {
             setConfirmation('');
@@ -103,17 +96,16 @@ export default function AccountRemovalPanel({
           }}
         >
           清空
-        </button>
-        <button
-          type="button"
-          className="settings-dialog-danger"
+        </SettingsButton>
+        <SettingsButton
+          variant="danger"
           disabled={!confirmationMatches || pending}
           data-account-remove-confirm
+          icon={<Trash2 size={15} />}
           onClick={() => { handleRemove().catch(() => undefined); }}
         >
-          <Trash2 size={15} />
           {pending ? '正在移除…' : '永久移除'}
-        </button>
+        </SettingsButton>
       </footer>
     </>
   );
@@ -137,24 +129,25 @@ export default function AccountRemovalPanel({
 
   return (
     <>
-      <section className="tool-panel settings-account-danger" aria-labelledby="remove-account-title">
-        <div>
-          <strong id="remove-account-title">删除账号</strong>
-          {!canRemove && <small>当前没有可移除的账号。</small>}
+      <section className="st-section settings-account-danger" aria-labelledby="remove-account-title">
+        <div className="st-section-body settings-account-danger-body">
+          <span className="st-section-heading">
+            <strong id="remove-account-title">删除账号</strong>
+            {!canRemove && <small>当前没有可移除的账号。</small>}
+          </span>
+          <SettingsButton
+            variant="danger"
+            disabled={!canRemove}
+            data-account-remove-trigger
+            onClick={() => {
+              setConfirmation('');
+              setError('');
+              setDialogOpen(true);
+            }}
+          >
+            移除账号
+          </SettingsButton>
         </div>
-        <button
-          type="button"
-          className="settings-danger-action"
-          disabled={!canRemove}
-          data-account-remove-trigger
-          onClick={() => {
-            setConfirmation('');
-            setError('');
-            setDialogOpen(true);
-          }}
-        >
-          移除账号
-        </button>
       </section>
 
       {dialogOpen && (

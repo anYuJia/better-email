@@ -27,7 +27,12 @@ import type {
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
 import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
-import './data-settings.css';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsSection,
+} from './shared';
 
 import { devMode } from './settingsNavigation';
 
@@ -90,13 +95,11 @@ export default function SyncOperationsSettings({
 
   return (
     <div className="settings-sync-stack" data-settings-section="sync">
-      <section className="settings-section-overview">
-        <span>
-          <strong>同步与发信高级工具</strong>
-          <em>{devMode ? '回写验收、IMAP 发现、同步演练和发件箱队列' : '管理邮件同步状态与连接'}</em>
-        </span>
-        <b>{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</b>
-      </section>
+      <SettingsSection
+        title="同步与发信高级工具"
+        description={devMode ? '回写验收、IMAP 发现、同步演练和发件箱队列' : '管理邮件同步状态与连接'}
+        badge={<SettingsBadge tone="neutral">{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</SettingsBadge>}
+      />
 
       {devMode && (
         <ProviderWriteValidationSettings
@@ -112,22 +115,20 @@ export default function SyncOperationsSettings({
       )}
 
       {devMode && (
-        <section className="tool-panel settings-imap-discovery">
-          <header className="tool-header">
-            <span>
-              <strong>IMAP 文件夹发现</strong>
-              <small>读取远端邮箱文件夹 structure 并映射本地角色</small>
-            </span>
-            <button type="button" onClick={onDiscoverImapFolders}>
-              <Search size={14} />
+        <SettingsSection
+          title="IMAP 文件夹发现"
+          description="读取远端邮箱文件夹 structure 并映射本地角色"
+          actions={
+            <SettingsButton icon={<Search size={14} />} onClick={onDiscoverImapFolders}>
               发现文件夹
-            </button>
-          </header>
+            </SettingsButton>
+          }
+        >
           {!imapProbe ? (
-            <p className="settings-empty-state">保存本地凭据后，可真实登录 IMAP 并读取远端文件夹列表。</p>
+            <SettingsEmptyState>保存本地凭据后，可真实登录 IMAP 并读取远端文件夹列表。</SettingsEmptyState>
           ) : (
             <>
-              <div className={imapProbe.status === 'ok' ? 'tool-row ok' : 'tool-row warn'}>
+              <div className={imapProbe.status === 'ok' ? 'st-data-row ok' : 'st-data-row warn'}>
                 <span>{imapProbe.status}</span>
                 <em>{imapProbe.account_email}</em>
                 <small>{imapProbe.folder_count} 个</small>
@@ -135,7 +136,7 @@ export default function SyncOperationsSettings({
               </div>
               <div className="settings-folder-grid">
                 {imapProbe.folders.slice(0, 12).map((folder) => (
-                  <div className="tool-row" key={folder.name}>
+                  <div className="st-data-row" key={folder.name}>
                     <span>{folder.name}</span>
                     <em>{folder.delimiter || 'flat'}</em>
                     <small>{folder.attributes.join(', ')}</small>
@@ -144,35 +145,31 @@ export default function SyncOperationsSettings({
               </div>
             </>
           )}
-        </section>
+        </SettingsSection>
       )}
 
-      <section className="tool-panel settings-sync-panel">
-        <header className="tool-header">
-          <span>
-            <strong>同步设置</strong>
-            <small>{devMode ? '检查调度批次、文件夹状态和增量同步结果' : '同步状态与手动刷新邮件头'}</small>
-          </span>
-          <div className="tool-actions">
-            {devMode && <button className="secondary" type="button" onClick={onRunSyncDryRun}>演练</button>}
+      <SettingsSection
+        title="同步设置"
+        description={devMode ? '检查调度批次、文件夹状态和增量同步结果' : '同步状态与手动刷新邮件头'}
+        actions={
+          <div className="st-actions">
+            {devMode && <SettingsButton onClick={onRunSyncDryRun}>演练</SettingsButton>}
             {devMode && (
-              <button
-                className="secondary"
+              <SettingsButton
                 disabled={pendingHistoryCount === 0}
                 title={pendingHistoryCount === 0 ? '当前账号历史邮件已回填完成' : `为 ${pendingHistoryCount} 个目录各回填一页`}
-                type="button"
+                icon={<History size={14} />}
                 onClick={onSyncHistory}
               >
-                <History size={14} />
                 回填一页
-              </button>
+              </SettingsButton>
             )}
-            <button type="button" onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
-              <RefreshCw size={14} />
+            <SettingsButton variant="primary" icon={<RefreshCw size={14} />} onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
               同步邮件头
-            </button>
+            </SettingsButton>
           </div>
-        </header>
+        }
+      >
         {syncSchedulePlan && (
           <div className="sync-schedule-card">
             <div>
@@ -234,14 +231,14 @@ export default function SyncOperationsSettings({
                       ))}
                     </select>
                     {!mailbox.local_folder_id && (
-                      <button
-                        className="secondary mailbox-create-map"
+                      <SettingsButton
+                        size="sm"
+                        className="mailbox-create-map"
+                        icon={<FolderPlus size={13} />}
                         onClick={() => onCreateAndMapImapMailbox(mailbox)}
-                        type="button"
                       >
-                        <FolderPlus size={13} />
                         新建同名
-                      </button>
+                      </SettingsButton>
                     )}
                   </div>
                 ) : (
@@ -261,11 +258,11 @@ export default function SyncOperationsSettings({
           </div>
         )}
         {syncRuns.length === 0 ? (
-          <p className="settings-empty-state">还没有同步运行记录。</p>
+          <SettingsEmptyState>还没有同步运行记录。</SettingsEmptyState>
         ) : (
-          <div className="settings-compact-list">
+          <div className="st-list">
             {syncRuns.map((run) => (
-              <div className={run.imported_messages > 0 ? 'tool-row ok' : 'tool-row'} key={run.id}>
+              <div className={run.imported_messages > 0 ? 'st-data-row ok' : 'st-data-row'} key={run.id}>
                 <span>{run.status}</span>
                 <em>扫描 {run.scanned_folders} 个文件夹 · 新增 {run.imported_messages} 封</em>
                 <small>{formatDate(run.started_at)}</small>
@@ -274,39 +271,28 @@ export default function SyncOperationsSettings({
             ))}
           </div>
         )}
-      </section>
+      </SettingsSection>
 
-      <section className="tool-panel settings-outbox-panel">
-        <header className="tool-header">
-          <span>
-            <strong>发件箱队列</strong>
-            <small>查看排队、定时发送、重试和撤回状态</small>
-          </span>
-          {devMode && (
-            <div className="tool-actions">
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}
-              >
-                发送演练
-              </button>
-              <button
-                type="button"
-                onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}
-              >
-                <Send size={14} />
-                真实发送
-              </button>
-            </div>
-          )}
-        </header>
+      <SettingsSection
+        title="发件箱队列"
+        description="查看排队、定时发送、重试和撤回状态"
+        actions={devMode ? (
+          <div className="st-actions">
+            <SettingsButton onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}>
+              发送演练
+            </SettingsButton>
+            <SettingsButton variant="primary" icon={<Send size={14} />} onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}>
+              真实发送
+            </SettingsButton>
+          </div>
+        ) : undefined}
+      >
         {outbox.length === 0 ? (
-          <p className="settings-empty-state">发件箱当前为空。</p>
+          <SettingsEmptyState>发件箱当前为空。</SettingsEmptyState>
         ) : (
-          <div className="settings-compact-list">
+          <div className="st-list">
             {outbox.map((item) => (
-              <div className="tool-row" key={item.id}>
+              <div className="st-data-row" key={item.id}>
                 <span>{outboxStatusLabel(item.status)}</span>
                 <em>{item.recipients}</em>
                 <small>{item.attempts} 次</small>
@@ -316,15 +302,15 @@ export default function SyncOperationsSettings({
                   {item.last_error ? ` · ${item.last_error}` : ''}
                 </p>
                 {canCancelOutboxItem(item.status) && (
-                  <button className="inline-action" type="button" onClick={() => onCancelOutboxItem(item)}>
+                  <SettingsButton size="sm" variant="danger-secondary" onClick={() => onCancelOutboxItem(item)}>
                     撤回
-                  </button>
+                  </SettingsButton>
                 )}
               </div>
             ))}
           </div>
         )}
-      </section>
+      </SettingsSection>
     </div>
   );
 }

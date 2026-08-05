@@ -1,0 +1,49 @@
+/*
+ * Message list: attachment indicator.
+ * The attachment chip used to live in the bottom chip row, which overflows
+ * the fixed 62px card height and gets clipped. It now sits inline on the
+ * subject line so it never pushes content below the card bounds.
+ */
+
+.message-subject-line {
+  grid-column: 1;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+}
+
+.message-subject-line > .subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.message-attachment {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 999px;
+  color: var(--ui-text-tertiary, #646f7b);
+  background: rgba(17, 24, 39, 0.07);
+  font-size: 10.5px;
+  font-weight: 560;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.message-card.is-current .message-attachment,
+.message-card:hover .message-attachment {
+  color: var(--ui-accent, #0a63c4);
+  background: rgba(10, 99, 196, 0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-attachment {
+    transition: none;
+  }
+}

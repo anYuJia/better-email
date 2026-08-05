@@ -110,8 +110,16 @@ export default React.memo(function MessageListCard({
         <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
         <time>{formatDate(message.received_at)}</time>
       </div>
-      <div className={message.is_read ? 'subject' : 'subject unread'}>
-        {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
+      <div className="message-subject-line">
+        <span className={message.is_read ? 'subject' : 'subject unread'}>
+          {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
+        </span>
+        {message.attachment_count > 0 && (
+          <span className="message-attachment" title={`${message.attachment_count} 个附件`}>
+            <Paperclip size={11} aria-hidden="true" />
+            {message.attachment_count}
+          </span>
+        )}
       </div>
       {preview && <p title={preview}>{preview}</p>}
       <div className="message-chips">
@@ -121,7 +129,6 @@ export default React.memo(function MessageListCard({
             +{message.labels.length - 2}
           </span>
         )}
-        {message.attachment_count > 0 && <span title={`${message.attachment_count} 个附件`}><Paperclip size={12} /> {message.attachment_count}</span>}
       </div>
     </div>
   );

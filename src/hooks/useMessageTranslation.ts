@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Message } from '../app/types/message';
 import { assessTranslationNeed, extractPlainText, type TranslationAssessment } from '../app/translation';
 import { aiErrorMessage, translateMessage } from '../app/aiService';
@@ -48,6 +48,13 @@ export default function useMessageTranslation(
   const cacheKey = useMemo(() => (
     message ? `${message.account_id}:${message.id}` : null
   ), [message]);
+
+  useEffect(() => {
+    setState((current) => {
+      if (current.status === 'idle' && current.messageId === message?.id) return current;
+      return { messageId: null, status: 'idle', translation: '', error: '', showTranslation: false };
+    });
+  }, [message?.id]);
 
   const needsTranslation = assessment !== null && assessment.foreign;
 

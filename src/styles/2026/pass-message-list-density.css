@@ -16,36 +16,6 @@
   letter-spacing: 0;
 }
 
-.message-card {
-  min-height: 66px;
-  padding: 8px 12px 8px 62px;
-  border-bottom: 1px solid #e9edf2;
-  background: #fff;
-}
-
-.message-card:hover {
-  background: #f5f8fb;
-  box-shadow: inset 0 0 0 1px rgba(88, 111, 139, 0.08);
-}
-
-.message-card.is-unread {
-  background: #fbfdff;
-  box-shadow: none;
-}
-
-.message-card.is-unread:hover {
-  background: #f1f7fc;
-  box-shadow: inset 0 0 0 1px rgba(94, 129, 172, 0.10);
-}
-
-.message-card.is-unread.selected,
-.message-card.is-unread.selected:hover {
-  background: #e6f1fb;
-  box-shadow:
-    inset 2px 0 0 #4f8fd0,
-    inset 0 0 0 1px rgba(79, 143, 208, 0.24);
-}
-
 .message-avatar {
   left: 27px;
   top: 50%;

@@ -412,27 +412,10 @@
   background: rgba(255, 255, 255, 0.40);
 }
 
-.message-card {
-  min-height: 108px;
-  margin: 7px 8px;
-  padding: 13px 13px 13px 42px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
-}
-
 .message-card:hover {
   border-color: rgba(10, 132, 255, 0.13);
   background: rgba(255, 255, 255, 0.76);
   box-shadow: 0 12px 28px rgba(31, 41, 55, 0.075);
-}
-
-.message-card.selected {
-  border-color: rgba(10, 132, 255, 0.22);
-  background: rgba(239, 247, 255, 0.96);
-  box-shadow:
-    inset 3px 0 0 var(--blue),
-    0 12px 28px rgba(10, 132, 255, 0.10);
 }
 
 .message-select {

@@ -193,16 +193,6 @@
   color: #54606c;
   font-size: 12px;
 }
-.message-card {
-  position: relative;
-  width: 100%;
-  text-align: left;
-  border: none;
-  border-bottom: 1px solid #edf0f3;
-  background: #fff;
-  padding: 14px 14px 14px 58px;
-}
-.message-card:hover, .message-card.selected { background: #eef7f2; }
 .message-select {
   position: absolute;
   left: 27px;

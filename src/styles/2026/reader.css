@@ -741,6 +741,12 @@
   user-select: none;
 }
 
+/* While panning, transform updates every pointermove — disable the
+   transition so the image tracks the pointer without lag. */
+.reader-image-preview-stage.is-panning img {
+  transition: none;
+}
+
 .reader-image-context-menu {
   position: fixed;
   z-index: 110;

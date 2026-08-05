@@ -117,8 +117,3 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-
-.thread-message.active {
-  background: #f3f7fb;
-  box-shadow: inset 2px 0 0 #6f9dcc;
-}

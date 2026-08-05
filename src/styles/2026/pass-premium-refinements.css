@@ -77,6 +77,24 @@ textarea:focus-visible {
   box-shadow: none;
 }
 
+/* Drag feedback is color/opacity only — no geometry change. */
+.message-card.dragging {
+  opacity: 0.58;
+  box-shadow: inset 2px 0 0 var(--quiet-row-selected-border);
+}
+
+/* Unread rows share the same hover feel as read rows. */
+.message-card.is-unread:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+/* Thread view active states share the 2026 theme accent. */
+.thread-message.active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
 .message-unread-dot {
   background: var(--ui-accent);
   box-shadow: 0 0 0 2px var(--ui-surface);

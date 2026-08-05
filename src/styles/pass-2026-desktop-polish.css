@@ -826,12 +826,6 @@ kbd {
   scrollbar-color: rgba(107, 114, 128, 0.36) transparent;
 }
 
-.message-card {
-  border-bottom: 1px solid rgba(17, 24, 39, 0.07);
-  background: transparent;
-  padding: 15px 15px 15px 44px;
-}
-
 .message-select {
   opacity: 0;
   transition: opacity 160ms ease;
@@ -846,11 +840,6 @@ kbd {
 
 .message-card:hover {
   background: rgba(10, 132, 255, 0.06);
-}
-
-.message-card.selected {
-  background: var(--surface-active);
-  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .message-card p,

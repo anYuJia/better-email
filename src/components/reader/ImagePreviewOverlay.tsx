@@ -9,6 +9,7 @@ type ImagePreviewOverlayProps = {
   imagePreviewFit: boolean;
   imagePreviewZoom: number;
   imagePreviewPan: Pan;
+  isPanning: boolean;
   imagePreviewStageRef: MutableRefObject<HTMLDivElement | null>;
   imagePreviewImageRef: MutableRefObject<HTMLImageElement | null>;
   zoomIn: () => void;
@@ -30,6 +31,7 @@ export default function ImagePreviewOverlay({
   imagePreviewFit,
   imagePreviewZoom,
   imagePreviewPan,
+  isPanning,
   imagePreviewStageRef,
   imagePreviewImageRef,
   zoomIn,
@@ -96,7 +98,7 @@ export default function ImagePreviewOverlay({
           </button>
         </div>
         <div
-          className="reader-image-preview-stage"
+          className={`reader-image-preview-stage${isPanning ? ' is-panning' : ''}`}
           ref={imagePreviewStageRef}
           onWheel={handleImagePreviewWheel}
           onPointerDown={handleImagePreviewPointerDown}

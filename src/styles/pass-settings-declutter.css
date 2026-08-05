@@ -220,10 +220,6 @@
   background: #fff;
 }
 
-.message-card {
-  min-height: 112px;
-}
-
 .message-chips span {
   min-height: 22px;
   padding: 0 7px;

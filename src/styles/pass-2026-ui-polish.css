@@ -372,26 +372,10 @@ body {
   font-weight: 650;
 }
 
-.message-card {
-  margin: 7px 8px;
-  padding: 14px 13px 14px 42px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
-}
-
 .message-card:hover {
   border-color: rgba(10, 132, 255, 0.12);
   background: rgba(255, 255, 255, 0.74);
   box-shadow: 0 10px 26px rgba(31, 41, 55, 0.07);
-}
-
-.message-card.selected {
-  border-color: rgba(10, 132, 255, 0.20);
-  background: rgba(239, 247, 255, 0.92);
-  box-shadow:
-    inset 3px 0 0 #0a84ff,
-    0 12px 28px rgba(10, 132, 255, 0.10);
 }
 
 .message-select {

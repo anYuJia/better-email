@@ -215,6 +215,7 @@ export default function ReaderPane({
     imagePreviewZoom,
     imagePreviewFit,
     imagePreviewPan,
+    isImagePreviewPanning,
     imagePreviewStageRef,
     imagePreviewImageRef,
     openImagePreview,
@@ -524,6 +525,7 @@ if (activeThread && threadMessages.length > 0) {
           handleImagePreviewPointerDown={handleImagePreviewPointerDown}
           handleImagePreviewPointerMove={handleImagePreviewPointerMove}
           stopImagePreviewPanning={stopImagePreviewPanning}
+          isPanning={isImagePreviewPanning}
           onClose={() => setImagePreview(null)}
         />
       )}

@@ -438,20 +438,6 @@ body {
   display: none;
 }
 
-.message-card {
-  min-height: 70px;
-  padding: 8px 12px 8px 47px;
-  border-bottom: 1px solid #eceef1;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.message-card:hover {
-  background: var(--quiet-row-hover);
-  box-shadow: none;
-}
-
 .message-avatar {
   left: 12px;
   top: 11px;

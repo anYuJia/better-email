@@ -68,7 +68,10 @@ describe('TemplateSettings', () => {
   it('shows the empty state with AI guidance', () => {
     window.localStorage.setItem(composeTemplatesStorageKey, '[]');
     render(<TemplateSettings />);
-    expect(screen.getByText(/暂无模板。新建一个模板，或使用 AI 辅助生成/)).not.toBeNull();
+    expect(screen.getByText('暂无模板')).not.toBeNull();
+    expect(screen.getByText('新建一个模板，或使用 AI 辅助生成。')).not.toBeNull();
+    expect(screen.getAllByRole('button', { name: /新建模板/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: /AI 生成/ }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps the AI generate entry available and collapses the card by default', () => {

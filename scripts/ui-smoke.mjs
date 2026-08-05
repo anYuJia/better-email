@@ -1343,6 +1343,21 @@ async function main() {
     await clickButton(cdp, '阻止该发件人', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已阻止发件人：security@example.com')");
 
+    await clickButton(cdp, '设置');
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置'");
+    await clickButton(cdp, '隐私', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-privacy-panel') && document.body.innerText.includes('外部邮箱拦截') && document.body.innerText.includes('HTTPS 链接拦截')");
+    await selectOptionByText(cdp, '.privacy-account-selector select', 'demo@better-email.local');
+    await evalInPage(cdp, "(() => { const boxes = [...document.querySelectorAll('.settings-privacy-panel input[type=\"checkbox\"]')]; const target = boxes[1]; if (!target) throw new Error('External mailbox toggle not found'); target.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-privacy-panel')?.innerText.includes('当前：已拦截')");
+    await clickButton(cdp, '保存', "document.querySelector('.settings-header-actions')");
+    await waitForExpression(cdp, "(() => { const calls = window.__betterEmailMockInvocations || []; const call = [...calls].reverse().find((e) => e.command === 'update_account_settings'); return call?.args?.input?.block_external_mailboxes === true; })()");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
+    await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
+    await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
+    await waitForExpression(cdp, "document.body.innerText.includes('外部邮箱已拦截') && ![...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示本封图片'))");
+
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");

@@ -249,7 +249,8 @@ impl MailStore {
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
-                       a.signature, a.cross_account_risk_warning, a.is_default
+                       a.signature, a.cross_account_risk_warning,
+                       a.block_external_mailboxes, a.intercept_https_links, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1
@@ -342,6 +343,31 @@ impl MailStore {
             message
                 .security_warnings
                 .retain(|warning| !warning.contains("远程图片"));
+            Ok(message)
+        })
+    }
+    pub fn persist_message_remote_images_once(&self, message_id: i64) -> MailResult<Message> {
+        self.with_conn(|conn| {
+            let mut message = message_for_conn(conn, message_id)?;
+            if !message.body.trim().is_empty() && looks_like_html_fragment(&message.body) {
+                message.sanitized_html =
+                    crate::protocol::sanitize_html_with_remote_images(&message.body);
+            }
+            message
+                .security_warnings
+                .retain(|warning| !warning.contains("远程图片"));
+            conn.execute(
+                "
+                UPDATE messages
+                SET sanitized_html = ?2, security_warnings = ?3
+                WHERE id = ?1
+                ",
+                params![
+                    message_id,
+                    message.sanitized_html,
+                    warning_lines_to_text(&message.security_warnings)
+                ],
+            )?;
             Ok(message)
         })
     }
@@ -1238,11 +1264,32 @@ pub(super) fn map_remote_image_trust(row: &rusqlite::Row<'_>) -> rusqlite::Resul
         created_at: row.get(5)?,
     })
 }
+pub(super) fn sender_is_external_mailbox(account: &Account, sender_email: &str) -> bool {
+    let account_domain = account
+        .email
+        .split_once('@')
+        .map(|(_, domain)| domain.trim().trim_start_matches('@').to_ascii_lowercase())
+        .unwrap_or_default();
+    let sender = sender_email.trim().to_ascii_lowercase();
+    let sender_domain = sender
+        .split_once('@')
+        .map(|(_, domain)| domain.trim().trim_start_matches('@').to_ascii_lowercase())
+        .unwrap_or_default();
+    if account_domain.is_empty() {
+        return false;
+    }
+    sender_domain.is_empty() || sender_domain != account_domain
+}
+
 pub(super) fn should_allow_remote_images_for_message(
     conn: &Connection,
     message: &Message,
 ) -> MailResult<bool> {
     let account = account_for_conn(conn, Some(message.account_id))?;
+    if account.block_external_mailboxes && sender_is_external_mailbox(&account, &message.sender_email)
+    {
+        return Ok(false);
+    }
     if account.remote_images_allowed {
         return Ok(true);
     }

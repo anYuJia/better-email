@@ -17,6 +17,8 @@ const demoAccount: Account = {
   remote_images_allowed: false,
   signature: '',
   cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
   is_default: true,
 };
 

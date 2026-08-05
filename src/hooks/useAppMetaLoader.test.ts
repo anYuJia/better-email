@@ -31,6 +31,8 @@ const account: Account = {
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
   cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
   is_default: true,
 };
 

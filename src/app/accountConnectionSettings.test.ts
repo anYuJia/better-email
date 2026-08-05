@@ -27,6 +27,8 @@ describe('accountConnectionSettings pure functions', () => {
     remote_images_allowed: true,
     signature: '--\nTest',
     cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
     is_default: true,
   };
 

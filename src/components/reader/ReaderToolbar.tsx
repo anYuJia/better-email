@@ -26,6 +26,7 @@ type ReaderToolbarProps = {
   folders: Folder[];
   selectedSenderTrusted: boolean;
   selectedSenderDomain: string;
+  selectedExternalBlocked: boolean;
   onTrustRemoteImages: (scope: 'sender' | 'domain') => void;
   onBlockSender: () => void;
   needsTranslation: boolean;
@@ -57,6 +58,7 @@ export default function ReaderToolbar({
   folders,
   selectedSenderTrusted,
   selectedSenderDomain,
+  selectedExternalBlocked,
   onTrustRemoteImages,
   onBlockSender,
   needsTranslation,
@@ -192,10 +194,10 @@ export default function ReaderToolbar({
             {!isDraft && selected.sender_email.trim() && (
               <>
                 <span className="menu-section-title">安全</span>
-                {!selectedSenderTrusted && (
+                {!selectedSenderTrusted && !selectedExternalBlocked && (
                   <button onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
                 )}
-                {selectedSenderDomain && !selectedSenderTrusted && (
+                {selectedSenderDomain && !selectedSenderTrusted && !selectedExternalBlocked && (
                   <button onClick={() => onTrustRemoteImages('domain')}>
                     信任 {selectedSenderDomain}
                   </button>

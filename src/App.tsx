@@ -615,6 +615,19 @@ export default function App() {
   const selectedHasRemoteImageWarning = Boolean(
     readerSelectedDetail?.security_warnings.some((warning) => warning.includes('远程图片')),
   ) && !selectedSenderTrusted;
+  const selectedAccount = useMemo(
+    () => accounts.find((item) => item.id === readerSelectedDetail?.account_id) ?? null,
+    [accounts, readerSelectedDetail?.account_id],
+  );
+  const selectedSenderIsExternal = useMemo(() => {
+    const accountDomain = (selectedAccount?.email.split('@')[1] ?? '').trim().toLowerCase();
+    const senderDomainValue = selectedSenderDomain.trim().toLowerCase();
+    return Boolean(accountDomain && senderDomainValue && senderDomainValue !== accountDomain);
+  }, [selectedAccount?.email, selectedSenderDomain]);
+  const selectedExternalBlocked = Boolean(
+    selectedAccount?.block_external_mailboxes && selectedSenderIsExternal,
+  );
+  const selectedInterceptsHttps = selectedAccount?.intercept_https_links !== false;
 
   const {
     fetchSelectedBody,
@@ -1332,6 +1345,12 @@ export default function App() {
         selectedSenderTrusted={selectedSenderTrusted}
         selectedSenderDomain={selectedSenderDomain}
         selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
+        selectedSenderIsExternal={selectedSenderIsExternal}
+        selectedExternalBlocked={selectedExternalBlocked}
+        selectedInterceptsHttps={selectedInterceptsHttps}
+        onOpenHttpsLink={(href) => {
+          invoke('open_url', { url: href }).catch((error) => setStatus(String(error)));
+        }}
         quickReplyBody={quickReplyBody}
         onSelectMessage={selectMessageForReading}
         onComposeNew={(fields) => {

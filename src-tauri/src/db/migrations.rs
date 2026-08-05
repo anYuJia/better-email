@@ -300,6 +300,18 @@ impl MailStore {
             add_column_if_missing(
                 conn,
                 "accounts",
+                "block_external_mailboxes",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "intercept_https_links",
+                "INTEGER NOT NULL DEFAULT 1",
+            )?;
+            add_column_if_missing(
+                conn,
+                "accounts",
                 "is_default",
                 "INTEGER NOT NULL DEFAULT 0",
             )?;

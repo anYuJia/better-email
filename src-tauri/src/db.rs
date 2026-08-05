@@ -1592,6 +1592,8 @@ mod tests {
                     remote_images_allowed: true,
                     signature: "Regards".to_string(),
                     cross_account_risk_warning: true,
+                    block_external_mailboxes: false,
+                    intercept_https_links: true,
                 },
             )
             .unwrap();
@@ -1672,6 +1674,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: "Second signature".to_string(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
 
@@ -1748,6 +1752,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
         let first_folders = store
@@ -1972,6 +1978,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
         let first_inbox = store
@@ -2091,6 +2099,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
 
@@ -2133,6 +2143,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: "Remove signature".to_string(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
         store.set_default_account(second_account.id).unwrap();
@@ -2277,6 +2289,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
 
@@ -2348,6 +2362,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
         let third_account = store
@@ -2363,6 +2379,8 @@ mod tests {
                 remote_images_allowed: false,
                 signature: String::new(),
                 cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
             })
             .unwrap();
 

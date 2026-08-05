@@ -15,6 +15,10 @@ pub struct Account {
     pub remote_images_allowed: bool,
     pub signature: String,
     pub cross_account_risk_warning: bool,
+    #[serde(default = "default_false")]
+    pub block_external_mailboxes: bool,
+    #[serde(default = "default_true")]
+    pub intercept_https_links: bool,
     pub is_default: bool,
 }
 
@@ -193,6 +197,10 @@ pub struct AccountSettingsInput {
     pub signature: String,
     #[serde(default = "default_true")]
     pub cross_account_risk_warning: bool,
+    #[serde(default = "default_false")]
+    pub block_external_mailboxes: bool,
+    #[serde(default = "default_true")]
+    pub intercept_https_links: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -209,6 +217,14 @@ pub struct AccountCreateInput {
     pub signature: String,
     #[serde(default = "default_true")]
     pub cross_account_risk_warning: bool,
+    #[serde(default = "default_false")]
+    pub block_external_mailboxes: bool,
+    #[serde(default = "default_true")]
+    pub intercept_https_links: bool,
+}
+
+fn default_false() -> bool {
+    false
 }
 
 fn default_true() -> bool {

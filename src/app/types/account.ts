@@ -15,6 +15,8 @@ export type Account = {
   remote_images_allowed: boolean;
   signature: string;
   cross_account_risk_warning: boolean;
+  block_external_mailboxes: boolean;
+  intercept_https_links: boolean;
   is_default: boolean;
 };
 

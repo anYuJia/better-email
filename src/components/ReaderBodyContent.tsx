@@ -14,6 +14,8 @@ type ReaderBodyContentProps = {
   handleReaderHtmlClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   handleReaderHtmlContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onAllowRemoteImagesOnce: () => void;
+  interceptHttpsLinks: boolean;
+  onOpenHttpsLink: (href: string) => void;
   onComposeNew: (fields?: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string }) => void;
   onLinkClick: (href: string, text: string) => void;
   setClickedLink: Dispatch<SetStateAction<{ href: string; text: string } | null>>;
@@ -29,6 +31,8 @@ export default function ReaderBodyContent({
   handleReaderHtmlClick,
   handleReaderHtmlContextMenu,
   onAllowRemoteImagesOnce,
+  interceptHttpsLinks,
+  onOpenHttpsLink,
   onComposeNew,
   onLinkClick,
   setClickedLink,
@@ -58,7 +62,11 @@ export default function ReaderBodyContent({
             if (lowerHref.startsWith('mailto:')) {
               onComposeNew(parseMailtoUrl(href));
             } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
-              onLinkClick(href, text);
+              if (interceptHttpsLinks || lowerHref.startsWith('http://')) {
+                onLinkClick(href, text);
+              } else {
+                onOpenHttpsLink(href);
+              }
             } else {
               console.warn('Blocked navigation to unsafe/unknown protocol:', href);
             }

@@ -34,6 +34,8 @@ export let account = {
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
   cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
   is_default: true,
 };
 
@@ -738,7 +740,13 @@ export function renderMessageWithPolicy(messageId: number, persist = true) {
   if (!message) throw new Error('message not found');
   const sender = message.sender_email.toLowerCase();
   const domain = sender.split('@')[1] ?? '';
-  const accountAllowsRemoteImages = mockAccounts.find((item) => item.id === message.account_id)?.remote_images_allowed === true;
+  const accountEntry = mockAccounts.find((item) => item.id === message.account_id);
+  const accountDomain = (accountEntry?.email.split('@')[1] ?? '').trim().toLowerCase();
+  const externalSender = Boolean(accountDomain && domain && domain !== accountDomain);
+  const accountAllowsRemoteImages = accountEntry?.remote_images_allowed === true;
+  if (accountEntry?.block_external_mailboxes && externalSender) {
+    return message;
+  }
   const trusted = accountAllowsRemoteImages || remoteImageTrusts.some(
     (trust) =>
       trust.account_id === message.account_id &&
@@ -822,6 +830,8 @@ export function createMockAccount(args?: InvokeArgs) {
     remote_images_allowed: Boolean(input.remote_images_allowed),
     signature: String(input.signature ?? ''),
     cross_account_risk_warning: input.cross_account_risk_warning !== false,
+    block_external_mailboxes: Boolean(input.block_external_mailboxes),
+    intercept_https_links: input.intercept_https_links !== false,
     is_default: isFirstAccount,
   };
   mockAccounts = [...mockAccounts, created];

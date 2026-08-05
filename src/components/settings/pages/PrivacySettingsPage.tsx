@@ -23,6 +23,8 @@ export default function PrivacySettingsPage({
 }: PrivacySettingsPageProps) {
   const accountTrusts = remoteImageTrusts.filter((trust) => trust.account_id === accountForm.id);
   const remoteImagesAllowed = accountForm.remote_images_allowed;
+  const externalBlocked = accountForm.block_external_mailboxes === true;
+  const interceptsHttps = accountForm.intercept_https_links !== false;
 
   return (
     <div className="settings-experience-stack">
@@ -85,6 +87,65 @@ export default function PrivacySettingsPage({
           <p className="privacy-section-note">
             可信发件人/域名可单独放行远程图片，不需要为整个账号开启。
           </p>
+        </div>
+
+        <div className="privacy-section">
+          <div className="privacy-section-header">
+            <span>
+              <strong>外部邮箱拦截</strong>
+              <small>拦截来自外部邮箱（域名与本账号不同）的邮件内容。</small>
+            </span>
+            <em>{externalBlocked ? '当前：已拦截' : '当前：未拦截'}</em>
+          </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={externalBlocked}
+              onChange={(event) => onAccountFormChange({
+                ...accountForm,
+                block_external_mailboxes: event.target.checked,
+              })}
+            />
+            <span>
+              <strong>拦截外部邮箱邮件</strong>
+              <small>
+                {accountForm.block_external_mailboxes
+                  ? '外部发件人（域名与本账号不同）的邮件会显示拦截提示，且不加载其中的远程图片。'
+                  : '关闭后，外部发件人的邮件按普通策略处理。'}
+              </small>
+            </span>
+          </label>
+          <p className="privacy-section-note">
+            常用于防钓鱼：冒充内部发件人、但邮箱域名不一致的邮件会先被拦截。
+          </p>
+        </div>
+
+        <div className="privacy-section">
+          <div className="privacy-section-header">
+            <span>
+              <strong>HTTPS 链接拦截</strong>
+              <small>点击邮件中的 HTTPS 链接前先进行安全确认。</small>
+            </span>
+            <em>{interceptsHttps ? '当前：已拦截' : '当前：直接打开'}</em>
+          </div>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={interceptsHttps}
+              onChange={(event) => onAccountFormChange({
+                ...accountForm,
+                intercept_https_links: event.target.checked,
+              })}
+            />
+            <span>
+              <strong>拦截 HTTPS 链接并提示确认</strong>
+              <small>
+                {accountForm.intercept_https_links
+                  ? '开启后点击 HTTPS 链接会先显示安全链接检查，确认目标域名后再打开。'
+                  : '关闭后点击 HTTPS 链接直接用系统浏览器打开，不再弹确认提示。'}
+              </small>
+            </span>
+          </label>
         </div>
 
         <div className="privacy-section">

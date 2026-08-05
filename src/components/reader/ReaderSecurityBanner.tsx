@@ -4,6 +4,8 @@ type ReaderSecurityBannerProps = {
   hasRenderableHtml: boolean;
   selectedSenderTrusted: boolean;
   selectedSenderDomain: string;
+  selectedSenderIsExternal: boolean;
+  selectedExternalBlocked: boolean;
   onAllowRemoteImagesOnce: () => void;
   onTrustSender: () => void;
   onTrustDomain: () => void;
@@ -15,22 +17,29 @@ export default function ReaderSecurityBanner({
   hasRenderableHtml,
   selectedSenderTrusted,
   selectedSenderDomain,
+  selectedSenderIsExternal,
+  selectedExternalBlocked,
   onAllowRemoteImagesOnce,
   onTrustSender,
   onTrustDomain,
 }: ReaderSecurityBannerProps) {
-  if (warnings.length === 0 && !showRemoteImageNote) return null;
+  if (warnings.length === 0 && !showRemoteImageNote && !selectedExternalBlocked) return null;
+
+  const externalBlockNote = selectedExternalBlocked
+    ? '发件人来自外部邮箱，已按账号策略拦截远程图片等远程内容。'
+    : null;
 
   return (
     <div className="reader-warning-panel">
       <div className="reader-warning-heading">
         <strong>安全提示</strong>
-        {showRemoteImageNote && (
-          <span>远程图片默认阻止</span>
+        {(showRemoteImageNote || selectedExternalBlocked) && (
+          <span>{selectedExternalBlocked ? '外部邮箱已拦截' : '远程图片默认阻止'}</span>
         )}
       </div>
       {warnings.map((warning) => <p key={warning}>{warning}</p>)}
-      {showRemoteImageNote && hasRenderableHtml && (
+      {externalBlockNote && <p>{externalBlockNote}</p>}
+      {showRemoteImageNote && hasRenderableHtml && !selectedExternalBlocked && (
         <div className="reader-warning-action-row">
           <button
             type="button"

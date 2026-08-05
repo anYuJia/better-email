@@ -78,6 +78,10 @@ export type ReaderPaneProps = {
   selectedSenderTrusted: boolean;
   selectedSenderDomain: string;
   selectedHasRemoteImageWarning: boolean;
+  selectedSenderIsExternal: boolean;
+  selectedExternalBlocked: boolean;
+  selectedInterceptsHttps: boolean;
+  onOpenHttpsLink: (href: string) => void;
   quickReplyBody: string;
   onSelectMessage: (messageId: number) => void;
   readTriggerKey: number;
@@ -137,6 +141,10 @@ export default function ReaderPane({
   selectedSenderTrusted,
   selectedSenderDomain,
   selectedHasRemoteImageWarning,
+  selectedSenderIsExternal,
+  selectedExternalBlocked,
+  selectedInterceptsHttps,
+  onOpenHttpsLink,
   quickReplyBody,
   onSelectMessage,
   onComposeNew,
@@ -368,6 +376,7 @@ if (activeThread && threadMessages.length > 0) {
           folders={folders}
           selectedSenderTrusted={selectedSenderTrusted}
           selectedSenderDomain={selectedSenderDomain}
+          selectedExternalBlocked={selectedExternalBlocked}
           onTrustRemoteImages={onTrustRemoteImages}
           onBlockSender={onBlockSender}
           needsTranslation={needsTranslation}
@@ -443,6 +452,8 @@ if (activeThread && threadMessages.length > 0) {
           hasRenderableHtml={hasRenderableHtml}
           selectedSenderTrusted={selectedSenderTrusted}
           selectedSenderDomain={selectedSenderDomain}
+          selectedSenderIsExternal={selectedSenderIsExternal}
+          selectedExternalBlocked={selectedExternalBlocked}
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onTrustSender={() => onTrustRemoteImages('sender')}
           onTrustDomain={() => onTrustRemoteImages('domain')}
@@ -458,6 +469,8 @@ if (activeThread && threadMessages.length > 0) {
           handleReaderHtmlClick={handleReaderHtmlClick}
           handleReaderHtmlContextMenu={handleReaderHtmlContextMenu}
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
+          interceptHttpsLinks={selectedInterceptsHttps}
+          onOpenHttpsLink={onOpenHttpsLink}
           onComposeNew={onComposeNew}
           onLinkClick={(href, text) => setClickedLink({ href, text })}
           setClickedLink={setClickedLink}

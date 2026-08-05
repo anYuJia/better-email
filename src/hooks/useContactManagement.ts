@@ -268,6 +268,7 @@ export default function useContactManagement({
     mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
+    refreshManagedContacts,
     confirmDeleteContact,
     setConfirmDeleteContact,
   };

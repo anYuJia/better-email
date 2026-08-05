@@ -14,6 +14,7 @@ export type Account = {
   sync_mode: string;
   remote_images_allowed: boolean;
   signature: string;
+  cross_account_risk_warning: boolean;
   is_default: boolean;
 };
 

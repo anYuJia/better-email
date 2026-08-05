@@ -96,6 +96,7 @@ export const emptyAccountCreateForm: AccountCreateInput = {
   auth_type: 'password',
   sync_mode: '5min',
   remote_images_allowed: false,
+  cross_account_risk_warning: true,
   signature: '',
 };
 

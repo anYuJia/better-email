@@ -43,6 +43,8 @@ import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
 import ThreadReaderList from './reader/ThreadReaderList';
+import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
+import useMessageTranslation from '../hooks/useMessageTranslation';
 
 const readerBodyRenderDelayMs = 0;
 const readerBodyRenderIdleTimeoutMs = 50;
@@ -304,17 +306,14 @@ export default function ReaderPane({
     maybeCompleteReading();
   }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
 
+  const {
+    needsTranslation,
+    translationState,
+    translate: translateMessage,
+    toggleTranslation,
+  } = useMessageTranslation(selected, {});
 
-
-
-
-
-
-
-
-
-
-  if (activeThread && threadMessages.length > 0) {
+if (activeThread && threadMessages.length > 0) {
     return (
       <section className="reader-panel">
         <article className="reader thread-reader">
@@ -371,6 +370,11 @@ export default function ReaderPane({
           selectedSenderDomain={selectedSenderDomain}
           onTrustRemoteImages={onTrustRemoteImages}
           onBlockSender={onBlockSender}
+          needsTranslation={needsTranslation}
+          translationActive={translationState.status === 'success' && translationState.showTranslation}
+          translationLoading={translationState.status === 'translating'}
+          onTranslateMessage={translateMessage}
+          onToggleTranslation={toggleTranslation}
           onToggleStar={onToggleStar}
           onEditDraft={onEditDraft}
           onComposeFromMessage={onComposeFromMessage}
@@ -451,6 +455,13 @@ export default function ReaderPane({
           onComposeNew={onComposeNew}
           onLinkClick={(href, text) => setClickedLink({ href, text })}
           setClickedLink={setClickedLink}
+        />
+
+        <ReaderTranslationPanel
+          state={translationState}
+          needsTranslation={needsTranslation}
+          onTranslate={translateMessage}
+          onToggle={toggleTranslation}
         />
 
 

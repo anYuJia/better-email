@@ -1,6 +1,7 @@
 use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
-    BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactInput,
+    BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactImportBatch,
+    ContactImportCommitSummary, ContactImportPreviewEntry, ContactImportUndoReport, ContactInput,
     ContactMergeSuggestion, CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
     ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, ImapReconcileResult, Label, LocalBackup,
     LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
@@ -1561,6 +1562,7 @@ mod tests {
                     sync_mode: "5min".to_string(),
                     remote_images_allowed: true,
                     signature: "Regards".to_string(),
+                    cross_account_risk_warning: true,
                 },
             )
             .unwrap();
@@ -1640,6 +1642,7 @@ mod tests {
                 sync_mode: "15min".to_string(),
                 remote_images_allowed: false,
                 signature: "Second signature".to_string(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
 
@@ -1715,6 +1718,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
         let first_folders = store
@@ -1938,6 +1942,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
         let first_inbox = store
@@ -2056,6 +2061,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
 
@@ -2097,6 +2103,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: "Remove signature".to_string(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
         store.set_default_account(second_account.id).unwrap();
@@ -2240,6 +2247,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
 
@@ -2310,6 +2318,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
         let third_account = store
@@ -2324,6 +2333,7 @@ mod tests {
                 sync_mode: "manual".to_string(),
                 remote_images_allowed: false,
                 signature: String::new(),
+                cross_account_risk_warning: true,
             })
             .unwrap();
 

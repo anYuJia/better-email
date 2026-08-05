@@ -247,6 +247,7 @@ export default function App() {
     mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
+    refreshManagedContacts,
     confirmDeleteContact: contactToDeleteFromHook,
     setConfirmDeleteContact: setContactToDeleteFromHook,
   } = useContactManagement({ setStatus, setNotificationPolicy });
@@ -698,6 +699,12 @@ export default function App() {
     editDraftMessage,
     saveDraft,
     sendDraft,
+    requestSend,
+    confirmSendRisk,
+    sendRiskConfirm,
+    setSendRiskConfirm,
+    crossAccountRisks,
+    composerContextAccountId,
     sendQuickReply,
     queueDraft,
     cancelOutboxItem,
@@ -1107,57 +1114,6 @@ export default function App() {
     syncAndRefresh().catch((error) => setStatus(String(error)));
   }, [syncAndRefresh, setStatus]);
 
-  useEffect(() => {
-    let active = true;
-    const unlisteners: Array<() => void> = [];
-
-    async function registerTrayListeners() {
-      try {
-        const unlistenCompose = await listen('tray://compose', () => {
-          if (!active) return;
-          setRichComposer(false);
-          openComposer(emptyDraft);
-          setStatus('已打开新邮件');
-        });
-        unlisteners.push(unlistenCompose);
-
-        const unlistenSync = await listen('tray://sync', () => {
-          if (!active) return;
-          syncAndRefresh().catch((error) => setStatus(String(error)));
-        });
-        unlisteners.push(unlistenSync);
-
-        const unlistenUnread = await listen('tray://open-unread', () => {
-          if (!active) return;
-          const inboxFolder = folders.find((folder) => folder.role === 'inbox');
-          if (inboxFolder) {
-            setFolderId(inboxFolder.id);
-          }
-          setActiveThread(null);
-          setThreadMessages([]);
-          setListMode('messages');
-          setFilter('unread');
-        });
-        unlisteners.push(unlistenUnread);
-
-        const unlistenSettings = await listen('tray://settings', () => {
-          if (!active) return;
-          setSettingsOpen(true);
-        });
-        unlisteners.push(unlistenSettings);
-      } catch (error) {
-        console.error('Failed to register tray listeners:', error);
-      }
-    }
-
-    void registerTrayListeners();
-
-    return () => {
-      active = false;
-      unlisteners.forEach((unlisten) => unlisten());
-    };
-  }, [openComposer, syncAndRefresh, folders, setFolderId, setFilter, setListMode, setSettingsOpen, setActiveThread, setThreadMessages, setRichComposer, setStatus, emptyDraft]);
-
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));
   }, [moveSelectedMessagesToFolder, setStatus]);
@@ -1457,7 +1413,11 @@ export default function App() {
           onAttachmentPaste={handleComposerAttachmentPaste}
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
-          onSendDraft={() => { sendDraft().catch((error) => setStatus(String(error))); }}
+          onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
+          onSendRiskConfirm={confirmSendRisk}
+          onSendRiskCancel={() => setSendRiskConfirm(null)}
+          sendRiskConfirm={sendRiskConfirm}
+          crossAccountRisks={crossAccountRisks}
           />
         </Suspense>
       )}
@@ -1659,6 +1619,8 @@ export default function App() {
           onMergeSourceChange={setMergeSourceContactId}
           onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
           onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
+          onRefreshContacts={refreshManagedContacts}
+          onStatus={setStatus}
           onRuleFormChange={setRuleForm}
           onRuleConditionFieldChange={updateRuleConditionField}
           onRuleConditionValueChange={updateRuleConditionValue}

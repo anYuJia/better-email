@@ -6,7 +6,7 @@ impl MailStore {
     pub fn list_accounts(&self) -> MailResult<Vec<Account>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, is_default
                  FROM accounts ORDER BY is_default DESC, id",
             )?;
             let accounts = stmt
@@ -166,8 +166,8 @@ impl MailStore {
                 conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| row.get::<_, bool>(0))?;
             let now = Utc::now().to_rfc3339();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     email,
                     display_name,
@@ -179,6 +179,7 @@ impl MailStore {
                     normalize_sync_mode(&input.sync_mode),
                     bool_to_int(input.remote_images_allowed),
                     input.signature,
+                    bool_to_int(input.cross_account_risk_warning),
                     bool_to_int(is_default),
                     now
                 ],
@@ -285,7 +286,8 @@ impl MailStore {
             conn.execute(
                 "UPDATE accounts
                  SET display_name = ?1, provider = ?2, imap_host = ?3, smtp_host = ?4,
-                     incoming_protocol = ?5, auth_type = ?6, sync_mode = ?7, remote_images_allowed = ?8, signature = ?9
+                     incoming_protocol = ?5, auth_type = ?6, sync_mode = ?7, remote_images_allowed = ?8, signature = ?9,
+                     cross_account_risk_warning = ?11
                  WHERE id = ?10",
                 params![
                     input.display_name.trim(),
@@ -297,7 +299,8 @@ impl MailStore {
                     normalize_sync_mode(&input.sync_mode),
                     bool_to_int(input.remote_images_allowed),
                     input.signature,
-                    account.id
+                    account.id,
+                    bool_to_int(input.cross_account_risk_warning)
                 ],
             )?;
             upsert_account_default_identity_conn(
@@ -400,7 +403,8 @@ pub(super) fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> 
         sync_mode: row.get(8)?,
         remote_images_allowed: row.get::<_, i64>(9)? != 0,
         signature: row.get(10)?,
-        is_default: row.get::<_, i64>(11)? != 0,
+        cross_account_risk_warning: row.get::<_, i64>(11)? != 0,
+        is_default: row.get::<_, i64>(12)? != 0,
     })
 }
 pub(super) fn normalize_identity_email(value: &str) -> MailResult<String> {
@@ -651,7 +655,7 @@ pub(super) fn account_for_conn_optional(
     if let Some(account_id) = account_id {
         return conn
             .query_row(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, is_default
                  FROM accounts WHERE id = ?1",
                 params![account_id],
                 map_account,
@@ -661,7 +665,7 @@ pub(super) fn account_for_conn_optional(
     }
 
     conn.query_row(
-        "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, is_default
+        "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, is_default
          FROM accounts ORDER BY is_default DESC, id LIMIT 1",
         [],
         map_account,

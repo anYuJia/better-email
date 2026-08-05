@@ -7,6 +7,141 @@ pub struct ParsedVcards {
     pub skipped: i64,
 }
 
+#[derive(Debug, Clone)]
+pub struct ParsedContactImport {
+    pub contacts: Vec<ContactCreateInput>,
+    pub total: i64,
+    pub skipped: i64,
+    pub format: String,
+}
+
+pub fn parse_contact_import(raw: &str, file_name: &str) -> ParsedContactImport {
+    let is_csv = file_name.to_ascii_lowercase().ends_with(".csv") || raw.contains("BEGIN:VCARD") == false;
+    if is_csv {
+        let parsed = parse_contacts_csv(raw);
+        ParsedContactImport {
+            contacts: parsed.contacts,
+            total: parsed.total_cards,
+            skipped: parsed.skipped,
+            format: "csv".to_string(),
+        }
+    } else {
+        let parsed = parse_contacts(raw);
+        ParsedContactImport {
+            contacts: parsed.contacts,
+            total: parsed.total_cards,
+            skipped: parsed.skipped,
+            format: "vcard".to_string(),
+        }
+    }
+}
+
+pub fn parse_contacts_csv(raw: &str) -> ParsedVcards {
+    let rows = parse_csv_rows(raw);
+    let mut contacts: Vec<ContactCreateInput> = Vec::new();
+    let mut skipped = 0_i64;
+    let mut header_seen = false;
+    for row in rows {
+        let mut cells = row;
+        if cells.len() == 1 && cells[0].trim().is_empty() {
+            skipped += 1;
+            continue;
+        }
+        let _trimmed_first = cells.first().unwrap_or(&String::new()).trim().to_ascii_lowercase();
+        let header_indicators = ["name", "姓名", "名字", "email", "邮箱", "邮件", "地址", "联系人"];
+        if !header_seen && cells.iter().any(|cell| {
+            let value = cell.trim().to_ascii_lowercase();
+            header_indicators.iter().any(|indicator| value == *indicator)
+        }) {
+            header_seen = true;
+            continue;
+        }
+        let mut name = String::new();
+        let mut email_cells: Vec<String> = Vec::new();
+        for cell in cells.iter_mut() {
+            let value = cell.trim().to_string();
+            if value.is_empty() {
+                continue;
+            }
+            let emails: Vec<String> = value
+                .split(|character: char| character == ',' || character == ';' || character == ' ')
+                .filter_map(|part| {
+                    let candidate = part.trim().trim_matches('"').trim().to_ascii_lowercase();
+                    if is_valid_email(&candidate) { Some(candidate) } else { None }
+                })
+                .collect();
+            if !emails.is_empty() {
+                email_cells.extend(emails);
+            } else if name.is_empty() {
+                name = value;
+            }
+        }
+        if email_cells.is_empty() {
+            skipped += 1;
+            continue;
+        }
+        email_cells.sort();
+        email_cells.dedup();
+        let primary = email_cells.remove(0);
+        if name.is_empty() {
+            name = primary.clone();
+        }
+        contacts.push(ContactCreateInput {
+            name,
+            email: primary,
+            aliases: email_cells,
+            vip: false,
+        });
+    }
+    ParsedVcards {
+        total_cards: contacts.len() as i64 + skipped,
+        contacts,
+        skipped,
+    }
+}
+
+fn parse_csv_rows(raw: &str) -> Vec<Vec<String>> {
+    let normalized = raw.replace("\r\n", "\n").replace('\r', "\n");
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut current: Vec<String> = Vec::new();
+    let mut cell = String::new();
+    let mut in_quotes = false;
+    let mut chars = normalized.chars().peekable();
+    while let Some(character) = chars.next() {
+        match character {
+            '"' if !in_quotes => in_quotes = true,
+            '"' if in_quotes => {
+                if chars.peek() == Some(&'"') {
+                    cell.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
+                }
+            }
+            ',' if !in_quotes => {
+                current.push(cell.trim().to_string());
+                cell.clear();
+            }
+            '\n' if !in_quotes => {
+                current.push(cell.trim().to_string());
+                cell.clear();
+                if current.iter().any(|value| !value.trim().is_empty()) {
+                    rows.push(current);
+                }
+                current = Vec::new();
+            }
+            _ => cell.push(character),
+        }
+    }
+    if !cell.is_empty() || !current.is_empty() {
+        current.push(cell.trim().to_string());
+        if current.iter().any(|value| !value.trim().is_empty()) {
+            rows.push(current);
+        }
+    }
+    rows
+}
+
 pub fn parse_contacts(raw: &str) -> ParsedVcards {
     let lines = unfold_lines(raw);
     let mut contacts = Vec::new();
@@ -307,5 +442,40 @@ mod tests {
             vec!["ada@work.example.com".to_string()]
         );
         assert!(parsed.contacts[0].vip);
+    }
+
+    #[test]
+    fn parses_csv_contacts_with_quoted_names_and_aliases() {
+        let parsed = parse_contacts_csv(
+            "姓名,邮箱\n\"Ada, Lovelace\",ada@example.com;ada@work.example.com\nKatherine,katherine@example.com\nbad-row-no-email\n",
+        );
+        assert_eq!(parsed.skipped, 1);
+        assert_eq!(parsed.contacts.len(), 2);
+        let ada = parsed.contacts.iter().find(|item| item.email == "ada@example.com").unwrap();
+        assert_eq!(ada.name, "Ada, Lovelace");
+        assert!(ada.aliases.contains(&"ada@work.example.com".to_string()));
+        let katherine = parsed.contacts.iter().find(|item| item.email == "katherine@example.com").unwrap();
+        assert_eq!(katherine.name, "Katherine");
+    }
+
+    #[test]
+    fn csv_parser_handles_escaped_quotes_and_detects_header() {
+        let parsed = parse_contacts_csv(
+            "name,email\n\"\"\"Dr.\"\" Grace\",grace@example.com\n",
+        );
+        assert_eq!(parsed.contacts.len(), 1);
+        assert_eq!(parsed.contacts[0].name, "\"Dr.\" Grace");
+    }
+
+    #[test]
+    fn detects_csv_vs_vcard_by_extension_and_content() {
+        let csv_parsed = parse_contact_import("name,email\nAda,ada@example.com\n", "contacts.csv");
+        assert_eq!(csv_parsed.format, "csv");
+        let vcard_parsed = parse_contact_import(
+            "BEGIN:VCARD\nFN:Ada\nEMAIL:ada@example.com\nEND:VCARD\n",
+            "contacts.vcf",
+        );
+        assert_eq!(vcard_parsed.format, "vcard");
+        assert_eq!(vcard_parsed.contacts.len(), 1);
     }
 }

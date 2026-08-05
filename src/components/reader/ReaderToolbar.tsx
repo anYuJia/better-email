@@ -2,6 +2,8 @@ import {
   Archive,
   Clock,
   Forward,
+  Languages,
+  Loader2,
   Mail,
   MailOpen,
   MailPlus,
@@ -26,6 +28,11 @@ type ReaderToolbarProps = {
   selectedSenderDomain: string;
   onTrustRemoteImages: (scope: 'sender' | 'domain') => void;
   onBlockSender: () => void;
+  needsTranslation: boolean;
+  translationActive: boolean;
+  translationLoading: boolean;
+  onTranslateMessage: () => void;
+  onToggleTranslation: () => void;
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
@@ -52,6 +59,11 @@ export default function ReaderToolbar({
   selectedSenderDomain,
   onTrustRemoteImages,
   onBlockSender,
+  needsTranslation,
+  translationActive,
+  translationLoading,
+  onTranslateMessage,
+  onToggleTranslation,
   onToggleStar,
   onEditDraft,
   onComposeFromMessage,
@@ -118,6 +130,17 @@ export default function ReaderToolbar({
             <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
               <MailPlus size={17} />
             </button>
+            {needsTranslation && (
+              <button
+                className={`icon-only-action reader-translate-action${translationActive ? ' active' : ''}`}
+                title={translationActive ? '显示原文' : '翻译为中文'}
+                aria-label={translationActive ? '显示原文' : '翻译为中文'}
+                onClick={translationActive ? onToggleTranslation : onTranslateMessage}
+                disabled={translationLoading}
+              >
+                {translationLoading ? <Loader2 size={16} className="reader-translation-spinner" /> : <Languages size={16} />}
+              </button>
+            )}
           </>
         )}
         {isTrash ? (

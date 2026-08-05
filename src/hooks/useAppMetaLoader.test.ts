@@ -28,6 +28,7 @@ const account: Account = {
   sync_mode: 'manual',
   remote_images_allowed: false,
   signature: 'Sent from Better Email',
+  cross_account_risk_warning: true,
   is_default: true,
 };
 
@@ -85,6 +86,8 @@ function setupInvokeMocks() {
         return Promise.resolve(true);
       case 'mark_benchmark_sync_complete':
         return Promise.resolve({});
+      case 'set_tray_unread_count':
+        return Promise.resolve(undefined);
       default:
         return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
     }

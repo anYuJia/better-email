@@ -26,6 +26,7 @@ describe('accountConnectionSettings pure functions', () => {
     sync_mode: 'push' as const,
     remote_images_allowed: true,
     signature: '--\nTest',
+    cross_account_risk_warning: true,
     is_default: true,
   };
 

@@ -720,6 +720,37 @@
   box-shadow: inset 2px 0 0 #7da7cf;
 }
 
+.settings-account-risk-toggle {
+  margin: 0 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.09));
+  border-radius: 8px;
+  background: rgba(250, 204, 21, 0.05);
+}
+
+.settings-account-risk-toggle .checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.settings-account-risk-toggle .checkbox-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-account-risk-toggle strong {
+  font-size: 12.5px;
+}
+
+.settings-account-risk-toggle small {
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
 .settings-account-add-overlay {
   position: fixed;
   inset: 0;

@@ -1,6 +1,7 @@
 mod commands;
 mod credentials;
 mod db;
+mod ai;
 mod imap_probe;
 mod models;
 mod oauth;
@@ -292,6 +293,14 @@ pub fn run() {
             commands::merge_contacts,
             commands::export_contacts_vcard,
             commands::import_contacts_vcard,
+            commands::preview_contact_import,
+            commands::commit_contact_import,
+            commands::list_contact_import_batches,
+            commands::undo_contact_import_batch,
+            commands::pick_contact_import_file,
+            commands::ai_chat_request,
+            commands::ai_request,
+            commands::test_ai_connection,
             commands::list_rules,
             commands::upsert_rule,
             commands::set_rule_enabled,

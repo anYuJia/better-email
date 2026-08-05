@@ -728,6 +728,7 @@ mod tests {
             sync_mode: "manual".to_string(),
             remote_images_allowed: false,
             signature: String::new(),
+            cross_account_risk_warning: true,
             is_default: true,
         }
     }

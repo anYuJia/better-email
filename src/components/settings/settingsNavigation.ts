@@ -8,6 +8,7 @@ import {
   ScanSearch,
   Server,
   ShieldCheck,
+  Sparkles,
   TimerReset,
   UserRound,
   Workflow,
@@ -26,7 +27,9 @@ export type SettingsSectionId =
   | 'sync'
   | 'contacts'
   | 'rules'
-  | 'security-preview';
+  | 'security-preview'
+  | 'ai'
+  | 'templates';
 
 export type SettingsNavigationItem = {
   id: SettingsSectionId;
@@ -97,6 +100,18 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
         label: '身份',
         description: '维护发件身份、别名、Reply-To 与签名。',
         icon: BadgeCheck,
+      },
+      {
+        id: 'ai',
+        label: 'AI 服务',
+        description: '配置翻译、模板生成与摘要的 AI / MCP 服务。',
+        icon: Sparkles,
+      },
+      {
+        id: 'templates',
+        label: '模板',
+        description: '管理写信模板、分类与变量，支持 AI 辅助生成。',
+        icon: Workflow,
       },
     ],
   },

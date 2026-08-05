@@ -37,6 +37,7 @@ const account: Account = {
   sync_mode: 'manual',
   remote_images_allowed: false,
   signature: '',
+  cross_account_risk_warning: true,
   is_default: true,
 };
 

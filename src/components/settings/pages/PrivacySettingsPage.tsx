@@ -59,80 +59,47 @@ export default function PrivacySettingsPage({
         </div>
       )}
 
-      <div className="st-subsection">
-        <header className="st-subsection-header">
-          <span>
-            <strong>远程图片策略</strong>
-            <small>邮件中的远程图片可能被用来追踪你的打开行为。</small>
-          </span>
-          <SettingsBadge tone={remoteImagesAllowed ? 'warning' : 'neutral'}>
-            当前：{remoteImagesAllowed ? '允许加载' : '默认阻止'}
-          </SettingsBadge>
-        </header>
-        <SettingsSwitch
-          label="允许此账号加载远程图片"
-          description={
-            remoteImagesAllowed
-              ? '开启后邮件中的远程图片会直接加载，可能暴露你的打开行为与网络位置；可信发件人或域名仍可单独放行。'
-              : '默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。'
-          }
-          checked={remoteImagesAllowed}
-          onChange={(checked) => onAccountFormChange({
-            ...accountForm,
-            remote_images_allowed: checked,
-          })}
-        />
-      </div>
+      <SettingsSwitch
+        label="允许此账号加载远程图片"
+        description={
+          remoteImagesAllowed
+            ? '开启后邮件中的远程图片会直接加载，可能暴露你的打开行为与网络位置；可信发件人或域名仍可单独放行。'
+            : '默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。'
+        }
+        checked={remoteImagesAllowed}
+        onChange={(checked) => onAccountFormChange({
+          ...accountForm,
+          remote_images_allowed: checked,
+        })}
+      />
 
-      <div className="st-subsection">
-        <header className="st-subsection-header">
-          <span>
-            <strong>外部邮箱拦截</strong>
-            <small>拦截来自外部邮箱（域名与本账号不同）的邮件内容，常用于防钓鱼。</small>
-          </span>
-          <SettingsBadge tone={externalBlocked ? 'success' : 'neutral'}>
-            当前：{externalBlocked ? '已拦截' : '未拦截'}
-          </SettingsBadge>
-        </header>
-        <SettingsSwitch
-          label="拦截外部邮箱邮件"
-          description={
-            externalBlocked
-              ? '外部发件人（域名与本账号不同）的邮件会显示拦截提示，且不加载其中的远程图片。'
-              : '关闭后，外部发件人的邮件按普通策略处理。'
-          }
-          checked={externalBlocked}
-          onChange={(checked) => onAccountFormChange({
-            ...accountForm,
-            block_external_mailboxes: checked,
-          })}
-        />
-      </div>
+      <SettingsSwitch
+        label="拦截外部邮箱邮件"
+        description={
+          externalBlocked
+            ? '外部发件人（域名与本账号不同）的邮件会显示拦截提示，且不加载其中的远程图片。'
+            : '关闭后，外部发件人的邮件按普通策略处理。'
+        }
+        checked={externalBlocked}
+        onChange={(checked) => onAccountFormChange({
+          ...accountForm,
+          block_external_mailboxes: checked,
+        })}
+      />
 
-      <div className="st-subsection">
-        <header className="st-subsection-header">
-          <span>
-            <strong>HTTPS 链接拦截</strong>
-            <small>点击邮件中的 HTTPS 链接前先进行安全确认。</small>
-          </span>
-          <SettingsBadge tone={interceptsHttps ? 'success' : 'neutral'}>
-            当前：{interceptsHttps ? '已拦截' : '直接打开'}
-          </SettingsBadge>
-        </header>
-        <SettingsSwitch
-          label="拦截 HTTPS 链接并提示确认"
-          description={
-            interceptsHttps
-              ? '开启后点击 HTTPS 链接会先显示安全链接检查，确认目标域名后再打开。'
-              : '关闭后点击 HTTPS 链接直接用系统浏览器打开，不再弹确认提示。'
-          }
-          checked={interceptsHttps}
-          onChange={(checked) => onAccountFormChange({
-            ...accountForm,
-            intercept_https_links: checked,
-          })}
-        />
-      </div>
+      <SettingsSwitch
+        label="拦截 HTTPS 链接并提示确认"
+        description={
+          interceptsHttps
+            ? '开启后点击 HTTPS 链接会先显示安全链接检查，确认目标域名后再打开。'
+            : '关闭后点击 HTTPS 链接直接用系统浏览器打开，不再弹确认提示。'
+        }
+        checked={interceptsHttps}
+        onChange={(checked) => onAccountFormChange({
+          ...accountForm,
+          intercept_https_links: checked,
+        })}
+      />
 
       <div className="st-subsection">
         <header className="st-subsection-header">

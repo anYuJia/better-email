@@ -269,6 +269,12 @@
     background-color 120ms ease;
 }
 
+/* The global stylesheet draws a white checkmark via ::before; the switch
+ * thumb uses ::after, so suppress the inherited checkmark. */
+.settings-modal .st-switch input[type="checkbox"]::before {
+  content: none;
+}
+
 .settings-modal .st-switch input[type="checkbox"]::after {
   content: "";
   position: absolute;

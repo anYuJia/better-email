@@ -777,4 +777,12 @@
   .settings-modal .settings-page-picker > svg {
     transition: none;
   }
+
+  .settings-modal .settings-action-spinner,
+  .settings-modal .spinning,
+  .settings-modal .spin,
+  .settings-modal .connection-spinner,
+  .settings-modal .settings-page-loading::before {
+    animation: none;
+  }
 }

@@ -34,7 +34,8 @@ type SettingsFrameProps = {
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
   onSave: () => void;
-  onSaveAndVerify?: () => void;
+  onSaveAndVerify: () => void;
+  canSaveAndVerify?: boolean;
   isDirty?: boolean;
   isBusy?: boolean;
   connectionSummary?: string;
@@ -56,6 +57,7 @@ export default function SettingsFrame({
   onTestConnection,
   onSave,
   onSaveAndVerify,
+  canSaveAndVerify = false,
   isDirty = false,
   isBusy = false,
   connectionSummary,
@@ -66,7 +68,7 @@ export default function SettingsFrame({
     item: activeItem,
     index: activeIndex,
   } = getSettingsNavigationContext(activeSection);
-  const hasConnectionActions = saveAndVerifySettingsSections.has(activeSection) && Boolean(onSaveAndVerify);
+  const hasConnectionActions = saveAndVerifySettingsSections.has(activeSection) && canSaveAndVerify;
   const shouldShowConnectionSummary = hasConnectionActions
     && Boolean(connectionSummary)
     && connectionSummary !== '尚未开始验证';

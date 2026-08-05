@@ -1,4 +1,12 @@
-import React, { Suspense, lazy, type Dispatch, type SetStateAction } from 'react';
+import React, {
+  Suspense,
+  lazy,
+  memo,
+  useMemo,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import type {
   Account,
   AccountCreateInput,
@@ -48,6 +56,7 @@ import type { SettingsSectionId } from './SettingsFrame';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
 import { invoke } from '../../tauriBridge';
+import { createSettingsHandlers } from './settingsOverlayHandlers';
 
 const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));
 const CredentialSecuritySettings = lazy(() => import('./CredentialSecuritySettings'));
@@ -60,7 +69,7 @@ const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
 const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
 const TemplateSettings = lazy(() => import('./TemplateSettings'));
 
-type SettingsOverlayProps = {
+export type SettingsOverlayProps = {
   accountForm: Account | null;
   accounts: Account[];
   newAccountForm: AccountCreateInput;
@@ -217,381 +226,280 @@ type SettingsOverlayProps = {
   onParseRawMessage: () => void;
 };
 
-export default function SettingsOverlay({
-  accountForm,
-  accounts,
-  newAccountForm,
-  activeSettingsSection,
-  accountSettingsDirty,
-  accountSettingsSaving,
-  saveAndVerifyRunning,
-  saveAndVerifyReport,
-  providerVerifications,
-  activeProviderVerification,
-  oauthClientId,
-  oauthClientSecret,
-  oauthRedirectUri,
-  oauthCallbackState,
-  oauthCallbackCode,
-  oauthReport,
-  oauthCallbackReport,
-  oauthExchangeReport,
-  oauthRefreshReport,
-  oauthSessions,
-  authTypeChanged,
-  authTypeChangeNotice,
-  connectionReport,
-  credentialVerification,
-  providerValidationReport,
-  providerValidationRunning,
-  credentialSecret,
-  credentialStatus,
-  notificationPolicy,
-  sendUndoDelaySeconds,
-  remoteImageTrusts,
-  identities,
-  identityForm,
-  diagnosticExport,
-  localBackupSummary,
-  storageUsage,
-  storageBusy,
-  imapProbe,
-  syncSchedulePlan,
-  imapMailboxes,
-  folders,
-  syncRuns,
-  outbox,
-  labels,
-  rules,
-  ruleForm,
-  ruleBuilderField,
-  ruleBuilderNeedle,
-  editingRuleId,
-  rawMessage,
-  parsedPreview,
-  mergeSuggestions,
-  contactForm,
-  contactFormAliases,
-  contacts,
-  editingContactId,
-  contactEditName,
-  contactEditAliases,
-  mergeSourceContactId,
-  contactTransferBusy,
-  providerWriteValidationStatus,
-  providerWriteValidationLoading,
-  providerWritebackValidationProgress,
-  setStatus,
-  onNavigate,
-  onClose,
-  onTestConnection,
-  onSave,
-  onSaveAndVerify,
-  onAccountFormChange,
-  onSelectAccount,
-  onNewAccountFormChange,
-  onApplyProviderPreset,
-  onApplyNewAccountPreset,
-  onCreateNewAccount,
-  onRemoveAccount,
-  onUpdateProviderVerification,
-  onSaveProviderVerification,
-  onSaveAccountSettings,
-  onOauthClientIdChange,
-  onOauthClientSecretChange,
-  onOauthRedirectUriChange,
-  onOauthCallbackStateChange,
-  onOauthCallbackCodeChange,
-  onStartOAuth2Pkce,
-  onRefreshOAuth2Token,
-  onCompleteOAuth2Callback,
-  onWaitForOAuth2Callback,
-  onExchangeOAuth2Token,
-  onCredentialSecretChange,
-  onCheckCredential,
-  onVerifyCredential,
-  onRunProviderValidation,
-  onDeleteCredential,
-  onStoreCredential,
-  onStoreAndVerifyCredential,
-  onNotificationPolicyChange,
-  onSendUndoDelayChange,
-  onDeleteRemoteImageTrust,
-  onIdentityFormChange,
-  onEditIdentity,
-  onDeleteIdentity,
-  onSaveIdentity,
-  onExportDiagnostics,
-  onImportEml,
-  onPreviewBackup,
-  onImportBackup,
-  onExportBackup,
-  onRefreshStorage,
-  onClearAttachmentCache,
-  onDiscoverImapFolders,
-  onPrepareWriteValidation,
-  onRefreshWriteValidation,
-  onLocateWriteValidation,
-  onRunWritebackValidationStep,
-  onResetWritebackValidation,
-  onRunSyncDryRun,
-  onSyncHistory,
-  onMapImapMailbox,
-  onCreateAndMapImapMailbox,
-  onEnqueueBackgroundTask,
-  onCancelOutboxItem,
-  onContactFormChange,
-  onContactFormAliasesChange,
-  onCreateContact,
-  onMergeSuggested,
-  onEditNameChange,
-  onEditAliasesChange,
-  onSaveContactOverride,
-  onCancelEdit,
-  onComposeToContact,
-  onStartEditContact,
-  onToggleContactVip,
-  onMergeContact,
-  onDeleteContact,
-  onMergeSourceChange,
-  onImportContacts,
-  onExportContacts,
-  onRefreshContacts,
-  onStatus,
-  onRuleFormChange,
-  onRuleConditionFieldChange,
-  onRuleConditionValueChange,
-  onRuleLabelActionChange,
-  onToggleRuleAction,
-  onSaveRule,
-  onToggleRule,
-  onEditRule,
-  onRemoveRule,
-  onRawMessageChange,
-  onParseRawMessage,
-}: SettingsOverlayProps) {
+const MemoizedAccountConnection = memo(AccountConnectionSettings);
+const MemoizedCredentialSecurity = memo(CredentialSecuritySettings);
+const MemoizedExperience = memo(ExperienceSettings);
+const MemoizedDataSafety = memo(DataSafetySettings);
+const MemoizedSyncOperations = memo(SyncOperationsSettings);
+const MemoizedContactAutomation = memo(ContactAutomationSettings);
+const MemoizedRuleAutomation = memo(RuleAutomationSettings);
+const MemoizedSecurityPreview = memo(SecurityPreviewSettings);
+const MemoizedAiService = memo(AiServiceSettings);
+const MemoizedTemplates = memo(TemplateSettings);
+
+export default function SettingsOverlay(props: SettingsOverlayProps) {
+  const {
+    accountForm,
+    activeSettingsSection,
+    accountSettingsDirty,
+    accountSettingsSaving,
+    saveAndVerifyRunning,
+  } = props;
+
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const handlers = useMemo(() => createSettingsHandlers(propsRef), []);
+
+  // Split the incoming state into per-section prop slices so a change in one
+  // section's data does not re-render the pages of other sections.
+  const accountProps = useMemo(() => ({
+    accounts: props.accounts,
+    accountForm: props.accountForm,
+    accountCount: props.accounts.length,
+    newAccountForm: props.newAccountForm,
+    providerVerifications: props.providerVerifications,
+    activeProviderVerification: props.activeProviderVerification,
+    oauthClientId: props.oauthClientId,
+    oauthClientSecret: props.oauthClientSecret,
+    oauthRedirectUri: props.oauthRedirectUri,
+    oauthCallbackState: props.oauthCallbackState,
+    oauthCallbackCode: props.oauthCallbackCode,
+    oauthReport: props.oauthReport,
+    oauthCallbackReport: props.oauthCallbackReport,
+    oauthExchangeReport: props.oauthExchangeReport,
+    oauthRefreshReport: props.oauthRefreshReport,
+    oauthSessions: props.oauthSessions,
+    authTypeChanged: props.authTypeChanged,
+    authTypeChangeNotice: props.authTypeChangeNotice,
+    saveAndVerifyReport: props.saveAndVerifyReport,
+  }), [
+    props.accounts,
+    props.accountForm,
+    props.newAccountForm,
+    props.providerVerifications,
+    props.activeProviderVerification,
+    props.oauthClientId,
+    props.oauthClientSecret,
+    props.oauthRedirectUri,
+    props.oauthCallbackState,
+    props.oauthCallbackCode,
+    props.oauthReport,
+    props.oauthCallbackReport,
+    props.oauthExchangeReport,
+    props.oauthRefreshReport,
+    props.oauthSessions,
+    props.authTypeChanged,
+    props.authTypeChangeNotice,
+    props.saveAndVerifyReport,
+  ]);
+
+  const credentialProps = useMemo(() => ({
+    credentialSecret: props.credentialSecret,
+    credentialStatus: props.credentialStatus,
+    authTypeChangeNotice: props.authTypeChangeNotice,
+    providerValidationRunning: props.providerValidationRunning,
+  }), [
+    props.credentialSecret,
+    props.credentialStatus,
+    props.authTypeChangeNotice,
+    props.providerValidationRunning,
+  ]);
+
+  const experienceProps = useMemo(() => ({
+    accounts: props.accounts,
+    notificationPolicy: props.notificationPolicy,
+    sendUndoDelaySeconds: props.sendUndoDelaySeconds,
+    remoteImageTrusts: props.remoteImageTrusts,
+    identities: props.identities,
+    identityForm: props.identityForm,
+  }), [
+    props.accounts,
+    props.notificationPolicy,
+    props.sendUndoDelaySeconds,
+    props.remoteImageTrusts,
+    props.identities,
+    props.identityForm,
+  ]);
+
+  const backupProps = useMemo(() => ({
+    diagnosticExport: props.diagnosticExport,
+    localBackupSummary: props.localBackupSummary,
+    connectionReport: props.connectionReport,
+    storageUsage: props.storageUsage,
+    storageBusy: props.storageBusy,
+  }), [
+    props.diagnosticExport,
+    props.localBackupSummary,
+    props.connectionReport,
+    props.storageUsage,
+    props.storageBusy,
+  ]);
+
+  const syncProps = useMemo(() => ({
+    imapProbe: props.imapProbe,
+    syncSchedulePlan: props.syncSchedulePlan,
+    imapMailboxes: props.imapMailboxes,
+    folders: props.folders,
+    syncRuns: props.syncRuns,
+    outbox: props.outbox,
+    writeValidationStatus: props.providerWriteValidationStatus,
+    writeValidationLoading: props.providerWriteValidationLoading,
+    writebackValidationProgress: props.providerWritebackValidationProgress,
+  }), [
+    props.imapProbe,
+    props.syncSchedulePlan,
+    props.imapMailboxes,
+    props.folders,
+    props.syncRuns,
+    props.outbox,
+    props.providerWriteValidationStatus,
+    props.providerWriteValidationLoading,
+    props.providerWritebackValidationProgress,
+  ]);
+
+  const contactsProps = useMemo(() => ({
+    mergeSuggestions: props.mergeSuggestions,
+    contactForm: props.contactForm,
+    contactFormAliases: props.contactFormAliases,
+    contacts: props.contacts,
+    editingContactId: props.editingContactId,
+    editName: props.contactEditName,
+    editAliases: props.contactEditAliases,
+    mergeSourceContactId: props.mergeSourceContactId,
+    transferBusy: props.contactTransferBusy,
+  }), [
+    props.mergeSuggestions,
+    props.contactForm,
+    props.contactFormAliases,
+    props.contacts,
+    props.editingContactId,
+    props.contactEditName,
+    props.contactEditAliases,
+    props.mergeSourceContactId,
+    props.contactTransferBusy,
+  ]);
+
+  const rulesProps = useMemo(() => ({
+    ruleForm: props.ruleForm,
+    ruleBuilderField: props.ruleBuilderField,
+    ruleBuilderNeedle: props.ruleBuilderNeedle,
+    editingRuleId: props.editingRuleId,
+    rules: props.rules,
+    labels: props.labels,
+  }), [
+    props.ruleForm,
+    props.ruleBuilderField,
+    props.ruleBuilderNeedle,
+    props.editingRuleId,
+    props.rules,
+    props.labels,
+  ]);
+
+  const securityPreviewProps = useMemo(() => ({
+    rawMessage: props.rawMessage,
+    parsedPreview: props.parsedPreview,
+  }), [props.rawMessage, props.parsedPreview]);
+
+  const isAccountSection = activeSettingsSection === 'accounts'
+    || activeSettingsSection === 'providers'
+    || activeSettingsSection === 'auth';
+  const isExperienceSection = activeSettingsSection === 'sending'
+    || activeSettingsSection === 'notifications'
+    || activeSettingsSection === 'privacy'
+    || activeSettingsSection === 'identities';
+
+  const connectionReportForAccount = accountForm
+    && props.connectionReport?.account_email === accountForm.email
+    ? props.connectionReport
+    : null;
+  const credentialVerificationForAccount = accountForm
+    && !props.authTypeChanged
+    && props.credentialVerification?.account_email === accountForm.email
+    ? props.credentialVerification
+    : null;
+  const providerValidationForAccount = accountForm
+    && props.providerValidationReport?.account_email === accountForm.email
+    ? props.providerValidationReport
+    : null;
+
   return (
     <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
       <SettingsFrame
         title="设置"
         subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
         activeSection={activeSettingsSection}
-        onNavigate={onNavigate}
-        onTestConnection={onTestConnection}
         isDirty={accountSettingsDirty}
         isBusy={accountSettingsSaving || saveAndVerifyRunning}
-        connectionSummary={saveAndVerifyReport.summary}
-        onSave={onSave}
-        onSaveAndVerify={onSaveAndVerify}
-        onClose={onClose}
+        connectionSummary={props.saveAndVerifyReport.summary}
+        canSaveAndVerify={Boolean(accountForm) && Boolean(props.onSaveAndVerify)}
+        {...handlers}
       >
         <Suspense fallback={<div className="settings-page-loading" role="status">正在加载设置页面…</div>}>
-        {(activeSettingsSection === 'accounts'
-          || activeSettingsSection === 'providers'
-          || activeSettingsSection === 'auth') && (
-        <>
-        <AccountConnectionSettings
-          section={activeSettingsSection}
-          accounts={accounts}
-          accountForm={accountForm}
-          accountCount={accounts.length}
-          newAccountForm={newAccountForm}
-          providerVerifications={providerVerifications}
-          activeProviderVerification={activeProviderVerification}
-          oauthClientId={oauthClientId}
-          oauthClientSecret={oauthClientSecret}
-          oauthRedirectUri={oauthRedirectUri}
-          oauthCallbackState={oauthCallbackState}
-          oauthCallbackCode={oauthCallbackCode}
-          oauthReport={oauthReport}
-          oauthCallbackReport={oauthCallbackReport}
-          oauthExchangeReport={oauthExchangeReport}
-          oauthRefreshReport={oauthRefreshReport}
-          oauthSessions={oauthSessions}
-          authTypeChanged={authTypeChanged}
-          authTypeChangeNotice={authTypeChangeNotice}
-          saveAndVerifyReport={saveAndVerifyReport}
-          onAccountFormChange={onAccountFormChange}
-          onNewAccountFormChange={onNewAccountFormChange}
-          onApplyProviderPreset={onApplyProviderPreset}
-          onApplyNewAccountPreset={onApplyNewAccountPreset}
-          onCreateNewAccount={onCreateNewAccount}
-          onRemoveAccount={onRemoveAccount}
-          onUpdateProviderVerification={onUpdateProviderVerification}
-          onSaveProviderVerification={onSaveProviderVerification}
-          onSaveAccountSettings={onSaveAccountSettings}
-          onNavigate={onNavigate}
-          onOauthClientIdChange={onOauthClientIdChange}
-          onOauthClientSecretChange={onOauthClientSecretChange}
-          onOauthRedirectUriChange={onOauthRedirectUriChange}
-          onOauthCallbackStateChange={onOauthCallbackStateChange}
-          onOauthCallbackCodeChange={onOauthCallbackCodeChange}
-          onStartOAuth2Pkce={onStartOAuth2Pkce}
-          onRefreshOAuth2Token={onRefreshOAuth2Token}
-          onCompleteOAuth2Callback={onCompleteOAuth2Callback}
-          onWaitForOAuth2Callback={onWaitForOAuth2Callback}
-          onExchangeOAuth2Token={onExchangeOAuth2Token}
-        />
-        {activeSettingsSection === 'auth' && accountForm && (
-          <CredentialSecuritySettings
-            account={accountForm}
-            credentialSecret={credentialSecret}
-            credentialStatus={credentialStatus}
-            connectionReport={connectionReport?.account_email === accountForm.email ? connectionReport : null}
-            credentialVerification={
-              !authTypeChanged && credentialVerification?.account_email === accountForm.email
-                ? credentialVerification
-                : null
-            }
-            authTypeChangeNotice={authTypeChangeNotice}
-            providerValidationReport={
-              providerValidationReport?.account_email === accountForm.email ? providerValidationReport : null
-            }
-            providerValidationRunning={
-              providerValidationRunning && providerValidationReport?.account_email === accountForm.email
-            }
-            onCredentialSecretChange={onCredentialSecretChange}
-            onCheckCredential={onCheckCredential}
-            onVerifyCredential={onVerifyCredential}
-            onRunProviderValidation={onRunProviderValidation}
-            onDeleteCredential={onDeleteCredential}
-            onStoreCredential={onStoreCredential}
-            onStoreAndVerifyCredential={onStoreAndVerifyCredential}
-          />
-        )}
-        </>
-        )}
-        {(activeSettingsSection === 'sending'
-          || activeSettingsSection === 'notifications'
-          || activeSettingsSection === 'privacy'
-          || activeSettingsSection === 'identities') && accountForm && (
-        <ExperienceSettings
-          section={activeSettingsSection}
-          accountForm={accountForm}
-          accounts={accounts}
-          notificationPolicy={notificationPolicy}
-          sendUndoDelaySeconds={sendUndoDelaySeconds}
-          remoteImageTrusts={remoteImageTrusts}
-          identities={identities}
-          identityForm={identityForm}
-          onAccountFormChange={onAccountFormChange}
-          onSelectAccount={onSelectAccount}
-          onNotificationPolicyChange={onNotificationPolicyChange}
-          onSendUndoDelayChange={onSendUndoDelayChange}
-          onDeleteRemoteImageTrust={onDeleteRemoteImageTrust}
-          onIdentityFormChange={onIdentityFormChange}
-          onEditIdentity={onEditIdentity}
-          onDeleteIdentity={onDeleteIdentity}
-          onSaveIdentity={onSaveIdentity}
-          onNavigateToAi={() => onNavigate('ai')}
-        />
-        )}
-        {activeSettingsSection === 'backup' && (
-        <DataSafetySettings
-          diagnosticExport={diagnosticExport}
-          localBackupSummary={localBackupSummary}
-          connectionReport={connectionReport}
-          storageUsage={storageUsage}
-          storageBusy={storageBusy}
-          onExportDiagnostics={onExportDiagnostics}
-          onImportEml={onImportEml}
-          onPreviewBackup={onPreviewBackup}
-          onImportBackup={onImportBackup}
-          onExportBackup={onExportBackup}
-          onRefreshStorage={onRefreshStorage}
-          onClearAttachmentCache={onClearAttachmentCache}
-        />
-        )}
-        {activeSettingsSection === 'sync' && accountForm && (
-        <SyncOperationsSettings
-          accountForm={accountForm}
-          imapProbe={imapProbe}
-          syncSchedulePlan={syncSchedulePlan}
-          imapMailboxes={imapMailboxes}
-          folders={folders}
-          syncRuns={syncRuns}
-          outbox={outbox}
-          writeValidationStatus={providerWriteValidationStatus}
-          writeValidationLoading={providerWriteValidationLoading}
-          writebackValidationProgress={providerWritebackValidationProgress}
-          onDiscoverImapFolders={onDiscoverImapFolders}
-          onPrepareWriteValidation={onPrepareWriteValidation}
-          onRefreshWriteValidation={onRefreshWriteValidation}
-          onLocateWriteValidation={onLocateWriteValidation}
-          onRunWritebackValidationStep={onRunWritebackValidationStep}
-          onResetWritebackValidation={onResetWritebackValidation}
-          onRunSyncDryRun={onRunSyncDryRun}
-          onSyncHistory={onSyncHistory}
-          onMapImapMailbox={onMapImapMailbox}
-          onCreateAndMapImapMailbox={onCreateAndMapImapMailbox}
-          onEnqueueBackgroundTask={onEnqueueBackgroundTask}
-          onCancelOutboxItem={onCancelOutboxItem}
-        />
-        )}
-        {activeSettingsSection === 'contacts' && (
-        <ContactAutomationSettings
-          mergeSuggestions={mergeSuggestions}
-          contactForm={contactForm}
-          contactFormAliases={contactFormAliases}
-          contacts={contacts}
-          editingContactId={editingContactId}
-          editName={contactEditName}
-          editAliases={contactEditAliases}
-          mergeSourceContactId={mergeSourceContactId}
-          transferBusy={contactTransferBusy}
-          onContactFormChange={onContactFormChange}
-          onContactFormAliasesChange={onContactFormAliasesChange}
-          onCreateContact={onCreateContact}
-          onMergeSuggested={onMergeSuggested}
-          onEditNameChange={onEditNameChange}
-          onEditAliasesChange={onEditAliasesChange}
-          onSaveContactOverride={onSaveContactOverride}
-          onCancelEdit={onCancelEdit}
-          onComposeToContact={onComposeToContact}
-          onStartEditContact={onStartEditContact}
-          onToggleContactVip={onToggleContactVip}
-          onMergeContact={onMergeContact}
-          onDeleteContact={onDeleteContact}
-          onMergeSourceChange={onMergeSourceChange}
-          onImportContacts={onImportContacts}
-          onExportContacts={onExportContacts}
-          onRefreshContacts={onRefreshContacts}
-          onStatus={onStatus}
-        />
-        )}
-        {activeSettingsSection === 'rules' && (
-        <RuleAutomationSettings
-          ruleForm={ruleForm}
-          ruleBuilderField={ruleBuilderField}
-          ruleBuilderNeedle={ruleBuilderNeedle}
-          editingRuleId={editingRuleId}
-          rules={rules}
-          labels={labels}
-          onRuleFormChange={onRuleFormChange}
-          onRuleConditionFieldChange={onRuleConditionFieldChange}
-          onRuleConditionValueChange={onRuleConditionValueChange}
-          onRuleLabelActionChange={onRuleLabelActionChange}
-          onToggleRuleAction={onToggleRuleAction}
-          onSaveRule={onSaveRule}
-          onToggleRule={onToggleRule}
-          onEditRule={onEditRule}
-          onRemoveRule={onRemoveRule}
-        />
-        )}
-        {activeSettingsSection === 'security-preview' && (
-        <SecurityPreviewSettings
-          rawMessage={rawMessage}
-          parsedPreview={parsedPreview}
-          onRawMessageChange={onRawMessageChange}
-          onParseRawMessage={onParseRawMessage}
-        />
-        )}
-        {activeSettingsSection === 'ai' && (
-        <AiServiceSettings />
-        )}
-        {activeSettingsSection === 'templates' && (
-        <TemplateSettings onNavigateToAi={() => onNavigate('ai')} />
-        )}
+          {isAccountSection && (
+            <>
+              <MemoizedAccountConnection
+                section={activeSettingsSection}
+                {...accountProps}
+                {...handlers}
+              />
+              {activeSettingsSection === 'auth' && accountForm && (
+                <MemoizedCredentialSecurity
+                  account={accountForm}
+                  connectionReport={connectionReportForAccount}
+                  credentialVerification={credentialVerificationForAccount}
+                  providerValidationReport={providerValidationForAccount}
+                  {...credentialProps}
+                  {...handlers}
+                />
+              )}
+            </>
+          )}
+          {isExperienceSection && accountForm && (
+            <MemoizedExperience
+              section={activeSettingsSection}
+              accountForm={accountForm}
+              {...experienceProps}
+              onNavigateToAi={() => handlers.onNavigate('ai')}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'backup' && (
+            <MemoizedDataSafety
+              {...backupProps}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'sync' && accountForm && (
+            <MemoizedSyncOperations
+              accountForm={accountForm}
+              {...syncProps}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'contacts' && (
+            <MemoizedContactAutomation
+              {...contactsProps}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'rules' && (
+            <MemoizedRuleAutomation
+              {...rulesProps}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'security-preview' && (
+            <MemoizedSecurityPreview
+              {...securityPreviewProps}
+              {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'ai' && (
+            <MemoizedAiService />
+          )}
+          {activeSettingsSection === 'templates' && (
+            <MemoizedTemplates onNavigateToAi={() => handlers.onNavigate('ai')} />
+          )}
         </Suspense>
       </SettingsFrame>
     </Suspense>

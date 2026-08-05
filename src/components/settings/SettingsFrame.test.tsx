@@ -1,0 +1,105 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import SettingsFrame from './SettingsFrame';
+
+describe('SettingsFrame dialog behavior', () => {
+  let modalRef: HTMLElement | null = null;
+
+  beforeEach(() => {
+    // jsdom has no layout, so offsetParent is always null; stub it so the
+    // focus trap can enumerate visible focusable elements.
+    Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
+      configurable: true,
+      get() {
+        return this.parentElement;
+      },
+    });
+  });
+
+  afterEach(() => {
+    modalRef = null;
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  function renderFrame(onClose = () => undefined) {
+    const utils = render(
+      <div data-testid="app-shell">
+        <button type="button">后台按钮</button>
+        <SettingsFrame
+          title="设置"
+          subtitle="work@example.com"
+          activeSection="notifications"
+          onNavigate={() => undefined}
+          onTestConnection={() => undefined}
+          onSave={() => undefined}
+          onSaveAndVerify={() => undefined}
+          onClose={onClose}
+        >
+          <input placeholder="设置内输入框" />
+        </SettingsFrame>
+      </div>,
+    );
+    modalRef = utils.container.querySelector('.settings-modal');
+    return utils;
+  }
+
+  it('renders the dialog with role and label', () => {
+    renderFrame();
+    expect(screen.getByRole('dialog', { name: '设置' })).not.toBeNull();
+    expect(screen.getByText('work@example.com')).not.toBeNull();
+  });
+
+  it('marks background siblings inert and aria-hidden while open', () => {
+    const { container, unmount } = renderFrame();
+    const backgroundButton = container.querySelector<HTMLButtonElement>('[data-testid="app-shell"] > button')!;
+    expect(backgroundButton.hasAttribute('inert')).toBe(true);
+    expect(backgroundButton.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.settings-backdrop')?.hasAttribute('inert')).toBe(false);
+    unmount();
+    expect(backgroundButton.hasAttribute('inert')).toBe(false);
+    expect(backgroundButton.getAttribute('aria-hidden')).toBeNull();
+  });
+
+  it('restores focus to the previously focused element on close', () => {
+    const backgroundButton = document.createElement('button');
+    backgroundButton.textContent = '触发按钮';
+    document.body.appendChild(backgroundButton);
+    backgroundButton.focus();
+    const { unmount } = renderFrame();
+    expect(document.activeElement).not.toBe(backgroundButton);
+    unmount();
+    expect(document.activeElement).toBe(backgroundButton);
+    document.body.removeChild(backgroundButton);
+  });
+
+  it('closes on Escape', () => {
+    const onClose = vi.fn();
+    renderFrame(onClose);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Tab focus inside the dialog', () => {
+    renderFrame();
+    const focusable = Array.from(
+      modalRef!.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'),
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    last.focus();
+    fireEvent.keyDown(modalRef!, { key: 'Tab' });
+    expect(document.activeElement).toBe(first);
+    first.focus();
+    fireEvent.keyDown(modalRef!, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('closes when clicking the backdrop outside the modal', () => {
+    const onClose = vi.fn();
+    const { container } = renderFrame(onClose);
+    const backdrop = container.querySelector('.settings-backdrop')!;
+    fireEvent.mouseDown(backdrop, { target: backdrop });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

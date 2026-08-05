@@ -4,6 +4,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -21,7 +22,7 @@ type SettingsNavigationProps = {
   onNavigate: (section: SettingsSectionId) => void;
 };
 
-export function SettingsSidebar({
+export const SettingsSidebar = memo(function SettingsSidebar({
   activeSection,
   onNavigate,
 }: Omit<SettingsNavigationProps, 'activeItem'>) {
@@ -104,9 +105,9 @@ export function SettingsSidebar({
       </div>
     </nav>
   );
-}
+});
 
-export function SettingsMobileNavigation({
+export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
   activeSection,
   activeItem,
   onNavigate,
@@ -186,4 +187,4 @@ export function SettingsMobileNavigation({
       )}
     </div>
   );
-}
+});

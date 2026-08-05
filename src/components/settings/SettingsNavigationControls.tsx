@@ -81,7 +81,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                   key={item.id}
                   aria-current={active ? 'page' : undefined}
                   aria-label={`${item.label}设置`}
-                  title={item.description}
                   onClick={() => onNavigate(item.id)}
                 >
                   <span className="settings-nav-icon">

@@ -43,6 +43,9 @@ export function getTooltipText(element: HTMLElement) {
 }
 
 export function shouldShowGlobalTooltip(target: HTMLElement) {
+  // The settings sidebar carries its own persistent labels; hover hints
+  // there are redundant and visually noisy.
+  if (target.closest('.settings-nav')) return false;
   const text = getTooltipText(target);
   if (
     !text

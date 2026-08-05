@@ -1,0 +1,156 @@
+/*
+ * Shared dropdown (CustomSelect) — used in the settings workspace and the
+ * composer. The option menu renders in a body portal with fixed positioning,
+ * so these rules are intentionally global, not scoped to a dialog.
+ * Visual language: 40px trigger, bordered rounded box, chevron, focus ring.
+ */
+
+.custom-select-menu {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.custom-select-summary {
+  min-height: var(--ui-control-height, 40px);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border, #dde2e8);
+  border-radius: var(--ui-radius-control, 8px);
+  color: var(--ui-text, #1d232b);
+  background: var(--ui-surface, #ffffff);
+  box-shadow: none;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.custom-select-summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.custom-select-summary strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 540;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-summary small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary, #646f7b);
+  font-size: 12px;
+  font-weight: 460;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-summary > svg {
+  color: var(--ui-text-tertiary, #646f7b);
+}
+
+.custom-select-summary:hover {
+  border-color: var(--ui-border-strong, #c3ccd5);
+}
+
+.custom-select-menu[data-open="true"] .custom-select-summary,
+.custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-accent, #0a63c4);
+  box-shadow: 0 0 0 3px rgba(10, 99, 196, 0.2);
+}
+
+.custom-select-dropdown {
+  z-index: 1000;
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  padding: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border-strong, #c3ccd5);
+  border-radius: var(--ui-radius-panel, 10px);
+  background: var(--ui-surface, #ffffff);
+  box-shadow: var(--ui-shadow-float, 0 16px 40px rgba(15, 23, 42, 0.14));
+}
+
+.custom-select-dropdown button {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control, 8px);
+  color: var(--ui-text-secondary, #4e5966);
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+  text-align: left;
+}
+
+.custom-select-dropdown button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.custom-select-dropdown button strong,
+.custom-select-dropdown button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-dropdown button strong {
+  font-size: 14px;
+  font-weight: 540;
+}
+
+.custom-select-dropdown button small {
+  color: var(--ui-text-tertiary, #646f7b);
+  font-size: 12px;
+  font-weight: 460;
+}
+
+.custom-select-dropdown button:hover {
+  color: var(--ui-text, #1d232b);
+  background: var(--ui-surface-muted, #f1f3f5);
+}
+
+.custom-select-dropdown button.active {
+  color: var(--ui-accent, #0a63c4);
+  background: var(--ui-accent-soft, #eaf3fd);
+}
+
+.custom-select-dropdown button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .custom-select-summary {
+    min-height: 44px;
+  }
+
+  .custom-select-dropdown button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .custom-select-summary,
+  .custom-select-dropdown button {
+    transition: none;
+  }
+}

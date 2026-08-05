@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
+import { Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
   DraftInput,
   MailIdentity,
 } from '../../app/types';
+import { CustomSelect } from '../settings/accounts/CustomSelect';
 
 type ComposerAdvancedToolsProps = {
   draft: DraftInput;
@@ -37,84 +37,21 @@ type ComposerInlineSelectProps = {
 };
 
 function ComposerInlineSelect({ label, ariaLabel, value, options, onChange }: ComposerInlineSelectProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((option) => option.value === value) ?? options[0] ?? null;
 
-  useEffect(() => {
-    if (!open) return undefined;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node | null)) {
-        setOpen(false);
-      }
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('pointerdown', closeOnOutside, true);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside, true);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [open]);
-
   return (
-    <div className="composer-from composer-inline-select" ref={rootRef}>
+    <div className="composer-from composer-inline-select">
       <span>{label}</span>
-      <select
-        aria-label={ariaLabel ?? label}
-        className="composer-native-select"
-        value={selected?.value ?? 0}
-        onChange={(event) => onChange(Number(event.target.value))}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label} {option.meta ? `· ${option.meta}` : ''}
-          </option>
-        ))}
-      </select>
-      <div className={`composer-select${open ? ' is-open' : ''}`}>
-        <button
-          type="button"
-          className="composer-select-trigger"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
-        >
-          <span>
-            <strong>{selected?.label ?? '未选择'}</strong>
-            {selected?.meta && <small>{selected.meta}</small>}
-          </span>
-          <ChevronDown size={14} />
-        </button>
-        {open && (
-          <div className="composer-select-menu" role="listbox" aria-label={label}>
-            {options.map((option) => {
-              const active = option.value === selected?.value;
-              return (
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  className={active ? 'is-selected' : ''}
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span>
-                    <strong>{option.label}</strong>
-                    {option.meta && <small>{option.meta}</small>}
-                  </span>
-                  {active && <Check size={13} />}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <CustomSelect
+        ariaLabel={ariaLabel ?? label}
+        value={selected ? String(selected.value) : ''}
+        options={options.map((option) => ({
+          value: String(option.value),
+          label: option.label,
+          meta: option.meta,
+        }))}
+        onChange={(nextValue) => onChange(Number(nextValue))}
+      />
     </div>
   );
 }

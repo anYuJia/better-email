@@ -970,78 +970,8 @@
 .settings-modal .oauth-result small,
 .settings-modal .oauth-result em {
   color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-style: normal;
-}
-
-/* --- CustomSelect --- */
-.settings-modal .custom-select-menu {
-  position: relative;
-  min-width: 0;
-}
-
-.settings-modal .custom-select-menu summary {
-  min-height: var(--st-control-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-sm);
-  color: var(--st-text);
-  background: var(--st-surface);
-  list-style: none;
-  cursor: pointer;
-  font-size: var(--st-font-size-body);
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.settings-modal .custom-select-menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-modal .custom-select-menu summary:hover {
-  border-color: var(--st-border-strong);
-}
-
-.settings-modal .custom-select-menu[open] summary {
-  border-color: var(--st-focus-border);
-  box-shadow: var(--st-focus-ring);
-}
-
-.settings-modal .custom-select-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 60;
-  display: grid;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-  box-shadow: var(--st-shadow-float);
-}
-
-.settings-modal .custom-select-dropdown button {
-  min-height: 36px;
-  justify-content: flex-start;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-sm);
-  color: var(--st-text-secondary);
-  background: transparent;
-  text-align: left;
-}
-
-.settings-modal .custom-select-dropdown button:hover,
-.settings-modal .custom-select-dropdown button.active {
-  color: var(--st-accent);
-  background: var(--st-accent-soft);
+   font-size: var(--st-font-size-secondary);
+   font-style: normal;
 }
 
 /* =====================================================================
@@ -1979,63 +1909,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.settings-modal .contact-suggestion-panel {
-  display: grid;
-  gap: 8px;
-}
-
-.settings-modal .contact-suggestion-panel > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 2px 2px;
-}
-
-.settings-modal .contact-suggestion-panel > header strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .contact-suggestion-panel > header em {
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  font-style: normal;
-}
-
-.settings-modal .contact-suggestion {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #ecd9a8;
-  border-radius: var(--st-radius-md);
-  background: var(--st-warning-soft);
-}
-
-.settings-modal .contact-suggestion > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .contact-suggestion strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
-}
-
-.settings-modal .contact-suggestion em,
-.settings-modal .contact-suggestion small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-style: normal;
-  line-height: 1.45;
 }
 
 .settings-modal .settings-contact-create {
@@ -3533,7 +3406,6 @@
   }
 
   .settings-modal .contact-import-history-row,
-  .settings-modal .contact-suggestion,
   .settings-modal .settings-storage-actions {
     align-items: stretch;
     flex-direction: column;

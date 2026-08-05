@@ -24,7 +24,7 @@ const OPEN_OVERLAY_SELECTOR = [
   '.context-menu',
   '.context-submenu',
   '.search-suggestion-panel',
-  '.composer-select-menu',
+  '.custom-select-dropdown',
   '.settings-mobile-menu',
 ].join(',');
 

@@ -154,3 +154,19 @@ textarea:focus-visible {
   border-radius: var(--ui-radius-control);
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
+
+/* Bulk selection toolbar: neutralize the legacy green .bulk-toolbar.active
+   background/border so the strip matches the 2026 blue palette. */
+.bulk-toolbar.active {
+  background: #f7faff;
+}
+
+.bulk-toolbar.active button {
+  border-color: #bad8f7;
+}
+
+/* Sidebar disclosure chevron rotates with the same easing as the settings
+   disclosure arrow instead of snapping while the background fades. */
+.sidebar-disclosure summary::before {
+  transition: transform 160ms ease;
+}

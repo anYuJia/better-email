@@ -29,6 +29,7 @@ import {
   releaseMockDueOutboxItems,
   flushMockOutboxSmtp,
   fetchMockMessageBody,
+  renderMessageWithPolicy,
 } from './state';
 import { messageThreadKey, mutedThreadScopeKey } from './utils';
 
@@ -85,7 +86,11 @@ export const handlers: Record<string, MockCommandHandler> = {
     return labels;
   },
   'list_outbox': () => outbox,
-  'get_message_detail': (args) => messages.find((message) => message.id === args?.messageId),
+  'get_message_detail': (args) => {
+    const message = messages.find((item) => item.id === args?.messageId);
+    if (!message) return undefined;
+    return renderMessageWithPolicy(message.id, false);
+  },
   'set_message_read': setMockMessageRead,
   'mark_folder_read': markMockFolderRead,
   'set_message_starred': setMockMessageStarred,

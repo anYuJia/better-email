@@ -389,6 +389,32 @@ impl MailStore {
                 )?;
             }
             message_for_conn(conn, message_id)
+                .and_then(|message| {
+                    if !should_allow_remote_images_for_message(conn, &message)?
+                        || !looks_like_html_fragment(&message.body)
+                    {
+                        return Ok(message);
+                    }
+                    let mut message = message;
+                    message.sanitized_html =
+                        crate::protocol::sanitize_html_with_remote_images(&message.body);
+                    message
+                        .security_warnings
+                        .retain(|warning| !warning.contains("远程图片"));
+                    conn.execute(
+                        "
+                        UPDATE messages
+                        SET sanitized_html = ?2, security_warnings = ?3
+                        WHERE id = ?1
+                        ",
+                        params![
+                            message_id,
+                            message.sanitized_html,
+                            warning_lines_to_text(&message.security_warnings)
+                        ],
+                    )?;
+                    Ok(message)
+                })
         })
     }
     pub fn import_eml_message(&self, account_id: Option<i64>, raw: &[u8]) -> MailResult<Message> {

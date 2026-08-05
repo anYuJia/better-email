@@ -440,6 +440,12 @@ if (activeThread && threadMessages.length > 0) {
         <ReaderSecurityBanner
           warnings={visibleSecurityWarnings}
           showRemoteImageNote={selectedHasRemoteImageWarning || shouldOfferRemoteContent}
+          hasRenderableHtml={hasRenderableHtml}
+          selectedSenderTrusted={selectedSenderTrusted}
+          selectedSenderDomain={selectedSenderDomain}
+          onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
+          onTrustSender={() => onTrustRemoteImages('sender')}
+          onTrustDomain={() => onTrustRemoteImages('domain')}
         />
 
         <ReaderBodyContent

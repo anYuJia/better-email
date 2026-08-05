@@ -3,17 +3,21 @@ import type { Account, RemoteImageTrust } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
 
 type PrivacySettingsPageProps = {
+  accounts: Account[];
   accountForm: Account;
   remoteImageTrusts: RemoteImageTrust[];
   onAccountFormChange: (account: Account) => void;
+  onSelectAccount: (account: Account) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onNavigateToAi?: () => void;
 };
 
 export default function PrivacySettingsPage({
+  accounts,
   accountForm,
   remoteImageTrusts,
   onAccountFormChange,
+  onSelectAccount,
   onDeleteRemoteImageTrust,
   onNavigateToAi,
 }: PrivacySettingsPageProps) {
@@ -30,6 +34,27 @@ export default function PrivacySettingsPage({
           </span>
           <em>{accountTrusts.length} 条信任</em>
         </header>
+
+        {accounts.length > 1 && (
+          <div className="privacy-section privacy-account-selector">
+            <label htmlFor="privacy-account-select">配置账号</label>
+            <select
+              id="privacy-account-select"
+              value={accountForm.id}
+              onChange={(event) => {
+                const next = accounts.find((item) => item.id === Number(event.target.value));
+                if (next) onSelectAccount(next);
+              }}
+            >
+              {accounts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.display_name || item.email} · {item.email}
+                </option>
+              ))}
+            </select>
+            <small>隐私策略按账号独立生效，切换后保存才会应用到所选账号。</small>
+          </div>
+        )}
 
         <div className="privacy-section">
           <div className="privacy-section-header">

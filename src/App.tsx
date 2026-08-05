@@ -1532,12 +1532,24 @@ export default function App() {
               setStatus('请先添加邮箱账号');
               return;
             }
-            saveSettings().catch((error) => setStatus(String(error)));
+            saveSettings()
+              .then((saved) => {
+                if (saved && selected && selected.account_id === saved.id) {
+                  renderSelectedWithRemoteImagePolicy(selected.id).catch(() => undefined);
+                }
+              })
+              .catch((error) => setStatus(String(error)));
           }}
           onSaveAndVerify={accountForm ? () => {
             saveAndVerify().catch((error) => setStatus(String(error)));
           } : undefined}
           onAccountFormChange={setAccountForm}
+          onSelectAccount={(next) => {
+            setAccountForm(next);
+            invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: next.id })
+              .then(setRemoteImageTrusts)
+              .catch((error) => setStatus(String(error)));
+          }}
           onNewAccountFormChange={setNewAccountForm}
           onApplyProviderPreset={applyProviderPreset}
           onApplyNewAccountPreset={applyNewAccountPreset}

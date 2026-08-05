@@ -53,7 +53,7 @@ pub fn get_message_detail(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<Message> {
-    store.get_message(message_id)
+    store.message_with_remote_image_policy(message_id)
 }
 
 #[tauri::command]

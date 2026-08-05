@@ -131,6 +131,7 @@ type SettingsOverlayProps = {
   onSave: () => void;
   onSaveAndVerify: (() => void) | undefined;
   onAccountFormChange: Dispatch<SetStateAction<Account | null>>;
+  onSelectAccount: (account: Account) => void;
   onNewAccountFormChange: Dispatch<SetStateAction<AccountCreateInput>>;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
@@ -287,6 +288,7 @@ export default function SettingsOverlay({
   onSave,
   onSaveAndVerify,
   onAccountFormChange,
+  onSelectAccount,
   onNewAccountFormChange,
   onApplyProviderPreset,
   onApplyNewAccountPreset,
@@ -418,6 +420,7 @@ export default function SettingsOverlay({
           onUpdateProviderVerification={onUpdateProviderVerification}
           onSaveProviderVerification={onSaveProviderVerification}
           onSaveAccountSettings={onSaveAccountSettings}
+          onNavigate={onNavigate}
           onOauthClientIdChange={onOauthClientIdChange}
           onOauthClientSecretChange={onOauthClientSecretChange}
           onOauthRedirectUriChange={onOauthRedirectUriChange}
@@ -472,6 +475,7 @@ export default function SettingsOverlay({
           identities={identities}
           identityForm={identityForm}
           onAccountFormChange={onAccountFormChange}
+          onSelectAccount={onSelectAccount}
           onNotificationPolicyChange={onNotificationPolicyChange}
           onSendUndoDelayChange={onSendUndoDelayChange}
           onDeleteRemoteImageTrust={onDeleteRemoteImageTrust}

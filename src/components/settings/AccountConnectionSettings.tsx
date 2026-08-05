@@ -11,6 +11,7 @@ import type {
 } from '../../app/types';
 import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
 import type { AccountProviderPreset } from '../../providerCatalog';
+import type { SettingsSectionId } from './SettingsFrame';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AuthenticationSettingsPage from './pages/AuthenticationSettingsPage';
 import ProviderSettingsPage from './pages/ProviderSettingsPage';
@@ -49,6 +50,7 @@ export type AccountConnectionSettingsProps = {
   ) => void;
   onSaveProviderVerification: () => void;
   onSaveAccountSettings?: (account: Account) => Promise<void>;
+  onNavigate: (section: SettingsSectionId) => void;
   onOauthClientIdChange: (value: string) => void;
   onOauthClientSecretChange: (value: string) => void;
   onOauthRedirectUriChange: (value: string) => void;
@@ -76,18 +78,27 @@ const saveAndVerifyStateLabels = {
   needs_auth: '需要认证',
 } as const;
 
-function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsProps['section'] }) {
+function ConnectionFlowHeader({
+  section,
+  onNavigate,
+}: {
+  section: AccountConnectionSettingsProps['section'];
+  onNavigate: (section: SettingsSectionId) => void;
+}) {
   const activeIndex = connectionSteps.findIndex((step) => step.id === section);
 
   return (
     <nav className="settings-connection-flow" aria-label="账号连接流程">
       {connectionSteps.map((step, index) => (
-        <span
+        <button
+          type="button"
           className={[
             'settings-connection-step',
             index === activeIndex ? 'active' : '',
             index < activeIndex ? 'complete' : '',
           ].filter(Boolean).join(' ')}
+          aria-current={index === activeIndex ? 'step' : undefined}
+          onClick={() => onNavigate(step.id)}
           key={step.id}
         >
           <b>{step.index}</b>
@@ -95,7 +106,7 @@ function ConnectionFlowHeader({ section }: { section: AccountConnectionSettingsP
             <strong>{step.label}</strong>
             <small>{step.detail}</small>
           </span>
-        </span>
+        </button>
       ))}
     </nav>
   );
@@ -166,7 +177,7 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
 
   return (
     <div className="settings-connection-shell">
-      <ConnectionFlowHeader section={props.section} />
+      <ConnectionFlowHeader section={props.section} onNavigate={props.onNavigate} />
       {showSaveAndVerifyStatus && (
         <section
           className={`settings-save-verify-status ${props.saveAndVerifyReport.overall}`}

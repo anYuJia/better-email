@@ -22,12 +22,15 @@ function renderPage(
   account: Account,
   trusts: RemoteImageTrust[],
   onNavigateToAi: () => void = () => undefined,
+  accounts: Account[] = [account],
 ) {
   return render(
     <PrivacySettingsPage
+      accounts={accounts}
       accountForm={account}
       remoteImageTrusts={trusts}
       onAccountFormChange={() => undefined}
+      onSelectAccount={() => undefined}
       onDeleteRemoteImageTrust={() => undefined}
       onNavigateToAi={onNavigateToAi}
     />,
@@ -56,6 +59,26 @@ describe('PrivacySettingsPage', () => {
   it('shows an explicit empty state for the trust list', () => {
     renderPage(makeAccount(), []);
     expect(screen.getByText('暂无信任项。你可以在邮件阅读页按发件人或域名允许图片。')).not.toBeNull();
+  });
+
+  it('offers an account selector only when multiple accounts exist', () => {
+    renderPage(makeAccount(), []);
+    expect(screen.queryByLabelText('配置账号')).toBeNull();
+    const second = makeAccount({ id: 2, email: 'home@example.com' });
+    const first = makeAccount();
+    const select = vi.fn();
+    render(
+      <PrivacySettingsPage
+        accounts={[first, second]}
+        accountForm={first}
+        remoteImageTrusts={[]}
+        onAccountFormChange={() => undefined}
+        onSelectAccount={select}
+        onDeleteRemoteImageTrust={() => undefined}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('配置账号'), { target: { value: '2' } });
+    expect(select).toHaveBeenCalledWith(second);
   });
 
   it('renders trust items with scope, value, created date and remove button', () => {

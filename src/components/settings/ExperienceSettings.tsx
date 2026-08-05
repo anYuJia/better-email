@@ -22,6 +22,7 @@ export type ExperienceSettingsProps = {
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
   onAccountFormChange: (account: Account) => void;
+  onSelectAccount: (account: Account) => void;
   onNotificationPolicyChange: (policy: NotificationPolicy) => void;
   onSendUndoDelayChange: (seconds: SendUndoDelaySeconds) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
@@ -57,9 +58,11 @@ export default function ExperienceSettings(props: ExperienceSettingsProps) {
   if (section === 'privacy') {
     return (
       <PrivacySettingsPage
+        accounts={props.accounts}
         accountForm={props.accountForm}
         remoteImageTrusts={props.remoteImageTrusts}
         onAccountFormChange={props.onAccountFormChange}
+        onSelectAccount={props.onSelectAccount}
         onDeleteRemoteImageTrust={props.onDeleteRemoteImageTrust}
         onNavigateToAi={props.onNavigateToAi}
       />

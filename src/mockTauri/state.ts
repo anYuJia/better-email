@@ -733,12 +733,13 @@ export function stats(args?: InvokeArgs) {
   };
 }
 
-export function renderMessageWithPolicy(messageId: number) {
+export function renderMessageWithPolicy(messageId: number, persist = true) {
   const message = messages.find((item) => item.id === messageId);
   if (!message) throw new Error('message not found');
   const sender = message.sender_email.toLowerCase();
   const domain = sender.split('@')[1] ?? '';
-  const trusted = remoteImageTrusts.some(
+  const accountAllowsRemoteImages = mockAccounts.find((item) => item.id === message.account_id)?.remote_images_allowed === true;
+  const trusted = accountAllowsRemoteImages || remoteImageTrusts.some(
     (trust) =>
       trust.account_id === message.account_id &&
       ((trust.scope === 'sender' && trust.value === sender) || (trust.scope === 'domain' && trust.value === domain)),
@@ -749,7 +750,9 @@ export function renderMessageWithPolicy(messageId: number) {
     sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="https://cdn.example.com/open.png">',
     security_warnings: message.security_warnings.filter((warning) => !warning.includes('远程图片')),
   };
-  messages = messages.map((item) => (item.id === messageId ? updated : item));
+  if (persist) {
+    messages = messages.map((item) => (item.id === messageId ? updated : item));
+  }
   return updated;
 }
 

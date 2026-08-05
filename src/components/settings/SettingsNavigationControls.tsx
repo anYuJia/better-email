@@ -33,7 +33,7 @@ export function SettingsSidebar({
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => (
-          `${item.label} ${item.description}`
+          `${item.label} ${item.description} ${(item.keywords || []).join(' ')}`
             .toLowerCase()
             .includes(normalizedQuery)
         )),

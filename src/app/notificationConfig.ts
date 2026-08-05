@@ -91,3 +91,31 @@ export function toggleAccountNotificationList(
     ),
   };
 }
+
+/** VIP 发件人列表条目：`ada@example.com` 或 `@customer.com`。 */
+export function vipSenderEntries(value: string): string[] {
+  return notificationListEntries(value);
+}
+
+/** 追加一个 VIP 发件人/域名条目，已存在时保持不变。 */
+export function addVipSenderEntry(value: string, entry: string): string {
+  const normalized = entry.trim().toLowerCase();
+  if (!normalized || vipSenderEntries(value).includes(normalized)) return value;
+  return [...vipSenderEntries(value), normalized].join('\n');
+}
+
+/** 移除一个 VIP 发件人/域名条目。 */
+export function removeVipSenderEntry(value: string, entry: string): string {
+  const normalized = entry.trim().toLowerCase();
+  return vipSenderEntries(value)
+    .filter((item) => item !== normalized)
+    .join('\n');
+}
+
+/** 校验 VIP 发件人输入：必须是邮箱或 `@域名`，且不含空白。 */
+export function isValidVipSenderEntry(entry: string): boolean {
+  const trimmed = entry.trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+  if (trimmed.startsWith('@')) return /^@[\w.-]+$/.test(trimmed);
+  return /^[\w.+-]+@[\w.-]+$/.test(trimmed);
+}

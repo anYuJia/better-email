@@ -63,8 +63,8 @@ export type AccountConnectionSettingsProps = {
 
 const connectionSteps = [
   { id: 'accounts', index: '01', label: '账号', detail: '邮箱与显示名称' },
-  { id: 'providers', index: '02', label: '连接', detail: '服务商与服务器' },
-  { id: 'auth', index: '03', label: '认证', detail: '密码或 OAuth2' },
+  { id: 'providers', index: '02', label: '连接', detail: '连接设置与服务器' },
+  { id: 'auth', index: '03', label: '认证', detail: '登录方式与授权' },
 ] as const;
 
 const saveAndVerifyStateLabels = {

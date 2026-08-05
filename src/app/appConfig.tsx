@@ -43,6 +43,10 @@ export {
   getAccountNotificationMode,
   setAccountNotificationMode,
   toggleAccountNotificationList,
+  vipSenderEntries,
+  addVipSenderEntry,
+  removeVipSenderEntry,
+  isValidVipSenderEntry,
 } from './notificationConfig';
 export {
   providerVerificationStorageKey,

@@ -67,6 +67,85 @@
   font-weight: 500;
 }
 
+/* ===== AI 服务页：状态卡与信息层级 ===== */
+
+.ai-status-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.09));
+  border-radius: 9px;
+  background: rgba(10, 132, 255, 0.06);
+}
+
+.ai-status-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 8px;
+  color: #7dd3fc;
+  background: rgba(10, 132, 255, 0.14);
+}
+
+.ai-status-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  flex: 1;
+}
+
+.ai-status-copy strong {
+  color: var(--ui-text, #e6e9ef);
+  font-size: 13px;
+}
+
+.ai-status-copy small {
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ai-status-card > em {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #7dd3fc;
+  background: rgba(10, 132, 255, 0.14);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.settings-ai-config-area {
+  transition: opacity 140ms ease;
+}
+
+.settings-ai-config-area.is-dimmed {
+  opacity: 0.45;
+}
+
+.ai-service-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fbbf24;
+  background: rgba(250, 204, 21, 0.14);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 650;
+  vertical-align: 1px;
+}
+
+.settings-ai-privacy-confirm {
+  border-color: rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.08);
+}
+
 .settings-ai-service-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -198,8 +277,222 @@
 .template-toolbar {
   display: flex;
   align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.template-page-header {
+  margin-bottom: 12px;
+}
+
+.template-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.09));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.template-filter-button:hover,
+.template-filter-button.active {
+  border-color: rgba(250, 204, 21, 0.4);
+  color: #fbbf24;
+  background: rgba(250, 204, 21, 0.08);
+}
+
+.template-ai-generator {
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.template-ai-generator.is-collapsed {
+  padding: 0;
+  border-style: dashed;
+}
+
+.template-ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text, #e6e9ef);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-ai-toggle strong {
+  font-size: 13px;
+}
+
+.template-ai-toggle small {
+  flex: 1;
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 11px;
+}
+
+.template-ai-chevron {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary, #6b7280);
+  transition: transform 160ms ease;
+}
+
+.template-ai-generator:not(.is-collapsed) .template-ai-chevron {
+  transform: rotate(180deg);
+}
+
+.template-ai-body {
+  padding: 0 12px 12px;
+}
+
+.template-ai-disabled-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(250, 204, 21, 0.25);
+  border-radius: 8px;
+  background: rgba(250, 204, 21, 0.07);
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.template-ai-disabled-hint button {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid rgba(10, 132, 255, 0.4);
+  border-radius: 7px;
+  color: #7dd3fc;
+  background: rgba(10, 132, 255, 0.1);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.template-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.template-editor-header h3 {
+  margin: 0;
+}
+
+.template-editor-ai-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid rgba(10, 132, 255, 0.35);
+  border-radius: 7px;
+  color: #7dd3fc;
+  background: rgba(10, 132, 255, 0.08);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.template-editor-ai-entry:hover {
+  background: rgba(10, 132, 255, 0.14);
+}
+
+.template-variable-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.template-variable-hints strong {
+  font-size: 12px;
+  color: var(--ui-text-secondary, #8b93a1);
+  margin-right: 4px;
+}
+
+.template-variable-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border: 1px solid rgba(10, 132, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.08);
+  color: var(--ui-text, #e6e9ef);
+  cursor: pointer;
+}
+
+.template-variable-chip:hover {
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(10, 132, 255, 0.16);
+}
+
+.template-variable-chip code {
+  color: #7dd3fc;
+  font-size: 11.5px;
+}
+
+.template-variable-chip small {
+  color: var(--ui-text-secondary, #8b93a1);
+  font-size: 10.5px;
+}
+
+.template-variable-hints > small {
+  width: 100%;
+  color: var(--ui-text-tertiary, #6b7280);
+  font-size: 11px;
+}
+
+.template-preview {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(10, 132, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(10, 132, 255, 0.04);
+}
+
+.template-preview > strong {
+  font-size: 12px;
+  color: var(--ui-text-secondary, #8b93a1);
+}
+
+.template-preview-subject {
+  margin: 0;
+  color: var(--ui-text, #e6e9ef);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.template-preview-body {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.07));
+  border-radius: 7px;
+  background: var(--ui-surface-muted, rgba(255, 255, 255, 0.03));
+  color: var(--ui-text-secondary, #8b93a1);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.template-preview > small {
+  color: var(--ui-text-tertiary, #6b7280);
+  font-size: 10.5px;
 }
 
 .template-search {

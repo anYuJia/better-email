@@ -29,6 +29,7 @@ export type ExperienceSettingsProps = {
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
   onSaveIdentity: () => void;
+  onNavigateToAi?: () => void;
 };
 
 export default function ExperienceSettings(props: ExperienceSettingsProps) {
@@ -60,6 +61,7 @@ export default function ExperienceSettings(props: ExperienceSettingsProps) {
         remoteImageTrusts={props.remoteImageTrusts}
         onAccountFormChange={props.onAccountFormChange}
         onDeleteRemoteImageTrust={props.onDeleteRemoteImageTrust}
+        onNavigateToAi={props.onNavigateToAi}
       />
     );
   }

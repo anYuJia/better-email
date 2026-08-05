@@ -479,6 +479,7 @@ export default function SettingsOverlay({
           onEditIdentity={onEditIdentity}
           onDeleteIdentity={onDeleteIdentity}
           onSaveIdentity={onSaveIdentity}
+          onNavigateToAi={() => onNavigate('ai')}
         />
         )}
         {activeSettingsSection === 'backup' && (
@@ -585,7 +586,7 @@ export default function SettingsOverlay({
         <AiServiceSettings />
         )}
         {activeSettingsSection === 'templates' && (
-        <TemplateSettings />
+        <TemplateSettings onNavigateToAi={() => onNavigate('ai')} />
         )}
         </Suspense>
       </SettingsFrame>

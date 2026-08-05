@@ -66,10 +66,10 @@ export default function AuthenticationSettingsPage({
       <section className="tool-panel settings-auth-method-panel" data-settings-section="auth">
         <header className="tool-header">
           <span>
-            <strong>认证方式</strong>
-            <small>选择登录方式</small>
+            <strong>登录方式</strong>
+            <small>选择登录认证方式</small>
           </span>
-          <em>{accountForm.auth_type === 'oauth2' ? 'OAuth2' : '授权码'}</em>
+          <em>{accountForm.auth_type === 'oauth2' ? 'OAuth2' : '密码/授权码'}</em>
         </header>
         <label>
           登录方式

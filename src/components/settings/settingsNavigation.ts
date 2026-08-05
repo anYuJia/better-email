@@ -35,6 +35,7 @@ export type SettingsNavigationItem = {
   id: SettingsSectionId;
   label: string;
   description: string;
+  keywords?: string[];
   icon: LucideIcon;
 };
 
@@ -55,62 +56,74 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       {
         id: 'accounts',
         label: '账号',
-        description: '管理账号资料、同步策略和本机账号生命周期。',
+        description: '管理邮箱账号、连接设置和登录方式',
+        keywords: ['账号', '服务商', '认证', '连接', '登录', '密码', '授权码', 'oauth', 'oauth2', 'imap', 'smtp', 'pop3'],
         icon: UserRound,
       },
-      ...(devMode ? [
-        {
-          id: 'providers' as SettingsSectionId,
-          label: '服务商',
-          description: '选择服务商预设，配置 IMAP、SMTP 与兼容性记录。',
-          icon: Server,
-        },
-        {
-          id: 'auth' as SettingsSectionId,
-          label: '认证',
-          description: '管理授权码、OAuth2 流程和安全凭据验证。',
-          icon: ShieldCheck,
-        },
-      ] : []),
     ],
   },
   {
-    label: '使用与隐私',
+    label: '使用偏好',
     items: [
       {
         id: 'sending',
         label: '发送',
         description: '设置撤销发送窗口与发件队列。',
+        keywords: ['发送', '撤销', '取消发送', '发件队列', '队列', 'undo', '收件箱'],
         icon: TimerReset,
       },
       {
         id: 'notifications',
         label: '通知',
         description: '配置免打扰、VIP 和账号级提醒优先级。',
+        keywords: ['通知', '提醒', '免打扰', '免打扰时段', 'vip', '静音', '铃声', '通知策略', 'notification'],
         icon: Bell,
       },
+    ],
+  },
+  {
+    label: '安全与隐私',
+    items: [
       {
         id: 'privacy',
         label: '隐私',
-        description: '控制远程图片、追踪防护与发件人信任规则。',
+        description: '控制远程图片、追踪像素与发件人信任规则。',
+        keywords: ['隐私', '远程图片', '追踪', '像素', '跟踪', '信任', '放行', '图片', 'privacy', 'tracking'],
         icon: EyeOff,
       },
       {
         id: 'identities',
         label: '身份',
         description: '维护发件身份、别名、Reply-To 与签名。',
+        keywords: ['身份', '别名', '签名', '发件人', 'reply-to', '回复地址', 'identity'],
         icon: BadgeCheck,
       },
+      ...(devMode ? [
+        {
+          id: 'security-preview' as SettingsSectionId,
+          label: '安全预览',
+          description: '解析 MIME、清洗 HTML 并检查附件与远程资源。',
+          keywords: ['安全预览', 'mime', 'html', '清洗', '附件', '远程资源', '预览'],
+          icon: ScanSearch,
+        },
+      ] : []),
+    ],
+  },
+  {
+    label: '智能与效率',
+    items: [
       {
         id: 'ai',
         label: 'AI 服务',
-        description: '配置翻译、模板生成与摘要的 AI / MCP 服务。',
+        description: '配置翻译、摘要与模板生成的 AI / MCP 服务。',
+        keywords: ['ai', '翻译', '摘要', '模板生成', 'api', 'mcp', 'openai', '模型', 'key', '智能', '人工智能'],
         icon: Sparkles,
       },
       {
         id: 'templates',
         label: '模板',
         description: '管理写信模板、分类与变量，支持 AI 辅助生成。',
+        keywords: ['模板', '写信', '变量', '常用', '分类', '标签', 'ai 生成', 'template'],
         icon: Workflow,
       },
     ],
@@ -122,6 +135,7 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
         id: 'backup',
         label: '备份',
         description: '导入导出本地数据、诊断报告和连接状态。',
+        keywords: ['备份', '导入', '导出', '诊断', '恢复', 'backup', 'restore'],
         icon: DatabaseBackup,
       },
       {
@@ -130,28 +144,23 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
         description: devMode 
           ? '管理 IMAP 发现、凭据验证、同步和远端回写验收。'
           : '管理邮件同步状态与连接。',
+        keywords: ['同步', 'imap', '连接', '同步状态', 'sync', '拉取', '刷新'],
         icon: RefreshCw,
       },
       {
         id: 'contacts',
         label: '联系人',
         description: '维护联系人、别名、VIP 与重复项合并。',
+        keywords: ['联系人', '通讯录', '别名', 'vip', '合并', '重复', 'contact'],
         icon: ContactRound,
       },
       {
         id: 'rules',
         label: '规则',
         description: '按发件人、主题和内容处理新邮件。',
+        keywords: ['规则', '自动化', '过滤', '标签', '发件人', '主题', 'rule'],
         icon: Workflow,
       },
-      ...(devMode ? [
-        {
-          id: 'security-preview' as SettingsSectionId,
-          label: '安全预览',
-          description: '解析 MIME、清洗 HTML 并检查附件与远程资源。',
-          icon: ScanSearch,
-        },
-      ] : []),
     ],
   },
 ];
@@ -168,14 +177,15 @@ export const connectionSettingsSections = new Set<SettingsSectionId>([
 ]);
 
 export function getSettingsNavigationContext(activeSection: SettingsSectionId) {
+  const resolvedSection = (activeSection === 'providers' || activeSection === 'auth') ? 'accounts' : activeSection;
   const group = settingsNavigationGroups.find((candidate) => (
-    candidate.items.some((item) => item.id === activeSection)
+    candidate.items.some((item) => item.id === resolvedSection)
   )) ?? settingsNavigationGroups[0];
-  const item = group.items.find((candidate) => candidate.id === activeSection) ?? group.items[0];
+  const item = group.items.find((candidate) => candidate.id === resolvedSection) ?? group.items[0];
 
   return {
     group,
     item,
-    index: settingsNavigationItems.findIndex((candidate) => candidate.id === activeSection),
+    index: Math.max(0, settingsNavigationItems.findIndex((candidate) => candidate.id === resolvedSection)),
   };
 }

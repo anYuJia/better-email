@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { OutboxItem } from './types';
 import {
+  addVipSenderEntry,
   canCancelOutboxItem,
   getAccountNotificationMode,
   isListSort,
+  isValidVipSenderEntry,
   outboxStatusLabel,
   outboxTimingLabel,
+  removeVipSenderEntry,
   setAccountNotificationMode,
   toggleAccountNotificationList,
+  vipSenderEntries,
 } from './appConfig';
 
 function archivePendingItem(): OutboxItem {
@@ -89,5 +93,46 @@ describe('account notification routing helpers', () => {
     const next = toggleAccountNotificationList(policy, 'mutedAccounts', 'work@example.com');
     expect(getAccountNotificationMode(next, 'work@example.com')).toBe('muted');
     expect(next.priorityAccounts).toBe('');
+  });
+});
+
+describe('VIP sender list helpers', () => {
+  const vipList = 'ada@example.com\n@customer.com';
+
+  it('parses email and domain entries', () => {
+    expect(vipSenderEntries(vipList)).toEqual(['ada@example.com', '@customer.com']);
+    expect(vipSenderEntries(' a@b.com ,B@c.com；\n')).toEqual(['a@b.com', 'b@c.com']);
+    expect(vipSenderEntries('')).toEqual([]);
+  });
+
+  it('appends a new entry and keeps the storage format stable', () => {
+    const next = addVipSenderEntry(vipList, 'Zhang@Example.com');
+    expect(vipSenderEntries(next)).toEqual([
+      'ada@example.com',
+      '@customer.com',
+      'zhang@example.com',
+    ]);
+    expect(next.split('\n')).toEqual(['ada@example.com', '@customer.com', 'zhang@example.com']);
+  });
+
+  it('does not duplicate existing entries', () => {
+    expect(addVipSenderEntry(vipList, 'ADA@example.com')).toBe(vipList);
+    expect(addVipSenderEntry(vipList, '')).toBe(vipList);
+  });
+
+  it('removes an entry by normalized value', () => {
+    const next = removeVipSenderEntry(vipList, '@CUSTOMER.COM');
+    expect(vipSenderEntries(next)).toEqual(['ada@example.com']);
+  });
+
+  it('accepts only email addresses or @domain entries', () => {
+    expect(isValidVipSenderEntry('ada@example.com')).toBe(true);
+    expect(isValidVipSenderEntry('@customer.com')).toBe(true);
+    expect(isValidVipSenderEntry('@customer.com.cn')).toBe(true);
+    expect(isValidVipSenderEntry('ada+tag@example.com')).toBe(true);
+    expect(isValidVipSenderEntry('not-an-email')).toBe(false);
+    expect(isValidVipSenderEntry('a b@example.com')).toBe(false);
+    expect(isValidVipSenderEntry('@bad domain.com')).toBe(false);
+    expect(isValidVipSenderEntry('')).toBe(false);
   });
 });

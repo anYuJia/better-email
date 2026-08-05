@@ -1,0 +1,89 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { Account, RemoteImageTrust } from '../../../app/types';
+import PrivacySettingsPage from './PrivacySettingsPage';
+
+function makeAccount(overrides: Partial<Account> = {}): Account {
+  return { id: 1, email: 'work@example.com', remote_images_allowed: false, ...overrides } as Account;
+}
+
+function makeTrust(overrides: Partial<RemoteImageTrust> = {}): RemoteImageTrust {
+  return {
+    id: 10,
+    account_id: 1,
+    scope: 'sender',
+    value: 'ada@example.com',
+    created_at: '2026-07-01T08:00:00+08:00',
+    ...overrides,
+  } as RemoteImageTrust;
+}
+
+function renderPage(
+  account: Account,
+  trusts: RemoteImageTrust[],
+  onNavigateToAi: () => void = () => undefined,
+) {
+  return render(
+    <PrivacySettingsPage
+      accountForm={account}
+      remoteImageTrusts={trusts}
+      onAccountFormChange={() => undefined}
+      onDeleteRemoteImageTrust={() => undefined}
+      onNavigateToAi={onNavigateToAi}
+    />,
+  );
+}
+
+describe('PrivacySettingsPage', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders the remote image policy toggle with risk-aware copy', () => {
+    renderPage(makeAccount({ remote_images_allowed: false }), []);
+    const toggle = screen.getByRole('checkbox');
+    expect(toggle).not.toBeNull();
+    expect(screen.getByText('默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
+    expect(screen.getByText('当前：默认阻止')).not.toBeNull();
+  });
+
+  it('explains the risk when remote images are allowed', () => {
+    renderPage(makeAccount({ remote_images_allowed: true }), []);
+    expect(screen.getByText(/可能暴露你的打开行为与网络位置/)).not.toBeNull();
+    expect(screen.getByText('当前：允许加载')).not.toBeNull();
+  });
+
+  it('shows an explicit empty state for the trust list', () => {
+    renderPage(makeAccount(), []);
+    expect(screen.getByText('暂无信任项。你可以在邮件阅读页按发件人或域名允许图片。')).not.toBeNull();
+  });
+
+  it('renders trust items with scope, value, created date and remove button', () => {
+    renderPage(makeAccount(), [
+      makeTrust({ scope: 'sender', value: 'ada@example.com' }),
+      makeTrust({ id: 11, scope: 'domain', value: '@customer.com', created_at: '2026-07-02T09:00:00+08:00' }),
+    ]);
+    expect(screen.getByText('发件人')).not.toBeNull();
+    expect(screen.getByText('域名')).not.toBeNull();
+    expect(screen.getByText('ada@example.com')).not.toBeNull();
+    expect(screen.getByText('@customer.com')).not.toBeNull();
+    expect(screen.getAllByRole('button', { name: '移除' })).toHaveLength(2);
+  });
+
+  it('only shows trusts belonging to the current account', () => {
+    renderPage(makeAccount(), [
+      makeTrust({ id: 11, account_id: 2, scope: 'domain', value: '@other.com' }),
+    ]);
+    expect(screen.queryByText('@other.com')).toBeNull();
+    expect(screen.getByText('暂无信任项。你可以在邮件阅读页按发件人或域名允许图片。')).not.toBeNull();
+  });
+
+  it('warns about external AI services and offers a navigation entry', () => {
+    const navigate = () => undefined;
+    const spy = vi.fn(navigate);
+    renderPage(makeAccount(), [], spy);
+    expect(screen.getByText(/可能会把邮件内容发送到外部 AI 服务/)).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /前往 AI 服务设置/ }));
+    expect(spy).toHaveBeenCalledOnce();
+  });
+});

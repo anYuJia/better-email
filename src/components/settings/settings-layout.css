@@ -24,13 +24,25 @@
   height: min(820px, calc(100vh - 40px));
   max-height: calc(100vh - 40px);
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
   isolation: isolate;
   border: 1px solid var(--st-border-strong);
   border-radius: var(--st-radius-modal);
   background: var(--st-canvas);
   box-shadow: var(--st-shadow-modal);
+}
+
+.settings-modal .settings-main-header {
+  grid-row: 1;
+}
+
+.settings-modal .settings-connection-summary {
+  grid-row: 2;
+}
+
+.settings-modal .settings-body {
+  grid-row: 3;
 }
 
 /* --- Header --- */

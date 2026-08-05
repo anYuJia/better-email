@@ -46,35 +46,37 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
         .with_minimal_headers()
         .with_message_ids()
         .parse(raw);
-    let raw_lossy = String::from_utf8_lossy(raw);
-    let normalized = raw_lossy.replace("\r\n", "\n");
-    let (header_block, fallback_body) = normalized
-        .split_once("\n\n")
-        .unwrap_or((normalized.as_str(), ""));
+    let header_fields = crate::mime::extract_header_fields(raw);
+    let header_field = |name: &str| {
+        header_fields
+            .iter()
+            .find(|(field_name, _)| field_name == name)
+            .map(|(_, value)| crate::mime::decode_header_value_bytes(value))
+    };
+    let (_, body_bytes) = crate::mime::split_header_body(raw);
+    let fallback_body = crate::mime::decode_body_text(
+        body_bytes,
+        crate::mime::content_transfer_encoding(&header_fields).as_deref(),
+        crate::mime::content_type_charset(&header_fields).as_deref(),
+    );
 
     let subject = parsed
         .as_ref()
         .and_then(|message| message.subject())
         .map(ToOwned::to_owned)
-        .or_else(|| {
-            header_value(header_block, "subject").map(|value| decode_mime_header_value(&value))
-        })
+        .or_else(|| header_field("subject"))
         .unwrap_or_else(|| "(无主题)".to_string());
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
         .map(format_address_list)
-        .or_else(|| {
-            header_value(header_block, "from").map(|value| decode_address_header_value(&value))
-        })
+        .or_else(|| header_field("from"))
         .unwrap_or_default();
     let to = parsed
         .as_ref()
         .and_then(|message| message.to())
         .map(format_address_list)
-        .or_else(|| {
-            header_value(header_block, "to").map(|value| decode_address_header_value(&value))
-        })
+        .or_else(|| header_field("to"))
         .unwrap_or_default();
     let text_body = parsed
         .as_ref()
@@ -82,7 +84,7 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
         .map(|body| body.into_owned())
         .unwrap_or_else(|| {
             if parsed.is_none() {
-                fallback_body.to_string()
+                fallback_body.clone()
             } else {
                 String::new()
             }
@@ -100,8 +102,8 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
                 .map(|attachment| {
                     attachment
                         .attachment_name()
-                        .unwrap_or("Untitled attachment")
-                        .to_string()
+                        .map(crate::mime::decode_attachment_filename)
+                        .unwrap_or_else(|| "Untitled attachment".to_string())
                 })
                 .collect::<Vec<_>>()
         })
@@ -155,11 +157,19 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
         .with_minimal_headers()
         .with_message_ids()
         .parse(raw);
-    let raw_lossy = String::from_utf8_lossy(raw);
-    let normalized = raw_lossy.replace("\r\n", "\n");
-    let (header_block, fallback_body) = normalized
-        .split_once("\n\n")
-        .unwrap_or((normalized.as_str(), ""));
+    let header_fields = crate::mime::extract_header_fields(raw);
+    let header_field = |name: &str| {
+        header_fields
+            .iter()
+            .find(|(field_name, _)| field_name == name)
+            .map(|(_, value)| crate::mime::decode_header_value_bytes(value))
+    };
+    let (_, body_bytes) = crate::mime::split_header_body(raw);
+    let fallback_body = crate::mime::decode_body_text(
+        body_bytes,
+        crate::mime::content_transfer_encoding(&header_fields).as_deref(),
+        crate::mime::content_type_charset(&header_fields).as_deref(),
+    );
     let preview = parse_message_preview_bytes(raw);
     let text_body = parsed
         .as_ref()
@@ -177,20 +187,18 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
     } else if !text_body.trim().is_empty() {
         text_body.clone()
     } else if parsed.is_none() {
-        fallback_body.to_string()
+        fallback_body.clone()
     } else {
         String::new()
     };
-    let snippet = message_body_snippet(&text_body, &html_body, &body);
+    let snippet = message_body_snippet(&text_body, &html_body, &fallback_body);
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
         .map(format_address_list)
-        .or_else(|| {
-            header_value(header_block, "from").map(|value| decode_address_header_value(&value))
-        })
+        .or_else(|| header_field("from"))
         .unwrap_or_default();
-    let received_at = header_value(header_block, "date")
+    let received_at = header_field("date")
         .and_then(|value| {
             DateTime::parse_from_rfc2822(&value)
                 .or_else(|_| DateTime::parse_from_rfc3339(&value))
@@ -198,10 +206,10 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
         })
         .map(|value| value.with_timezone(&Utc).to_rfc3339())
         .unwrap_or_else(|| Utc::now().to_rfc3339());
-    let message_id_header = header_value(header_block, "message-id")
-        .unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
-    let in_reply_to_header = header_value(header_block, "in-reply-to").unwrap_or_default();
-    let references_header = header_value(header_block, "references").unwrap_or_default();
+    let message_id_header =
+        header_field("message-id").unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
+    let in_reply_to_header = header_field("in-reply-to").unwrap_or_default();
+    let references_header = header_field("references").unwrap_or_default();
     let attachments =
         parsed
             .as_ref()
@@ -226,9 +234,12 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
                             .is_some_and(|disposition| disposition.is_inline())
                             || !content_id.is_empty();
                         ImportedEmlAttachment {
-                            filename: part.attachment_name().map(str::to_string).unwrap_or_else(
-                                || inline_attachment_filename(&mime_type, &content_id, index),
-                            ),
+                            filename: part
+                                .attachment_name()
+                                .map(crate::mime::decode_attachment_filename)
+                                .unwrap_or_else(|| {
+                                    inline_attachment_filename(&mime_type, &content_id, index)
+                                }),
                             mime_type,
                             bytes: part.contents().to_vec(),
                             content_id,
@@ -246,25 +257,19 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
             .as_ref()
             .and_then(|message| message.to())
             .map(format_address_list)
-            .or_else(|| {
-                header_value(header_block, "to").map(|value| decode_address_header_value(&value))
-            })
+            .or_else(|| header_field("to"))
             .unwrap_or_default(),
         cc: parsed
             .as_ref()
             .and_then(|message| message.cc())
             .map(format_address_list)
-            .or_else(|| {
-                header_value(header_block, "cc").map(|value| decode_address_header_value(&value))
-            })
+            .or_else(|| header_field("cc"))
             .unwrap_or_default(),
         bcc: parsed
             .as_ref()
             .and_then(|message| message.bcc())
             .map(format_address_list)
-            .or_else(|| {
-                header_value(header_block, "bcc").map(|value| decode_address_header_value(&value))
-            })
+            .or_else(|| header_field("bcc"))
             .unwrap_or_default(),
         subject: preview.subject,
         snippet,
@@ -335,21 +340,11 @@ fn email_from_address(address: &str) -> String {
 }
 
 pub(crate) fn decode_mime_header_value(value: &str) -> String {
-    let probe = format!("Subject: {value}\r\n\r\n");
-    MessageParser::new()
-        .header_text(mail_parser::HeaderName::Subject)
-        .parse(probe.as_bytes())
-        .and_then(|message| message.subject().map(ToOwned::to_owned))
-        .unwrap_or_else(|| value.trim().to_string())
+    crate::mime::decode_mime_header_value(value)
 }
 
 pub(crate) fn decode_address_header_value(value: &str) -> String {
-    let probe = format!("To: {value}\r\n\r\n");
-    MessageParser::new()
-        .header_address(mail_parser::HeaderName::To)
-        .parse(probe.as_bytes())
-        .and_then(|message| message.to().map(format_address_list))
-        .unwrap_or_else(|| decode_mime_header_value(value))
+    crate::mime::decode_address_header_value(value)
 }
 
 pub(crate) fn format_address_list(addresses: &Address<'_>) -> String {
@@ -953,17 +948,6 @@ fn parse_endpoint(configured: &str, default_port: u16) -> Result<(String, u16), 
 fn resolve_first(host: &str, port: u16) -> std::io::Result<SocketAddr> {
     (host, port).to_socket_addrs()?.next().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::AddrNotAvailable, "无法解析服务器地址")
-    })
-}
-
-fn header_value(headers: &str, name: &str) -> Option<String> {
-    let prefix = format!("{name}:");
-    headers.lines().find_map(|line| {
-        if line.to_ascii_lowercase().starts_with(&prefix) {
-            Some(line[prefix.len()..].trim().to_string())
-        } else {
-            None
-        }
     })
 }
 

@@ -3,7 +3,7 @@ import { Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
-import { senderInitial } from '../app/messageDetailUtils';
+import { senderAvatarTone } from '../app/messageDetailUtils';
 import Avatar from './Avatar';
 
 type MessageListCardProps = {
@@ -38,7 +38,6 @@ export default React.memo(function MessageListCard({
   onSetDraggingMessageIds,
 }: MessageListCardProps) {
   const preview = useMemo(() => mailboxListPreview(message), [message]);
-  const avatarInitial = senderInitial(message.sender_name, message.sender_email);
   const cardLabel = [
     `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
     message.subject || '无主题',
@@ -95,8 +94,7 @@ export default React.memo(function MessageListCard({
         <Avatar
           email={message.sender_email}
           name={message.sender_name}
-          className={`message-avatar avatar-tone-${Math.abs(message.id) % 6}`}
-          fallbackInitial={avatarInitial}
+          className={`message-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
         {!message.is_read && <span className="message-unread-dot" />}
       </span>

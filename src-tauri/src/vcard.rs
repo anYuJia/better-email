@@ -16,7 +16,7 @@ pub struct ParsedContactImport {
 }
 
 pub fn parse_contact_import(raw: &str, file_name: &str) -> ParsedContactImport {
-    let is_csv = file_name.to_ascii_lowercase().ends_with(".csv") || raw.contains("BEGIN:VCARD") == false;
+    let is_csv = file_name.to_ascii_lowercase().ends_with(".csv") || !raw.contains("BEGIN:VCARD");
     if is_csv {
         let parsed = parse_contacts_csv(raw);
         ParsedContactImport {
@@ -64,7 +64,7 @@ pub fn parse_contacts_csv(raw: &str) -> ParsedVcards {
                 continue;
             }
             let emails: Vec<String> = value
-                .split(|character: char| character == ',' || character == ';' || character == ' ')
+                .split([',', ';', ' '])
                 .filter_map(|part| {
                     let candidate = part.trim().trim_matches('"').trim().to_ascii_lowercase();
                     if is_valid_email(&candidate) { Some(candidate) } else { None }

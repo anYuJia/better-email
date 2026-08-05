@@ -1322,13 +1322,7 @@ fn filename_from_disposition(disposition: &ContentDisposition<'_>) -> Option<Str
 fn filename_from_params(
     params: Option<&[(std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>)]>,
 ) -> Option<String> {
-    params?.iter().find_map(|(key, value)| {
-        if key.eq_ignore_ascii_case("filename") || key.eq_ignore_ascii_case("name") {
-            Some(value.to_string())
-        } else {
-            None
-        }
-    })
+    crate::mime::decode_rfc2231_params(params?)
 }
 
 struct XOAuth2Authenticator<'a> {
@@ -1460,42 +1454,39 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         .with_minimal_headers()
         .with_message_ids()
         .parse(header_bytes);
-    let raw_header = String::from_utf8_lossy(header_bytes);
+    let header_fields = crate::mime::extract_header_fields(header_bytes);
+    let header_field = |name: &str| {
+        header_fields
+            .iter()
+            .find(|(field_name, _)| field_name == name)
+            .map(|(_, value)| crate::mime::decode_header_value_bytes(value))
+    };
     let subject = parsed
         .as_ref()
         .and_then(|message| message.subject())
         .map(ToOwned::to_owned)
-        .or_else(|| {
-            header_value(&raw_header, "subject")
-                .map(|value| protocol::decode_mime_header_value(&value))
-        })
+        .or_else(|| header_field("subject"))
         .unwrap_or_else(|| "(无主题)".to_string());
     let from = parsed
         .as_ref()
         .and_then(|message| message.from())
         .map(protocol::format_address_list)
-        .or_else(|| {
-            header_value(&raw_header, "from")
-                .map(|value| protocol::decode_address_header_value(&value))
-        })
+        .or_else(|| header_field("from"))
         .unwrap_or_default();
     let to = parsed
         .as_ref()
         .and_then(|message| message.to())
         .map(protocol::format_address_list)
-        .or_else(|| {
-            header_value(&raw_header, "to")
-                .map(|value| protocol::decode_address_header_value(&value))
-        })
+        .or_else(|| header_field("to"))
         .unwrap_or_default();
     let message_id =
-        header_value(&raw_header, "message-id").unwrap_or_else(|| format!("imap-{uid}"));
-    let in_reply_to = header_value(&raw_header, "in-reply-to").unwrap_or_default();
-    let references = header_value(&raw_header, "references").unwrap_or_default();
+        header_field("message-id").unwrap_or_else(|| format!("imap-{uid}"));
+    let in_reply_to = header_field("in-reply-to").unwrap_or_default();
+    let references = header_field("references").unwrap_or_default();
     let received_at = fetch
         .internal_date()
         .map(|date| date.to_rfc3339())
-        .or_else(|| header_value(&raw_header, "date"))
+        .or_else(|| header_field("date"))
         .unwrap_or_else(|| Utc::now().to_rfc3339());
     let flags = format!("{:?}", fetch.flags());
 
@@ -1525,31 +1516,6 @@ fn flag_state_from_fetch(fetch: &imap::types::Fetch<'_>) -> Option<ImapFlagState
     })
 }
 
-fn header_value(headers: &str, name: &str) -> Option<String> {
-    let prefix = format!("{name}:");
-    let mut value = String::new();
-    for line in headers.lines() {
-        if line.starts_with(' ') || line.starts_with('\t') {
-            if !value.is_empty() {
-                value.push(' ');
-                value.push_str(line.trim());
-            }
-            continue;
-        }
-        if !value.is_empty() {
-            break;
-        }
-        if line.to_ascii_lowercase().starts_with(&prefix) {
-            value = line[prefix.len()..].trim().to_string();
-        }
-    }
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
-    }
-}
-
 fn display_name_from_address(address: &str) -> String {
     let decoded = protocol::decode_address_header_value(address);
     decoded
@@ -1576,14 +1542,15 @@ fn email_from_address(address: &str) -> String {
 fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
     let parsed = MessageParser::default().parse(raw);
     let raw_lossy = String::from_utf8_lossy(raw);
-    let has_html_part = raw_lossy
-        .to_ascii_lowercase()
-        .contains("content-type: text/html");
-    let fallback_body = raw_lossy
-        .replace("\r\n", "\n")
-        .split_once("\n\n")
-        .map(|(_, body)| body.to_string())
-        .unwrap_or_default();
+    let has_html_part =
+        crate::mime::contains_ascii_case_insensitive(raw, b"content-type: text/html");
+    let header_fields = crate::mime::extract_header_fields(raw);
+    let (_, body_bytes) = crate::mime::split_header_body(raw);
+    let fallback_body = crate::mime::decode_body_text(
+        body_bytes,
+        crate::mime::content_transfer_encoding(&header_fields).as_deref(),
+        crate::mime::content_type_charset(&header_fields).as_deref(),
+    );
     let text_body = parsed
         .as_ref()
         .and_then(|message| message.body_text(0))
@@ -1626,6 +1593,12 @@ fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
     }
 }
 
+fn attachment_display_name(part: &MessagePart<'_>) -> String {
+    part.attachment_name()
+        .map(crate::mime::decode_attachment_filename)
+        .unwrap_or_default()
+}
+
 fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteAttachmentMetadata> {
     let mut attachments = Vec::new();
     let mut seen_inline_content_ids = BTreeSet::new();
@@ -1655,13 +1628,13 @@ fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteA
             part.contents().len()
         ));
         seen_inline_content_ids.insert(content_id.clone());
+        let filename = attachment_display_name(part);
         attachments.push(RemoteAttachmentMetadata {
-            filename: part
-                .attachment_name()
-                .map(str::to_string)
-                .unwrap_or_else(|| {
-                    protocol::inline_attachment_filename(&mime_type, &content_id, index)
-                }),
+            filename: if filename.is_empty() {
+                protocol::inline_attachment_filename(&mime_type, &content_id, index)
+            } else {
+                filename
+            },
             mime_type,
             size_bytes: part.contents().len() as i64,
             content_id,
@@ -1682,14 +1655,14 @@ fn remote_attachment_metadata_from_part(
         .content_disposition()
         .is_some_and(|disposition| disposition.is_inline())
         || !content_id.is_empty();
+    let filename = attachment_display_name(part);
 
     RemoteAttachmentMetadata {
-        filename: part
-            .attachment_name()
-            .map(str::to_string)
-            .unwrap_or_else(|| {
-                protocol::inline_attachment_filename(&mime_type, &content_id, index)
-            }),
+        filename: if filename.is_empty() {
+            protocol::inline_attachment_filename(&mime_type, &content_id, index)
+        } else {
+            filename
+        },
         mime_type,
         size_bytes: part.contents().len() as i64,
         content_id,
@@ -1803,13 +1776,13 @@ fn parse_attachment_payload_from_raw(
         let (index, part) = attachments.first()?;
         let mime_type = part_mime_type(part);
         let part_content_id = protocol::normalize_content_id(part.content_id());
+        let filename = attachment_display_name(part);
         return Some(RemoteAttachmentPayload {
-            filename: part
-                .attachment_name()
-                .map(str::to_string)
-                .unwrap_or_else(|| {
-                    protocol::inline_attachment_filename(&mime_type, &part_content_id, *index)
-                }),
+            filename: if filename.is_empty() {
+                protocol::inline_attachment_filename(&mime_type, &part_content_id, *index)
+            } else {
+                filename
+            },
             bytes: part.contents().to_vec(),
         });
     }
@@ -1824,12 +1797,13 @@ fn parse_attachment_payload_from_raw(
         };
         if matches {
             let mime_type = part_mime_type(part);
+            let payload_filename = if part_name.is_empty() {
+                protocol::inline_attachment_filename(&mime_type, &part_content_id, index)
+            } else {
+                crate::mime::decode_attachment_filename(part_name)
+            };
             Some(RemoteAttachmentPayload {
-                filename: if part_name.is_empty() {
-                    protocol::inline_attachment_filename(&mime_type, &part_content_id, index)
-                } else {
-                    part_name.to_string()
-                },
+                filename: payload_filename,
                 bytes: part.contents().to_vec(),
             })
         } else {
@@ -2116,8 +2090,14 @@ mod tests {
 
     #[test]
     fn parses_folded_headers_and_addresses() {
-        let headers = "Subject: Hello\r\n World\r\nFrom: Ada <ada@example.com>\r\n\r\n";
-        assert_eq!(header_value(headers, "subject").unwrap(), "Hello World");
+        let headers = b"Subject: Hello\r\n World\r\nFrom: Ada <ada@example.com>\r\n\r\n";
+        let fields = crate::mime::extract_header_fields(headers);
+        let subject = fields
+            .iter()
+            .find(|(name, _)| name == "subject")
+            .map(|(_, value)| crate::mime::decode_header_value_bytes(value))
+            .unwrap();
+        assert_eq!(subject, "Hello World");
         assert_eq!(display_name_from_address("Ada <ada@example.com>"), "Ada");
         assert_eq!(
             email_from_address("Ada <ada@example.com>"),
@@ -2390,5 +2370,108 @@ mod tests {
                 .expect("content id should select the matching inline part");
         assert_eq!(payload.filename, "logo.png");
         assert_eq!(payload.bytes, b"right image");
+    }
+
+    #[test]
+    fn parses_gbk_qp_body_with_chinese_subject_and_attachment() {
+        // 用户数据计算过程26日7月汇总 (1) — GBK quoted-printable body,
+        // GBK B-encoded subject, GBK B-encoded attachment filename.
+        let body = parse_body_from_raw(
+            concat!(
+                "Subject: =?GBK?B?08O7p8r9vt28xsvjuf2zzDI2yNU31MK749fcICgxKQ==?=\r\n",
+                "From: =?GBK?B?wO7Hvw==?= <li@example.com>\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/mixed; boundary=\"b\"\r\n",
+                "\r\n",
+                "--b\r\n",
+                "Content-Type: text/plain; charset=GBK\r\n",
+                "Content-Transfer-Encoding: quoted-printable\r\n",
+                "\r\n",
+                "=D3=C3=BB=A7=CA=FD=BE=DD=BC=C6=CB=E3=B9=FD=B3=CC\r\n",
+                "--b\r\n",
+                "Content-Type: application/vnd.ms-excel; name=\"=?GBK?B?08O7p8r9vt28xsvjuf2zzDI2yNU31MK749fcICgxKQ==?=.xlsx\"\r\n",
+                "Content-Disposition: attachment; filename=\"=?GBK?B?08O7p8r9vt28xsvjuf2zzDI2yNU31MK749fcICgxKQ==?=.xlsx\"\r\n",
+                "Content-Transfer-Encoding: base64\r\n",
+                "\r\n",
+                "YXR0YWNobWVudCBieXRlcw==\r\n",
+                "--b--\r\n",
+            )
+            .as_bytes(),
+        );
+
+        assert!(body.body.contains("用户数据计算过程"));
+        assert!(body.snippet.contains("用户数据计算过程"));
+        assert_eq!(body.attachments.len(), 1);
+        assert_eq!(body.attachments[0].filename, "用户数据计算过程26日7月汇总 (1).xlsx");
+    }
+
+    #[test]
+    fn parses_rfc2231_utf8_attachment_filename_from_raw_message() {
+        let body = parse_body_from_raw(
+            concat!(
+                "Subject: RFC2231\r\n",
+                "MIME-Version: 1.0\r\n",
+                "Content-Type: multipart/mixed; boundary=\"b\"\r\n",
+                "\r\n",
+                "--b\r\n",
+                "Content-Type: text/plain\r\n",
+                "\r\n",
+                "body\r\n",
+                "--b\r\n",
+                "Content-Type: application/vnd.ms-excel\r\n",
+                "Content-Disposition: attachment; filename*=UTF-8''%E7%94%A8%E6%88%B7%E6%95%B0%E6%8D%AE%E8%AE%A1%E7%AE%97%E8%BF%87%E7%A8%8B26%E6%97%A57%E6%9C%88%E6%B1%87%E6%80%BB%20%281%29.xlsx\r\n",
+                "Content-Transfer-Encoding: base64\r\n",
+                "\r\n",
+                "YXR0YWNobWVudCBieXRlcw==\r\n",
+                "--b--\r\n",
+            )
+            .as_bytes(),
+        );
+
+        assert_eq!(body.attachments.len(), 1);
+        assert_eq!(body.attachments[0].filename, "用户数据计算过程26日7月汇总 (1).xlsx");
+    }
+
+    #[test]
+    fn parses_rfc2231_continuation_filename_from_bodystructure() {
+        let response = b"* 1 FETCH (BODYSTRUCTURE (\"APPLICATION\" \"OCTET-STREAM\" (\"NAME*0*\" \"UTF-8''%E7%94%A8%E6%88%B7\" \"NAME*1*\" \"%E6%95%B0%E6%8D%AE.xlsx\") NIL NIL \"BASE64\" 10 NIL (\"ATTACHMENT\" (\"FILENAME*0*\" \"UTF-8''%E7%94%A8%E6%88%B7\" \"FILENAME*1*\" \"%E6%95%B0%E6%8D%AE.xlsx\")) NIL))\r\n";
+        let (_, parsed) = imap_proto::parser::parse_response(response).unwrap();
+        match parsed {
+            imap_proto::types::Response::Fetch(_, attributes) => {
+                let bodystructure = attributes
+                    .iter()
+                    .find_map(|attribute| match attribute {
+                        imap_proto::types::AttributeValue::BodyStructure(bodystructure) => {
+                            Some(bodystructure)
+                        }
+                        _ => None,
+                    })
+                    .unwrap();
+                let filename = attachment_filename_from_bodystructure(bodystructure).unwrap();
+                assert_eq!(filename, "用户数据.xlsx");
+            }
+            _ => panic!("expected FETCH response"),
+        };
+    }
+
+    #[test]
+    fn decodes_header_field_bytes_without_lossy_corruption() {
+        // GBK-encoded From display name as raw non-UTF-8 bytes.
+        let raw = b"From: \xD5\xC5\xBD\xA1 <zhang@example.com>\r\n\r\n";
+        let fields = crate::mime::extract_header_fields(raw);
+        let from = fields
+            .iter()
+            .find(|(name, _)| name == "from")
+            .map(|(_, value)| crate::mime::decode_header_value_bytes(value))
+            .unwrap();
+        assert_eq!(from, "张健 <zhang@example.com>");
+    }
+
+    #[test]
+    fn parse_body_from_raw_falls_back_to_charset_decoded_text() {
+        // Message that mail-parser fails to structure (no MIME headers at all)
+        // with GBK bytes: the fallback path must not corrupt to U+FFFD.
+        let body = parse_body_from_raw(b"Content-Type: text/plain; charset=GBK\r\n\r\n\xD3\xC3\xBB\xA7\xCA\xFD\xBE\xDD");
+        assert!(body.body.contains("用户数据"), "got: {:?}", body.body);
     }
 }

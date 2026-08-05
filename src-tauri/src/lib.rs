@@ -3,6 +3,7 @@ mod credentials;
 mod db;
 mod ai;
 mod imap_probe;
+mod mime;
 mod models;
 mod oauth;
 mod pop3_probe;

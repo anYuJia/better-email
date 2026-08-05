@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMessageMetadataPatch,
   resolveReaderSelectedDetail,
+  senderAvatarTone,
   senderInitial,
   type MessageMetadataPatch,
 } from './messageDetailUtils';
@@ -143,5 +144,38 @@ describe('senderInitial', () => {
     expect(result).toBe('🌟');
     // English fallback after emoji still works
     expect(senderInitial('Hello')).toBe('H');
+  });
+});
+
+describe('senderAvatarTone', () => {
+  it('always returns an index in the 0-5 tone range', () => {
+    for (const value of ['张健', 'anan', 'bob@example.com', 'Alice Zhang', '', '?', '🌟Star']) {
+      const tone = senderAvatarTone(value);
+      expect(Number.isInteger(tone)).toBe(true);
+      expect(tone).toBeGreaterThanOrEqual(0);
+      expect(tone).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('is stable for the same sender identity', () => {
+    expect(senderAvatarTone('张健', 'zhang@example.com')).toBe(
+      senderAvatarTone('张健', 'zhang@example.com'),
+    );
+    expect(senderAvatarTone('anan', 'anan@example.com')).toBe(
+      senderAvatarTone('anan', 'anan@example.com'),
+    );
+  });
+
+  it('is stable regardless of name casing', () => {
+    expect(senderAvatarTone('Alice Zhang', 'alice@example.com')).toBe(
+      senderAvatarTone('alice zhang', 'alice@example.com'),
+    );
+  });
+
+  it('falls back to the email when the name is empty', () => {
+    expect(senderAvatarTone('', 'bob@example.com')).toBe(
+      senderAvatarTone('bob@example.com'),
+    );
+    expect(senderAvatarTone(null, null)).toBe(senderAvatarTone('?'));
   });
 });

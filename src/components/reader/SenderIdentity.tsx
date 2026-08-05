@@ -1,5 +1,5 @@
 import type { Message, MessageSummary } from '../../app/types';
-import { senderInitial } from '../../app/messageDetailUtils';
+import { senderAvatarTone } from '../../app/messageDetailUtils';
 import Avatar from '../Avatar';
 
 type SenderIdentityProps = {
@@ -12,8 +12,7 @@ export default function SenderIdentity({ message }: SenderIdentityProps) {
       <Avatar
         email={message.sender_email}
         name={message.sender_name}
-        className={`reader-avatar avatar-tone-${Math.abs(message.id) % 6}`}
-        fallbackInitial={senderInitial(message.sender_name, message.sender_email)}
+        className={`reader-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
       />
       <span className="reader-sender-copy">
         <strong>{message.sender_name || message.sender_email}</strong>

@@ -1,56 +1,33 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Avatar from './Avatar';
+import Avatar, { isValidAvatarUrl } from './Avatar';
 
 describe('Avatar', () => {
   afterEach(() => {
     cleanup();
   });
 
-  it('renders fallback initial in the fixed-size avatar shell when no email or image src exists', () => {
-    render(
-      <Avatar
-        email=""
-        name="Google"
-        className="message-avatar avatar-tone-1"
-        fallbackInitial="G"
-      />,
-    );
+  describe('isValidAvatarUrl', () => {
+    it('accepts http/https URLs', () => {
+      expect(isValidAvatarUrl('https://example.com/avatar.png')).toBe(true);
+      expect(isValidAvatarUrl('http://example.com/avatar.png')).toBe(true);
+    });
 
-    const shell = screen.getByText('G');
-    expect(shell.tagName).toBe('SPAN');
-    expect(shell.className).toContain('message-avatar');
-    expect(shell.className).toContain('avatar-tone-1');
-    expect(screen.queryByRole('img')).toBeNull();
+    it('rejects empty, invalid, and non-http schemes', () => {
+      expect(isValidAvatarUrl('')).toBe(false);
+      expect(isValidAvatarUrl('not-a-url')).toBe(false);
+      expect(isValidAvatarUrl('ftp://example.com/avatar.png')).toBe(false);
+      expect(isValidAvatarUrl('mailto:a@b.com')).toBe(false);
+    });
   });
 
-  it('infers avatar image candidates from sender email before using the fallback initial', () => {
-    render(
-      <Avatar
-        email="google@example.com"
-        name="Google"
-        className="message-avatar avatar-tone-1"
-        fallbackInitial="G"
-      />,
-    );
-
-    const img = screen.getByRole('img', { name: 'Google' });
-    const shell = img.parentElement;
-
-    expect(shell?.tagName).toBe('SPAN');
-    expect(shell?.className).toContain('message-avatar');
-    expect(img.getAttribute('src')).toContain('unavatar.io');
-    expect(screen.queryByText('G')).toBeNull();
-  });
-
-  it('renders an explicit avatar src inside the fixed-size avatar shell instead of sizing the img itself', () => {
+  it('renders an explicit avatar src inside the fixed-size avatar shell', () => {
     render(
       <Avatar
         email="google@example.com"
         name="Google"
         src="https://example.com/avatar.png"
         className="reader-avatar avatar-tone-2"
-        fallbackInitial="G"
       />,
     );
 
@@ -61,17 +38,49 @@ describe('Avatar', () => {
     expect(shell?.tagName).toBe('SPAN');
     expect(shell?.className).toContain('reader-avatar');
     expect(shell?.className).toContain('avatar-tone-2');
-    expect(img.className).toBe('');
+    expect(img.getAttribute('src')).toBe('https://example.com/avatar.png');
+    expect(screen.queryByText('G')).toBeNull();
   });
 
-  it('falls back to the initial when an explicit avatar src fails to load', () => {
+  it('renders the initial text avatar instead of an image when no avatar URL exists', () => {
+    render(
+      <Avatar
+        email="google@example.com"
+        name="Google"
+        className="message-avatar avatar-tone-1"
+      />,
+    );
+
+    const shell = screen.getByText('G');
+    expect(shell.tagName).toBe('SPAN');
+    expect(shell.className).toContain('message-avatar');
+    expect(shell.className).toContain('avatar-tone-1');
+    expect(shell.className).toContain('avatar-initial');
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('never requests an image for an invalid avatar URL', () => {
+    render(
+      <Avatar
+        email="google@example.com"
+        name="Google"
+        src="not-a-valid-url"
+        className="message-avatar avatar-tone-1"
+      />,
+    );
+
+    const shell = screen.getByText('G');
+    expect(shell.tagName).toBe('SPAN');
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('falls back to the initial text avatar when an avatar src fails to load', () => {
     render(
       <Avatar
         email="resend@example.com"
         name="Resend"
         src="https://example.com/missing.png"
         className="message-avatar avatar-tone-3"
-        fallbackInitial="R"
       />,
     );
 
@@ -83,23 +92,97 @@ describe('Avatar', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('falls back to the initial only after all inferred avatar candidates fail', () => {
-    render(
+  it('retries a new avatar src after a previous one failed', () => {
+    const { rerender } = render(
       <Avatar
         email="resend@example.com"
         name="Resend"
-        className="message-avatar avatar-tone-4"
-        fallbackInitial="R"
+        src="https://example.com/missing.png"
+        className="message-avatar avatar-tone-3"
       />,
     );
 
-    for (let i = 0; i < 3; i += 1) {
-      fireEvent.error(screen.getByRole('img', { name: 'Resend' }));
-    }
+    fireEvent.error(screen.getByRole('img', { name: 'Resend' }));
+    expect(screen.getByText('R')).not.toBeNull();
 
-    const shell = screen.getByText('R');
-    expect(shell.tagName).toBe('SPAN');
-    expect(shell.className).toContain('message-avatar');
+    rerender(
+      <Avatar
+        email="resend@example.com"
+        name="Resend"
+        src="https://example.com/works.png"
+        className="message-avatar avatar-tone-3"
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: 'Resend' }).getAttribute('src')).toBe(
+      'https://example.com/works.png',
+    );
+  });
+
+  it('shows the first character of a Chinese name', () => {
+    render(
+      <Avatar
+        email="zhang@example.com"
+        name="张健"
+        className="message-avatar avatar-tone-4"
+      />,
+    );
+
+    expect(screen.getByText('张')).not.toBeNull();
+    expect(screen.queryByText('健')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('shows the uppercase first letter of an English name', () => {
+    render(
+      <Avatar
+        email="anan@example.com"
+        name="anan"
+        className="message-avatar avatar-tone-5"
+      />,
+    );
+
+    expect(screen.getByText('A')).not.toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('falls back to the uppercase email prefix when the name is empty', () => {
+    render(
+      <Avatar
+        email="bob@example.com"
+        name=""
+        className="message-avatar avatar-tone-1"
+      />,
+    );
+
+    expect(screen.getByText('B')).not.toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('falls back to "?" when name and email are both empty', () => {
+    render(
+      <Avatar
+        email=""
+        name=""
+        className="message-avatar avatar-tone-1"
+      />,
+    );
+
+    expect(screen.getByText('?')).not.toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('honors an explicit fallbackInitial override when provided', () => {
+    render(
+      <Avatar
+        email="google@example.com"
+        name="Google"
+        className="message-avatar avatar-tone-1"
+        fallbackInitial="X"
+      />,
+    );
+
+    expect(screen.getByText('X')).not.toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
   });
 });

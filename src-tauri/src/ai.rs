@@ -103,7 +103,7 @@ pub fn call_chat_completion(
         temperature: 0.2,
     };
     let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(timeout_seconds.max(5).min(300))))
+        .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
         .build()
         .new_agent();
     let mut request = agent.post(&url).header("Content-Type", "application/json");
@@ -245,7 +245,7 @@ fn json_rpc_call(
         "params": params,
     });
     let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(timeout_seconds.max(5).min(300))))
+        .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
         .build()
         .new_agent();
     let mut request = agent.post(&url).header("Content-Type", "application/json");
@@ -285,7 +285,7 @@ fn mcp_result_content(result: &serde_json::Value) -> Option<String> {
         for item in content {
             if let Some(text) = item.get("text").and_then(|value| value.as_str()) {
                 parts.push(text.to_string());
-            } else if let Some(serialized) = serde_json::to_string(item).ok() {
+            } else if let Ok(serialized) = serde_json::to_string(item) {
                 parts.push(serialized);
             }
         }

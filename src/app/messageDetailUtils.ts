@@ -51,3 +51,16 @@ export function senderInitial(name?: string | null, email?: string | null): stri
   const first = Array.from(source)[0] || '?';
   return /^[a-zA-Z]$/.test(first) ? first.toUpperCase() : first;
 }
+
+/**
+ * Stable avatar tone index (0-5) derived from the sender identity.
+ * The same sender always maps to the same tone, independent of message id.
+ */
+export function senderAvatarTone(name?: string | null, email?: string | null): number {
+  const source = ((name && name.trim()) || (email && email.trim()) || '?').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash << 5) - hash + source.charCodeAt(i)) >>> 0;
+  }
+  return hash % 6;
+}

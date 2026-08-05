@@ -47,6 +47,15 @@
   border-radius: inherit;
 }
 
+/* Text (initial) fallback avatar: same shell, legible centered letter */
+.message-avatar.avatar-initial,
+.reader-avatar.avatar-initial {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1;
+  user-select: none;
+}
+
 .width-100 { width: 100%; }
 .width-95 { width: 95%; }
 .width-90 { width: 90%; }

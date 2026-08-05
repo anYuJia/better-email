@@ -333,7 +333,7 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
 }
 
 #[tauri::command]
-pub fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
     let started_at = std::time::Instant::now();
     command_info("[better-email][send] flush smtp start");
     retry_pending_remote_archives(store.inner())?;

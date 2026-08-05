@@ -38,7 +38,7 @@ pub fn complete_oauth2_callback(
 }
 
 #[tauri::command]
-pub fn wait_for_oauth2_callback(
+pub async fn wait_for_oauth2_callback(
     store: State<'_, MailStore>,
     input: OAuthLocalCallbackInput,
 ) -> MailResult<OAuthCallbackReport> {
@@ -48,7 +48,7 @@ pub fn wait_for_oauth2_callback(
 }
 
 #[tauri::command]
-pub fn exchange_oauth2_token(
+pub async fn exchange_oauth2_token(
     store: State<'_, MailStore>,
     input: OAuthTokenExchangeInput,
 ) -> MailResult<OAuthTokenExchangeReport> {
@@ -74,7 +74,7 @@ pub fn exchange_oauth2_token(
 }
 
 #[tauri::command]
-pub fn refresh_oauth2_token(
+pub async fn refresh_oauth2_token(
     store: State<'_, MailStore>,
     input: OAuthRefreshInput,
 ) -> MailResult<OAuthRefreshReport> {

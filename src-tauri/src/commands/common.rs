@@ -187,7 +187,9 @@ pub(super) fn mime_type_for_path(path: &Path) -> String {
     .to_string()
 }
 
-pub(super) fn read_backup_from_dialog(app: AppHandle) -> MailResult<Option<(LocalBackup, String, i64)>> {
+pub(super) async fn read_backup_from_dialog(
+    app: AppHandle,
+) -> MailResult<Option<(LocalBackup, String, i64)>> {
     let Some(path) = app
         .dialog()
         .file()

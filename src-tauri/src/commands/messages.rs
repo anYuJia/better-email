@@ -128,7 +128,7 @@ pub async fn set_message_read(
 }
 
 #[tauri::command]
-pub fn mark_folder_read(
+pub async fn mark_folder_read(
     store: State<'_, MailStore>,
     folder_id: i64,
     role: String,

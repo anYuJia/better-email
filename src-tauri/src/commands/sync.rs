@@ -16,7 +16,7 @@ use crate::smtp;
 use chrono::Utc;
 use tauri::State;
 #[tauri::command]
-pub fn test_connection(
+pub async fn test_connection(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<ConnectionReport> {

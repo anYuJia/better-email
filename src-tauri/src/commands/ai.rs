@@ -4,7 +4,7 @@ use crate::ai::{
 };
 
 #[tauri::command]
-pub fn ai_chat_request(input: AiChatRequest) -> Result<AiChatOutcome, String> {
+pub async fn ai_chat_request(input: AiChatRequest) -> Result<AiChatOutcome, String> {
     crate::ai::call_chat_completion(
         &input.endpoint,
         &input.api_key,
@@ -15,7 +15,7 @@ pub fn ai_chat_request(input: AiChatRequest) -> Result<AiChatOutcome, String> {
 }
 
 #[tauri::command]
-pub fn ai_request(input: AiRequestInput) -> Result<AiRequestResult, String> {
+pub async fn ai_request(input: AiRequestInput) -> Result<AiRequestResult, String> {
     match input.service_type.as_str() {
         "mcp" => run_mcp_tool_call(&input),
         _ => run_ai_request(&input),
@@ -23,7 +23,7 @@ pub fn ai_request(input: AiRequestInput) -> Result<AiRequestResult, String> {
 }
 
 #[tauri::command]
-pub fn test_ai_connection(
+pub async fn test_ai_connection(
     service_type: String,
     endpoint: String,
     api_key: String,

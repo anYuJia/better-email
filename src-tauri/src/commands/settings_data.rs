@@ -77,7 +77,7 @@ pub fn export_diagnostics(store: State<'_, MailStore>) -> MailResult<String> {
 }
 
 #[tauri::command]
-pub fn export_local_backup(
+pub async fn export_local_backup(
     app: AppHandle,
     store: State<'_, MailStore>,
 ) -> MailResult<LocalBackupSummary> {
@@ -109,8 +109,8 @@ pub fn export_local_backup(
 }
 
 #[tauri::command]
-pub fn preview_local_backup(app: AppHandle) -> MailResult<Option<LocalBackupSummary>> {
-    let Some((backup, path, size_bytes)) = read_backup_from_dialog(app)? else {
+pub async fn preview_local_backup(app: AppHandle) -> MailResult<Option<LocalBackupSummary>> {
+    let Some((backup, path, size_bytes)) = read_backup_from_dialog(app).await? else {
         return Ok(None);
     };
     Ok(Some(MailStore::summarize_local_backup(
@@ -119,11 +119,11 @@ pub fn preview_local_backup(app: AppHandle) -> MailResult<Option<LocalBackupSumm
 }
 
 #[tauri::command]
-pub fn import_local_backup(
+pub async fn import_local_backup(
     app: AppHandle,
     store: State<'_, MailStore>,
 ) -> MailResult<Option<LocalBackupSummary>> {
-    let Some((backup, path, size_bytes)) = read_backup_from_dialog(app)? else {
+    let Some((backup, path, size_bytes)) = read_backup_from_dialog(app).await? else {
         return Ok(None);
     };
     store.import_local_backup(&backup)?;
@@ -138,6 +138,6 @@ pub fn get_storage_usage(store: State<'_, MailStore>) -> MailResult<StorageUsage
 }
 
 #[tauri::command]
-pub fn clear_attachment_cache(store: State<'_, MailStore>) -> MailResult<CacheClearResult> {
+pub async fn clear_attachment_cache(store: State<'_, MailStore>) -> MailResult<CacheClearResult> {
     store.clear_reclaimable_attachment_cache()
 }

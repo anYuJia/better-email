@@ -96,7 +96,7 @@ pub async fn save_image_data_url_as(
 }
 
 #[tauri::command]
-pub fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttachmentInput>> {
+pub async fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttachmentInput>> {
     let Some(paths) = app
         .dialog()
         .file()
@@ -470,7 +470,7 @@ pub async fn save_attachment_as(
 }
 
 #[tauri::command]
-pub fn export_message_as_eml(
+pub async fn export_message_as_eml(
     app: AppHandle,
     store: State<'_, MailStore>,
     message_id: i64,
@@ -504,7 +504,7 @@ pub fn export_message_as_eml(
 }
 
 #[tauri::command]
-pub fn import_eml_file(
+pub async fn import_eml_file(
     app: AppHandle,
     store: State<'_, MailStore>,
     account_id: Option<i64>,

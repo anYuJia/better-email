@@ -13,7 +13,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
-pub fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<String>> {
+pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<String>> {
     let Some(source_path) = app
         .dialog()
         .file()
@@ -52,7 +52,10 @@ fn read_contact_file_by_path(path: &str) -> MailResult<(String, String, usize)> 
 }
 
 #[tauri::command]
-pub fn preview_contact_import(path: String, store: State<'_, MailStore>) -> MailResult<ContactImportPreview> {
+pub async fn preview_contact_import(
+    path: String,
+    store: State<'_, MailStore>,
+) -> MailResult<ContactImportPreview> {
     let (file_name, raw, _size_bytes) = read_contact_file_by_path(&path)?;
     let parsed = vcard::parse_contact_import(&raw, &file_name);
     let entries = store.classify_contact_import(parsed.contacts)?;
@@ -165,7 +168,7 @@ pub fn merge_contacts(
 }
 
 #[tauri::command]
-pub fn export_contacts_vcard(
+pub async fn export_contacts_vcard(
     app: AppHandle,
     store: State<'_, MailStore>,
 ) -> MailResult<Option<ContactExportSummary>> {
@@ -197,7 +200,7 @@ pub fn export_contacts_vcard(
     }))
 }
 
-fn read_contact_import_file(
+async fn read_contact_import_file(
     app: &AppHandle,
 ) -> MailResult<Option<(std::path::PathBuf, String, usize)>> {
     let Some(source_path) = app
@@ -229,11 +232,11 @@ fn read_contact_import_file(
 }
 
 #[tauri::command]
-pub fn import_contacts_vcard(
+pub async fn import_contacts_vcard(
     app: AppHandle,
     store: State<'_, MailStore>,
 ) -> MailResult<Option<ContactImportSummary>> {
-    let Some((source_path, raw, size_bytes)) = read_contact_import_file(&app)? else {
+    let Some((source_path, raw, size_bytes)) = read_contact_import_file(&app).await? else {
         return Ok(None);
     };
     let parsed = vcard::parse_contacts(&raw);

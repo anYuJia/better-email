@@ -126,7 +126,7 @@ export default function MessageListView({
     for (const item of flatItems) {
       let height = 34;
       if (item.type === 'message') {
-        height = 96;
+        height = 62;
       }
       layout.push({ top: currentTop, height });
       currentTop += height;

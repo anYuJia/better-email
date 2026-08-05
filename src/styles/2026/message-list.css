@@ -301,13 +301,13 @@
 }
 
 .message-card {
-  height: 96px !important;
-  min-height: 96px !important;
-  max-height: 96px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   box-sizing: border-box !important;
   overflow: hidden;
   margin: 0;
-  padding: 10px 12px 9px 57px;
+  padding: 6px 12px 6px 66px;
   border: 0;
   border-bottom: 1px solid #e8ebef;
   border-radius: 0;

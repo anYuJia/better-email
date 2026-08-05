@@ -560,6 +560,35 @@ mod tests {
     }
 
     #[test]
+    fn get_message_account_reads_every_account_column() {
+        let store = test_store();
+        let account = store.get_account().expect("seeded account loads");
+        let inbox = store
+            .list_folders_for_account(Some(account.id))
+            .expect("folders load")
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .expect("inbox folder exists");
+        let message_id = store
+            .list_messages_for_scope_sorted(Some(account.id), inbox.id, None, None, None, 1)
+            .expect("messages load")
+            .first()
+            .expect("seeded message exists")
+            .id;
+        let fetched = store
+            .get_message_account(message_id)
+            .expect("get_message_account reads all account columns");
+        assert_eq!(fetched.id, account.id);
+        assert_eq!(fetched.email, account.email);
+        assert_eq!(
+            fetched.cross_account_risk_warning,
+            account.cross_account_risk_warning,
+            "cross_account_risk_warning column must be selected to keep map_account column order"
+        );
+        assert_eq!(fetched.is_default, account.is_default);
+    }
+
+    #[test]
     fn new_database_starts_empty_without_demo_seed_env() {
         let store = MailStore::open_at(test_database_path("better-email-empty-default"))
             .expect("empty default store opens");

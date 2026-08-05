@@ -249,7 +249,7 @@ impl MailStore {
                 "
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
-                       a.signature, a.is_default
+                       a.signature, a.cross_account_risk_warning, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1

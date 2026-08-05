@@ -3,9 +3,11 @@ import { renderHook, act } from '@testing-library/react';
 import useAppMetaLoader from './useAppMetaLoader';
 import type { Account, Folder, MailStats, SyncRun } from '../app/types';
 
+const mockSetBadgeCount = vi.fn(async () => undefined);
+
 vi.mock('../tauriBridge', () => ({
   getCurrentWindow: () => ({
-    setBadgeCount: async () => undefined,
+    setBadgeCount: mockSetBadgeCount,
     setBadgeLabel: async () => undefined,
     onDragDropEvent: async () => () => undefined,
   }),
@@ -128,6 +130,7 @@ function renderMetaLoader() {
 describe('useAppMetaLoader', () => {
   beforeEach(() => {
     mockInvoke.mockReset();
+    mockSetBadgeCount.mockReset();
     localStorage.clear();
   });
 
@@ -179,5 +182,62 @@ describe('useAppMetaLoader', () => {
     expect(mockInvoke).toHaveBeenCalledWith('mark_benchmark_sync_complete', {
       message: 'ok;folders=2;imported=3',
     });
+  });
+
+  it('clears the dock badge and tray count when refreshUnreadIndicators finds zero unread', async () => {
+    setupInvokeMocks();
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_stats') {
+        return Promise.resolve({ ...stats, unread_messages: 0 });
+      }
+      if (command === 'set_tray_unread_count') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+    }) as never);
+    const { result } = renderMetaLoader();
+
+    await act(async () => {
+      await result.current.refreshUnreadIndicators('all');
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('get_stats', { accountId: null });
+    expect(mockInvoke).toHaveBeenCalledWith('set_tray_unread_count', { unreadCount: 0 });
+    expect(mockSetBadgeCount).toHaveBeenCalledWith(undefined);
+  });
+
+  it('pushes the real unread count to the dock badge and tray', async () => {
+    setupInvokeMocks();
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_stats') {
+        return Promise.resolve({ ...stats, unread_messages: 38 });
+      }
+      if (command === 'set_tray_unread_count') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+    }) as never);
+    const { result } = renderMetaLoader();
+
+    await act(async () => {
+      await result.current.refreshUnreadIndicators(1);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('get_stats', { accountId: 1 });
+    expect(mockInvoke).toHaveBeenCalledWith('set_tray_unread_count', { unreadCount: 38 });
+    expect(mockSetBadgeCount).toHaveBeenCalledWith(38);
+  });
+
+  it('keeps refreshUnreadIndicators resilient when get_stats fails', async () => {
+    setupInvokeMocks();
+    mockInvoke.mockRejectedValue(new Error('stats unavailable'));
+    const { result } = renderMetaLoader();
+
+    await expect(
+      act(async () => {
+        await result.current.refreshUnreadIndicators('all');
+      }),
+    ).resolves.toBeUndefined();
+    expect(mockSetBadgeCount).not.toHaveBeenCalled();
   });
 });

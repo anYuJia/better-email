@@ -34,6 +34,7 @@ export function mockGetCurrentWindow() {
     setBadgeCount: async () => undefined,
     setBadgeLabel: async () => undefined,
     onDragDropEvent: async () => async () => undefined,
+    onFocusChanged: async () => async () => undefined,
   };
 }
 

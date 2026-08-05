@@ -55,6 +55,10 @@ export function getCurrentWindow() {
       const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
       return prodGetCurrentWindow().onDragDropEvent(handler);
     },
+    onFocusChanged: async (handler: () => void) => {
+      const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
+      return prodGetCurrentWindow().onFocusChanged(handler);
+    },
   };
 }
 

@@ -54,6 +54,7 @@ type UseAccountConnectionControllerOptions = {
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
   setNewAccountForm: Dispatch<SetStateAction<AccountCreateInput>>;
   setFolderId: Dispatch<SetStateAction<number | null>>;
+  setFolders: Dispatch<SetStateAction<Folder[]>>;
   setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
@@ -93,6 +94,7 @@ export default function useAccountConnectionController({
   setAccountForm,
   setNewAccountForm,
   setFolderId,
+  setFolders,
   setMessages,
   setSelectedId,
   setAttachments,
@@ -189,6 +191,7 @@ export default function useAccountConnectionController({
     setAccountForm,
     setNewAccountForm,
     setFolderId,
+    setFolders,
     setMessages,
     setSelectedId,
     setAttachments,

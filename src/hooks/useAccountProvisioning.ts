@@ -13,6 +13,7 @@ import type {
   CredentialStatus,
   CredentialVerificationReport,
   FilterMode,
+  Folder,
   MessageSummary,
   SearchScope,
   SyncRun,
@@ -32,6 +33,7 @@ type AccountProvisioningOptions = {
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
   setNewAccountForm: Dispatch<SetStateAction<AccountCreateInput>>;
   setFolderId: Dispatch<SetStateAction<number | null>>;
+  setFolders: Dispatch<SetStateAction<Folder[]>>;
   setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
@@ -75,6 +77,7 @@ export default function useAccountProvisioning({
   setAccountForm,
   setNewAccountForm,
   setFolderId,
+  setFolders,
   setMessages,
   setSelectedId,
   setAttachments,
@@ -311,6 +314,7 @@ export default function useAccountProvisioning({
     setAccount(nextAccount);
     setAccountForm(nextAccount);
     setFolderId(null);
+    setFolders([]);
     setMessages([]);
     setSelectedId(null);
     setAttachments([]);
@@ -341,6 +345,7 @@ export default function useAccountProvisioning({
     setAttachments,
     setCredentialStatus,
     setFolderId,
+    setFolders,
     setMessages,
     setSelectedId,
     setSettingsOpen,

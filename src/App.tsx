@@ -294,6 +294,7 @@ export default function App() {
   const {
     loadMeta,
     releaseDueSnoozedMessages,
+    refreshUnreadIndicators,
     maybeRunBenchmarkSync,
   } = useAppMetaLoader({
     folderId,
@@ -473,6 +474,7 @@ export default function App() {
     setAccountForm,
     setNewAccountForm,
     setFolderId,
+    setFolders,
     setMessages,
     setSelectedId,
     setAttachments,
@@ -566,6 +568,20 @@ export default function App() {
         skipNextFolderEffectLoadRef.current = false;
       });
   }, [accountScope]);
+
+  useEffect(() => {
+    const scopeRef: { current: AccountScope } = { current: accountScope };
+    const syncIndicators = () => {
+      void refreshUnreadIndicators(scopeRef.current);
+    };
+    syncIndicators();
+    const unlistenPromise = Promise.resolve(
+      getCurrentWindow().onFocusChanged?.(syncIndicators),
+    ).catch(() => () => undefined);
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten?.());
+    };
+  }, [refreshUnreadIndicators]);
 
   useEffect(() => {
     if (!folderId) return;

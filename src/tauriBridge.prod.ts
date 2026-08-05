@@ -53,6 +53,10 @@ export function prodGetCurrentWindow() {
       const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
       return getTauriCurrentWindow().onDragDropEvent((event) => handler(event.payload as unknown as DesktopFileDropEvent));
     },
+    onFocusChanged: async (handler: () => void) => {
+      const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+      return getTauriCurrentWindow().onFocusChanged(handler);
+    },
   };
 }
 

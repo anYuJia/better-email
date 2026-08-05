@@ -271,6 +271,21 @@ export default function useAppMetaLoader({
     }
   }
 
+  /**
+   * 独立于 loadMeta 的角标/托盘未读同步：即使邮件加载失败，
+   * 也能用一次轻量 get_stats 把 Dock 角标和托盘未读数刷新到真实状态。
+   */
+  async function refreshUnreadIndicators(scope: AccountScope = 'all') {
+    try {
+      const nextStats = await invoke<MailStats>('get_stats', {
+        accountId: accountIdForScope(scope),
+      });
+      await updateAppUnreadBadge(nextStats.unread_messages);
+    } catch (error) {
+      console.warn('Failed to refresh unread indicators:', error);
+    }
+  }
+
   async function maybeRunBenchmarkSync(runSyncDryRun: () => Promise<SyncRun>) {
     if (benchmarkSyncRef.current) return;
     const requested = await invoke<boolean>('benchmark_sync_requested');
@@ -292,6 +307,7 @@ export default function useAppMetaLoader({
     loadMeta,
     releaseDueSnoozedMessages,
     updateAppUnreadBadge,
+    refreshUnreadIndicators,
     maybeRunBenchmarkSync,
   };
 }

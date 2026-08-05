@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Avatar, { isValidAvatarUrl } from './Avatar';
+import Avatar, { inferredAvatarCandidates, isValidAvatarUrl } from './Avatar';
 
 describe('Avatar', () => {
   afterEach(() => {
@@ -18,6 +18,16 @@ describe('Avatar', () => {
       expect(isValidAvatarUrl('not-a-url')).toBe(false);
       expect(isValidAvatarUrl('ftp://example.com/avatar.png')).toBe(false);
       expect(isValidAvatarUrl('mailto:a@b.com')).toBe(false);
+    });
+  });
+
+  describe('inferredAvatarCandidates', () => {
+    it('only infers avatars for known service domains to avoid generic placeholders', () => {
+      expect(inferredAvatarCandidates('daisy@example.com', 'Daisy Priya')).toEqual([]);
+      expect(inferredAvatarCandidates('pageupdates@facebookmail.com', 'Facebook 公共主页')).toEqual([
+        'https://unavatar.io/facebook.com?fallback=false',
+      ]);
+      expect(inferredAvatarCandidates('daisy@example.com', 'Daisy Priya').join('\n')).not.toContain('google.com/s2/favicons');
     });
   });
 
@@ -45,7 +55,7 @@ describe('Avatar', () => {
   it('renders the initial text avatar instead of an image when no avatar URL exists', () => {
     render(
       <Avatar
-        email="google@example.com"
+        email="unknown@example.com"
         name="Google"
         className="message-avatar avatar-tone-1"
       />,
@@ -89,6 +99,26 @@ describe('Avatar', () => {
     const shell = screen.getByText('R');
     expect(shell.tagName).toBe('SPAN');
     expect(shell.className).toContain('message-avatar');
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('skips tiny placeholder images and falls back after inferred candidates fail', () => {
+    render(
+      <Avatar
+        email="notify@github.com"
+        name="GitHub"
+        className="message-avatar avatar-tone-3"
+      />,
+    );
+
+    for (let index = 0; index < 2; index += 1) {
+      const img = screen.getByRole('img', { name: 'GitHub' }) as HTMLImageElement;
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 16 });
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 16 });
+      fireEvent.load(img);
+    }
+
+    expect(screen.getByText('G')).not.toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
   });
 
@@ -175,7 +205,7 @@ describe('Avatar', () => {
   it('honors an explicit fallbackInitial override when provided', () => {
     render(
       <Avatar
-        email="google@example.com"
+        email="unknown@example.com"
         name="Google"
         className="message-avatar avatar-tone-1"
         fallbackInitial="X"

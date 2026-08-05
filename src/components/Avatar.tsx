@@ -1,6 +1,25 @@
 import React from 'react';
 import { senderInitial } from '../app/messageDetailUtils';
 
+const minUsableAvatarPixelSize = 32;
+const serviceAvatarDomains: Record<string, string> = {
+  'github.com': 'github.com',
+  'facebook.com': 'facebook.com',
+  'facebookmail.com': 'facebook.com',
+  'instagram.com': 'instagram.com',
+  'linkedin.com': 'linkedin.com',
+  'twitter.com': 'twitter.com',
+  'x.com': 'x.com',
+  'youtube.com': 'youtube.com',
+  'google.com': 'google.com',
+  'openai.com': 'openai.com',
+  'anthropic.com': 'anthropic.com',
+  'figma.com': 'figma.com',
+  'notion.so': 'notion.so',
+  'slack.com': 'slack.com',
+  'stripe.com': 'stripe.com',
+};
+
 type AvatarProps = {
   email: string;
   name: string;
@@ -18,25 +37,64 @@ export function isValidAvatarUrl(value: string): boolean {
   }
 }
 
+export function inferredAvatarCandidates(email: string, name: string): string[] {
+  const trimmedEmail = email.trim().toLowerCase();
+  if (!trimmedEmail) return [];
+
+  const domain = trimmedEmail.split('@')[1]?.trim();
+  const serviceDomain = domain ? serviceAvatarDomains[domain] : '';
+  if (!serviceDomain) return [];
+
+  const candidates: string[] = [];
+
+  if (domain === 'github.com' && name.trim()) {
+    const cleanName = name.split(/\s+/)[0].trim().replace(/[^a-zA-Z0-9\-_]/g, '');
+    if (cleanName) {
+      candidates.push(`https://unavatar.io/github/${encodeURIComponent(cleanName)}`);
+    }
+  }
+
+  candidates.push(`https://unavatar.io/${encodeURIComponent(serviceDomain)}?fallback=false`);
+
+  return candidates;
+}
+
 export default function Avatar({ email, name, src, className, fallbackInitial }: AvatarProps) {
-  const [imageFailed, setImageFailed] = React.useState(false);
   const rawUrl = (src || '').trim();
-  const avatarUrl = isValidAvatarUrl(rawUrl) ? rawUrl : '';
+  const avatarUrls = React.useMemo(() => {
+    if (rawUrl) {
+      return isValidAvatarUrl(rawUrl) ? [rawUrl] : [];
+    }
+    return inferredAvatarCandidates(email, name);
+  }, [email, name, rawUrl]);
+  const avatarKey = avatarUrls.join('\n');
+  const [candidateIndex, setCandidateIndex] = React.useState(0);
+  const avatarUrl = avatarUrls[candidateIndex] ?? '';
   const initial = fallbackInitial || senderInitial(name, email);
   const altText = name.trim() || email.trim() || initial;
 
   React.useEffect(() => {
-    setImageFailed(false);
-  }, [avatarUrl]);
+    setCandidateIndex(0);
+  }, [avatarKey]);
 
-  if (avatarUrl && !imageFailed) {
+  if (avatarUrl) {
     return (
       <span className={className}>
         <img
           src={avatarUrl}
           alt={altText}
+          onLoad={(event) => {
+            const image = event.currentTarget;
+            if (
+              image.naturalWidth > 0 &&
+              image.naturalHeight > 0 &&
+              (image.naturalWidth < minUsableAvatarPixelSize || image.naturalHeight < minUsableAvatarPixelSize)
+            ) {
+              setCandidateIndex((current) => current + 1);
+            }
+          }}
           onError={() => {
-            setImageFailed(true);
+            setCandidateIndex((current) => current + 1);
           }}
           style={{
             width: '100%',

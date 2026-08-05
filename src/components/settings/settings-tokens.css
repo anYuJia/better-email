@@ -1,0 +1,82 @@
+/*
+ * Settings design tokens.
+ * Single source of truth for the settings workspace. Page styles must consume
+ * these variables instead of hard-coding colors, radii, shadows or font sizes.
+ * WCAG AA check notes: every text token is >= 4.5:1 against its intended surface.
+ */
+
+.settings-backdrop {
+  /* Surfaces */
+  --st-canvas: #f6f7f9;
+  --st-surface: #ffffff;
+  --st-surface-subtle: #fafbfc;
+  --st-surface-muted: #f1f3f5;
+  --st-sidebar: #eef0f3;
+
+  /* Borders */
+  --st-border: #dde2e8;
+  --st-border-strong: #c3ccd5;
+
+  /* Text (AA on white) */
+  --st-text: #1d232b;
+  --st-text-secondary: #4e5966;
+  --st-text-tertiary: #646f7b;
+
+  /* Accent */
+  --st-accent: #0a63c4;
+  --st-accent-hover: #084f9e;
+  --st-accent-soft: #eaf3fd;
+  --st-on-accent: #ffffff;
+
+  /* Semantic tones */
+  --st-danger: #b3261e;
+  --st-danger-hover: #941d16;
+  --st-danger-soft: #fdeceb;
+  --st-success: #1e7d3c;
+  --st-success-soft: #e9f6ee;
+  --st-warning: #8a5a00;
+  --st-warning-soft: #fdf6e7;
+  --st-info: #0a63c4;
+  --st-info-soft: #eaf3fd;
+
+  /* Typography scale */
+  --st-font-size-body: 14px;
+  --st-font-size-secondary: 13px;
+  --st-font-size-aux: 12px;
+  --st-font-size-card-title: 15px;
+  --st-font-size-page-title: 21px;
+
+  /* Spacing */
+  --st-space-1: 4px;
+  --st-space-2: 8px;
+  --st-space-3: 12px;
+  --st-space-4: 16px;
+  --st-space-5: 20px;
+  --st-space-6: 24px;
+  --st-space-7: 32px;
+
+  /* Radii */
+  --st-radius-sm: 8px;
+  --st-radius-md: 10px;
+  --st-radius-lg: 12px;
+  --st-radius-modal: 16px;
+
+  /* Shadows */
+  --st-shadow-card: 0 1px 2px rgba(21, 31, 44, 0.05);
+  --st-shadow-float: 0 16px 40px rgba(15, 23, 42, 0.14);
+  --st-shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.2);
+
+  /* Controls */
+  --st-control-height: 40px;
+  --st-control-height-mobile: 44px;
+  --st-focus-ring: 0 0 0 3px rgba(10, 99, 196, 0.2);
+  --st-focus-border: #0a63c4;
+}
+
+/* Layout constants (shared with TS where useful) */
+.settings-backdrop {
+  --st-sidebar-width: 240px;
+  --st-content-max-width: 800px;
+  --st-breakpoint-narrow: 900px;
+  --st-breakpoint-mobile: 640px;
+}

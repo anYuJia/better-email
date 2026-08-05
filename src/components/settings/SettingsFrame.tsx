@@ -18,10 +18,11 @@ import {
   settingsNavigationItems,
   type SettingsSectionId,
 } from './settingsNavigation';
-import './settings.css';
-import './settings-shell.css';
+import './settings-tokens.css';
+import './settings-foundation.css';
+import './settings-layout.css';
+import './settings-components.css';
 import './settings-pages.css';
-import './settings-design-language.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 
@@ -70,6 +71,7 @@ export default function SettingsFrame({
     && Boolean(connectionSummary)
     && connectionSummary !== '尚未开始验证';
   const modalRef = useRef<HTMLElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<Element | null>(null);
 
   // Focus the dialog on open and restore focus to the previously focused
@@ -84,6 +86,28 @@ export default function SettingsFrame({
       const previouslyFocused = previouslyFocusedRef.current;
       if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
         previouslyFocused.focus();
+      }
+    };
+  }, []);
+
+  // Make the rest of the application inert while settings are open so that
+  // keyboard and screen-reader focus cannot escape the dialog.
+  useEffect(() => {
+    const backdrop = backdropRef.current;
+    const container = backdrop?.parentElement;
+    if (!backdrop || !container) return undefined;
+    const siblings = Array.from(container.children).filter((element) => element !== backdrop);
+    const previouslyInert = new Map<Element, boolean>();
+    for (const sibling of siblings) {
+      previouslyInert.set(sibling, sibling.hasAttribute('inert'));
+      sibling.setAttribute('inert', '');
+      sibling.setAttribute('aria-hidden', 'true');
+    }
+    return () => {
+      for (const sibling of siblings) {
+        if (previouslyInert.get(sibling)) continue;
+        sibling.removeAttribute('inert');
+        sibling.removeAttribute('aria-hidden');
       }
     };
   }, []);
@@ -145,7 +169,8 @@ export default function SettingsFrame({
 
   return (
     <div
-      className="composer-backdrop settings-backdrop"
+      className="settings-backdrop"
+      ref={backdropRef}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -245,8 +270,6 @@ export default function SettingsFrame({
               activeSection={activeSection}
               group={activeGroup}
               item={activeItem}
-              pageIndex={activeIndex}
-              onNavigate={onNavigate}
             >
               {children}
             </SettingsPageShell>

@@ -66,40 +66,42 @@ export function SettingsSidebar({
           </button>
         )}
       </div>
-      {filteredGroups.map((group) => (
-        <div className="settings-nav-section" key={group.label}>
-          <span className="settings-nav-group">{group.label}</span>
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            const active = activeSection === item.id;
-            return (
-              <button
-                type="button"
-                className={active ? 'active' : ''}
-                key={item.id}
-                aria-current={active ? 'page' : undefined}
-                aria-label={`${item.label}设置`}
-                title={item.description}
-                onClick={() => onNavigate(item.id)}
-              >
-                <span className="settings-nav-icon">
-                  <Icon size={15} />
-                </span>
-                <span className="settings-nav-copy">
-                  <span className="settings-nav-label">{item.label}</span>
-                </span>
-                {active && <span className="settings-nav-active-dot" aria-hidden="true" />}
-              </button>
-            );
-          })}
-        </div>
-      ))}
-      {filteredGroups.length === 0 && (
-        <div className="settings-nav-empty">
-          <strong>没有匹配的设置</strong>
-          <span>换一个关键词试试</span>
-        </div>
-      )}
+      <div className="settings-nav-scroll">
+        {filteredGroups.map((group) => (
+          <div className="settings-nav-section" key={group.label}>
+            <span className="settings-nav-group">{group.label}</span>
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const active = activeSection === item.id;
+              return (
+                <button
+                  type="button"
+                  className={active ? 'active' : ''}
+                  key={item.id}
+                  aria-current={active ? 'page' : undefined}
+                  aria-label={`${item.label}设置`}
+                  title={item.description}
+                  onClick={() => onNavigate(item.id)}
+                >
+                  <span className="settings-nav-icon">
+                    <Icon size={15} />
+                  </span>
+                  <span className="settings-nav-copy">
+                    <span className="settings-nav-label">{item.label}</span>
+                  </span>
+                  {active && <span className="settings-nav-active-dot" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+        {filteredGroups.length === 0 && (
+          <div className="settings-nav-empty">
+            <strong>没有匹配的设置</strong>
+            <span>换一个关键词试试</span>
+          </div>
+        )}
+      </div>
     </nav>
   );
 }

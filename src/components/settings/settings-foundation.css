@@ -1,0 +1,138 @@
+/*
+ * Settings foundation.
+ * Element-level defaults scoped to the settings workspace: typography scale,
+ * form controls, focus rings and disabled states. Component classes build on
+ * these; pages must not redefine them.
+ */
+
+.settings-modal {
+  color: var(--st-text);
+  background: var(--st-canvas);
+  font-family: inherit;
+  font-size: var(--st-font-size-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.settings-modal *,
+.settings-modal *::before,
+.settings-modal *::after {
+  box-sizing: border-box;
+}
+
+/* --- Typography helpers --- */
+.settings-modal strong {
+  font-weight: 620;
+}
+
+/* --- Form controls --- */
+.settings-modal :is(input, select, textarea, button) {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea) {
+  min-height: var(--st-control-height);
+  padding: 0 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text);
+  background-color: var(--st-surface);
+  box-shadow: none;
+  font-size: var(--st-font-size-body);
+  line-height: 1.45;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):hover {
+  border-color: var(--st-border-strong);
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):focus {
+  border-color: var(--st-focus-border);
+  outline: none;
+  box-shadow: var(--st-focus-ring);
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea):disabled {
+  color: var(--st-text-tertiary);
+  background-color: var(--st-surface-muted);
+  cursor: not-allowed;
+}
+
+.settings-modal .settings-page-content textarea {
+  min-height: 92px;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.settings-modal .settings-page-content select {
+  appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--st-text-tertiary) 50%),
+    linear-gradient(135deg, var(--st-text-tertiary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.settings-modal input[type="checkbox"] {
+  accent-color: var(--st-accent);
+}
+
+/* --- Buttons (base) --- */
+.settings-modal .settings-page-content button {
+  min-height: var(--st-control-height);
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.settings-modal button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* --- Focus visibility --- */
+.settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 2px;
+}
+
+.settings-modal :is(input, select, textarea):focus {
+  outline: none;
+}
+
+/* --- Motion --- */
+.settings-modal .settings-page-content button,
+.settings-modal .settings-nav button,
+.settings-modal .settings-header-actions button {
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+/* --- Mobile touch targets --- */
+@media (max-width: 640px) {
+  .settings-modal .settings-page-content :is(input, select, textarea),
+  .settings-modal .settings-page-content button {
+    min-height: var(--st-control-height-mobile);
+  }
+}

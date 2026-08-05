@@ -10,7 +10,6 @@ import IdentitySettingsPage from './pages/IdentitySettingsPage';
 import NotificationSettingsPage from './pages/NotificationSettingsPage';
 import PrivacySettingsPage from './pages/PrivacySettingsPage';
 import SendingSettingsPage from './pages/SendingSettingsPage';
-import './settings.css';
 
 export type ExperienceSettingsProps = {
   section: 'sending' | 'notifications' | 'privacy' | 'identities';

@@ -28,14 +28,6 @@
   box-shadow: inset 0 0 0 1px rgba(88, 111, 139, 0.08);
 }
 
-.message-card.selected,
-.message-card.selected:hover {
-  background: #eaf2fb;
-  box-shadow:
-    inset 2px 0 0 #6fa4df,
-    inset 0 0 0 1px rgba(111, 164, 223, 0.20);
-}
-
 .message-card.is-unread {
   background: #fbfdff;
   box-shadow: none;

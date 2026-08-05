@@ -324,8 +324,6 @@
 
 .message-card.selected {
   border-color: #dce2e8;
-  background: #e9edf2;
-  box-shadow: inset 3px 0 0 var(--ui-accent);
 }
 
 .message-card.is-new {

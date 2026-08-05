@@ -42,10 +42,39 @@ textarea:focus-visible {
   box-shadow: none;
 }
 
+/* The card's geometry (left/width/height/border-radius) is identical for every
+   state. The selected highlight is drawn by ::before, an inset layer that
+   appears and disappears instantly, so switching messages never leaves a
+   full-width blue ghost and never animates layout. */
+.message-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.message-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 6px;
+  z-index: -1;
+  border-radius: 10px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.message-card.selected::before,
+.message-card.is-unread.selected::before {
+  background: #d4e4f7;
+}
+
+/* Single source of truth for the selected state: neutralize the card-level
+   background and box-shadow left behind by earlier passes, while the
+   highlight lives on ::before only. */
 .message-card.selected,
-.message-card.selected:hover {
-  background: var(--ui-accent-soft);
-  box-shadow: inset 3.5px 0 0 var(--ui-accent);
+.message-card.selected:hover,
+.message-card.is-unread.selected,
+.message-card.is-unread.selected:hover {
+  background: transparent;
+  box-shadow: none;
 }
 
 .message-unread-dot {

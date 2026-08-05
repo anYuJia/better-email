@@ -69,12 +69,6 @@
   box-shadow: var(--quiet-row-shadow);
 }
 
-.message-card.selected,
-.message-card.selected:hover {
-  background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--quiet-row-selected-border);
-}
-
 .message-card.dragging {
   opacity: 0.58;
   box-shadow: inset 2px 0 0 var(--quiet-row-selected-border);

@@ -452,12 +452,6 @@ body {
   box-shadow: none;
 }
 
-.message-card.selected {
-  border-color: #dce1e7;
-  background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--ui-accent);
-}
-
 .message-avatar {
   left: 12px;
   top: 11px;

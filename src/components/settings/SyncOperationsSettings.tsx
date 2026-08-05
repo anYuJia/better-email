@@ -27,6 +27,7 @@ import type {
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
 import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
+import { CustomSelect } from './accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -217,19 +218,21 @@ export default function SyncOperationsSettings({
                 </div>
                 {mailbox.local_role === 'custom' ? (
                   <div className="mailbox-map-controls">
-                    <select
-                      aria-label={`映射远端目录 ${mailbox.remote_name}`}
-                      onChange={(event) => {
-                        const nextFolderId = Number(event.target.value);
+                    <CustomSelect
+                      ariaLabel={`映射远端目录 ${mailbox.remote_name}`}
+                      value={mailbox.local_folder_id ? String(mailbox.local_folder_id) : ''}
+                      options={[
+                        { value: '', label: '暂不同步' },
+                        ...customFolders.map((folder) => ({
+                          value: String(folder.id),
+                          label: folder.name,
+                        })),
+                      ]}
+                      onChange={(nextValue) => {
+                        const nextFolderId = Number(nextValue);
                         onMapImapMailbox(mailbox, nextFolderId > 0 ? nextFolderId : null);
                       }}
-                      value={mailbox.local_folder_id ?? ''}
-                    >
-                      <option value="">暂不同步</option>
-                      {customFolders.map((folder) => (
-                        <option key={folder.id} value={folder.id}>{folder.name}</option>
-                      ))}
-                    </select>
+                    />
                     {!mailbox.local_folder_id && (
                       <SettingsButton
                         size="sm"

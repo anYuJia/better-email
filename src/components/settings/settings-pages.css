@@ -1596,7 +1596,7 @@
   gap: 8px;
 }
 
-.settings-modal .mailbox-map-controls select {
+.settings-modal .mailbox-map-controls .custom-select-menu {
   min-width: 0;
 }
 

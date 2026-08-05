@@ -7,6 +7,7 @@ import type {
   OAuthTokenExchangeReport,
 } from '../../../app/types';
 import OAuthSettingsPanel from '../OAuthSettingsPanel';
+import { CustomSelect } from '../accounts/CustomSelect';
 import { SettingsBadge, SettingsSection, SettingsField } from '../shared';
 
 type AuthenticationSettingsPageProps = {
@@ -71,13 +72,15 @@ export default function AuthenticationSettingsPage({
         dataSection="auth"
       >
         <SettingsField label="登录方式">
-          <select
+          <CustomSelect
+            ariaLabel="登录方式"
             value={accountForm.auth_type}
-            onChange={(event) => onAccountFormChange({ ...accountForm, auth_type: event.target.value })}
-          >
-            <option value="password">应用专用密码 / 授权码</option>
-            <option value="oauth2">OAuth2 Token</option>
-          </select>
+            options={[
+              { value: 'password', label: '应用专用密码 / 授权码' },
+              { value: 'oauth2', label: 'OAuth2 Token' },
+            ]}
+            onChange={(nextAuthType) => onAccountFormChange({ ...accountForm, auth_type: nextAuthType })}
+          />
         </SettingsField>
         {authTypeChanged && authTypeChangeNotice && (
           <p className="settings-auth-change-notice" role="status">

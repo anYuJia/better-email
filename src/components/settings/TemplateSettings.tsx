@@ -25,6 +25,7 @@ import {
 import { aiErrorMessage, generateTemplate } from '../../app/aiService';
 import { loadAiServiceConfig } from '../../app/aiServiceConfig';
 import type { AiRequestError } from '../../app/types/ai';
+import { CustomSelect } from './accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -396,19 +397,18 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
             />
           </SettingsField>
           <SettingsField label="适用账号">
-            <select
-              className="settings-text-input"
-              aria-label="适用账号"
-              value={editor.account_id}
-              onChange={(event) => setEditor({ ...editor, account_id: Number(event.target.value) || 0 })}
-            >
-              <option value={0}>全局（所有账号）</option>
-              {accounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  仅 {entry.display_name || entry.email}（{entry.email}）
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              ariaLabel="适用账号"
+              value={String(editor.account_id)}
+              options={[
+                { value: '0', label: '全局（所有账号）' },
+                ...accounts.map((entry) => ({
+                  value: String(entry.id),
+                  label: `仅 ${entry.display_name || entry.email}（${entry.email}）`,
+                })),
+              ]}
+              onChange={(nextValue) => setEditor({ ...editor, account_id: Number(nextValue) || 0 })}
+            />
           </SettingsField>
           <SettingsSwitch
             label="设为常用模板"

@@ -85,7 +85,8 @@ describe('PrivacySettingsPage', () => {
         onDeleteRemoteImageTrust={() => undefined}
       />,
     );
-    fireEvent.change(screen.getByLabelText('配置账号'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('配置账号'));
+    fireEvent.click(screen.getByRole('option', { name: /home@example\.com/ }));
     expect(select).toHaveBeenCalledWith(second);
   });
 

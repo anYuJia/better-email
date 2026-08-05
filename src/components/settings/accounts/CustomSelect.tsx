@@ -14,6 +14,8 @@ type CustomSelectProps = {
   onChange: (val: string) => void;
   className?: string;
   ariaLabel?: string;
+  disabled?: boolean;
+  disabledValues?: readonly string[];
 };
 
 type MenuPlacement = {
@@ -33,6 +35,8 @@ export function CustomSelect({
   onChange,
   className = '',
   ariaLabel,
+  disabled = false,
+  disabledValues = [],
 }: CustomSelectProps) {
   const activeOption = options.find((o) => o.value === value) || options[0];
   const [open, setOpen] = useState(false);
@@ -104,11 +108,13 @@ export function CustomSelect({
         >
           {options.map((option) => {
             const active = option.value === value;
+            const optionDisabled = disabledValues.includes(option.value);
             return (
               <button
                 type="button"
                 role="option"
                 aria-selected={active}
+                disabled={optionDisabled}
                 className={active ? 'active' : ''}
                 key={option.value}
                 onClick={() => {
@@ -139,6 +145,7 @@ export function CustomSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >
         <span>

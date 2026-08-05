@@ -21,6 +21,7 @@ import type {
   ProviderVerificationStatus,
 } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
+import { CustomSelect } from '../accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -78,26 +79,28 @@ export default function ProviderSettingsPage({
       )}
       <label>
         收信协议
-        <select
+        <CustomSelect
+          ariaLabel="收信协议"
           value={accountForm.incoming_protocol}
-          onChange={(event) => {
-            const nextProtocol = event.target.value as IncomingProtocol;
+          options={[
+            { value: 'imap', label: 'IMAP' },
+            { value: 'pop3', label: 'POP3' },
+          ]}
+          onChange={(nextProtocol) => {
+            const nextProtocolValue = nextProtocol as IncomingProtocol;
             const preset = providerCompatibilityMatrix.find(
               (provider) => provider.provider === accountForm.provider,
             );
             onAccountFormChange({
               ...accountForm,
-              incoming_protocol: nextProtocol,
-              imap_host: preset ? incomingHostForProtocol(preset, nextProtocol) : accountForm.imap_host,
-              auth_type: nextProtocol === 'pop3' && accountForm.auth_type === 'oauth2'
+              incoming_protocol: nextProtocolValue,
+              imap_host: preset ? incomingHostForProtocol(preset, nextProtocolValue) : accountForm.imap_host,
+              auth_type: nextProtocolValue === 'pop3' && accountForm.auth_type === 'oauth2'
                 ? 'password'
                 : accountForm.auth_type,
             });
           }}
-        >
-          <option value="imap">IMAP</option>
-          <option value="pop3">POP3</option>
-        </select>
+        />
       </label>
       <label>
         收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
@@ -125,10 +128,15 @@ export default function ProviderSettingsPage({
         dataSection="providers"
       >
         <SettingsField label="服务商">
-          <select
+          <CustomSelect
+            ariaLabel="服务商"
             value={providerOption}
-            onChange={(event) => {
-              const nextOption = event.target.value as OrdinaryProviderOptionId;
+            options={ordinaryProviderOptions.map((option) => ({
+              value: option.id,
+              label: option.label,
+            }))}
+            onChange={(nextOptionValue) => {
+              const nextOption = nextOptionValue as OrdinaryProviderOptionId;
               if (nextOption === 'custom') {
                 onAccountFormChange({ ...accountForm, provider: 'custom' });
                 return;
@@ -136,11 +144,7 @@ export default function ProviderSettingsPage({
               const preset = providerCompatibilityMatrix.find((provider) => provider.id === nextOption);
               if (preset) onApplyProviderPreset(preset);
             }}
-          >
-            {ordinaryProviderOptions.map((option) => (
-              <option value={option.id} key={option.id}>{option.label}</option>
-            ))}
-          </select>
+          />
         </SettingsField>
         {customProvider ? serverFields : (
           <details className="settings-provider-advanced settings-provider-server-advanced">
@@ -208,17 +212,19 @@ export default function ProviderSettingsPage({
               <SettingsBadge>{providerVerificationLabel(activeProviderVerification.status)}</SettingsBadge>
             }>
               <SettingsField label="验证状态">
-                <select
+                <CustomSelect
+                  ariaLabel="验证状态"
                   value={activeProviderVerification.status}
-                  onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
-                    status: event.target.value as ProviderVerificationStatus,
+                  options={[
+                    { value: 'untested', label: '未验证' },
+                    { value: 'passed', label: '通过' },
+                    { value: 'partial', label: '部分通过' },
+                    { value: 'failed', label: '失败' },
+                  ]}
+                  onChange={(nextStatus) => onUpdateProviderVerification(accountForm.provider, {
+                    status: nextStatus as ProviderVerificationStatus,
                   })}
-                >
-                  <option value="untested">未验证</option>
-                  <option value="passed">通过</option>
-                  <option value="partial">部分通过</option>
-                  <option value="failed">失败</option>
-                </select>
+                />
               </SettingsField>
               <div className="settings-toggle-grid">
                 <SettingsSwitch

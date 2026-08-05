@@ -19,6 +19,7 @@ import type {
   ContactCreateInput,
 } from '../../app/types';
 import useContactImportManager from '../../hooks/useContactImportManager';
+import { CustomSelect } from './accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -168,15 +169,21 @@ export default function ContactAutomationSettings({
                   <em>{entry.email}{entry.aliases.length ? `（别名 ${entry.aliases.length}）` : ''}</em>
                 </span>
                 <small>{entry.existing_name ? `已有：${entry.existing_name}` : entry.reason}</small>
-                <select
+                <CustomSelect
+                  ariaLabel={`${entry.name || entry.email} 导入操作`}
                   value={selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')}
-                  onChange={(event) => setSelection(`${entry.email}|${entry.status}`, event.target.value as 'create' | 'merge' | 'skip')}
                   disabled={entry.status === 'invalid'}
-                >
-                  <option value="create">新增</option>
-                  <option value="merge" disabled={entry.status === 'new'}>合并到已有</option>
-                  <option value="skip">跳过</option>
-                </select>
+                  disabledValues={entry.status === 'new' ? ['merge'] : []}
+                  options={[
+                    { value: 'create', label: '新增' },
+                    { value: 'merge', label: '合并到已有' },
+                    { value: 'skip', label: '跳过' },
+                  ]}
+                  onChange={(nextAction) => setSelection(
+                    `${entry.email}|${entry.status}`,
+                    nextAction as 'create' | 'merge' | 'skip',
+                  )}
+                />
               </div>
             ))}
           </div>
@@ -338,17 +345,18 @@ export default function ContactAutomationSettings({
       )}
 
       <SettingsField label="合并来源">
-        <select
-          value={mergeSourceContactId ?? ''}
-          onChange={(event) => onMergeSourceChange(event.target.value ? Number(event.target.value) : null)}
-        >
-          <option value="">选择一个联系人</option>
-          {contacts.map((contact) => (
-            <option key={contact.id} value={contact.id}>
-              {contact.name || contact.email} · {contact.email}
-            </option>
-          ))}
-        </select>
+        <CustomSelect
+          ariaLabel="合并来源"
+          value={mergeSourceContactId !== null ? String(mergeSourceContactId) : ''}
+          options={[
+            { value: '', label: '选择一个联系人' },
+            ...contacts.map((contact) => ({
+              value: String(contact.id),
+              label: `${contact.name || contact.email} · ${contact.email}`,
+            })),
+          ]}
+          onChange={(nextValue) => onMergeSourceChange(nextValue ? Number(nextValue) : null)}
+        />
       </SettingsField>
 
       {confirmUndoBatch && (

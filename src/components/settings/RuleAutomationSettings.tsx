@@ -18,6 +18,7 @@ import {
   SettingsSection,
   SettingsSwitch,
 } from './shared';
+import { CustomSelect } from './accounts/CustomSelect';
 
 type RuleAutomationSettingsProps = {
   ruleForm: MailRuleInput;
@@ -72,14 +73,15 @@ export default function RuleAutomationSettings({
         <div className="rule-builder">
           <label>
             <span>如果</span>
-            <select
+            <CustomSelect
+              ariaLabel="规则条件字段"
               value={ruleBuilderField}
-              onChange={(event) => onRuleConditionFieldChange(event.target.value as RuleConditionField)}
-            >
-              {ruleConditionFields.map((field) => (
-                <option key={field.id} value={field.id}>{field.label}</option>
-              ))}
-            </select>
+              options={ruleConditionFields.map((field) => ({
+                value: field.id,
+                label: field.label,
+              }))}
+              onChange={(nextField) => onRuleConditionFieldChange(nextField as RuleConditionField)}
+            />
           </label>
           <label>
             <span>包含</span>
@@ -91,19 +93,19 @@ export default function RuleAutomationSettings({
           </label>
           <label>
             <span>打标签</span>
-            <select
+            <CustomSelect
+              ariaLabel="规则标签动作"
               value={
                 ruleActionParts(ruleForm.action)
                   .find((part) => part.toLowerCase().startsWith('apply label '))
                   ?.slice('apply label '.length) ?? ''
               }
-              onChange={(event) => onRuleLabelActionChange(event.target.value)}
-            >
-              <option value="">不打标签</option>
-              {labels.map((label) => (
-                <option key={label.id} value={label.name}>{label.name}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: '不打标签' },
+                ...labels.map((label) => ({ value: label.name, label: label.name })),
+              ]}
+              onChange={onRuleLabelActionChange}
+            />
           </label>
           <div className="rule-action-chips">
             {ruleActionPresets.map((item) => (

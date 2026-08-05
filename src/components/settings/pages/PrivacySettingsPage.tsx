@@ -1,6 +1,7 @@
 import { ShieldAlert, Sparkles } from 'lucide-react';
 import type { Account, RemoteImageTrust } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
+import { CustomSelect } from '../accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -43,21 +44,19 @@ export default function PrivacySettingsPage({
     >
       {accounts.length > 1 && (
         <div className="st-field">
-          <label className="st-field-label" htmlFor="privacy-account-select">配置账号</label>
-          <select
-            id="privacy-account-select"
-            value={accountForm.id}
-            onChange={(event) => {
-              const next = accounts.find((item) => item.id === Number(event.target.value));
+          <label className="st-field-label" id="privacy-account-select-label">配置账号</label>
+          <CustomSelect
+            ariaLabel="配置账号"
+            value={String(accountForm.id)}
+            options={accounts.map((item) => ({
+              value: String(item.id),
+              label: `${item.display_name || item.email} · ${item.email}`,
+            }))}
+            onChange={(nextValue) => {
+              const next = accounts.find((item) => item.id === Number(nextValue));
               if (next) onSelectAccount(next);
             }}
-          >
-            {accounts.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.display_name || item.email} · {item.email}
-              </option>
-            ))}
-          </select>
+          />
           <span className="st-field-hint">隐私策略按账号独立生效，切换后保存才会应用到所选账号。</span>
         </div>
       )}

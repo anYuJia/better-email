@@ -354,27 +354,7 @@ export let labels = [
   { id: 3, name: '重要客户', color: '#16a34a', message_count: 0 },
 ];
 
-export let contacts: MockContact[] = [
-  { id: 1, name: 'Ada', email: 'ada@example.com', aliases: ['ada@personal.example.com'], vip: false, message_count: 7, last_seen_at: now },
-  {
-    id: 2,
-    name: 'Security Team',
-    email: 'security@example.com',
-    aliases: [],
-    vip: false,
-    message_count: 4,
-    last_seen_at: '2026-07-09T07:34:00+08:00',
-  },
-  {
-    id: 3,
-    name: 'Product Robot',
-    email: 'updates@example.com',
-    aliases: [],
-    vip: false,
-    message_count: 2,
-    last_seen_at: '2026-07-09T07:34:00+08:00',
-  },
-];
+export let contacts: MockContact[] = [];
 
 export let attachments = [
   {
@@ -1771,26 +1751,12 @@ export function importMockContactsVCard(args?: InvokeArgs) {
     message_count: 0,
     last_seen_at: now,
   };
-  const ada = contacts.find((contact) => contact.email === 'ada@example.com');
-  contacts = [
-    importedContact,
-    ...contacts
-      .filter((contact) => contact.id !== importedContact.id)
-      .map((contact) => (
-        contact.id === ada?.id
-          ? {
-              ...contact,
-              aliases: [...new Set([...contact.aliases, 'ada.vcard@example.com'])],
-              vip: true,
-            }
-          : contact
-      )),
-  ];
+  contacts = [importedContact, ...contacts];
   return {
     path: '/tmp/imported-contacts.vcf',
-    total_cards: 2,
+    total_cards: 1,
     created: existingImported ? 0 : 1,
-    updated: 1,
+    updated: 0,
     skipped: 0,
     size_bytes: 428,
   };
@@ -1816,26 +1782,6 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
       reason: '新联系人',
     },
     {
-      email: 'ada@example.com',
-      name: 'Ada Imported',
-      aliases: ['ada.import@example.com'] as string[],
-      vip: false,
-      status: 'merge',
-      existing_contact_id: 1,
-      existing_name: 'Ada',
-      reason: '已有联系人，可合并补充字段',
-    },
-    {
-      email: 'ada@example.com',
-      name: 'Ada',
-      aliases: [] as string[],
-      vip: false,
-      status: 'duplicate',
-      existing_contact_id: 1,
-      existing_name: 'Ada',
-      reason: '与已有联系人完全相同',
-    },
-    {
       email: 'not-an-email',
       name: 'Broken',
       aliases: [] as string[],
@@ -1850,10 +1796,10 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
     file_name,
     path,
     format: file_name.toLowerCase().endsWith('.csv') ? 'csv' : 'vcard',
-    total_count: 4,
+    total_count: 2,
     new_count: 1,
-    merge_count: 1,
-    duplicate_count: 1,
+    merge_count: 0,
+    duplicate_count: 0,
     invalid_count: 1,
     entries: seeded,
   };
@@ -1890,7 +1836,6 @@ export function mockCommitContactImport(args?: InvokeArgs) {
     }
   };
   applyEmail('import.new@example.com');
-  applyEmail('ada@example.com');
   const batchId = nextContactImportBatchId++;
   contactImportBatches = [
     {

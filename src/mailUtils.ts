@@ -37,7 +37,9 @@ export function replyThreadingHeaders(
 export function formatDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
+  const showYear = date.getFullYear() !== new Date().getFullYear();
   return new Intl.DateTimeFormat('zh-CN', {
+    ...(showYear ? { year: 'numeric' } : {}),
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

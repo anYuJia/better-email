@@ -30,6 +30,17 @@ describe('mail UI utilities', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
   });
 
+  it('shows the year only for dates outside the current year', () => {
+    const now = new Date();
+    const thisYear = new Date(now.getFullYear(), 6, 11, 14, 30, 0).toString();
+    const lastYear = new Date(now.getFullYear() - 1, 6, 11, 14, 30, 0).toString();
+    const nextYear = new Date(now.getFullYear() + 1, 6, 11, 14, 30, 0).toString();
+
+    expect(formatDate(thisYear)).not.toContain(`/${now.getFullYear()}`);
+    expect(formatDate(lastYear)).toContain(String(now.getFullYear() - 1));
+    expect(formatDate(nextYear)).toContain(String(now.getFullYear() + 1));
+  });
+
   it('groups message dates into stable mailbox sections', () => {
     const now = new Date(2026, 6, 11, 14, 30, 0);
 

@@ -3,7 +3,6 @@ import {
   contacts,
   rules,
   remoteImageTrusts,
-  contactMergeSuggestions,
   renderMessageWithPolicy,
   createMockContact,
   updateMockContact,
@@ -25,7 +24,6 @@ import {
 
 export const handlers: Record<string, MockCommandHandler> = {
   'list_contacts': () => contacts,
-  'list_contact_merge_suggestions': () => contactMergeSuggestions(),
   'create_contact': createMockContact,
   'update_contact': updateMockContact,
   'delete_contact': deleteMockContact,

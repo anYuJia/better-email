@@ -2,7 +2,7 @@ use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
     BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactImportBatch,
     ContactImportCommitSummary, ContactImportPreviewEntry, ContactImportUndoReport, ContactInput,
-    ContactMergeSuggestion, CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
+    CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
     ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, ImapReconcileResult, Label, LocalBackup,
     LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
     MailStats, Message, MessageSummary, MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
@@ -3517,37 +3517,6 @@ mod tests {
     }
 
     #[test]
-    fn contact_merge_suggestions_find_alias_and_name_matches() {
-        let store = test_store();
-        let target = store
-            .list_contacts()
-            .unwrap()
-            .into_iter()
-            .find(|contact| contact.email == "ada@example.com")
-            .unwrap();
-        let duplicate = store
-            .create_contact(ContactCreateInput {
-                name: "Ada".to_string(),
-                email: "ada.duplicate@example.com".to_string(),
-                aliases: vec!["ada@example.com".to_string()],
-                vip: false,
-            })
-            .unwrap();
-
-        let suggestions = store.list_contact_merge_suggestions().unwrap();
-        let suggestion = suggestions
-            .iter()
-            .find(|suggestion| {
-                (suggestion.target.id == target.id && suggestion.source.id == duplicate.id)
-                    || (suggestion.target.id == duplicate.id && suggestion.source.id == target.id)
-            })
-            .unwrap();
-        assert!(suggestion
-            .shared_keys
-            .contains(&"ada@example.com".to_string()));
-        assert_eq!(suggestion.reason, "邮箱或别名重叠");
-    }
-
     #[test]
     fn contact_import_creates_and_merges_by_primary_email() {
         let store = test_store();

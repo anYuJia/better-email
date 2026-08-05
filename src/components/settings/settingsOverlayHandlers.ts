@@ -4,7 +4,7 @@ import type { NotificationPolicy } from '../../mailUtils';
 import type { AccountProviderPreset } from '../../providerCatalog';
 import type { ProviderVerificationRecord } from '../../app/types';
 import type { SettingsOverlayProps } from './SettingsOverlay';
-import type { BackgroundTaskKind, Account, AccountCreateInput, Contact, ContactCreateInput, ContactMergeSuggestion, ImapMailboxState, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, OutboxItem, RemoteImageTrust } from '../../app/types';
+import type { BackgroundTaskKind, Account, AccountCreateInput, Contact, ContactCreateInput, ImapMailboxState, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, OutboxItem, RemoteImageTrust } from '../../app/types';
 import type { RuleConditionField, SendUndoDelaySeconds } from '../../app/appConfig';
 import type { ProviderWritebackValidationStepId } from '../../app/providerWriteValidation';
 
@@ -79,7 +79,6 @@ export type SettingsHandlers = {
   onContactFormChange: SettingsOverlayProps['onContactFormChange'];
   onContactFormAliasesChange: SettingsOverlayProps['onContactFormAliasesChange'];
   onCreateContact: () => void;
-  onMergeSuggested: SettingsOverlayProps['onMergeSuggested'];
   onEditNameChange: SettingsOverlayProps['onEditNameChange'];
   onEditAliasesChange: SettingsOverlayProps['onEditAliasesChange'];
   onSaveContactOverride: SettingsOverlayProps['onSaveContactOverride'];
@@ -173,7 +172,6 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onContactFormChange: (contact: SetStateAction<ContactCreateInput>) => latest().onContactFormChange(contact),
     onContactFormAliasesChange: (value: SetStateAction<string>) => latest().onContactFormAliasesChange(value),
     onCreateContact: () => latest().onCreateContact(),
-    onMergeSuggested: (suggestion: ContactMergeSuggestion) => latest().onMergeSuggested(suggestion),
     onEditNameChange: (value: SetStateAction<string>) => latest().onEditNameChange(value),
     onEditAliasesChange: (value: SetStateAction<string>) => latest().onEditAliasesChange(value),
     onSaveContactOverride: (contact: Contact) => latest().onSaveContactOverride(contact),

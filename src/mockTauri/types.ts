@@ -65,13 +65,6 @@ export type MockContact = {
   last_seen_at: string;
 };
 
-export type MockContactMergeSuggestion = {
-  target: MockContact;
-  source: MockContact;
-  reason: string;
-  shared_keys: string[];
-};
-
 export type MockBackgroundTask = {
   id: number;
   kind: string;

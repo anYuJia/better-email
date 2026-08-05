@@ -80,8 +80,6 @@ function setupInvokeMocks() {
         return Promise.resolve([]);
       case 'list_contacts':
         return Promise.resolve([]);
-      case 'list_contact_merge_suggestions':
-        return Promise.resolve([]);
       case 'list_rules':
         return Promise.resolve([]);
       case 'list_oauth_sessions':
@@ -114,7 +112,6 @@ function renderMetaLoader() {
     setRemoteImageTrusts: vi.fn(),
     setImapMailboxes: vi.fn(),
     setContacts: vi.fn(),
-    setContactMergeSuggestions: vi.fn(),
     setRules: vi.fn(),
     setOauthSessions: vi.fn(),
     setFolderId: vi.fn(),

@@ -60,7 +60,6 @@ export type { ComposeTemplate } from './types/composer';
 export type { ComposerAutosave } from './types/composer';
 export type { OutboxItem } from './types/composer';
 export type { Contact } from './types/contact';
-export type { ContactMergeSuggestion } from './types/contact';
 export type { ContactCreateInput } from './types/contact';
 export type { ContactImportSummary } from './types/contact';
 export type { ContactExportSummary } from './types/contact';

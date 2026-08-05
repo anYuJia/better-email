@@ -7,16 +7,6 @@ export type Contact = {
   message_count: number;
   last_seen_at: string;
 };
-
-
-export type ContactMergeSuggestion = {
-  target: Contact;
-  source: Contact;
-  reason: string;
-  shared_keys: string[];
-};
-
-
 export type ContactCreateInput = {
   name: string;
   email: string;

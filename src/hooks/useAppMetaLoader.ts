@@ -8,7 +8,6 @@ import type {
   AccountScope,
   BackgroundTask,
   Contact,
-  ContactMergeSuggestion,
   Folder,
   ImapMailboxState,
   Label,
@@ -49,7 +48,6 @@ type UseAppMetaLoaderOptions = {
   setRemoteImageTrusts: Dispatch<SetStateAction<RemoteImageTrust[]>>;
   setImapMailboxes: Dispatch<SetStateAction<ImapMailboxState[]>>;
   setContacts: Dispatch<SetStateAction<Contact[]>>;
-  setContactMergeSuggestions: Dispatch<SetStateAction<ContactMergeSuggestion[]>>;
   setRules: Dispatch<SetStateAction<MailRule[]>>;
   setOauthSessions: Dispatch<SetStateAction<OAuthSession[]>>;
   setFolderId: Dispatch<SetStateAction<number | null>>;
@@ -86,7 +84,6 @@ export default function useAppMetaLoader({
   setRemoteImageTrusts,
   setImapMailboxes,
   setContacts,
-  setContactMergeSuggestions,
   setRules,
   setOauthSessions,
   setFolderId,
@@ -185,7 +182,6 @@ export default function useAppMetaLoader({
         nextStats,
         nextSyncRuns,
         nextContacts,
-        nextContactMergeSuggestions,
         nextIdentities,
         nextRules,
         nextOutbox,
@@ -202,7 +198,6 @@ export default function useAppMetaLoader({
         invoke<MailStats>('get_stats', { accountId: nextAccountId }),
         invoke<SyncRun[]>('list_sync_runs'),
         invoke<Contact[]>('list_contacts'),
-        invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions'),
         invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
         invoke<MailRule[]>('list_rules'),
         invoke<OutboxItem[]>('list_outbox'),
@@ -220,7 +215,6 @@ export default function useAppMetaLoader({
       setStats(nextStats);
       setSyncRuns(nextSyncRuns);
       setContacts(nextContacts);
-      setContactMergeSuggestions(nextContactMergeSuggestions);
       setIdentities(nextIdentities);
       setRules(nextRules);
       setOutbox(nextOutbox);

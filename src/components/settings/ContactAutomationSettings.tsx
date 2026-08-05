@@ -17,7 +17,6 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   Contact,
   ContactCreateInput,
-  ContactMergeSuggestion,
 } from '../../app/types';
 import useContactImportManager from '../../hooks/useContactImportManager';
 import {
@@ -30,7 +29,6 @@ import {
 } from './shared';
 
 type ContactAutomationSettingsProps = {
-  mergeSuggestions: ContactMergeSuggestion[];
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
@@ -42,7 +40,6 @@ type ContactAutomationSettingsProps = {
   onContactFormChange: (contact: ContactCreateInput) => void;
   onContactFormAliasesChange: (value: string) => void;
   onCreateContact: () => void;
-  onMergeSuggested: (suggestion: ContactMergeSuggestion) => void;
   onEditNameChange: (value: string) => void;
   onEditAliasesChange: (value: string) => void;
   onSaveContactOverride: (contact: Contact) => void;
@@ -60,7 +57,6 @@ type ContactAutomationSettingsProps = {
 };
 
 export default function ContactAutomationSettings({
-  mergeSuggestions,
   contactForm,
   contactFormAliases,
   contacts,
@@ -72,7 +68,6 @@ export default function ContactAutomationSettings({
   onContactFormChange,
   onContactFormAliasesChange,
   onCreateContact,
-  onMergeSuggested,
   onEditNameChange,
   onEditAliasesChange,
   onSaveContactOverride,
@@ -221,29 +216,6 @@ export default function ContactAutomationSettings({
                 onClick={() => setConfirmUndoBatch(batch)}
               >
                 {batch.created_count > 0 ? '撤销本批新增' : '无可撤销'}
-              </SettingsButton>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {mergeSuggestions.length > 0 && (
-        <section className="contact-suggestion-panel">
-          <header>
-            <span>
-              <strong>重复联系人建议</strong>
-              <em>{mergeSuggestions.length} 组待处理</em>
-            </span>
-          </header>
-          {mergeSuggestions.slice(0, 3).map((suggestion) => (
-            <div className="contact-suggestion" key={`${suggestion.target.id}-${suggestion.source.id}`}>
-              <span>
-                <strong>{suggestion.source.name || suggestion.source.email}</strong>
-                <em>合并到 {suggestion.target.name || suggestion.target.email}</em>
-                <small>{suggestion.reason} · {suggestion.shared_keys.join(', ')}</small>
-              </span>
-              <SettingsButton size="sm" variant="primary" icon={<Merge size={14} />} onClick={() => onMergeSuggested(suggestion)}>
-                合并建议
               </SettingsButton>
             </div>
           ))}

@@ -106,16 +106,3 @@ export function messageThreadKey(message: MockMessage) {
 export function mutedThreadScopeKey(accountId: number, threadKey: string) {
   return `${accountId}:${threadKey}`;
 }
-
-export function contactIdentityKeys(contact: MockContact) {
-  const keys = [contact.email, ...contact.aliases].map((value) => value.trim().toLowerCase()).filter(Boolean);
-  const domain = contact.email.split('@')[1] ?? '';
-  const name = contact.name.trim().toLowerCase();
-  if (domain && name && name !== contact.email.toLowerCase()) keys.push(`${name}@${domain}`);
-  contact.name
-    .split(/[^a-zA-Z0-9]+/)
-    .map((part) => part.trim().toLowerCase())
-    .filter((part) => part.length >= 4)
-    .forEach((part) => keys.push(part));
-  return [...new Set(keys)];
-}

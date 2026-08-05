@@ -5,14 +5,12 @@ import {
   compareMessagesBySort,
   messageThreadKey,
   mutedThreadScopeKey,
-  contactIdentityKeys,
 } from './utils';
 import type {
   InvokeArgs,
   MockMessage,
   MockFolder,
   MockContact,
-  MockContactMergeSuggestion,
   MockDraftInput,
   MockThreadingInput,
   MockIdentity,
@@ -783,31 +781,6 @@ export function releaseDueSnoozedMessages(nowInput: string) {
   return { released_count: count };
 }
 
-export function contactMergeSuggestions(): MockContactMergeSuggestion[] {
-  const sorted = [...contacts].sort((left, right) =>
-    right.message_count - left.message_count ||
-    right.last_seen_at.localeCompare(left.last_seen_at) ||
-    left.name.localeCompare(right.name),
-  );
-  const suggestions: MockContactMergeSuggestion[] = [];
-  for (let leftIndex = 0; leftIndex < sorted.length; leftIndex += 1) {
-    const target = sorted[leftIndex];
-    const leftKeys = contactIdentityKeys(target);
-    for (const source of sorted.slice(leftIndex + 1)) {
-      const rightKeys = contactIdentityKeys(source);
-      const shared_keys = leftKeys.filter((key) => rightKeys.includes(key)).slice(0, 4);
-      if (shared_keys.length === 0) continue;
-      suggestions.push({
-        target,
-        source,
-        reason: shared_keys.some((key) => key.includes('@')) ? '邮箱或别名重叠' : '名称相近，建议检查是否同一联系人',
-        shared_keys,
-      });
-      if (suggestions.length >= 8) return suggestions;
-    }
-  }
-  return suggestions;
-}
 
 export function createMockAccount(args?: InvokeArgs) {
   const input = (args?.input ?? {}) as Partial<typeof account>;

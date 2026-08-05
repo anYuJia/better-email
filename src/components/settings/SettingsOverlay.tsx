@@ -13,7 +13,6 @@ import type {
   BackgroundTaskKind,
   Contact,
   ContactCreateInput,
-  ContactMergeSuggestion,
   ConnectionReport,
   CredentialStatus,
   CredentialVerificationReport,
@@ -121,7 +120,6 @@ export type SettingsOverlayProps = {
   editingRuleId: number | null;
   rawMessage: string;
   parsedPreview: ParsedMessagePreview | null;
-  mergeSuggestions: ContactMergeSuggestion[];
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
@@ -198,7 +196,6 @@ export type SettingsOverlayProps = {
   onContactFormChange: Dispatch<SetStateAction<ContactCreateInput>>;
   onContactFormAliasesChange: Dispatch<SetStateAction<string>>;
   onCreateContact: () => void;
-  onMergeSuggested: (suggestion: ContactMergeSuggestion) => void;
   onEditNameChange: Dispatch<SetStateAction<string>>;
   onEditAliasesChange: Dispatch<SetStateAction<string>>;
   onSaveContactOverride: (contact: Contact) => void;
@@ -358,7 +355,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const contactsProps = useMemo(() => ({
-    mergeSuggestions: props.mergeSuggestions,
     contactForm: props.contactForm,
     contactFormAliases: props.contactFormAliases,
     contacts: props.contacts,
@@ -368,7 +364,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     mergeSourceContactId: props.mergeSourceContactId,
     transferBusy: props.contactTransferBusy,
   }), [
-    props.mergeSuggestions,
     props.contactForm,
     props.contactFormAliases,
     props.contacts,

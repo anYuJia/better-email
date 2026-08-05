@@ -8,7 +8,6 @@ import type {
   ContactCreateInput,
   ContactExportSummary,
   ContactImportSummary,
-  ContactMergeSuggestion,
 } from '../app/types';
 import type { NotificationPolicy } from '../mailUtils';
 import { invoke } from '../tauriBridge';
@@ -23,7 +22,6 @@ export default function useContactManagement({
   setNotificationPolicy,
 }: ContactManagementOptions) {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactMergeSuggestions, setContactMergeSuggestions] = useState<ContactMergeSuggestion[]>([]);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactEditName, setContactEditName] = useState('');
   const [contactEditAliases, setContactEditAliases] = useState('');
@@ -55,15 +53,9 @@ export default function useContactManagement({
     setContactEditAliases(contact.aliases.join(', '));
   }
 
-  async function refreshContactMergeSuggestions() {
-    const suggestions = await invoke<ContactMergeSuggestion[]>('list_contact_merge_suggestions');
-    setContactMergeSuggestions(suggestions);
-  }
-
   async function refreshManagedContacts() {
     const refreshed = await invoke<Contact[]>('list_contacts');
     setContacts(refreshed);
-    await refreshContactMergeSuggestions();
     return refreshed;
   }
 
@@ -126,7 +118,6 @@ export default function useContactManagement({
     setContacts((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     setContactForm(emptyContactForm);
     setContactFormAliases('');
-    await refreshContactMergeSuggestions();
     setStatus(`联系人已新增：${created.name || created.email}`);
   }
 
@@ -143,7 +134,6 @@ export default function useContactManagement({
     });
     setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setEditingContactId(null);
-    await refreshContactMergeSuggestions();
     setStatus(`联系人已更新：${updated.name}`);
   }
 
@@ -159,7 +149,6 @@ export default function useContactManagement({
       },
     });
     setContacts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    await refreshContactMergeSuggestions();
     setNotificationPolicy((current) => {
       const vipSenders = normalizeContactAliases(current.vipSenders);
       const contactEmails = [contact.email, ...aliases]
@@ -184,7 +173,6 @@ export default function useContactManagement({
     if (mergeSourceContactId === contact.id) {
       setMergeSourceContactId(null);
     }
-    await refreshContactMergeSuggestions();
     setStatus(`联系人已删除：${contact.name || contact.email}`);
   }
 
@@ -203,45 +191,12 @@ export default function useContactManagement({
       ...current.filter((item) => item.id !== target.id && item.id !== mergeSourceContactId),
     ]);
     setMergeSourceContactId(null);
-    await refreshContactMergeSuggestions();
     setStatus(`已合并联系人：${source?.name || source?.email || '来源联系人'} → ${merged.name || merged.email}`);
-  }
-
-  async function mergeSuggestedContact(suggestion: ContactMergeSuggestion) {
-    const merged = await invoke<Contact>('merge_contacts', {
-      targetContactId: suggestion.target.id,
-      sourceContactId: suggestion.source.id,
-    });
-    setContacts((current) => [
-      merged,
-      ...current.filter((item) =>
-        item.id !== suggestion.target.id && item.id !== suggestion.source.id,
-      ),
-    ]);
-    setContactMergeSuggestions((current) =>
-      current.filter(
-        (item) =>
-          item.target.id !== suggestion.target.id &&
-          item.source.id !== suggestion.target.id &&
-          item.target.id !== suggestion.source.id &&
-          item.source.id !== suggestion.source.id,
-      ),
-    );
-    if (
-      mergeSourceContactId === suggestion.source.id
-      || mergeSourceContactId === suggestion.target.id
-    ) {
-      setMergeSourceContactId(null);
-    }
-    await refreshContactMergeSuggestions();
-    setStatus(`已按建议合并：${suggestion.source.name || suggestion.source.email} → ${merged.name || merged.email}`);
   }
 
   return {
     contacts,
     setContacts,
-    contactMergeSuggestions,
-    setContactMergeSuggestions,
     editingContactId,
     setEditingContactId,
     contactEditName,
@@ -265,7 +220,6 @@ export default function useContactManagement({
     toggleContactVip,
     deleteManagedContact,
     mergeManagedContact,
-    mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
     refreshManagedContacts,

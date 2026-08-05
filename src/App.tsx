@@ -78,7 +78,6 @@ import type {
   SyncSchedulePlan,
   ParsedMessagePreview,
   Contact,
-  ContactMergeSuggestion,
   MailRule,
   ThreadSummary,
   OutboxItem,
@@ -222,8 +221,6 @@ export default function App() {
   const [sendUndoDelaySeconds, setSendUndoDelaySeconds] = useState<SendUndoDelaySeconds>(loadSendUndoDelaySeconds);
   const {
     setContacts,
-    contactMergeSuggestions,
-    setContactMergeSuggestions,
     editingContactId,
     setEditingContactId,
     contactEditName,
@@ -244,7 +241,6 @@ export default function App() {
     toggleContactVip,
     deleteManagedContact,
     mergeManagedContact,
-    mergeSuggestedContact,
     importContactsVcard,
     exportContactsVcard,
     refreshManagedContacts,
@@ -313,7 +309,6 @@ export default function App() {
     setRemoteImageTrusts,
     setImapMailboxes,
     setContacts,
-    setContactMergeSuggestions,
     setRules,
     setOauthSessions,
     setFolderId,
@@ -1521,7 +1516,6 @@ export default function App() {
           editingRuleId={editingRuleId}
           rawMessage={rawMessage}
           parsedPreview={parsedPreview}
-          mergeSuggestions={contactMergeSuggestions}
           contactForm={contactForm}
           contactFormAliases={contactFormAliases}
           contacts={managedContacts}
@@ -1653,7 +1647,6 @@ export default function App() {
           onContactFormChange={setContactForm}
           onContactFormAliasesChange={setContactFormAliases}
           onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
-          onMergeSuggested={(suggestion) => { mergeSuggestedContact(suggestion).catch((error) => setStatus(String(error))); }}
           onEditNameChange={setContactEditName}
           onEditAliasesChange={setContactEditAliases}
           onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}

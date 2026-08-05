@@ -37,8 +37,6 @@ export default function PrivacySettingsPage({
 
   return (
     <SettingsSection
-      title="隐私保护"
-      description="控制远程图片、追踪像素和发件人信任规则。"
       badge={<SettingsBadge tone="info">{accountTrusts.length} 条信任</SettingsBadge>}
       dataSection="privacy"
     >
@@ -75,7 +73,7 @@ export default function PrivacySettingsPage({
           label="允许此账号加载远程图片"
           description={
             remoteImagesAllowed
-              ? '开启后邮件中的远程图片会直接加载，可能暴露你的打开行为与网络位置。'
+              ? '开启后邮件中的远程图片会直接加载，可能暴露你的打开行为与网络位置；可信发件人或域名仍可单独放行。'
               : '默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。'
           }
           checked={remoteImagesAllowed}
@@ -84,16 +82,13 @@ export default function PrivacySettingsPage({
             remote_images_allowed: checked,
           })}
         />
-        <p className="st-field-hint">
-          可信发件人/域名可单独放行远程图片，不需要为整个账号开启。
-        </p>
       </div>
 
       <div className="st-subsection">
         <header className="st-subsection-header">
           <span>
             <strong>外部邮箱拦截</strong>
-            <small>拦截来自外部邮箱（域名与本账号不同）的邮件内容。</small>
+            <small>拦截来自外部邮箱（域名与本账号不同）的邮件内容，常用于防钓鱼。</small>
           </span>
           <SettingsBadge tone={externalBlocked ? 'success' : 'neutral'}>
             当前：{externalBlocked ? '已拦截' : '未拦截'}
@@ -112,9 +107,6 @@ export default function PrivacySettingsPage({
             block_external_mailboxes: checked,
           })}
         />
-        <p className="st-field-hint">
-          常用于防钓鱼：冒充内部发件人、但邮箱域名不一致的邮件会先被拦截。
-        </p>
       </div>
 
       <div className="st-subsection">

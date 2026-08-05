@@ -62,8 +62,6 @@ export default function AiServiceSettings() {
 
   return (
     <SettingsSection
-      title="AI 服务"
-      description="配置翻译、摘要与模板生成所用的 AI 服务。"
       badge={
         <span className="st-badge st-badge-info">{statusLabel}</span>
       }

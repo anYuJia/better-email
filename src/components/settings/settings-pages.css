@@ -81,6 +81,28 @@
   margin: 0;
 }
 
+/* --- Identity form --- */
+.settings-modal .st-identity-form {
+  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--st-border);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-modal .st-identity-form .st-field textarea,
+.settings-modal .st-identity-form .st-switch,
+.settings-modal .st-identity-form .st-actions {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .settings-modal .st-identity-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* --- Identity form (legacy identity page) --- */
 .settings-modal .settings-account-signature {
   display: grid;
@@ -563,6 +585,1012 @@
 .settings-modal .settings-privacy-panel .privacy-ai-reminder button:hover {
   border-color: var(--st-border-strong);
   background: var(--st-surface-subtle);
+}
+
+/* =====================================================================
+ * Account pages: connection flow, account list, dialogs, provider matrix,
+ * OAuth flows and custom select.
+ * ===================================================================== */
+
+/* --- Connection flow (wizard steps) --- */
+.settings-modal .settings-connection-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+}
+
+.settings-modal .settings-connection-step {
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text-tertiary);
+  background: var(--st-surface-subtle);
+  text-align: left;
+}
+
+.settings-modal .settings-connection-step b {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--st-text-tertiary);
+  background: var(--st-surface-muted);
+  font-size: var(--st-font-size-aux);
+  font-weight: 620;
+}
+
+.settings-modal .settings-connection-step > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.settings-modal .settings-connection-step strong {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-connection-step small {
+  overflow: hidden;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-connection-step.complete {
+  color: var(--st-success);
+}
+
+.settings-modal .settings-connection-step.complete b {
+  color: var(--st-success);
+  background: var(--st-success-soft);
+}
+
+.settings-modal .settings-connection-step.active {
+  border-color: var(--st-border-strong);
+  color: var(--st-accent);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+}
+
+.settings-modal .settings-connection-step.active b {
+  color: var(--st-on-accent);
+  background: var(--st-accent);
+}
+
+@media (max-width: 640px) {
+  .settings-modal .settings-connection-flow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Save & verify status --- */
+.settings-modal .settings-save-verify-status {
+  min-width: 0;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+  overflow: hidden;
+}
+
+.settings-modal .settings-save-verify-status > header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-save-verify-status > header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-save-verify-status > header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-card-title);
+  font-weight: 620;
+}
+
+.settings-modal .settings-save-verify-status > header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-save-verify-status > header > em {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid var(--st-border);
+  border-radius: 999px;
+  color: var(--st-text-secondary);
+  background: var(--st-surface-muted);
+  font-size: var(--st-font-size-aux);
+  font-style: normal;
+  font-weight: 560;
+}
+
+.settings-modal .settings-save-verify-status.success > header > em {
+  color: var(--st-success);
+  background: var(--st-success-soft);
+}
+
+.settings-modal .settings-save-verify-status.error > header > em {
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+}
+
+.settings-modal .settings-save-verify-status.partial > header > em,
+.settings-modal .settings-save-verify-status.needs_auth > header > em {
+  color: var(--st-warning);
+  background: var(--st-warning-soft);
+}
+
+.settings-modal .settings-save-verify-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.settings-modal .settings-save-verify-stages > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-save-verify-stages > span b {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-save-verify-stages > span small {
+  overflow: hidden;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-save-verify-stages > span.running b {
+  color: var(--st-accent);
+}
+
+.settings-modal .settings-save-verify-stages > span.success b {
+  color: var(--st-success);
+}
+
+.settings-modal .settings-save-verify-stages > span.error b {
+  color: var(--st-danger);
+}
+
+.settings-modal .settings-save-verify-stages > span.partial b,
+.settings-modal .settings-save-verify-stages > span.needs_auth b {
+  color: var(--st-warning);
+}
+
+.settings-modal .settings-save-verify-status details {
+  padding: 10px 16px 14px;
+}
+
+.settings-modal .settings-save-verify-status summary {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  cursor: pointer;
+}
+
+.settings-modal .settings-save-verify-status pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+  color: var(--st-text-secondary);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* --- Account list --- */
+.settings-modal .settings-account-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-modal .settings-account-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.settings-modal .settings-account-row:hover {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface);
+}
+
+.settings-modal .settings-account-row.active {
+  border-color: #a9cdf1;
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-account-row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-account-row-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.settings-modal .settings-account-row-copy strong,
+.settings-modal .settings-account-row-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-account-row-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-account-row-copy span {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-account-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.settings-modal .settings-account-row-meta > span {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+}
+
+.settings-modal .settings-account-row-meta em {
+  padding: 2px 8px;
+  border: 1px solid #c9ddef;
+  border-radius: 999px;
+  color: var(--st-info);
+  background: var(--st-info-soft);
+  font-size: var(--st-font-size-aux);
+  font-style: normal;
+  font-weight: 560;
+}
+
+.settings-modal .settings-account-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .settings-account-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-modal .settings-account-row-meta {
+    display: none;
+  }
+}
+
+/* --- Account dialogs --- */
+.settings-modal .settings-account-add-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(18, 24, 31, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.settings-modal .settings-account-add-dialog {
+  width: min(520px, 100%);
+  max-height: min(82vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border: 1px solid var(--st-border-strong);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-modal);
+}
+
+.settings-modal .settings-account-add-dialog > header {
+  min-height: 54px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-account-add-dialog > header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-account-add-dialog > header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-card-title);
+  font-weight: 620;
+}
+
+.settings-modal .settings-account-add-dialog > header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-account-add-dialog > header button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+  background: transparent;
+}
+
+.settings-modal .settings-account-add-dialog > header button:hover {
+  color: var(--st-text);
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .settings-account-add-dialog > .st-section-body,
+.settings-modal .settings-account-add-dialog > div:not(.settings-account-form-grid-wrapper) {
+  padding: 16px;
+}
+
+.settings-modal .settings-account-add-dialog > .st-section-body.dialog-nested-body {
+  padding-top: 0;
+}
+
+.settings-modal .settings-account-add-dialog > footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-account-add-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e8c7c4;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-account-add-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #c9ddef;
+  border-radius: var(--st-radius-sm);
+  background: var(--st-info-soft);
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+/* --- Account form grids --- */
+.settings-modal .settings-account-form-grid,
+.settings-modal .settings-oauth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-modal .settings-account-form-grid > label,
+.settings-modal .settings-oauth-grid > label,
+.settings-modal .settings-provider-verification > label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 540;
+}
+
+.settings-modal .settings-account-form-grid > label > :is(input, select, textarea),
+.settings-modal .settings-oauth-grid > label > :is(input, select, textarea) {
+  width: 100%;
+}
+
+.settings-modal .settings-account-secret-field {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-modal .settings-account-secret-field input {
+  min-width: 0;
+}
+
+.settings-modal .settings-account-secret-field button {
+  width: var(--st-control-height);
+  min-width: var(--st-control-height);
+  min-height: var(--st-control-height);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+  background: transparent;
+}
+
+.settings-modal .settings-account-secret-field button:hover:not(:disabled) {
+  color: var(--st-text);
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .settings-account-auto-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-account-auto-match[data-ready="true"] {
+  border-color: #c2e2cd;
+  background: var(--st-success-soft);
+}
+
+.settings-modal .settings-account-auto-match > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-account-auto-match strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-account-auto-match small {
+  overflow: hidden;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-account-protocol-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-modal .settings-account-protocol-grid > span {
+  align-self: center;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-account-risk-toggle {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+@media (max-width: 640px) {
+  .settings-modal .settings-account-form-grid,
+  .settings-modal .settings-oauth-grid,
+  .settings-modal .settings-account-protocol-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Provider presets & matrix --- */
+.settings-modal .settings-provider-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-modal .settings-provider-presets.compact {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.settings-modal .settings-provider-presets button {
+  min-width: 0;
+  min-height: 56px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text-secondary);
+  background: var(--st-surface-subtle);
+  text-align: left;
+}
+
+.settings-modal .settings-provider-presets button:hover {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface);
+}
+
+.settings-modal .settings-provider-presets button.active {
+  border-color: #a9cdf1;
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-provider-presets button strong {
+  overflow: hidden;
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-provider-presets button span {
+  overflow: hidden;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-provider-matrix {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-modal .settings-provider-matrix > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 2px;
+}
+
+.settings-modal .settings-provider-matrix > header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-provider-matrix > header span {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+}
+
+.settings-modal .settings-provider-matrix > button {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text-secondary);
+  background: var(--st-surface-subtle);
+  text-align: left;
+}
+
+.settings-modal .settings-provider-matrix > button:hover {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface);
+}
+
+.settings-modal .settings-provider-matrix > button.active {
+  border-color: #a9cdf1;
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-provider-matrix > button strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-provider-matrix > button span,
+.settings-modal .settings-provider-matrix > button small,
+.settings-modal .settings-provider-matrix > button em {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-style: normal;
+  line-height: 1.45;
+}
+
+/* --- Provider advanced (details disclosure) --- */
+.settings-modal .settings-provider-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.settings-modal .settings-provider-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-modal .settings-provider-advanced > summary::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+  border-right: 1.5px solid var(--st-text-tertiary);
+  border-bottom: 1.5px solid var(--st-text-tertiary);
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform 120ms ease;
+}
+
+.settings-modal .settings-provider-advanced[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.settings-modal .settings-provider-advanced > summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-provider-advanced > summary strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-provider-advanced > summary em {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-style: normal;
+}
+
+.settings-modal .settings-provider-advanced > summary > b {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid var(--st-border);
+  border-radius: 999px;
+  color: var(--st-text-secondary);
+  background: var(--st-surface-muted);
+  font-size: var(--st-font-size-aux);
+  font-weight: 560;
+}
+
+.settings-modal .settings-provider-advanced-content {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-provider-advanced-content .tool-panel {
+  margin: 0;
+}
+
+.settings-modal .settings-primary-action {
+  min-height: var(--st-control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--st-accent);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-on-accent);
+  background: var(--st-accent);
+  font-size: var(--st-font-size-body);
+  font-weight: 560;
+}
+
+.settings-modal .settings-primary-action:hover {
+  border-color: var(--st-accent-hover);
+  background: var(--st-accent-hover);
+}
+
+/* --- Auth & OAuth --- */
+.settings-modal .settings-auth-change-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #ecd9a8;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-warning);
+  background: var(--st-warning-soft);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-auth-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+}
+
+.settings-modal .settings-auth-guide > span {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-auth-guide > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-modal .settings-auth-guide strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-auth-guide p {
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-oauth-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+}
+
+.settings-modal .settings-oauth-primary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-oauth-primary strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-oauth-primary small,
+.settings-modal .settings-oauth-primary em {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-style: normal;
+}
+
+.settings-modal .settings-oauth-callback {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-oauth-callback input {
+  min-width: 0;
+}
+
+.settings-modal .settings-oauth-callback button {
+  min-width: 92px;
+}
+
+.settings-modal .settings-oauth-sessions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.settings-modal .settings-oauth-sessions > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-oauth-sessions strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .settings-oauth-sessions span,
+.settings-modal .settings-oauth-sessions small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-oauth-sessions button {
+  min-height: 32px;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-accent);
+  background: var(--st-surface);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .oauth-result {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #c9ddef;
+  border-radius: var(--st-radius-md);
+  background: var(--st-info-soft);
+}
+
+.settings-modal .oauth-result strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 580;
+}
+
+.settings-modal .oauth-result span,
+.settings-modal .oauth-result small,
+.settings-modal .oauth-result em {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-style: normal;
+}
+
+/* --- CustomSelect --- */
+.settings-modal .custom-select-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.settings-modal .custom-select-menu summary {
+  min-height: var(--st-control-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text);
+  background: var(--st-surface);
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--st-font-size-body);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.settings-modal .custom-select-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-modal .custom-select-menu summary:hover {
+  border-color: var(--st-border-strong);
+}
+
+.settings-modal .custom-select-menu[open] summary {
+  border-color: var(--st-focus-border);
+  box-shadow: var(--st-focus-ring);
+}
+
+.settings-modal .custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-float);
+}
+
+.settings-modal .custom-select-dropdown button {
+  min-height: 36px;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: transparent;
+  text-align: left;
+}
+
+.settings-modal .custom-select-dropdown button:hover,
+.settings-modal .custom-select-dropdown button.active {
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
 }
 
 /* --- Responsive refinements --- */

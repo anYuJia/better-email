@@ -15,7 +15,6 @@ import type { SettingsSectionId } from './SettingsFrame';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AuthenticationSettingsPage from './pages/AuthenticationSettingsPage';
 import ProviderSettingsPage from './pages/ProviderSettingsPage';
-import './account-settings.css';
 
 export type AccountConnectionSettingsProps = {
   section: 'accounts' | 'providers' | 'auth';

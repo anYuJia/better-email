@@ -3,6 +3,12 @@ import {
   type SendUndoDelaySeconds,
 } from '../../../app/appConfig';
 import { CustomSelect } from '../accounts/CustomSelect';
+import {
+  SettingsBadge,
+  SettingsField,
+  SettingsRow,
+  SettingsSection,
+} from '../shared';
 
 type SendingSettingsPageProps = {
   sendUndoDelaySeconds: SendUndoDelaySeconds;
@@ -14,33 +20,32 @@ export default function SendingSettingsPage({
   onSendUndoDelayChange,
 }: SendingSettingsPageProps) {
   return (
-    <div className="settings-experience-stack">
-      <section className="tool-panel settings-send-panel" data-settings-section="sending">
-        <header className="tool-header">
-          <span>
-            <strong>发送与撤回</strong>
-            <small>发送后短暂保留在发件箱，误发时可立即撤回到草稿箱</small>
-          </span>
-          <em>{sendUndoDelaySeconds > 0 ? `${sendUndoDelaySeconds} 秒` : '已关闭'}</em>
-        </header>
-        <div className="settings-send-control">
-          <span>
-            <strong>撤销发送延迟</strong>
-            <small>倒计时结束后自动进入 SMTP 后台任务，应用重启后仍会继续。</small>
-          </span>
-          <label>
-            <span>延迟时间</span>
+    <SettingsSection
+      title="发送与撤回"
+      description="发送后短暂保留在发件箱，误发时可立即撤回到草稿箱"
+      badge={
+        <SettingsBadge tone={sendUndoDelaySeconds > 0 ? 'info' : 'neutral'}>
+          {sendUndoDelaySeconds > 0 ? `${sendUndoDelaySeconds} 秒` : '已关闭'}
+        </SettingsBadge>
+      }
+      dataSection="sending"
+    >
+      <SettingsRow
+        title="撤销发送延迟"
+        description="倒计时结束后自动进入 SMTP 后台任务，应用重启后仍会继续。"
+        control={
+          <SettingsField label="延迟时间">
             <CustomSelect
               value={String(sendUndoDelaySeconds)}
               options={sendUndoDelayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
               onChange={(val) => onSendUndoDelayChange(Number(val) as SendUndoDelaySeconds)}
             />
-          </label>
-        </div>
-        <p className="settings-send-note">
-          “发件箱”用于手动排队或稍后发送；“发送”按钮使用这里设置的撤销延迟。
-        </p>
-      </section>
-    </div>
+          </SettingsField>
+        }
+      />
+      <p className="st-field-hint">
+        “发件箱”用于手动排队或稍后发送；“发送”按钮使用这里设置的撤销延迟。
+      </p>
+    </SettingsSection>
   );
 }

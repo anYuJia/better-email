@@ -9,6 +9,7 @@ import {
   type AccountDialogMode,
 } from './accountSettingsShared';
 import { CustomSelect } from './CustomSelect';
+import { SettingsButton, SettingsSwitch } from '../shared';
 
 type AccountManageDialogProps = {
   mode: AccountDialogMode;
@@ -83,8 +84,8 @@ export default function AccountManageDialog({
         </header>
 
         {mode === 'config' && (
-          <div className="settings-account-form-grid-wrapper">
-            <div className="settings-account-form-grid settings-account-config-grid" style={{ marginBottom: '16px' }}>
+          <div className="st-section-body settings-account-form-grid-wrapper">
+            <div className="settings-account-form-grid">
               <label>
                 显示名
                 <input
@@ -144,41 +145,33 @@ export default function AccountManageDialog({
             </div>
 
             <div className="settings-account-risk-toggle">
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={account.cross_account_risk_warning !== false}
-                  onChange={(event) => onAccountChange({
-                    ...account,
-                    cross_account_risk_warning: event.target.checked,
-                  })}
-                />
-                <span>
-                  <strong>跨邮箱发送风险提示</strong>
-                  <small>回复其他账号的邮件、收件人包含自己其他账号、快捷写信账号不一致时，在发送前提醒。</small>
-                </span>
-              </label>
+              <SettingsSwitch
+                label="跨邮箱发送风险提示"
+                description="回复其他账号的邮件、收件人包含自己其他账号、快捷写信账号不一致时，在发送前提醒。"
+                checked={account.cross_account_risk_warning !== false}
+                onChange={(checked) => onAccountChange({
+                  ...account,
+                  cross_account_risk_warning: checked,
+                })}
+              />
             </div>
 
             {error && (
-              <p className="settings-account-add-error" role="alert" style={{ margin: '0 0 12px 0' }}>
+              <p className="settings-account-add-error" role="alert">
                 {error}
               </p>
             )}
 
-            <footer style={{ marginTop: '20px' }}>
-              <button type="button" className="settings-account-add-cancel" onClick={onClose} disabled={submitting}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="settings-account-add-submit"
+            <footer>
+              <SettingsButton onClick={onClose} disabled={submitting}>取消</SettingsButton>
+              <SettingsButton
+                variant="primary"
                 disabled={submitting}
+                icon={<Save size={14} />}
                 onClick={handleSave}
               >
-                <Save size={14} />
                 {submitting ? '保存中...' : '保存'}
-              </button>
+              </SettingsButton>
             </footer>
           </div>
         )}

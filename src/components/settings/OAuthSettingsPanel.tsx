@@ -7,6 +7,7 @@ import type {
   OAuthTokenExchangeReport,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
+import { SettingsButton, SettingsSection } from './shared';
 
 type OAuthSettingsPanelProps = {
   authType: string;
@@ -84,10 +85,13 @@ export default function OAuthSettingsPanel({
                   : '尚未建立授权会话'}
               </small>
             </span>
-            <button type="button" onClick={onStart}>
-              <ExternalLink size={14} />
+            <SettingsButton
+              variant="primary"
+              icon={<ExternalLink size={14} />}
+              onClick={onStart}
+            >
               {latestSession ? '重新授权' : '开始授权'}
-            </button>
+            </SettingsButton>
             {!clientId.trim() && <em>开始前需要在高级设置中填写 OAuth2 Client ID</em>}
           </section>
           <details className="settings-disclosure settings-provider-advanced settings-oauth-advanced">
@@ -99,113 +103,108 @@ export default function OAuthSettingsPanel({
               <b>{clientId.trim() ? '已配置 Client ID' : '等待配置'}</b>
             </summary>
             <div className="settings-provider-advanced-content">
-        <section className="settings-static-section" data-settings-section="auth">
-          <header className="settings-static-header">
-            <span>
-              <strong>OAuth2 连接流程</strong>
-              <em>PKCE、回调、Token 交换与刷新</em>
-            </span>
-            <b>{sessions.length} 个会话</b>
-          </header>
-          <section className="oauth-pkce-panel settings-oauth-panel">
-            <div className="settings-oauth-grid">
-              <label>
-                OAuth2 Client ID
-                <input
-                  value={clientId}
-                  onChange={(event) => onClientIdChange(event.target.value)}
-                  placeholder="Gmail / Outlook 应用 Client ID"
-                />
-              </label>
-              <label>
-                Redirect URI
-                <input
-                  value={redirectUri}
-                  onChange={(event) => onRedirectUriChange(event.target.value)}
-                />
-              </label>
-              <label>
-                Client Secret（可选）
-                <input
-                  value={clientSecret}
-                  onChange={(event) => onClientSecretChange(event.target.value)}
-                  placeholder="桌面 PKCE 通常可留空"
-                  type="password"
-                />
-              </label>
-            </div>
-            <div className="settings-oauth-actions">
-              <button type="button" className="secondary" onClick={onRefresh}>
-                <RefreshCw size={14} />
-                刷新已保存 Token
-              </button>
-            </div>
-            {report && (
-              <div className="oauth-result">
-                <strong>{report.provider} · Session #{report.session_id}</strong>
-                <span>{report.code_verifier_hint}</span>
-                <small>Scopes: {report.scopes.join(', ')}</small>
-                <em>State: {report.state}</em>
-              </div>
-            )}
-            <div className="oauth-callback-form settings-oauth-callback">
-              <input
-                value={callbackState}
-                onChange={(event) => onCallbackStateChange(event.target.value)}
-                placeholder="回调 state"
-              />
-              <input
-                value={callbackCode}
-                onChange={(event) => onCallbackCodeChange(event.target.value)}
-                placeholder="授权码 code"
-                type="password"
-              />
-              <button type="button" onClick={onCompleteCallback}>记录回调授权码</button>
-              <button type="button" className="secondary" onClick={onWaitForCallback}>监听本地回调</button>
-            </div>
-            {callbackReport && (
-              <div className="oauth-result">
-                <strong>{callbackReport.provider} · {callbackReport.status}</strong>
-                <span>Session #{callbackReport.session_id}</span>
-                <small>{callbackReport.message}</small>
-              </div>
-            )}
-            {exchangeReport && (
-              <div className="oauth-result">
-                <strong>{exchangeReport.provider} · {exchangeReport.status}</strong>
-                <span>Session #{exchangeReport.session_id}</span>
-                <small>
-                  {exchangeReport.expires_at
-                    ? `Access token 过期时间：${formatDate(exchangeReport.expires_at)}`
-                    : exchangeReport.message}
-                </small>
-              </div>
-            )}
-            {refreshReport && (
-              <div className="oauth-result">
-                <strong>{refreshReport.provider} · {refreshReport.status}</strong>
-                <span>{refreshReport.message}</span>
-                <small>Access token 过期时间：{formatDate(refreshReport.expires_at)}</small>
-              </div>
-            )}
-            {sessions.length > 0 && (
-              <div className="oauth-session-list settings-oauth-sessions">
-                {sessions.slice(0, 3).map((session) => (
-                  <div key={session.id}>
-                    <strong>{session.provider} · {session.status}</strong>
-                    <span>{formatDate(session.created_at)} · {session.redirect_uri}</span>
-                    <small>{session.scopes.join(', ')}</small>
-                    {(session.status === 'code_received' || session.status === 'token_exchange_failed') && (
-                      <button type="button" onClick={() => onExchange(session.id)}>
-                        交换并保存 Token
-                      </button>
-                    )}
+              <SettingsSection
+                title="OAuth2 连接流程"
+                description="PKCE、回调、Token 交换与刷新"
+                badge={<span className="st-badge st-badge-neutral">{sessions.length} 个会话</span>}
+                dataSection="auth"
+              >
+                <div className="settings-oauth-grid">
+                  <label>
+                    OAuth2 Client ID
+                    <input
+                      value={clientId}
+                      onChange={(event) => onClientIdChange(event.target.value)}
+                      placeholder="Gmail / Outlook 应用 Client ID"
+                    />
+                  </label>
+                  <label>
+                    Redirect URI
+                    <input
+                      value={redirectUri}
+                      onChange={(event) => onRedirectUriChange(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Client Secret（可选）
+                    <input
+                      value={clientSecret}
+                      onChange={(event) => onClientSecretChange(event.target.value)}
+                      placeholder="桌面 PKCE 通常可留空"
+                      type="password"
+                    />
+                  </label>
+                </div>
+                <div className="st-actions">
+                  <SettingsButton icon={<RefreshCw size={14} />} onClick={onRefresh}>
+                    刷新已保存 Token
+                  </SettingsButton>
+                </div>
+                {report && (
+                  <div className="oauth-result">
+                    <strong>{report.provider} · Session #{report.session_id}</strong>
+                    <span>{report.code_verifier_hint}</span>
+                    <small>Scopes: {report.scopes.join(', ')}</small>
+                    <em>State: {report.state}</em>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </section>
+                )}
+                <div className="settings-oauth-callback">
+                  <input
+                    value={callbackState}
+                    onChange={(event) => onCallbackStateChange(event.target.value)}
+                    placeholder="回调 state"
+                  />
+                  <input
+                    value={callbackCode}
+                    onChange={(event) => onCallbackCodeChange(event.target.value)}
+                    placeholder="授权码 code"
+                    type="password"
+                  />
+                  <SettingsButton onClick={onCompleteCallback}>记录回调授权码</SettingsButton>
+                  <SettingsButton onClick={onWaitForCallback}>监听本地回调</SettingsButton>
+                </div>
+                {callbackReport && (
+                  <div className="oauth-result">
+                    <strong>{callbackReport.provider} · {callbackReport.status}</strong>
+                    <span>Session #{callbackReport.session_id}</span>
+                    <small>{callbackReport.message}</small>
+                  </div>
+                )}
+                {exchangeReport && (
+                  <div className="oauth-result">
+                    <strong>{exchangeReport.provider} · {exchangeReport.status}</strong>
+                    <span>Session #{exchangeReport.session_id}</span>
+                    <small>
+                      {exchangeReport.expires_at
+                        ? `Access token 过期时间：${formatDate(exchangeReport.expires_at)}`
+                        : exchangeReport.message}
+                    </small>
+                  </div>
+                )}
+                {refreshReport && (
+                  <div className="oauth-result">
+                    <strong>{refreshReport.provider} · {refreshReport.status}</strong>
+                    <span>{refreshReport.message}</span>
+                    <small>Access token 过期时间：{formatDate(refreshReport.expires_at)}</small>
+                  </div>
+                )}
+                {sessions.length > 0 && (
+                  <div className="settings-oauth-sessions">
+                    {sessions.slice(0, 3).map((session) => (
+                      <div key={session.id}>
+                        <strong>{session.provider} · {session.status}</strong>
+                        <span>{formatDate(session.created_at)} · {session.redirect_uri}</span>
+                        <small>{session.scopes.join(', ')}</small>
+                        {(session.status === 'code_received' || session.status === 'token_exchange_failed') && (
+                          <button type="button" onClick={() => onExchange(session.id)}>
+                            交换并保存 Token
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SettingsSection>
             </div>
           </details>
         </>

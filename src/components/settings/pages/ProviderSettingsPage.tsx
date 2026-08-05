@@ -21,6 +21,13 @@ import type {
   ProviderVerificationStatus,
 } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsField,
+  SettingsSection,
+  SettingsSwitch,
+} from '../shared';
 
 type ProviderSettingsPageProps = {
   accountForm: Account;
@@ -110,17 +117,14 @@ export default function ProviderSettingsPage({
   );
 
   return (
-    <div className="settings-account-stack settings-account-page settings-account-page-providers">
-      <section className="tool-panel settings-current-account-panel settings-provider-config-panel">
-        <header className="tool-header">
-          <span>
-            <strong>连接参数</strong>
-            <small>{accountForm.email}</small>
-          </span>
-          <em>{accountForm.provider}</em>
-        </header>
-        <label>
-          服务商
+    <>
+      <SettingsSection
+        title="连接参数"
+        description={accountForm.email}
+        badge={<SettingsBadge tone="info">{accountForm.provider}</SettingsBadge>}
+        dataSection="providers"
+      >
+        <SettingsField label="服务商">
           <select
             value={providerOption}
             onChange={(event) => {
@@ -137,7 +141,7 @@ export default function ProviderSettingsPage({
               <option value={option.id} key={option.id}>{option.label}</option>
             ))}
           </select>
-        </label>
+        </SettingsField>
         {customProvider ? serverFields : (
           <details className="settings-provider-advanced settings-provider-server-advanced">
             <summary>
@@ -150,7 +154,7 @@ export default function ProviderSettingsPage({
             {serverFields}
           </details>
         )}
-      </section>
+      </SettingsSection>
 
       <details
         className="settings-disclosure settings-provider-advanced"
@@ -200,16 +204,10 @@ export default function ProviderSettingsPage({
             ))}
           </section>
           {activeProviderVerification && (
-            <section className="tool-panel settings-provider-verification">
-              <header className="tool-header">
-                <span>
-                  <strong>真实账号验证记录</strong>
-                  <small>记录真实账号环境下的可用性</small>
-                </span>
-                <em>{providerVerificationLabel(activeProviderVerification.status)}</em>
-              </header>
-              <label>
-                验证状态
+            <SettingsSection title="真实账号验证记录" description="记录真实账号环境下的可用性" badge={
+              <SettingsBadge>{providerVerificationLabel(activeProviderVerification.status)}</SettingsBadge>
+            }>
+              <SettingsField label="验证状态">
                 <select
                   value={activeProviderVerification.status}
                   onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
@@ -221,50 +219,34 @@ export default function ProviderSettingsPage({
                   <option value="partial">部分通过</option>
                   <option value="failed">失败</option>
                 </select>
-              </label>
+              </SettingsField>
               <div className="settings-toggle-grid">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.imap_ok}
-                    onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
-                      imap_ok: event.target.checked,
-                    })}
-                  />
-                  <span>
-                    <strong>收信已通过</strong>
-                    <small>IMAP 或 POP3 登录与同步</small>
-                  </span>
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.smtp_ok}
-                    onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
-                      smtp_ok: event.target.checked,
-                    })}
-                  />
-                  <span>
-                    <strong>SMTP 已通过</strong>
-                    <small>普通文本、HTML 和附件发送</small>
-                  </span>
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={activeProviderVerification.oauth_ok}
-                    onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
-                      oauth_ok: event.target.checked,
-                    })}
-                  />
-                  <span>
-                    <strong>OAuth2 已通过</strong>
-                    <small>PKCE、刷新和 XOAUTH2 登录</small>
-                  </span>
-                </label>
+                <SettingsSwitch
+                  label="收信已通过"
+                  description="IMAP 或 POP3 登录与同步"
+                  checked={activeProviderVerification.imap_ok}
+                  onChange={(checked) => onUpdateProviderVerification(accountForm.provider, {
+                    imap_ok: checked,
+                  })}
+                />
+                <SettingsSwitch
+                  label="SMTP 已通过"
+                  description="普通文本、HTML 和附件发送"
+                  checked={activeProviderVerification.smtp_ok}
+                  onChange={(checked) => onUpdateProviderVerification(accountForm.provider, {
+                    smtp_ok: checked,
+                  })}
+                />
+                <SettingsSwitch
+                  label="OAuth2 已通过"
+                  description="PKCE、刷新和 XOAUTH2 登录"
+                  checked={activeProviderVerification.oauth_ok}
+                  onChange={(checked) => onUpdateProviderVerification(accountForm.provider, {
+                    oauth_ok: checked,
+                  })}
+                />
               </div>
-              <label>
-                备注
+              <SettingsField label="备注">
                 <textarea
                   value={activeProviderVerification.notes}
                   onChange={(event) => onUpdateProviderVerification(accountForm.provider, {
@@ -272,15 +254,16 @@ export default function ProviderSettingsPage({
                   })}
                   placeholder="记录失败原因、租户限制、授权码策略或附件/HTML 样本问题"
                 />
-              </label>
-              <button type="button" className="settings-primary-action" onClick={onSaveProviderVerification}>
-                <Save size={14} />
-                保存验证记录
-              </button>
-            </section>
+              </SettingsField>
+              <div className="st-actions">
+                <SettingsButton variant="primary" icon={<Save size={14} />} onClick={onSaveProviderVerification}>
+                  保存验证记录
+                </SettingsButton>
+              </div>
+            </SettingsSection>
           )}
         </div>
       </details>
-    </div>
+    </>
   );
 }

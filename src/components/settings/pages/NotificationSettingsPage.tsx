@@ -10,6 +10,14 @@ import {
   type AccountNotificationMode,
 } from '../../../app/appConfig';
 import type { NotificationPolicy } from '../../../mailUtils';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsNotice,
+  SettingsSection,
+  SettingsSwitch,
+} from '../shared';
 
 type NotificationSettingsPageProps = {
   accounts: Account[];
@@ -77,215 +85,188 @@ export default function NotificationSettingsPage({
   const quietHoursOn = notificationPolicy.quietHoursEnabled;
 
   return (
-    <div className="settings-experience-stack">
-      <section className="tool-panel settings-policy-panel notification-policy-panel" data-settings-section="notifications">
-        <header className="tool-header">
-          <span>
-            <strong>通知策略</strong>
-            <small>控制哪些邮件会通知你，以及什么时候不该被打扰</small>
-          </span>
-          <em title="当前生效的通知范围">{policyStatusLabel(notificationPolicy)}</em>
-        </header>
+    <SettingsSection
+      title="通知策略"
+      description="控制哪些邮件会通知你，以及什么时候不该被打扰"
+      badge={
+        <SettingsBadge tone="info" title="当前生效的通知范围">
+          {policyStatusLabel(notificationPolicy)}
+        </SettingsBadge>
+      }
+      dataSection="notifications"
+    >
+      <SettingsNotice tone="info" title="邮件到达时">
+        <p>VIP 发件人与重点账号优先提醒；免打扰时段内普通邮件静默，VIP 与重点账号仍然提醒。</p>
+      </SettingsNotice>
 
-        <div className="notification-overview" aria-label="通知范围概览">
-          <span>
-            <strong>邮件到达时</strong>
-            <small>VIP 发件人与重点账号优先提醒；免打扰时段内普通邮件静默，VIP 与重点账号仍然提醒。</small>
-          </span>
-        </div>
+      <div className="st-subsection">
+        <SettingsSwitch
+          label="只提醒 VIP"
+          description="忽略不在 VIP 发件人列表中的邮件，其余邮件全部静默。"
+          checked={notificationPolicy.vipOnly}
+          onChange={(checked) => onNotificationPolicyChange({
+            ...notificationPolicy,
+            vipOnly: checked,
+          })}
+        />
+        <SettingsNotice tone="info">
+          <p>
+            <strong>VIP 发件人</strong> · {vipEntries.length > 0 ? `${vipEntries.length} 个` : '尚未设置'}
+          </p>
+        </SettingsNotice>
+      </div>
 
-        <div className="notification-section">
-          <div className="notification-section-header">
-            <span>
-              <strong>通知范围</strong>
-              <small>控制哪些邮件会触发系统通知。</small>
-            </span>
-          </div>
-          <div className="settings-toggle-grid notification-scope-grid">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={notificationPolicy.vipOnly}
-                onChange={(event) => onNotificationPolicyChange({
-                  ...notificationPolicy,
-                  vipOnly: event.target.checked,
-                })}
-              />
-              <span>
-                <strong>只提醒 VIP</strong>
-                <small>忽略不在 VIP 发件人列表中的邮件，其余邮件全部静默。</small>
-              </span>
-            </label>
-            <div className="notification-section-note">
-              <strong>VIP 发件人</strong>
-              <small>{vipEntries.length > 0 ? `${vipEntries.length} 个` : '尚未设置'}</small>
-            </div>
-          </div>
-        </div>
-
-        <div className="notification-section">
-          <div className="notification-section-header">
-            <span>
-              <strong>免打扰</strong>
-              <small>在设定时段内暂停普通新邮件通知。</small>
-            </span>
-          </div>
-          <label className="checkbox-row">
+      <div className="st-subsection">
+        <SettingsSwitch
+          label="免打扰时段"
+          description="开启后，仅 VIP 发件人与重点账号的邮件会在该时段内提醒。"
+          checked={quietHoursOn}
+          onChange={(checked) => onNotificationPolicyChange({
+            ...notificationPolicy,
+            quietHoursEnabled: checked,
+          })}
+        />
+        <div className={`st-field-grid notification-quiet-times${quietHoursOn ? '' : ' is-dimmed'}`} aria-hidden={!quietHoursOn}>
+          <label className="st-field">
+            <span className="st-field-label">免打扰开始</span>
             <input
-              type="checkbox"
-              checked={notificationPolicy.quietHoursEnabled}
+              type="time"
+              disabled={!quietHoursOn}
+              value={notificationPolicy.quietStart}
               onChange={(event) => onNotificationPolicyChange({
                 ...notificationPolicy,
-                quietHoursEnabled: event.target.checked,
+                quietStart: event.target.value,
               })}
             />
-            <span>
-              <strong>免打扰时段</strong>
-              <small>开启后，仅 VIP 发件人与重点账号的邮件会在该时段内提醒。</small>
-            </span>
           </label>
-          <div className={`settings-inline-fields notification-quiet-times${quietHoursOn ? '' : ' is-dimmed'}`} aria-hidden={!quietHoursOn}>
-            <label>
-              免打扰开始
-              <input
-                type="time"
-                disabled={!quietHoursOn}
-                value={notificationPolicy.quietStart}
-                onChange={(event) => onNotificationPolicyChange({
-                  ...notificationPolicy,
-                  quietStart: event.target.value,
-                })}
-              />
-            </label>
-            <label>
-              免打扰结束
-              <input
-                type="time"
-                disabled={!quietHoursOn}
-                value={notificationPolicy.quietEnd}
-                onChange={(event) => onNotificationPolicyChange({
-                  ...notificationPolicy,
-                  quietEnd: event.target.value,
-                })}
-              />
-            </label>
-          </div>
-          {!quietHoursOn && (
-            <p className="notification-quiet-hint">开启免打扰后，可在此设定开始与结束时间。</p>
+          <label className="st-field">
+            <span className="st-field-label">免打扰结束</span>
+            <input
+              type="time"
+              disabled={!quietHoursOn}
+              value={notificationPolicy.quietEnd}
+              onChange={(event) => onNotificationPolicyChange({
+                ...notificationPolicy,
+                quietEnd: event.target.value,
+              })}
+            />
+          </label>
+        </div>
+        {!quietHoursOn && (
+          <p className="st-field-hint">开启免打扰后，可在此设定开始与结束时间。</p>
+        )}
+      </div>
+
+      <div className="st-subsection">
+        <header className="st-subsection-header">
+          <span>
+            <strong>账号通知优先级</strong>
+            <small>为每个账号单独选择提醒方式；优先提醒账号会穿透免打扰时段。</small>
+          </span>
+          <SettingsBadge>{priorityCount} 个优先 · {mutedCount} 个静音</SettingsBadge>
+        </header>
+        <div className="notification-account-grid" aria-label="账号提醒模式">
+          {accounts.map((item) => {
+            const mode = getAccountNotificationMode(notificationPolicy, item.email);
+            return (
+              <div key={item.id} data-notification-account={item.email}>
+                <span>
+                  <strong>{item.display_name || item.email}</strong>
+                  <small>{item.email}</small>
+                </span>
+                <div className="notification-account-mode" role="group" aria-label={`${item.email} 提醒模式`}>
+                  {accountModeOptions.map((option) => {
+                    const active = mode === option.mode;
+                    return (
+                      <button
+                        type="button"
+                        className={active ? 'active' : ''}
+                        key={option.mode}
+                        data-mode={option.mode}
+                        aria-pressed={active}
+                        title={option.description}
+                        onClick={() => onNotificationPolicyChange(
+                          setAccountNotificationMode(notificationPolicy, item.email, option.mode),
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {accounts.length === 0 && (
+            <SettingsEmptyState>还没有可配置的邮箱账号。</SettingsEmptyState>
           )}
         </div>
+      </div>
 
-        <div className="notification-section">
-          <div className="notification-section-header">
-            <span>
-              <strong>账号通知优先级</strong>
-              <small>为每个账号单独选择提醒方式；优先提醒账号会穿透免打扰时段。</small>
-            </span>
-            <em>{priorityCount} 个优先 · {mutedCount} 个静音</em>
+      <div className="st-subsection">
+        <header className="st-subsection-header">
+          <span>
+            <strong>发件人规则</strong>
+            <small>VIP 发件人的邮件始终提醒，且优先于普通邮件展示。</small>
+          </span>
+        </header>
+        <div className="vip-sender-editor">
+          <div className="vip-sender-input-row">
+            <input
+              type="text"
+              value={vipDraft}
+              placeholder="ada@example.com 或 @customer.com"
+              aria-label="添加 VIP 发件人"
+              aria-invalid={vipDraftError}
+              onChange={(event) => {
+                setVipDraft(event.target.value);
+                setVipDraftError(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  addVipEntry();
+                }
+              }}
+            />
+            <SettingsButton onClick={addVipEntry}>添加</SettingsButton>
           </div>
-          <div className="notification-account-grid" aria-label="账号提醒模式">
-            {accounts.map((item) => {
-              const mode = getAccountNotificationMode(notificationPolicy, item.email);
-              return (
-                <div key={item.id} data-notification-account={item.email}>
-                  <span>
-                    <strong>{item.display_name || item.email}</strong>
-                    <small>{item.email}</small>
-                  </span>
-                  <div className="notification-account-mode" role="group" aria-label={`${item.email} 提醒模式`}>
-                    {accountModeOptions.map((option) => {
-                      const active = mode === option.mode;
-                      return (
-                        <button
-                          type="button"
-                          className={active ? 'active' : ''}
-                          key={option.mode}
-                          data-mode={option.mode}
-                          aria-pressed={active}
-                          title={option.description}
-                          onClick={() => onNotificationPolicyChange(
-                            setAccountNotificationMode(notificationPolicy, item.email, option.mode),
-                          )}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-            {accounts.length === 0 && (
-              <p className="settings-empty-state">还没有可配置的邮箱账号。</p>
-            )}
-          </div>
+          {vipDraftError && (
+            <p className="st-field-error">请输入邮箱地址（如 ada@example.com）或域名（如 @customer.com）。</p>
+          )}
+          {vipEntries.length === 0 ? (
+            <SettingsEmptyState>
+              还没有 VIP 发件人。添加后，他们的邮件会优先提醒。
+            </SettingsEmptyState>
+          ) : (
+            <ul className="vip-sender-chips" aria-label="VIP 发件人列表">
+              {vipEntries.map((entry) => (
+                <li key={entry} className="vip-sender-chip">
+                  <span>{entry}</span>
+                  <button
+                    type="button"
+                    aria-label={`移除 ${entry}`}
+                    onClick={() => removeVipEntry(entry)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+      </div>
 
-        <div className="notification-section">
-          <div className="notification-section-header">
-            <span>
-              <strong>发件人规则</strong>
-              <small>VIP 发件人的邮件始终提醒，且优先于普通邮件展示。</small>
-            </span>
-          </div>
-          <div className="vip-sender-editor">
-            <div className="vip-sender-input-row">
-              <input
-                type="text"
-                value={vipDraft}
-                placeholder="ada@example.com 或 @customer.com"
-                aria-label="添加 VIP 发件人"
-                aria-invalid={vipDraftError}
-                onChange={(event) => {
-                  setVipDraft(event.target.value);
-                  setVipDraftError(false);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addVipEntry();
-                  }
-                }}
-              />
-              <button type="button" onClick={addVipEntry}>添加</button>
-            </div>
-            {vipDraftError && (
-              <p className="vip-sender-error">请输入邮箱地址（如 ada@example.com）或域名（如 @customer.com）。</p>
-            )}
-            {vipEntries.length === 0 ? (
-              <p className="settings-empty-state">
-                还没有 VIP 发件人。添加后，他们的邮件会优先提醒。
-              </p>
-            ) : (
-              <ul className="vip-sender-chips" aria-label="VIP 发件人列表">
-                {vipEntries.map((entry) => (
-                  <li key={entry} className="vip-sender-chip">
-                    <span>{entry}</span>
-                    <button
-                      type="button"
-                      aria-label={`移除 ${entry}`}
-                      onClick={() => removeVipEntry(entry)}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        <div className="notification-rule-order" aria-label="规则优先级说明">
-          <strong>规则判断顺序</strong>
-          <ol>
-            <li><span>静音账号</span>最先拦截，不弹系统提醒</li>
-            <li><span>只提醒 VIP</span>开启后，仅 VIP 发件人的邮件会提醒</li>
-            <li><span>免打扰时段</span>内暂停通知，VIP 发件人与重点账号仍会提醒</li>
-            <li><span>VIP 发件人 · 重点账号</span>优先提醒</li>
-            <li>其余邮件按<span>正常通知</span>处理</li>
-          </ol>
-        </div>
-      </section>
-    </div>
+      <div className="notification-rule-order" aria-label="规则优先级说明">
+        <strong>规则判断顺序</strong>
+        <ol>
+          <li><span>静音账号</span>最先拦截，不弹系统提醒</li>
+          <li><span>只提醒 VIP</span>开启后，仅 VIP 发件人的邮件会提醒</li>
+          <li><span>免打扰时段</span>内暂停通知，VIP 发件人与重点账号仍会提醒</li>
+          <li><span>VIP 发件人 · 重点账号</span>优先提醒</li>
+          <li>其余邮件按<span>正常通知</span>处理</li>
+        </ol>
+      </div>
+    </SettingsSection>
   );
 }

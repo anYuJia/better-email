@@ -18,7 +18,12 @@ import type {
   CredentialVerificationReport,
 } from '../../app/types';
 import ConnectionDiagnosticsPanel from './ConnectionDiagnosticsPanel';
-import './data-settings.css';
+import {
+  SettingsBadge,
+  SettingsButton,
+  SettingsField,
+  SettingsSection,
+} from './shared';
 
 type CredentialSecuritySettingsProps = {
   account: Account;
@@ -74,21 +79,17 @@ export default function CredentialSecuritySettings({
   }, [hasSecret]);
 
   return (
-    <section
-      className="tool-panel settings-credential-panel"
-      data-credential-provider={guidance.providerId}
-      data-settings-section="auth"
+    <SettingsSection
+      title="本地凭据存储"
+      description={account.email}
+      badge={
+        activeCredentialStatus?.exists
+          ? <SettingsBadge tone="success">已保存到本地</SettingsBadge>
+          : <SettingsBadge tone="neutral">等待本地凭据</SettingsBadge>
+      }
+      className="settings-credential-panel"
+      dataSection="auth"
     >
-      <header className="tool-header">
-        <span className="credential-panel-title">
-          <strong>本地凭据存储</strong>
-          <small>{account.email}</small>
-        </span>
-        <em className={activeCredentialStatus?.exists ? 'stored' : ''}>
-          {activeCredentialStatus?.exists ? '已保存到本地' : '等待本地凭据'}
-        </em>
-      </header>
-
       <div className="credential-guide-card">
         <span className="credential-guide-icon" aria-hidden="true">
           <ShieldCheck size={17} />
@@ -106,8 +107,7 @@ export default function CredentialSecuritySettings({
         </p>
       )}
 
-      <label className="credential-field">
-        <span>{guidance.credentialLabel}</span>
+      <SettingsField label={guidance.credentialLabel} hint={guidance.verificationHint}>
         <div className="credential-input-shell">
           <input
             aria-label={guidance.credentialLabel}
@@ -142,8 +142,7 @@ export default function CredentialSecuritySettings({
             </button>
           </div>
         </div>
-        <small>{guidance.verificationHint}</small>
-      </label>
+      </SettingsField>
 
       <ul className="credential-safety-points" aria-label="凭据安全说明">
         {guidance.checklist.map((item) => (
@@ -154,38 +153,29 @@ export default function CredentialSecuritySettings({
         ))}
       </ul>
 
-      <div className="credential-actions">
-        <button className="secondary" type="button" onClick={onCheckCredential}>
-          <Search size={14} />
+      <div className="st-actions">
+        <SettingsButton icon={<Search size={14} />} onClick={onCheckCredential}>
           检查存储
-        </button>
-        <button
-          className="secondary danger"
+        </SettingsButton>
+        <SettingsButton
+          variant="danger-secondary"
           disabled={activeCredentialStatus?.exists === false}
-          type="button"
+          icon={<Trash2 size={14} />}
           onClick={onDeleteCredential}
         >
-          <Trash2 size={14} />
           删除
-        </button>
-        <button
-          className="secondary"
-          disabled={!hasSecret}
-          type="button"
-          onClick={onStoreCredential}
-        >
-          <KeyRound size={14} />
+        </SettingsButton>
+        <SettingsButton disabled={!hasSecret} icon={<KeyRound size={14} />} onClick={onStoreCredential}>
           仅保存
-        </button>
-        <button
-          data-credential-primary-action
+        </SettingsButton>
+        <SettingsButton
+          variant="primary"
           title={hasSecret ? '保存到本地数据库后立即验证 IMAP 与 SMTP 登录' : '验证已保存的 IMAP 与 SMTP 凭据'}
-          type="button"
+          icon={<BadgeCheck size={14} />}
           onClick={hasSecret ? onStoreAndVerifyCredential : onVerifyCredential}
         >
-          <BadgeCheck size={14} />
           {hasSecret ? '保存并验证' : '验证登录'}
-        </button>
+        </SettingsButton>
       </div>
 
       <ConnectionDiagnosticsPanel
@@ -197,6 +187,6 @@ export default function CredentialSecuritySettings({
         providerValidationRunning={providerValidationRunning}
         onRunProviderValidation={onRunProviderValidation}
       />
-    </section>
+    </SettingsSection>
   );
 }

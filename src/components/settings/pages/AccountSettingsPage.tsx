@@ -200,7 +200,7 @@ export default function AccountSettingsPage({
   }
 
   return (
-    <div className="settings-account-stack settings-account-page settings-account-page-accounts">
+    <>
       <AccountList
         accounts={accounts}
         activeAccountId={accountForm?.id ?? null}
@@ -211,9 +211,6 @@ export default function AccountSettingsPage({
         }}
         onOpen={openAccountDialog}
       />
-
-
-
 
       {addDialogOpen && (
         <AddAccountDialog
@@ -257,6 +254,6 @@ export default function AccountSettingsPage({
           onSaveAccountSettings={onSaveAccountSettings}
         />
       )}
-    </div>
+    </>
   );
 }

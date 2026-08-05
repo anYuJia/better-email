@@ -91,6 +91,57 @@
   border-bottom-color: var(--st-border);
 }
 
+/* --- Subsection (group inside a section body) --- */
+.settings-modal .st-subsection {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .st-subsection:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-modal .st-subsection-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-modal .st-subsection-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .st-subsection-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .st-subsection-header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 440;
+  line-height: 1.45;
+}
+
+.settings-modal .st-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* --- Row --- */
 .settings-modal .st-row {
   min-width: 0;
@@ -386,6 +437,10 @@
   justify-content: space-between;
 }
 
+.settings-modal .st-actions.end {
+  justify-self: end;
+}
+
 /* --- Badge --- */
 .settings-modal .st-badge {
   display: inline-flex;
@@ -511,6 +566,56 @@
 .settings-modal .st-notice-success .st-notice-icon,
 .settings-modal .st-notice-success .st-notice-copy strong {
   color: var(--st-success);
+}
+
+/* --- Key-value list (trust list etc.) --- */
+.settings-modal .st-trust-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .st-trust-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .st-trust-row:first-child {
+  border-top: 0;
+}
+
+.settings-modal .st-trust-row em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--st-text);
+  font-style: normal;
+  font-size: var(--st-font-size-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .st-trust-row small {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-trust-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .settings-modal .st-trust-row small {
+    display: none;
+  }
 }
 
 /* --- Empty state --- */

@@ -8,6 +8,7 @@ import {
   syncModeOptions,
 } from './accountSettingsShared';
 import { CustomSelect } from './CustomSelect';
+import { SettingsButton } from '../shared';
 
 type AddAccountDialogProps = {
   form: AccountCreateInput;
@@ -92,7 +93,7 @@ export default function AddAccountDialog({
           </button>
         </header>
 
-        <div className="settings-account-form-grid" style={{ marginBottom: '14px' }}>
+        <div className="st-section-body settings-account-form-grid">
           <label>
             邮箱地址
             <input
@@ -155,13 +156,13 @@ export default function AddAccountDialog({
                 : '未识别服务商，请打开手动配置填写服务器'}
             </small>
           </span>
-          <button type="button" onClick={() => onManualConfigOpenChange(!manualConfigOpen)}>
+          <SettingsButton size="sm" onClick={() => onManualConfigOpenChange(!manualConfigOpen)}>
             {manualConfigOpen ? '收起配置' : '手动配置'}
-          </button>
+          </SettingsButton>
         </div>
 
         {manualConfigOpen && (
-          <>
+          <div className="st-section-body dialog-nested-body">
             <div className="settings-account-form-grid">
               <label>
                 认证方式
@@ -171,7 +172,6 @@ export default function AddAccountDialog({
                   onChange={(val) => onFormChange({ ...form, auth_type: val })}
                 />
               </label>
-              <label style={{ display: 'none' }} />
             </div>
 
             <div className="settings-account-protocol-grid" aria-label="邮件协议">
@@ -216,7 +216,7 @@ export default function AddAccountDialog({
                 />
               </label>
             </div>
-          </>
+          </div>
         )}
 
         {error && (
@@ -226,36 +226,22 @@ export default function AddAccountDialog({
         )}
 
         {submitting && (
-          <div className="settings-account-add-progress" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 12px',
-            background: '#f4f8fc',
-            borderRadius: '6px',
-            border: '1px solid #dbebfa',
-            margin: '0 0 12px 0',
-            fontSize: '11px',
-            color: '#465b70',
-          }}>
+          <div className="settings-account-add-progress">
             <div className="deferred-spinner" />
             <span>{submittingStage || '正在处理中，请稍候...'}</span>
           </div>
         )}
 
         <footer>
-          <button type="button" className="settings-account-add-cancel" onClick={onClose}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="settings-account-add-submit"
+          <SettingsButton onClick={onClose}>取消</SettingsButton>
+          <SettingsButton
+            variant="primary"
             disabled={!canSubmit || submitting}
+            icon={!submitting ? <Plus size={14} /> : undefined}
             onClick={onSubmit}
           >
-            {!submitting && <Plus size={14} />}
             {submitting ? '添加中' : '添加'}
-          </button>
+          </SettingsButton>
         </footer>
       </section>
     </div>

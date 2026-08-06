@@ -36,6 +36,21 @@ body {
   cursor: grabbing;
 }
 
+/* The sidebar brand row below the strip is also dead space; let it drag the
+ * window too. Width follows the resizable sidebar via --app-sidebar-width. */
+.window-drag-region-side {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: var(--app-sidebar-width, 240px);
+  height: 40px;
+  cursor: grab;
+}
+
+.window-drag-region-side:active {
+  cursor: grabbing;
+}
+
 /* macOS: the strip also hosts the traffic lights at the top-left. */
 .window-chrome-macos {
   height: 32px;

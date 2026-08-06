@@ -72,6 +72,11 @@ export default function WindowChrome() {
         onMouseDown={handleDrag}
         role="presentation"
       />
+      <div
+        className="window-drag-region-side"
+        onMouseDown={handleDrag}
+        role="presentation"
+      />
       {platform !== 'macos' && (
         <div className="window-controls" data-no-window-drag>
           <button

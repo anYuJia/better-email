@@ -1182,7 +1182,10 @@ export default function App() {
   return (
     <main
       className="app-shell"
-      style={{ gridTemplateColumns: `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(360px, 1fr)` }}
+      style={{
+        gridTemplateColumns: `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(360px, 1fr)`,
+        '--app-sidebar-width': `${appLayout.sidebar}px`,
+      } as React.CSSProperties}
       onPointerMove={moveLayoutResize}
       onPointerUp={endLayoutResize}
       onPointerCancel={endLayoutResize}

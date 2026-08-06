@@ -1154,8 +1154,6 @@ h1 {
   border-top: 1px solid var(--line);
 }
 
-.composer footer button,
-.settings-modal footer button,
 .credential-actions button,
 .tool-actions button:not(.secondary),
 .tool-header button,
@@ -1167,8 +1165,6 @@ h1 {
   box-shadow: 0 8px 18px rgba(10, 132, 255, 0.22);
 }
 
-.composer footer button:hover,
-.settings-modal footer button:hover,
 .credential-actions button:hover,
 .tool-actions button:not(.secondary):hover,
 .tool-header button:hover,
@@ -1178,8 +1174,6 @@ h1 {
   color: #fff;
 }
 
-.composer footer button.secondary,
-.settings-modal footer button.secondary,
 .credential-actions button.secondary,
 .tool-actions button.secondary {
   border: 1px solid var(--line);
@@ -1605,16 +1599,6 @@ h1 {
   padding: 0;
   display: grid;
   place-items: center;
-}
-
-.composer footer button,
-.settings-modal footer button {
-  min-width: 86px;
-}
-
-.composer footer button:last-child,
-.settings-modal footer button:last-child {
-  min-width: 76px;
 }
 
 .provider-presets {

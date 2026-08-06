@@ -22,9 +22,11 @@ type LinkSafetyDialogProps = {
 export default function LinkSafetyDialog({ link, onClose, onComposeNew }: LinkSafetyDialogProps) {
   if (!link) return null;
 
+  const showDomainWarning = shouldWarnForLinkDisplay(link.href, link.text);
+
   return createPortal((
     <div
-      className="settings-cache-confirm-backdrop"
+      className="dialog-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -32,22 +34,22 @@ export default function LinkSafetyDialog({ link, onClose, onComposeNew }: LinkSa
       }}
     >
       <section
-        className="settings-cache-confirm"
+        className="dialog-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="link-confirm-title"
         style={{ width: '480px' }}
       >
         <header>
-          <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fef3c7', color: '#d97706' }}>
+          <span className="dialog-card-mark dialog-card-mark-warning" aria-hidden="true">
             <ExternalLink size={17} />
           </span>
-          <span>
+          <span className="dialog-card-heading">
             <strong id="link-confirm-title">安全链接检查</strong>
             <small>请确认目标链接与显示的域名一致</small>
           </span>
           <button
-            className="icon-only-action"
+            className="dialog-card-close"
             type="button"
             title="关闭"
             aria-label="关闭安全检查"
@@ -56,36 +58,28 @@ export default function LinkSafetyDialog({ link, onClose, onComposeNew }: LinkSa
             <X size={16} />
           </button>
         </header>
-        <div className="settings-cache-confirm-summary" style={{ background: '#fffbeb', borderLeft: '3px solid #f59e0b', wordBreak: 'break-all' }}>
-          <div style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>真实目标地址：</div>
-          <strong style={{ fontSize: '13px', color: '#1f2937', display: 'block' }}>{link.href}</strong>
+        <div className="dialog-card-summary">
+          <small>真实目标地址：</small>
+          <strong>{link.href}</strong>
         </div>
-        <div style={{ fontSize: '12.5px', color: '#374151', margin: '14px 0', lineHeight: '1.5' }}>
-          {(() => {
-            const showDomainWarning = shouldWarnForLinkDisplay(link.href, link.text);
-
-            if (showDomainWarning) {
-              return (
-                <div style={{ padding: '10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b', fontWeight: 'bold' }}>
-                  ⚠️ 风险提示：显示的链接文本与实际指向的域名不一致！这可能是一个钓鱼链接，请谨慎访问。
-                </div>
-              );
-            }
-            return '您点击的链接将通过系统默认浏览器打开，请确认该目标地址安全。';
-          })()}
-        </div>
+        {showDomainWarning ? (
+          <div className="dialog-link-warning" role="alert">
+            ⚠️ 风险提示：显示的链接文本与实际指向的域名不一致！这可能是一个钓鱼链接，请谨慎访问。
+          </div>
+        ) : (
+          <p>您点击的链接将通过系统默认浏览器打开，请确认该目标地址安全。</p>
+        )}
         <footer>
           <button
-            className="secondary"
+            className="dialog-button dialog-button-secondary"
             type="button"
             onClick={onClose}
           >
             取消访问
           </button>
           <button
-            className="primary"
+            className="dialog-button dialog-button-primary"
             type="button"
-            style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             onClick={async () => {
               if (link.href.toLowerCase().startsWith('mailto:')) {
                 const parsed = parseMailtoUrl(link.href);

@@ -495,8 +495,7 @@
 .tool-header button,
 .tool-actions button,
 .credential-actions button,
-.rule-editor button,
-.settings-modal footer button {
+.rule-editor button {
   border-radius: 8px;
 }
 

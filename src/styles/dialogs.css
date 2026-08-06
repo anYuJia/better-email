@@ -349,15 +349,6 @@
 }
 .composer footer, .settings-modal footer { background: #f5f6f8; color: #68717d; }
 .composer footer div, .settings-modal footer div { display: flex; gap: 8px; }
-.composer footer button, .settings-modal footer button {
-  border: none;
-  border-radius: 7px;
-  background: #3aa675;
-  color: white;
-  padding: 9px 14px;
-  font-weight: 700;
-}
-.composer footer button.secondary, .settings-modal footer button.secondary { background: #1f2933; }
 .settings-modal {
   padding-bottom: 0;
   align-self: center;

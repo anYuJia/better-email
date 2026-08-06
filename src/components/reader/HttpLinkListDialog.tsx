@@ -13,7 +13,7 @@ export default function HttpLinkListDialog({ links, onClose, onOpenLink }: HttpL
 
   return createPortal((
     <div
-      className="settings-cache-confirm-backdrop"
+      className="dialog-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -21,22 +21,22 @@ export default function HttpLinkListDialog({ links, onClose, onOpenLink }: HttpL
       }}
     >
       <section
-        className="settings-cache-confirm"
+        className="dialog-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="http-links-dialog-title"
         style={{ width: '480px' }}
       >
         <header>
-          <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#fef3c7', color: '#d97706' }}>
+          <span className="dialog-card-mark dialog-card-mark-warning" aria-hidden="true">
             <Link2 size={17} />
           </span>
-          <span>
+          <span className="dialog-card-heading">
             <strong id="http-links-dialog-title">正文中的明文 HTTP 链接</strong>
             <small>链接未加密，打开前请核对目标地址</small>
           </span>
           <button
-            className="icon-only-action"
+            className="dialog-card-close"
             type="button"
             title="关闭"
             aria-label="关闭"
@@ -60,7 +60,7 @@ export default function HttpLinkListDialog({ links, onClose, onOpenLink }: HttpL
           ))}
         </div>
         <footer>
-          <button className="secondary" type="button" onClick={onClose}>
+          <button className="dialog-button dialog-button-secondary" type="button" onClick={onClose}>
             关闭
           </button>
         </footer>

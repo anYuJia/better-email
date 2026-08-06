@@ -286,14 +286,14 @@ export default function ComposerWindow({
             {autosave && !isDraftEmpty(draft) ? ` · 自动保存 ${formatDate(autosave.saved_at)}` : ''}
           </span>
           <div>
-            <button className="secondary" onClick={onSaveDraft}>
+            <button className="dialog-button dialog-button-secondary" onClick={onSaveDraft}>
               <Save size={14} />
               保存草稿
             </button>
-            <button className="secondary" onClick={onQueueDraft}>
+            <button className="dialog-button dialog-button-secondary" onClick={onQueueDraft}>
               {draft.send_at.trim() ? '稍后发送' : '发件箱'}
             </button>
-            <button onClick={onSendDraft}>
+            <button className="dialog-button dialog-button-primary" onClick={onSendDraft}>
               <Send size={14} />
               发送
             </button>

@@ -19,7 +19,8 @@ type BackgroundSchedulerOptions = {
   setNotificationStatus: Dispatch<SetStateAction<string>>;
   setBackgroundSyncStatus: Dispatch<SetStateAction<string>>;
   setStatus: Dispatch<SetStateAction<string>>;
-  sendDueOutboxItems: () => Promise<string>;
+  showToast: (text: string) => void;
+  sendDueOutboxItems: () => Promise<{ message: string; items: OutboxItem[] }>;
   enqueueBackgroundTask: (kind: 'sync', source: 'manual' | 'timer') => Promise<void>;
 };
 
@@ -31,6 +32,7 @@ export default function useBackgroundScheduler({
   setNotificationStatus,
   setBackgroundSyncStatus,
   setStatus,
+  showToast,
   sendDueOutboxItems,
   enqueueBackgroundTask,
 }: BackgroundSchedulerOptions) {
@@ -70,7 +72,16 @@ export default function useBackgroundScheduler({
         messageId: nextScheduledItem.message_id,
         dueAt: nextScheduledItem.next_attempt_at,
       });
-      sendDueOutboxItems().catch((error) => setStatus(String(error)));
+      sendDueOutboxItems()
+        .then(({ items }) => {
+          const flushedItem = items.find((entry) => entry.id === nextScheduledItem.id);
+          const delivered =
+            !flushedItem ||
+            flushedItem.status === 'sent' ||
+            flushedItem.status === 'sent_remote_pending';
+          if (delivered) showToast('邮件已发送');
+        })
+        .catch((error) => setStatus(String(error)));
     }, timerDelay);
 
     return () => {
@@ -85,6 +96,7 @@ export default function useBackgroundScheduler({
     setOutbox,
     setPendingSendUndo,
     setStatus,
+    showToast,
   ]);
 
   useEffect(() => {

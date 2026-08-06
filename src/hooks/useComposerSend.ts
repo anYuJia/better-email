@@ -31,6 +31,7 @@ type ComposerSendOptions = {
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  showToast: (text: string) => void;
   draftInputForCurrentAccount: (input: DraftInput) => DraftInput;
   threadingForDraft: (input: DraftInput) => { in_reply_to: string; references: string } | null;
   clearComposerAutosave: () => void;
@@ -62,6 +63,7 @@ export default function useComposerSend({
   setPendingSendUndo,
   setSelectedId,
   setStatus,
+  showToast,
   draftInputForCurrentAccount,
   threadingForDraft,
   clearComposerAutosave,
@@ -114,7 +116,8 @@ export default function useComposerSend({
         setDraft(emptyDraft);
         clearComposerAutosave();
         forceCloseComposer();
-        await focusMailboxRole('sent', input.account_id || account?.id || null, '邮件已发送并进入已发送');
+        await focusMailboxRole('sent', input.account_id || account?.id || null, '');
+        showToast('邮件已发送');
         composerFlowLog('sendDraft done', {
           messageId,
           accountId: input.account_id,
@@ -159,7 +162,7 @@ export default function useComposerSend({
       accountId: input.account_id,
       targetRole: 'outbox',
     });
-  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, closeComposer, forceCloseComposer, focusMailboxRole, account, setOutbox, setPendingSendUndo, setStatus]);
+  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, closeComposer, forceCloseComposer, focusMailboxRole, account, setOutbox, setPendingSendUndo, setStatus, showToast]);
 
   const sendQuickReply = useCallback(async (message: Message) => {
     const body = quickReplyBody.trim();
@@ -194,7 +197,7 @@ export default function useComposerSend({
         setQuickReplyBody('');
         await refreshAll();
         setSelectedId(message.id);
-        setStatus(`已快速回复：${message.sender_name || message.sender_email}`);
+        showToast(`已快速回复：${message.sender_name || message.sender_email}`);
         composerFlowLog('sendQuickReply done', {
           messageId,
           accountId: message.account_id,
@@ -247,7 +250,7 @@ export default function useComposerSend({
         targetRole: 'outbox',
       });
     }
-  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, refreshAll, setSelectedId, setStatus, focusMailboxRole, setOutbox, setPendingSendUndo]);
+  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, refreshAll, setSelectedId, setStatus, showToast, focusMailboxRole, setOutbox, setPendingSendUndo]);
 
   const queueDraft = useCallback(async () => {
     if (!draft.to.trim()) {

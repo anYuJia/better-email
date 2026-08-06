@@ -19,6 +19,7 @@ function renderComposer() {
   const setPendingSendUndo = vi.fn();
   const setSelectedId = vi.fn();
   const setStatus = vi.fn();
+  const showToast = vi.fn();
   const refreshAll = vi.fn().mockResolvedValue(undefined);
   const loadMeta = vi.fn().mockResolvedValue({ folderId: 101, folders: [] });
   const focusMailboxRole = vi.fn().mockResolvedValue(undefined);
@@ -34,6 +35,7 @@ function renderComposer() {
     setPendingSendUndo,
     setSelectedId,
     setStatus,
+    showToast,
     loadMeta,
     refreshAll,
     focusMailboxRole,

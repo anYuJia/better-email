@@ -65,6 +65,7 @@ type UseComposerControllerOptions = {
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  showToast: (text: string) => void;
   loadMeta: (folderId?: number | null) => Promise<LoadMetaResult>;
   refreshAll: () => Promise<void>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
@@ -89,6 +90,7 @@ export default function useComposerController({
   setPendingSendUndo,
   setSelectedId,
   setStatus,
+  showToast,
   loadMeta,
   refreshAll,
   focusMailboxRole,
@@ -163,6 +165,7 @@ export default function useComposerController({
     setPendingSendUndo,
     setSelectedId,
     setStatus,
+    showToast,
     draftInputForCurrentAccount,
     threadingForDraft,
     clearComposerAutosave,

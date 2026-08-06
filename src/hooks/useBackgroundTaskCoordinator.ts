@@ -65,6 +65,7 @@ type UseBackgroundTaskCoordinatorOptions = {
   setNotificationStatus: Dispatch<SetStateAction<string>>;
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  showToast: (text: string) => void;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -110,6 +111,7 @@ export default function useBackgroundTaskCoordinator({
   setNotificationStatus,
   setPendingSendUndo,
   setStatus,
+  showToast,
   loadMeta,
   loadMessages,
   releaseDueSnoozedMessages,
@@ -258,7 +260,7 @@ export default function useBackgroundTaskCoordinator({
 
   const executeBackgroundTask = useCallback(async (task: BackgroundTask): Promise<string> => {
     if (task.kind === 'sync') return runBackgroundSync(task.source);
-    if (task.kind === 'outbox-smtp' && task.source === 'timer') return sendDueOutboxItems();
+    if (task.kind === 'outbox-smtp' && task.source === 'timer') return (await sendDueOutboxItems()).message;
     if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
     return flushOutboxDryRun();
   }, [flushOutboxDryRun, flushOutboxSmtp, runBackgroundSync, sendDueOutboxItems]);
@@ -332,6 +334,7 @@ export default function useBackgroundTaskCoordinator({
     setNotificationStatus,
     setBackgroundSyncStatus,
     setStatus,
+    showToast,
     sendDueOutboxItems,
     enqueueBackgroundTask,
   });

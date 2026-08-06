@@ -51,11 +51,7 @@ export default function UndoSnackbarStack({
       {pendingSendUndo && (
         <section className="undo-snackbar send-undo-snackbar" role="status" aria-live="polite">
           <div>
-            <strong>
-              {secondsLeft > 0
-                ? `邮件将在 ${secondsLeft} 秒后发送`
-                : '邮件已发送'}
-            </strong>
+            <strong>邮件将在 {secondsLeft} 秒后发送</strong>
             <span>{pendingSendUndo.subject} · 预计 {formatDate(pendingSendUndo.expiresAt)}</span>
           </div>
           <button type="button" onClick={onUndoSend}>

@@ -44,7 +44,7 @@ export default function useOutboxFlush({
     return message;
   }, [setOutbox, setStatus, refreshMailboxContext]);
 
-  const sendDueOutboxItems = useCallback(async (): Promise<string> => {
+  const sendDueOutboxItems = useCallback(async (): Promise<{ message: string; items: OutboxItem[] }> => {
     outboxFlowLog('scheduled smtp due start');
     let items: OutboxItem[];
     try {
@@ -64,7 +64,7 @@ export default function useOutboxFlush({
       message,
     });
     setStatus(message);
-    return message;
+    return { message, items };
   }, [setOutbox, setStatus, refreshMailboxContext]);
 
   return {

@@ -18,6 +18,7 @@ import ConfirmationDialogs from './components/ConfirmationDialogs';
 import ConfirmDialog from './components/ConfirmDialog';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
+import MessageToastStack, { type MessageToast } from './components/MessageToastStack';
 import useAppLayout from './hooks/useAppLayout';
 import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
@@ -290,6 +291,15 @@ export default function App() {
     queueUndoAction,
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
+  const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
+  const messageToastIdRef = useRef(0);
+  const showMessageToast = useCallback((text: string) => {
+    const id = ++messageToastIdRef.current;
+    setMessageToasts((current) => [...current, { id, text }]);
+    window.setTimeout(() => {
+      setMessageToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 3000);
+  }, []);
   const {
     loadMeta,
     releaseDueSnoozedMessages,
@@ -425,6 +435,7 @@ export default function App() {
     setNotificationStatus,
     setPendingSendUndo,
     setStatus,
+    showToast: showMessageToast,
     loadMeta,
     loadMessages,
     releaseDueSnoozedMessages,
@@ -748,6 +759,7 @@ export default function App() {
     setPendingSendUndo,
     setSelectedId,
     setStatus,
+    showToast: showMessageToast,
     loadMeta: (nextFolderId?: number | null) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     refreshAll,
     focusMailboxRole,
@@ -1716,6 +1728,7 @@ export default function App() {
         }}
         onDismissAction={clearUndoAction}
       />
+      <MessageToastStack toasts={messageToasts} />
       <GlobalTooltip />
       {composerCloseConfirmOpen && (
         <ComposerCloseConfirmDialog

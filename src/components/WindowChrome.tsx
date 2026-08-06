@@ -1,5 +1,6 @@
 import { useEffect, type MouseEvent as ReactMouseEvent } from 'react';
 import { Maximize2, Minus, X } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
@@ -17,12 +18,13 @@ export function detectDesktopPlatform(): DesktopPlatform {
 
 /**
  * Custom window chrome for the frameless/transparent window:
- * - macOS gets the system traffic lights from the overlay title bar; the
- *   top strip stays draggable.
- * - Windows/Linux hide the native decorations (window_chrome_ready) and
- *   render their own minimize / maximize / close controls.
+ * - macOS: the overlay title bar draws traffic lights at the top-left, so
+ *   only the sidebar gets headroom and the drag strip spans the sidebar.
+ * - Windows/Linux: hide the native decorations (window_chrome_ready), render
+ *   minimize/maximize/close controls at the top-right and reserve headroom
+ *   above the mail panes.
  */
-export default function WindowChrome() {
+export default function WindowChrome({ sidebarWidth = 240 }: { sidebarWidth?: number }) {
   const platform = detectDesktopPlatform();
 
   useEffect(() => {
@@ -38,25 +40,19 @@ export default function WindowChrome() {
 
   if (platform === 'web') return null;
 
-  async function withCurrentWindow(action: (window: TauriWindow) => Promise<void>) {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await action(getCurrentWindow());
-  }
-
   async function toggleMaximize() {
-    await withCurrentWindow(async (window) => {
-      if (await window.isMaximized()) {
-        await window.unmaximize();
-      } else {
-        await window.maximize();
-      }
-    });
+    const window = getCurrentWindow();
+    if (await window.isMaximized()) {
+      await window.unmaximize();
+    } else {
+      await window.maximize();
+    }
   }
 
   const handleDrag = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.detail > 1) return;
     if (event.target instanceof Element && event.target.closest('button')) return;
-    void withCurrentWindow((window) => window.startDragging()).catch((error) => {
+    getCurrentWindow().startDragging().catch((error) => {
       console.error('Failed to start window dragging', error);
     });
   };
@@ -68,6 +64,7 @@ export default function WindowChrome() {
   return (
     <div
       className={`window-chrome window-chrome-${platform}`}
+      style={platform === 'macos' ? { width: sidebarWidth } : undefined}
       onDoubleClick={handleDoubleClick}
       role="presentation"
     >
@@ -84,7 +81,7 @@ export default function WindowChrome() {
             className="window-control"
             aria-label="最小化窗口"
             title="最小化"
-            onClick={() => void withCurrentWindow((window) => window.minimize())}
+            onClick={() => void getCurrentWindow().minimize()}
           >
             <Minus size={15} strokeWidth={1.7} />
           </button>
@@ -102,7 +99,7 @@ export default function WindowChrome() {
             className="window-control window-control-close"
             aria-label="关闭窗口"
             title="关闭"
-            onClick={() => void withCurrentWindow((window) => window.close())}
+            onClick={() => void getCurrentWindow().close()}
           >
             <X size={15} strokeWidth={1.7} />
           </button>
@@ -111,5 +108,3 @@ export default function WindowChrome() {
     </div>
   );
 }
-
-type TauriWindow = Awaited<ReturnType<typeof import('@tauri-apps/api/window')['getCurrentWindow']>>;

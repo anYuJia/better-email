@@ -2,6 +2,12 @@
  * Custom window chrome for the frameless, transparent window.
  * The webview background is transparent so the desktop shows through the
  * top strip; the app shell supplies its own background below it.
+ *
+ * Headroom is applied per pane, not to the whole shell:
+ * - macOS: traffic lights sit at the top-left, so only the sidebar gets
+ *   extra top padding and the drag strip spans the sidebar width.
+ * - Windows/Linux: custom controls sit at the top-right, so the mail panes
+ *   get the headroom instead.
  */
 
 html,
@@ -12,9 +18,10 @@ body {
 /* Top drag strip: sits above the app content, below dialogs/overlays. */
 .window-chrome {
   position: fixed;
-  inset: 0 0 auto;
-  z-index: 100;
+  top: 0;
+  left: 0;
   height: 36px;
+  z-index: 100;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -29,20 +36,27 @@ body {
   cursor: grabbing;
 }
 
-/* The macOS overlay title bar draws traffic lights at the top-left; give
- * the sidebar a little more headroom so the brand sits clear of them. */
+/* macOS: taller strip for the traffic lights, spanning only the sidebar. */
 .window-chrome-macos {
   height: 44px;
 }
 
-/* Push the whole app shell below the drag strip. */
-.platform-macos .app-shell {
-  padding-top: 44px;
+/* Sidebar headroom for the macOS traffic lights. */
+.platform-macos .sidebar {
+  padding-top: 52px;
 }
 
-.platform-windows .app-shell,
-.platform-linux .app-shell {
+/* Mail pane headroom for the Windows/Linux drag strip and window controls. */
+.platform-windows .message-list-panel,
+.platform-linux .message-list-panel,
+.platform-windows .reader-panel,
+.platform-linux .reader-panel {
   padding-top: 36px;
+}
+
+/* Keep the sidebar footer pinned so it never collapses when panes shrink. */
+.sidebar-footer {
+  flex-shrink: 0;
 }
 
 /* Window controls for frameless Windows/Linux builds. */

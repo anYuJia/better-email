@@ -61,7 +61,7 @@
   box-shadow: none;
   font-size: 13.5px;
   line-height: 1.55;
-  resize: vertical;
+  resize: none;
 }
 
 .quick-reply textarea::placeholder {
@@ -69,8 +69,14 @@
 }
 
 .quick-reply textarea:focus {
-  border-color: #b8c4d1;
-  box-shadow: 0 0 0 1px rgba(31, 35, 40, 0.04);
+  border-color: var(--ui-accent);
+  box-shadow: none;
+}
+
+.quick-reply textarea:focus-visible {
+  border-color: var(--ui-accent) !important;
+  box-shadow: none !important;
+  outline: none;
 }
 
 .quick-reply > footer {

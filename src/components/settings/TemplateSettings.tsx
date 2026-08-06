@@ -398,6 +398,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
           </SettingsField>
           <SettingsField label="适用账号">
             <CustomSelect
+              dense
               ariaLabel="适用账号"
               value={String(editor.account_id)}
               options={[

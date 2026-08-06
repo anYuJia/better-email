@@ -16,6 +16,7 @@ type CustomSelectProps = {
   ariaLabel?: string;
   disabled?: boolean;
   disabledValues?: readonly string[];
+  dense?: boolean;
 };
 
 type MenuPlacement = {
@@ -37,6 +38,7 @@ export function CustomSelect({
   ariaLabel,
   disabled = false,
   disabledValues = [],
+  dense = false,
 }: CustomSelectProps) {
   const activeOption = options.find((o) => o.value === value) || options[0];
   const [open, setOpen] = useState(false);
@@ -96,7 +98,7 @@ export function CustomSelect({
     ? createPortal(
         <div
           ref={menuRef}
-          className="custom-select-dropdown"
+          className={`custom-select-dropdown ${dense ? 'dense' : ''}`.trim()}
           role="listbox"
           aria-label={ariaLabel}
           style={{
@@ -141,7 +143,7 @@ export function CustomSelect({
       <button
         ref={triggerRef}
         type="button"
-        className="custom-select-summary"
+        className={`custom-select-summary ${dense ? 'dense' : ''}`.trim()}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}

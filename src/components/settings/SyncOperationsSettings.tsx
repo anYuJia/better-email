@@ -219,6 +219,7 @@ export default function SyncOperationsSettings({
                 {mailbox.local_role === 'custom' ? (
                   <div className="mailbox-map-controls">
                     <CustomSelect
+                      dense
                       ariaLabel={`映射远端目录 ${mailbox.remote_name}`}
                       value={mailbox.local_folder_id ? String(mailbox.local_folder_id) : ''}
                       options={[

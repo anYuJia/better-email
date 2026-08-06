@@ -59,6 +59,12 @@
   color: var(--ui-text-tertiary, #646f7b);
 }
 
+.custom-select-summary.dense {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
 .custom-select-summary:hover {
   border-color: var(--ui-border-strong, #c3ccd5);
 }
@@ -97,6 +103,11 @@
   box-shadow: none;
   font-size: 14px;
   text-align: left;
+}
+
+.custom-select-dropdown.dense button {
+  min-height: 30px;
+  padding: 3px 10px;
 }
 
 .custom-select-dropdown button > span {

@@ -80,6 +80,7 @@ export default function ProviderSettingsPage({
       <label>
         收信协议
         <CustomSelect
+          dense
           ariaLabel="收信协议"
           value={accountForm.incoming_protocol}
           options={[
@@ -129,6 +130,7 @@ export default function ProviderSettingsPage({
       >
         <SettingsField label="服务商">
           <CustomSelect
+            dense
             ariaLabel="服务商"
             value={providerOption}
             options={ordinaryProviderOptions.map((option) => ({
@@ -213,6 +215,7 @@ export default function ProviderSettingsPage({
             }>
               <SettingsField label="验证状态">
                 <CustomSelect
+                  dense
                   ariaLabel="验证状态"
                   value={activeProviderVerification.status}
                   options={[

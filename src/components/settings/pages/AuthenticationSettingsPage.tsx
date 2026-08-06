@@ -73,6 +73,7 @@ export default function AuthenticationSettingsPage({
       >
         <SettingsField label="登录方式">
           <CustomSelect
+            dense
             ariaLabel="登录方式"
             value={accountForm.auth_type}
             options={[

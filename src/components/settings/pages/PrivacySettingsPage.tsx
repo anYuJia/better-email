@@ -44,6 +44,7 @@ export default function PrivacySettingsPage({
         <div className="st-field">
           <label className="st-field-label" id="privacy-account-select-label">配置账号</label>
           <CustomSelect
+            dense
             ariaLabel="配置账号"
             value={String(accountForm.id)}
             options={accounts.map((item) => ({

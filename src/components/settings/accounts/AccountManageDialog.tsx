@@ -100,6 +100,7 @@ export default function AccountManageDialog({
               <label>
                 获取新邮件时间
                 <CustomSelect
+                  dense
                   value={account.sync_mode === 'push' ? '5min' : account.sync_mode}
                   options={syncModeOptions}
                   onChange={(val) => onAccountChange({ ...account, sync_mode: val })}
@@ -115,6 +116,7 @@ export default function AccountManageDialog({
               <label>
                 认证方式
                 <CustomSelect
+                  dense
                   value={account.auth_type}
                   options={authTypeOptions}
                   onChange={(val) => onAccountChange({ ...account, auth_type: val })}
@@ -123,6 +125,7 @@ export default function AccountManageDialog({
               <label>
                 收信协议
                 <CustomSelect
+                  dense
                   value={account.incoming_protocol}
                   options={protocolOptions}
                   onChange={(val) => onProtocolChange(val as IncomingProtocol)}

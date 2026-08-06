@@ -140,6 +140,7 @@ export default function AddAccountDialog({
           <label>
             获取新邮件时间
             <CustomSelect
+              dense
               value={form.sync_mode === 'push' ? '5min' : form.sync_mode}
               options={syncModeOptions}
               onChange={(val) => onFormChange({ ...form, sync_mode: val })}
@@ -167,6 +168,7 @@ export default function AddAccountDialog({
               <label>
                 认证方式
                 <CustomSelect
+                  dense
                   value={form.auth_type}
                   options={authTypeOptions}
                   onChange={(val) => onFormChange({ ...form, auth_type: val })}
@@ -178,6 +180,7 @@ export default function AddAccountDialog({
               <label>
                 收信协议
                 <CustomSelect
+                  dense
                   value={form.incoming_protocol}
                   options={protocolOptions}
                   onChange={(val) => onProtocolChange(val as IncomingProtocol)}

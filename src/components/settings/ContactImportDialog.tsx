@@ -276,6 +276,7 @@ export default function ContactImportDialog({
                           )}
                         </span>
                         <CustomSelect
+                          dense
                           ariaLabel={`${entry.name || entry.email} 导入操作`}
                           value={selectionMap[key] ?? defaultActionFor(entry.status)}
                           disabled={entry.status === 'invalid' && !editFixedEmail}

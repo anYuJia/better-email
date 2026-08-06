@@ -36,6 +36,7 @@ export default function SendingSettingsPage({
         control={
           <SettingsField label="延迟时间">
             <CustomSelect
+              dense
               value={String(sendUndoDelaySeconds)}
               options={sendUndoDelayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
               onChange={(val) => onSendUndoDelayChange(Number(val) as SendUndoDelaySeconds)}

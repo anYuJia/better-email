@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { UndoAction } from '../app/types';
 import type { SendUndoDelaySeconds } from '../app/appConfig';
@@ -19,6 +20,10 @@ type UndoSnackbarStackProps = {
   onDismissAction: () => void;
 };
 
+function remainingSeconds(expiresAt: string): number {
+  return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));
+}
+
 export default function UndoSnackbarStack({
   pendingSendUndo,
   undoAction,
@@ -27,6 +32,18 @@ export default function UndoSnackbarStack({
   onUndoAction,
   onDismissAction,
 }: UndoSnackbarStackProps) {
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    pendingSendUndo ? remainingSeconds(pendingSendUndo.expiresAt) : 0,
+  );
+
+  useEffect(() => {
+    if (!pendingSendUndo) return undefined;
+    const tick = () => setSecondsLeft(remainingSeconds(pendingSendUndo.expiresAt));
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [pendingSendUndo]);
+
   if (!pendingSendUndo && !undoAction) return null;
 
   return (
@@ -34,14 +51,18 @@ export default function UndoSnackbarStack({
       {pendingSendUndo && (
         <section className="undo-snackbar send-undo-snackbar" role="status" aria-live="polite">
           <div>
-            <strong>邮件将在 {pendingSendUndo.delaySeconds} 秒后发送</strong>
+            <strong>
+              {secondsLeft > 0
+                ? `邮件将在 ${secondsLeft} 秒后发送`
+                : '邮件已发送'}
+            </strong>
             <span>{pendingSendUndo.subject} · 预计 {formatDate(pendingSendUndo.expiresAt)}</span>
           </div>
           <button type="button" onClick={onUndoSend}>
             撤回发送
           </button>
-          <button type="button" aria-label="关闭发送提示" onClick={onDismissSend}>
-            <X size={15} />
+          <button type="button" className="undo-close" aria-label="关闭发送提示" onClick={onDismissSend}>
+            <X size={14} />
           </button>
           <span
             className="send-undo-progress"

@@ -11,10 +11,10 @@
 }
 
 .snackbar-stack {
-  left: auto;
-  right: 20px;
-  bottom: 20px;
-  width: min(340px, calc(100vw - 40px));
+  left: 12px;
+  right: auto;
+  bottom: 76px;
+  width: min(264px, calc(100vw - 24px));
   gap: 8px;
   transform: none;
   z-index: 10000;
@@ -25,62 +25,65 @@
   width: 100%;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  color: #ffffff;
-  background: rgba(24, 29, 37, 0.95);
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  color: var(--ui-text);
+  background: #ffffff;
   box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.22),
-    0 1px 3px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(20px);
+    0 12px 28px rgba(15, 23, 42, 0.12),
+    0 1px 3px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .send-undo-snackbar {
-  border-color: rgba(56, 189, 248, 0.25);
+  border-color: rgba(10, 115, 217, 0.3);
 }
 
 .undo-snackbar strong {
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.1px;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 680;
+  letter-spacing: 0;
 }
 
 .undo-snackbar span {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11.5px;
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
   margin-top: 2px;
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .undo-snackbar button {
-  min-height: 30px;
-  padding: 0 12px;
+  min-height: 26px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 8px;
-  color: #38bdf8;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 12px;
-  font-weight: 550;
+  border-radius: 7px;
+  color: #ffffff;
+  background: var(--ui-accent);
+  font-size: 11.5px;
+  font-weight: 650;
   transition: color 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .undo-snackbar button:hover {
-  color: #7dd3fc;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--ui-accent-hover);
 }
 
-.undo-snackbar button:last-child {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
+.undo-snackbar button.undo-close {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  min-width: 26px;
   padding: 0;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--ui-text-tertiary);
   background: transparent;
   display: flex;
   align-items: center;
@@ -88,14 +91,13 @@
   border-radius: 50%;
 }
 
-.undo-snackbar button:last-child:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+.undo-snackbar button.undo-close:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
   transform: none;
 }
 
 .send-undo-progress {
   height: 3px;
-  background: linear-gradient(90deg, #38bdf8, #00e5ff);
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+  background: linear-gradient(90deg, var(--ui-accent), #00a3ff);
 }

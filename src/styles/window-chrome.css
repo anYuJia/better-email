@@ -3,11 +3,10 @@
  * The webview background is transparent so the desktop shows through the
  * top strip; the app shell supplies its own background below it.
  *
- * Headroom is applied per pane, not to the whole shell:
- * - macOS: traffic lights sit at the top-left, so only the sidebar gets
- *   extra top padding and the drag strip spans the sidebar width.
- * - Windows/Linux: custom controls sit at the top-right, so the mail panes
- *   get the headroom instead.
+ * The whole top edge is draggable; each pane reserves matching headroom so
+ * the drag strip never covers interactive content:
+ * - macOS: 32px (traffic lights + drag strip)
+ * - Windows/Linux: 36px (drag strip + custom window controls)
  */
 
 html,
@@ -20,6 +19,7 @@ body {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
   height: 36px;
   z-index: 100;
   user-select: none;
@@ -36,20 +36,23 @@ body {
   cursor: grabbing;
 }
 
-/* macOS: taller strip for the traffic lights, spanning only the sidebar. */
+/* macOS: the strip also hosts the traffic lights at the top-left. */
 .window-chrome-macos {
   height: 32px;
 }
 
-/* Sidebar headroom for the macOS traffic lights. */
-.platform-macos .sidebar {
+/* Headroom for the drag strip across all panes. */
+.platform-macos .sidebar,
+.platform-macos .message-list-panel,
+.platform-macos .reader-panel {
   padding-top: 32px;
 }
 
-/* Mail pane headroom for the Windows/Linux drag strip and window controls. */
+.platform-windows .sidebar,
 .platform-windows .message-list-panel,
-.platform-linux .message-list-panel,
 .platform-windows .reader-panel,
+.platform-linux .sidebar,
+.platform-linux .message-list-panel,
 .platform-linux .reader-panel {
   padding-top: 36px;
 }

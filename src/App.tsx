@@ -1190,7 +1190,7 @@ export default function App() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
-      <WindowChrome sidebarWidth={appLayout.sidebar} />
+      <WindowChrome />
       <Sidebar
         accountScope={accountScope}
         accounts={accounts}

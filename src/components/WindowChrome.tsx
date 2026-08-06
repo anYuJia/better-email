@@ -24,7 +24,7 @@ export function detectDesktopPlatform(): DesktopPlatform {
  *   minimize/maximize/close controls at the top-right and reserve headroom
  *   above the mail panes.
  */
-export default function WindowChrome({ sidebarWidth = 240 }: { sidebarWidth?: number }) {
+export default function WindowChrome() {
   const platform = detectDesktopPlatform();
 
   useEffect(() => {
@@ -64,13 +64,11 @@ export default function WindowChrome({ sidebarWidth = 240 }: { sidebarWidth?: nu
   return (
     <div
       className={`window-chrome window-chrome-${platform}`}
-      style={platform === 'macos' ? { width: sidebarWidth } : undefined}
       onDoubleClick={handleDoubleClick}
       role="presentation"
     >
       <div
         className="window-drag-region"
-        data-tauri-drag-region
         onMouseDown={handleDrag}
         role="presentation"
       />

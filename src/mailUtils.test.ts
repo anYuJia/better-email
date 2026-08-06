@@ -479,3 +479,20 @@ describe('extractPlainHttpLinks', () => {
     expect(extractPlainHttpLinks('')).toEqual([]);
   });
 });
+
+describe('plainTextPreview entity decoding', () => {
+  it('decodes astral-plane numeric entities without mojibake', () => {
+    expect(plainTextPreview('前缀 &#128512; 后缀')).toContain('😀');
+    expect(plainTextPreview('前缀 &#x1F600; 后缀')).toContain('😀');
+    expect(plainTextPreview('&#128512;')).not.toMatch(/[\uFFFD\uE000-\uF8FF]/);
+  });
+
+  it('keeps chinese text intact', () => {
+    expect(plainTextPreview('这是一封中文草稿，用于测试乱码问题。')).toContain('这是一封中文草稿');
+  });
+
+  it('rejects out-of-range entity values', () => {
+    expect(plainTextPreview('&#0;')).not.toContain('\u0000');
+    expect(plainTextPreview('&#999999999;')).not.toContain('\uFFFD');
+  });
+});

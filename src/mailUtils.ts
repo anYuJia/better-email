@@ -83,6 +83,13 @@ export function isMessageBodyCorrupted(body: string): boolean {
   return trimmed.startsWith('--') && (trimmed.includes('Content-Type:') || trimmed.includes('content-type:'));
 }
 
+function decodeNumericEntity(code: number): string {
+  if (Number.isInteger(code) && code > 0 && code <= 0x10ffff) {
+    return String.fromCodePoint(code);
+  }
+  return '';
+}
+
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&nbsp;/gi, ' ')
@@ -91,8 +98,8 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
-    .replace(/&#x([a-f0-9]+);/gi, (_, code: string) => String.fromCharCode(parseInt(code, 16)));
+    .replace(/&#(\d+);/g, (_, code: string) => decodeNumericEntity(Number(code)))
+    .replace(/&#x([a-f0-9]+);/gi, (_, code: string) => decodeNumericEntity(parseInt(code, 16)));
 }
 
 export function plainTextPreview(value: string): string {

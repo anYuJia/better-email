@@ -517,7 +517,7 @@ export function accountMessageFromDraft(
     cc: input.cc?.trim() || '',
     bcc: input.bcc?.trim() || '',
     subject,
-    snippet: body.slice(0, 96),
+    snippet: Array.from(body).slice(0, 96).join(''),
     body,
     sanitized_html: htmlBody,
     security_warnings: [],

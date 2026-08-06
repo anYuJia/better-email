@@ -317,6 +317,10 @@ export default function ReaderPane({
   const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
+  // 正文真正渲染出来后才显示快速回复框，避免切换时回复框先于内容出现
+  const hasRenderedBodyContent = isBodyRenderReady && Boolean(
+    hasRenderableHtml || plainBodyForReader.trim() || shouldOfferRemoteContent,
+  );
 
   useEffect(() => {
     maybeCompleteReading();
@@ -496,7 +500,7 @@ if (activeThread && threadMessages.length > 0) {
 
 
 
-        {!isDraft && !isTrash && (
+        {!isDraft && !isTrash && hasRenderedBodyContent && (
           <QuickReplySection
             selected={selected}
             quickReplyBody={quickReplyBody}

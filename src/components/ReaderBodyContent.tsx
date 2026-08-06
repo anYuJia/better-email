@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from 'react';
 import EmailReaderSkeleton from './EmailReaderSkeleton';
 import EmailShadowView from './reader/EmailShadowView';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
@@ -11,14 +10,12 @@ type ReaderBodyContentProps = {
   shouldOfferRemoteContent: boolean;
   readerHtml: string;
   plainBodyForReader: string;
+  linksHidden: boolean;
   handleReaderHtmlClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   handleReaderHtmlContextMenu: (event: React.MouseEvent<HTMLDivElement>) => void;
   onAllowRemoteImagesOnce: () => void;
-  interceptHttpsLinks: boolean;
-  onOpenHttpsLink: (href: string) => void;
+  onOpenLink: (href: string) => void;
   onComposeNew: (fields?: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string }) => void;
-  onLinkClick: (href: string, text: string) => void;
-  setClickedLink: Dispatch<SetStateAction<{ href: string; text: string } | null>>;
 };
 
 export default function ReaderBodyContent({
@@ -28,14 +25,12 @@ export default function ReaderBodyContent({
   shouldOfferRemoteContent,
   readerHtml,
   plainBodyForReader,
+  linksHidden,
   handleReaderHtmlClick,
   handleReaderHtmlContextMenu,
   onAllowRemoteImagesOnce,
-  interceptHttpsLinks,
-  onOpenHttpsLink,
+  onOpenLink,
   onComposeNew,
-  onLinkClick,
-  setClickedLink,
 }: ReaderBodyContentProps) {
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
@@ -48,19 +43,16 @@ export default function ReaderBodyContent({
         <EmailShadowView
           className="reader-html"
           html={readerHtml}
+          linksHidden={linksHidden}
           onClick={handleReaderHtmlClick}
           onContextMenuCapture={handleReaderHtmlContextMenu}
           onContextMenu={handleReaderHtmlContextMenu}
-          onLinkClick={(href, text) => {
+          onLinkClick={(href) => {
             const lowerHref = href.toLowerCase();
             if (lowerHref.startsWith('mailto:')) {
               onComposeNew(parseMailtoUrl(href));
             } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
-              if (interceptHttpsLinks || lowerHref.startsWith('http://')) {
-                onLinkClick(href, text);
-              } else {
-                onOpenHttpsLink(href);
-              }
+              onOpenLink(href);
             } else {
               console.warn('Blocked navigation to unsafe/unknown protocol:', href);
             }
@@ -73,7 +65,7 @@ export default function ReaderBodyContent({
     return (
       <EmptyMessageBody
         title="正文主要由远程图片组成"
-        detail="已先阻止自动加载，点击后会显示本邮件中的 HTTPS 图片；外部链接仍不会变成可点击跳转。"
+        detail="已先阻止自动加载，点击后会显示本邮件中的 HTTPS 图片；正文链接保持「已隐藏链接」，可在安全提示中查看后打开。"
         action={(
           <button
             type="button"
@@ -86,5 +78,5 @@ export default function ReaderBodyContent({
       />
     );
   }
-  return <PlainMessageBody body={plainBodyForReader} />;
+  return <PlainMessageBody body={plainBodyForReader} linksHidden={linksHidden} />;
 }

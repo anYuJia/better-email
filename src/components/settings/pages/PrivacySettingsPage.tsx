@@ -88,11 +88,11 @@ export default function PrivacySettingsPage({
       />
 
       <SettingsSwitch
-        label="拦截 HTTPS 链接并提示确认"
+        label="隐藏邮件中的链接"
         description={
           interceptsHttps
-            ? '开启后点击 HTTPS 链接会先显示安全链接检查，确认目标域名后再打开。'
-            : '关闭后点击 HTTPS 链接直接用系统浏览器打开，不再弹确认提示。'
+            ? '开启后，正文中的链接默认显示为「已隐藏链接」，点击「查看链接」后在原文位置显示并可直接打开。'
+            : '关闭后，邮件中的链接直接显示并可直接打开。'
         }
         checked={interceptsHttps}
         onChange={(checked) => onAccountFormChange({

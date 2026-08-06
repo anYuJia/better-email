@@ -102,15 +102,29 @@ export function EmptyMessageBody({
 
 type PlainMessageBodyProps = {
   body: string;
+  linksHidden?: boolean;
 };
 
 const URL_REGEX = /(https?:\/\/[^\s<]+[^.,;?\s<])/gi;
 
-function renderTextWithLinks(text: string) {
+function renderTextWithLinks(text: string, linksHidden: boolean) {
   if (!text) return null;
   const parts = text.split(URL_REGEX);
   return parts.map((part, index) => {
     if (part.match(URL_REGEX)) {
+      if (linksHidden) {
+        return (
+          <span
+            key={index}
+            style={{
+              color: 'var(--color-primary, #2563eb)',
+              cursor: 'default',
+            }}
+          >
+            已隐藏链接
+          </span>
+        );
+      }
       return (
         <a
           key={index}
@@ -138,7 +152,7 @@ function renderTextWithLinks(text: string) {
   });
 }
 
-export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
+export default function PlainMessageBody({ body, linksHidden = false }: PlainMessageBodyProps) {
   const blocks = useMemo(() => parsePlainBody(body), [body]);
   const originalBlockCount = useMemo(
     () => blocks.filter((item) => item.type === 'original').length,
@@ -155,7 +169,7 @@ export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
         if (block.type === 'text') {
           return (
             <div className="plain-body-copy" key={`text-${index}`}>
-              {renderTextWithLinks(block.content)}
+              {renderTextWithLinks(block.content, linksHidden)}
             </div>
           );
         }
@@ -181,7 +195,7 @@ export default function PlainMessageBody({ body }: PlainMessageBodyProps) {
                 })}
               </dl>
             )}
-            {block.content && <pre>{renderTextWithLinks(block.content)}</pre>}
+            {block.content && <pre>{renderTextWithLinks(block.content, linksHidden)}</pre>}
           </section>
         );
       })}

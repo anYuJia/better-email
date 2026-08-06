@@ -20,7 +20,7 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl, extractPlainHttpLinks } from '../mailUtils';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl } from '../mailUtils';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
@@ -28,18 +28,13 @@ import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from '
 import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
 import InlineImageNotice from './reader/InlineImageNotice';
-import HttpLinkListDialog from './reader/HttpLinkListDialog';
 import ReaderBodyContent from './ReaderBodyContent';
 import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
-import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import QuickReplySection from './reader/QuickReplySection';
 import { attachmentKind, attachmentIcon } from './reader/attachmentUtils';
-import EmailShadowView from './reader/EmailShadowView';
-import EmailReaderSkeleton from './EmailReaderSkeleton';
 import AttachmentList from './reader/AttachmentList';
-import LinkSafetyDialog from './reader/LinkSafetyDialog';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
@@ -187,8 +182,7 @@ export default function ReaderPane({
   onQuickReplyChange,
   onSendQuickReply,
 }: ReaderPaneProps) {
-  const [clickedLink, setClickedLink] = useState<{ href: string; text: string } | null>(null);
-  const [httpLinkListOpen, setHttpLinkListOpen] = useState(false);
+  const [linksRevealed, setLinksRevealed] = useState(false);
   const {
     readerRef,
     bodySelected,
@@ -297,11 +291,6 @@ export default function ReaderPane({
     ) ?? [],
     [selected?.security_warnings, selectedSenderTrusted],
   );
-  const plainHttpLinks = useMemo(() => {
-    if (!bodySelected?.body.trim()) return [];
-    if (!bodySelected.security_warnings.some((warning) => warning.includes('明文 HTTP 链接'))) return [];
-    return extractPlainHttpLinks(bodySelected.body);
-  }, [bodySelected?.body, bodySelected?.security_warnings]);
   const readerHtml = inlineImageResolution.html;
   const hasRenderableHtml = Boolean(
     bodySelected?.sanitized_html.trim()
@@ -321,6 +310,16 @@ export default function ReaderPane({
   const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
+  const selectedHasLinks = useMemo(() => {
+    if (!bodySelected) return false;
+    if (/href\s*=\s*["']https?:\/\//i.test(bodySelected.sanitized_html)) return true;
+    return /https?:\/\/[^\s"'<>]+/i.test(bodySelected.body);
+  }, [bodySelected?.sanitized_html, bodySelected?.body]);
+  const linksHidden = Boolean(selectedInterceptsHttps && !linksRevealed);
+
+  useEffect(() => {
+    setLinksRevealed(false);
+  }, [selectedId]);
   // 正文真正渲染出来、且展示的就是当前选中的邮件时才显示快速回复框：
   // 切换加载期间（冻结展示上一封）、正文未就绪、附件列表未加载完
   // 或内嵌图片尚未解析完成时都不出现，避免回复框先于内容出现
@@ -479,8 +478,9 @@ if (activeThread && threadMessages.length > 0) {
           selectedSenderDomain={selectedSenderDomain}
           selectedSenderIsExternal={selectedSenderIsExternal}
           selectedExternalBlocked={selectedExternalBlocked}
-          showHttpLinkAction={plainHttpLinks.length > 0}
-          onViewHttpLinks={() => setHttpLinkListOpen(true)}
+          showLinkAction={Boolean(selectedInterceptsHttps && selectedHasLinks)}
+          linkActionLabel={linksRevealed ? '隐藏链接' : '查看链接'}
+          onLinkAction={() => setLinksRevealed((current) => !current)}
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onTrustSender={() => onTrustRemoteImages('sender')}
           onTrustDomain={() => onTrustRemoteImages('domain')}
@@ -493,14 +493,12 @@ if (activeThread && threadMessages.length > 0) {
           shouldOfferRemoteContent={shouldOfferRemoteContent}
           readerHtml={readerHtml}
           plainBodyForReader={plainBodyForReader}
+          linksHidden={linksHidden}
           handleReaderHtmlClick={handleReaderHtmlClick}
           handleReaderHtmlContextMenu={handleReaderHtmlContextMenu}
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
-          interceptHttpsLinks={selectedInterceptsHttps}
-          onOpenHttpsLink={onOpenHttpsLink}
+          onOpenLink={onOpenHttpsLink}
           onComposeNew={onComposeNew}
-          onLinkClick={(href, text) => setClickedLink({ href, text })}
-          setClickedLink={setClickedLink}
         />
 
         <ReaderTranslationPanel
@@ -565,25 +563,6 @@ if (activeThread && threadMessages.length > 0) {
           items={attachmentMenuItems(attachmentContextMenu.attachment)}
           onClose={() => setAttachmentContextMenu(null)}
           ariaLabel="附件操作"
-        />
-      )}
-
-      {httpLinkListOpen && (
-        <HttpLinkListDialog
-          links={plainHttpLinks}
-          onClose={() => setHttpLinkListOpen(false)}
-          onOpenLink={(href, text) => {
-            setHttpLinkListOpen(false);
-            setClickedLink({ href, text });
-          }}
-        />
-      )}
-
-      {clickedLink && (
-        <LinkSafetyDialog
-          link={clickedLink}
-          onClose={() => setClickedLink(null)}
-          onComposeNew={onComposeNew}
         />
       )}
     </section>

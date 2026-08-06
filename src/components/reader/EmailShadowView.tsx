@@ -1,7 +1,34 @@
 import React, { useEffect, useRef } from 'react';
 
+function isWebLink(href: string): boolean {
+  const normalized = href.trim().toLowerCase();
+  return normalized.startsWith('http://') || normalized.startsWith('https://');
+}
+
+function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean) {
+  contentDiv.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
+    const href = anchor.getAttribute('href') ?? '';
+    if (!isWebLink(href)) return;
+    if (linksHidden) {
+      if (anchor.dataset.betterEmailHref) return;
+      anchor.dataset.betterEmailHref = href;
+      anchor.removeAttribute('href');
+      anchor.textContent = '已隐藏链接';
+      anchor.setAttribute('data-better-email-hidden-link', 'true');
+    } else {
+      const originalHref = anchor.dataset.betterEmailHref;
+      if (!originalHref) return;
+      anchor.setAttribute('href', originalHref);
+      anchor.textContent = originalHref;
+      delete anchor.dataset.betterEmailHref;
+      anchor.removeAttribute('data-better-email-hidden-link');
+    }
+  });
+}
+
 interface EmailShadowViewProps {
   html: string;
+  linksHidden?: boolean;
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
   onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
   onContextMenuCapture?: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -11,6 +38,7 @@ interface EmailShadowViewProps {
 
 export default function EmailShadowView({
   html,
+  linksHidden = false,
   onClick,
   onContextMenu,
   onContextMenuCapture,
@@ -44,6 +72,11 @@ export default function EmailShadowView({
         }
         a {
           color: var(--accent, #0066cc);
+        }
+        a[data-better-email-hidden-link] {
+          color: var(--accent, #0066cc);
+          text-decoration: none;
+          cursor: default;
         }
         img {
           max-width: 100%;
@@ -82,8 +115,9 @@ export default function EmailShadowView({
     const contentDiv = contentDivRef.current;
     if (contentDiv) {
       contentDiv.innerHTML = html;
+      applyLinksVisibility(contentDiv, linksHidden);
     }
-  }, [html]);
+  }, [html, linksHidden]);
 
   useEffect(() => {
     const shadowRoot = shadowRootRef.current;

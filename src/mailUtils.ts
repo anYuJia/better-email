@@ -386,39 +386,6 @@ export function senderDomain(senderEmail: string): string {
   return domain.trim();
 }
 
-export type PlainHttpLink = { href: string; text: string };
-
-const HTTP_ANCHOR_PATTERN = /<a\s+[^>]*href=["'](http:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-const HTTP_ANCHOR_STRIP_PATTERN = /<a\s+[^>]*href=["'](http:\/\/[^"']+)["'][^>]*>[\s\S]*?<\/a>/gi;
-const BARE_HTTP_URL_PATTERN = /(^|[\s([{（「])(http:\/\/[^\s<>"'）)\]}>]+)/gi;
-
-function plainTextFor(htmlFragment: string): string {
-  return htmlFragment
-    .replace(/<[^>]*>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function extractPlainHttpLinks(content: string): PlainHttpLink[] {
-  const links: PlainHttpLink[] = [];
-  const seen = new Set<string>();
-  const push = (href: string, text: string) => {
-    if (seen.has(href)) return;
-    seen.add(href);
-    links.push({ href, text });
-  };
-  let match: RegExpExecArray | null;
-  while ((match = HTTP_ANCHOR_PATTERN.exec(content)) !== null) {
-    const text = plainTextFor(match[2]) || match[1];
-    push(match[1], text);
-  }
-  const withoutAnchors = content.replace(HTTP_ANCHOR_STRIP_PATTERN, '');
-  while ((match = BARE_HTTP_URL_PATTERN.exec(withoutAnchors)) !== null) {
-    push(match[2], match[2]);
-  }
-  return links;
-}
-
 export function remoteImageTrustInput(
   accountId: number,
   senderEmail: string,
@@ -558,63 +525,4 @@ export function compareDomains(domainA: string, domainB: string): boolean {
     return clean;
   };
   return normalize(domainA) === normalize(domainB);
-}
-
-function hostFromDisplayText(text: string): string {
-  const trimmed = text.trim().replace(/^<|>$/g, '').replace(/[),.;]+$/g, '');
-  if (!trimmed || /\s/.test(trimmed)) return '';
-
-  try {
-    const url = new URL(trimmed);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : '';
-  } catch {
-    // Plain domains like example.com are handled below.
-  }
-
-  try {
-    if (trimmed.startsWith('//')) {
-      return new URL(`https:${trimmed}`).hostname;
-    }
-  } catch {
-    return '';
-  }
-
-  const withoutProtocol = trimmed.replace(/^https?:\/\//i, '');
-  const hostCandidate = withoutProtocol.split('/')[0].split('?')[0].split('#')[0].split('@').pop() || '';
-  const hostWithoutPort = hostCandidate.startsWith('[')
-    ? hostCandidate.replace(/^\[|\](?::\d+)?$/g, '')
-    : hostCandidate.split(':')[0];
-  if (!hostWithoutPort || !hostWithoutPort.includes('.')) return '';
-  return hostWithoutPort;
-}
-
-function displayTextHasSuspiciousUserInfo(text: string): boolean {
-  const trimmed = text.trim().replace(/^<|>$/g, '').replace(/[),.;]+$/g, '');
-  const hasUrlPrefix = /^(https?:)?\/\//i.test(trimmed);
-  const authority = trimmed
-    .replace(/^https?:\/\//i, '')
-    .replace(/^\/\//, '')
-    .split('/')[0]
-    .split('?')[0]
-    .split('#')[0];
-  const atIndex = authority.lastIndexOf('@');
-  if (atIndex <= 0) return false;
-  const userInfo = authority.slice(0, atIndex);
-  return hasUrlPrefix || userInfo.includes('.');
-}
-
-export function shouldWarnForLinkDisplay(targetHref: string, displayText: string): boolean {
-  let targetHost = '';
-  try {
-    const targetUrl = new URL(targetHref);
-    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') return false;
-    targetHost = targetUrl.hostname;
-  } catch {
-    return false;
-  }
-
-  if (displayTextHasSuspiciousUserInfo(displayText)) return true;
-  const displayHost = hostFromDisplayText(displayText);
-  if (!displayHost) return false;
-  return !compareDomains(targetHost, displayHost);
 }

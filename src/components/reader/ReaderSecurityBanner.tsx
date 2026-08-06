@@ -6,8 +6,9 @@ type ReaderSecurityBannerProps = {
   selectedSenderDomain: string;
   selectedSenderIsExternal: boolean;
   selectedExternalBlocked: boolean;
-  showHttpLinkAction: boolean;
-  onViewHttpLinks: () => void;
+  showLinkAction: boolean;
+  linkActionLabel: string;
+  onLinkAction: () => void;
   onAllowRemoteImagesOnce: () => void;
   onTrustSender: () => void;
   onTrustDomain: () => void;
@@ -21,13 +22,14 @@ export default function ReaderSecurityBanner({
   selectedSenderDomain,
   selectedSenderIsExternal,
   selectedExternalBlocked,
-  showHttpLinkAction,
-  onViewHttpLinks,
+  showLinkAction,
+  linkActionLabel,
+  onLinkAction,
   onAllowRemoteImagesOnce,
   onTrustSender,
   onTrustDomain,
 }: ReaderSecurityBannerProps) {
-  if (warnings.length === 0 && !showRemoteImageNote && !selectedExternalBlocked && !showHttpLinkAction) {
+  if (warnings.length === 0 && !showRemoteImageNote && !selectedExternalBlocked && !showLinkAction) {
     return null;
   }
 
@@ -36,7 +38,7 @@ export default function ReaderSecurityBanner({
     : null;
   const showImageAction = showRemoteImageNote && hasRenderableHtml;
   const showActionRow = Boolean(
-    !selectedExternalBlocked && (showHttpLinkAction || showImageAction),
+    !selectedExternalBlocked && (showLinkAction || showImageAction),
   );
 
   return (
@@ -51,13 +53,13 @@ export default function ReaderSecurityBanner({
       {externalBlockNote && <p>{externalBlockNote}</p>}
       {showActionRow && (
         <div className="reader-warning-action-row">
-          {showHttpLinkAction && (
+          {showLinkAction && (
             <button
               type="button"
               className="reader-warning-primary-action"
-              onClick={onViewHttpLinks}
+              onClick={onLinkAction}
             >
-              查看链接
+              {linkActionLabel}
             </button>
           )}
           {showImageAction && (

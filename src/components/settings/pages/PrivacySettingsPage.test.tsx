@@ -56,10 +56,10 @@ describe('PrivacySettingsPage', () => {
     expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(true);
   });
 
-  it('offers external mailbox and HTTPS link interception toggles', () => {
+  it('offers external mailbox and link hiding toggles', () => {
     renderPage(makeAccount(), []);
     expect(screen.getByText('拦截外部邮箱邮件')).not.toBeNull();
-    expect(screen.getByText('拦截 HTTPS 链接并提示确认')).not.toBeNull();
+    expect(screen.getByText('隐藏邮件中的链接')).not.toBeNull();
   });
 
   it('shows an explicit empty state for the trust list', () => {

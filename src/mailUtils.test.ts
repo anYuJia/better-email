@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  extractPlainHttpLinks,
   formatBytes,
   formatDate,
   messageDateGroup,
@@ -21,7 +20,6 @@ import {
   htmlHasRemoteVisualContent,
   parseMailtoUrl,
   compareDomains,
-  shouldWarnForLinkDisplay,
 } from './mailUtils';
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
@@ -426,57 +424,6 @@ describe('mail UI utilities', () => {
       expect(compareDomains('paypal.com', 'paypal.com.evil.example')).toBe(false);
       expect(compareDomains('paypal.com', 'PAYPAL.COM')).toBe(true);
     });
-
-    it('warns when displayed link host differs from the real target host', () => {
-      expect(shouldWarnForLinkDisplay('https://paypal.com/login', 'paypal.com')).toBe(false);
-      expect(shouldWarnForLinkDisplay('https://www.paypal.com/login', 'paypal.com')).toBe(false);
-      expect(shouldWarnForLinkDisplay('https://login.paypal.com/', 'paypal.com')).toBe(true);
-      expect(shouldWarnForLinkDisplay('https://paypal.com.evil.example/login', 'paypal.com')).toBe(true);
-      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'https://paypal.com/reset')).toBe(true);
-      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'paypal.com@evil.example')).toBe(true);
-      expect(shouldWarnForLinkDisplay('https://evil.example/login', 'click here')).toBe(false);
-    });
-  });
-});
-
-describe('extractPlainHttpLinks', () => {
-  it('extracts http anchor hrefs with their display text', () => {
-    const links = extractPlainHttpLinks(
-      '<p>请<a href="http://track.example.com/open">查看订单状态</a>或<a href="http://old.example.com/a">旧链接</a></p>',
-    );
-    expect(links).toEqual([
-      { href: 'http://track.example.com/open', text: '查看订单状态' },
-      { href: 'http://old.example.com/a', text: '旧链接' },
-    ]);
-  });
-
-  it('strips nested markup from anchor display text', () => {
-    const links = extractPlainHttpLinks('<a href="http://example.com/x"><b>加粗</b> 文本</a>');
-    expect(links).toEqual([{ href: 'http://example.com/x', text: '加粗 文本' }]);
-  });
-
-  it('falls back to the href when an anchor has no text', () => {
-    const links = extractPlainHttpLinks('<a href="http://example.com/"><img src="x.png"></a>');
-    expect(links).toEqual([{ href: 'http://example.com/', text: 'http://example.com/' }]);
-  });
-
-  it('extracts bare http urls from plain text and dedupes by href', () => {
-    const links = extractPlainHttpLinks(
-      '访问 http://example.com/a 或 http://example.com/a 或 https://secure.example.com/b',
-    );
-    expect(links).toEqual([{ href: 'http://example.com/a', text: 'http://example.com/a' }]);
-  });
-
-  it('ignores https anchors and already-extracted anchors in plain text scan', () => {
-    const links = extractPlainHttpLinks(
-      '<a href="https://paypal.com/login">安全登录</a> 请勿使用 http://paypal.com/login',
-    );
-    expect(links).toEqual([{ href: 'http://paypal.com/login', text: 'http://paypal.com/login' }]);
-  });
-
-  it('returns an empty list for content without http links', () => {
-    expect(extractPlainHttpLinks('只有 https 链接 https://example.com 和普通文本')).toEqual([]);
-    expect(extractPlainHttpLinks('')).toEqual([]);
   });
 });
 

@@ -118,9 +118,6 @@ pub fn parse_message_preview_bytes(raw: &[u8]) -> ParsedMessagePreview {
     if lower.contains("<script") {
         warnings.push("HTML 正文包含 script 标签，渲染前必须清洗。".to_string());
     }
-    if lower.contains("http://") {
-        warnings.push("正文包含明文 HTTP 链接，后续应提示潜在风险。".to_string());
-    }
     if html_has_remote_images(&html_body) || html_has_remote_images(&text_body) {
         warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
     }
@@ -484,9 +481,8 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
     let mut url_schemes = HashSet::new();
     url_schemes.insert("mailto");
     url_schemes.insert("cid");
-    if allow_remote_images {
-        url_schemes.insert("https");
-    }
+    url_schemes.insert("http");
+    url_schemes.insert("https");
 
     let limited_html = html.chars().take(30_000).collect::<String>();
     let prepared_html = if allow_remote_images {
@@ -498,12 +494,6 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
         .url_schemes(url_schemes)
         .rm_tags(&["style"])
         .attribute_filter(move |element, attribute, value| {
-            if element.eq_ignore_ascii_case("a") && attribute.eq_ignore_ascii_case("href") {
-                let normalized = value.trim().to_ascii_lowercase();
-                if normalized.starts_with("http://") || normalized.starts_with("https://") {
-                    return None;
-                }
-            }
             if element.eq_ignore_ascii_case("img") && attribute.eq_ignore_ascii_case("src") {
                 let normalized = value.trim().to_ascii_lowercase();
                 if normalized.starts_with("http://")
@@ -973,7 +963,15 @@ mod tests {
             "Subject: Hello\nFrom: a@example.com\nTo: b@example.com\nContent-Type: text/html\n\n<p onclick=\"x()\">Hi</p><img src=\"http://example.com/a.png\"><script>x</script>",
         );
         assert_eq!(parsed.subject, "Hello");
-        assert!(parsed.warning_count >= 3);
+        assert!(parsed.warning_count >= 2);
+        assert!(parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("script")));
+        assert!(parsed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("远程图片")));
         assert!(!parsed.sanitized_html.contains("<script"));
         assert!(!parsed.sanitized_html.contains("onclick"));
         assert!(!parsed.sanitized_html.contains("src=\"http"));
@@ -1027,7 +1025,7 @@ mod tests {
 
         let allowed = sanitize_html_with_remote_images(html);
         assert!(allowed.contains("https://cdn.example.com/hero.png"));
-        assert!(!allowed.contains("count.mail.163.com/statistics/login.do"));
+        assert!(allowed.contains("href=\"https://count.mail.163.com/statistics/login.do\""));
         assert!(!allowed.contains("width=\"436\" height=\"96\"></a>"));
     }
 
@@ -1184,8 +1182,8 @@ mod tests {
 
         assert!(sanitized.contains("https://cdn.example.com/open.png"));
         assert!(!sanitized.contains("http://tracker.example/open.png"));
-        assert!(!sanitized.contains("https://phish.example/login"));
-        assert!(!sanitized.contains("http://phish.example/login"));
+        assert!(sanitized.contains("href=\"https://phish.example/login\""));
+        assert!(sanitized.contains("href=\"http://phish.example/login\""));
         assert!(sanitized.contains("href=\"mailto:a@example.com\""));
     }
 

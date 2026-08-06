@@ -1,0 +1,79 @@
+/*
+ * Custom window chrome for the frameless, transparent window.
+ * The webview background is transparent so the desktop shows through the
+ * top strip; the app shell supplies its own background below it.
+ */
+
+html,
+body {
+  background: transparent;
+}
+
+/* Top drag strip: sits above the app content, below dialogs/overlays. */
+.window-chrome {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 100;
+  height: 36px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.window-drag-region {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.window-drag-region:active {
+  cursor: grabbing;
+}
+
+/* The macOS overlay title bar draws traffic lights at the top-left; give
+ * the sidebar a little more headroom so the brand sits clear of them. */
+.window-chrome-macos {
+  height: 44px;
+}
+
+/* Push the whole app shell below the drag strip. */
+.platform-macos .app-shell {
+  padding-top: 44px;
+}
+
+.platform-windows .app-shell,
+.platform-linux .app-shell {
+  padding-top: 36px;
+}
+
+/* Window controls for frameless Windows/Linux builds. */
+.window-controls {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.window-control {
+  width: 30px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text-secondary, #4e5966);
+  background: transparent;
+  box-shadow: none;
+}
+
+.window-control:hover {
+  color: var(--ui-text, #1d232b);
+  background: rgba(17, 24, 39, 0.07);
+}
+
+.window-control-close:hover {
+  color: #ffffff;
+  background: #d92d20;
+}

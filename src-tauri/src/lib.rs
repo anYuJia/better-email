@@ -66,6 +66,23 @@ fn set_tray_unread_count(
     Ok(())
 }
 
+/// Hide the native window chrome on platforms that do not get the macOS
+/// overlay title bar from tauri.conf.json. Called once the webview is ready.
+#[tauri::command]
+fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            window
+                .set_decorations(false)
+                .map_err(|error| format!("无法隐藏系统标题栏：{error}"))?;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    let _ = &app;
+    Ok(())
+}
+
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let unread_item = MenuItem::with_id(app, "tray_unread_label", "没有未读邮件", false, None::<&str>)?;
     let show_item = MenuItem::with_id(app, "tray_show", "打开 Better Email", true, None::<&str>)?;
@@ -197,6 +214,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             set_tray_unread_count,
+            window_chrome_ready,
             commands::list_accounts,
             commands::get_account,
             commands::create_account,

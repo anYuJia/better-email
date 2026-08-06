@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import './styles.css';
 import Sidebar from './components/Sidebar';
+import WindowChrome from './components/WindowChrome';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
@@ -1189,6 +1190,7 @@ export default function App() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
+      <WindowChrome />
       <Sidebar
         accountScope={accountScope}
         accounts={accounts}

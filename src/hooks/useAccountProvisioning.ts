@@ -1,6 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { emptyAccountCreateForm } from '../app/appConfig';
 import {
+  formatInvokeError,
   handleAccountDeleteFlow,
   maskEmailForLog,
   shouldRunInitialMailboxSync,
@@ -257,56 +258,33 @@ export default function useAccountProvisioning({
       deleteSecret,
     });
 
-    let backendResult: CredentialStatus | null = null;
-    if (deleteSecret) {
-      try {
-        backendResult = await invoke<CredentialStatus>('delete_account_secret', { accountEmail: removedAccount.email });
-      } catch (e) {
-        const errMsg = String(e);
-        accountFlowWarn('failed to delete credential during account removal', {
-          email: maskEmailForLog(removedAccount.email),
-          error: errMsg,
-        });
-        const errorResult = handleAccountDeleteFlow(removedAccount.email, deleteSecret, { status: 'failed', message: errMsg });
-        setCredentialStatus(errorResult.credentialStatus);
-        setStatus(`凭据删除失败：${errMsg}`);
-        throw e; // Block deletion
-      }
+    let nextAccount: Account | null = null;
+    try {
+      nextAccount = await invoke<Account | null>('remove_account', {
+        accountId: removedAccount.id,
+        deleteCredentials: deleteSecret,
+      });
+    } catch (e) {
+      const errMsg = formatInvokeError(e);
+      accountFlowWarn('failed to remove account atomically', {
+        accountId: removedAccount.id,
+        email: maskEmailForLog(removedAccount.email),
+        error: errMsg,
+      });
+      setStatus(`账号移除失败：${errMsg}`);
+      throw e; // Account and credentials remain untouched: removal is atomic on the backend
     }
 
     const flowResult = handleAccountDeleteFlow(
       removedAccount.email,
       deleteSecret,
-      backendResult
-        ? {
-            status: backendResult.status as 'deleted' | 'not_found' | 'failed' | 'invalid_input',
-            message: backendResult.message,
-          }
-        : null
+      deleteSecret ? { status: 'deleted', message: '账号及本地凭据已成功移除。' } : null,
     );
-    if (!flowResult.allowed) {
-      setCredentialStatus(flowResult.credentialStatus);
-      setStatus(flowResult.credentialStatus.message);
-      throw new Error(flowResult.credentialStatus.message);
-    }
-
-    // Perform account database removal
-    let nextAccount: Account | null = null;
-    try {
-      nextAccount = await invoke<Account | null>('delete_account', { accountId: removedAccount.id });
-    } catch (e) {
-      const errMsg = String(e);
-      accountFlowWarn('failed to delete account record from db', {
-        accountId: removedAccount.id,
-        error: errMsg,
-      });
-      setStatus(`账号删除失败：${errMsg}`);
-      throw e; // Do NOT swallow database deletion exceptions
-    }
 
     accountFlowLog('remove account deleted', {
       removedAccountId: removedAccount.id,
       nextAccountId: nextAccount?.id ?? null,
+      credentialsDeleted: deleteSecret,
     });
     setCredentialStatus(flowResult.credentialStatus);
     setAccounts((current) => current.filter((item) => item.id !== removedAccount.id));

@@ -11,6 +11,16 @@ export function maskEmailForLog(value: string) {
   return `${local[0] ?? '*'}***@${domain}`;
 }
 
+export function formatInvokeError(error: unknown): string {
+  const text = (error instanceof Error ? error.message : String(error ?? '')).trim();
+  if (!text) return '操作失败，请重试。';
+  const stripped = text
+    .replace(/^Error(?:\([^)]*\))?:\s*/i, '')
+    .replace(/^error:\s*/i, '')
+    .trim();
+  return stripped || '操作失败，请重试。';
+}
+
 export interface DeleteFlowResult {
   allowed: boolean;
   credentialStatus: {

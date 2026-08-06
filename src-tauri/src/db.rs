@@ -2248,6 +2248,112 @@ mod tests {
         assert!(store.get_account_by_id_optional(None).unwrap().is_none());
     }
 
+    fn create_additional_account(store: &MailStore, email: &str) -> Account {
+        store
+            .create_account(AccountCreateInput {
+                email: email.to_string(),
+                display_name: format!("Account {email}"),
+                provider: "Custom".to_string(),
+                imap_host: format!("imap.{email}:993"),
+                smtp_host: format!("smtp.{email}:465"),
+                incoming_protocol: "imap".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn remove_account_deletes_credentials_atomically_when_requested() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        store
+            .store_account_secret(&account.email, "remove-secret")
+            .unwrap();
+        assert!(store.check_account_secret(&account.email).unwrap().exists);
+
+        let next_account = store.remove_account(account.id, true).unwrap();
+        assert!(next_account.is_none());
+        assert!(store.list_accounts().unwrap().is_empty());
+        assert!(!store.check_account_secret(&account.email).unwrap().exists);
+    }
+
+    #[test]
+    fn remove_account_preserves_credentials_when_flag_disabled() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = create_additional_account(&store, "keep-secret@better-email.local");
+        store
+            .store_account_secret(&second_account.email, "keep-me")
+            .unwrap();
+
+        let next_account = store.remove_account(second_account.id, false).unwrap().unwrap();
+        assert_eq!(next_account.id, first_account.id);
+        assert!(next_account.is_default);
+        let status = store.check_account_secret(&second_account.email).unwrap();
+        assert!(status.exists, "credentials must survive removal when disabled");
+    }
+
+    #[test]
+    fn remove_account_succeeds_without_stored_credentials() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = create_additional_account(&store, "no-secret@better-email.local");
+        assert!(!store.check_account_secret(&second_account.email).unwrap().exists);
+
+        let next_account = store.remove_account(second_account.id, true).unwrap().unwrap();
+        assert_eq!(next_account.id, first_account.id);
+        assert!(store.list_accounts().unwrap().iter().all(|account| account.id != second_account.id));
+    }
+
+    #[test]
+    fn remove_account_switches_default_to_next_account() {
+        let store = test_store();
+        let first_account = store.get_account().unwrap();
+        let second_account = create_additional_account(&store, "default-switch@better-email.local");
+        store.set_default_account(second_account.id).unwrap();
+
+        let next_account = store.remove_account(second_account.id, true).unwrap().unwrap();
+        assert_eq!(next_account.id, first_account.id);
+        assert!(next_account.is_default);
+        assert_eq!(
+            store.list_accounts().unwrap().iter().filter(|account| account.is_default).count(),
+            1
+        );
+    }
+
+    #[test]
+    fn remove_account_failure_leaves_accounts_and_credentials_untouched() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        store.store_account_secret(&account.email, "still-here").unwrap();
+
+        let error = store.remove_account(999_999, true).unwrap_err().to_string();
+        assert!(error.contains("邮箱账号不存在"));
+        assert_eq!(store.list_accounts().unwrap().len(), 1);
+        assert!(
+            store.check_account_secret(&account.email).unwrap().exists,
+            "failed removal must not drop credentials"
+        );
+    }
+
+    #[test]
+    fn remove_account_last_account_returns_none() {
+        let store = test_store();
+        let account = store.get_account().unwrap();
+        store.store_account_secret(&account.email, "gone").unwrap();
+
+        assert!(store.remove_account(account.id, true).unwrap().is_none());
+        assert!(store.list_accounts().unwrap().is_empty());
+        assert!(store.get_account_by_id_optional(None).unwrap().is_none());
+        assert!(!store.check_account_secret(&account.email).unwrap().exists);
+    }
+
     #[test]
     fn reopening_after_removing_all_accounts_does_not_seed_demo_again() {
         let unique = TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed);

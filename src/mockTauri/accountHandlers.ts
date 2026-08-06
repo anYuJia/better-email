@@ -10,6 +10,7 @@ import {
   oauthSessions,
   createMockAccount,
   setDefaultMockAccount,
+  removeMockAccount,
   deleteMockAccount,
   mockSavedSecretEmails,
   updateMockAccountSettings,
@@ -134,6 +135,7 @@ export const handlers: Record<string, MockCommandHandler> = {
       message: '本地凭据已删除。',
     };
   },
+  'remove_account': removeMockAccount,
   'delete_account': deleteMockAccount,
   'update_account_settings': updateMockAccountSettings,
   'list_folders': (args) => folders.filter((folder) => {

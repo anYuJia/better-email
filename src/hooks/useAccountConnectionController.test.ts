@@ -6,6 +6,7 @@ import {
   providerVerificationRecordFor,
   shouldRunInitialMailboxSync,
   handleAccountDeleteFlow,
+  formatInvokeError,
 } from '../app/accountConnectionFlows';
 
 describe('account connection controller helpers', () => {
@@ -67,6 +68,11 @@ describe('account connection controller helpers', () => {
     expect(record.status).toBe('untested');
   });
 
+  it('formats Error objects without exposing a duplicate Error prefix', () => {
+    expect(formatInvokeError(new Error('Error: 本地数据库写入拒绝，删除凭据失败。')))
+      .toBe('本地数据库写入拒绝，删除凭据失败。');
+  });
+
   describe('Credential delete status paths', () => {
     it('handles status "deleted" path calling handleAccountDeleteFlow', () => {
       const result = handleAccountDeleteFlow('test@example.com', true, { status: 'deleted', message: '已删除。' });
@@ -104,5 +110,4 @@ describe('account connection controller helpers', () => {
     });
   });
 });
-
 

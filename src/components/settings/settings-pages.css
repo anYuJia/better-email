@@ -428,6 +428,18 @@
   box-shadow: var(--st-shadow-modal);
 }
 
+.settings-modal .settings-account-manage-dialog {
+  overflow: hidden;
+}
+
+.settings-modal .settings-account-manage-dialog > .settings-confirm-dialog-embedded {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .settings-modal .settings-account-add-dialog > header {
   min-height: 54px;
   flex: 0 0 auto;
@@ -1344,9 +1356,13 @@
 
 .settings-modal .settings-confirm-error {
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
   color: var(--st-danger);
   font-size: var(--st-font-size-secondary);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* =====================================================================

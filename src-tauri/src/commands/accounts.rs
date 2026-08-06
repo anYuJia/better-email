@@ -81,6 +81,34 @@ pub async fn delete_account(
 }
 
 #[tauri::command]
+pub async fn remove_account(
+    store: State<'_, MailStore>,
+    account_id: i64,
+    delete_credentials: bool,
+) -> MailResult<Option<Account>> {
+    command_info(format!(
+        "[better-email][account] remove command start account_id={account_id} delete_credentials={delete_credentials}"
+    ));
+    match store.remove_account(account_id, delete_credentials) {
+        Ok(next_account) => {
+            command_info(format!(
+                "[better-email][account] remove command ok removed_account_id={} next_account_id={} credentials_deleted={}",
+                account_id,
+                next_account.as_ref().map(|account| account.id).unwrap_or_default(),
+                delete_credentials,
+            ));
+            Ok(next_account)
+        }
+        Err(error) => {
+            eprintln!(
+                "[better-email][account] remove command failed account_id={account_id} error={error}",
+            );
+            Err(error)
+        }
+    }
+}
+
+#[tauri::command]
 pub fn update_account_settings(
     store: State<'_, MailStore>,
     account_id: Option<i64>,

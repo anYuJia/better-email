@@ -242,9 +242,16 @@ impl MailStore {
         })
     }
     pub fn delete_account(&self, account_id: i64) -> MailResult<Option<Account>> {
+        self.remove_account(account_id, true)
+    }
+    pub fn remove_account(
+        &self,
+        account_id: i64,
+        delete_credentials: bool,
+    ) -> MailResult<Option<Account>> {
         self.with_conn(|conn| {
             db_info(format!(
-                "[better-email][db] delete_account start account_id={account_id}"
+                "[better-email][db] remove_account start account_id={account_id} delete_credentials={delete_credentials}"
             ));
             let transaction = conn.unchecked_transaction()?;
             let account_email = transaction
@@ -255,25 +262,28 @@ impl MailStore {
                 )
                 .optional()?;
             let Some(account_email) = account_email else {
-                eprintln!("[better-email][db] delete_account missing account_id={account_id}");
+                eprintln!("[better-email][db] remove_account missing account_id={account_id}");
                 return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
             };
 
-            transaction.execute(
-                "DELETE FROM account_credentials WHERE account_email = ?1",
-                params![account_email],
-            )?;
+            if delete_credentials {
+                transaction.execute(
+                    "DELETE FROM account_credentials WHERE account_email = ?1",
+                    params![account_email],
+                )?;
+            }
             transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
             ensure_default_account_for_conn(&transaction)?;
             let next_account = account_for_conn_optional(&transaction, None)?;
             transaction.commit()?;
             db_info(format!(
-                "[better-email][db] delete_account ok removed_account_id={} next_account_id={}",
+                "[better-email][db] remove_account ok removed_account_id={} next_account_id={} credentials_deleted={}",
                 account_id,
                 next_account
                     .as_ref()
                     .map(|account| account.id)
                     .unwrap_or_default(),
+                delete_credentials,
             ));
             Ok(next_account)
         })

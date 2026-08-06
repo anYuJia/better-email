@@ -826,10 +826,15 @@ export function setDefaultMockAccount(args?: InvokeArgs) {
   return account;
 }
 
-export function deleteMockAccount(args?: InvokeArgs) {
+export function removeMockAccount(args?: InvokeArgs) {
   const accountId = Number(args?.accountId ?? 0);
+  const deleteCredentials = Boolean(args?.deleteCredentials ?? args?.delete_credentials);
   const removedAccount = mockAccounts.find((item) => item.id === accountId);
   if (!removedAccount) throw new Error('邮箱账号不存在或已被移除。');
+  if (deleteCredentials && removedAccount.email.startsWith('fail')) {
+    throw new Error('本地数据库写入拒绝，删除凭据失败。');
+  }
+  if (deleteCredentials) mockSavedSecretEmails.delete(removedAccount.email.trim().toLowerCase());
   const removedMessageIds = new Set(
     messages.filter((message) => message.account_id === accountId).map((message) => message.id),
   );
@@ -847,6 +852,10 @@ export function deleteMockAccount(args?: InvokeArgs) {
   }
   account = mockAccounts.find((item) => item.is_default) ?? mockAccounts[0];
   return (mockAccounts[0] ? account : null);
+}
+
+export function deleteMockAccount(args?: InvokeArgs) {
+  return removeMockAccount({ ...args, deleteCredentials: true });
 }
 
 export function updateMockAccountSettings(args?: InvokeArgs) {

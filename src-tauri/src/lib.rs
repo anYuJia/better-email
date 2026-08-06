@@ -220,6 +220,7 @@ pub fn run() {
             commands::create_account,
             commands::set_default_account,
             commands::delete_account,
+            commands::remove_account,
             commands::update_account_settings,
             commands::list_folders,
             commands::create_custom_folder,

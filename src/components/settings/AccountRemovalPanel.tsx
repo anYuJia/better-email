@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import type { Account } from '../../app/types';
-import { SettingsButton, SettingsEmptyState, SettingsSwitch } from './shared';
+import { formatInvokeError } from '../../app/accountConnectionFlows';
+import { SettingsButton, SettingsSwitch } from './shared';
 
 type AccountRemovalPanelProps = {
   account: Account;
@@ -22,7 +23,8 @@ export default function AccountRemovalPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const canRemove = accountCount > 0;
-  const confirmationMatches = confirmation.trim().toLowerCase() === account.email.toLowerCase();
+  const confirmationMatches = confirmation.trim().toLowerCase() === account.email.trim().toLowerCase();
+  const confirmationMismatch = !confirmationMatches && confirmation.trim().length > 0;
 
   useEffect(() => {
     setDialogOpen(false);
@@ -50,7 +52,7 @@ export default function AccountRemovalPanel({
       await onRemove(deleteSecret);
       setDialogOpen(false);
     } catch (removeError) {
-      setError(String(removeError));
+      setError(formatInvokeError(removeError));
       setPending(false);
     }
   }
@@ -67,14 +69,21 @@ export default function AccountRemovalPanel({
           autoFocus
           value={confirmation}
           aria-label="输入邮箱地址确认移除"
-          placeholder={account.email}
+          placeholder="示例：name@example.com"
           disabled={pending}
           onChange={(event) => {
             setConfirmation(event.target.value);
             setError('');
           }}
         />
+        <small className="st-field-hint">
+          下方灰色文字仅为示例，不会自动填入；请手动输入要移除账号的完整邮箱地址
+          <strong>{account.email}</strong>。
+        </small>
       </label>
+      {confirmationMismatch && (
+        <p className="settings-confirm-error" role="alert">邮箱地址不匹配，请检查后重试。</p>
+      )}
       <SettingsSwitch
         label="同时删除本机保存的登录凭据"
         description={
@@ -86,7 +95,7 @@ export default function AccountRemovalPanel({
         disabled={pending}
         onChange={setDeleteSecret}
       />
-      {error && <p className="settings-confirm-error">{error}</p>}
+      {error && <p className="settings-confirm-error" role="alert">{error}</p>}
       <footer className="st-actions">
         <SettingsButton
           disabled={pending}

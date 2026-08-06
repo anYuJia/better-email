@@ -38,12 +38,12 @@ body {
 
 /* macOS: taller strip for the traffic lights, spanning only the sidebar. */
 .window-chrome-macos {
-  height: 44px;
+  height: 32px;
 }
 
 /* Sidebar headroom for the macOS traffic lights. */
 .platform-macos .sidebar {
-  padding-top: 44px;
+  padding-top: 32px;
 }
 
 /* Mail pane headroom for the Windows/Linux drag strip and window controls. */

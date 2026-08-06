@@ -16,8 +16,7 @@ export default function ComposerCloseConfirmDialog({
 }: ComposerCloseConfirmDialogProps) {
   return (
     <div
-      className="settings-cache-confirm-backdrop"
-      style={{ zIndex: 10000 }}
+      className="dialog-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           setOpen(false);
@@ -25,21 +24,21 @@ export default function ComposerCloseConfirmDialog({
       }}
     >
       <section
-        className="settings-cache-confirm"
+        className="dialog-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="composer-close-confirm-title"
       >
         <header>
-          <span className="settings-cache-confirm-mark" aria-hidden="true" style={{ background: '#e0f2fe', color: '#0284c7' }}>
+          <span className="dialog-card-mark dialog-card-mark-info" aria-hidden="true">
             <Mail size={17} />
           </span>
-          <span>
+          <span className="dialog-card-heading">
             <strong id="composer-close-confirm-title">关闭写信窗口</strong>
             <small>当前草稿有未保存的修改</small>
           </span>
           <button
-            className="icon-only-action"
+            className="dialog-card-close"
             type="button"
             title="关闭"
             aria-label="关闭确认"
@@ -48,35 +47,30 @@ export default function ComposerCloseConfirmDialog({
             <X size={16} />
           </button>
         </header>
-        <div className="settings-cache-confirm-summary" style={{ background: '#f0f9ff', borderLeft: '3px solid #0ea5e9' }}>
-          <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: 'bold' }}>
-            是否保留对当前邮件草稿的修改？
-          </span>
+        <div className="dialog-card-summary">
+          是否保留对当前邮件草稿的修改？
         </div>
         <p>
           您可以选择将草稿保存至本地，以便下次在“草稿箱”中继续编辑，或者舍弃当前修改。
         </p>
         <footer>
           <button
-            className="secondary"
+            className="dialog-button dialog-button-secondary dialog-button-spacer"
             type="button"
-            style={{ marginRight: 'auto' }}
             onClick={onClose}
           >
             继续编辑
           </button>
           <button
-            className="secondary"
+            className="dialog-button dialog-button-danger"
             type="button"
-            style={{ borderColor: '#fca5a5', color: '#dc2626' }}
             onClick={onDiscard}
           >
             舍弃草稿
           </button>
           <button
-            className="primary"
+            className="dialog-button dialog-button-primary"
             type="button"
-            style={{ background: 'var(--ui-accent, #0a7aff)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold' }}
             onClick={async () => {
               await onSaveDraft();
               setOpen(false);

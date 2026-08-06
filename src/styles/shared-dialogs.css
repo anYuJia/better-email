@@ -1,0 +1,221 @@
+/*
+ * Shared app dialogs: frameless confirm dialogs used across the app
+ * (composer close confirm, generic confirmations). Buttons follow the
+ * global button language: 40px controls, 8px radius, accent primary,
+ * outlined secondary, soft danger.
+ */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(18, 24, 31, 0.34);
+  backdrop-filter: blur(6px);
+}
+
+.dialog-card {
+  width: min(440px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border-strong, #c3ccd5);
+  border-radius: 12px;
+  background: var(--ui-surface, #ffffff);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.2);
+  color: var(--ui-text, #1d232b);
+}
+
+.dialog-card > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dialog-card-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.dialog-card-mark-info {
+  color: #0284c7;
+  background: #e0f2fe;
+}
+
+.dialog-card-mark-warning {
+  color: var(--ui-warning, #8a5a00);
+  background: var(--ui-warning-bg, #fdf6e7);
+}
+
+.dialog-card-mark-danger {
+  color: var(--ui-danger, #b3261e);
+  background: #fdeceb;
+}
+
+.dialog-card-heading {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.dialog-card-heading strong {
+  color: var(--ui-text, #1d232b);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.dialog-card-heading small {
+  color: var(--ui-text-secondary, #4e5966);
+  font-size: 13px;
+  font-weight: 460;
+  line-height: 1.4;
+}
+
+.dialog-card-close {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ui-text-tertiary, #646f7b);
+  background: transparent;
+  box-shadow: none;
+}
+
+.dialog-card-close:hover {
+  color: var(--ui-text, #1d232b);
+  background: rgba(17, 24, 39, 0.06);
+}
+
+.dialog-card-summary {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border, #dde2e8);
+  border-radius: 8px;
+  background: var(--ui-surface-muted, #f1f3f5);
+}
+
+.dialog-card > p {
+  margin: 0;
+  color: var(--ui-text-secondary, #4e5966);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* The legacy classes keep their look; inside the shared card the gap handles
+ * spacing so their own margins are reset. */
+.dialog-card .confirm-dialog-description,
+.dialog-card .confirm-dialog-error {
+  margin: 0;
+}
+
+.dialog-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dialog-button-spacer {
+  margin-right: auto;
+}
+
+/* --- Dialog buttons (global button language) --- */
+.dialog-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.dialog-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.dialog-button-primary {
+  color: #ffffff;
+  border-color: var(--ui-accent, #0a63c4);
+  background: var(--ui-accent, #0a63c4);
+}
+
+.dialog-button-primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover, #084f9e);
+  background: var(--ui-accent-hover, #084f9e);
+}
+
+.dialog-button-secondary {
+  color: var(--ui-text-secondary, #4e5966);
+  border-color: var(--ui-border, #dde2e8);
+  background: var(--ui-surface, #ffffff);
+}
+
+.dialog-button-secondary:hover:not(:disabled) {
+  color: var(--ui-accent, #0a63c4);
+  border-color: var(--ui-border-strong, #c3ccd5);
+  background: var(--ui-surface-muted, #f1f3f5);
+}
+
+.dialog-button-danger {
+  color: var(--ui-danger, #b3261e);
+  border-color: #e8c7c4;
+  background: #fdeceb;
+}
+
+.dialog-button-danger:hover:not(:disabled) {
+  color: #941d16;
+  border-color: var(--ui-danger, #b3261e);
+  background: #fbe0de;
+}
+
+.dialog-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dialog-button:focus-visible {
+  outline: 2px solid var(--ui-accent, #0a63c4);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .dialog-button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-button {
+    transition: none;
+  }
+}

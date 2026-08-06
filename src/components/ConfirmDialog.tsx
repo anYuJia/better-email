@@ -120,8 +120,7 @@ export default function ConfirmDialog({
 
   return createPortal(
     <div
-      className="settings-cache-confirm-backdrop"
-      style={{ zIndex: 10000 }}
+      className="dialog-backdrop"
       onMouseDown={(event) => {
         if (!pending && event.target === event.currentTarget) {
           onCancel();
@@ -129,7 +128,7 @@ export default function ConfirmDialog({
       }}
     >
       <section
-        className="settings-cache-confirm"
+        className="dialog-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -137,22 +136,18 @@ export default function ConfirmDialog({
       >
         <header>
           <span
-            className="settings-cache-confirm-mark"
+            className={`dialog-card-mark ${danger ? 'dialog-card-mark-danger' : 'dialog-card-mark-info'}`}
             aria-hidden="true"
-            style={{
-              background: danger ? '#fee2e2' : '#e0f2fe',
-              color: danger ? '#dc2626' : '#0284c7',
-            }}
           >
             {danger ? <Trash2 size={17} /> : <AlertTriangle size={17} />}
           </span>
-          <span>
+          <span className="dialog-card-heading">
             <strong id={titleId}>{title}</strong>
             <small>请仔细核对以下信息</small>
           </span>
           <button
             ref={closeRef}
-            className="icon-only-action"
+            className="dialog-card-close"
             type="button"
             title="关闭"
             aria-label="关闭确认"
@@ -163,16 +158,8 @@ export default function ConfirmDialog({
           </button>
         </header>
         {summaryText && (
-          <div
-            className="settings-cache-confirm-summary"
-            style={{
-              background: danger ? '#fef2f2' : '#f0f9ff',
-              borderLeft: `3px solid ${danger ? '#ef4444' : '#0ea5e9'}`,
-            }}
-          >
-            <span className="confirm-summary-text" style={{ color: danger ? '#991b1b' : '#0369a1' }}>
-              {summaryText}
-            </span>
+          <div className="dialog-card-summary">
+            {summaryText}
           </div>
         )}
         <p id={descId} className="confirm-dialog-description">
@@ -188,7 +175,7 @@ export default function ConfirmDialog({
         <footer>
           <button
             ref={cancelRef}
-            className="secondary"
+            className="dialog-button dialog-button-secondary"
             type="button"
             disabled={pending}
             onClick={handleCancelClick}
@@ -197,7 +184,7 @@ export default function ConfirmDialog({
           </button>
           <button
             ref={confirmRef}
-            className={danger ? 'danger' : 'primary'}
+            className={`dialog-button ${danger ? 'dialog-button-danger' : 'dialog-button-primary'}`}
             type="button"
             disabled={pending}
             onClick={handleConfirm}

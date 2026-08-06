@@ -1,11 +1,11 @@
 import type { MessageSummary } from '../app/types';
 
 export type SearchSuggestion = {
-  id: 'to' | 'from' | 'attachment' | 'body';
+  id: 'all' | 'to' | 'from' | 'body';
   label: string;
-  hint: string;
   count: number;
   query: string;
+  active: boolean;
 };
 
 export type MessageSearchEntry = {
@@ -14,6 +14,8 @@ export type MessageSearchEntry = {
   body: string;
   hasAttachments: boolean;
 };
+
+const FIELD_PREFIX_PATTERN = /^(from|to|cc|bcc|subject|content|body|filename|label|account|mailbox|folder|after|before):/i;
 
 function normalizeSearchText(...values: string[]) {
   return values.join('\n').toLowerCase();
@@ -29,45 +31,63 @@ export function buildMessageSearchEntries(messages: MessageSummary[]): MessageSe
   }));
 }
 
+function activeFieldFor(rawQuery: string): 'all' | 'to' | 'from' | 'body' {
+  const match = rawQuery.trim().match(FIELD_PREFIX_PATTERN);
+  if (!match) return 'all';
+  const field = match[1].toLowerCase();
+  if (field === 'from') return 'from';
+  if (field === 'to') return 'to';
+  if (field === 'body' || field === 'content') return 'body';
+  return 'all';
+}
+
 export function buildMessageSearchSuggestions(
   entries: MessageSearchEntry[],
   rawQuery: string,
 ): SearchSuggestion[] {
   const trimmedQuery = rawQuery.trim();
-  const normalizedQuery = trimmedQuery.toLowerCase();
-  if (!normalizedQuery || normalizedQuery.includes(':')) return [];
+  if (!trimmedQuery || /^(from|to|body):$/i.test(trimmedQuery)) return [];
+  const activeField = activeFieldFor(trimmedQuery);
+  const searchText = trimmedQuery.replace(FIELD_PREFIX_PATTERN, '').trim();
+  const normalizedText = searchText.toLowerCase();
 
   const countMatches = (predicate: (entry: MessageSearchEntry) => boolean) =>
     entries.reduce((count, entry) => count + (predicate(entry) ? 1 : 0), 0);
 
   return [
     {
-      id: 'to',
-      label: '收件人',
-      hint: '收件人、抄送、密送',
-      count: countMatches((entry) => entry.to.includes(normalizedQuery)),
-      query: `to:${trimmedQuery}`,
+      id: 'all',
+      label: '全部',
+      count: countMatches(
+        (entry) =>
+          entry.to.includes(normalizedText)
+          || entry.from.includes(normalizedText)
+          || entry.body.includes(normalizedText)
+          || entry.hasAttachments,
+      ),
+      query: searchText,
+      active: activeField === 'all',
     },
     {
       id: 'from',
       label: '发件人',
-      hint: '姓名或邮箱',
-      count: countMatches((entry) => entry.from.includes(normalizedQuery)),
-      query: `from:${trimmedQuery}`,
+      count: countMatches((entry) => entry.from.includes(normalizedText)),
+      query: `from:${searchText}`,
+      active: activeField === 'from',
     },
     {
-      id: 'attachment',
-      label: '附件',
-      hint: '附件名',
-      count: countMatches((entry) => entry.hasAttachments),
-      query: `filename:${trimmedQuery}`,
+      id: 'to',
+      label: '收件人',
+      count: countMatches((entry) => entry.to.includes(normalizedText)),
+      query: `to:${searchText}`,
+      active: activeField === 'to',
     },
     {
       id: 'body',
       label: '内容',
-      hint: '正文',
-      count: countMatches((entry) => entry.body.includes(normalizedQuery)),
-      query: `body:${trimmedQuery}`,
+      count: countMatches((entry) => entry.body.includes(normalizedText)),
+      query: `body:${searchText}`,
+      active: activeField === 'body',
     },
   ];
 }

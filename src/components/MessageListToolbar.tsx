@@ -90,7 +90,7 @@ export default function MessageListToolbar({
     () => buildMessageSearchSuggestions(searchEntries, trimmedQuery),
     [searchEntries, trimmedQuery],
   );
-  const showSearchSuggestions = searchFocused && trimmedQuery.length >= 2 && searchSuggestions.length > 0;
+  const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
 
   function clearSearchBlurTimer() {
     if (searchBlurTimerRef.current === null) return;
@@ -143,17 +143,19 @@ export default function MessageListToolbar({
               </button>
             )}
             {showSearchSuggestions && (
-              <div className="search-suggestion-panel" role="listbox" aria-label="搜索建议">
+              <div className="search-suggestion-panel" role="listbox" aria-label="搜索范围选项">
+                <span className="search-suggestion-title">搜索范围</span>
                 {searchSuggestions.map((item) => (
                   <button
                     type="button"
                     key={item.id}
+                    className={item.active ? 'active' : ''}
+                    aria-selected={item.active}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => applySuggestedSearch(item.query)}
                   >
                     <span>
                       <strong>{item.label}</strong>
-                      <small>{item.hint}</small>
                     </span>
                     <em>{item.count} 封</em>
                   </button>

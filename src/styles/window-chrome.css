@@ -43,7 +43,7 @@ body {
 
 /* Sidebar headroom for the macOS traffic lights. */
 .platform-macos .sidebar {
-  padding-top: 52px;
+  padding-top: 44px;
 }
 
 /* Mail pane headroom for the Windows/Linux drag strip and window controls. */

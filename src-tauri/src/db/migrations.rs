@@ -23,6 +23,7 @@ impl MailStore {
                     remote_images_allowed INTEGER NOT NULL DEFAULT 0,
                     signature TEXT NOT NULL DEFAULT '',
                     is_default INTEGER NOT NULL DEFAULT 0,
+                    auto_download_attachments INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
 
@@ -308,6 +309,12 @@ impl MailStore {
                 "accounts",
                 "intercept_https_links",
                 "INTEGER NOT NULL DEFAULT 1",
+            )?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "auto_download_attachments",
+                "INTEGER NOT NULL DEFAULT 0",
             )?;
             add_column_if_missing(
                 conn,

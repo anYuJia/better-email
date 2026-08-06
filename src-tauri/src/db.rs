@@ -1594,12 +1594,35 @@ mod tests {
                     cross_account_risk_warning: true,
                     block_external_mailboxes: false,
                     intercept_https_links: true,
+                    auto_download_attachments: false,
                 },
             )
             .unwrap();
         assert_eq!(account.display_name, "New Name");
         assert_eq!(account.auth_type, "oauth2");
         assert!(account.remote_images_allowed);
+        assert!(!account.auto_download_attachments);
+        let updated = store
+            .update_account_settings_for(
+                None,
+                AccountSettingsInput {
+                    display_name: "New Name".to_string(),
+                    provider: "Custom".to_string(),
+                    imap_host: "imap.mail.test:993".to_string(),
+                    smtp_host: "smtp.mail.test:465".to_string(),
+                    incoming_protocol: "imap".to_string(),
+                    auth_type: "oauth2".to_string(),
+                    sync_mode: "5min".to_string(),
+                    remote_images_allowed: true,
+                    signature: "Regards".to_string(),
+                    cross_account_risk_warning: true,
+                    block_external_mailboxes: false,
+                    intercept_https_links: true,
+                    auto_download_attachments: true,
+                },
+            )
+            .unwrap();
+        assert!(updated.auto_download_attachments);
     }
 
     #[test]
@@ -1676,6 +1699,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
 
@@ -1754,6 +1778,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
         let first_folders = store
@@ -1980,6 +2005,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
         let first_inbox = store
@@ -2101,6 +2127,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
 
@@ -2145,6 +2172,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
         store.set_default_account(second_account.id).unwrap();
@@ -2264,6 +2292,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap()
     }
@@ -2397,6 +2426,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
 
@@ -2470,6 +2500,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
         let third_account = store
@@ -2487,6 +2518,7 @@ mod tests {
                 cross_account_risk_warning: true,
                 block_external_mailboxes: false,
                 intercept_https_links: true,
+                auto_download_attachments: false,
             })
             .unwrap();
 
@@ -3369,6 +3401,69 @@ mod tests {
         assert_eq!(updated.sanitized_html, "<p>Full remote body</p>");
         assert_eq!(updated.security_warnings.len(), 1);
         assert_eq!(updated.remote_uid, 8);
+    }
+
+    #[test]
+    fn messages_missing_body_are_listed_until_body_is_persisted() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let batch = ImapHeaderBatch {
+            remote_name: "INBOX".to_string(),
+            uid_validity: "42".to_string(),
+            highest_uid: 5,
+            lowest_uid: 5,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 5,
+                message_id: "<missing-body@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
+                subject: "Missing body".to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: "demo@better-email.local".to_string(),
+                snippet: "header only".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+                is_starred: false,
+            }],
+        };
+        store.import_imap_headers(mailbox.id, &batch).unwrap();
+        let pending = store
+            .list_messages_missing_body(account_id, "INBOX", 50)
+            .unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].1, 5);
+        let uids = store.list_remote_uids_for_mailbox(account_id, "INBOX").unwrap();
+        assert!(uids.contains(&5));
+
+        store
+            .update_message_body(
+                pending[0].0,
+                &RemoteMessageBody {
+                    body: "Now fetched".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "Now fetched".to_string(),
+                    has_attachments: false,
+                    attachments: Vec::new(),
+                },
+            )
+            .unwrap();
+        let pending = store
+            .list_messages_missing_body(account_id, "INBOX", 50)
+            .unwrap();
+        assert!(pending.is_empty());
     }
 
     #[test]

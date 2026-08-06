@@ -155,13 +155,13 @@ impl MailStore {
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
                        a.signature, a.cross_account_risk_warning,
-                       a.block_external_mailboxes, a.intercept_https_links, a.is_default
+                       a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments, a.is_default
                 FROM accounts a
                 LEFT JOIN imap_mailboxes m ON m.account_id = a.id
                 GROUP BY a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                          a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
                          a.signature, a.cross_account_risk_warning,
-                         a.block_external_mailboxes, a.intercept_https_links, a.is_default
+                         a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments, a.is_default
                 ORDER BY
                     CASE WHEN COUNT(m.id) = 0 THEN 0 ELSE 1 END,
                     MIN(CASE WHEN m.last_sync_at = '' THEN '0000-00-00T00:00:00Z' ELSE m.last_sync_at END) ASC,

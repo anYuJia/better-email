@@ -19,6 +19,7 @@ function makeAccount(overrides: Partial<Account> = {}): Account {
     cross_account_risk_warning: true,
     block_external_mailboxes: false,
     intercept_https_links: true,
+    auto_download_attachments: false,
     is_default: true,
     ...overrides,
   };

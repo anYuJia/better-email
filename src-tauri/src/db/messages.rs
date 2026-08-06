@@ -250,7 +250,7 @@ impl MailStore {
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
                        a.signature, a.cross_account_risk_warning,
-                       a.block_external_mailboxes, a.intercept_https_links, a.is_default
+                       a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1
@@ -441,6 +441,56 @@ impl MailStore {
                     )?;
                     Ok(message)
                 })
+        })
+    }
+    pub fn list_messages_missing_body(
+        &self,
+        account_id: i64,
+        remote_mailbox: &str,
+        limit: i64,
+    ) -> MailResult<Vec<(i64, i64)>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT id, remote_uid
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid > 0
+                  AND body = ''
+                ORDER BY id DESC
+                LIMIT ?3
+                ",
+            )?;
+            let rows = stmt
+                .query_map(params![account_id, remote_mailbox, limit], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        })
+    }
+    pub fn list_remote_uids_for_mailbox(
+        &self,
+        account_id: i64,
+        remote_mailbox: &str,
+    ) -> MailResult<std::collections::BTreeSet<i64>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT remote_uid
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid > 0
+                ",
+            )?;
+            let uids = stmt
+                .query_map(params![account_id, remote_mailbox], |row| {
+                    row.get::<_, i64>(0)
+                })?
+                .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+            Ok(uids)
         })
     }
     pub fn import_eml_message(&self, account_id: Option<i64>, raw: &[u8]) -> MailResult<Message> {

@@ -34,6 +34,7 @@ export let account = {
   cross_account_risk_warning: true,
   block_external_mailboxes: false,
   intercept_https_links: true,
+  auto_download_attachments: false,
   is_default: true,
 };
 
@@ -144,8 +145,8 @@ export let messages: MockMessage[] = [
     subject: '安全检查清单',
     snippet: 'Better Email 的 HTML 安全预览、附件和规则都可以验证。',
     body: '<p>Better Email 的 HTML 安全预览已就绪。</p><a href="http://track.example.com/open">查看订单状态</a><img src="cid:better-email-logo@example.com"><img src="https://cdn.example.com/open.png">',
-    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><img src="cid:better-email-logo@example.com" alt="Better Email">',
-    security_warnings: ['检测到远程图片，默认已阻止自动加载。', '正文包含明文 HTTP 链接，已移除可点击目标。'],
+    sanitized_html: '<p>Better Email 的 HTML 安全预览已就绪。</p><a href="http://track.example.com/open">查看订单状态</a><img src="cid:better-email-logo@example.com" alt="Better Email">',
+    security_warnings: ['检测到远程图片，默认已阻止自动加载。'],
     received_at: now,
     is_read: false,
     is_starred: true,
@@ -785,6 +786,7 @@ export function createMockAccount(args?: InvokeArgs) {
     cross_account_risk_warning: input.cross_account_risk_warning !== false,
     block_external_mailboxes: Boolean(input.block_external_mailboxes),
     intercept_https_links: input.intercept_https_links !== false,
+    auto_download_attachments: Boolean(input.auto_download_attachments),
     is_default: isFirstAccount,
   };
   mockAccounts = [...mockAccounts, created];
@@ -1974,9 +1976,11 @@ export function runMockSyncCommand(command: string, args?: InvokeArgs) {
     && targetAccount.id === 2
     && !messages.some((message) => message.subject === 'Design remote sync sample')
   ) {
+    const sampleMessageId = nextMessageId++;
+    const autoDownload = targetAccount.auto_download_attachments === true;
     messages = [
       {
-        id: nextMessageId++,
+        id: sampleMessageId,
         account_id: targetAccount.id,
         account_email: targetAccount.email,
         folder_id: folderIdForRole('inbox', targetAccount.id),
@@ -1994,14 +1998,30 @@ export function runMockSyncCommand(command: string, args?: InvokeArgs) {
         received_at: '2026-07-09T10:00:00+08:00',
         is_read: false,
         is_starred: false,
-        has_attachments: false,
+        has_attachments: true,
         snoozed_until: '',
         labels: [],
-        attachment_count: 0,
+        attachment_count: 1,
         remote_mailbox: 'INBOX',
         remote_uid: 6001,
       },
       ...messages,
+    ];
+    attachments = [
+      {
+        id: nextAttachmentId++,
+        message_id: sampleMessageId,
+        filename: autoDownload ? 'design-brief-downloaded.pdf' : 'design-brief.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 245760,
+        is_downloaded: autoDownload,
+        local_path: autoDownload
+          ? `/tmp/better-email/${sampleMessageId}-design-brief.pdf`
+          : '',
+        content_id: '',
+        is_inline: false,
+      },
+      ...attachments,
     ];
   }
   if (command === 'sync_imap_history') {

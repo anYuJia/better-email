@@ -392,6 +392,64 @@ pub fn fetch_message_body(
     Ok(parse_body_from_raw(&raw))
 }
 
+pub fn fetch_message_bodies(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    remote_uids: &[i64],
+) -> Result<Vec<(i64, RemoteMessageBody)>, MailError> {
+    if remote_uids.is_empty() {
+        return Ok(Vec::new());
+    }
+    imap_info(format!(
+        "[better-email][imap] body batch fetch start account_id={} mailbox={} uids={}",
+        account.id,
+        remote_name,
+        remote_uids.len()
+    ));
+    let (host, port) = parse_imap_endpoint(&account.imap_host)?;
+    let client = imap::ClientBuilder::new(host.as_str(), port)
+        .connect()
+        .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
+    let mut session = login_imap(client, account, secret)?;
+    session
+        .select(remote_name)
+        .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
+    let uid_set = remote_uids
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fetches = session
+        .uid_fetch(uid_set, "(UID BODY.PEEK[])")
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
+    let mut bodies_by_uid = std::collections::BTreeMap::new();
+    for fetch in fetches.iter() {
+        let (Some(uid), Some(raw)) = (fetch.uid, fetch.body()) else {
+            continue;
+        };
+        bodies_by_uid.insert(i64::from(uid), raw.to_vec());
+    }
+    let _ = session.logout();
+    let mut results = Vec::with_capacity(remote_uids.len());
+    for remote_uid in remote_uids {
+        let Some(raw) = bodies_by_uid.remove(remote_uid) else {
+            continue;
+        };
+        let body = parse_body_from_raw(&raw);
+        imap_info(format!(
+            "[better-email][imap] body batch fetch ok account_id={} mailbox={} uid={} bytes={} attachments={}",
+            account.id,
+            remote_name,
+            remote_uid,
+            raw.len(),
+            body.attachments.len()
+        ));
+        results.push((*remote_uid, body));
+    }
+    Ok(results)
+}
+
 pub struct RemoteAttachmentWrite {
     pub filename: String,
     pub size_bytes: i64,
@@ -1756,9 +1814,6 @@ fn reader_security_warnings(raw: &str, html_body: &str) -> Vec<String> {
     if protocol::html_has_remote_images(html_body) || protocol::html_has_remote_images(raw) {
         warnings.push("检测到远程图片，默认已阻止自动加载。".to_string());
     }
-    if lower.contains("href=\"http://") || lower.contains("href='http://") {
-        warnings.push("正文包含明文 HTTP 链接，已移除可点击目标。".to_string());
-    }
     warnings.extend(protocol::link_risk_warnings(html_body));
     warnings
 }
@@ -1984,6 +2039,7 @@ mod tests {
             cross_account_risk_warning: true,
             block_external_mailboxes: false,
             intercept_https_links: true,
+            auto_download_attachments: false,
             is_default: true,
         };
         assert!(needs_imap_client_id(&account));

@@ -2,7 +2,9 @@ use super::common::{
     command_info, is_pop3_account, mask_email, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH,
     SYNCABLE_IMAP_ROLES,
 };
+use crate::commands::attachments::auto_download_attachments_for_message;
 use crate::credentials;
+use crate::credentials::AccountSecret;
 use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
 use crate::models::{
@@ -14,6 +16,7 @@ use crate::pop3_probe;
 use crate::protocol;
 use crate::smtp;
 use chrono::Utc;
+use std::collections::{BTreeMap, BTreeSet};
 use tauri::State;
 #[tauri::command]
 pub async fn test_connection(
@@ -484,6 +487,10 @@ fn sync_imap_headers_for_account(
     let mut removed_remote_messages = 0;
     let mut failures = Vec::new();
     let mut completed_history_folders = 0;
+    let mut fetched_bodies = 0;
+    let mut body_failures = 0;
+    let mut auto_downloaded_attachments = 0;
+    let mut auto_download_failures = 0;
     for mailbox in mailboxes {
         if history_only && mailbox.history_complete {
             completed_history_folders += 1;
@@ -503,6 +510,17 @@ fn sync_imap_headers_for_account(
             },
         ) {
             Ok(fetch) => {
+                let pre_existing_uids = if account.auto_download_attachments {
+                    match store.list_remote_uids_for_mailbox(account.id, &mailbox.remote_name) {
+                        Ok(uids) => uids,
+                        Err(error) => {
+                            failures.push(format!("{}: {error}", mailbox.remote_name));
+                            continue;
+                        }
+                    }
+                } else {
+                    BTreeSet::new()
+                };
                 let reconcile = store.reconcile_imap_flag_snapshot(mailbox.id, &fetch.flags);
                 let imported = store.import_imap_headers_batch(mailbox.id, &fetch.headers);
                 match (reconcile, imported) {
@@ -511,6 +529,28 @@ fn sync_imap_headers_for_account(
                         imported_messages += imported;
                         updated_remote_states += reconciled.updated_messages;
                         removed_remote_messages += reconciled.removed_messages;
+                        match sync_mailbox_bodies(
+                            store,
+                            account,
+                            &secret,
+                            &mailbox.remote_name,
+                            &pre_existing_uids,
+                        ) {
+                            Ok(stats) => {
+                                fetched_bodies += stats.fetched;
+                                body_failures += stats.failures;
+                                auto_downloaded_attachments += stats.auto_downloaded;
+                                auto_download_failures += stats.auto_download_failures;
+                            }
+                            Err(error) => {
+                                eprintln!(
+                                    "[better-email][sync] body sync failed account_id={} mailbox={} error={error}",
+                                    account.id,
+                                    mailbox.remote_name
+                                );
+                                body_failures += 1;
+                            }
+                        }
                     }
                     (Err(error), _) | (_, Err(error)) => {
                         failures.push(format!("{}: {error}", mailbox.remote_name));
@@ -572,6 +612,26 @@ fn sync_imap_headers_for_account(
         return Err(crate::db::MailError::Imap(message));
     }
 
+    let body_note = if fetched_bodies > 0 || body_failures > 0 || auto_downloaded_attachments > 0 || auto_download_failures > 0 {
+        let mut parts = Vec::new();
+        if fetched_bodies > 0 || body_failures > 0 {
+            let mut part = format!("获取正文 {fetched_bodies} 封");
+            if body_failures > 0 {
+                part.push_str(&format!("，{body_failures} 封失败"));
+            }
+            parts.push(part);
+        }
+        if auto_downloaded_attachments > 0 || auto_download_failures > 0 {
+            let mut part = format!("自动下载附件 {auto_downloaded_attachments} 个");
+            if auto_download_failures > 0 {
+                part.push_str(&format!("，{auto_download_failures} 个失败"));
+            }
+            parts.push(part);
+        }
+        format!(" {}", parts.join("；"))
+    } else {
+        String::new()
+    };
     let (status, message) = if failures.is_empty() {
         (
             if history_only {
@@ -581,23 +641,25 @@ fn sync_imap_headers_for_account(
             },
             if history_only {
                 format!(
-                    "{} 历史回填完成：扫描 {} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录此前已完成。{}",
+                    "{} 历史回填完成：扫描 {} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录此前已完成。{}{}",
                     account.email,
                     scanned_folders,
                     imported_messages,
                     updated_remote_states,
                     removed_remote_messages,
                     completed_history_folders,
+                    body_note,
                     custom_note
                 )
             } else {
                 format!(
-                    "{} 同步完成：扫描 {} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封，并推进历史回填。{}",
+                    "{} 同步完成：扫描 {} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封，并推进历史回填。{}{}",
                     account.email,
                     scanned_folders,
                     imported_messages,
                     updated_remote_states,
                     removed_remote_messages,
+                    body_note,
                     custom_note
                 )
             },
@@ -611,7 +673,7 @@ fn sync_imap_headers_for_account(
             },
             if history_only {
                 format!(
-                    "{} 历史回填部分完成：扫描 {}/{} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}",
+                    "{} 历史回填部分完成：扫描 {}/{} 个文件夹，补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}{}",
                     account.email,
                     scanned_folders,
                     total_mapped_folders,
@@ -620,11 +682,12 @@ fn sync_imap_headers_for_account(
                     removed_remote_messages,
                     failures.len(),
                     failures.join("；"),
+                    body_note,
                     custom_note
                 )
             } else {
                 format!(
-                    "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}",
+                    "{} 同步部分完成：扫描 {}/{} 个已映射文件夹，新增或补充 {} 封，更新远端状态 {} 封，移除远端已删除邮件 {} 封；{} 个目录失败：{}。{}{}",
                     account.email,
                     scanned_folders,
                     total_mapped_folders,
@@ -633,6 +696,7 @@ fn sync_imap_headers_for_account(
                     removed_remote_messages,
                     failures.len(),
                     failures.join("；"),
+                    body_note,
                     custom_note
                 )
             },
@@ -661,6 +725,89 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
         }
     }
     (syncable, skipped_custom)
+}
+
+const BODY_SYNC_LIMIT_PER_MAILBOX: i64 = 50;
+
+struct MailboxBodySyncStats {
+    fetched: usize,
+    failures: usize,
+    auto_downloaded: usize,
+    auto_download_failures: usize,
+}
+
+fn sync_mailbox_bodies(
+    store: &MailStore,
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    pre_existing_uids: &BTreeSet<i64>,
+) -> MailResult<MailboxBodySyncStats> {
+    let mut stats = MailboxBodySyncStats {
+        fetched: 0,
+        failures: 0,
+        auto_downloaded: 0,
+        auto_download_failures: 0,
+    };
+    let pending = store.list_messages_missing_body(
+        account.id,
+        remote_name,
+        BODY_SYNC_LIMIT_PER_MAILBOX,
+    )?;
+    if pending.is_empty() {
+        return Ok(stats);
+    }
+    let uid_to_message_id = pending
+        .into_iter()
+        .map(|(message_id, uid)| (uid, message_id))
+        .collect::<BTreeMap<i64, i64>>();
+    let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+    let bodies = match imap_probe::fetch_message_bodies(account, secret, remote_name, &uids) {
+        Ok(bodies) => bodies,
+        Err(error) => {
+            eprintln!(
+                "[better-email][sync] body batch fetch failed account_id={} mailbox={} pending={} error={error}",
+                account.id,
+                remote_name,
+                uid_to_message_id.len()
+            );
+            stats.failures = uid_to_message_id.len();
+            return Ok(stats);
+        }
+    };
+    let mut fetched_message_ids = Vec::new();
+    for (uid, body) in bodies {
+        let Some(&message_id) = uid_to_message_id.get(&uid) else {
+            continue;
+        };
+        match store.update_message_body(message_id, &body) {
+            Ok(_) => {
+                stats.fetched += 1;
+                fetched_message_ids.push(message_id);
+            }
+            Err(error) => {
+                eprintln!(
+                    "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
+                    account.id,
+                    remote_name,
+                    uid,
+                    message_id
+                );
+                stats.failures += 1;
+            }
+        }
+    }
+    if account.auto_download_attachments {
+        for (uid, message_id) in &uid_to_message_id {
+            if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid) {
+                continue;
+            }
+            let outcome = auto_download_attachments_for_message(store, *message_id);
+            stats.auto_downloaded += outcome.downloaded;
+            stats.auto_download_failures += outcome.failures;
+        }
+    }
+    Ok(stats)
 }
 
 #[tauri::command]
@@ -731,6 +878,7 @@ mod tests {
             cross_account_risk_warning: true,
             block_external_mailboxes: false,
             intercept_https_links: true,
+            auto_download_attachments: false,
             is_default: true,
         }
     }

@@ -19,6 +19,8 @@ pub struct Account {
     pub block_external_mailboxes: bool,
     #[serde(default = "default_true")]
     pub intercept_https_links: bool,
+    #[serde(default = "default_false")]
+    pub auto_download_attachments: bool,
     pub is_default: bool,
 }
 
@@ -201,6 +203,8 @@ pub struct AccountSettingsInput {
     pub block_external_mailboxes: bool,
     #[serde(default = "default_true")]
     pub intercept_https_links: bool,
+    #[serde(default = "default_false")]
+    pub auto_download_attachments: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -221,6 +225,8 @@ pub struct AccountCreateInput {
     pub block_external_mailboxes: bool,
     #[serde(default = "default_true")]
     pub intercept_https_links: bool,
+    #[serde(default = "default_false")]
+    pub auto_download_attachments: bool,
 }
 
 fn default_false() -> bool {

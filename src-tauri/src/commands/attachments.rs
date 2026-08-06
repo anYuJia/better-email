@@ -163,6 +163,13 @@ pub async fn download_attachment(
     attachment_id: i64,
 ) -> MailResult<AttachmentDownload> {
     let attachment = store.get_attachment(attachment_id)?;
+    download_attachment_file(&store, &attachment)
+}
+
+pub fn download_attachment_file(
+    store: &MailStore,
+    attachment: &Attachment,
+) -> MailResult<AttachmentDownload> {
     let account = store.get_message_account(attachment.message_id)?;
     let secret = store.get_account_secret(&account)?;
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(attachment.message_id)?;
@@ -279,6 +286,42 @@ pub async fn download_attachment(
             format!("附件已下载到 {local_path_string}")
         },
     })
+}
+
+pub struct AutoDownloadOutcome {
+    pub downloaded: usize,
+    pub failures: usize,
+}
+
+pub fn auto_download_attachments_for_message(
+    store: &MailStore,
+    message_id: i64,
+) -> AutoDownloadOutcome {
+    let mut outcome = AutoDownloadOutcome {
+        downloaded: 0,
+        failures: 0,
+    };
+    let Ok(attachments) = store.list_attachments(message_id) else {
+        return outcome;
+    };
+    for attachment in attachments {
+        if attachment.is_inline || attachment.is_downloaded {
+            continue;
+        }
+        match download_attachment_file(store, &attachment) {
+            Ok(_) => outcome.downloaded += 1,
+            Err(error) => {
+                eprintln!(
+                    "[better-email][attachment] auto download failed message_id={} attachment_id={} filename={} error={error}",
+                    message_id,
+                    attachment.id,
+                    attachment.filename
+                );
+                outcome.failures += 1;
+            }
+        }
+    }
+    outcome
 }
 
 

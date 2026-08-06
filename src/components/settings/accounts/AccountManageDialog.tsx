@@ -156,6 +156,18 @@ export default function AccountManageDialog({
               />
             </div>
 
+            <div className="settings-account-risk-toggle">
+              <SettingsSwitch
+                label="自动下载新邮件附件"
+                description="开启后，同步时新到达邮件的附件会自动下载到本地；开启前已有的邮件附件不会自动下载。"
+                checked={account.auto_download_attachments}
+                onChange={(checked) => onAccountChange({
+                  ...account,
+                  auto_download_attachments: checked,
+                })}
+              />
+            </div>
+
             {error && (
               <p className="settings-account-add-error" role="alert">
                 {error}

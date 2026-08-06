@@ -17,6 +17,7 @@ export type Account = {
   cross_account_risk_warning: boolean;
   block_external_mailboxes: boolean;
   intercept_https_links: boolean;
+  auto_download_attachments: boolean;
   is_default: boolean;
 };
 

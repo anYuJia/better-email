@@ -429,12 +429,14 @@
 }
 
 .settings-modal .settings-account-manage-dialog {
+  height: min(82vh, 720px);
+  max-height: calc(100vh - 40px);
   overflow: hidden;
 }
 
 .settings-modal .settings-account-manage-dialog > .settings-confirm-dialog-embedded {
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;

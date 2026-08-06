@@ -1254,6 +1254,36 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.message-list')");
     await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.settings-account-row')].find((r) => r.innerText.includes('qa-new@better-email.local')); const deleteBtn = row && [...row.querySelectorAll('.settings-account-row-actions button')].find((button) => button.textContent.includes('删除')); if (!deleteBtn) throw new Error('Delete button for qa-new@better-email.local not found'); deleteBtn.click(); })()");
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-dialog]') && document.querySelector('[data-account-remove-confirm]').disabled");
+    const removalDialogGeometry = await evalInPage(cdp, `(() => {
+      const manageDialog = document.querySelector('.settings-account-manage-dialog');
+      const manageHeader = manageDialog?.querySelector(':scope > header');
+      const dialog = document.querySelector('[data-account-remove-dialog]');
+      const header = dialog?.querySelector(':scope > header');
+      const footer = dialog?.querySelector(':scope footer');
+      if (!manageDialog || !manageHeader || !dialog || !header || !footer) {
+        throw new Error('Account removal dialog structure is incomplete');
+      }
+      const pageTransform = getComputedStyle(document.querySelector('.settings-page')).transform;
+      if (pageTransform !== 'none') throw new Error('Settings page transform creates a clipping context: ' + pageTransform);
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+      const rects = Object.fromEntries([
+        ['manageDialog', manageDialog],
+        ['manageHeader', manageHeader],
+        ['dialog', dialog],
+        ['header', header],
+        ['footer', footer],
+      ].map(([name, element]) => {
+        const rect = element.getBoundingClientRect();
+        return [name, { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, height: rect.height }];
+      }));
+      const visible = [rects.manageDialog, rects.manageHeader, rects.dialog, rects.header, rects.footer].every((rect) => (
+        rect.top >= 0 && rect.bottom <= viewport.height && rect.left >= 0 && rect.right <= viewport.width
+      ));
+      if (!visible) throw new Error('Account removal dialog is clipped: ' + JSON.stringify({ viewport, rects }));
+      return { viewport, pageTransform, rects };
+    })()`);
+    console.log(`Account removal dialog geometry: ${JSON.stringify(removalDialogGeometry)}`);
+    await captureScreenshot(cdp, 'settings-account-removal-confirm');
     await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'wrong@better-email.local');
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-confirm]').disabled");
     await fillInput(cdp, 'input[aria-label="输入邮箱地址确认移除"]', 'qa-new@better-email.local');

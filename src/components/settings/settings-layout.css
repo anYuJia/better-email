@@ -447,14 +447,14 @@
   animation: settings-page-enter 130ms ease-out both;
 }
 
+/* Keep this animation opacity-only. A transform here would create a new
+ * containing block and clip fixed-position settings overlays to the page. */
 @keyframes settings-page-enter {
   from {
     opacity: 0.92;
-    transform: translateY(3px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

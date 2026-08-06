@@ -730,17 +730,3 @@ body {
   background: rgba(32, 36, 42, 0.92);
   box-shadow: var(--ui-shadow-popover);
 }
-
-@media (max-width: 980px) {
-  .app-shell {
-    grid-template-columns: minmax(214px, 25vw) 1px minmax(326px, 38vw) 1px minmax(360px, 1fr) !important;
-  }
-
-  .pane-resizer {
-    display: block;
-  }
-
-  .reader {
-    padding-inline: 22px;
-  }
-}

@@ -1179,12 +1179,25 @@ export default function App() {
     loadMoreMessages().catch((error) => setStatus(String(error)));
   }, [loadMoreMessages, setStatus]);
 
+  const [shellWidth, setShellWidth] = useState<number>(() => window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setShellWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isCompactShell = shellWidth <= 1180;
+  const shellColumns = isCompactShell
+    ? '200px 320px minmax(0, 1fr)'
+    : `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(0, 1fr)`;
+  const sidebarWidth = isCompactShell ? 200 : appLayout.sidebar;
+
   return (
     <main
       className="app-shell"
       style={{
-        gridTemplateColumns: `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(360px, 1fr)`,
-        '--app-sidebar-width': `${appLayout.sidebar}px`,
+        gridTemplateColumns: shellColumns,
+        '--app-sidebar-width': `${sidebarWidth}px`,
       } as React.CSSProperties}
       onPointerMove={moveLayoutResize}
       onPointerUp={endLayoutResize}

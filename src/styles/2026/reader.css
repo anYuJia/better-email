@@ -107,6 +107,7 @@
   max-width: 100%;
   padding: 0;
   gap: 5px;
+  flex-wrap: nowrap;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -314,7 +315,7 @@
   gap: 12px;
   padding: 9px 12px;
   border: 1px solid #e8edf2;
-  border-radius: 13px;
+  border-radius: 10px;
   background: #fff;
   box-shadow: none;
   box-sizing: border-box;
@@ -512,8 +513,15 @@
 .reader-warning-action-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 9px;
+}
+
+.reader-warning-primary-action,
+.reader-warning-secondary-action {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .reader-warning-primary-action {

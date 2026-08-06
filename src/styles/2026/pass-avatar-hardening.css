@@ -1,16 +1,16 @@
 /* Final avatar hardening: Avatar renders this element as the fixed-size
    clipping shell, with any remote image nested inside it. */
 .message-avatar {
-  left: 0;
+  left: 3px;
   top: 5px;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  flex: 0 0 40px;
+  flex: 0 0 34px;
   overflow: hidden;
   border-radius: 9999px;
   line-height: 1;
@@ -50,7 +50,7 @@
 /* Text (initial) fallback avatar: same shell, legible centered letter */
 .message-avatar.avatar-initial,
 .reader-avatar.avatar-initial {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 650;
   line-height: 1;
   user-select: none;

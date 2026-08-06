@@ -10,16 +10,16 @@
 }
 
 .brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  font-size: 11px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .brand strong {
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13.5px;
+  font-weight: 680;
 }
 
 .brand span {
@@ -27,22 +27,23 @@
 }
 
 .compose-button {
-  min-height: 36px;
-  justify-content: flex-start;
-  padding: 0 11px;
-  border: 1px solid rgba(26, 115, 232, 0.22);
+  min-height: 38px;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--ui-accent);
   border-radius: 8px;
-  color: #0f5fb7;
-  background: #eef5ff;
+  color: #ffffff;
+  background: var(--ui-accent);
   box-shadow: none;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 650;
 }
 
 .compose-button:hover {
-  color: #0b4f9d;
-  background: #e6f0ff;
-  box-shadow: var(--quiet-row-shadow);
+  color: #ffffff;
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+  box-shadow: none;
 }
 
 .compose-button svg {

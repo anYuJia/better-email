@@ -1644,10 +1644,6 @@ h1 {
 }
 
 @media (max-width: 980px) {
-  .app-shell {
-    grid-template-columns: 82px 0 340px 0 minmax(360px, 1fr) !important;
-  }
-
   .pane-resizer,
   .layout-reset-button {
     display: none;

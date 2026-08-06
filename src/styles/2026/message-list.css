@@ -309,7 +309,6 @@
   margin: 0;
   padding: 6px 12px 6px 66px;
   border: 0;
-  border-bottom: 1px solid #e8ebef;
   border-radius: 0;
   color: var(--ui-text);
   background: transparent;
@@ -317,7 +316,6 @@
 }
 
 .message-card:hover {
-  border-color: #e3e7ec;
   background: #f5f8fb;
   box-shadow: none;
 }

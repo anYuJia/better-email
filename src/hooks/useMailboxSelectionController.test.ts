@@ -199,6 +199,43 @@ describe('useMailboxSelectionController', () => {
     expect(result.current.readerSelectedDetail?.id).toBe(2);
   });
 
+  it('keeps the previous detail visible while the new selection loads, then swaps', async () => {
+    let resolveDetail2!: (value: Message) => void;
+    mockInvoke.mockImplementation(((command: string, args?: { messageId?: number }) => {
+      if (command === 'get_message_detail') {
+        if (args?.messageId === 1) {
+          return Promise.resolve(message(1));
+        }
+        return new Promise<Message>((resolve) => {
+          resolveDetail2 = resolve;
+        });
+      }
+      return Promise.resolve([]);
+    }) as never);
+    const { result } = renderController();
+
+    act(() => {
+      result.current.setSelectedId(1);
+    });
+    await waitFor(() => {
+      expect(result.current.readerSelectedDetail?.id).toBe(1);
+    });
+
+    act(() => {
+      result.current.setSelectedId(2);
+    });
+    expect(result.current.readerSelectedDetail?.id).toBe(1);
+    expect(result.current.readerDisplayedId).toBe(1);
+
+    act(() => {
+      resolveDetail2(message(2));
+    });
+    await waitFor(() => {
+      expect(result.current.readerSelectedDetail?.id).toBe(2);
+    });
+    expect(result.current.readerDisplayedId).toBe(2);
+  });
+
   it('clears the detail state and pending work when selection is cleared', async () => {
     let resolveDetail!: (value: Message) => void;
     mockInvoke.mockImplementation(((command: string) => {

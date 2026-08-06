@@ -44,8 +44,10 @@ export default function useReaderCompletion({
     const isPlainText = !selected.sanitized_html?.trim() &&
                         !bodyLooksLikeHtml(selected.body) &&
                         selected.attachment_count === 0;
+    const hasCachedBody = Boolean(selected.sanitized_html?.trim() || selected.body.trim());
 
-    if (isPlainText) {
+    // 正文已在详情中（本地消息或已拉取过）：立即提交渲染，切换时不留骨架帧
+    if (isPlainText || hasCachedBody) {
       setBodyRenderMessageId(selectedId);
       return undefined;
     }

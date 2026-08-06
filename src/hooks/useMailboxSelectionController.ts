@@ -19,7 +19,6 @@ import {
 } from '../mailUtils';
 import {
   applyMessageMetadataPatch,
-  resolveReaderSelectedDetail,
   type MessageMetadataPatch,
 } from '../app/messageDetailUtils';
 import type {
@@ -161,11 +160,21 @@ export default function useMailboxSelectionController({
     };
   }, [readerSelectedId, mailboxContextKey]);
 
-  // 派生值：确保 reader 只收到与当前 readerSelectedId 匹配的详情，防止 stale
-  const readerSelectedDetail = useMemo(
-    () => resolveReaderSelectedDetail(selectedDetail, readerSelectedId),
-    [selectedDetail, readerSelectedId],
-  );
+  // 冻结展示：切换到新邮件而详情尚未就绪时，reader 继续显示上一封已展示的
+  // 邮件，避免切换时闪烁空状态；新详情就绪后整体原子切换。与 useDeferredValue
+  // 或旧的严格空值方案不同，这里不会渲染任何过期或不一致的内容。
+  const displayedDetailRef = useRef<Message | null>(null);
+
+  useEffect(() => {
+    if (selectedDetail?.id === selectedId) {
+      displayedDetailRef.current = selectedDetail;
+    }
+  }, [selectedDetail, selectedId]);
+
+  const readerSelectedDetail = selectedDetail?.id === selectedId
+    ? selectedDetail
+    : (selectedId == null ? null : displayedDetailRef.current);
+  const readerDisplayedId = readerSelectedDetail?.id ?? null;
   const selected = useMemo(
     () =>
       messages.find((message) => message.id === readerSelectedId)
@@ -195,7 +204,6 @@ export default function useMailboxSelectionController({
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   } = useReaderBodyLoading({
-    selected,
     readerSelectedDetail,
     selectedDetail,
     selectedSenderTrusted,
@@ -222,6 +230,7 @@ export default function useMailboxSelectionController({
     setSelectedId,
     readerSelectedId,
     readerSelectedDetail,
+    readerDisplayedId,
     readerSelectionRevision,
     selected,
     selectedDetail,

@@ -18,7 +18,6 @@ import {
 } from './readerSelectionState';
 
 type ReaderBodyLoadingOptions = {
-  selected: MessageSummary | null;
   readerSelectedDetail: Message | null;
   selectedDetail: Message | null;
   selectedSenderTrusted: boolean;
@@ -32,7 +31,6 @@ type ReaderBodyLoadingOptions = {
 };
 
 export default function useReaderBodyLoading({
-  selected,
   readerSelectedDetail,
   selectedDetail,
   selectedSenderTrusted,
@@ -50,9 +48,9 @@ export default function useReaderBodyLoading({
 
   useEffect(() => {
     setAttachments([]);
-    if (!selected) return undefined;
+    if (!readerSelectedDetail) return undefined;
 
-    const selectedMessageId = selected.id;
+    const selectedMessageId = readerSelectedDetail.id;
     let cancelled = false;
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
       invoke<Attachment[]>('list_attachments', { messageId: selectedMessageId })
@@ -68,7 +66,7 @@ export default function useReaderBodyLoading({
       cancelled = true;
       cancelScheduledWork();
     };
-  }, [selected?.id, setAttachments, setStatus]);
+  }, [readerSelectedDetail?.id, setAttachments, setStatus]);
 
   useEffect(() => {
     if (!readerSelectedDetail || !selectedSenderTrusted) return undefined;

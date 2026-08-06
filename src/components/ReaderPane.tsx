@@ -72,6 +72,7 @@ export type ReaderPaneProps = {
   activeThreadSelected: Message | null;
   selected: Message | null;
   selectedId: number | null;
+  activeSelectedId: number | null;
   accountScope: AccountScope;
   folders: Folder[];
   labels: Label[];
@@ -134,6 +135,7 @@ export default function ReaderPane({
   activeThreadSelected,
   selected,
   selectedId,
+  activeSelectedId,
   readTriggerKey,
   accountScope,
   folders,
@@ -317,8 +319,10 @@ export default function ReaderPane({
   const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
-  // 正文真正渲染出来后才显示快速回复框，避免切换时回复框先于内容出现
-  const hasRenderedBodyContent = isBodyRenderReady && Boolean(
+  // 正文真正渲染出来、且展示的就是当前选中的邮件时才显示快速回复框：
+  // 切换加载期间（冻结展示上一封）与正文未就绪时都不出现，避免回复框先于内容
+  const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
+  const hasRenderedBodyContent = isBodyRenderReady && isActiveMessage && Boolean(
     hasRenderableHtml || plainBodyForReader.trim() || shouldOfferRemoteContent,
   );
 

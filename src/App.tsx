@@ -1364,6 +1364,7 @@ export default function App() {
         activeThreadSelected={activeThreadSelected}
         selected={readerSelectedDetail}
         selectedId={readerDisplayedId}
+        activeSelectedId={selectedId}
         readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}
         folders={folders}

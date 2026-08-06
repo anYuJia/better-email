@@ -1,7 +1,6 @@
 import {
   startTransition,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -99,7 +98,7 @@ export default function useMailboxSelectionController({
   selectedIdRef.current = selectedId;
   selectedDetailRef.current = selectedDetail;
 
-  const readerSelectedId = useDeferredValue(selectedId);
+  const readerSelectedId = selectedId;
 
   const patchSelectedDetailMetadata = useCallback((messageId: number, patch: MessageMetadataPatch) => {
     messageDetailCacheRef.current.patch(messageId, patch);

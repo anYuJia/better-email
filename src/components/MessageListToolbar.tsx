@@ -223,7 +223,7 @@ export default function MessageListToolbar({
           <details className="compact-menu filter-menu">
             <summary className={filter !== 'all' ? 'active' : ''}>
               <SlidersHorizontal size={15} />
-              {filter === 'all' ? '筛选' : activeFilterLabel}
+              <span className="filter-label">{filter === 'all' ? '筛选' : activeFilterLabel}</span>
             </summary>
             <div>
               {filters.map((item) => (
@@ -241,7 +241,7 @@ export default function MessageListToolbar({
           <details className="compact-menu sort-menu">
             <summary className={listSort !== 'newest' ? 'active' : ''}>
               <ArrowDownUp size={15} />
-              {activeSortLabel}
+              <span className="sort-label">{activeSortLabel}</span>
             </summary>
             <div>
               <span className="menu-section-title">排序方式</span>

@@ -55,6 +55,30 @@
   .refresh-text-button span {
     display: none;
   }
+
+  .list-control-actions {
+    gap: 2px;
+    padding: 2px;
+  }
+
+  .list-control-actions > button,
+  .list-control-actions .compact-menu summary {
+    min-height: 28px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+
+  .list-control-actions .filter-menu summary,
+  .list-control-actions .sort-menu summary {
+    width: 34px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .list-control-actions .filter-menu summary .filter-label,
+  .list-control-actions .sort-menu summary .sort-label {
+    display: none;
+  }
 }
 
 @media (max-width: 980px) {

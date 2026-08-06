@@ -1,4 +1,5 @@
 import type {
+  AccountScope,
   AppLayout,
   BackgroundTaskKind,
   ComposeTemplate,
@@ -20,6 +21,7 @@ export const legacyAppLayoutStorageKey = 'swiftmail.appLayout.v2';
 export const sendUndoDelayStorageKey = 'better-email.sendUndoDelaySeconds';
 export const favoriteFolderKeysStorageKey = 'better-email.favoriteFolderKeys.v1';
 export const listSortStorageKey = 'better-email.listSort.v1';
+export const accountScopeStorageKey = 'better-email.accountScope.v1';
 
 const legacyStorageKeyByCurrent: Record<string, string> = {
   [notificationPolicyStorageKey]: 'swiftmail.notificationPolicy',
@@ -83,6 +85,18 @@ export function isSearchScope(value: unknown): value is SearchScope {
 
 export function isListSort(value: unknown): value is ListSort {
   return typeof value === 'string' && listSortModes.includes(value as ListSort);
+}
+
+export function loadAccountScope(): AccountScope {
+  try {
+    const stored = readAppStorage(accountScopeStorageKey);
+    if (stored === 'all') return 'all';
+    const id = Number(stored);
+    if (Number.isInteger(id) && id > 0) return id;
+    return 'all';
+  } catch {
+    return 'all';
+  }
 }
 
 export function loadListSort(): ListSort {

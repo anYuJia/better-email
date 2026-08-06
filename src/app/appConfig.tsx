@@ -66,6 +66,7 @@ export {
   loadListSort,
   loadFavoriteFolderKeys,
   loadProviderVerifications,
+  loadAccountScope,
   isFilterMode,
   isSearchScope,
   loadSavedSearches,

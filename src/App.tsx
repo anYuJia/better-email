@@ -93,6 +93,7 @@ import {
   loadNotificationPolicy,
   loadSendUndoDelaySeconds,
   loadProviderVerifications,
+  loadAccountScope,
   isDraftEmpty,
   sampleRawMessage,
   messagePageSize,
@@ -125,11 +126,12 @@ import {
   loadMailboxMessageLimit,
   saveMailboxListState,
 } from './app/mailboxListState';
+import { accountScopeStorageKey } from './app/storageConfig';
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountScope, setAccountScope] = useState<AccountScope>('all');
+  const [accountScope, setAccountScope] = useState<AccountScope>(loadAccountScope);
   const [accountForm, setAccountForm] = useState<Account | null>(null);
   const [newAccountForm, setNewAccountForm] = useState<AccountCreateInput>(emptyAccountCreateForm);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -573,10 +575,21 @@ export default function App() {
   useEffect(() => {
     skipNextFolderEffectLoadRef.current = true;
     refreshMailbox(accountScope, null)
-      .catch((error) => setStatus(String(error)))
+      .catch((error) => {
+        if (typeof accountScope === 'number') {
+          // 上次记住的账号可能已被删除，回退到统一邮箱视图
+          setAccountScope('all');
+          return;
+        }
+        setStatus(String(error));
+      })
       .finally(() => {
         skipNextFolderEffectLoadRef.current = false;
       });
+  }, [accountScope]);
+
+  useEffect(() => {
+    window.localStorage.setItem(accountScopeStorageKey, String(accountScope));
   }, [accountScope]);
 
   useEffect(() => {

@@ -36,6 +36,7 @@
     0 1px 3px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: message-toast-in 0.34s cubic-bezier(0.21, 1.02, 0.73, 1);
 }
 
 .message-toast-progress {
@@ -132,7 +133,15 @@
   box-shadow:
     0 8px 20px rgba(15, 23, 42, 0.1),
     0 1px 3px rgba(15, 23, 42, 0.06);
-  animation: message-toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: message-toast-in 0.34s cubic-bezier(0.21, 1.02, 0.73, 1);
+}
+
+.message-toast.leaving {
+  animation: message-toast-out 0.26s cubic-bezier(0.55, 0, 0.55, 0.2) forwards;
+}
+
+.message-toast-undo.leaving {
+  animation: message-toast-out 0.26s cubic-bezier(0.55, 0, 0.55, 0.2) forwards;
 }
 
 .message-toast svg {
@@ -172,9 +181,11 @@
 }
 
 .message-toast-undo .message-toast-count {
+  display: inline-block;
   color: var(--ui-accent);
   font-weight: 720;
   font-variant-numeric: tabular-nums;
+  animation: count-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .message-toast-undo-main span {
@@ -234,10 +245,46 @@
 @keyframes message-toast-in {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-10px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.01);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes message-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+@keyframes count-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.24);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-toast,
+  .message-toast-undo,
+  .undo-snackbar {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
   }
 }

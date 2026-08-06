@@ -195,6 +195,9 @@ export type SettingsOverlayProps = {
   onCancelOutboxItem: (item: OutboxItem) => void;
   onContactFormChange: Dispatch<SetStateAction<ContactCreateInput>>;
   onContactFormAliasesChange: Dispatch<SetStateAction<string>>;
+  filteredContacts: Contact[];
+  contactQuery: string;
+  onContactQueryChange: Dispatch<SetStateAction<string>>;
   onCreateContact: () => void;
   onEditNameChange: Dispatch<SetStateAction<string>>;
   onEditAliasesChange: Dispatch<SetStateAction<string>>;
@@ -206,7 +209,6 @@ export type SettingsOverlayProps = {
   onMergeContact: (contact: Contact) => void;
   onDeleteContact: (contact: Contact) => void;
   onMergeSourceChange: Dispatch<SetStateAction<number | null>>;
-  onImportContacts: () => void;
   onExportContacts: () => void;
   onRefreshContacts: () => Promise<Contact[]>;
   onStatus: Dispatch<SetStateAction<string>>;
@@ -358,6 +360,8 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     contactForm: props.contactForm,
     contactFormAliases: props.contactFormAliases,
     contacts: props.contacts,
+    filteredContacts: props.filteredContacts,
+    contactQuery: props.contactQuery,
     editingContactId: props.editingContactId,
     editName: props.contactEditName,
     editAliases: props.contactEditAliases,
@@ -367,6 +371,8 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.contactForm,
     props.contactFormAliases,
     props.contacts,
+    props.filteredContacts,
+    props.contactQuery,
     props.editingContactId,
     props.contactEditName,
     props.contactEditAliases,

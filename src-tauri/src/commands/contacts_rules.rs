@@ -2,7 +2,7 @@ use super::common::MAX_VCARD_IMPORT_BYTES;
 use crate::db::{MailResult, MailStore};
 use crate::models::{
     Contact, ContactCreateInput, ContactExportSummary, ContactImportBatch,
-    ContactImportCommitSummary, ContactImportPreview,
+    ContactImportCommitSummary, ContactImportEntryInput, ContactImportPreview,
     ContactImportSelection, ContactImportSummary, ContactImportUndoReport, ContactInput,
     MailRule, MailRuleInput,
 };
@@ -17,7 +17,8 @@ pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<Strin
     let Some(source_path) = app
         .dialog()
         .file()
-        .set_title("导入联系人 vCard 或 CSV")
+        .set_title("导入联系人（vCard / CSV）")
+        .add_filter("联系人文件", &["vcf", "vcard", "csv"])
         .blocking_pick_file()
     else {
         return Ok(None);
@@ -109,6 +110,30 @@ pub fn commit_contact_import(
         })
         .collect();
     store.commit_contact_import(inputs, &file_name, scope.unwrap_or_else(|| "global".to_string()).as_str())
+}
+
+#[tauri::command]
+pub fn commit_contact_import_entries(
+    file_name: String,
+    entries: Vec<ContactImportEntryInput>,
+    scope: Option<String>,
+    store: State<'_, MailStore>,
+) -> MailResult<ContactImportCommitSummary> {
+    let inputs: Vec<(ContactCreateInput, String)> = entries
+        .into_iter()
+        .map(|entry| {
+            (
+                ContactCreateInput {
+                    name: entry.name,
+                    email: entry.email,
+                    aliases: entry.aliases,
+                    vip: entry.vip,
+                },
+                entry.action,
+            )
+        })
+        .collect();
+    store.commit_contact_import_entries(inputs, &file_name, scope.unwrap_or_else(|| "global".to_string()).as_str())
 }
 
 #[tauri::command]

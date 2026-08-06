@@ -78,6 +78,7 @@ export type SettingsHandlers = {
   onCancelOutboxItem: SettingsOverlayProps['onCancelOutboxItem'];
   onContactFormChange: SettingsOverlayProps['onContactFormChange'];
   onContactFormAliasesChange: SettingsOverlayProps['onContactFormAliasesChange'];
+  onContactQueryChange: SettingsOverlayProps['onContactQueryChange'];
   onCreateContact: () => void;
   onEditNameChange: SettingsOverlayProps['onEditNameChange'];
   onEditAliasesChange: SettingsOverlayProps['onEditAliasesChange'];
@@ -89,7 +90,6 @@ export type SettingsHandlers = {
   onMergeContact: SettingsOverlayProps['onMergeContact'];
   onDeleteContact: SettingsOverlayProps['onDeleteContact'];
   onMergeSourceChange: SettingsOverlayProps['onMergeSourceChange'];
-  onImportContacts: () => void;
   onExportContacts: () => void;
   onRefreshContacts: SettingsOverlayProps['onRefreshContacts'];
   onStatus: SettingsOverlayProps['onStatus'];
@@ -171,6 +171,7 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onCancelOutboxItem: (item: OutboxItem) => latest().onCancelOutboxItem(item),
     onContactFormChange: (contact: SetStateAction<ContactCreateInput>) => latest().onContactFormChange(contact),
     onContactFormAliasesChange: (value: SetStateAction<string>) => latest().onContactFormAliasesChange(value),
+    onContactQueryChange: (value: SetStateAction<string>) => latest().onContactQueryChange(value),
     onCreateContact: () => latest().onCreateContact(),
     onEditNameChange: (value: SetStateAction<string>) => latest().onEditNameChange(value),
     onEditAliasesChange: (value: SetStateAction<string>) => latest().onEditAliasesChange(value),
@@ -182,7 +183,6 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onMergeContact: (contact: Contact) => latest().onMergeContact(contact),
     onDeleteContact: (contact: Contact) => latest().onDeleteContact(contact),
     onMergeSourceChange: (contactId: SetStateAction<number | null>) => latest().onMergeSourceChange(contactId),
-    onImportContacts: () => latest().onImportContacts(),
     onExportContacts: () => latest().onExportContacts(),
     onRefreshContacts: () => latest().onRefreshContacts(),
     onStatus: (status: SetStateAction<string>) => latest().onStatus(status),

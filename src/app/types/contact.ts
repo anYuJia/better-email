@@ -59,6 +59,21 @@ export type ContactImportSelection = {
   action: 'create' | 'merge' | 'skip';
 };
 
+export type ContactImportEntryInput = {
+  email: string;
+  name: string;
+  aliases: string[];
+  vip: boolean;
+  action: 'create' | 'merge' | 'skip';
+};
+
+export type ContactImportEntryEdit = {
+  email: string;
+  name: string;
+  aliases: string[];
+  vip: boolean;
+};
+
 export type ContactImportCommitSummary = {
   batch_id: number;
   created: number;

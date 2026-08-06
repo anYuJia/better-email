@@ -1862,6 +1862,72 @@ export function mockCommitContactImport(args?: InvokeArgs) {
   return { batch_id: batchId, created, merged, skipped };
 }
 
+export function mockCommitContactImportEntries(args?: InvokeArgs) {
+  const file_name = String(args?.file_name ?? 'import-contacts.vcf');
+  const rawEntries = Array.isArray(args?.entries)
+    ? (args.entries as Array<{
+        email: string;
+        name: string;
+        aliases: string[];
+        vip: boolean;
+        action: string;
+      }>)
+    : [];
+  let created = 0;
+  let merged = 0;
+  let skipped = 0;
+  for (const entry of rawEntries) {
+    const email = entry.email.trim().toLowerCase();
+    if (entry.action === 'skip' || !email || !email.includes('@')) {
+      skipped += 1;
+      continue;
+    }
+    const existing = contacts.find((contact) => contact.email === email);
+    if (existing) {
+      contacts = contacts.map((contact) => (
+        contact.id === existing.id
+          ? {
+              ...contact,
+              name: entry.name.trim() || contact.name,
+              aliases: [...new Set([...contact.aliases, ...entry.aliases])],
+              vip: contact.vip || entry.vip,
+            }
+          : contact
+      ));
+      merged += 1;
+    } else {
+      contacts = [
+        {
+          id: nextContactId++,
+          name: entry.name.trim() || email,
+          email,
+          aliases: [...entry.aliases],
+          vip: entry.vip,
+          message_count: 0,
+          last_seen_at: now,
+        },
+        ...contacts,
+      ];
+      created += 1;
+    }
+  }
+  const batchId = nextContactImportBatchId++;
+  contactImportBatches = [
+    {
+      id: batchId,
+      file_name,
+      total_count: rawEntries.length,
+      created_count: created,
+      merged_count: merged,
+      skipped_count: skipped,
+      scope: String(args?.scope ?? 'global'),
+      created_at: now,
+    },
+    ...contactImportBatches,
+  ];
+  return { batch_id: batchId, created, merged, skipped };
+}
+
 export function mockListContactImportBatches() {
   return contactImportBatches.map((batch) => ({ ...batch }));
 }

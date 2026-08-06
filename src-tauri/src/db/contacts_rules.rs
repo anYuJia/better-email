@@ -225,143 +225,15 @@ impl MailStore {
         file_name: &str,
         scope: &str,
     ) -> MailResult<ContactImportCommitSummary> {
-        self.with_conn(|conn| {
-            let transaction = conn.unchecked_transaction()?;
-            let now = Utc::now().to_rfc3339();
-            let mut created = 0_i64;
-            let mut merged = 0_i64;
-            let mut skipped = 0_i64;
-            let mut entries: Vec<(i64, String, String)> = Vec::new();
-            for (input, action) in inputs {
-                let email = normalize_email(&input.email);
-                if email.is_empty() {
-                    skipped += 1;
-                    continue;
-                }
-                match action.as_str() {
-                    "skip" => {
-                        skipped += 1;
-                    }
-                    "merge" => {
-                        let existing = transaction
-                            .query_row(
-                                "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-                                 FROM contacts WHERE lower(email) = lower(?1)",
-                                params![email],
-                                |row| {
-                                    Ok(Contact {
-                                        id: row.get(0)?,
-                                        name: row.get(1)?,
-                                        email: row.get(2)?,
-                                        aliases: contact_aliases_from_text(row.get(3)?),
-                                        vip: row.get::<_, i64>(4)? != 0,
-                                        message_count: row.get(5)?,
-                                        last_seen_at: row.get(6)?,
-                                    })
-                                },
-                            )
-                            .optional()?;
-                        if let Some(existing) = existing {
-                            let mut aliases = existing.aliases.clone();
-                            aliases.extend(input.aliases);
-                            let aliases = normalize_contact_aliases(aliases, &existing.email);
-                            let imported_name = input.name.trim();
-                            let name = if (existing.name.trim().is_empty()
-                                || existing.name == existing.email)
-                                && !imported_name.is_empty()
-                            {
-                                imported_name
-                            } else {
-                                existing.name.as_str()
-                            };
-                            transaction.execute(
-                                "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1",
-                                params![
-                                    existing.id,
-                                    name,
-                                    contact_aliases_to_text(&aliases),
-                                    if existing.vip || input.vip { 1 } else { 0 },
-                                ],
-                            )?;
-                            entries.push((existing.id, email, "merge".to_string()));
-                            merged += 1;
-                        } else {
-                            let display_name = if input.name.trim().is_empty() {
-                                email.as_str()
-                            } else {
-                                input.name.trim()
-                            };
-                            let aliases = normalize_contact_aliases(input.aliases, &email);
-                            transaction.execute(
-                                "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                                params![
-                                    display_name,
-                                    email,
-                                    contact_aliases_to_text(&aliases),
-                                    if input.vip { 1 } else { 0 },
-                                    now,
-                                ],
-                            )?;
-                            let contact_id = transaction.last_insert_rowid();
-                            entries.push((contact_id, email, "create".to_string()));
-                            created += 1;
-                        }
-                    }
-                    _ => {
-                        let display_name = if input.name.trim().is_empty() {
-                            email.as_str()
-                        } else {
-                            input.name.trim()
-                        };
-                        let aliases = normalize_contact_aliases(input.aliases, &email);
-                        transaction.execute(
-                            "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                             VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                            params![
-                                display_name,
-                                email,
-                                contact_aliases_to_text(&aliases),
-                                if input.vip { 1 } else { 0 },
-                                now,
-                            ],
-                        )?;
-                        let contact_id = transaction.last_insert_rowid();
-                        entries.push((contact_id, email, "create".to_string()));
-                        created += 1;
-                    }
-                }
-            }
-            let total_count = created + merged + skipped;
-            transaction.execute(
-                "INSERT INTO contact_import_batches(file_name, total_count, created_count, merged_count, skipped_count, scope, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
-                    file_name,
-                    total_count,
-                    created,
-                    merged,
-                    skipped,
-                    scope,
-                    now
-                ],
-            )?;
-            let batch_id = transaction.last_insert_rowid();
-            for (contact_id, email, action) in entries {
-                transaction.execute(
-                    "INSERT INTO contact_import_entries(batch_id, contact_id, email, action)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    params![batch_id, contact_id, email, action],
-                )?;
-            }
-            transaction.commit()?;
-            Ok(ContactImportCommitSummary {
-                batch_id,
-                created,
-                merged,
-                skipped,
-            })
-        })
+        self.with_conn(|conn| commit_import_inputs(conn, inputs, file_name, scope))
+    }
+    pub fn commit_contact_import_entries(
+        &self,
+        inputs: Vec<(ContactCreateInput, String)>,
+        file_name: &str,
+        scope: &str,
+    ) -> MailResult<ContactImportCommitSummary> {
+        self.with_conn(|conn| commit_import_inputs(conn, inputs, file_name, scope))
     }
     pub fn list_contact_import_batches(&self) -> MailResult<Vec<ContactImportBatch>> {
         self.with_conn(|conn| {
@@ -619,6 +491,141 @@ pub(super) fn contact_aliases_to_text(aliases: &[String]) -> String {
         .filter(|alias| !alias.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn contact_row_for_conn(conn: &Connection, email: &str) -> MailResult<Option<Contact>> {
+    conn.query_row(
+        "SELECT id, name, email, aliases, vip, message_count, last_seen_at
+         FROM contacts WHERE lower(email) = lower(?1)",
+        params![email],
+        |row| {
+            Ok(Contact {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                email: row.get(2)?,
+                aliases: contact_aliases_from_text(row.get(3)?),
+                vip: row.get::<_, i64>(4)? != 0,
+                message_count: row.get(5)?,
+                last_seen_at: row.get(6)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn merge_imported_contact(
+    transaction: &rusqlite::Transaction<'_>,
+    existing: &Contact,
+    input: &ContactCreateInput,
+) -> MailResult<()> {
+    let mut aliases = existing.aliases.clone();
+    aliases.extend(input.aliases.clone());
+    let aliases = normalize_contact_aliases(aliases, &existing.email);
+    let imported_name = input.name.trim();
+    let differs = !existing.name.trim().is_empty()
+        && !existing.name.eq_ignore_ascii_case(imported_name)
+        && existing.name != existing.email;
+    let name = if !imported_name.is_empty() && differs {
+        imported_name
+    } else if (existing.name.trim().is_empty() || existing.name == existing.email)
+        && !imported_name.is_empty()
+    {
+        imported_name
+    } else {
+        existing.name.as_str()
+    };
+    transaction.execute(
+        "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1",
+        params![
+            existing.id,
+            name,
+            contact_aliases_to_text(&aliases),
+            if existing.vip || input.vip { 1 } else { 0 },
+        ],
+    )?;
+    Ok(())
+}
+
+fn commit_import_inputs(
+    conn: &Connection,
+    inputs: Vec<(ContactCreateInput, String)>,
+    file_name: &str,
+    scope: &str,
+) -> MailResult<ContactImportCommitSummary> {
+    let transaction = conn.unchecked_transaction()?;
+    let now = Utc::now().to_rfc3339();
+    let mut created = 0_i64;
+    let mut merged = 0_i64;
+    let mut skipped = 0_i64;
+    let mut entries: Vec<(i64, String, String)> = Vec::new();
+    for (input, action) in inputs {
+        let email = normalize_email(&input.email);
+        if email.is_empty() || !email.contains('@') {
+            skipped += 1;
+            continue;
+        }
+        if action == "skip" {
+            skipped += 1;
+            continue;
+        }
+        let existing = contact_row_for_conn(&transaction, &email)?;
+        if let Some(existing) = existing {
+            merge_imported_contact(&transaction, &existing, &input)?;
+            entries.push((existing.id, email, "merge".to_string()));
+            merged += 1;
+        } else {
+            let display_name = if input.name.trim().is_empty() {
+                email.as_str()
+            } else {
+                input.name.trim()
+            };
+            let aliases = normalize_contact_aliases(input.aliases, &email);
+            transaction.execute(
+                "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                params![
+                    display_name,
+                    email,
+                    contact_aliases_to_text(&aliases),
+                    if input.vip { 1 } else { 0 },
+                    now,
+                ],
+            )?;
+            let contact_id = transaction.last_insert_rowid();
+            entries.push((contact_id, email, "create".to_string()));
+            created += 1;
+        }
+    }
+    let total_count = created + merged + skipped;
+    transaction.execute(
+        "INSERT INTO contact_import_batches(file_name, total_count, created_count, merged_count, skipped_count, scope, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            file_name,
+            total_count,
+            created,
+            merged,
+            skipped,
+            scope,
+            now
+        ],
+    )?;
+    let batch_id = transaction.last_insert_rowid();
+    for (contact_id, email, action) in entries {
+        transaction.execute(
+            "INSERT INTO contact_import_entries(batch_id, contact_id, email, action)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![batch_id, contact_id, email, action],
+        )?;
+    }
+    transaction.commit()?;
+    Ok(ContactImportCommitSummary {
+        batch_id,
+        created,
+        merged,
+        skipped,
+    })
 }
 pub(super) fn contact_aliases_from_text(raw: String) -> Vec<String> {
     raw.lines()

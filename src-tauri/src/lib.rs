@@ -314,6 +314,7 @@ pub fn run() {
             commands::import_contacts_vcard,
             commands::preview_contact_import,
             commands::commit_contact_import,
+            commands::commit_contact_import_entries,
             commands::list_contact_import_batches,
             commands::undo_contact_import_batch,
             commands::pick_contact_import_file,

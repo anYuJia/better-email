@@ -672,6 +672,15 @@ pub struct ContactImportSelection {
     pub action: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactImportEntryInput {
+    pub email: String,
+    pub name: String,
+    pub aliases: Vec<String>,
+    pub vip: bool,
+    pub action: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ContactImportCommitSummary {
     pub batch_id: i64,

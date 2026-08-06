@@ -15,6 +15,67 @@ export function normalizeContactAliases(value: string): string[] {
     .filter(Boolean))];
 }
 
+export function isValidEmailAddress(value: string): boolean {
+  const parts = value.trim().split('@');
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  return local.length > 0 && domain.includes('.') && !value.includes(' ');
+}
+
+export type ContactAliasIssues = {
+  invalid: string[];
+  duplicatesWithin: string[];
+  conflictingPrimary: string[];
+  takenByOther: string[];
+};
+
+export const emptyContactAliasIssues: ContactAliasIssues = {
+  invalid: [],
+  duplicatesWithin: [],
+  conflictingPrimary: [],
+  takenByOther: [],
+};
+
+export function validateContactAliases(
+  raw: string,
+  primaryEmail: string,
+  takenByOther: ReadonlySet<string>,
+): ContactAliasIssues {
+  const primary = primaryEmail.trim().toLowerCase();
+  const unique = [...new Set(raw
+    .split(/[;,\n]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean))];
+  const invalid: string[] = [];
+  const conflictingPrimary: string[] = [];
+  const taken: string[] = [];
+  for (const item of unique) {
+    if (!isValidEmailAddress(item)) {
+      invalid.push(item);
+    } else if (item === primary) {
+      conflictingPrimary.push(item);
+    } else if (takenByOther.has(item)) {
+      taken.push(item);
+    }
+  }
+  const seen = new Set<string>();
+  const duplicatesWithin: string[] = [];
+  for (const item of unique) {
+    if (seen.has(item)) duplicatesWithin.push(item);
+    seen.add(item);
+  }
+  return { invalid, duplicatesWithin, conflictingPrimary, takenByOther: taken };
+}
+
+export function formatContactAliasIssues(issues: ContactAliasIssues): string {
+  const parts: string[] = [];
+  if (issues.invalid.length > 0) parts.push(`格式无效：${issues.invalid.join('、')}`);
+  if (issues.duplicatesWithin.length > 0) parts.push(`重复输入：${issues.duplicatesWithin.join('、')}`);
+  if (issues.conflictingPrimary.length > 0) parts.push(`与主邮箱相同（将被忽略）：${issues.conflictingPrimary.join('、')}`);
+  if (issues.takenByOther.length > 0) parts.push(`已被其他联系人使用：${issues.takenByOther.join('、')}`);
+  return parts.join('；');
+}
+
 export const emptyContactForm: ContactCreateInput = {
   name: '',
   email: '',

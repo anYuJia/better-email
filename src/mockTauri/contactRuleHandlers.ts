@@ -12,6 +12,7 @@ import {
   mockPickContactImportFile,
   mockPreviewContactImport,
   mockCommitContactImport,
+  mockCommitContactImportEntries,
   mockListContactImportBatches,
   mockUndoContactImportBatch,
   upsertMockRule,
@@ -32,6 +33,7 @@ export const handlers: Record<string, MockCommandHandler> = {
   'pick_contact_import_file': mockPickContactImportFile,
   'preview_contact_import': mockPreviewContactImport,
   'commit_contact_import': mockCommitContactImport,
+  'commit_contact_import_entries': mockCommitContactImportEntries,
   'list_contact_import_batches': mockListContactImportBatches,
   'undo_contact_import_batch': mockUndoContactImportBatch,
   'export_contacts_vcard': () => ({

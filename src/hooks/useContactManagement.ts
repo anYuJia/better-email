@@ -7,7 +7,6 @@ import type {
   Contact,
   ContactCreateInput,
   ContactExportSummary,
-  ContactImportSummary,
 } from '../app/types';
 import type { NotificationPolicy } from '../mailUtils';
 import { invoke } from '../tauriBridge';
@@ -57,35 +56,6 @@ export default function useContactManagement({
     const refreshed = await invoke<Contact[]>('list_contacts');
     setContacts(refreshed);
     return refreshed;
-  }
-
-  async function importContactsVcard() {
-    setContactTransferBusy(true);
-    try {
-      const summary = await invoke<ContactImportSummary | null>('import_contacts_vcard');
-      if (!summary) {
-        setStatus('已取消联系人 vCard 导入');
-        return;
-      }
-      const refreshed = await refreshManagedContacts();
-      const importedVipSenders = refreshed
-        .filter((contact) => contact.vip)
-        .flatMap((contact) => [contact.email, ...contact.aliases])
-        .map((email) => email.trim().toLowerCase())
-        .filter(Boolean);
-      setNotificationPolicy((current) => ({
-        ...current,
-        vipSenders: [...new Set([
-          ...normalizeContactAliases(current.vipSenders),
-          ...importedVipSenders,
-        ])].join('\n'),
-      }));
-      setStatus(
-        `联系人 vCard 已导入：新增 ${summary.created}、合并 ${summary.updated}、跳过 ${summary.skipped}`,
-      );
-    } finally {
-      setContactTransferBusy(false);
-    }
   }
 
   async function exportContactsVcard() {
@@ -220,7 +190,6 @@ export default function useContactManagement({
     toggleContactVip,
     deleteManagedContact,
     mergeManagedContact,
-    importContactsVcard,
     exportContactsVcard,
     refreshManagedContacts,
     confirmDeleteContact,

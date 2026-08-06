@@ -2,13 +2,20 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import type {
   ContactImportBatch,
   ContactImportCommitSummary,
+  ContactImportEntryEdit,
+  ContactImportEntryInput,
   ContactImportPreview,
-  ContactImportSelection,
   ContactImportUndoReport,
 } from '../app/types/contact';
 import { invoke } from '../tauriBridge';
 
 export type ImportSelectionMap = Record<string, 'create' | 'merge' | 'skip'>;
+
+export type ImportEntryEditMap = Record<string, ContactImportEntryEdit>;
+
+export function importSelectionKey(email: string, status: string): string {
+  return `${email}|${status}`;
+}
 
 type ContactImportManagerOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
@@ -16,7 +23,9 @@ type ContactImportManagerOptions = {
 
 export default function useContactImportManager({ setStatus }: ContactImportManagerOptions) {
   const [preview, setPreview] = useState<ContactImportPreview | null>(null);
+  const [commitResult, setCommitResult] = useState<ContactImportCommitSummary | null>(null);
   const [selectionMap, setSelectionMap] = useState<ImportSelectionMap>({});
+  const [entryEdits, setEntryEdits] = useState<ImportEntryEditMap>({});
   const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [batches, setBatches] = useState<ContactImportBatch[]>([]);
@@ -39,9 +48,11 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
       }
       const nextPreview = await invoke<ContactImportPreview>('preview_contact_import', { path });
       setPreview(nextPreview);
+      setCommitResult(null);
+      setEntryEdits({});
       setSelectionMap(Object.fromEntries(
         nextPreview.entries.map((entry) => [
-          `${entry.email}|${entry.status}`,
+          importSelectionKey(entry.email, entry.status),
           defaultActionForStatus(entry.status),
         ]),
       ));
@@ -67,30 +78,41 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
     });
   }, []);
 
-  const selectionSummary = useCallback((): ContactImportSelection[] => {
-    const byEmail = new Map<string, 'create' | 'merge' | 'skip'>();
-    for (const entry of preview?.entries ?? []) {
-      if (entry.status === 'invalid') continue;
-      const action = selectionMap[entry.email] ?? defaultActionForStatus(entry.status);
-      const existing = byEmail.get(entry.email);
-      if (!existing || (action === 'merge' && existing !== 'merge')) {
-        byEmail.set(entry.email, action);
-      }
-    }
-    return [...byEmail.entries()].map(([email, action]) => ({ email, action }));
-  }, [preview, selectionMap, defaultActionForStatus]);
+  const setEntryEdit = useCallback((key: string, edit: ContactImportEntryEdit) => {
+    setEntryEdits((current) => ({ ...current, [key]: edit }));
+  }, []);
 
   const commitImport = useCallback(async () => {
     if (!preview) return;
     setImporting(true);
     try {
-      const selections = selectionSummary();
-      const summary = await invoke<ContactImportCommitSummary>('commit_contact_import', {
-        path: preview.path,
-        selections,
+      const entries: ContactImportEntryInput[] = preview.entries.map((entry) => {
+        const key = importSelectionKey(entry.email, entry.status);
+        const edit = entryEdits[key];
+        const email = (edit?.email ?? entry.email).trim().toLowerCase();
+        const action = selectionMap[key] ?? defaultActionForStatus(entry.status);
+        return {
+          email,
+          name: edit?.name.trim() ?? entry.name,
+          aliases: edit
+            ? [...new Set(
+              edit.aliases
+                .map((alias) => alias.trim().toLowerCase())
+                .filter((alias) => alias.length > 0 && alias !== email),
+            )]
+            : entry.aliases,
+          vip: edit?.vip ?? entry.vip,
+          action: action === 'skip' ? 'skip' : action,
+        };
+      });
+      const summary = await invoke<ContactImportCommitSummary>('commit_contact_import_entries', {
+        file_name: preview.file_name,
+        entries,
         scope: 'global',
       });
       setPreview(null);
+      setEntryEdits({});
+      setCommitResult(summary);
       await refreshBatches();
       setStatus(`联系人导入完成：新增 ${summary.created}、合并 ${summary.merged}、跳过 ${summary.skipped}`);
     } catch (error) {
@@ -98,11 +120,12 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
     } finally {
       setImporting(false);
     }
-  }, [preview, selectionSummary, setStatus]);
+  }, [preview, entryEdits, selectionMap, defaultActionForStatus, setStatus]);
 
   const cancelImport = useCallback(() => {
     setPreview(null);
     setSelectionMap({});
+    setEntryEdits({});
   }, []);
 
   const refreshBatches = useCallback(async () => {
@@ -131,10 +154,12 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
   return {
     preview,
     setPreview,
+    commitResult,
     selectionMap,
     setSelection,
     setAllSelection,
-    selectionSummary,
+    entryEdits,
+    setEntryEdit,
     previewing,
     importing,
     startImport,

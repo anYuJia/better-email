@@ -3666,6 +3666,95 @@ mod tests {
     }
 
     #[test]
+    fn contact_import_entries_respect_edits_and_survive_collisions() {
+        let store = test_store();
+        store
+            .create_contact(ContactCreateInput {
+                name: "Existing Ada".to_string(),
+                email: "existing@example.com".to_string(),
+                aliases: vec!["existing.old@example.com".to_string()],
+                vip: false,
+            })
+            .unwrap();
+
+        let summary = store
+            .commit_contact_import_entries(
+                vec![
+                    (
+                        ContactCreateInput {
+                            name: "Collision".to_string(),
+                            email: "existing@example.com".to_string(),
+                            aliases: Vec::new(),
+                            vip: false,
+                        },
+                        "create".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "Ada Edited".to_string(),
+                            email: "existing@example.com".to_string(),
+                            aliases: vec!["existing.new@example.com".to_string()],
+                            vip: true,
+                        },
+                        "merge".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "New Person".to_string(),
+                            email: "new.person@example.com".to_string(),
+                            aliases: vec!["alias.person@example.com".to_string()],
+                            vip: false,
+                        },
+                        "create".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "Broken".to_string(),
+                            email: "not-an-email".to_string(),
+                            aliases: Vec::new(),
+                            vip: false,
+                        },
+                        "create".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "Skipped".to_string(),
+                            email: "skip@example.com".to_string(),
+                            aliases: Vec::new(),
+                            vip: false,
+                        },
+                        "skip".to_string(),
+                    ),
+                ],
+                "edits.csv",
+                "global",
+            )
+            .unwrap();
+
+        assert_eq!(summary.created, 1);
+        assert_eq!(summary.merged, 2);
+        assert_eq!(summary.skipped, 2);
+
+        let contacts = store.list_all_contacts().unwrap();
+        let merged_contact = contacts
+            .iter()
+            .find(|contact| contact.email == "existing@example.com")
+            .unwrap();
+        assert_eq!(merged_contact.name, "Ada Edited");
+        assert!(merged_contact
+            .aliases
+            .contains(&"existing.old@example.com".to_string()));
+        assert!(merged_contact
+            .aliases
+            .contains(&"existing.new@example.com".to_string()));
+        assert!(merged_contact.vip);
+        assert!(!contacts.iter().any(|contact| contact.email == "skip@example.com"));
+        assert!(contacts
+            .iter()
+            .any(|contact| contact.email == "new.person@example.com"));
+    }
+
+    #[test]
     fn local_backup_round_trips_seeded_mailbox_state() {
         let store = test_store();
         let backup = store.export_local_backup().unwrap();

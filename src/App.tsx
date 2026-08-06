@@ -236,13 +236,15 @@ export default function App() {
     setMergeSourceContactId,
     contactTransferBusy,
     managedContacts,
+    filteredContacts,
+    contactQuery,
+    setContactQuery,
     startEditContact,
     createManagedContact,
     saveContactOverride,
     toggleContactVip,
     deleteManagedContact,
     mergeManagedContact,
-    importContactsVcard,
     exportContactsVcard,
     refreshManagedContacts,
     confirmDeleteContact: contactToDeleteFromHook,
@@ -1664,6 +1666,9 @@ export default function App() {
           onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
           onContactFormChange={setContactForm}
           onContactFormAliasesChange={setContactFormAliases}
+          filteredContacts={filteredContacts}
+          contactQuery={contactQuery}
+          onContactQueryChange={setContactQuery}
           onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
           onEditNameChange={setContactEditName}
           onEditAliasesChange={setContactEditAliases}
@@ -1675,7 +1680,6 @@ export default function App() {
           onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
           onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
           onMergeSourceChange={setMergeSourceContactId}
-          onImportContacts={() => { importContactsVcard().catch((error) => setStatus(String(error))); }}
           onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
           onRefreshContacts={refreshManagedContacts}
           onStatus={setStatus}

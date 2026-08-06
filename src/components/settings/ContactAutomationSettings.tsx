@@ -1,25 +1,30 @@
 import {
-  Check,
   FileDown,
   FileUp,
   History,
-  LoaderCircle,
   Merge,
   Pencil,
+  Search,
   Send,
   Star,
   Trash2,
-  Undo2,
   UserPlus,
   X,
 } from 'lucide-react';
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   Contact,
   ContactCreateInput,
 } from '../../app/types';
+import {
+  emptyContactAliasIssues,
+  formatContactAliasIssues,
+  validateContactAliases,
+} from '../../app/uiConfig';
 import useContactImportManager from '../../hooks/useContactImportManager';
 import { CustomSelect } from './accounts/CustomSelect';
+import ContactImportDialog from './ContactImportDialog';
+import ContactImportHistoryDialog from './ContactImportHistoryDialog';
 import {
   SettingsBadge,
   SettingsButton,
@@ -33,6 +38,8 @@ type ContactAutomationSettingsProps = {
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
+  filteredContacts: Contact[];
+  contactQuery: string;
   editingContactId: number | null;
   editName: string;
   editAliases: string;
@@ -40,6 +47,7 @@ type ContactAutomationSettingsProps = {
   transferBusy: boolean;
   onContactFormChange: (contact: ContactCreateInput) => void;
   onContactFormAliasesChange: (value: string) => void;
+  onContactQueryChange: (value: string) => void;
   onCreateContact: () => void;
   onEditNameChange: (value: string) => void;
   onEditAliasesChange: (value: string) => void;
@@ -51,7 +59,6 @@ type ContactAutomationSettingsProps = {
   onMergeContact: (contact: Contact) => void;
   onDeleteContact: (contact: Contact) => void;
   onMergeSourceChange: (contactId: number | null) => void;
-  onImportContacts: () => void;
   onExportContacts: () => void;
   onRefreshContacts: () => Promise<Contact[]>;
   onStatus: Dispatch<SetStateAction<string>>;
@@ -61,6 +68,8 @@ export default function ContactAutomationSettings({
   contactForm,
   contactFormAliases,
   contacts,
+  filteredContacts,
+  contactQuery,
   editingContactId,
   editName,
   editAliases,
@@ -68,6 +77,7 @@ export default function ContactAutomationSettings({
   transferBusy,
   onContactFormChange,
   onContactFormAliasesChange,
+  onContactQueryChange,
   onCreateContact,
   onEditNameChange,
   onEditAliasesChange,
@@ -79,14 +89,16 @@ export default function ContactAutomationSettings({
   onMergeContact,
   onDeleteContact,
   onMergeSourceChange,
-  onImportContacts,
   onExportContacts,
   onRefreshContacts,
   onStatus,
 }: ContactAutomationSettingsProps) {
   const {
     preview,
+    commitResult,
     selectionMap,
+    entryEdits,
+    setEntryEdit,
     setSelection,
     setAllSelection,
     previewing,
@@ -101,7 +113,8 @@ export default function ContactAutomationSettings({
     confirmUndoBatch,
     setConfirmUndoBatch,
   } = useContactImportManager({ setStatus: onStatus });
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
   useEffect(() => {
     void refreshBatches();
@@ -112,6 +125,40 @@ export default function ContactAutomationSettings({
     await onRefreshContacts();
   }
 
+  function handleCloseImport() {
+    cancelImport();
+    setImportDialogOpen(false);
+  }
+
+  function handleCloseHistory() {
+    setHistoryDialogOpen(false);
+    void refreshBatches();
+  }
+
+  const contactAliasIssues = useMemo(() => {
+    const takenByOther = new Set<string>();
+    for (const contact of contacts) {
+      takenByOther.add(contact.email.trim().toLowerCase());
+      for (const alias of contact.aliases) takenByOther.add(alias.trim().toLowerCase());
+    }
+    return validateContactAliases(contactFormAliases, contactForm.email, takenByOther);
+  }, [contactFormAliases, contactForm.email, contacts]);
+
+  const editAliasIssues = useMemo(() => {
+    const editing = contacts.find((contact) => contact.id === editingContactId);
+    if (!editing) return emptyContactAliasIssues;
+    const takenByOther = new Set<string>();
+    for (const contact of contacts) {
+      if (contact.id === editing.id) continue;
+      takenByOther.add(contact.email.trim().toLowerCase());
+      for (const alias of contact.aliases) takenByOther.add(alias.trim().toLowerCase());
+    }
+    return validateContactAliases(editAliases, editing.email, takenByOther);
+  }, [editAliases, editingContactId, contacts]);
+
+  const aliasIssueText = formatContactAliasIssues(contactAliasIssues);
+  const editAliasIssueText = formatContactAliasIssues(editAliasIssues);
+
   return (
     <SettingsSection
       title="联系人管理"
@@ -121,13 +168,14 @@ export default function ContactAutomationSettings({
           <SettingsBadge tone="neutral">{contacts.length} 位联系人</SettingsBadge>
           <SettingsButton
             size="sm"
-            disabled={transferBusy || previewing}
-            icon={previewing ? <LoaderCircle className="spinning" size={14} /> : <FileDown size={14} />}
-            onClick={startImport}
+            disabled={transferBusy}
+            title="导入 vCard（.vcf / .vcard）或 CSV（.csv）联系人"
+            icon={<FileUp size={14} />}
+            onClick={() => setImportDialogOpen(true)}
           >
             导入联系人
           </SettingsButton>
-          <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileUp size={14} />} onClick={onExportContacts}>
+          <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
             导出 vCard
           </SettingsButton>
           <SettingsButton
@@ -137,97 +185,12 @@ export default function ContactAutomationSettings({
             aria-label="最近导入记录"
             title="最近导入记录"
             icon={<History size={14} />}
-            onClick={() => setHistoryOpen((current) => !current)}
+            onClick={() => setHistoryDialogOpen(true)}
           />
         </div>
       }
       dataSection="contacts"
     >
-      {preview && (
-        <section className="contact-import-preview" data-import-preview>
-          <header>
-            <span>
-              <strong>导入预览：{preview.file_name}</strong>
-              <em>
-                共 {preview.total_count} 条 · 新增 {preview.new_count} · 可合并 {preview.merge_count} ·
-                重复/无效 {preview.duplicate_count + preview.invalid_count}
-              </em>
-            </span>
-          </header>
-          <div className="contact-import-selection-toolbar">
-            <span>批量选择：</span>
-            <SettingsButton size="sm" onClick={() => setAllSelection('create')}>全部新增</SettingsButton>
-            <SettingsButton size="sm" onClick={() => setAllSelection('merge')}>全部合并</SettingsButton>
-            <SettingsButton size="sm" onClick={() => setAllSelection('skip')}>全部跳过</SettingsButton>
-          </div>
-          <div className="contact-import-preview-list">
-            {preview.entries.map((entry) => (
-              <div className="contact-import-preview-row" key={`${entry.email}-${entry.status}`}>
-                <span className={`contact-import-status ${entry.status}`}>{entry.status === 'new' ? '新增' : entry.status === 'merge' ? '合并' : entry.status === 'duplicate' ? '重复' : '无效'}</span>
-                <span className="contact-import-identity">
-                  <strong>{entry.name || entry.email}</strong>
-                  <em>{entry.email}{entry.aliases.length ? `（别名 ${entry.aliases.length}）` : ''}</em>
-                </span>
-                <small>{entry.existing_name ? `已有：${entry.existing_name}` : entry.reason}</small>
-                <CustomSelect
-                  ariaLabel={`${entry.name || entry.email} 导入操作`}
-                  value={selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')}
-                  disabled={entry.status === 'invalid'}
-                  disabledValues={entry.status === 'new' ? ['merge'] : []}
-                  options={[
-                    { value: 'create', label: '新增' },
-                    { value: 'merge', label: '合并到已有' },
-                    { value: 'skip', label: '跳过' },
-                  ]}
-                  onChange={(nextAction) => setSelection(
-                    `${entry.email}|${entry.status}`,
-                    nextAction as 'create' | 'merge' | 'skip',
-                  )}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="contact-import-preview-actions">
-            <SettingsButton icon={<X size={14} />} onClick={cancelImport} disabled={importing}>
-              取消
-            </SettingsButton>
-            <SettingsButton variant="primary" icon={importing ? <LoaderCircle className="spinning" size={14} /> : <Check size={14} />} onClick={handleCommitImport} disabled={importing}>
-              确认导入（{preview.entries.filter((entry) => (selectionMap[`${entry.email}|${entry.status}`] ?? (entry.status === 'invalid' ? 'skip' : 'create')) !== 'skip' && entry.status !== 'invalid').length} 条）
-            </SettingsButton>
-          </div>
-        </section>
-      )}
-
-      {historyOpen && (
-        <section className="contact-import-history" data-import-history>
-          <header>
-            <span>
-              <strong>最近导入记录</strong>
-              <em>{batches.length} 批次</em>
-            </span>
-          </header>
-          {batches.length === 0 && <p className="settings-empty-hint">暂无导入记录。</p>}
-          {batches.map((batch) => (
-            <div className="contact-import-history-row" key={batch.id}>
-              <span>
-                <strong>{batch.file_name}</strong>
-                <em>
-                  {new Date(batch.created_at).toLocaleString()} · 新增 {batch.created_count} ·
-                  合并 {batch.merged_count} · 跳过 {batch.skipped_count}
-                </em>
-              </span>
-              <SettingsButton
-                size="sm"
-                disabled={batch.created_count === 0 || undoingBatchId === batch.id}
-                icon={<Undo2 size={13} />}
-                onClick={() => setConfirmUndoBatch(batch)}
-              >
-                {batch.created_count > 0 ? '撤销本批新增' : '无可撤销'}
-              </SettingsButton>
-            </div>
-          ))}
-        </section>
-      )}
 
       <div className="contact-create-form settings-contact-create">
         <SettingsField label="联系人名称">
@@ -244,11 +207,11 @@ export default function ContactAutomationSettings({
             placeholder="邮箱地址"
           />
         </SettingsField>
-        <SettingsField label="别名邮箱">
+        <SettingsField label="别名邮箱" hint={aliasIssueText || undefined}>
           <textarea
             value={contactFormAliases}
             onChange={(event) => onContactFormAliasesChange(event.target.value)}
-            placeholder="别名邮箱，逗号或换行分隔"
+            placeholder="别名邮箱，逗号、分号或换行分隔"
           />
         </SettingsField>
         <SettingsSwitch
@@ -263,10 +226,33 @@ export default function ContactAutomationSettings({
       </div>
 
       {contacts.length === 0 ? (
-        <SettingsEmptyState>还没有联系人。可以手动新增，或从 vCard 文件导入。</SettingsEmptyState>
+        <SettingsEmptyState>
+          还没有联系人。可以手动新增，或从 vCard（.vcf）/ CSV（.csv）文件导入。
+        </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">
-          {contacts.slice(0, 6).map((contact) => (
+          <SettingsField label="搜索联系人">
+            <div className="settings-contact-search">
+              <Search size={14} aria-hidden="true" />
+              <input
+                value={contactQuery}
+                onChange={(event) => onContactQueryChange(event.target.value)}
+                placeholder="名称、邮箱或别名"
+              />
+              {contactQuery && (
+                <button
+                  type="button"
+                  className="settings-contact-search-clear"
+                  aria-label="清除搜索"
+                  title="清除搜索"
+                  onClick={() => onContactQueryChange('')}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </SettingsField>
+          {filteredContacts.map((contact) => (
             <div className="st-data-row contact-tool-row" key={contact.id}>
               {editingContactId === contact.id ? (
                 <div className="contact-edit-form">
@@ -275,11 +261,16 @@ export default function ContactAutomationSettings({
                     onChange={(event) => onEditNameChange(event.target.value)}
                     placeholder="联系人名称"
                   />
-                  <textarea
-                    value={editAliases}
-                    onChange={(event) => onEditAliasesChange(event.target.value)}
-                    placeholder="别名邮箱，逗号或换行分隔"
-                  />
+                  <div>
+                    <textarea
+                      value={editAliases}
+                      onChange={(event) => onEditAliasesChange(event.target.value)}
+                      placeholder="别名邮箱，逗号、分号或换行分隔"
+                    />
+                    {editAliasIssueText && (
+                      <p className="contact-alias-warning">{editAliasIssueText}</p>
+                    )}
+                  </div>
                   <div className="st-actions">
                     <SettingsButton size="sm" variant="primary" onClick={() => onSaveContactOverride(contact)}>保存</SettingsButton>
                     <SettingsButton size="sm" onClick={onCancelEdit}>取消</SettingsButton>
@@ -291,7 +282,17 @@ export default function ContactAutomationSettings({
                     <Send size={14} />
                     <span>
                       <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                      <em>{contact.email}{contact.aliases.length ? ` · 别名 ${contact.aliases.length}` : ''}</em>
+                      <em>{contact.email}</em>
+                      {contact.aliases.length > 0 && (
+                        <span className="contact-alias-chips">
+                          {contact.aliases.slice(0, 4).map((alias) => (
+                            <span key={alias}>{alias}</span>
+                          ))}
+                          {contact.aliases.length > 4 && (
+                            <span>+{contact.aliases.length - 4}</span>
+                          )}
+                        </span>
+                      )}
                       <small>{contact.message_count} 封往来</small>
                     </span>
                   </button>
@@ -341,6 +342,9 @@ export default function ContactAutomationSettings({
               )}
             </div>
           ))}
+          {filteredContacts.length === 0 && contactQuery && (
+            <p className="settings-empty-hint">没有匹配「{contactQuery}」的联系人。</p>
+          )}
         </div>
       )}
 
@@ -380,6 +384,35 @@ export default function ContactAutomationSettings({
           </div>
         </div>
       )}
+
+      <ContactImportDialog
+        open={importDialogOpen}
+        preview={preview}
+        commitResult={commitResult}
+        selectionMap={selectionMap}
+        entryEdits={entryEdits}
+        previewing={previewing}
+        importing={importing}
+        onSetSelection={setSelection}
+        onSetAllSelection={setAllSelection}
+        onSetEntryEdit={setEntryEdit}
+        onPickFile={() => { void startImport(); }}
+        onConfirm={() => { void handleCommitImport(); }}
+        onCancel={handleCloseImport}
+        onOpenHistory={() => {
+          setImportDialogOpen(false);
+          setHistoryDialogOpen(true);
+          void refreshBatches();
+        }}
+      />
+
+      <ContactImportHistoryDialog
+        open={historyDialogOpen}
+        batches={batches}
+        undoingBatchId={undoingBatchId}
+        onUndo={(batch) => setConfirmUndoBatch(batch)}
+        onClose={handleCloseHistory}
+      />
     </SettingsSection>
   );
 }

@@ -351,6 +351,7 @@ export default function App() {
     clearManualUnreadSuppression,
     markMessageReadAfterReading,
     updateDetailCache,
+    attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   } = useMailboxSelectionController({
@@ -1365,6 +1366,7 @@ export default function App() {
         selected={readerSelectedDetail}
         selectedId={readerDisplayedId}
         activeSelectedId={selectedId}
+        attachmentsLoaded={attachmentsLoaded}
         readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}
         folders={folders}

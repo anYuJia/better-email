@@ -201,6 +201,7 @@ export default function useMailboxSelectionController({
   );
 
   const {
+    attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   } = useReaderBodyLoading({
@@ -245,6 +246,7 @@ export default function useMailboxSelectionController({
     rememberManualReadState,
     clearManualUnreadSuppression,
     markMessageReadAfterReading,
+    attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   };

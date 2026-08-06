@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { startTransition, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
 import type {
   Attachment,
@@ -45,20 +45,37 @@ export default function useReaderBodyLoading({
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
   const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
+  /** 附件列表当前属于哪封邮件；解析结果只在与当前选中一致时才生效 */
+  const attachmentsOwnerRef = useRef<number | null>(null);
+  /** 附件列表是否已加载完成（或加载失败）——内嵌图片解析、快速回复框都要等它 */
+  const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
 
   useEffect(() => {
     setAttachments([]);
-    if (!readerSelectedDetail) return undefined;
+    setAttachmentsLoaded(false);
+    if (!readerSelectedDetail) {
+      attachmentsOwnerRef.current = null;
+      return undefined;
+    }
 
     const selectedMessageId = readerSelectedDetail.id;
+    attachmentsOwnerRef.current = selectedMessageId;
     let cancelled = false;
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
       invoke<Attachment[]>('list_attachments', { messageId: selectedMessageId })
         .then((items) => {
-          if (!cancelled) startTransition(() => setAttachments(items));
+          if (cancelled) return;
+          startTransition(() => setAttachments(items));
+          if (attachmentsOwnerRef.current === selectedMessageId) {
+            setAttachmentsLoaded(true);
+          }
         })
         .catch((error) => {
-          if (!cancelled) setStatus(String(error));
+          if (cancelled) return;
+          setStatus(String(error));
+          if (attachmentsOwnerRef.current === selectedMessageId) {
+            setAttachmentsLoaded(true);
+          }
         });
     }, readerAttachmentLoadDelayMs);
 
@@ -165,6 +182,9 @@ export default function useReaderBodyLoading({
           });
           return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
             if (!cancelled) startTransition(() => setAttachments(items));
+            if (attachmentsOwnerRef.current === updated.id) {
+              setAttachmentsLoaded(true);
+            }
             readerFlowLog('autoFetchBody done', {
               messageId: updated.id,
               bodyLength: updated.body.length,
@@ -209,6 +229,7 @@ export default function useReaderBodyLoading({
   ]);
 
   return {
+    attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
   };

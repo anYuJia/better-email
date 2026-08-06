@@ -73,6 +73,7 @@ export type ReaderPaneProps = {
   selected: Message | null;
   selectedId: number | null;
   activeSelectedId: number | null;
+  attachmentsLoaded: boolean;
   accountScope: AccountScope;
   folders: Folder[];
   labels: Label[];
@@ -136,6 +137,7 @@ export default function ReaderPane({
   selected,
   selectedId,
   activeSelectedId,
+  attachmentsLoaded,
   readTriggerKey,
   accountScope,
   folders,
@@ -320,11 +322,17 @@ export default function ReaderPane({
     ? bodySelected.body
     : '';
   // 正文真正渲染出来、且展示的就是当前选中的邮件时才显示快速回复框：
-  // 切换加载期间（冻结展示上一封）与正文未就绪时都不出现，避免回复框先于内容
+  // 切换加载期间（冻结展示上一封）、正文未就绪、附件列表未加载完
+  // 或内嵌图片尚未解析完成时都不出现，避免回复框先于内容出现
+  // （含"有图片的邮件先出回复框、图片后加载出来"的情况）
   const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
-  const hasRenderedBodyContent = isBodyRenderReady && isActiveMessage && Boolean(
-    hasRenderableHtml || plainBodyForReader.trim() || shouldOfferRemoteContent,
+  const inlineImagesSettled = Boolean(
+    inlineImageResolution.pendingAttachments.length === 0 || inlineImageError,
   );
+  const hasRenderedBodyContent = isBodyRenderReady && isActiveMessage && attachmentsLoaded
+    && inlineImagesSettled && Boolean(
+      hasRenderableHtml || plainBodyForReader.trim() || shouldOfferRemoteContent,
+    );
 
   useEffect(() => {
     maybeCompleteReading();

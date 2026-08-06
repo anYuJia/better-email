@@ -42,6 +42,11 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
     }
 
+    function hasActiveTextSelection(): boolean {
+      const selection = window.getSelection();
+      return Boolean(selection && !selection.isCollapsed && selection.toString());
+    }
+
     function selectRelativeMessage(offset: number) {
       const { messages, selectedId, setSelectedId } = optionsRef.current;
       if (messages.length === 0) return;
@@ -114,7 +119,14 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         return;
       }
 
-      if (commandModifier && !event.shiftKey && key === 'a' && listMode === 'messages' && messages.length > 0) {
+      if (
+        commandModifier
+        && !event.shiftKey
+        && key === 'a'
+        && listMode === 'messages'
+        && messages.length > 0
+        && !hasActiveTextSelection()
+      ) {
         event.preventDefault();
         toggleAllVisibleMessages(true);
         setStatus(`已选择当前列表 ${messages.length} 封邮件`);

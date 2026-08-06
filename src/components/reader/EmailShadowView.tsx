@@ -62,6 +62,8 @@ export default function EmailShadowView({
         :host {
           display: block;
           overflow-wrap: anywhere;
+          -webkit-user-select: text;
+          user-select: text;
         }
         * {
           box-sizing: border-box;

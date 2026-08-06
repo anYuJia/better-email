@@ -2,7 +2,10 @@ use crate::credentials::AccountSecret;
 use crate::db::MailError;
 use crate::models::{Account, Attachment, OutboundMessage};
 use lettre::{
-    message::{header::ContentType, Mailbox, MultiPart, SinglePart},
+    message::{
+        header::{ContentId, ContentType},
+        Mailbox, MultiPart, SinglePart,
+    },
     transport::smtp::{
         authentication::{Credentials, Mechanism},
         SmtpTransportBuilder,
@@ -107,15 +110,16 @@ fn build_email(
     builder: lettre::message::MessageBuilder,
     message: &OutboundMessage,
 ) -> Result<Message, MailError> {
-    let body_part = if message.html_body.trim().is_empty() {
-        MultiPart::alternative().singlepart(SinglePart::plain(message.body.clone()))
-    } else {
-        MultiPart::alternative()
-            .singlepart(SinglePart::plain(message.body.clone()))
-            .singlepart(SinglePart::html(message.html_body.clone()))
-    };
-    if message.attachments.is_empty() {
-        return if message.html_body.trim().is_empty() {
+    let html_present = !message.html_body.trim().is_empty();
+    let html_uses_cid = html_present && message.html_body.to_ascii_lowercase().contains("cid:");
+    let body_part = build_body_part(message, html_uses_cid)?;
+    let regular_attachments = message
+        .attachments
+        .iter()
+        .filter(|attachment| !is_inline_attachment(attachment, html_uses_cid))
+        .collect::<Vec<_>>();
+    if regular_attachments.is_empty() {
+        return if !html_present {
             builder
                 .header(ContentType::TEXT_PLAIN)
                 .body(message.body.clone())
@@ -128,12 +132,64 @@ fn build_email(
     }
 
     let mut multipart = MultiPart::mixed().multipart(body_part);
-    for attachment in &message.attachments {
+    for attachment in regular_attachments {
         multipart = multipart.singlepart(attachment_part(attachment)?);
     }
     builder
         .multipart(multipart)
         .map_err(|error| MailError::Smtp(format!("邮件构建失败：{error}")))
+}
+
+fn is_inline_attachment(attachment: &Attachment, html_uses_cid: bool) -> bool {
+    html_uses_cid && attachment.is_inline && !attachment.content_id.trim().is_empty()
+}
+
+fn build_body_part(
+    message: &OutboundMessage,
+    html_uses_cid: bool,
+) -> Result<MultiPart, MailError> {
+    let alternative = if message.html_body.trim().is_empty() {
+        MultiPart::alternative().singlepart(SinglePart::plain(message.body.clone()))
+    } else {
+        MultiPart::alternative()
+            .singlepart(SinglePart::plain(message.body.clone()))
+            .singlepart(SinglePart::html(message.html_body.clone()))
+    };
+    let inline_attachments = message
+        .attachments
+        .iter()
+        .filter(|attachment| is_inline_attachment(attachment, html_uses_cid))
+        .collect::<Vec<_>>();
+    if inline_attachments.is_empty() {
+        return Ok(alternative);
+    }
+
+    let mut related = MultiPart::related().multipart(alternative);
+    for attachment in inline_attachments {
+        related = related.singlepart(inline_attachment_part(attachment)?);
+    }
+    Ok(related)
+}
+
+fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
+    if attachment.local_path.trim().is_empty() {
+        return Err(MailError::Smtp(format!(
+            "内嵌图片缺少本地路径，无法发送：{}",
+            attachment.filename
+        )));
+    }
+    let bytes = fs::read(&attachment.local_path).map_err(|error| {
+        MailError::Smtp(format!("读取内嵌图片失败 {}：{error}", attachment.local_path))
+    })?;
+    let content_type = ContentType::parse(&attachment.mime_type)
+        .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
+    Ok(SinglePart::builder()
+        .header(content_type)
+        .header(ContentId::from(format!(
+            "<{}>",
+            attachment.content_id.trim()
+        )))
+        .body(bytes))
 }
 
 fn attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
@@ -432,6 +488,124 @@ mod tests {
         assert!(rendered.contains("multipart/alternative"));
         assert!(rendered.contains("text/html"));
         assert!(rendered.contains("rich-notes.txt"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn builds_multipart_related_for_inline_cid_images() {
+        let path = std::env::temp_dir().join(format!(
+            "better-email-smtp-inline-{}-{}.png",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::write(&path, b"fake png bytes").unwrap();
+
+        let message = OutboundMessage {
+            id: 11,
+            account_id: 1,
+            sender_name: "Me".to_string(),
+            sender_email: "me@example.com".to_string(),
+            reply_to: String::new(),
+            recipients: "friend@example.com".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Inline image".to_string(),
+            body: "See the image".to_string(),
+            html_body: "<p>See the image</p><img src=\"cid:inline-1@better-email.local\">".to_string(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: vec![
+                Attachment {
+                    id: 1,
+                    message_id: 11,
+                    filename: "inline.png".to_string(),
+                    mime_type: "image/png".to_string(),
+                    size_bytes: 16,
+                    is_downloaded: true,
+                    local_path: path.to_string_lossy().to_string(),
+                    content_id: "inline-1@better-email.local".to_string(),
+                    is_inline: true,
+                },
+                Attachment {
+                    id: 2,
+                    message_id: 11,
+                    filename: "notes.txt".to_string(),
+                    mime_type: "text/plain".to_string(),
+                    size_bytes: 15,
+                    is_downloaded: true,
+                    local_path: path.to_string_lossy().to_string(),
+                    content_id: String::new(),
+                    is_inline: false,
+                },
+            ],
+        };
+        let email = build_email(
+            Message::builder()
+                .from(mailbox("Me", "me@example.com").unwrap())
+                .to(mailbox("", "friend@example.com").unwrap())
+                .subject("Inline image"),
+            &message,
+        )
+        .unwrap();
+        let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
+
+        assert!(rendered.contains("multipart/related"));
+        assert!(rendered.contains("multipart/alternative"));
+        assert!(rendered.contains("multipart/mixed"));
+        assert!(rendered.contains("Content-ID: <inline-1@better-email.local>"));
+        assert!(rendered.contains("cid:inline-1@better-email.local"));
+        assert!(rendered.contains("notes.txt"));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn inline_attachment_without_cid_reference_stays_regular() {
+        let path = std::env::temp_dir().join(format!(
+            "better-email-smtp-inline-plain-{}-{}.png",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::write(&path, b"fake png bytes").unwrap();
+
+        let message = OutboundMessage {
+            id: 12,
+            account_id: 1,
+            sender_name: "Me".to_string(),
+            sender_email: "me@example.com".to_string(),
+            reply_to: String::new(),
+            recipients: "friend@example.com".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Inline unused".to_string(),
+            body: "No images".to_string(),
+            html_body: "<p>No images</p>".to_string(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: vec![Attachment {
+                id: 3,
+                message_id: 12,
+                filename: "unused.png".to_string(),
+                mime_type: "image/png".to_string(),
+                size_bytes: 16,
+                is_downloaded: true,
+                local_path: path.to_string_lossy().to_string(),
+                content_id: "unused@better-email.local".to_string(),
+                is_inline: true,
+            }],
+        };
+        let email = build_email(
+            Message::builder()
+                .from(mailbox("Me", "me@example.com").unwrap())
+                .to(mailbox("", "friend@example.com").unwrap())
+                .subject("Inline unused"),
+            &message,
+        )
+        .unwrap();
+        let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
+
+        assert!(!rendered.contains("multipart/related"));
+        assert!(rendered.contains("multipart/alternative"));
+        assert!(rendered.contains("multipart/mixed"));
         let _ = fs::remove_file(path);
     }
 

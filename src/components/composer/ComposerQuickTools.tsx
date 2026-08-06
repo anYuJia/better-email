@@ -106,8 +106,8 @@ export default function ComposerQuickTools({
               添加附件
             </button>
             <span>
-              {draft.attachments.length > 0
-                ? `已添加 ${draft.attachments.length} 个附件`
+              {draft.attachments.some((attachment) => !attachment.is_inline)
+                ? `已添加 ${draft.attachments.filter((attachment) => !attachment.is_inline).length} 个附件`
                 : '拖入文件，或点击添加附件'}
             </span>
           </div>

@@ -53,6 +53,8 @@ export type MockOutboundAttachmentInput = {
   mime_type?: string;
   size_bytes?: number;
   local_path?: string;
+  content_id?: string;
+  is_inline?: boolean;
 };
 
 export type MockContact = {

@@ -466,15 +466,17 @@ pub(super) fn replace_outbound_attachments_for_conn(
     for attachment in outbound_attachments {
         let local_path = attachment.local_path.trim();
         conn.execute(
-            "INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path, content_id, is_inline)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 message_id,
                 attachment.filename.trim(),
                 fallback_mime_type(&attachment.mime_type),
                 attachment.size_bytes.max(0),
                 bool_to_int(!local_path.is_empty()),
-                local_path
+                local_path,
+                attachment.content_id.trim(),
+                bool_to_int(attachment.is_inline)
             ],
         )?;
     }

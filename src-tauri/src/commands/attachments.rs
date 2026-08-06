@@ -126,6 +126,8 @@ pub async fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<Outboun
                 mime_type: mime_type_for_path(&path),
                 size_bytes: metadata.len().min(i64::MAX as u64) as i64,
                 local_path: path.to_string_lossy().into_owned(),
+                content_id: String::new(),
+                is_inline: false,
             })
         })
         .collect()
@@ -154,6 +156,8 @@ fn attachment_input_from_path(path: PathBuf) -> MailResult<OutboundAttachmentInp
         mime_type: mime_type_for_path(&path),
         size_bytes: metadata.len().min(i64::MAX as u64) as i64,
         local_path: path.to_string_lossy().into_owned(),
+        content_id: String::new(),
+        is_inline: false,
     })
 }
 

@@ -184,6 +184,10 @@ pub struct OutboundAttachmentInput {
     pub size_bytes: i64,
     #[serde(default)]
     pub local_path: String,
+    #[serde(default)]
+    pub content_id: String,
+    #[serde(default)]
+    pub is_inline: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

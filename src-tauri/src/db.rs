@@ -1508,6 +1508,8 @@ mod tests {
                     mime_type: "application/pdf".to_string(),
                     size_bytes: 2048,
                     local_path: "/tmp/proposal.pdf".to_string(),
+                    content_id: String::new(),
+                    is_inline: false,
                 }],
             })
             .unwrap();
@@ -1557,6 +1559,8 @@ mod tests {
                     mime_type: String::new(),
                     size_bytes: 12,
                     local_path: String::new(),
+                    content_id: String::new(),
+                    is_inline: false,
                 }],
             })
             .unwrap();

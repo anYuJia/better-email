@@ -18,6 +18,8 @@ export type OutboundAttachmentInput = {
   mime_type: string;
   size_bytes: number;
   local_path: string;
+  content_id?: string;
+  is_inline?: boolean;
 };
 
 

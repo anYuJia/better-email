@@ -17,8 +17,8 @@ pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<Strin
     let Some(source_path) = app
         .dialog()
         .file()
-        .set_title("导入联系人（vCard / CSV）")
-        .add_filter("联系人文件", &["vcf", "vcard", "csv"])
+        .set_title("导入联系人（vCard / CSV / Excel）")
+        .add_filter("联系人文件", &["vcf", "vcard", "csv", "xlsx", "xlsm"])
         .blocking_pick_file()
     else {
         return Ok(None);
@@ -29,7 +29,7 @@ pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<Strin
     Ok(Some(source_path.to_string_lossy().into_owned()))
 }
 
-fn read_contact_file_by_path(path: &str) -> MailResult<(String, String, usize)> {
+fn read_contact_file_by_path(path: &str) -> MailResult<(String, Vec<u8>, usize)> {
     let source_path = std::path::PathBuf::from(path);
     let payload = fs::read(&source_path)?;
     if payload.is_empty() {
@@ -43,13 +43,12 @@ fn read_contact_file_by_path(path: &str) -> MailResult<(String, String, usize)> 
             MAX_VCARD_IMPORT_BYTES / 1024 / 1024
         )));
     }
-    let raw = String::from_utf8(payload.clone())
-        .map_err(|_| crate::db::MailError::Imap("联系人文件不是有效的 UTF-8 文本。".to_string()))?;
     let file_name = source_path
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string());
-    Ok((file_name, raw, payload.len()))
+    let size_bytes = payload.len();
+    Ok((file_name, payload, size_bytes))
 }
 
 #[tauri::command]
@@ -57,8 +56,10 @@ pub async fn preview_contact_import(
     path: String,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportPreview> {
-    let (file_name, raw, _size_bytes) = read_contact_file_by_path(&path)?;
-    let parsed = vcard::parse_contact_import(&raw, &file_name);
+    let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
+    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name).map_err(
+        |message| crate::db::MailError::Imap(message),
+    )?;
     let entries = store.classify_contact_import(parsed.contacts)?;
     let mut new_count = 0_i64;
     let mut merge_count = 0_i64;
@@ -92,8 +93,10 @@ pub fn commit_contact_import(
     scope: Option<String>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
-    let (file_name, raw, _size_bytes) = read_contact_file_by_path(&path)?;
-    let parsed = vcard::parse_contact_import(&raw, &file_name);
+    let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
+    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name).map_err(
+        |message| crate::db::MailError::Imap(message),
+    )?;
     let action_by_email: std::collections::HashMap<String, String> = selections
         .into_iter()
         .map(|selection| (selection.email.trim().to_ascii_lowercase(), selection.action))

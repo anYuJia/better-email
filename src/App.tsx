@@ -740,6 +740,8 @@ export default function App() {
     saveDraftAsTemplate,
     deleteComposeTemplate,
     pickDraftAttachments,
+    buildInlineImageAttachments,
+    addInlineImages,
     handleComposerAttachmentDrop,
     handleComposerAttachmentPaste,
     handleComposerAttachmentDragOver,
@@ -1489,6 +1491,8 @@ export default function App() {
           onAttachmentDragLeave={handleComposerAttachmentDragLeave}
           onAttachmentDragOver={handleComposerAttachmentDragOver}
           onAttachmentPaste={handleComposerAttachmentPaste}
+          buildInlineImageAttachments={buildInlineImageAttachments}
+          onInlineImagesAdded={addInlineImages}
           onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
           onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}

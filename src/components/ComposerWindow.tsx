@@ -16,6 +16,7 @@ import type {
   Contact,
   DraftInput,
   MailIdentity,
+  OutboundAttachmentInput,
 } from '../app/types';
 import { formatDate } from '../mailUtils';
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
@@ -68,6 +69,8 @@ export type ComposerWindowProps = {
   onAttachmentDragLeave: React.DragEventHandler<HTMLElement>;
   onAttachmentDragOver: React.DragEventHandler<HTMLElement>;
   onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
+  buildInlineImageAttachments: (files: File[]) => Promise<OutboundAttachmentInput[]>;
+  onInlineImagesAdded: (attachments: OutboundAttachmentInput[]) => void;
   onSaveDraft: () => void;
   onQueueDraft: () => void;
   onSendDraft: () => void;
@@ -108,6 +111,8 @@ export default function ComposerWindow({
   onAttachmentDragLeave,
   onAttachmentDragOver,
   onAttachmentPaste,
+  buildInlineImageAttachments,
+  onInlineImagesAdded,
   onSaveDraft,
   onQueueDraft,
   onSendDraft,
@@ -248,6 +253,8 @@ export default function ComposerWindow({
           onAttachmentDragLeave={onAttachmentDragLeave}
           onAttachmentDragOver={onAttachmentDragOver}
           onAttachmentPaste={onAttachmentPaste}
+          buildInlineImageAttachments={buildInlineImageAttachments}
+          onInlineImagesAdded={onInlineImagesAdded}
         />
 
         <ComposerQuickTools

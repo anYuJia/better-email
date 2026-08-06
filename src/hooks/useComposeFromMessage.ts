@@ -107,6 +107,8 @@ export default function useComposeFromMessage({
         mime_type: attachment.mime_type,
         size_bytes: attachment.size_bytes,
         local_path: attachment.local_path,
+        content_id: attachment.content_id,
+        is_inline: attachment.is_inline,
       })),
     });
     setStatus('已打开草稿继续编辑');

@@ -61,7 +61,9 @@ const statusLabel: Record<ContactImportPreviewEntry['status'], string> = {
 };
 
 function formatLabel(format: string): string {
-  return format === 'csv' ? 'CSV' : 'vCard';
+  if (format === 'csv') return 'CSV';
+  if (format === 'xlsx') return 'Excel';
+  return 'vCard';
 }
 
 function defaultActionFor(status: string): 'create' | 'merge' | 'skip' {
@@ -349,9 +351,9 @@ export default function ContactImportDialog({
             </span>
             <strong id="contact-import-title">导入联系人</strong>
             <p>
-              支持 vCard（.vcf / .vcard）和 CSV（.csv）文件，单个文件最大 5 MB。
+              支持 vCard（.vcf / .vcard）、CSV（.csv）和 Excel（.xlsx / .xlsm）文件，单个文件最大 5 MB。
             </p>
-            <p>CSV 请使用 name、email 表头；vCard 中的多个邮箱会按 PREF 标记选择主邮箱。</p>
+            <p>CSV / Excel 请使用 name、email 表头；vCard 中的多个邮箱会按 PREF 标记选择主邮箱。</p>
             <div className="contact-import-dialog-actions">
               <SettingsButton icon={<X size={14} />} onClick={onCancel}>
                 取消

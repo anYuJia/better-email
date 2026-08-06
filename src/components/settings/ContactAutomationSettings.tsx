@@ -169,7 +169,7 @@ export default function ContactAutomationSettings({
           <SettingsButton
             size="sm"
             disabled={transferBusy}
-            title="导入 vCard（.vcf / .vcard）或 CSV（.csv）联系人"
+            title="导入 vCard（.vcf / .vcard）、CSV（.csv）或 Excel（.xlsx）联系人"
             icon={<FileUp size={14} />}
             onClick={() => setImportDialogOpen(true)}
           >
@@ -227,7 +227,7 @@ export default function ContactAutomationSettings({
 
       {contacts.length === 0 ? (
         <SettingsEmptyState>
-          还没有联系人。可以手动新增，或从 vCard（.vcf）/ CSV（.csv）文件导入。
+           还没有联系人。可以手动新增，或从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件导入。
         </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">

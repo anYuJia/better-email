@@ -544,8 +544,8 @@ export function accountMessageFromDraft(
       size_bytes: Number(attachment.size_bytes ?? 0),
       is_downloaded: Boolean(attachment.local_path?.trim()),
       local_path: attachment.local_path?.trim() || '',
-      content_id: '',
-      is_inline: false,
+      content_id: attachment.content_id?.trim() || '',
+      is_inline: attachment.is_inline === true,
     })),
     ...attachments,
   ];
@@ -1781,6 +1781,7 @@ export function mockPickContactImportFile(args?: InvokeArgs) {
 export function mockPreviewContactImport(args?: InvokeArgs) {
   const path = String(args?.path ?? '/mock/import-contacts.vcf');
   const file_name = path.split('/').pop() || 'import-contacts.vcf';
+  const lowerName = file_name.toLowerCase();
   const seeded = [
     {
       email: 'import.new@example.com',
@@ -1806,7 +1807,7 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
   return {
     file_name,
     path,
-    format: file_name.toLowerCase().endsWith('.csv') ? 'csv' : 'vcard',
+    format: lowerName.endsWith('.csv') ? 'csv' : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? 'xlsx' : 'vcard',
     total_count: 2,
     new_count: 1,
     merge_count: 0,

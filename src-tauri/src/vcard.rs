@@ -1,4 +1,5 @@
 use crate::models::{Contact, ContactCreateInput};
+use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
 
 #[derive(Debug, Clone)]
 pub struct ParsedVcards {
@@ -36,8 +37,53 @@ pub fn parse_contact_import(raw: &str, file_name: &str) -> ParsedContactImport {
     }
 }
 
+pub fn parse_contact_import_bytes(payload: &[u8], file_name: &str) -> Result<ParsedContactImport, String> {
+    let lower_name = file_name.to_ascii_lowercase();
+    if lower_name.ends_with(".xlsx") || lower_name.ends_with(".xlsm") {
+        let parsed = parse_contacts_xlsx(payload)?;
+        return Ok(ParsedContactImport {
+            contacts: parsed.contacts,
+            total: parsed.total_cards,
+            skipped: parsed.skipped,
+            format: "xlsx".to_string(),
+        });
+    }
+    let raw = std::str::from_utf8(payload)
+        .map_err(|_| "联系人文件不是有效的 UTF-8 文本。".to_string())?;
+    Ok(parse_contact_import(raw, file_name))
+}
+
+pub fn parse_contacts_xlsx(payload: &[u8]) -> Result<ParsedVcards, String> {
+    let mut workbook: Xlsx<std::io::Cursor<&[u8]>> =
+        open_workbook_from_rs(std::io::Cursor::new(payload))
+            .map_err(|error| format!("无法解析 xlsx 文件：{error}"))?;
+    let sheet_names = workbook.sheet_names().to_vec();
+    let sheet_name = sheet_names
+        .first()
+        .map(String::as_str)
+        .ok_or_else(|| "xlsx 文件中没有工作表。".to_string())?;
+    let range = workbook
+        .worksheet_range(sheet_name)
+        .map_err(|error| format!("读取 xlsx 工作表失败：{error}"))?;
+    let rows: Vec<Vec<String>> = range
+        .rows()
+        .map(|row| {
+            row.iter()
+                .map(|cell| match cell {
+                    Data::String(value) => value.clone(),
+                    other => other.to_string(),
+                })
+                .collect()
+        })
+        .collect();
+    Ok(parse_contact_rows(rows))
+}
+
 pub fn parse_contacts_csv(raw: &str) -> ParsedVcards {
-    let rows = parse_csv_rows(raw);
+    parse_contact_rows(parse_csv_rows(raw))
+}
+
+fn parse_contact_rows(rows: Vec<Vec<String>>) -> ParsedVcards {
     let mut contacts: Vec<ContactCreateInput> = Vec::new();
     let mut skipped = 0_i64;
     let mut header_seen = false;
@@ -47,7 +93,6 @@ pub fn parse_contacts_csv(raw: &str) -> ParsedVcards {
             skipped += 1;
             continue;
         }
-        let _trimmed_first = cells.first().unwrap_or(&String::new()).trim().to_ascii_lowercase();
         let header_indicators = ["name", "姓名", "名字", "email", "邮箱", "邮件", "地址", "联系人"];
         if !header_seen && cells.iter().any(|cell| {
             let value = cell.trim().to_ascii_lowercase();
@@ -362,6 +407,7 @@ fn escape_value(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     fn parses_folded_vcard_with_preferred_email_alias_and_vip() {
@@ -477,5 +523,101 @@ mod tests {
         );
         assert_eq!(vcard_parsed.format, "vcard");
         assert_eq!(vcard_parsed.contacts.len(), 1);
+    }
+
+    fn build_minimal_xlsx() -> Vec<u8> {
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut buffer);
+            let options = zip::write::SimpleFileOptions::default();
+            let files = [
+                (
+                    "[Content_Types].xml",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+</Types>"#,
+                ),
+                (
+                    "_rels/.rels",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>"#,
+                ),
+                (
+                    "xl/workbook.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>"#,
+                ),
+                (
+                    "xl/_rels/workbook.xml.rels",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+</Relationships>"#,
+                ),
+                (
+                    "xl/sharedStrings.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="6" uniqueCount="6">
+<si><t>姓名</t></si><si><t>邮箱</t></si><si><t>Alice</t></si><si><t>alice@example.com</t></si><si><t>Bob</t></si><si><t>bob@example.com</t></si>
+</sst>"#,
+                ),
+                (
+                    "xl/worksheets/sheet1.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>
+<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>
+<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row>
+<row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="s"><v>5</v></c></row>
+</sheetData>
+</worksheet>"#,
+                ),
+            ];
+            for (name, content) in files {
+                writer.start_file(name, options).unwrap();
+                writer.write_all(content.as_bytes()).unwrap();
+            }
+            writer.finish().unwrap();
+        }
+        buffer.into_inner()
+    }
+
+    #[test]
+    fn parses_xlsx_contacts_from_first_sheet() {
+        let payload = build_minimal_xlsx();
+        let parsed = parse_contact_import_bytes(&payload, "contacts.xlsx").unwrap();
+
+        assert_eq!(parsed.format, "xlsx");
+        assert_eq!(parsed.total, 2);
+        assert_eq!(parsed.skipped, 0);
+        assert_eq!(parsed.contacts.len(), 2);
+        let alice = parsed
+            .contacts
+            .iter()
+            .find(|item| item.email == "alice@example.com")
+            .unwrap();
+        assert_eq!(alice.name, "Alice");
+        let bob = parsed
+            .contacts
+            .iter()
+            .find(|item| item.email == "bob@example.com")
+            .unwrap();
+        assert_eq!(bob.name, "Bob");
+    }
+
+    #[test]
+    fn rejects_invalid_xlsx_payloads() {
+        let error = parse_contact_import_bytes(b"not a zip at all", "contacts.xlsx").unwrap_err();
+        assert!(error.contains("xlsx"));
     }
 }

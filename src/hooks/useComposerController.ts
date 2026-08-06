@@ -130,9 +130,50 @@ export default function useComposerController({
     setStatus(`${statusPrefix} ${validAttachments.length} 个`);
   }, [setStatus]);
 
+  const addInlineImages = useCallback((newAttachments: OutboundAttachmentInput[]) => {
+    const validAttachments = newAttachments.filter(
+      (attachment) => attachment.filename.trim() && attachment.is_inline,
+    );
+    if (validAttachments.length === 0) {
+      setStatus('没有可插入的图片');
+      return;
+    }
+    setDraft((current) => ({
+      ...current,
+      attachments: [...current.attachments, ...validAttachments],
+    }));
+  }, [setStatus]);
+
+  const insertInlineImagesAtEnd = useCallback((newAttachments: OutboundAttachmentInput[]) => {
+    const validAttachments = newAttachments.filter(
+      (attachment) => attachment.filename.trim() && attachment.is_inline,
+    );
+    if (validAttachments.length === 0) {
+      setStatus('没有可插入的图片');
+      return;
+    }
+    setRichComposer(true);
+    const imageHtml = validAttachments
+      .map((attachment) => (
+        `<img src="cid:${attachment.content_id ?? ''}" alt="${(attachment.filename || '图片').replace(/["<>]/g, '')}">`
+      ))
+      .join('');
+    setDraft((current) => {
+      const base = current.html_body.trimEnd();
+      const separator = base && !base.endsWith('<br>') ? '<br>' : '';
+      return {
+        ...current,
+        attachments: [...current.attachments, ...validAttachments],
+        html_body: `${base}${separator}${imageHtml}`,
+      };
+    });
+    setStatus(`已插入 ${validAttachments.length} 张内嵌图片`);
+  }, [setStatus]);
+
   const {
     isComposerDropActive,
     pickDraftAttachments,
+    buildInlineImageAttachments,
     processDroppedOrPastedFiles,
     handleComposerAttachmentDrop,
     handleComposerAttachmentPaste,
@@ -143,6 +184,7 @@ export default function useComposerController({
     isComposerOpen,
     setStatus,
     onAttachmentsReady,
+    onInlineImagesReady: insertInlineImagesAtEnd,
   });
 
   const {
@@ -387,6 +429,9 @@ export default function useComposerController({
     saveDraftAsTemplate,
     deleteComposeTemplate,
     pickDraftAttachments,
+    buildInlineImageAttachments,
+    addInlineImages,
+    insertInlineImagesAtEnd,
     processDroppedOrPastedFiles,
     handleComposerAttachmentDrop,
     handleComposerAttachmentPaste,

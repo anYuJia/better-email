@@ -81,8 +81,14 @@ export const handlers: Record<string, MockCommandHandler> = {
           mime_type: mimeTypeForMockPath(filename),
           size_bytes: 0,
           local_path: path,
+          content_id: '',
+          is_inline: false,
         };
       });
+  },
+  'save_temp_attachment': (args) => {
+    const filename = String(args?.filename || 'attachment').split(/[\\/]/).pop() || 'attachment';
+    return `/tmp/better-email/${filename}`;
   },
   'get_storage_usage': () => mockStorageUsage(),
   'clear_attachment_cache': clearMockAttachmentCache,

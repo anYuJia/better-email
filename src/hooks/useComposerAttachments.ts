@@ -6,12 +6,30 @@ type ComposerAttachmentsOptions = {
   isComposerOpen: boolean;
   setStatus: Dispatch<SetStateAction<string>>;
   onAttachmentsReady: (attachments: OutboundAttachmentInput[], statusPrefix?: string) => void;
+  onInlineImagesReady: (attachments: OutboundAttachmentInput[]) => void;
 };
+
+function readFileAsBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1] || '');
+    };
+    reader.onerror = () => reject(new Error('读取文件失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function nextInlineContentId(index: number) {
+  return `inline-${Date.now().toString(36)}-${index}@better-email.local`;
+}
 
 export default function useComposerAttachments({
   isComposerOpen,
   setStatus,
   onAttachmentsReady,
+  onInlineImagesReady,
 }: ComposerAttachmentsOptions) {
   const [isComposerDropActive, setComposerDropActive] = useState(false);
 
@@ -70,7 +88,27 @@ export default function useComposerAttachments({
     onAttachmentsReady(newAttachments, '已添加附件');
   }
 
-  async function processDroppedOrPastedFiles(files: FileList, statusPrefix = '已添加附件') {
+  async function buildInlineImageAttachments(files: File[]): Promise<OutboundAttachmentInput[]> {
+    const savedAttachments: OutboundAttachmentInput[] = [];
+    for (const [index, file] of files.entries()) {
+      const base64Data = await readFileAsBase64(file);
+      const savedPath = await invoke<string>('save_temp_attachment', {
+        filename: file.name,
+        base64Data,
+      });
+      savedAttachments.push({
+        filename: file.name,
+        mime_type: file.type || 'application/octet-stream',
+        size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
+        local_path: savedPath,
+        content_id: nextInlineContentId(index),
+        is_inline: true,
+      });
+    }
+    return savedAttachments;
+  }
+
+  async function processDroppedOrPastedFiles(files: FileList | File[], statusPrefix = '已添加附件') {
     const validFiles = Array.from(files).filter((file) => file.name.trim());
     if (validFiles.length === 0) return;
 
@@ -78,19 +116,7 @@ export default function useComposerAttachments({
     try {
       const savedAttachments: OutboundAttachmentInput[] = [];
       for (const file of validFiles) {
-        // Read file bytes as base64
-        const base64Data = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            const base64 = result.split(',')[1] || '';
-            resolve(base64);
-          };
-          reader.onerror = () => reject(new Error('读取文件失败'));
-          reader.readAsDataURL(file);
-        });
-
-        // Call backend to save
+        const base64Data = await readFileAsBase64(file);
         const savedPath = await invoke<string>('save_temp_attachment', {
           filename: file.name,
           base64Data,
@@ -128,7 +154,17 @@ export default function useComposerAttachments({
     if (!files || files.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
-    void processDroppedOrPastedFiles(files, '已粘贴附件');
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    const otherFiles = Array.from(files).filter((file) => !file.type.startsWith('image/'));
+    if (imageFiles.length > 0) {
+      setStatus('正在插入图片...');
+      buildInlineImageAttachments(imageFiles)
+        .then((attachments) => onInlineImagesReady(attachments))
+        .catch((error) => setStatus(`插入图片失败：${String(error)}`));
+    }
+    if (otherFiles.length > 0) {
+      void processDroppedOrPastedFiles(otherFiles, '已粘贴附件');
+    }
   }
 
   function handleComposerAttachmentDragOver(event: React.DragEvent<HTMLElement>) {
@@ -150,6 +186,7 @@ export default function useComposerAttachments({
   return {
     isComposerDropActive,
     pickDraftAttachments,
+    buildInlineImageAttachments,
     processDroppedOrPastedFiles,
     handleComposerAttachmentDrop,
     handleComposerAttachmentPaste,

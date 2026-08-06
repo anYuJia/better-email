@@ -140,6 +140,11 @@
   animation: message-toast-out 0.26s cubic-bezier(0.55, 0, 0.55, 0.2) forwards;
 }
 
+.message-toast.toast-delayed {
+  animation-delay: 0.28s;
+  animation-fill-mode: backwards;
+}
+
 .message-toast-undo.leaving {
   animation: message-toast-out 0.26s cubic-bezier(0.55, 0, 0.55, 0.2) forwards;
 }

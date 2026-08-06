@@ -16,6 +16,7 @@ type MessageToastStackProps = {
 };
 
 const EXIT_MS = 260;
+const ENTER_DELAY_MS = 280;
 
 function remainingSeconds(expiresAt: string): number {
   return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));
@@ -30,11 +31,10 @@ export default function MessageToastStack({
   const [secondsLeft, setSecondsLeft] = useState(() =>
     pendingSendUndo ? remainingSeconds(pendingSendUndo.expiresAt) : 0,
   );
-  const [leaving, setLeaving] = useState<{ toasts: RenderedToast[]; undo: RenderedUndo | null }>({
-    toasts: [],
-    undo: null,
-  });
-  const prevPropsRef = useRef({ toasts, pendingSendUndo });
+  const [leavingToasts, setLeavingToasts] = useState<RenderedToast[]>([]);
+  const [leavingUndo, setLeavingUndo] = useState<RenderedUndo | null>(null);
+  const prevToastsRef = useRef(toasts);
+  const prevUndoRef = useRef(pendingSendUndo);
 
   useEffect(() => {
     if (!pendingSendUndo) return undefined;
@@ -44,27 +44,30 @@ export default function MessageToastStack({
     return () => window.clearInterval(id);
   }, [pendingSendUndo]);
 
-  useEffect(() => {
-    const prev = prevPropsRef.current;
-    prevPropsRef.current = { toasts, pendingSendUndo };
-    const nowIds = new Set(toasts.map((t) => t.id));
-    const prevIds = new Set(prev.toasts.map((t) => t.id));
-    const leftToasts = prev.toasts
-      .filter((t) => prevIds.has(t.id) && !nowIds.has(t.id))
-      .map((t) => ({ ...t, leaving: true }));
-    const leftUndo =
-      prev.pendingSendUndo && !pendingSendUndo ? { ...prev.pendingSendUndo, leaving: true } : null;
-    if (leftToasts.length === 0 && !leftUndo) {
-      setLeaving({ toasts: [], undo: null });
-      return undefined;
-    }
-    setLeaving({ toasts: leftToasts, undo: leftUndo });
-    const timer = window.setTimeout(() => setLeaving({ toasts: [], undo: null }), EXIT_MS);
-    return () => window.clearTimeout(timer);
-  }, [toasts, pendingSendUndo]);
+  if (prevUndoRef.current !== null && pendingSendUndo === null && !leavingUndo) {
+    setLeavingUndo({ ...prevUndoRef.current, leaving: true });
+  }
+  prevUndoRef.current = pendingSendUndo;
 
-  const renderedUndo: RenderedUndo | null = pendingSendUndo ?? (leaving.undo ? leaving.undo : null);
-  const renderedToasts: RenderedToast[] = [...toasts, ...leaving.toasts];
+  const removedToasts = prevToastsRef.current.filter(
+    (toast) => !toasts.some((next) => next.id === toast.id),
+  );
+  if (removedToasts.length > 0 && leavingToasts.length === 0) {
+    setLeavingToasts(removedToasts.map((toast) => ({ ...toast, leaving: true })));
+  }
+  prevToastsRef.current = toasts;
+
+  useEffect(() => {
+    if (leavingToasts.length === 0 && !leavingUndo) return undefined;
+    const timer = window.setTimeout(() => {
+      setLeavingToasts([]);
+      setLeavingUndo(null);
+    }, EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [leavingToasts, leavingUndo]);
+
+  const renderedUndo: RenderedUndo | null = pendingSendUndo ?? leavingUndo;
+  const renderedToasts: RenderedToast[] = [...toasts, ...leavingToasts];
 
   if (!renderedUndo && renderedToasts.length === 0) return null;
 
@@ -96,7 +99,12 @@ export default function MessageToastStack({
         </section>
       )}
       {renderedToasts.map((toast) => (
-        <div key={toast.id} className={`message-toast${toast.leaving ? ' leaving' : ''}`}>
+        <div
+          key={toast.id}
+          className={`message-toast${toast.leaving ? ' leaving' : ''}${
+            leavingUndo && !toast.leaving ? ' toast-delayed' : ''
+          }`}
+        >
           <Check size={13} strokeWidth={2.5} />
           <span>{toast.text}</span>
         </div>

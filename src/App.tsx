@@ -335,8 +335,8 @@ export default function App() {
   const {
     selectedId,
     setSelectedId,
-    readerSelectedId,
     readerSelectedDetail,
+    readerDisplayedId,
     readerSelectionRevision,
     selected,
     selectedDetail,
@@ -1363,7 +1363,7 @@ export default function App() {
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}
         selected={readerSelectedDetail}
-        selectedId={readerSelectedId}
+        selectedId={readerDisplayedId}
         readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}
         folders={folders}
@@ -1717,18 +1717,20 @@ export default function App() {
         </Suspense>
       )}
       <UndoSnackbarStack
-        pendingSendUndo={pendingSendUndo}
         undoAction={undoAction}
-        onUndoSend={() => {
-          undoPendingSend().catch((error) => setStatus(String(error)));
-        }}
-        onDismissSend={() => setPendingSendUndo(null)}
         onUndoAction={() => {
           restoreUndoAction().catch((error) => setStatus(String(error)));
         }}
         onDismissAction={clearUndoAction}
       />
-      <MessageToastStack toasts={messageToasts} />
+      <MessageToastStack
+        toasts={messageToasts}
+        pendingSendUndo={pendingSendUndo}
+        onUndoSend={() => {
+          undoPendingSend().catch((error) => setStatus(String(error)));
+        }}
+        onDismissSend={() => setPendingSendUndo(null)}
+      />
       <GlobalTooltip />
       {composerCloseConfirmOpen && (
         <ComposerCloseConfirmDialog

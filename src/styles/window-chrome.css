@@ -3,10 +3,13 @@
  * The webview background is transparent so the desktop shows through the
  * top strip; the app shell supplies its own background below it.
  *
- * The whole top edge is draggable; each pane reserves matching headroom so
- * the drag strip never covers interactive content:
- * - macOS: 32px (traffic lights + drag strip)
- * - Windows/Linux: 36px (drag strip + custom window controls)
+ * The top edge is draggable (native startDragging with a setPosition
+ * fallback); each pane reserves matching headroom so the drag strip never
+ * covers interactive content:
+ * - macOS: 32px (traffic lights + drag strip, full width)
+ * - Windows/Linux: 36px (drag strip + custom window controls; the strip
+ *   stops short of the controls)
+ * Double-clicking the strip toggles maximize/restore.
  */
 
 html,
@@ -34,6 +37,13 @@ body {
 
 .window-drag-region:active {
   cursor: grabbing;
+}
+
+/* On Windows/Linux the strip must stop short of the custom window controls
+ * (3 x 30px buttons + gaps + right offset), so it never covers them. */
+.window-chrome-windows .window-drag-region,
+.window-chrome-linux .window-drag-region {
+  right: 104px;
 }
 
 /* The sidebar brand row below the strip is also dead space; let it drag the

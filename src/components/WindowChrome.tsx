@@ -1,6 +1,6 @@
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Maximize2, Minus, X } from 'lucide-react';
-import { getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window';
+import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
@@ -16,6 +16,19 @@ export function detectDesktopPlatform(): DesktopPlatform {
   return 'linux';
 }
 
+/** The pointer must travel this far before a drag starts, so plain clicks
+ *  and double-clicks on the strip keep working. */
+const DRAG_START_DISTANCE_PX = 4;
+
+type DragPointerStart = {
+  pointerId: number;
+  x: number;
+  y: number;
+};
+
+/** Manual setPosition drag, engaged only when the native startDragging()
+ *  drag fails to move the window (async IPC can miss the event context on
+ *  transparent macOS windows). */
 type DragState = {
   startX: number;
   startY: number;
@@ -30,13 +43,16 @@ type DragState = {
  * - Windows/Linux: hide the native decorations (window_chrome_ready), render
  *   minimize/maximize/close controls at the top-right.
  *
- * Dragging is implemented manually with setPosition instead of
- * startDragging: on macOS the native drag API goes through async IPC and
- * frequently misses the mousedown event context on transparent windows,
- * while setPosition always works.
+ * Dragging mirrors the better-douyin shell: pointerdown only records the
+ * gesture, and once the pointer moves past DRAG_START_DISTANCE_PX the native
+ * startDragging() takes over. Double-clicking the strip toggles
+ * maximize/restore. If the window never starts moving (native drag failed),
+ * a manual setPosition drag (LogicalPosition, so retina scaling is handled)
+ * takes over.
  */
 export default function WindowChrome() {
   const platform = detectDesktopPlatform();
+  const dragPointerStartRef = useRef<DragPointerStart | null>(null);
   const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
@@ -60,7 +76,7 @@ export default function WindowChrome() {
       const dy = event.screenY - drag.startY;
       if (dx === 0 && dy === 0) return;
       void getCurrentWindow()
-        .setPosition(new PhysicalPosition(drag.winX + dx, drag.winY + dy))
+        .setPosition(new LogicalPosition(drag.winX + dx, drag.winY + dy))
         .catch(() => undefined);
     };
 
@@ -84,51 +100,110 @@ export default function WindowChrome() {
 
   if (platform === 'web') return null;
 
-  const handleDragStart = (event: ReactMouseEvent<HTMLDivElement>) => {
+  const clearDragPointerStart = () => {
+    dragPointerStartRef.current = null;
+  };
+
+  const handleDragPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    clearDragPointerStart();
     if (event.button !== 0 || event.detail > 1) return;
     if (event.target instanceof Element && event.target.closest('button')) return;
+    dragPointerStartRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const handleDragPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = dragPointerStartRef.current;
+    if (!start || start.pointerId !== event.pointerId || event.buttons !== 1) return;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.hypot(deltaX, deltaY) < DRAG_START_DISTANCE_PX) return;
+    clearDragPointerStart();
+    void beginWindowDrag(event);
+  };
+
+  /**
+   * Try the native drag first. If the window has not moved shortly after
+   * (startDragging can silently no-op when the async IPC misses the mouse
+   * event context, e.g. on transparent macOS windows), fall back to the
+   * manual setPosition drag.
+   */
+  const beginWindowDrag = async (event: ReactPointerEvent<HTMLDivElement>) => {
     const tauriWindow = getCurrentWindow();
-    void tauriWindow.outerPosition().then((position) => {
-      dragRef.current = {
-        startX: event.screenX,
-        startY: event.screenY,
-        winX: position.x,
-        winY: position.y,
-      };
-    });
+    const startX = event.screenX;
+    const startY = event.screenY;
+    let winX = 0;
+    let winY = 0;
+    try {
+      const position = await tauriWindow.innerPosition();
+      winX = position.x;
+      winY = position.y;
+    } catch {
+      return;
+    }
+    try {
+      await tauriWindow.startDragging();
+    } catch {
+      dragRef.current = { startX, startY, winX, winY };
+      return;
+    }
+    const watchdog = window.setTimeout(() => {
+      void tauriWindow.innerPosition().then((position) => {
+        const moved = Math.hypot(position.x - winX, position.y - winY) > DRAG_START_DISTANCE_PX;
+        if (!moved) {
+          dragRef.current = { startX, startY, winX, winY };
+        }
+      });
+    }, 300);
+    window.addEventListener('mouseup', () => window.clearTimeout(watchdog), { once: true });
+    window.addEventListener('blur', () => window.clearTimeout(watchdog), { once: true });
+  };
+
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    clearDragPointerStart();
+    if (event.target instanceof Element && event.target.closest('button')) return;
+    void toggleMaximize();
   };
 
   async function toggleMaximize() {
     const tauriWindow = getCurrentWindow();
-    if (await tauriWindow.isMaximized()) {
+    if (typeof tauriWindow.toggleMaximize === 'function') {
+      await tauriWindow.toggleMaximize();
+    } else if (await tauriWindow.isMaximized()) {
       await tauriWindow.unmaximize();
     } else {
       await tauriWindow.maximize();
     }
   }
 
-  const handleDoubleClick = () => {
-    if (platform !== 'macos') void toggleMaximize();
-  };
-
   return (
     <div
       className={`window-chrome window-chrome-${platform}`}
-      onDoubleClick={handleDoubleClick}
       role="presentation"
     >
       <div
         className="window-drag-region"
-        onMouseDown={handleDragStart}
+        onPointerDown={handleDragPointerDown}
+        onPointerMove={handleDragPointerMove}
+        onPointerUp={clearDragPointerStart}
+        onPointerCancel={clearDragPointerStart}
+        onDoubleClick={handleDoubleClick}
         role="presentation"
       />
       <div
         className="window-drag-region-side"
-        onMouseDown={handleDragStart}
+        onPointerDown={handleDragPointerDown}
+        onPointerMove={handleDragPointerMove}
+        onPointerUp={clearDragPointerStart}
+        onPointerCancel={clearDragPointerStart}
+        onDoubleClick={handleDoubleClick}
         role="presentation"
       />
       {platform !== 'macos' && (
-        <div className="window-controls" data-no-window-drag>
+        <div className="window-controls">
           <button
             type="button"
             className="window-control"

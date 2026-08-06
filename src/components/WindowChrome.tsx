@@ -1,6 +1,6 @@
-import { useEffect, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { Maximize2, Minus, X } from 'lucide-react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
@@ -16,16 +16,28 @@ export function detectDesktopPlatform(): DesktopPlatform {
   return 'linux';
 }
 
+type DragState = {
+  startX: number;
+  startY: number;
+  winX: number;
+  winY: number;
+};
+
 /**
  * Custom window chrome for the frameless/transparent window:
- * - macOS: the overlay title bar draws traffic lights at the top-left, so
- *   only the sidebar gets headroom and the drag strip spans the sidebar.
+ * - macOS: the overlay title bar draws traffic lights at the top-left; the
+ *   top strip and the sidebar brand row drag the window.
  * - Windows/Linux: hide the native decorations (window_chrome_ready), render
- *   minimize/maximize/close controls at the top-right and reserve headroom
- *   above the mail panes.
+ *   minimize/maximize/close controls at the top-right.
+ *
+ * Dragging is implemented manually with setPosition instead of
+ * startDragging: on macOS the native drag API goes through async IPC and
+ * frequently misses the mousedown event context on transparent windows,
+ * while setPosition always works.
  */
 export default function WindowChrome() {
   const platform = detectDesktopPlatform();
+  const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
     if (platform === 'web') return undefined;
@@ -38,24 +50,62 @@ export default function WindowChrome() {
     };
   }, [platform]);
 
+  useEffect(() => {
+    if (platform === 'web') return undefined;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dx = event.screenX - drag.startX;
+      const dy = event.screenY - drag.startY;
+      if (dx === 0 && dy === 0) return;
+      void getCurrentWindow()
+        .setPosition(new PhysicalPosition(drag.winX + dx, drag.winY + dy))
+        .catch(() => undefined);
+    };
+
+    const handleMouseUp = () => {
+      dragRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', () => {
+      dragRef.current = null;
+    });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', () => {
+        dragRef.current = null;
+      });
+    };
+  }, [platform]);
+
   if (platform === 'web') return null;
 
-  async function toggleMaximize() {
-    const window = getCurrentWindow();
-    if (await window.isMaximized()) {
-      await window.unmaximize();
-    } else {
-      await window.maximize();
-    }
-  }
-
-  const handleDrag = (event: ReactMouseEvent<HTMLDivElement>) => {
+  const handleDragStart = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.detail > 1) return;
     if (event.target instanceof Element && event.target.closest('button')) return;
-    getCurrentWindow().startDragging().catch((error) => {
-      console.error('Failed to start window dragging', error);
+    const tauriWindow = getCurrentWindow();
+    void tauriWindow.outerPosition().then((position) => {
+      dragRef.current = {
+        startX: event.screenX,
+        startY: event.screenY,
+        winX: position.x,
+        winY: position.y,
+      };
     });
   };
+
+  async function toggleMaximize() {
+    const tauriWindow = getCurrentWindow();
+    if (await tauriWindow.isMaximized()) {
+      await tauriWindow.unmaximize();
+    } else {
+      await tauriWindow.maximize();
+    }
+  }
 
   const handleDoubleClick = () => {
     if (platform !== 'macos') void toggleMaximize();
@@ -69,12 +119,12 @@ export default function WindowChrome() {
     >
       <div
         className="window-drag-region"
-        onMouseDown={handleDrag}
+        onMouseDown={handleDragStart}
         role="presentation"
       />
       <div
         className="window-drag-region-side"
-        onMouseDown={handleDrag}
+        onMouseDown={handleDragStart}
         role="presentation"
       />
       {platform !== 'macos' && (

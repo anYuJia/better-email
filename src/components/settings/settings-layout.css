@@ -420,8 +420,8 @@
   z-index: 4;
   flex: 0 0 auto;
   display: grid;
-  gap: 6px;
-  padding: 18px 28px 12px;
+  gap: 4px;
+  padding: 16px 24px 12px;
   border-bottom: 1px solid var(--st-border);
   background: var(--st-canvas);
 }

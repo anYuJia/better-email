@@ -2921,25 +2921,30 @@
 .settings-modal .settings-ai-service-option {
   min-width: 0;
   display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--st-border);
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
+  background: var(--st-surface);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
   cursor: pointer;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease;
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .settings-modal .settings-ai-service-option:hover {
-  border-color: var(--st-border-strong);
+  border-color: rgba(203, 213, 225, 0.9);
   background: var(--st-surface);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .settings-modal .settings-ai-service-option.active {
-  border-color: #a9cdf1;
+  border-color: var(--st-accent);
   background: var(--st-accent-soft);
+  box-shadow: 0 0 0 1px var(--st-accent), 0 4px 12px rgba(37, 99, 235, 0.08);
 }
 
 .settings-modal .settings-ai-service-option input {

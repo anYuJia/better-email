@@ -68,7 +68,7 @@ export default function AiServiceSettings() {
       dataSection="ai"
     >
       <div className="ai-overview-row" aria-label="AI 服务状态">
-        <span className="ai-overview-icon" aria-hidden="true"><Sparkles size={15} /></span>
+        <span className="ai-overview-icon" aria-hidden="true"><Sparkles size={16} /></span>
         <span className="ai-overview-copy">
           <strong>可用功能：{AVAILABLE_FEATURES.join('、')}。</strong>
           <small>
@@ -81,13 +81,13 @@ export default function AiServiceSettings() {
 
       <div className={`settings-ai-config-area${config.enabled ? '' : ' is-dimmed'}`}>
         <SettingsSwitch
-          label="开启 AI 服务"
-          description="关闭后翻译、摘要与模板生成不可用，已保存的配置会保留。"
+          label="开启 AI 智能引擎"
+          description="启用智能翻译、一键摘要与邮件模板生成。已保存的配置将安全保留。"
           checked={config.enabled}
           onChange={(checked) => patchConfig({ enabled: checked })}
         />
 
-        <SettingsField label="服务来源">
+        <SettingsField label="选择服务提供商">
           <div className="settings-ai-service-options">
             {SERVICE_OPTIONS.map((option) => {
               const active = config.serviceType === option.value;
@@ -106,7 +106,7 @@ export default function AiServiceSettings() {
                   <strong>
                     {option.label}
                     {option.advanced && <em className="ai-service-badge">高级</em>}
-                    <Check size={14} className="ai-service-check" aria-hidden="true" />
+                    <Check size={15} className="ai-service-check" aria-hidden="true" />
                   </strong>
                   <small>{option.description}</small>
                 </label>
@@ -116,8 +116,8 @@ export default function AiServiceSettings() {
         </SettingsField>
 
         {external && (
-          <>
-            <SettingsField label={config.serviceType === 'mcp' ? 'MCP 服务地址' : 'API 服务地址'}>
+          <div className="st-field-grid">
+            <SettingsField label={config.serviceType === 'mcp' ? 'MCP 服务地址' : 'API 服务端点'}>
               <input
                 className="settings-text-input"
                 type="url"
@@ -139,12 +139,12 @@ export default function AiServiceSettings() {
                 />
                 <span className="settings-ai-key-hint">
                   <KeyRound size={12} aria-hidden="true" />
-                  {maskedApiKey ? '已保存，输入新值可替换' : '未保存'}
+                  {maskedApiKey ? '已保存 Key' : '未保存'}
                 </span>
               </div>
             </SettingsField>
 
-            <SettingsField label="默认模型">
+            <SettingsField label="默认模型名称">
               <input
                 className="settings-text-input"
                 type="text"
@@ -154,7 +154,7 @@ export default function AiServiceSettings() {
               />
             </SettingsField>
 
-            <SettingsField label="超时（秒）">
+            <SettingsField label="请求超时时间 (秒)">
               <input
                 className="settings-text-input"
                 type="number"
@@ -165,19 +165,21 @@ export default function AiServiceSettings() {
               />
             </SettingsField>
 
-            <SettingsNotice tone="warning" title="隐私确认" icon={ShieldAlert}>
-              <p>
-                开启翻译、模板生成或摘要后，邮件正文与提示词将被发送到上面配置的外部 AI 服务。
-                请在确认服务商数据处理政策后使用；Better Email 不会在你的设备之外保存这些内容。
-              </p>
-              <SettingsSwitch
-                label="我已阅读并同意将邮件内容发送到外部 AI 服务"
-                description="未确认前，外部服务模式无法使用翻译、摘要与模板生成。"
-                checked={config.privacyAcknowledged}
-                onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
-              />
-            </SettingsNotice>
-          </>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <SettingsNotice tone="warning" title="隐私确认" icon={ShieldAlert}>
+                <p>
+                  开启翻译、模板生成或摘要后，邮件正文与提示词将被发送到上面配置的外部 AI 服务。
+                  请在确认服务商数据处理政策后使用；Better Email 不会在你的设备之外保存这些内容。
+                </p>
+                <SettingsSwitch
+                  label="我已阅读并同意将邮件内容发送到外部 AI 服务"
+                  description="未确认前，外部服务模式无法使用翻译、摘要与模板生成。"
+                  checked={config.privacyAcknowledged}
+                  onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
+                />
+              </SettingsNotice>
+            </div>
+          </div>
         )}
 
         {config.serviceType === 'mock' && (

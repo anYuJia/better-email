@@ -66,19 +66,19 @@ export default function ProviderSettingsPage({
   const customProvider = isCustomProvider(accountForm.provider);
 
   const serverFields = (
-    <div className="settings-account-form-grid">
+    <div className="settings-account-form-grid st-field-grid">
       {customProvider && (
-        <label>
-          服务商标识
+        <div className="st-field">
+          <label className="st-field-label">服务商标识</label>
           <input
             value={accountForm.provider}
             onChange={(event) => onAccountFormChange({ ...accountForm, provider: event.target.value })}
             placeholder="例如 company-mail"
           />
-        </label>
+        </div>
       )}
-      <label>
-        收信协议
+      <div className="st-field">
+        <label className="st-field-label">收信协议</label>
         <CustomSelect
           dense
           ariaLabel="收信协议"
@@ -102,21 +102,21 @@ export default function ProviderSettingsPage({
             });
           }}
         />
-      </label>
-      <label>
-        收信服务器（{protocolLabel(accountForm.incoming_protocol)}）
+      </div>
+      <div className="st-field">
+        <label className="st-field-label">收信服务器（{protocolLabel(accountForm.incoming_protocol)}）</label>
         <input
           value={accountForm.imap_host}
           onChange={(event) => onAccountFormChange({ ...accountForm, imap_host: event.target.value })}
         />
-      </label>
-      <label>
-        SMTP 服务器
+      </div>
+      <div className="st-field">
+        <label className="st-field-label">SMTP 服务器</label>
         <input
           value={accountForm.smtp_host}
           onChange={(event) => onAccountFormChange({ ...accountForm, smtp_host: event.target.value })}
         />
-      </label>
+      </div>
     </div>
   );
 

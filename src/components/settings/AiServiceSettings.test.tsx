@@ -13,18 +13,15 @@ describe('AiServiceSettings', () => {
     window.localStorage.clear();
   });
 
-  it('shows friendly service type labels', () => {
+  it('shows friendly service type labels and MCP gateway section', () => {
     render(<AiServiceSettings />);
-    expect(screen.getByText('本地演示模式')).not.toBeNull();
-    expect(screen.getByText('OpenAI 兼容接口')).not.toBeNull();
-    expect(screen.getByText('MCP 服务')).not.toBeNull();
-    expect(screen.getByText('高级')).not.toBeNull();
+    expect(screen.getByText(/模型推理服务 \(LLM\)/)).not.toBeNull();
+    expect(screen.getByText(/MCP 服务端 \(Model Context Protocol\)/)).not.toBeNull();
   });
 
-  it('marks MCP as an advanced option', () => {
+  it('allows toggling MCP gateway server', () => {
     render(<AiServiceSettings />);
-    const mcpRow = screen.getByText('MCP 服务').closest('.settings-account-row');
-    expect(mcpRow?.textContent).toContain('高级');
+    expect(screen.getByText('开启 MCP 网关服务')).not.toBeNull();
   });
 
   it('shows the status with 未启用 when the service is off', () => {

@@ -95,66 +95,38 @@ export default function AiServiceSettings() {
         </div>
       </SettingsSection>
 
-      {/* 模块二：服务提供商列表卡片（对齐账号界面 AccountList 架构） */}
+      {/* 核心服务区域 */}
       <div className={`settings-ai-config-area${config.enabled ? '' : ' is-dimmed'}`}>
+        {/* 模块二：LLM 模型推理服务配置 */}
         <SettingsSection
-          title="服务提供商"
-          description="选择 AI 智能服务来源与连接方式"
-          badge={<SettingsBadge tone="info">{config.serviceType.toUpperCase()}</SettingsBadge>}
-          dataSection="ai-providers"
+          title="模型推理服务 (LLM)"
+          description="用于处理应用内的邮件智能翻译、一键摘要与模板生成"
+          badge={
+            <SettingsBadge tone={external ? 'info' : 'neutral'}>
+              {external ? '外部 API 引擎' : '本地演示模式'}
+            </SettingsBadge>
+          }
+          dataSection="ai-llm-provider"
         >
-          <div className="settings-account-list" role="listbox" aria-label="服务提供商选项">
-            {SERVICE_OPTIONS.map((option) => {
-              const active = config.serviceType === option.value;
-              return (
-                <div
-                  key={option.value}
-                  className={['settings-account-row', active ? 'active' : ''].filter(Boolean).join(' ')}
-                  role="option"
-                  aria-selected={active}
-                >
-                  <button
-                    type="button"
-                    className="settings-account-row-main"
-                    onClick={() => patchConfig({ serviceType: option.value })}
-                  >
-                    <span className="settings-account-row-copy">
-                      <strong>{option.label}</strong>
-                      <span>{option.description}</span>
-                    </span>
-                  </button>
-                  <span className="settings-account-row-meta">
-                    {option.advanced && <em>高级</em>}
-                    {active && <span className="st-badge st-badge-info">当前使用</span>}
-                  </span>
-                  <span className="settings-account-row-actions">
-                    <SettingsButton
-                      size="sm"
-                      variant={active ? 'primary' : 'secondary'}
-                      onClick={() => patchConfig({ serviceType: option.value })}
-                    >
-                      {active ? '已选择' : '选择'}
-                    </SettingsButton>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </SettingsSection>
+          <SettingsField label="选择推理引擎来源" hint="按需选择本地离线演示模式或外部 OpenAI 兼容服务端点">
+            <CustomSelect
+              dense
+              value={config.serviceType === 'mcp' ? 'http' : config.serviceType}
+              options={[
+                { value: 'mock', label: '本地演示模式 (Mock) — 离线体验稳定示例，无外部请求' },
+                { value: 'http', label: 'OpenAI 兼容 API — 连接兼容 chat/completions 的外部 LLM 服务' },
+              ]}
+              onChange={(val) => patchConfig({ serviceType: val as AiServiceType })}
+            />
+          </SettingsField>
 
-        {/* 模块三：参数配置与测试连接 */}
-        <SettingsSection
-          title={external ? '服务连接配置' : '本地模拟模式'}
-          description={external ? '配置 API 端点、Token 以及超时模型参数' : '无需联网或填写密钥'}
-          dataSection="ai-params"
-        >
           {external && (
-            <div className="st-field-grid">
-              <SettingsField label={config.serviceType === 'mcp' ? 'MCP 服务地址' : 'API 服务端点'}>
+            <div className="st-field-grid" style={{ marginTop: '16px' }}>
+              <SettingsField label="API 服务端点">
                 <input
                   className="settings-text-input"
                   type="url"
-                  placeholder={config.serviceType === 'mcp' ? 'https://mcp.example.com/mcp' : 'https://api.example.com/v1'}
+                  placeholder="https://api.example.com/v1"
                   value={config.endpoint}
                   onChange={(event) => patchConfig({ endpoint: event.target.value })}
                 />
@@ -216,7 +188,7 @@ export default function AiServiceSettings() {
           )}
 
           {!external && (
-            <SettingsNotice tone="info" title="本地演示模式" icon={FlaskConical}>
+            <SettingsNotice tone="info" title="本地演示模式" icon={FlaskConical} style={{ marginTop: '12px' }}>
               <p>
                 当前为本地模拟服务：翻译、模板生成与摘要返回稳定的示例结果，
                 不会向任何外部服务器发送内容，无需网络连接，也不需要隐私确认。

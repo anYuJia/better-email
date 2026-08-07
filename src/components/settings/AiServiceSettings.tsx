@@ -13,6 +13,7 @@ import type { AiServiceType } from '../../app/types/ai';
 import useAiService from '../../hooks/useAiService';
 import { CustomSelect } from './accounts/CustomSelect';
 import {
+  SettingsBadge,
   SettingsButton,
   SettingsField,
   SettingsNotice,
@@ -94,28 +95,52 @@ export default function AiServiceSettings() {
         </div>
       </SettingsSection>
 
-      {/* 模块二：服务提供商与配置区（简洁无卡片底框设计） */}
+      {/* 模块二：服务提供商列表卡片（对齐账号界面 AccountList 架构） */}
       <div className={`settings-ai-config-area${config.enabled ? '' : ' is-dimmed'}`}>
-        <SettingsField label="选择服务来源" hint="按需选择本地模拟服务或外部兼容的大语言模型 / MCP 接口">
-          <div className="settings-ai-service-pills" role="radiogroup" aria-label="选择服务来源">
+        <SettingsSection
+          title="服务提供商"
+          description="选择 AI 智能服务来源与连接方式"
+          badge={<SettingsBadge tone="info">{config.serviceType.toUpperCase()}</SettingsBadge>}
+          dataSection="ai-providers"
+        >
+          <div className="settings-account-list" role="listbox" aria-label="服务提供商选项">
             {SERVICE_OPTIONS.map((option) => {
               const active = config.serviceType === option.value;
               return (
-                <button
-                  type="button"
+                <div
                   key={option.value}
-                  role="radio"
-                  aria-checked={active}
-                  className={`st-btn ${active ? 'st-btn-primary' : 'st-btn-secondary'}`}
-                  onClick={() => patchConfig({ serviceType: option.value })}
+                  className={['settings-account-row', active ? 'active' : ''].filter(Boolean).join(' ')}
+                  role="option"
+                  aria-selected={active}
                 >
-                  <span>{option.label}</span>
-                  {option.advanced && <em className="ai-service-badge">高级</em>}
-                </button>
+                  <button
+                    type="button"
+                    className="settings-account-row-main"
+                    onClick={() => patchConfig({ serviceType: option.value })}
+                  >
+                    <span className="settings-account-row-copy">
+                      <strong>{option.label}</strong>
+                      <span>{option.description}</span>
+                    </span>
+                  </button>
+                  <span className="settings-account-row-meta">
+                    {option.advanced && <em>高级</em>}
+                    {active && <span className="st-badge st-badge-info">当前使用</span>}
+                  </span>
+                  <span className="settings-account-row-actions">
+                    <SettingsButton
+                      size="sm"
+                      variant={active ? 'primary' : 'secondary'}
+                      onClick={() => patchConfig({ serviceType: option.value })}
+                    >
+                      {active ? '已选择' : '选择'}
+                    </SettingsButton>
+                  </span>
+                </div>
               );
             })}
           </div>
-        </SettingsField>
+        </SettingsSection>
 
         {/* 模块三：参数配置与测试连接 */}
         <SettingsSection

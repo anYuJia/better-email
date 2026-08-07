@@ -23,8 +23,8 @@ describe('AiServiceSettings', () => {
 
   it('marks MCP as an advanced option', () => {
     render(<AiServiceSettings />);
-    const mcpLabel = screen.getByText('MCP 服务').closest('button');
-    expect(mcpLabel?.textContent).toContain('高级');
+    const mcpRow = screen.getByText('MCP 服务').closest('.settings-account-row');
+    expect(mcpRow?.textContent).toContain('高级');
   });
 
   it('shows the status with 未启用 when the service is off', () => {

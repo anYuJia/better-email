@@ -5,15 +5,19 @@
  * re-implement them.
  */
 
-/* --- Section card --- */
 .settings-modal .st-section {
   min-width: 0;
-  border: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
+  border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--st-radius-md);
   background: var(--st-surface);
-  box-shadow: var(--st-shadow-card);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 16px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.settings-modal .st-section:hover {
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 .settings-modal .st-section-header {

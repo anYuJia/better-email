@@ -5,12 +5,12 @@
  */
 
 .settings-backdrop {
-  /* Surfaces */
-  --st-canvas: var(--ui-bg);
-  --st-surface: var(--ui-surface);
-  --st-surface-subtle: var(--ui-surface-muted);
-  --st-surface-muted: var(--ui-sidebar);
-  --st-sidebar: var(--ui-sidebar);
+  /* Surfaces (High Contrast Elevated Cards - Pro Max SaaS Dashboard Style) */
+  --st-canvas: #f4f6f9;
+  --st-surface: #ffffff;
+  --st-surface-subtle: #f8fafc;
+  --st-surface-muted: #eef2f6;
+  --st-sidebar: #f8fafc;
 
   /* Borders and text */
   --st-border: var(--ui-border);

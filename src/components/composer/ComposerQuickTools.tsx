@@ -41,7 +41,7 @@ export default function ComposerQuickTools({
               checked={richComposer}
               onChange={(event) => onRichComposerChange(event.target.checked)}
             />
-            富文本 HTML
+            富文本
           </label>
           {richComposer && (
             <div className="rich-toolbar">
@@ -113,15 +113,6 @@ export default function ComposerQuickTools({
           </div>
         </div>
       </div>
-
-      {richComposer && (
-        <textarea
-          className="composer-html-source"
-          value={draft.html_body}
-          onChange={(event) => onPatchDraft({ html_body: event.target.value })}
-          placeholder="HTML 正文，将在保存和发送前清洗"
-        />
-      )}
     </section>
   );
 }

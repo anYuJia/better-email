@@ -113,7 +113,7 @@ export default function ComposerAdvancedTools({
             <label className="composer-inline-input">
               <span>抄送</span>
               <input
-                list="contact-suggestions"
+                autoComplete="off"
                 value={draft.cc}
                 onChange={(event) => onPatchDraft({ cc: event.target.value })}
                 placeholder="可选"
@@ -122,7 +122,7 @@ export default function ComposerAdvancedTools({
             <label className="composer-inline-input">
               <span>密送</span>
               <input
-                list="contact-suggestions"
+                autoComplete="off"
                 value={draft.bcc}
                 onChange={(event) => onPatchDraft({ bcc: event.target.value })}
                 placeholder="可选"

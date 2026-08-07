@@ -534,7 +534,6 @@ h1 {
 }
 
 .composer textarea,
-.composer-html-source,
 .settings-modal textarea {
   line-height: 1.55;
 }
@@ -568,4 +567,3 @@ h1 {
     padding-inline: 28px;
   }
 }
-

@@ -28,7 +28,8 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$APPDATA/attachments/**"
+          "$APPDATA/attachments/**",
+          "$APPDATA/temp_attachments/**"
         ]
       }
     }

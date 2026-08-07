@@ -44,9 +44,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   return (
     <nav className="settings-nav" aria-label="设置分类">
-      <div className="settings-nav-intro">
-        <strong>设置</strong>
-      </div>
       <div className="settings-nav-search" role="search">
         <Search size={14} aria-hidden="true" />
         <input

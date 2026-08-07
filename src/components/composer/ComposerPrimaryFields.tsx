@@ -5,8 +5,8 @@ import type { Contact, DraftInput, OutboundAttachmentInput } from '../../app/typ
 import { formatBytes } from '../../mailUtils';
 import {
   buildContactSearchEntries,
-  datalistContacts as pickDatalistContacts,
   matchingContacts,
+  recommendedContacts,
 } from './contactSuggestions';
 import {
   joinEditableBody,
@@ -34,7 +34,6 @@ type ComposerPrimaryFieldsProps = {
   onInlineImagesAdded: (attachments: OutboundAttachmentInput[]) => void;
 };
 
-const datalistContactLimit = 30;
 const inlineSuggestionLimit = 5;
 
 function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
@@ -109,19 +108,20 @@ export default function ComposerPrimaryFields({
     () => buildContactSearchEntries(contacts),
     [contacts],
   );
-  const suggestedContacts = useMemo(
+  const matchedContacts = useMemo(
     () => matchingContacts(contactSearchEntries, recipientQuery, inlineSuggestionLimit),
     [contactSearchEntries, recipientQuery],
   );
-  const datalistContacts = useMemo(() => (
-    pickDatalistContacts(
-      contactSearchEntries,
-      recipientQuery,
-      suggestedContacts,
-      datalistContactLimit,
-    )
-  ), [contactSearchEntries, recipientQuery, suggestedContacts]);
+  const suggestedContacts = useMemo(
+    () => matchedContacts.length > 0
+      ? matchedContacts
+      : recommendedContacts(contactSearchEntries, inlineSuggestionLimit),
+    [contactSearchEntries, matchedContacts],
+  );
   const showRecipientSuggestions = suggestedContacts.length > 0 && recipientFocused;
+  const recipientSuggestionLabel = recipientQuery && matchedContacts.length > 0
+    ? '匹配联系人'
+    : '常用联系人';
   const { editableBody, originalQuote } = useMemo(
     () => splitEditableBody(draft.body),
     [draft.body],
@@ -269,13 +269,38 @@ export default function ComposerPrimaryFields({
     syncRichBodyFromEditor();
   }
 
+  function selectRecipientSuggestion(contact: Contact) {
+    if (!recipientQuery) {
+      onAddContact(contact);
+      return;
+    }
+
+    const separatorIndex = Math.max(draft.to.lastIndexOf(','), draft.to.lastIndexOf(';'));
+    const existingRecipients = (separatorIndex < 0 ? '' : draft.to.slice(0, separatorIndex))
+      .split(/[;,]/)
+      .map((recipient) => recipient.trim())
+      .filter(Boolean);
+    const contactAddresses = [contact.email, ...(contact.aliases ?? [])]
+      .map((address) => address.trim().toLowerCase())
+      .filter(Boolean);
+    const alreadyIncluded = existingRecipients.some((recipient) =>
+      contactAddresses.includes(recipient.toLowerCase()),
+    );
+
+    onPatchDraft({
+      to: alreadyIncluded
+        ? existingRecipients.join(', ')
+        : [...existingRecipients, contact.email].join(', '),
+    });
+  }
+
   return (
     <div className="composer-primary-fields">
       <div className="composer-recipient-field">
         <label className="composer-field-row">
           <span>收件人</span>
           <input
-            list="contact-suggestions"
+            autoComplete="off"
             value={draft.to}
             onChange={(event) => onPatchDraft({ to: event.target.value })}
             onFocus={() => {
@@ -292,19 +317,12 @@ export default function ComposerPrimaryFields({
             placeholder="收件人"
           />
         </label>
-        <datalist id="contact-suggestions">
-          {datalistContacts.map((contact) => (
-            <option key={contact.id} value={contact.email}>
-              {contact.name || contact.email}
-            </option>
-          ))}
-        </datalist>
 
         {showRecipientSuggestions && (
           <div className="recipient-suggestions">
-            <span>{recipientQuery ? '匹配联系人' : '常用联系人'}</span>
+            <span>{recipientSuggestionLabel}</span>
             {suggestedContacts.map((contact) => (
-              <button type="button" key={contact.id} onMouseDown={(event) => event.preventDefault()} onClick={() => onAddContact(contact)}>
+              <button type="button" key={contact.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectRecipientSuggestion(contact)}>
                 <strong>{contact.name || contact.email}</strong>
                 <small>{contact.email}</small>
               </button>

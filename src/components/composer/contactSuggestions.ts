@@ -5,15 +5,22 @@ export type ContactSearchEntry = {
   searchText: string;
 };
 
+function isSuggestedRecipient(contact: Contact) {
+  const email = contact.email.trim();
+  return email.includes('@') && !/[;,]/.test(email);
+}
+
 export function buildContactSearchEntries(contacts: Contact[]): ContactSearchEntry[] {
-  return contacts.map((contact) => ({
-    contact,
-    searchText: [
-      contact.name,
-      contact.email,
-      ...contact.aliases,
-    ].join('\n').toLowerCase(),
-  }));
+  return contacts
+    .filter(isSuggestedRecipient)
+    .map((contact) => ({
+      contact,
+      searchText: [
+        contact.name,
+        contact.email,
+        ...contact.aliases,
+      ].join('\n').toLowerCase(),
+    }));
 }
 
 export function matchingContacts(
@@ -33,14 +40,7 @@ export function matchingContacts(
   return matches;
 }
 
-export function datalistContacts(
-  entries: ContactSearchEntry[],
-  query: string,
-  suggestions: Contact[],
-  limit: number,
-): Contact[] {
+export function recommendedContacts(entries: ContactSearchEntry[], limit: number): Contact[] {
   if (limit <= 0) return [];
-  return query.trim()
-    ? suggestions
-    : entries.slice(0, limit).map((entry) => entry.contact);
+  return entries.slice(0, limit).map((entry) => entry.contact);
 }

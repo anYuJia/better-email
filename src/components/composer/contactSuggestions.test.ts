@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Contact } from '../../app/types';
 import {
   buildContactSearchEntries,
-  datalistContacts,
   matchingContacts,
+  recommendedContacts,
 } from './contactSuggestions';
 
 function contact(id: number, name: string, email: string, aliases: string[] = []): Contact {
@@ -48,18 +48,18 @@ describe('composer contact suggestions', () => {
 
     expect(matchingContacts(entries, 'example', 0)).toEqual([]);
     expect(matchingContacts(entries, 'example', -1)).toEqual([]);
-    expect(datalistContacts(entries, '', contacts, 0)).toEqual([]);
-    expect(datalistContacts(entries, 'example', contacts, -1)).toEqual([]);
   });
 
-  it('limits the idle datalist but keeps queried suggestions focused', () => {
-    const contacts = Array.from({ length: 40 }, (_, index) =>
-      contact(index + 1, `Contact ${index + 1}`, `contact${index + 1}@example.com`),
-    );
+  it('uses recent valid contacts as the fallback recommendations', () => {
+    const contacts = [
+      contact(1, 'Ada Lovelace', 'ada@example.com'),
+      contact(2, 'Invalid combined recipient', 'ada@example.com, grace@example.com'),
+      contact(3, 'Grace Hopper', 'grace@example.com'),
+    ];
     const entries = buildContactSearchEntries(contacts);
-    const suggestions = matchingContacts(entries, 'contact39', 5);
 
-    expect(datalistContacts(entries, '', suggestions, 30)).toHaveLength(30);
-    expect(datalistContacts(entries, 'contact39', suggestions, 30)).toEqual([contacts[38]]);
+    expect(entries.map((entry) => entry.contact)).toEqual([contacts[0], contacts[2]]);
+    expect(recommendedContacts(entries, 5)).toEqual([contacts[0], contacts[2]]);
+    expect(recommendedContacts(entries, 1)).toEqual([contacts[0]]);
   });
 });

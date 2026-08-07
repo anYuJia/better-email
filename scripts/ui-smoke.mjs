@@ -711,7 +711,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.composer textarea')");
     await waitForExpression(cdp, "document.querySelector('.composer-advanced:not([open])')");
     await evalInPage(cdp, "document.querySelector('.composer input[placeholder=\"收件人\"]').focus()");
-    await waitForExpression(cdp, "document.querySelector('#contact-suggestions option[value=\"ada@example.com\"]') && document.body.innerText.includes('常用联系人')");
+    await waitForExpression(cdp, "!document.querySelector('datalist') && document.querySelector('.recipient-suggestions button')?.textContent.includes('ada@example.com') && document.body.innerText.includes('常用联系人')");
     await clickButton(cdp, 'Ada', "document.querySelector('.recipient-suggestions')");
     await waitForExpression(cdp, "document.querySelector('.composer input[placeholder=\"收件人\"]').value.includes('ada@example.com')");
     await fillInput(cdp, '.composer input[placeholder=\"收件人\"]', 'ada@example.com');

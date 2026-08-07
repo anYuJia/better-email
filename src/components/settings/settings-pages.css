@@ -89,84 +89,43 @@
  * OAuth flows and custom select.
  * ===================================================================== */
 
-/* --- Connection flow (wizard steps) --- */
-.settings-modal .settings-connection-flow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-lg);
-  background: var(--st-surface);
-  box-shadow: var(--st-shadow-card);
-}
-
-.settings-modal .settings-connection-step {
-  min-width: 0;
-  min-height: 48px;
+/* --- Account configuration tabs --- */
+.settings-modal .settings-connection-tabs {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-tertiary);
-  background: var(--st-surface-subtle);
-  text-align: left;
+  align-items: end;
+  gap: 2px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--st-border);
+  scrollbar-width: none;
 }
 
-.settings-modal .settings-connection-step b {
-  width: 28px;
-  height: 28px;
+.settings-modal .settings-connection-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-modal .settings-page-content .settings-connection-tab {
+  min-height: 38px;
   flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--st-text-tertiary);
-  background: var(--st-surface-muted);
-  font-size: var(--st-font-size-aux);
-  font-weight: 620;
-}
-
-.settings-modal .settings-connection-step > span {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.settings-modal .settings-connection-step strong {
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
   color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
-}
-
-.settings-modal .settings-connection-step small {
-  overflow: hidden;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  text-overflow: ellipsis;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 transparent;
+  font-size: var(--st-font-size-secondary);
+  font-weight: 560;
   white-space: nowrap;
 }
 
-.settings-modal .settings-connection-step.complete {
-  color: var(--st-success);
+.settings-modal .settings-page-content .settings-connection-tab:hover {
+  color: var(--st-text);
+  background: var(--st-surface-subtle);
 }
 
-.settings-modal .settings-connection-step.complete b {
-  color: var(--st-success);
-  background: var(--st-success-soft);
-}
-
-.settings-modal .settings-connection-step.active {
-  border-color: var(--st-border-strong);
+.settings-modal .settings-page-content .settings-connection-tab.active {
   color: var(--st-accent);
-  background: var(--st-surface);
-  box-shadow: var(--st-shadow-card);
-}
-
-.settings-modal .settings-connection-step.active b {
-  color: var(--st-on-accent);
-  background: var(--st-accent);
+  box-shadow: inset 0 -2px 0 var(--st-accent);
+  font-weight: 620;
 }
 
 /* --- Save & verify status --- */
@@ -308,7 +267,7 @@
 /* --- Account list --- */
 .settings-modal .settings-account-list {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .settings-modal .settings-account-row {
@@ -317,23 +276,28 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
   transition:
     border-color 120ms ease,
     background-color 120ms ease;
 }
 
 .settings-modal .settings-account-row:hover {
-  border-color: var(--st-border-strong);
-  background: var(--st-surface);
+  border-color: var(--st-border);
+  background: var(--st-surface-subtle);
 }
 
 .settings-modal .settings-account-row.active {
-  border-color: #a9cdf1;
+  border-color: var(--st-border);
   background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-account-row:first-child {
+  border-top: 0;
 }
 
 .settings-modal .settings-account-row-main {
@@ -386,7 +350,7 @@
 }
 
 .settings-modal .settings-account-row-meta em {
-  padding: 2px 8px;
+  padding: 1px 6px;
   border: 1px solid #c9ddef;
   border-radius: 999px;
   color: var(--st-info);
@@ -3822,10 +3786,6 @@
 
   .settings-modal .settings-account-row-meta {
     display: none;
-  }
-
-  .settings-modal .settings-connection-flow {
-    grid-template-columns: 1fr;
   }
 
   .settings-modal .settings-oauth-callback {

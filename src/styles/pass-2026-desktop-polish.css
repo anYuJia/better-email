@@ -1351,12 +1351,6 @@ h1 {
   box-shadow: var(--shadow-sm);
 }
 
-.composer-html-source {
-  background: #fbfdff;
-  border-color: var(--line);
-  color: #1f2937;
-}
-
 .composer-attachment-chip button {
   color: var(--danger);
 }
@@ -1666,4 +1660,3 @@ h1 {
     min-width: 0;
   }
 }
-

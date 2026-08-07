@@ -189,14 +189,6 @@
   min-height: 28px;
   padding: 0 9px;
 }
-.composer-html-source {
-  min-height: 80px;
-  flex: 0 0 auto;
-  border-top: 1px solid #edf0f3;
-  background: #fffdf7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
 .composer-signature {
   display: flex;
   align-items: center;

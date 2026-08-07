@@ -180,9 +180,6 @@ export default function SettingsFrame({
       <section className="settings-modal" role="dialog" aria-modal="true" aria-label={title} ref={modalRef}>
         <header className="settings-main-header">
           <div className="settings-title">
-            <span className="settings-app-mark" aria-hidden="true">
-              <SettingsGlyph />
-            </span>
             <span className="settings-title-copy">
               <strong>{title}</strong>
               <small>
@@ -279,16 +276,5 @@ export default function SettingsFrame({
         </div>
       </section>
     </div>
-  );
-}
-
-function SettingsGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" role="presentation">
-      <path d="M5.4 7.2h13.2M7.7 12h8.6M9.8 16.8h4.4" />
-      <circle cx="8.1" cy="7.2" r="1.5" />
-      <circle cx="14.9" cy="12" r="1.5" />
-      <circle cx="11.5" cy="16.8" r="1.5" />
-    </svg>
   );
 }

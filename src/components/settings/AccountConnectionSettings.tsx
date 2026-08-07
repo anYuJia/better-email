@@ -62,10 +62,10 @@ export type AccountConnectionSettingsProps = {
   onExchangeOAuth2Token: (sessionId: number) => void;
 };
 
-const connectionSteps = [
-  { id: 'accounts', index: '01', label: '账号', detail: '邮箱与显示名称' },
-  { id: 'providers', index: '02', label: '连接', detail: '连接设置与服务器' },
-  { id: 'auth', index: '03', label: '认证', detail: '登录方式与授权' },
+const connectionTabs = [
+  { id: 'accounts', label: '账号' },
+  { id: 'providers', label: '服务器' },
+  { id: 'auth', label: '认证' },
 ] as const;
 
 const saveAndVerifyStateLabels = {
@@ -84,27 +84,20 @@ function ConnectionFlowHeader({
   section: AccountConnectionSettingsProps['section'];
   onNavigate: (section: SettingsSectionId) => void;
 }) {
-  const activeIndex = connectionSteps.findIndex((step) => step.id === section);
-
   return (
-    <nav className="settings-connection-flow" aria-label="账号连接流程">
-      {connectionSteps.map((step, index) => (
+    <nav className="settings-connection-tabs" aria-label="账号设置分类">
+      {connectionTabs.map((tab) => (
         <button
           type="button"
           className={[
-            'settings-connection-step',
-            index === activeIndex ? 'active' : '',
-            index < activeIndex ? 'complete' : '',
+            'settings-connection-tab',
+            tab.id === section ? 'active' : '',
           ].filter(Boolean).join(' ')}
-          aria-current={index === activeIndex ? 'step' : undefined}
-          onClick={() => onNavigate(step.id)}
-          key={step.id}
+          aria-current={tab.id === section ? 'page' : undefined}
+          onClick={() => onNavigate(tab.id)}
+          key={tab.id}
         >
-          <b>{step.index}</b>
-          <span>
-            <strong>{step.label}</strong>
-            <small>{step.detail}</small>
-          </span>
+          {tab.label}
         </button>
       ))}
     </nav>

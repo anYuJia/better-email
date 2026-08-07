@@ -14,8 +14,15 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.38);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  animation: settings-backdrop-fade 180ms ease-out both;
+}
+
+@keyframes settings-backdrop-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* --- Modal --- */
@@ -27,10 +34,24 @@
   flex-direction: column;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--st-border-subtle);
   border-radius: var(--st-radius-modal);
   background: var(--st-canvas);
-  box-shadow: var(--st-shadow-modal);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--st-shadow-modal), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  animation: settings-modal-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes settings-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* --- Header --- */
@@ -226,6 +247,24 @@
   color: var(--st-text-tertiary);
 }
 
+.settings-search-shortcut {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--st-text-tertiary);
+  background: var(--st-surface-muted);
+  border: 1px solid var(--st-border);
+}
+
+.settings-nav-match-count {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--st-accent);
+}
+
 .settings-nav-search > button {
   width: 26px;
   min-width: 26px;
@@ -243,6 +282,67 @@
 .settings-nav-search > button:hover {
   color: var(--st-text);
   background: var(--st-surface-muted);
+}
+
+/* Floating unsaved bar (UI/UX Pro Max UX) */
+.settings-floating-unsaved-bar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  color: #ffffff;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.35);
+  animation: settings-floating-bar-slide 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes settings-floating-bar-slide {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.settings-floating-unsaved-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 540;
+}
+
+.settings-floating-unsaved-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: settings-dot-pulse 1.8s infinite;
+}
+
+@keyframes settings-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.settings-floating-unsaved-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Scrollable list area: title + search always stay visible */

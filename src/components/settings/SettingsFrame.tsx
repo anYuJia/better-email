@@ -274,6 +274,33 @@ export default function SettingsFrame({
             </SettingsPageShell>
           </div>
         </div>
+        {isDirty && (
+          <div className="settings-floating-unsaved-bar" role="status" aria-live="polite">
+            <span className="settings-floating-unsaved-info">
+              <span className="settings-floating-unsaved-dot" />
+              当前存在未保存的设置更改
+            </span>
+            <div className="settings-floating-unsaved-actions">
+              <button
+                type="button"
+                className="st-btn st-btn-secondary st-btn-sm"
+                disabled={isBusy}
+                onClick={onSave}
+              >
+                仅保存
+              </button>
+              <button
+                type="button"
+                className="st-btn st-btn-primary st-btn-sm"
+                disabled={isBusy}
+                onClick={hasConnectionActions ? onSaveAndVerify : onSave}
+              >
+                {isBusy ? <LoaderCircle className="settings-action-spinner" size={13} /> : <Save size={13} />}
+                <span>{isBusy ? '保存中...' : hasConnectionActions ? '保存并验证' : '保存修改'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

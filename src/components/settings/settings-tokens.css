@@ -4,68 +4,96 @@
  * same system as the three-pane workspace.
  */
 
+/*
+ * Settings consumes the application semantic layer.
+ * Upgraded with UI/UX Pro Max Glassmorphism & Sleek Dark/Light Slate design tokens.
+ */
+
 .settings-backdrop {
-  /* Surfaces (High Contrast Elevated Cards - Pro Max SaaS Dashboard Style) */
-  --st-canvas: #f4f6f9;
-  --st-surface: #ffffff;
-  --st-surface-subtle: #f8fafc;
-  --st-surface-muted: #eef2f6;
-  --st-sidebar: #f8fafc;
+  /* Glassmorphism & High-end Surfaces */
+  --st-canvas: rgba(248, 250, 252, 0.85);
+  --st-surface: rgba(255, 255, 255, 0.82);
+  --st-surface-subtle: rgba(241, 245, 249, 0.7);
+  --st-surface-muted: rgba(226, 232, 240, 0.6);
+  --st-sidebar: rgba(248, 250, 252, 0.75);
 
-  /* Borders and text */
-  --st-border: var(--ui-border);
-  --st-border-strong: var(--ui-border-strong);
-  --st-text: var(--ui-text);
-  --st-text-secondary: var(--ui-text-secondary);
-  --st-text-tertiary: var(--ui-text-tertiary);
+  /* Borders and Glass Highlights */
+  --st-border: rgba(226, 232, 240, 0.8);
+  --st-border-strong: rgba(203, 213, 225, 0.9);
+  --st-border-subtle: rgba(255, 255, 255, 0.6);
+  --st-text: #0f172a;
+  --st-text-secondary: #475569;
+  --st-text-tertiary: #64748b;
 
-  /* Interaction and semantic state */
-  --st-accent: var(--ui-accent);
-  --st-accent-hover: var(--ui-accent-hover);
-  --st-accent-soft: var(--ui-accent-soft);
-  --st-on-accent: var(--color-text-on-accent);
-  --st-danger: var(--ui-danger);
-  --st-danger-hover: var(--ui-danger-hover);
-  --st-danger-soft: var(--ui-danger-bg);
-  --st-success: var(--ui-success);
-  --st-success-soft: var(--ui-success-bg);
-  --st-warning: var(--ui-warning);
-  --st-warning-soft: var(--ui-warning-bg);
-  --st-info: var(--ui-accent);
-  --st-info-soft: var(--ui-accent-soft);
+  /* Interaction and Accent Gradient Colors */
+  --st-accent: #2563eb;
+  --st-accent-hover: #1d4ed8;
+  --st-accent-soft: rgba(37, 99, 235, 0.08);
+  --st-on-accent: #ffffff;
+  --st-danger: #ef4444;
+  --st-danger-hover: #dc2626;
+  --st-danger-soft: rgba(239, 68, 68, 0.08);
+  --st-success: #10b981;
+  --st-success-soft: rgba(16, 185, 129, 0.08);
+  --st-warning: #f59e0b;
+  --st-warning-soft: rgba(245, 158, 11, 0.08);
+  --st-info: #2563eb;
+  --st-info-soft: rgba(37, 99, 235, 0.08);
 
   /* Type and rhythm */
-  --st-font-size-body: var(--ui-font-size-body);
-  --st-font-size-secondary: var(--ui-font-size-secondary);
-  --st-font-size-aux: var(--ui-font-size-aux);
+  --st-font-size-body: 13.5px;
+  --st-font-size-secondary: 12.5px;
+  --st-font-size-aux: 11.5px;
   --st-font-size-card-title: 15px;
-  --st-font-size-page-title: var(--ui-font-size-title);
-  --st-space-1: var(--ui-space-1);
-  --st-space-2: var(--ui-space-2);
-  --st-space-3: var(--ui-space-3);
-  --st-space-4: var(--ui-space-4);
-  --st-space-5: var(--ui-space-5);
-  --st-space-6: var(--ui-space-6);
-  --st-space-7: var(--ui-space-7);
+  --st-font-size-page-title: 20px;
+  --st-space-1: 4px;
+  --st-space-2: 8px;
+  --st-space-3: 12px;
+  --st-space-4: 16px;
+  --st-space-5: 20px;
+  --st-space-6: 24px;
+  --st-space-7: 32px;
 
   /* Concentric geometry and restrained elevation (UI/UX Pro Max Standard) */
   --st-radius-sm: 8px;
   --st-radius-md: 12px;
   --st-radius-lg: 16px;
   --st-radius-modal: 20px;
-  --st-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
-  --st-shadow-float: 0 4px 16px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.06);
-  --st-shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12), 0 24px 64px rgba(0, 0, 0, 0.08);
+  --st-shadow-card: 0 4px 16px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  --st-shadow-float: 0 12px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
+  --st-shadow-modal: 0 24px 64px -12px rgba(15, 23, 42, 0.25), 0 8px 24px -4px rgba(15, 23, 42, 0.12);
 
   /* Controls */
   --st-control-height: 38px;
   --st-control-height-mobile: 44px;
-  --st-focus-ring: var(--ui-focus-ring);
-  --st-focus-border: var(--ui-accent);
+  --st-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  --st-focus-border: #2563eb;
 
-  /* Layout constants (shared with TS where useful) */
+  /* Layout constants */
   --st-sidebar-width: 240px;
-  --st-content-max-width: 800px;
+  --st-content-max-width: 820px;
   --st-breakpoint-narrow: 900px;
   --st-breakpoint-mobile: 640px;
 }
+
+/* Dark mode glassmorphism override support */
+@media (prefers-color-scheme: dark) {
+  .settings-backdrop {
+    --st-canvas: rgba(15, 23, 42, 0.85);
+    --st-surface: rgba(30, 41, 59, 0.8);
+    --st-surface-subtle: rgba(51, 65, 85, 0.5);
+    --st-surface-muted: rgba(51, 65, 85, 0.7);
+    --st-sidebar: rgba(15, 23, 42, 0.75);
+
+    --st-border: rgba(51, 65, 85, 0.7);
+    --st-border-strong: rgba(71, 85, 105, 0.9);
+    --st-border-subtle: rgba(255, 255, 255, 0.08);
+    --st-text: #f8fafc;
+    --st-text-secondary: #cbd5e1;
+    --st-text-tertiary: #94a3b8;
+
+    --st-shadow-card: 0 4px 16px -2px rgba(0, 0, 0, 0.3);
+    --st-shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+

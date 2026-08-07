@@ -10,16 +10,25 @@
 .settings-modal .settings-page-content > .settings-security-stack,
 .settings-modal .settings-page-content > .settings-account-stack,
 .settings-modal .settings-page-content > .settings-data-safety,
-.settings-modal .settings-page-content > .settings-connection-shell {
+.settings-modal .settings-page-content > .settings-connection-shell,
+.settings-modal .settings-page-content .settings-provider-stack {
+  width: 100%;
   min-width: 0;
   display: grid;
   gap: 14px;
   align-content: start;
 }
 
-.settings-modal .settings-page-content .settings-experience-stack,
-.settings-modal .settings-page-content .settings-sync-stack,
-.settings-modal .settings-page-content .settings-security-stack {
+.settings-modal .settings-page-content .settings-connection-shell > *,
+.settings-modal .settings-page-content .settings-provider-stack > * {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-modal .settings-experience-stack,
+.settings-modal .settings-sync-stack,
+.settings-modal .settings-security-stack {
+  width: 100%;
   display: grid;
   gap: 14px;
 }
@@ -718,14 +727,29 @@
 }
 
 /* --- Provider advanced (details disclosure) --- */
+.settings-modal .settings-provider-advanced {
+  width: 100%;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+  overflow: hidden;
+  transition: border-color 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-modal .settings-provider-advanced:hover {
+  border-color: var(--st-border-strong);
+}
+
 .settings-modal .settings-provider-advanced > summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   list-style: none;
   cursor: pointer;
+  background: var(--st-surface);
 }
 
 .settings-modal .settings-provider-advanced > summary::-webkit-details-marker {
@@ -748,6 +772,10 @@
   transform: rotate(225deg) translate(-1px, -1px);
 }
 
+.settings-modal .settings-provider-advanced[open] > summary {
+  border-bottom: 1px solid var(--st-border);
+}
+
 .settings-modal .settings-provider-advanced > summary > span {
   min-width: 0;
   display: grid;
@@ -756,8 +784,8 @@
 
 .settings-modal .settings-provider-advanced > summary strong {
   color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-size: var(--st-font-size-card-title);
+  font-weight: 620;
 }
 
 .settings-modal .settings-provider-advanced > summary em {
@@ -779,9 +807,27 @@
 
 .settings-modal .settings-provider-advanced-content {
   display: grid;
-  gap: 12px;
-  padding: 12px 16px 16px;
-  border-top: 1px solid var(--st-border);
+  gap: 14px;
+  padding: 18px;
+  background: var(--st-canvas);
+}
+
+/* Embedded details inside a parent section (e.g., Advanced Server Settings inside Connection Params) */
+.settings-modal .st-section-body > .settings-provider-server-advanced {
+  margin-top: 6px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+  box-shadow: none;
+}
+
+.settings-modal .st-section-body > .settings-provider-server-advanced > summary {
+  padding: 10px 14px;
+  background: transparent;
+}
+
+.settings-modal .st-section-body > .settings-provider-server-advanced[open] > summary {
+  border-bottom: 1px solid var(--st-border);
 }
 
 .settings-modal .settings-provider-advanced-content .tool-panel {

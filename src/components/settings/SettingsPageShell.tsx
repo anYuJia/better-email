@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type React from 'react';
 import type {
   SettingsNavigationGroup,
@@ -18,8 +19,17 @@ export default function SettingsPageShell({
   item,
   children,
 }: SettingsPageShellProps) {
+  const pageRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (pageRef.current) {
+      pageRef.current.scrollTop = 0;
+    }
+  }, [activeSection]);
+
   return (
     <section
+      ref={pageRef}
       key={activeSection}
       className="settings-page"
       data-settings-page={activeSection}

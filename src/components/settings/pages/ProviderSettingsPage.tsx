@@ -121,7 +121,7 @@ export default function ProviderSettingsPage({
   );
 
   return (
-    <>
+    <div className="settings-provider-stack">
       <SettingsSection
         title="连接参数"
         description={accountForm.email}
@@ -273,6 +273,6 @@ export default function ProviderSettingsPage({
           )}
         </div>
       </details>
-    </>
+    </div>
   );
 }

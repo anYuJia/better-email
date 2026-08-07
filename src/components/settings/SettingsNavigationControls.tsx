@@ -27,7 +27,20 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   onNavigate,
 }: Omit<SettingsNavigationProps, 'activeItem'>) {
   const [query, setQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
+
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
   const filteredGroups = useMemo(() => {
     if (!normalizedQuery) return settingsNavigationGroups;
     return settingsNavigationGroups
@@ -42,18 +55,23 @@ export const SettingsSidebar = memo(function SettingsSidebar({
       .filter((group) => group.items.length > 0);
   }, [normalizedQuery]);
 
+  const totalMatchCount = useMemo(() => {
+    return filteredGroups.reduce((acc, g) => acc + g.items.length, 0);
+  }, [filteredGroups]);
+
   return (
     <nav className="settings-nav" aria-label="设置分类">
       <div className="settings-nav-search" role="search">
         <Search size={14} aria-hidden="true" />
         <input
+          ref={searchInputRef}
           type="search"
-          aria-label="搜索设置页面"
+          aria-label="搜索设置页面 (Cmd+K)"
           value={query}
-          placeholder="搜索设置"
+          placeholder="搜索设置 (⌘K)"
           onInput={(event) => setQuery(event.currentTarget.value)}
         />
-        {query && (
+        {query ? (
           <button
             type="button"
             aria-label="清空设置搜索"
@@ -62,8 +80,15 @@ export const SettingsSidebar = memo(function SettingsSidebar({
           >
             <X size={13} />
           </button>
+        ) : (
+          <kbd className="settings-search-shortcut">⌘K</kbd>
         )}
       </div>
+      {query && (
+        <div className="settings-nav-match-count">
+          找到 {totalMatchCount} 个相关设置
+        </div>
+      )}
       <div className="settings-nav-scroll">
         {filteredGroups.map((group) => (
           <div className="settings-nav-section" key={group.label}>
@@ -95,6 +120,13 @@ export const SettingsSidebar = memo(function SettingsSidebar({
           <div className="settings-nav-empty">
             <strong>没有匹配的设置</strong>
             <span>换一个关键词试试</span>
+            <button
+              type="button"
+              className="st-btn st-btn-secondary st-btn-sm"
+              onClick={() => setQuery('')}
+            >
+              清除搜索
+            </button>
           </div>
         )}
       </div>

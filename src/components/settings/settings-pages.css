@@ -267,9 +267,7 @@
 /* --- Account list --- */
 .settings-modal .settings-account-list {
   display: grid;
-  gap: 0;
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 3px;
 }
 
 .settings-modal .settings-account-row {
@@ -279,11 +277,12 @@
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  border: 0;
-  border-top: 1px solid var(--st-border);
-  border-radius: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
-  transition: background-color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .settings-modal .settings-account-row:hover {
@@ -292,7 +291,18 @@
 
 .settings-modal .settings-account-row.active {
   background: var(--st-surface-muted, #f3f5f8);
-  box-shadow: inset 2px 0 0 var(--st-accent);
+  border-color: var(--st-border-subtle, rgba(0, 0, 0, 0.06));
+}
+
+.settings-modal .settings-account-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--st-accent);
 }
 
 .settings-modal .settings-account-row:first-child {

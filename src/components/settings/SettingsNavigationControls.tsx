@@ -86,7 +86,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                   <span className="settings-nav-copy">
                     <span className="settings-nav-label">{item.label}</span>
                   </span>
-                  {active && <span className="settings-nav-active-dot" aria-hidden="true" />}
                 </button>
               );
             })}

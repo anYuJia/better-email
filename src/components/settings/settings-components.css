@@ -365,26 +365,28 @@
 }
 
 .settings-modal .st-btn-primary {
-  color: var(--st-on-accent);
+  color: #ffffff;
   border-color: var(--st-accent);
   background: var(--st-accent);
 }
 
 .settings-modal .st-btn-primary:hover:not(:disabled) {
+  color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .settings-modal .st-btn-secondary {
-  color: var(--st-text-secondary);
-  border-color: var(--st-border);
+  color: var(--st-text);
+  border-color: transparent;
   background: var(--st-surface);
 }
 
 .settings-modal .st-btn-secondary:hover:not(:disabled) {
   color: var(--st-accent);
-  border-color: var(--st-border-strong);
-  background: var(--st-surface-subtle);
+  border-color: transparent;
+  background: var(--st-accent-soft);
 }
 
 .settings-modal .st-btn-danger {
@@ -400,13 +402,13 @@
 
 .settings-modal .st-btn-danger-secondary {
   color: var(--st-danger);
-  border-color: #e8c7c4;
+  border-color: transparent;
   background: var(--st-danger-soft);
 }
 
 .settings-modal .st-btn-danger-secondary:hover:not(:disabled) {
   color: var(--st-danger-hover);
-  border-color: var(--st-danger);
+  border-color: transparent;
   background: #fbe0de;
 }
 

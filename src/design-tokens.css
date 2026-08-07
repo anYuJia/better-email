@@ -12,7 +12,7 @@
   /* Primitive palette: cool neutral workspace, gently warm reading paper. */
   --primitive-hue-neutral: 255;
   --primitive-hue-paper: 90;
-  --primitive-hue-accent: 252;
+  --primitive-hue-accent: 250;
   --primitive-hue-success: 152;
   --primitive-hue-warning: 78;
   --primitive-hue-danger: 29;
@@ -30,14 +30,14 @@
   --color-text-primary: oklch(0.235 0.017 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.445 0.015 var(--primitive-hue-neutral));
   --color-text-tertiary: oklch(0.61 0.012 var(--primitive-hue-neutral));
-  --color-text-on-accent: oklch(0.986 0.003 var(--primitive-hue-paper));
+  --color-text-on-accent: #ffffff;
 
   --color-border-subtle: oklch(0.885 0.007 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.8 0.011 var(--primitive-hue-neutral));
-  --color-focus: oklch(0.52 0.16 var(--primitive-hue-accent));
-  --color-accent: oklch(0.52 0.16 var(--primitive-hue-accent));
-  --color-accent-hover: oklch(0.465 0.155 var(--primitive-hue-accent));
-  --color-accent-soft: oklch(0.94 0.035 var(--primitive-hue-accent));
+  --color-focus: oklch(0.55 0.18 var(--primitive-hue-accent));
+  --color-accent: oklch(0.55 0.18 var(--primitive-hue-accent));
+  --color-accent-hover: oklch(0.59 0.18 var(--primitive-hue-accent));
+  --color-accent-soft: oklch(0.945 0.028 var(--primitive-hue-accent));
   --color-success: oklch(0.5 0.13 var(--primitive-hue-success));
   --color-success-soft: oklch(0.95 0.035 var(--primitive-hue-success));
   --color-warning: oklch(0.52 0.12 var(--primitive-hue-warning));

@@ -291,18 +291,7 @@
 
 .settings-modal .settings-account-row.active {
   background: var(--st-surface-muted, #f3f5f8);
-  border-color: var(--st-border-subtle, rgba(0, 0, 0, 0.06));
-}
-
-.settings-modal .settings-account-row.active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--st-accent);
+  border-color: transparent;
 }
 
 .settings-modal .settings-account-row:first-child {
@@ -362,7 +351,7 @@
 
 .settings-modal .settings-account-row-meta em {
   padding: 1px 6px;
-  border: 1px solid #c9ddef;
+  border: 0;
   border-radius: 999px;
   color: var(--st-info);
   background: var(--st-info-soft);
@@ -2290,26 +2279,28 @@
 }
 
 .contact-import-dialog .st-btn-primary {
-  color: var(--st-on-accent);
+  color: #ffffff;
   border-color: var(--st-accent);
   background: var(--st-accent);
 }
 
 .contact-import-dialog .st-btn-primary:hover:not(:disabled) {
+  color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .contact-import-dialog .st-btn-secondary {
-  color: var(--st-text-secondary);
-  border-color: var(--st-border);
+  color: var(--st-text);
+  border-color: transparent;
   background: var(--st-surface);
 }
 
 .contact-import-dialog .st-btn-secondary:hover:not(:disabled) {
   color: var(--st-accent);
-  border-color: var(--st-border-strong);
-  background: var(--st-surface-subtle);
+  border-color: transparent;
+  background: var(--st-accent-soft);
 }
 
 .contact-import-dialog .st-btn-danger {

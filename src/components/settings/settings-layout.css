@@ -102,26 +102,28 @@
 }
 
 .settings-header-button.secondary {
-  color: var(--st-text-secondary);
-  border-color: var(--st-border);
+  color: var(--st-text);
+  border-color: transparent;
   background: var(--st-surface);
 }
 
 .settings-header-button.secondary:hover:not(:disabled) {
   color: var(--st-accent);
-  border-color: var(--st-border-strong);
-  background: var(--st-surface-subtle);
+  border-color: transparent;
+  background: var(--st-accent-soft);
 }
 
 .settings-header-button.primary {
-  color: var(--st-on-accent);
+  color: #ffffff;
   border-color: var(--st-accent);
   background: var(--st-accent);
 }
 
 .settings-header-button.primary:hover:not(:disabled) {
+  color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .settings-close-button {
@@ -309,7 +311,6 @@
   border-color: transparent !important;
   color: var(--st-accent);
   background: var(--st-accent-soft);
-  box-shadow: inset 2px 0 0 var(--st-accent);
 }
 
 .settings-modal .settings-nav-section > button.active .settings-nav-icon {
@@ -325,11 +326,7 @@
 }
 
 .settings-nav-active-dot {
-  width: 3px;
-  height: 16px;
-  margin-left: auto;
-  border-radius: 999px;
-  background: var(--st-accent);
+  display: none;
 }
 
 .settings-nav-copy {

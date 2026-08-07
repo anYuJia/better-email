@@ -242,44 +242,42 @@
 /* --- Switch --- */
 .settings-modal .st-switch {
   min-width: 0;
-  min-height: 50px;
+  min-height: 52px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border: 0;
-  border-top: 1px solid var(--st-border);
-  border-radius: 0;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
   background: transparent;
   cursor: pointer;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease;
+    border-color 140ms ease,
+    background-color 140ms ease;
 }
 
 .settings-modal .st-switch:hover {
-  border-color: var(--st-border);
   background: var(--st-surface-subtle);
 }
 
 .settings-modal .st-switch input[type="checkbox"] {
   position: relative;
-  width: 38px;
-  min-width: 38px;
-  height: 22px;
-  min-height: 22px;
+  width: 44px;
+  min-width: 44px;
+  height: 24px;
+  min-height: 24px;
   margin: 0;
   padding: 0;
   appearance: none;
-  border: 1px solid var(--st-border-strong);
+  border: 0;
   border-radius: 999px;
-  background: #b9c2cc;
-  box-shadow: none;
+  background: #cbd5e1;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
   cursor: pointer;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease;
+    background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms ease;
 }
 
 /* The global stylesheet draws a white checkmark via ::before; the switch
@@ -293,21 +291,22 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
-  transition: transform 130ms ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25), 0 1px 2px rgba(15, 23, 42, 0.12);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .settings-modal .st-switch input[type="checkbox"]:checked {
-  border-color: var(--st-accent);
+  border-color: transparent;
   background: var(--st-accent);
+  box-shadow: none;
 }
 
 .settings-modal .st-switch input[type="checkbox"]:checked::after {
-  transform: translateX(16px);
+  transform: translateX(20px);
 }
 
 .settings-modal .st-switch input[type="checkbox"]:disabled {

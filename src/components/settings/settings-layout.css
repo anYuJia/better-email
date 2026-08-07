@@ -274,19 +274,20 @@
 
 .settings-modal .settings-nav-section > button {
   position: relative;
-  min-height: var(--st-control-height);
+  min-height: 40px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 9px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: none;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 520;
   text-align: left;
+  transition: color 140ms ease, background-color 140ms ease, transform 140ms ease;
 }
 
 .settings-nav-icon {
@@ -295,27 +296,33 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--st-text-tertiary);
   background: transparent;
+  transition: color 140ms ease, background-color 140ms ease;
 }
 
 .settings-modal .settings-nav-section > button:hover {
   border-color: transparent;
   color: var(--st-text);
-  background: var(--st-surface);
+  background: rgba(15, 23, 42, 0.05);
   box-shadow: none;
+}
+
+.settings-modal .settings-nav-section > button:hover .settings-nav-icon {
+  color: var(--st-text);
 }
 
 .settings-modal .settings-nav-section > button.active {
   border-color: transparent !important;
   color: var(--st-accent);
   background: var(--st-accent-soft);
+  font-weight: 620;
 }
 
 .settings-modal .settings-nav-section > button.active .settings-nav-icon {
   color: var(--st-accent);
-  background: var(--st-accent-soft);
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .settings-modal .settings-nav-section > button:focus-visible {

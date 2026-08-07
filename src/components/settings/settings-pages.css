@@ -2908,9 +2908,12 @@
   transition: opacity 120ms ease;
 }
 
-.settings-modal .settings-ai-page-stack {
-  display: grid;
-  gap: 16px;
+.settings-modal .settings-ai-service-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .settings-modal .settings-ai-service-options {

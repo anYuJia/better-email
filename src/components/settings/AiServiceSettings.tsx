@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { AiServiceType } from '../../app/types/ai';
 import useAiService from '../../hooks/useAiService';
+import { CustomSelect } from './accounts/CustomSelect';
 import {
   SettingsButton,
   SettingsField,
@@ -93,41 +94,30 @@ export default function AiServiceSettings() {
         </div>
       </SettingsSection>
 
-      {/* 模块二：服务提供商选择卡片 Tile Grid Card */}
+      {/* 模块二：服务提供商与配置区（简洁无卡片底框设计） */}
       <div className={`settings-ai-config-area${config.enabled ? '' : ' is-dimmed'}`}>
-        <SettingsSection
-          title="选择服务来源"
-          description="按需选择本地模拟服务或外部兼容的大语言模型 / MCP 接口"
-          dataSection="ai-provider"
-        >
-          <div className="settings-ai-service-options">
+        <SettingsField label="选择服务来源" hint="按需选择本地模拟服务或外部兼容的大语言模型 / MCP 接口">
+          <div className="settings-ai-service-pills" role="radiogroup" aria-label="选择服务来源">
             {SERVICE_OPTIONS.map((option) => {
               const active = config.serviceType === option.value;
               return (
-                <label
+                <button
+                  type="button"
                   key={option.value}
-                  className={`settings-ai-service-option${active ? ' active' : ''}`}
+                  role="radio"
+                  aria-checked={active}
+                  className={`st-btn ${active ? 'st-btn-primary' : 'st-btn-secondary'}`}
+                  onClick={() => patchConfig({ serviceType: option.value })}
                 >
-                  <input
-                    type="radio"
-                    name="ai-service-type"
-                    value={option.value}
-                    checked={active}
-                    onChange={() => patchConfig({ serviceType: option.value })}
-                  />
-                  <strong>
-                    {option.label}
-                    {option.advanced && <em className="ai-service-badge">高级</em>}
-                    <Check size={15} className="ai-service-check" aria-hidden="true" />
-                  </strong>
-                  <small>{option.description}</small>
-                </label>
+                  <span>{option.label}</span>
+                  {option.advanced && <em className="ai-service-badge">高级</em>}
+                </button>
               );
             })}
           </div>
-        </SettingsSection>
+        </SettingsField>
 
-        {/* 模块三：参数配置与测试连接卡片 Config & Actions Card */}
+        {/* 模块三：参数配置与测试连接 */}
         <SettingsSection
           title={external ? '服务连接配置' : '本地模拟模式'}
           description={external ? '配置 API 端点、Token 以及超时模型参数' : '无需联网或填写密钥'}

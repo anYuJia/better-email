@@ -23,7 +23,7 @@ describe('AiServiceSettings', () => {
 
   it('marks MCP as an advanced option', () => {
     render(<AiServiceSettings />);
-    const mcpLabel = screen.getByText('MCP 服务').closest('label');
+    const mcpLabel = screen.getByText('MCP 服务').closest('button');
     expect(mcpLabel?.textContent).toContain('高级');
   });
 

@@ -33,7 +33,7 @@
 
 .settings-modal .settings-page-content :is(input, select, textarea) {
   min-height: var(--st-control-height);
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
@@ -42,19 +42,20 @@
   font-size: var(--st-font-size-body);
   line-height: 1.45;
   transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):hover {
   border-color: var(--st-border-strong);
+  background-color: var(--st-surface);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):focus {
-  border-color: var(--st-focus-border);
+  border-color: var(--st-accent);
   outline: none;
-  box-shadow: var(--st-focus-ring);
+  box-shadow: 0 0 0 3px var(--st-accent-soft);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):disabled {

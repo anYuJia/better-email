@@ -13,21 +13,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(18, 24, 31, 0.34);
-  backdrop-filter: blur(10px);
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(12px);
 }
 
 /* --- Modal --- */
 .settings-modal {
-  width: min(1080px, calc(100vw - 40px));
-  height: min(780px, calc(100vh - 40px));
-  max-height: calc(100vh - 40px);
+  width: min(1080px, calc(100vw - 48px));
+  height: min(800px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--st-border-strong);
+  border: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.08));
   border-radius: var(--st-radius-modal);
   background: var(--st-canvas);
   box-shadow: var(--st-shadow-modal);
@@ -35,13 +35,13 @@
 
 /* --- Header --- */
 .settings-main-header {
-  min-height: 58px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 12px 0 16px;
-  border-bottom: 1px solid var(--st-border);
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
   background: var(--st-surface);
 }
 
@@ -412,14 +412,11 @@
 }
 
 .settings-page-header {
-  position: sticky;
-  top: 0;
-  z-index: 4;
   flex: 0 0 auto;
   display: grid;
   gap: 4px;
-  padding: 16px 24px 12px;
-  border-bottom: 1px solid var(--st-border);
+  padding: 18px 28px 12px;
+  border-bottom: 0;
   background: var(--st-canvas);
 }
 

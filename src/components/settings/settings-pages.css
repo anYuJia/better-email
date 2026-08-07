@@ -26,7 +26,7 @@
 
 .settings-modal .settings-page-content .settings-inline-status {
   padding: 10px 12px;
-  border: 1px solid #c9ddef;
+  border: 1px solid transparent;
   border-radius: var(--st-radius-md);
   color: var(--st-text-secondary);
   background: var(--st-info-soft);
@@ -94,8 +94,9 @@
   display: flex;
   align-items: end;
   gap: 2px;
-  overflow-x: auto;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--st-border);
+  overflow-x: auto;
   scrollbar-width: none;
 }
 
@@ -168,7 +169,7 @@
 .settings-modal .settings-save-verify-status > header > em {
   flex: 0 0 auto;
   padding: 3px 9px;
-  border: 1px solid var(--st-border);
+  border: 1px solid transparent;
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
@@ -205,7 +206,7 @@
   display: grid;
   gap: 2px;
   padding: 8px 10px;
-  border: 1px solid var(--st-border);
+  border: 1px solid transparent;
   border-radius: var(--st-radius-md);
   background: var(--st-surface-subtle);
 }
@@ -472,7 +473,7 @@
 .settings-modal .settings-account-add-error {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #e8c7c4;
+  border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   color: var(--st-danger);
   background: var(--st-danger-soft);
@@ -485,7 +486,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid #c9ddef;
+  border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   background: var(--st-info-soft);
   color: var(--st-text-secondary);
@@ -768,7 +769,7 @@
 .settings-modal .settings-provider-advanced > summary > b {
   flex: 0 0 auto;
   padding: 3px 9px;
-  border: 1px solid var(--st-border);
+  border: 1px solid transparent;
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
@@ -791,7 +792,7 @@
 .settings-modal .settings-auth-change-notice {
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #ecd9a8;
+  border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   color: var(--st-warning);
   background: var(--st-warning-soft);

@@ -48,18 +48,18 @@
   --st-space-6: var(--ui-space-6);
   --st-space-7: var(--ui-space-7);
 
-  /* Concentric geometry and restrained elevation */
-  --st-radius-sm: var(--ui-radius-sm);
-  --st-radius-md: 10px;
-  --st-radius-lg: var(--ui-radius-panel);
-  --st-radius-modal: var(--ui-radius-modal);
-  --st-shadow-card: none;
-  --st-shadow-float: var(--ui-shadow-popover);
-  --st-shadow-modal: var(--ui-shadow-float);
+  /* Concentric geometry and restrained elevation (UI/UX Pro Max Standard) */
+  --st-radius-sm: 8px;
+  --st-radius-md: 12px;
+  --st-radius-lg: 16px;
+  --st-radius-modal: 20px;
+  --st-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+  --st-shadow-float: 0 4px 16px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.06);
+  --st-shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12), 0 24px 64px rgba(0, 0, 0, 0.08);
 
   /* Controls */
-  --st-control-height: var(--ui-control-height-comfortable);
-  --st-control-height-mobile: var(--ui-control-height-touch);
+  --st-control-height: 38px;
+  --st-control-height-mobile: 44px;
   --st-focus-ring: var(--ui-focus-ring);
   --st-focus-border: var(--ui-accent);
 

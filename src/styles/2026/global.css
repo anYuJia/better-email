@@ -15,9 +15,10 @@ body {
   overflow: hidden;
   background: var(--ui-bg);
   color: var(--ui-text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
-  letter-spacing: -0.01em;
-  line-height: 1.45;
+  font-family: var(--ui-font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ui-letter-spacing);
+  line-height: var(--ui-line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -27,6 +28,8 @@ button,
 input,
 select,
 textarea {
+  font: inherit;
+  color: inherit;
   letter-spacing: 0;
 }
 
@@ -50,8 +53,8 @@ summary:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(8, 127, 245, 0.2);
-  outline-offset: 1px;
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
 }
 
 input[type="checkbox"] {
@@ -77,7 +80,7 @@ textarea:disabled {
 }
 
 * {
-  scrollbar-color: #c7cdd5 transparent;
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
   scrollbar-width: thin;
 }
 
@@ -90,10 +93,31 @@ textarea:disabled {
   min-height: 36px;
   border: 3px solid transparent;
   border-radius: 999px;
-  background: #c7cdd5;
+  background: var(--ui-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+::selection {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }

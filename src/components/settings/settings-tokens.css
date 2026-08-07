@@ -1,80 +1,69 @@
 /*
- * Settings design tokens.
- * Single source of truth for the settings workspace. Page styles must consume
- * these variables instead of hard-coding colors, radii, shadows or font sizes.
- * WCAG AA check notes: every text token is >= 4.5:1 against its intended surface.
+ * Settings consumes the application semantic layer. The `--st-*` names remain
+ * as a local component contract while the values deliberately come from the
+ * same system as the three-pane workspace.
  */
 
 .settings-backdrop {
   /* Surfaces */
-  --st-canvas: #f6f7f9;
-  --st-surface: #ffffff;
-  --st-surface-subtle: #fafbfc;
-  --st-surface-muted: #f1f3f5;
-  --st-sidebar: #f3f4f6;
+  --st-canvas: var(--ui-bg);
+  --st-surface: var(--ui-surface);
+  --st-surface-subtle: var(--ui-surface-muted);
+  --st-surface-muted: var(--ui-sidebar);
+  --st-sidebar: var(--ui-sidebar);
 
-  /* Borders */
-  --st-border: #dde2e8;
-  --st-border-strong: #c3ccd5;
+  /* Borders and text */
+  --st-border: var(--ui-border);
+  --st-border-strong: var(--ui-border-strong);
+  --st-text: var(--ui-text);
+  --st-text-secondary: var(--ui-text-secondary);
+  --st-text-tertiary: var(--ui-text-tertiary);
 
-  /* Text (AA on white) */
-  --st-text: #1d232b;
-  --st-text-secondary: #4e5966;
-  --st-text-tertiary: #646f7b;
+  /* Interaction and semantic state */
+  --st-accent: var(--ui-accent);
+  --st-accent-hover: var(--ui-accent-hover);
+  --st-accent-soft: var(--ui-accent-soft);
+  --st-on-accent: var(--color-text-on-accent);
+  --st-danger: var(--ui-danger);
+  --st-danger-hover: var(--ui-danger-hover);
+  --st-danger-soft: var(--ui-danger-bg);
+  --st-success: var(--ui-success);
+  --st-success-soft: var(--ui-success-bg);
+  --st-warning: var(--ui-warning);
+  --st-warning-soft: var(--ui-warning-bg);
+  --st-info: var(--ui-accent);
+  --st-info-soft: var(--ui-accent-soft);
 
-  /* Accent */
-  --st-accent: #0a63c4;
-  --st-accent-hover: #084f9e;
-  --st-accent-soft: #eaf3fd;
-  --st-on-accent: #ffffff;
-
-  /* Semantic tones */
-  --st-danger: #b3261e;
-  --st-danger-hover: #941d16;
-  --st-danger-soft: #fdeceb;
-  --st-success: #1e7d3c;
-  --st-success-soft: #e9f6ee;
-  --st-warning: #8a5a00;
-  --st-warning-soft: #fdf6e7;
-  --st-info: #0a63c4;
-  --st-info-soft: #eaf3fd;
-
-  /* Typography scale */
-  --st-font-size-body: 14px;
-  --st-font-size-secondary: 13px;
-  --st-font-size-aux: 12px;
+  /* Type and rhythm */
+  --st-font-size-body: var(--ui-font-size-body);
+  --st-font-size-secondary: var(--ui-font-size-secondary);
+  --st-font-size-aux: var(--ui-font-size-aux);
   --st-font-size-card-title: 15px;
-  --st-font-size-page-title: 21px;
+  --st-font-size-page-title: var(--ui-font-size-title);
+  --st-space-1: var(--ui-space-1);
+  --st-space-2: var(--ui-space-2);
+  --st-space-3: var(--ui-space-3);
+  --st-space-4: var(--ui-space-4);
+  --st-space-5: var(--ui-space-5);
+  --st-space-6: var(--ui-space-6);
+  --st-space-7: var(--ui-space-7);
 
-  /* Spacing */
-  --st-space-1: 4px;
-  --st-space-2: 8px;
-  --st-space-3: 12px;
-  --st-space-4: 16px;
-  --st-space-5: 20px;
-  --st-space-6: 24px;
-  --st-space-7: 32px;
-
-  /* Radii */
-  --st-radius-sm: 6px;
-  --st-radius-md: 7px;
-  --st-radius-lg: 8px;
-  --st-radius-modal: 10px;
-
-  /* Shadows */
+  /* Concentric geometry and restrained elevation */
+  --st-radius-sm: var(--ui-radius-sm);
+  --st-radius-md: 10px;
+  --st-radius-lg: var(--ui-radius-panel);
+  --st-radius-modal: var(--ui-radius-modal);
   --st-shadow-card: none;
-  --st-shadow-float: 0 16px 40px rgba(15, 23, 42, 0.14);
-  --st-shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.2);
+  --st-shadow-float: var(--ui-shadow-popover);
+  --st-shadow-modal: var(--ui-shadow-float);
 
   /* Controls */
-  --st-control-height: 40px;
-  --st-control-height-mobile: 44px;
-  --st-focus-ring: 0 0 0 3px rgba(10, 99, 196, 0.2);
-  --st-focus-border: #0a63c4;
-}
+  --st-control-height: var(--ui-control-height-comfortable);
+  --st-control-height-mobile: var(--ui-control-height-touch);
+  --st-focus-ring: var(--ui-focus-ring);
+  --st-focus-border: var(--ui-accent);
 
-/* Layout constants (shared with TS where useful) */
-.settings-backdrop {
+  /* Layout constants (shared with TS where useful) */
   --st-sidebar-width: 240px;
   --st-content-max-width: 800px;
   --st-breakpoint-narrow: 900px;

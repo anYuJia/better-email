@@ -1,3 +1,5 @@
+import { readerSecurityCopy } from '../../app/readerSecurityCopy';
+
 type ReaderSecurityBannerProps = {
   warnings: string[];
   showRemoteImageNote: boolean;
@@ -42,15 +44,18 @@ export default function ReaderSecurityBanner({
   );
 
   return (
-    <div className="reader-warning-panel">
+    <aside className="reader-warning-panel" aria-label="安全提示">
       <div className="reader-warning-heading">
         <strong>安全提示</strong>
         {(showRemoteImageNote || selectedExternalBlocked) && (
-          <span>{selectedExternalBlocked ? '外部邮箱已拦截' : '远程图片默认阻止'}</span>
+          <span className="reader-warning-badge">
+            {selectedExternalBlocked ? '外部邮箱已拦截' : '远程图片默认阻止'}
+          </span>
         )}
       </div>
       {warnings.map((warning) => <p key={warning}>{warning}</p>)}
       {externalBlockNote && <p>{externalBlockNote}</p>}
+      {showLinkAction && <p>{readerSecurityCopy.linksHidden}</p>}
       {showActionRow && (
         <div className="reader-warning-action-row">
           {showLinkAction && (
@@ -85,6 +90,6 @@ export default function ReaderSecurityBanner({
           )}
         </div>
       )}
-    </div>
+    </aside>
   );
 }

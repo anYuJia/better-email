@@ -1,0 +1,258 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: B
+      - strong [ref=e8]: Better Email
+    - region "邮箱范围" [ref=e9]:
+      - button "统一邮箱 3 个账号" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]:
+          - strong [ref=e12]: 统一邮箱
+          - generic [ref=e13]: 3 个账号
+    - button "写邮件" [ref=e16] [cursor=pointer]
+    - generic [ref=e19]: 邮箱
+    - navigation [ref=e20]:
+      - button "收件箱" [ref=e157] [cursor=pointer]
+      - button "已发送" [ref=e29] [cursor=pointer]
+      - button "草稿箱" [ref=e35] [cursor=pointer]
+      - button "归档" [ref=e40] [cursor=pointer]
+      - generic [ref=e45]:
+        - button "废纸篓" [ref=e46] [cursor=pointer]
+        - button "废纸篓 更多操作" [ref=e52] [cursor=pointer]
+      - generic [ref=e57]:
+        - button "垃圾邮件" [ref=e58] [cursor=pointer]
+        - button "垃圾邮件 更多操作" [ref=e64] [cursor=pointer]
+      - generic [ref=e69]:
+        - button "稍后处理" [ref=e70] [cursor=pointer]
+        - button "稍后处理 更多操作" [ref=e76] [cursor=pointer]
+    - group [ref=e82]:
+      - generic "工具" [ref=e83]
+    - generic [ref=e85]:
+      - button "设置" [ref=e86] [cursor=pointer]
+      - button "快捷键" [ref=e91] [cursor=pointer]
+  - button "调整侧边栏宽度" [ref=e95]
+  - generic [ref=e96]:
+    - generic [ref=e97]:
+      - generic [ref=e98]:
+        - textbox "搜索主题、发件人、正文" [ref=e103]
+        - group [ref=e104]:
+          - generic "搜索范围：当前文件夹" [ref=e105] [cursor=pointer]: 文件夹
+      - button "获取新邮件" [ref=e109] [cursor=pointer]
+    - generic [ref=e116]:
+      - generic [ref=e117]:
+        - strong [ref=e118]: 收件箱
+        - generic [ref=e119]: 40+ 封
+      - generic [ref=e120]:
+        - button "邮件" [ref=e121] [cursor=pointer]
+        - button "会话" [ref=e122] [cursor=pointer]
+        - group [ref=e123]:
+          - generic "筛选" [ref=e124] [cursor=pointer]
+        - group [ref=e127]:
+          - generic "最新优先" [ref=e128] [cursor=pointer]
+    - generic [ref=e158]:
+      - generic [ref=e159]: 更早
+      - generic [ref=e162]:
+        - button "查看邮件：Security Team，07/09 10:00，安全检查清单" [active] [ref=e163] [cursor=pointer]
+        - generic: S
+        - generic [ref=e166]:
+          - generic [ref=e167]: Security Team
+          - time [ref=e168]: 07/09 10:00
+        - generic [ref=e169]:
+          - generic [ref=e170]: ★ 安全检查清单
+          - generic "2 个附件" [ref=e171]: "2"
+        - paragraph [ref=e175]: Better Email 的 HTML 安全预览、附件和规则都可以验证。
+        - generic "重要" [ref=e177]
+      - generic [ref=e179]:
+        - button "查看邮件：Ada，07/08 12:00，Quarterly update" [ref=e180] [cursor=pointer]
+        - generic: A
+        - checkbox "选择 Quarterly update" [ref=e409]
+        - generic [ref=e181]:
+          - generic [ref=e182]: Ada
+          - time [ref=e183]: 07/08 12:00
+        - generic [ref=e184]: Quarterly update
+        - paragraph [ref=e186]: 跨平台低内存客户端的下一步计划。
+      - generic [ref=e188]:
+        - button "查看邮件：Alice Zhang，07/08 08:00，Design review invitation" [ref=e189] [cursor=pointer]
+        - generic: A
+        - checkbox "选择 Design review invitation" [ref=e191]
+        - generic [ref=e192]:
+          - generic [ref=e193]: Alice Zhang
+          - time [ref=e194]: 07/08 08:00
+        - generic [ref=e195]: Design review invitation
+        - paragraph [ref=e197]: Please review the attached design proposal before our meeting on Friday.
+      - generic [ref=e199]:
+        - button "查看邮件：Digest 1，07/07 18:00，Low memory digest 01" [ref=e200] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 01" [ref=e202]
+        - generic [ref=e203]:
+          - generic [ref=e204]: Digest 1
+          - time [ref=e205]: 07/07 18:00
+        - generic [ref=e206]: Low memory digest 01
+        - paragraph [ref=e208]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e210]:
+        - button "查看邮件：Digest 2，07/07 17:00，Low memory digest 02" [ref=e211] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 02" [ref=e213]
+        - generic [ref=e214]:
+          - generic [ref=e215]: Digest 2
+          - time [ref=e216]: 07/07 17:00
+        - generic [ref=e217]: Low memory digest 02
+        - paragraph [ref=e219]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e221]:
+        - button "查看邮件：Digest 3，07/07 16:00，Low memory digest 03" [ref=e222] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 03" [ref=e224]
+        - generic [ref=e225]:
+          - generic [ref=e226]: Digest 3
+          - time [ref=e227]: 07/07 16:00
+        - generic [ref=e228]: Low memory digest 03
+        - paragraph [ref=e230]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e232]:
+        - button "查看邮件：Digest 4，07/07 15:00，Low memory digest 04" [ref=e233] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 04" [ref=e235]
+        - generic [ref=e236]:
+          - generic [ref=e237]: Digest 4
+          - time [ref=e238]: 07/07 15:00
+        - generic [ref=e239]: Low memory digest 04
+        - paragraph [ref=e241]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e243]:
+        - button "查看邮件：Digest 5，07/07 14:00，Low memory digest 05" [ref=e244] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 05" [ref=e246]
+        - generic [ref=e247]:
+          - generic [ref=e248]: Digest 5
+          - time [ref=e249]: 07/07 14:00
+        - generic [ref=e250]: Low memory digest 05
+        - paragraph [ref=e252]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e254]:
+        - button "查看邮件：Digest 6，07/07 13:00，Low memory digest 06" [ref=e255] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 06" [ref=e257]
+        - generic [ref=e258]:
+          - generic [ref=e259]: Digest 6
+          - time [ref=e260]: 07/07 13:00
+        - generic [ref=e261]: Low memory digest 06
+        - paragraph [ref=e263]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e265]:
+        - button "查看邮件：Digest 7，07/07 12:00，Low memory digest 07" [ref=e266] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 07" [ref=e268]
+        - generic [ref=e269]:
+          - generic [ref=e270]: Digest 7
+          - time [ref=e271]: 07/07 12:00
+        - generic [ref=e272]: Low memory digest 07
+        - paragraph [ref=e274]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e276]:
+        - button "查看邮件：Digest 8，07/07 11:00，Low memory digest 08" [ref=e277] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 08" [ref=e279]
+        - generic [ref=e280]:
+          - generic [ref=e281]: Digest 8
+          - time [ref=e282]: 07/07 11:00
+        - generic [ref=e283]: Low memory digest 08
+        - paragraph [ref=e285]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e287]:
+        - button "查看邮件：Digest 9，07/07 10:00，Low memory digest 09" [ref=e288] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 09" [ref=e290]
+        - generic [ref=e291]:
+          - generic [ref=e292]: Digest 9
+          - time [ref=e293]: 07/07 10:00
+        - generic [ref=e294]: Low memory digest 09
+        - paragraph [ref=e296]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e298]:
+        - button "查看邮件：Digest 10，07/07 09:00，Low memory digest 10" [ref=e299] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 10" [ref=e301]
+        - generic [ref=e302]:
+          - generic [ref=e303]: Digest 10
+          - time [ref=e304]: 07/07 09:00
+        - generic [ref=e305]: Low memory digest 10
+        - paragraph [ref=e307]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e309]:
+        - button "查看邮件：Digest 11，07/07 08:00，Low memory digest 11" [ref=e310] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 11" [ref=e312]
+        - generic [ref=e313]:
+          - generic [ref=e314]: Digest 11
+          - time [ref=e315]: 07/07 08:00
+        - generic [ref=e316]: Low memory digest 11
+        - paragraph [ref=e318]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e320]:
+        - button "查看邮件：Digest 12，07/07 07:00，Low memory digest 12" [ref=e321] [cursor=pointer]
+        - generic: D
+        - checkbox "选择 Low memory digest 12" [ref=e323]
+        - generic [ref=e324]:
+          - generic [ref=e325]: Digest 12
+          - time [ref=e326]: 07/07 07:00
+        - generic [ref=e327]: Low memory digest 12
+        - paragraph [ref=e329]: 用于验证邮件列表首屏分页和加载更多，不一次性渲染全部邮件。
+      - generic [ref=e331]:
+        - text: 已显示 40 封 ·
+        - button "加载更多" [ref=e332] [cursor=pointer]
+  - button "调整邮件列表宽度" [ref=e143]
+  - article [ref=e333]:
+    - generic [ref=e334]:
+      - generic [ref=e335]:
+        - heading "安全检查清单" [level=1] [ref=e410]
+        - generic [ref=e337]:
+          - generic "Security Team" [ref=e411]: S
+          - generic [ref=e339]:
+            - strong [ref=e340]: Security Team
+            - generic [ref=e341]: security@example.com 发给 demo@better-email.local
+      - generic "邮件操作" [ref=e342]:
+        - button "取消星标" [ref=e412] [cursor=pointer]
+        - button "回复" [ref=e346] [cursor=pointer]
+        - button "回复全部" [ref=e351] [cursor=pointer]
+        - button "转发" [ref=e356] [cursor=pointer]
+        - button "新邮件" [ref=e360] [cursor=pointer]
+        - button "归档" [ref=e364] [cursor=pointer]
+        - button "标为未读" [ref=e368] [cursor=pointer]
+        - button "删除" [ref=e372] [cursor=pointer]
+        - group [ref=e376]:
+          - generic "更多操作" [ref=e377] [cursor=pointer]
+    - generic [ref=e382]:
+      - generic [ref=e383]: 07/09 10:00
+      - generic [ref=e384]: demo@better-email.local
+      - generic [ref=e413]: 含附件
+    - generic [ref=e385]:
+      - generic [ref=e414]: 重要
+      - group [ref=e387]:
+        - generic "标签" [ref=e388] [cursor=pointer]
+    - generic [ref=e416]:
+      - generic [ref=e417]:
+        - generic [ref=e418]:
+          - strong [ref=e419]: 附件
+          - generic [ref=e420]: 1 个 · 180 KB
+        - button "下载全部 1 个" [ref=e421] [cursor=pointer]
+      - generic [ref=e426]:
+        - generic [ref=e427]: PDF
+        - generic [ref=e429]:
+          - strong [ref=e430]: security-checklist.pdf
+          - generic [ref=e431]: PDF 文档 · 180 KB · 未下载
+        - button "下载" [ref=e433] [cursor=pointer]
+    - generic [ref=e434]:
+      - generic [ref=e435]:
+        - strong [ref=e436]: 安全提示
+        - generic [ref=e437]: 远程图片默认阻止
+      - paragraph [ref=e438]: 检测到远程图片，默认已阻止自动加载。
+      - paragraph [ref=e439]: 网页链接已隐藏，查看后可确认目标地址。
+      - generic [ref=e440]:
+        - button "查看链接" [ref=e441] [cursor=pointer]
+        - button "显示本封图片" [ref=e442] [cursor=pointer]
+        - button "信任发件人" [ref=e443] [cursor=pointer]
+        - button "信任 example.com" [ref=e444] [cursor=pointer]
+    - generic [ref=e447]:
+      - paragraph [ref=e448]: Better Email 的 HTML 安全预览已就绪。
+      - text: 已隐藏链接
+      - img "Better Email" [ref=e449]
+    - region "快速回复" [ref=e450]:
+      - generic [ref=e452]:
+        - strong [ref=e453]: 回复
+        - generic [ref=e454]: 发给 Security Team
+      - textbox "输入回复" [ref=e458]
+      - generic [ref=e460]:
+        - button "写信窗口" [ref=e461] [cursor=pointer]
+        - button "清空" [disabled] [ref=e462]
+        - button "发送回复" [disabled] [ref=e463]
+  - status: 本地原型已就绪

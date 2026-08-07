@@ -6,7 +6,6 @@ import {
   Loader2,
   Mail,
   MailOpen,
-  MailPlus,
   MoreHorizontal,
   Reply,
   ReplyAll,
@@ -38,7 +37,6 @@ type ReaderToolbarProps = {
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
-  onComposeNew: () => void;
   onRestoreFromTrash: () => void;
   onMoveArchive: () => void;
   onToggleRead: (message: Message) => void;
@@ -71,7 +69,6 @@ export default function ReaderToolbar({
   onToggleStar,
   onEditDraft,
   onComposeFromMessage,
-  onComposeNew,
   onRestoreFromTrash,
   onMoveArchive,
   onToggleRead,
@@ -96,21 +93,15 @@ export default function ReaderToolbar({
         <SenderIdentity message={selected} />
       </div>
       <div className="reader-actions" aria-label="邮件操作">
-        <button
-          className="icon-only-action"
-          title={selected.is_starred ? '取消星标' : '添加星标'}
-          aria-label={selected.is_starred ? '取消星标' : '添加星标'}
-          onClick={() => onToggleStar(selected)}
-        >
-          <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
-        </button>
         {isDraft ? (
-          <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
-            <MailOpen size={16} />
-            <span>继续编辑</span>
-          </button>
+          <div className="reader-action-group reader-response-actions" role="group" aria-label="草稿操作">
+            <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
+              <MailOpen size={16} />
+              <span>继续编辑</span>
+            </button>
+          </div>
         ) : (
-          <>
+          <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
             <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
               <Reply size={16} />
               <span>回复</span>
@@ -131,36 +122,43 @@ export default function ReaderToolbar({
             >
               <Forward size={17} />
             </button>
-            <button className="icon-only-action" title="新邮件" aria-label="新邮件" onClick={() => onComposeNew()}>
-              <MailPlus size={17} />
-            </button>
-          </>
+          </div>
         )}
-        {isTrash ? (
-          <button title="恢复邮件" onClick={onRestoreFromTrash}>
-            <RotateCcw size={16} />
-            <span>恢复</span>
-          </button>
-        ) : !isDraft && (
-          <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
-            <Archive size={16} />
-          </button>
-        )}
-        {!isDraft && (
+        <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
           <button
             className="icon-only-action"
-            aria-label={selected.is_read ? '标为未读' : '标为已读'}
-            title={selected.is_read ? '标为未读' : '标为已读'}
-            onClick={() => onToggleRead(selected)}
+            title={selected.is_starred ? '取消星标' : '添加星标'}
+            aria-label={selected.is_starred ? '取消星标' : '添加星标'}
+            onClick={() => onToggleStar(selected)}
           >
-            <Mail size={16} />
+            <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
           </button>
-        )}
-        {!isTrash && (
-          <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
-            <Trash2 size={16} />
-          </button>
-        )}
+          {isTrash ? (
+            <button title="恢复邮件" onClick={onRestoreFromTrash}>
+              <RotateCcw size={16} />
+              <span>恢复</span>
+            </button>
+          ) : !isDraft && (
+            <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
+              <Archive size={16} />
+            </button>
+          )}
+          {!isDraft && (
+            <button
+              className="icon-only-action"
+              aria-label={selected.is_read ? '标为未读' : '标为已读'}
+              title={selected.is_read ? '标为未读' : '标为已读'}
+              onClick={() => onToggleRead(selected)}
+            >
+              <Mail size={16} />
+            </button>
+          )}
+          {!isTrash && (
+            <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
         <details className="reader-more-menu compact-menu">
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
             <MoreHorizontal size={17} />

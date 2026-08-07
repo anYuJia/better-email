@@ -1,13 +1,13 @@
 /* Reader quick reply: quiet inline composer, not a floating card. */
 .quick-reply {
   max-width: none;
-  margin-top: 20px;
-  padding: 12px 0 0;
+  margin-top: 24px;
+  padding: 16px 0 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   overflow: visible;
   border: 0;
-  border-top: 1px solid #e3e6ea;
+  border-top: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -32,14 +32,14 @@
 }
 
 .quick-reply > header strong {
-  color: #222933;
+  color: var(--ui-text);
   font-size: 13px;
   font-weight: 650;
 }
 
 .quick-reply > header span {
   overflow: hidden;
-  color: #8a929d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   font-weight: 400;
   text-overflow: ellipsis;

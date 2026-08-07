@@ -357,7 +357,6 @@ if (activeThread && threadMessages.length > 0) {
             labels={labels}
             onSelectMessage={onSelectMessage}
             onRunThreadAction={onRunThreadAction}
-            onComposeNew={onComposeNew}
             onComposeFromMessage={onComposeFromMessage}
             onMoveThreadToFolder={onMoveThreadToFolder}
             onToggleThreadLabel={onToggleThreadLabel}
@@ -411,7 +410,6 @@ if (activeThread && threadMessages.length > 0) {
           onToggleStar={onToggleStar}
           onEditDraft={onEditDraft}
           onComposeFromMessage={onComposeFromMessage}
-          onComposeNew={onComposeNew}
           onRestoreFromTrash={onRestoreFromTrash}
           onMoveArchive={onMoveArchive}
           onToggleRead={onToggleRead}

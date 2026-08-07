@@ -1,0 +1,62 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: B
+      - strong [ref=e8]: Better Email
+    - region "邮箱范围" [ref=e9]:
+      - button "统一邮箱 3 个账号" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]:
+          - strong [ref=e12]: 统一邮箱
+          - generic [ref=e13]: 3 个账号
+    - button "写邮件" [ref=e16] [cursor=pointer]
+    - generic [ref=e19]: 邮箱
+    - navigation [ref=e20]:
+      - button "收件箱 1" [ref=e22] [cursor=pointer]:
+        - generic [ref=e23]: 收件箱
+        - generic [ref=e27]: "1"
+      - button "已发送" [ref=e29] [cursor=pointer]
+      - button "草稿箱" [ref=e35] [cursor=pointer]
+      - button "归档" [ref=e40] [cursor=pointer]
+      - generic [ref=e45]:
+        - button "废纸篓" [ref=e46] [cursor=pointer]
+        - button "废纸篓 更多操作" [ref=e52] [cursor=pointer]
+      - generic [ref=e57]:
+        - button "垃圾邮件" [ref=e58] [cursor=pointer]
+        - button "垃圾邮件 更多操作" [ref=e64] [cursor=pointer]
+      - generic [ref=e69]:
+        - button "稍后处理" [ref=e70] [cursor=pointer]
+        - button "稍后处理 更多操作" [ref=e76] [cursor=pointer]
+    - group [ref=e82]:
+      - generic "工具" [ref=e83]
+    - generic [ref=e85]:
+      - button "设置" [ref=e86] [cursor=pointer]
+      - button "快捷键" [ref=e91] [cursor=pointer]
+  - button "调整侧边栏宽度" [ref=e95]
+  - generic [ref=e96]:
+    - generic [ref=e97]:
+      - generic [ref=e98]:
+        - textbox "搜索主题、发件人、正文" [ref=e103]
+        - group [ref=e104]:
+          - generic "搜索范围：当前文件夹" [ref=e105] [cursor=pointer]: 文件夹
+      - button "获取新邮件" [ref=e109] [cursor=pointer]
+    - generic [ref=e116]:
+      - generic [ref=e117]:
+        - strong [ref=e118]: 收件箱
+        - generic [ref=e119]: 0 封
+      - generic [ref=e120]:
+        - button "邮件" [ref=e121] [cursor=pointer]
+        - button "会话" [ref=e122] [cursor=pointer]
+        - group [ref=e123]:
+          - generic "筛选" [ref=e124] [cursor=pointer]
+        - group [ref=e127]:
+          - generic "最新优先" [ref=e128] [cursor=pointer]
+    - generic [ref=e134]:
+      - strong [ref=e139]: 当前邮箱暂无可显示邮件
+      - generic [ref=e140]: 当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。
+      - button "刷新邮箱" [ref=e142] [cursor=pointer]
+  - button "调整邮件列表宽度" [ref=e143]
+  - generic [ref=e146]:
+    - strong [ref=e151]: 选择一封邮件开始阅读
+    - generic [ref=e152]: 常用动作会保持可见，整理与安全选项按需展开。
+    - button "新邮件" [ref=e153] [cursor=pointer]
+  - status: 本地原型已就绪

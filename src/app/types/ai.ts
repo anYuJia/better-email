@@ -8,6 +8,10 @@ export type AiServiceConfig = {
   defaultModel: string;
   timeoutSeconds: number;
   privacyAcknowledged: boolean;
+  /* Parallel MCP Server Gateway Configuration */
+  mcpEnabled?: boolean;
+  mcpEndpoint?: string;
+  mcpApiKey?: string;
 };
 
 export type AiChatMessage = {

@@ -11,6 +11,9 @@ export const defaultAiServiceConfig: AiServiceConfig = {
   defaultModel: 'gpt-4o-mini',
   timeoutSeconds: 30,
   privacyAcknowledged: false,
+  mcpEnabled: false,
+  mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+  mcpApiKey: '',
 };
 
 export function loadAiServiceConfig(): AiServiceConfig {
@@ -33,6 +36,11 @@ export function loadAiServiceConfig(): AiServiceConfig {
           ? Math.min(parsed.timeoutSeconds, 300)
           : defaultAiServiceConfig.timeoutSeconds,
       privacyAcknowledged: parsed.privacyAcknowledged === true,
+      mcpEnabled: parsed.mcpEnabled === true,
+      mcpEndpoint: typeof parsed.mcpEndpoint === 'string' && parsed.mcpEndpoint.trim()
+        ? parsed.mcpEndpoint.trim()
+        : defaultAiServiceConfig.mcpEndpoint,
+      mcpApiKey: typeof parsed.mcpApiKey === 'string' ? parsed.mcpApiKey : '',
     };
   } catch {
     return { ...defaultAiServiceConfig };

@@ -245,6 +245,50 @@ export default function AiServiceSettings() {
             </div>
           )}
         </SettingsSection>
+
+        {/* 模块四：MCP (Model Context Protocol) 独立服务端配置 */}
+        <SettingsSection
+          title="MCP 服务端 (Model Context Protocol)"
+          description="本地暴露出 MCP 接口，供外部 AI 工具（如 Cursor、Claude Desktop、Antigravity Agent）连接访问上下文"
+          badge={
+            <SettingsBadge tone={config.mcpEnabled ? 'success' : 'neutral'}>
+              {config.mcpEnabled ? 'MCP 服务已开启' : 'MCP 未开启'}
+            </SettingsBadge>
+          }
+          dataSection="ai-mcp-gateway"
+        >
+          <SettingsSwitch
+            label="开启 MCP 网关服务"
+            description="开启后允许外部 AI 客户端调用 JSON-RPC over HTTP 端点检索邮件数据与工具集。"
+            checked={Boolean(config.mcpEnabled)}
+            onChange={(checked) => patchConfig({ mcpEnabled: checked })}
+          />
+
+          {config.mcpEnabled && (
+            <div className="st-field-grid" style={{ marginTop: '12px' }}>
+              <SettingsField label="MCP 网关地址">
+                <input
+                  className="settings-text-input"
+                  type="url"
+                  placeholder="http://127.0.0.1:8080/mcp"
+                  value={config.mcpEndpoint || ''}
+                  onChange={(event) => patchConfig({ mcpEndpoint: event.target.value })}
+                />
+              </SettingsField>
+
+              <SettingsField label="MCP 访问密钥 (可选)">
+                <input
+                  className="settings-text-input"
+                  type="password"
+                  placeholder="设置鉴权 Token (Bearer)"
+                  value={config.mcpApiKey || ''}
+                  onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
+                  autoComplete="off"
+                />
+              </SettingsField>
+            </div>
+          )}
+        </SettingsSection>
       </div>
     </div>
   );

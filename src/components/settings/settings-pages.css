@@ -2908,8 +2908,9 @@
   transition: opacity 120ms ease;
 }
 
-.settings-modal .settings-ai-config-area.is-dimmed {
-  opacity: 0.5;
+.settings-modal .settings-ai-page-stack {
+  display: grid;
+  gap: 16px;
 }
 
 .settings-modal .settings-ai-service-options {

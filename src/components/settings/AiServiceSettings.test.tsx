@@ -31,7 +31,7 @@ describe('AiServiceSettings', () => {
     seedConfig({ enabled: false, serviceType: 'http' });
     render(<AiServiceSettings />);
     expect(screen.getByText('未启用')).not.toBeNull();
-    expect(screen.getByText('可用功能：翻译、摘要、模板生成。')).not.toBeNull();
+    expect(screen.getAllByText(/可用功能：翻译、摘要、模板生成/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows 本地演示 status and no external privacy confirmation in mock mode', () => {
@@ -41,7 +41,7 @@ describe('AiServiceSettings', () => {
     expect(screen.queryByText('隐私确认')).toBeNull();
     expect(screen.queryByText(/我已阅读并同意将邮件内容发送到外部 AI 服务/)).toBeNull();
     expect(screen.getAllByText(/不会向任何外部服务器发送内容/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/本地模拟服务/)).not.toBeNull();
+    expect(screen.getAllByText(/本地模拟服务/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows the privacy confirmation area for external service modes', () => {

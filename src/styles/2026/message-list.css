@@ -44,9 +44,9 @@
 }
 
 .search-box:focus-within {
-  border-color: rgba(8, 127, 245, 0.48);
+  border-color: #93c5fd;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.12);
+  box-shadow: none;
 }
 
 .search-box input {
@@ -246,9 +246,33 @@
 }
 
 .bulk-toolbar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 12px;
+  z-index: 12;
+  width: max-content;
+  max-width: calc(100% - 20px);
   min-height: 43px;
+  margin-inline: auto;
+  padding: 5px 6px;
   border-bottom: 1px solid var(--ui-border);
-  background: #f7faff;
+  border: 1px solid #c7d4e0;
+  border-radius: 8px;
+  color: #35485c;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(26, 44, 66, 0.16);
+  backdrop-filter: none;
+  transform: none;
+  overflow: visible;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* The bulk toolbar is pinned near the bottom of the list, so its menu must
+   expand into the available space above it instead of being clipped below. */
+.bulk-toolbar .bulk-more-menu > div {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 .message-list,

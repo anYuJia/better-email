@@ -573,7 +573,7 @@ export default function App() {
     const validationDraft = createValidationDraft();
     if (!validationDraft) return;
     setSettingsOpen(false);
-    setRichComposer(false);
+    setRichComposer(true);
     openComposer(validationDraft);
     setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
   }
@@ -795,7 +795,7 @@ export default function App() {
       try {
         const unlistenCompose = await listen('tray://compose', () => {
           if (!active || isAccountLoginActive) return;
-          setRichComposer(false);
+          setRichComposer(true);
           openComposer(emptyDraft);
           setStatus('已打开新邮件');
         });
@@ -1160,7 +1160,7 @@ export default function App() {
     openShortcuts: () => setShortcutsOpen(true),
     composeNew: () => {
       setDraft(emptyDraft);
-      setRichComposer(false);
+      setRichComposer(true);
       openComposer(emptyDraft);
       setStatus('已打开新邮件');
     },
@@ -1264,7 +1264,7 @@ export default function App() {
           if (isDraftEmpty(draft) && composerAutosave) {
             openComposer(undefined, { restoreAutosave: true });
           } else {
-            setRichComposer(false);
+            setRichComposer(true);
             openComposer(emptyDraft);
             setStatus('已打开新邮件');
           }
@@ -1406,7 +1406,7 @@ export default function App() {
         quickReplyBody={quickReplyBody}
         onSelectMessage={selectMessageForReading}
         onComposeNew={(fields) => {
-          setRichComposer(false);
+          setRichComposer(true);
           openComposer({
             ...emptyDraft,
             account_id: account?.id ?? accounts[0]?.id ?? 0,
@@ -1489,7 +1489,6 @@ export default function App() {
           onDeleteTemplate={deleteComposeTemplate}
           onTemplateNameChange={setTemplateName}
           onSaveTemplate={saveDraftAsTemplate}
-          onRichComposerChange={setRichComposer}
           onInsertSignature={insertSignatureIntoDraft}
           onPickAttachments={() => { pickDraftAttachments().catch((error) => setStatus(String(error))); }}
           onRemoveAttachment={removeDraftAttachment}
@@ -1565,7 +1564,6 @@ export default function App() {
           syncSchedulePlan={syncSchedulePlan}
           imapMailboxes={imapMailboxes}
           folders={folders}
-          syncRuns={syncRuns}
           outbox={outbox}
           labels={labels}
           rules={rules}
@@ -1673,7 +1671,7 @@ export default function App() {
           onIdentityFormChange={setIdentityForm}
           onEditIdentity={editIdentity}
           onDeleteIdentity={deleteIdentity}
-          onSaveIdentity={() => { saveIdentity().catch((error) => setStatus(String(error))); }}
+          onSaveIdentity={() => saveIdentity()}
           onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
           onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
           onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
@@ -1708,7 +1706,7 @@ export default function App() {
           filteredContacts={filteredContacts}
           contactQuery={contactQuery}
           onContactQueryChange={setContactQuery}
-          onCreateContact={() => { createManagedContact().catch((error) => setStatus(String(error))); }}
+          onCreateContact={createManagedContact}
           onEditNameChange={setContactEditName}
           onEditAliasesChange={setContactEditAliases}
           onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}
@@ -1727,7 +1725,7 @@ export default function App() {
           onRuleConditionValueChange={updateRuleConditionValue}
           onRuleLabelActionChange={updateRuleLabelAction}
           onToggleRuleAction={toggleRuleAction}
-          onSaveRule={() => { saveRule().catch((error) => setStatus(String(error))); }}
+          onSaveRule={saveRule}
           onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
           onEditRule={editRule}
           onRemoveRule={(rule) => { removeRule(rule); }}

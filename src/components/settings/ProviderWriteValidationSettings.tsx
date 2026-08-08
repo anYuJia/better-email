@@ -50,15 +50,17 @@ export default function ProviderWriteValidationSettings({
     >
       <SettingsNotice tone="info">
         <p>
-          草稿不会自动发送，也不会自动添加附件。请检查收件人，按需添加不含敏感信息的小文件，
-          再手动发送并验证已发送留档、自发自收、附件读取和远端状态回写。
+          验证草稿仅发给当前账号，发送前请手动确认收件人；不要在草稿或附件中放入密码、授权码或 Token。
         </p>
-        <ol>
-          <li>默认收件人为当前账号，避免向第三方发送测试邮件。</li>
-          <li>主题包含唯一验证编号，便于在已发送和收件箱中定位。</li>
-          <li>不要在草稿或附件中放入密码、授权码或 Token。</li>
-        </ol>
       </SettingsNotice>
+      <details className="write-validation-guidance">
+        <summary>查看验证说明</summary>
+        <ol>
+          <li>草稿不会自动发送，也不会自动添加附件。</li>
+          <li>主题包含唯一验证编号，可在已发送和收件箱中定位。</li>
+          <li>发送后可依次确认留档、自发自收、附件读取和远端状态回写。</li>
+        </ol>
+      </details>
       {status && (
         <section
           className="write-validation-status"

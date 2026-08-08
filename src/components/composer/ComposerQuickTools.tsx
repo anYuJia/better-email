@@ -1,14 +1,13 @@
 import type React from 'react';
 import { Bold, FileSignature, Italic, List, Paperclip } from 'lucide-react';
 import type { DraftInput } from '../../app/types';
+import { plainTextToRichHtml } from './composerBody';
 
 type ComposerQuickToolsProps = {
   draft: DraftInput;
-  richComposer: boolean;
   dropActive: boolean;
   signature: string;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
-  onRichComposerChange: (value: boolean) => void;
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onAttachmentDrop: React.DragEventHandler<HTMLElement>;
@@ -19,11 +18,9 @@ type ComposerQuickToolsProps = {
 
 export default function ComposerQuickTools({
   draft,
-  richComposer,
   dropActive,
   signature,
   onPatchDraft,
-  onRichComposerChange,
   onInsertSignature,
   onPickAttachments,
   onAttachmentDrop,
@@ -31,56 +28,45 @@ export default function ComposerQuickTools({
   onAttachmentDragLeave,
   onAttachmentDragOver,
 }: ComposerQuickToolsProps) {
+  const richHtml = draft.html_body || plainTextToRichHtml(draft.body);
+
   return (
     <section className="composer-quick-tools" aria-label="写信常用工具">
       <div className="composer-quick-toolbar">
-        <div className="composer-rich-toggle">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={richComposer}
-              onChange={(event) => onRichComposerChange(event.target.checked)}
-            />
-            富文本
-          </label>
-          {richComposer && (
-            <div className="rich-toolbar">
-              <button
-                type="button"
-                title="加粗"
-                aria-label="加粗 B"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<strong>加粗文字</strong>`,
-                  body: `${draft.body}加粗文字`,
-                })}
-              >
-                <Bold size={14} />
-                <span>B</span>
-              </button>
-              <button
-                type="button"
-                title="斜体"
-                aria-label="斜体 I"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<em>斜体文字</em>`,
-                  body: `${draft.body}斜体文字`,
-                })}
-              >
-                <Italic size={14} />
-                <span>I</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onPatchDraft({
-                  html_body: `${draft.html_body}<ul><li>列表项</li></ul>`,
-                  body: `${draft.body}\n- 列表项`,
-                })}
-              >
-                <List size={14} />
-                列表
-              </button>
-            </div>
-          )}
+        <div className="rich-toolbar" aria-label="富文本格式">
+          <button
+            type="button"
+            title="加粗"
+            aria-label="加粗"
+            onClick={() => onPatchDraft({
+              html_body: `${richHtml}<strong>加粗文字</strong>`,
+              body: `${draft.body}加粗文字`,
+            })}
+          >
+            <Bold size={14} />
+          </button>
+          <button
+            type="button"
+            title="斜体"
+            aria-label="斜体"
+            onClick={() => onPatchDraft({
+              html_body: `${richHtml}<em>斜体文字</em>`,
+              body: `${draft.body}斜体文字`,
+            })}
+          >
+            <Italic size={14} />
+          </button>
+          <button
+            type="button"
+            title="插入列表"
+            aria-label="插入列表"
+            onClick={() => onPatchDraft({
+              html_body: `${richHtml}<ul><li>列表项</li></ul>`,
+              body: `${draft.body}\n- 列表项`,
+            })}
+          >
+            <List size={14} />
+          </button>
         </div>
 
         <div className="composer-signature">

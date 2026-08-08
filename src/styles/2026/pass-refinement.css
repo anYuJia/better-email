@@ -46,16 +46,6 @@ body {
   gap: 9px;
 }
 
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: #22272e;
-  color: #fff;
-  box-shadow: none;
-  font-size: 12px;
-}
-
 .brand strong {
   color: var(--ui-text);
   font-size: 13px;
@@ -261,9 +251,9 @@ body {
 }
 
 .search-box:focus-within {
-  border-color: rgba(8, 127, 245, 0.48);
+  border-color: #93c5fd;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(31, 35, 40, 0.06);
 }
 
 .search-box > svg {

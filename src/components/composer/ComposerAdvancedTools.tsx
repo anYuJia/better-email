@@ -1,4 +1,4 @@
-import { Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -50,6 +50,7 @@ function ComposerInlineSelect({ label, ariaLabel, value, options, onChange }: Co
           label: option.label,
           meta: option.meta,
         }))}
+        dense
         onChange={(nextValue) => onChange(Number(nextValue))}
       />
     </div>
@@ -85,64 +86,51 @@ export default function ComposerAdvancedTools({
     <details className="composer-advanced">
       <summary>
         <SlidersHorizontal size={15} />
-        发送选项
+        <strong>发送选项</strong>
         <span>
-          {draft.send_at.trim() ? '已设置定时发送' : '账号 · 抄送 · 模板 · 定时'}
+          {draft.send_at.trim() ? '已设置定时发送' : '账号、身份、密送和模板'}
         </span>
+        <ChevronDown className="composer-advanced-chevron" size={14} aria-hidden="true" />
       </summary>
       <div className="composer-advanced-panel">
-        <section className="composer-tool-card composer-delivery-card">
-          <div className="composer-advanced-row composer-route-row">
-            <ComposerInlineSelect
-              label="账号"
-              ariaLabel="发件账号"
-              value={accountId}
-              options={accountOptions}
-              onChange={(nextAccountId) => onPatchDraft({ account_id: nextAccountId, identity_id: 0 })}
+        <section className="composer-delivery-controls" aria-label="发送信息">
+          <ComposerInlineSelect
+            label="账号"
+            ariaLabel="发件账号"
+            value={accountId}
+            options={accountOptions}
+            onChange={(nextAccountId) => onPatchDraft({ account_id: nextAccountId, identity_id: 0 })}
+          />
+          <ComposerInlineSelect
+            label="身份"
+            ariaLabel="发件身份"
+            value={identityId}
+            options={identityOptions}
+            onChange={(nextIdentityId) => onPatchDraft({ identity_id: nextIdentityId })}
+          />
+          <label className="composer-inline-input">
+            <span>密送</span>
+            <input
+              autoComplete="off"
+              value={draft.bcc}
+              onChange={(event) => onPatchDraft({ bcc: event.target.value })}
+              placeholder="可选"
             />
-            <ComposerInlineSelect
-              label="身份"
-              ariaLabel="发件身份"
-              value={identityId}
-              options={identityOptions}
-              onChange={(nextIdentityId) => onPatchDraft({ identity_id: nextIdentityId })}
+          </label>
+          <label className="composer-schedule">
+            <span>
+              <Clock3 size={13} />
+              定时
+            </span>
+            <input
+              type="datetime-local"
+              value={draft.send_at}
+              onChange={(event) => onPatchDraft({ send_at: event.target.value })}
             />
-          </div>
-
-          <div className="composer-advanced-row composer-options-row">
-            <label className="composer-inline-input">
-              <span>抄送</span>
-              <input
-                autoComplete="off"
-                value={draft.cc}
-                onChange={(event) => onPatchDraft({ cc: event.target.value })}
-                placeholder="可选"
-              />
-            </label>
-            <label className="composer-inline-input">
-              <span>密送</span>
-              <input
-                autoComplete="off"
-                value={draft.bcc}
-                onChange={(event) => onPatchDraft({ bcc: event.target.value })}
-                placeholder="可选"
-              />
-            </label>
-            <label className="composer-schedule">
-              <span>
-                <Clock3 size={13} />
-                定时
-              </span>
-              <input
-                type="datetime-local"
-                value={draft.send_at}
-                onChange={(event) => onPatchDraft({ send_at: event.target.value })}
-              />
-            </label>
-          </div>
+          </label>
         </section>
 
-        <section className="composer-tool-card composer-template-card">
+        <section className="composer-template-controls" aria-label="邮件模板">
           <div className="composer-template-list">
             {templates.length === 0 && <small>暂无模板</small>}
             {templates.slice(0, 6).map((template) => (

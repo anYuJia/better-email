@@ -1,4 +1,5 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   ruleActionParts,
   ruleActionPresets,
@@ -32,7 +33,7 @@ type RuleAutomationSettingsProps = {
   onRuleConditionValueChange: (value: string) => void;
   onRuleLabelActionChange: (label: string) => void;
   onToggleRuleAction: (action: string) => void;
-  onSaveRule: () => void;
+  onSaveRule: () => Promise<void>;
   onToggleRule: (rule: MailRule) => void;
   onEditRule: (rule: MailRule) => void;
   onRemoveRule: (rule: MailRule) => void;
@@ -55,6 +56,46 @@ export default function RuleAutomationSettings({
   onEditRule,
   onRemoveRule,
 }: RuleAutomationSettingsProps) {
+  const [saveIssue, setSaveIssue] = useState<{ field: 'name' | 'condition' | 'action' | 'save'; message: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function clearSaveIssue() {
+    if (saveIssue) setSaveIssue(null);
+  }
+
+  function validateRule() {
+    if (!ruleForm.name.trim()) {
+      return { field: 'name' as const, message: '请填写规则名称。' };
+    }
+    const condition = ruleForm.condition.trim();
+    if (!condition || /\bcontains$/i.test(condition)) {
+      return { field: 'condition' as const, message: '请填写要匹配的关键词、邮箱或地址。' };
+    }
+    const actions = ruleActionParts(ruleForm.action);
+    if (actions.length === 0 || actions.every((action) => action.toLowerCase() === 'apply label')) {
+      return { field: 'action' as const, message: '请至少选择一个处理操作，或指定要添加的标签。' };
+    }
+    return null;
+  }
+
+  async function handleSaveRule() {
+    const issue = validateRule();
+    if (issue) {
+      setSaveIssue(issue);
+      return;
+    }
+    setSaveIssue(null);
+    setSaving(true);
+    try {
+      await onSaveRule();
+    } catch (error) {
+      const message = error instanceof Error ? error.message.replace(/^Error:\s*/i, '') : String(error);
+      setSaveIssue({ field: 'save', message: message || '无法保存规则，请稍后重试。' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <SettingsSection
       title="处理规则"
@@ -63,81 +104,123 @@ export default function RuleAutomationSettings({
       dataSection="rules"
     >
       <div className="settings-rule-editor">
-        <SettingsField label="规则名称">
+        <header className="settings-rule-editor-header">
+          <span>
+            <strong>{editingRuleId ? '编辑规则' : '新建规则'}</strong>
+            <small>先设置匹配条件，再选择邮件到达后的处理方式。</small>
+          </span>
+        </header>
+        <SettingsField label="规则名称" error={saveIssue?.field === 'name' ? saveIssue.message : undefined}>
           <input
             value={ruleForm.name}
-            onChange={(event) => onRuleFormChange({ ...ruleForm, name: event.target.value })}
+            aria-invalid={saveIssue?.field === 'name'}
+            onChange={(event) => {
+              clearSaveIssue();
+              onRuleFormChange({ ...ruleForm, name: event.target.value });
+            }}
             placeholder="规则名称"
           />
         </SettingsField>
         <div className="settings-rule-builder">
-          <label>
-            <span>如果</span>
-            <CustomSelect
-              ariaLabel="规则条件字段"
-              value={ruleBuilderField}
-              options={ruleConditionFields.map((field) => ({
-                value: field.id,
-                label: field.label,
-              }))}
-              onChange={(nextField) => onRuleConditionFieldChange(nextField as RuleConditionField)}
-            />
-          </label>
-          <label>
-            <span>包含</span>
-            <input
-              value={ruleBuilderNeedle}
-              onChange={(event) => onRuleConditionValueChange(event.target.value)}
-              placeholder="关键词或邮箱"
-            />
-          </label>
-          <label>
-            <span>打标签</span>
-            <CustomSelect
-              ariaLabel="规则标签动作"
-              value={
-                ruleActionParts(ruleForm.action)
-                  .find((part) => part.toLowerCase().startsWith('apply label '))
-                  ?.slice('apply label '.length) ?? ''
-              }
-              options={[
-                { value: '', label: '不打标签' },
-                ...labels.map((label) => ({ value: label.name, label: label.name })),
-              ]}
-              onChange={onRuleLabelActionChange}
-            />
-          </label>
-          <div className="settings-rule-action-chips">
-            {ruleActionPresets.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={ruleActionParts(ruleForm.action).some((part) => part.toLowerCase() === item.id)
-                  ? 'active'
-                  : ''}
-                onClick={() => onToggleRuleAction(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <section className="settings-rule-builder-group">
+            <strong>匹配条件</strong>
+            <div className="settings-rule-condition-fields">
+              <label>
+                <span>字段</span>
+                <CustomSelect
+                  ariaLabel="规则条件字段"
+                  value={ruleBuilderField}
+                  options={ruleConditionFields.map((field) => ({
+                    value: field.id,
+                    label: field.label,
+                  }))}
+                  onChange={(nextField) => onRuleConditionFieldChange(nextField as RuleConditionField)}
+                />
+              </label>
+              <label>
+                <span>包含</span>
+                <input
+                  value={ruleBuilderNeedle}
+                  aria-invalid={saveIssue?.field === 'condition'}
+                  onChange={(event) => {
+                    clearSaveIssue();
+                    onRuleConditionValueChange(event.target.value);
+                  }}
+                  placeholder="关键词或邮箱"
+                />
+                {saveIssue?.field === 'condition' && <small className="st-field-error">{saveIssue.message}</small>}
+              </label>
+            </div>
+          </section>
+          <section className="settings-rule-builder-group">
+            <strong>处理操作</strong>
+            <label className="settings-rule-label-action">
+              <span>打标签</span>
+              <CustomSelect
+                ariaLabel="规则标签动作"
+                value={
+                  ruleActionParts(ruleForm.action)
+                    .find((part) => part.toLowerCase().startsWith('apply label '))
+                    ?.slice('apply label '.length) ?? ''
+                }
+                options={[
+                  { value: '', label: '不打标签' },
+                  ...labels.map((label) => ({ value: label.name, label: label.name })),
+                ]}
+                onChange={(labelName) => {
+                  clearSaveIssue();
+                  onRuleLabelActionChange(labelName);
+                }}
+              />
+            </label>
+            <div className="settings-rule-action-row">
+              <span>附加操作</span>
+              <div className="settings-rule-action-chips">
+                {ruleActionPresets.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={ruleActionParts(ruleForm.action).some((part) => part.toLowerCase() === item.id)
+                      ? 'active'
+                      : ''}
+                    onClick={() => {
+                      clearSaveIssue();
+                      onToggleRuleAction(item.id);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {saveIssue?.field === 'action' && <small className="st-field-error">{saveIssue.message}</small>}
+            </div>
+          </section>
         </div>
         <details className="settings-rule-advanced">
           <summary>规则语法</summary>
           <small>可手动组合多个动作，用分号分隔。</small>
           <input
             value={ruleForm.condition}
-            onChange={(event) => onRuleFormChange({ ...ruleForm, condition: event.target.value })}
+            onChange={(event) => {
+              clearSaveIssue();
+              onRuleFormChange({ ...ruleForm, condition: event.target.value });
+            }}
             placeholder="条件，如 from contains customer"
             aria-label="规则条件语法"
           />
           <input
             value={ruleForm.action}
-            onChange={(event) => onRuleFormChange({ ...ruleForm, action: event.target.value })}
+            onChange={(event) => {
+              clearSaveIssue();
+              onRuleFormChange({ ...ruleForm, action: event.target.value });
+            }}
             placeholder="动作，如 apply label 重要客户; mark read; star; stop processing"
             aria-label="规则动作语法"
           />
         </details>
+        {saveIssue?.field === 'save' && (
+          <p className="settings-rule-save-error" role="alert">无法保存规则：{saveIssue.message}</p>
+        )}
         <div className="settings-rule-footer">
           <SettingsSwitch
             label="启用规则"
@@ -145,8 +228,13 @@ export default function RuleAutomationSettings({
             checked={ruleForm.enabled}
             onChange={(checked) => onRuleFormChange({ ...ruleForm, enabled: checked })}
           />
-          <SettingsButton variant="primary" icon={<Plus size={14} />} onClick={onSaveRule}>
-            {editingRuleId ? '更新规则' : '新增规则'}
+          <SettingsButton
+            variant="primary"
+            icon={saving ? <LoaderCircle className="spinning" size={14} /> : <Plus size={14} />}
+            disabled={saving}
+            onClick={() => { void handleSaveRule(); }}
+          >
+            {saving ? '保存中…' : editingRuleId ? '更新规则' : '新增规则'}
           </SettingsButton>
         </div>
       </div>
@@ -161,13 +249,13 @@ export default function RuleAutomationSettings({
                 <strong>{rule.name}</strong>
                 <small>{rule.condition} → {rule.action}</small>
               </span>
-              <SettingsBadge tone={rule.enabled ? 'success' : 'neutral'}>
-                {rule.enabled ? '启用' : '停用'}
-              </SettingsBadge>
-              <div className="st-actions">
-                <SettingsButton size="sm" onClick={() => onToggleRule(rule)}>
-                  {rule.enabled ? '停用' : '启用'}
-                </SettingsButton>
+              <div className="settings-rule-item-actions">
+                <SettingsSwitch
+                  label=""
+                  ariaLabel={`${rule.enabled ? '停用' : '启用'}规则：${rule.name}`}
+                  checked={rule.enabled}
+                  onChange={() => onToggleRule(rule)}
+                />
                 <SettingsButton size="sm" icon={<Pencil size={13} />} onClick={() => onEditRule(rule)}>
                   编辑
                 </SettingsButton>

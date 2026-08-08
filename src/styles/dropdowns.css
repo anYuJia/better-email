@@ -71,8 +71,15 @@
 
 .custom-select-menu[data-open="true"] .custom-select-summary,
 .custom-select-summary[aria-expanded="true"] {
-  border-color: var(--ui-accent, #0a63c4);
-  box-shadow: 0 0 0 3px rgba(10, 99, 196, 0.2);
+  border-color: #9ca3af;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.custom-select-summary:focus-visible {
+  outline: 2px solid #6b7280;
+  outline-offset: 1px;
+  box-shadow: none;
 }
 
 .custom-select-dropdown {
@@ -142,8 +149,8 @@
 }
 
 .custom-select-dropdown button.active {
-  color: var(--ui-accent, #0a63c4);
-  background: var(--ui-accent-soft, #eaf3fd);
+  color: var(--ui-text, #1d232b);
+  background: #e5e7eb;
 }
 
 .custom-select-dropdown button:disabled {

@@ -19,6 +19,7 @@ import type {
 import {
   emptyContactAliasIssues,
   formatContactAliasIssues,
+  isValidEmailAddress,
   validateContactAliases,
 } from '../../app/uiConfig';
 import useContactImportManager from '../../hooks/useContactImportManager';
@@ -48,7 +49,7 @@ type ContactAutomationSettingsProps = {
   onContactFormChange: (contact: ContactCreateInput) => void;
   onContactFormAliasesChange: (value: string) => void;
   onContactQueryChange: (value: string) => void;
-  onCreateContact: () => void;
+  onCreateContact: () => Promise<void>;
   onEditNameChange: (value: string) => void;
   onEditAliasesChange: (value: string) => void;
   onSaveContactOverride: (contact: Contact) => void;
@@ -115,6 +116,7 @@ export default function ContactAutomationSettings({
   } = useContactImportManager({ setStatus: onStatus });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   useEffect(() => {
     void refreshBatches();
@@ -159,6 +161,29 @@ export default function ContactAutomationSettings({
   const aliasIssueText = formatContactAliasIssues(contactAliasIssues);
   const editAliasIssueText = formatContactAliasIssues(editAliasIssues);
 
+  async function handleCreateContact() {
+    const email = contactForm.email.trim();
+    if (!email) {
+      setCreateError('请输入联系人邮箱。');
+      return;
+    }
+    if (!isValidEmailAddress(email)) {
+      setCreateError('请输入有效的联系人邮箱地址。');
+      return;
+    }
+    if (contactAliasIssues.invalid.length > 0 || contactAliasIssues.duplicatesWithin.length > 0 || contactAliasIssues.takenByOther.length > 0) {
+      setCreateError(`请先修正别名：${aliasIssueText}`);
+      return;
+    }
+    setCreateError('');
+    try {
+      await onCreateContact();
+    } catch (error) {
+      const message = error instanceof Error ? error.message.replace(/^Error:\s*/i, '') : String(error);
+      setCreateError(message || '无法新增联系人，请稍后重试。');
+    }
+  }
+
   return (
     <SettingsSection
       title="联系人管理"
@@ -169,7 +194,7 @@ export default function ContactAutomationSettings({
           <SettingsButton
             size="sm"
             disabled={transferBusy}
-            title="导入 vCard（.vcf / .vcard）、CSV（.csv）或 Excel（.xlsx）联系人"
+            title="导入联系人"
             icon={<FileUp size={14} />}
             onClick={() => setImportDialogOpen(true)}
           >
@@ -193,36 +218,65 @@ export default function ContactAutomationSettings({
     >
 
       <div className="contact-create-form settings-contact-create">
-        <SettingsField label="联系人名称">
-          <input
-            value={contactForm.name}
-            onChange={(event) => onContactFormChange({ ...contactForm, name: event.target.value })}
-            placeholder="联系人名称"
-          />
-        </SettingsField>
-        <SettingsField label="邮箱地址">
-          <input
-            value={contactForm.email}
-            onChange={(event) => onContactFormChange({ ...contactForm, email: event.target.value })}
-            placeholder="邮箱地址"
-          />
-        </SettingsField>
-        <SettingsField label="别名邮箱" hint={aliasIssueText || undefined}>
+        <header className="settings-contact-create-header">
+          <span>
+            <strong>添加联系人</strong>
+            <small>填写常用邮箱和别名，后续可从联系人列表继续维护。</small>
+          </span>
+        </header>
+        <div className="settings-contact-create-fields">
+          <SettingsField label="联系人名称">
+            <input
+              value={contactForm.name}
+              onChange={(event) => {
+                setCreateError('');
+                onContactFormChange({ ...contactForm, name: event.target.value });
+              }}
+              placeholder="联系人名称"
+            />
+          </SettingsField>
+          <SettingsField label="邮箱地址">
+            <input
+              value={contactForm.email}
+              onChange={(event) => {
+                setCreateError('');
+                onContactFormChange({ ...contactForm, email: event.target.value });
+              }}
+              placeholder="name@example.com"
+            />
+          </SettingsField>
+        </div>
+        <SettingsField
+          className="settings-contact-aliases"
+          label="别名邮箱"
+          error={contactAliasIssues.invalid.length > 0 || contactAliasIssues.duplicatesWithin.length > 0 || contactAliasIssues.takenByOther.length > 0 ? aliasIssueText : undefined}
+          hint={contactAliasIssues.invalid.length === 0 && contactAliasIssues.duplicatesWithin.length === 0 && contactAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}
+        >
           <textarea
+            rows={2}
             value={contactFormAliases}
-            onChange={(event) => onContactFormAliasesChange(event.target.value)}
-            placeholder="别名邮箱，逗号、分号或换行分隔"
+            onChange={(event) => {
+              setCreateError('');
+              onContactFormAliasesChange(event.target.value);
+            }}
+            placeholder="alias@example.com"
           />
         </SettingsField>
-        <SettingsSwitch
-          label="设为 VIP"
-          description="可配合通知策略只提醒重要联系人"
-          checked={contactForm.vip}
-          onChange={(checked) => onContactFormChange({ ...contactForm, vip: checked })}
-        />
-        <SettingsButton variant="primary" icon={<UserPlus size={14} />} onClick={onCreateContact}>
-          新增联系人
-        </SettingsButton>
+        <footer className="settings-contact-create-footer">
+          <SettingsSwitch
+            label="设为 VIP"
+            description="可配合通知策略只提醒重要联系人"
+            checked={contactForm.vip}
+            onChange={(checked) => {
+              setCreateError('');
+              onContactFormChange({ ...contactForm, vip: checked });
+            }}
+          />
+          <SettingsButton variant="primary" icon={<UserPlus size={14} />} onClick={() => { void handleCreateContact(); }}>
+            新增联系人
+          </SettingsButton>
+        </footer>
+        {createError && <p className="settings-contact-save-error" role="alert">{createError}</p>}
       </div>
 
       {contacts.length === 0 ? (
@@ -231,47 +285,72 @@ export default function ContactAutomationSettings({
         </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">
-          <SettingsField label="搜索联系人">
-            <div className="settings-contact-search">
-              <Search size={14} aria-hidden="true" />
-              <input
-                value={contactQuery}
-                onChange={(event) => onContactQueryChange(event.target.value)}
-                placeholder="名称、邮箱或别名"
+          <div className="settings-contact-list-toolbar">
+            <SettingsField className="settings-contact-search-field" label="搜索联系人">
+              <div className="settings-contact-search">
+                <Search size={14} aria-hidden="true" />
+                <input
+                  value={contactQuery}
+                  onChange={(event) => onContactQueryChange(event.target.value)}
+                  placeholder="名称、邮箱或别名"
+                />
+                {contactQuery && (
+                  <button
+                    type="button"
+                    className="settings-contact-search-clear"
+                    aria-label="清除搜索"
+                    title="清除搜索"
+                    onClick={() => onContactQueryChange('')}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </SettingsField>
+            <SettingsField
+              className="settings-contact-merge-field"
+              label="合并来源"
+              hint="选择来源后，再点目标联系人的合并按钮。"
+            >
+              <CustomSelect
+                ariaLabel="合并来源"
+                value={mergeSourceContactId !== null ? String(mergeSourceContactId) : ''}
+                options={[
+                  { value: '', label: '选择一个联系人' },
+                  ...contacts.map((contact) => ({
+                    value: String(contact.id),
+                    label: `${contact.name || contact.email} · ${contact.email}`,
+                  })),
+                ]}
+                onChange={(nextValue) => onMergeSourceChange(nextValue ? Number(nextValue) : null)}
               />
-              {contactQuery && (
-                <button
-                  type="button"
-                  className="settings-contact-search-clear"
-                  aria-label="清除搜索"
-                  title="清除搜索"
-                  onClick={() => onContactQueryChange('')}
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </SettingsField>
+            </SettingsField>
+          </div>
           {filteredContacts.map((contact) => (
             <div className="st-data-row contact-tool-row" key={contact.id}>
               {editingContactId === contact.id ? (
                 <div className="contact-edit-form">
-                  <input
-                    value={editName}
-                    onChange={(event) => onEditNameChange(event.target.value)}
-                    placeholder="联系人名称"
-                  />
-                  <div>
+                  <SettingsField className="contact-edit-name" label="联系人名称">
+                    <input
+                      value={editName}
+                      onChange={(event) => onEditNameChange(event.target.value)}
+                      placeholder="联系人名称"
+                    />
+                  </SettingsField>
+                  <SettingsField
+                    className="contact-edit-aliases"
+                    label="别名邮箱"
+                    error={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0 ? editAliasIssueText : undefined}
+                    hint={editAliasIssues.invalid.length === 0 && editAliasIssues.duplicatesWithin.length === 0 && editAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}
+                  >
                     <textarea
+                      rows={2}
                       value={editAliases}
                       onChange={(event) => onEditAliasesChange(event.target.value)}
-                      placeholder="别名邮箱，逗号、分号或换行分隔"
+                      placeholder="alias@example.com"
                     />
-                    {editAliasIssueText && (
-                      <p className="contact-alias-warning">{editAliasIssueText}</p>
-                    )}
-                  </div>
-                  <div className="st-actions">
+                  </SettingsField>
+                  <div className="st-actions contact-edit-actions">
                     <SettingsButton size="sm" variant="primary" onClick={() => onSaveContactOverride(contact)}>保存</SettingsButton>
                     <SettingsButton size="sm" onClick={onCancelEdit}>取消</SettingsButton>
                   </div>
@@ -347,21 +426,6 @@ export default function ContactAutomationSettings({
           )}
         </div>
       )}
-
-      <SettingsField label="合并来源">
-        <CustomSelect
-          ariaLabel="合并来源"
-          value={mergeSourceContactId !== null ? String(mergeSourceContactId) : ''}
-          options={[
-            { value: '', label: '选择一个联系人' },
-            ...contacts.map((contact) => ({
-              value: String(contact.id),
-              label: `${contact.name || contact.email} · ${contact.email}`,
-            })),
-          ]}
-          onChange={(nextValue) => onMergeSourceChange(nextValue ? Number(nextValue) : null)}
-        />
-      </SettingsField>
 
       {confirmUndoBatch && (
         <div className="settings-cache-confirm-backdrop">

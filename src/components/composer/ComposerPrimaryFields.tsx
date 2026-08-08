@@ -11,6 +11,7 @@ import {
 import {
   joinEditableBody,
   parseOriginalQuote,
+  plainTextToRichHtml,
   splitEditableBody,
 } from './composerBody';
 import { normalizeContentId } from '../../app/inlineImages';
@@ -136,10 +137,11 @@ export default function ComposerPrimaryFields({
     const editor = richBodyRef.current;
     if (!editor) return;
     if (document.activeElement === editor) return;
-    if (editor.innerHTML !== draft.html_body) {
-      editor.innerHTML = draft.html_body;
+    const nextHtml = draft.html_body || plainTextToRichHtml(editableBody);
+    if (editor.innerHTML !== nextHtml) {
+      editor.innerHTML = nextHtml;
     }
-  }, [draft.html_body, richComposer]);
+  }, [draft.html_body, editableBody, richComposer]);
 
   useEffect(() => {
     if (!richComposer) return;
@@ -330,6 +332,16 @@ export default function ComposerPrimaryFields({
           </div>
         )}
       </div>
+
+      <label className="composer-field-row">
+        <span>抄送</span>
+        <input
+          autoComplete="off"
+          value={draft.cc}
+          onChange={(event) => onPatchDraft({ cc: event.target.value })}
+          placeholder="抄送（可选）"
+        />
+      </label>
 
       <label className="composer-field-row">
         <span>主题</span>

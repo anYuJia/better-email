@@ -60,7 +60,6 @@ export type ComposerWindowProps = {
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
   onSaveTemplate: () => void;
-  onRichComposerChange: (value: boolean) => void;
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
@@ -102,7 +101,6 @@ export default function ComposerWindow({
   onDeleteTemplate,
   onTemplateNameChange,
   onSaveTemplate,
-  onRichComposerChange,
   onInsertSignature,
   onPickAttachments,
   onRemoveAttachment,
@@ -259,11 +257,9 @@ export default function ComposerWindow({
 
         <ComposerQuickTools
           draft={draft}
-          richComposer={richComposer}
           dropActive={dropActive}
           signature={draftIdentity?.signature.trim() ?? ''}
           onPatchDraft={patchDraft}
-          onRichComposerChange={onRichComposerChange}
           onInsertSignature={onInsertSignature}
           onPickAttachments={onPickAttachments}
           onAttachmentDrop={onAttachmentDrop}

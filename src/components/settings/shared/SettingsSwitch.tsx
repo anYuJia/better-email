@@ -25,6 +25,10 @@ export default function SettingsSwitch({
 }: SettingsSwitchProps) {
   return (
     <label className={`st-switch ${className}`.trim()}>
+      <span className="st-switch-copy">
+        <strong>{label}</strong>
+        {description != null && <small>{description}</small>}
+      </span>
       <input
         type="checkbox"
         checked={checked}
@@ -32,10 +36,6 @@ export default function SettingsSwitch({
         aria-label={ariaLabel}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span className="st-switch-copy">
-        <strong>{label}</strong>
-        {description != null && <small>{description}</small>}
-      </span>
     </label>
   );
 }

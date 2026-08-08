@@ -90,7 +90,14 @@ function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">B</div>
+        <img
+          className="brand-mark"
+          src="/brand-mark.png"
+          alt=""
+          width={28}
+          height={28}
+          draggable={false}
+        />
         <div>
           <strong>Better Email</strong>
         </div>

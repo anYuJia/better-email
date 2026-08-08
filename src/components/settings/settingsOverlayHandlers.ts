@@ -56,7 +56,7 @@ export type SettingsHandlers = {
   onIdentityFormChange: SettingsOverlayProps['onIdentityFormChange'];
   onEditIdentity: SettingsOverlayProps['onEditIdentity'];
   onDeleteIdentity: SettingsOverlayProps['onDeleteIdentity'];
-  onSaveIdentity: () => void;
+  onSaveIdentity: () => Promise<void>;
   onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
@@ -79,7 +79,7 @@ export type SettingsHandlers = {
   onContactFormChange: SettingsOverlayProps['onContactFormChange'];
   onContactFormAliasesChange: SettingsOverlayProps['onContactFormAliasesChange'];
   onContactQueryChange: SettingsOverlayProps['onContactQueryChange'];
-  onCreateContact: () => void;
+  onCreateContact: () => Promise<void>;
   onEditNameChange: SettingsOverlayProps['onEditNameChange'];
   onEditAliasesChange: SettingsOverlayProps['onEditAliasesChange'];
   onSaveContactOverride: SettingsOverlayProps['onSaveContactOverride'];
@@ -98,7 +98,7 @@ export type SettingsHandlers = {
   onRuleConditionValueChange: SettingsOverlayProps['onRuleConditionValueChange'];
   onRuleLabelActionChange: SettingsOverlayProps['onRuleLabelActionChange'];
   onToggleRuleAction: SettingsOverlayProps['onToggleRuleAction'];
-  onSaveRule: () => void;
+  onSaveRule: () => Promise<void>;
   onToggleRule: SettingsOverlayProps['onToggleRule'];
   onEditRule: SettingsOverlayProps['onEditRule'];
   onRemoveRule: SettingsOverlayProps['onRemoveRule'];

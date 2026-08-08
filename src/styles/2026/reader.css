@@ -130,11 +130,16 @@
   font-size: 11.5px;
 }
 
-.reader-actions button:hover,
-.reader-actions .reader-more-menu summary:hover {
+.reader-actions button:hover {
   color: var(--ui-accent);
   border-color: #bad8f7;
   background: var(--ui-accent-soft);
+}
+
+.reader-actions .reader-more-menu summary:hover {
+  color: var(--ui-text-secondary);
+  border-color: #9ca3af;
+  background: #f8fafc;
 }
 
 .reader-actions .primary-action {

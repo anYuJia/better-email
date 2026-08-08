@@ -12,8 +12,6 @@
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
   background: var(--st-surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--st-shadow-card);
   overflow: hidden;
   transition:
@@ -280,7 +278,7 @@
   min-width: 0;
   min-height: 52px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   padding: 10px 14px;
@@ -379,7 +377,7 @@
 
 @media (max-width: 640px) {
   .settings-modal .st-switch {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
@@ -419,7 +417,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: none;
 }
 
 .settings-modal .st-btn-secondary {

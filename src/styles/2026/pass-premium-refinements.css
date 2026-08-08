@@ -8,15 +8,19 @@ summary:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(10, 115, 217, 0.45);
+  outline: 2px solid #6b7280;
   outline-offset: 1px;
 }
 
 .composer input:focus,
-.composer select:focus,
 .composer textarea:focus {
   border-color: var(--ui-accent);
   box-shadow: 0 0 0 3px rgba(10, 115, 217, 0.15);
+}
+
+.composer select:focus {
+  border-color: #9ca3af;
+  box-shadow: none;
 }
 
 .sidebar .folder.active,

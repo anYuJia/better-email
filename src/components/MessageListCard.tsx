@@ -90,13 +90,13 @@ export default React.memo(function MessageListCard({
           onSelectMessage(message.id);
         }}
       />
+      {!message.is_read && <span className="message-unread-dot" aria-hidden="true" />}
       <span className="message-leading" aria-hidden="true">
         <Avatar
           email={message.sender_email}
           name={message.sender_name}
           className={`message-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
-        {!message.is_read && <span className="message-unread-dot" />}
       </span>
       <span className="message-select" onClick={(event) => event.stopPropagation()}>
         <input

@@ -42,15 +42,6 @@
   padding: 2px 4px 4px;
 }
 
-.brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #0a84ff 0%, #27c07d 100%);
-  color: #fff;
-  box-shadow: 0 12px 28px rgba(10, 132, 255, 0.22);
-}
-
 .brand strong {
   color: var(--ink-0);
   font-size: 17px;
@@ -288,8 +279,8 @@
 .search-box:focus-within {
   background: #fff;
   box-shadow:
-    0 0 0 4px rgba(10, 132, 255, 0.13),
-    inset 0 0 0 1px rgba(10, 132, 255, 0.32);
+    inset 0 0 0 1px rgba(31, 41, 55, 0.085),
+    0 1px rgba(255, 255, 255, 0.82);
 }
 
 .search-box input {

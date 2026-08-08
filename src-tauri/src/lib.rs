@@ -107,7 +107,8 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         &quit_item,
     ])?;
 
-    let icon = app.default_window_icon().cloned().ok_or("failed to get default window icon")?;
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
+        .map_err(|error| format!("failed to load tray icon: {error}"))?;
 
     let tray = TrayIconBuilder::new()
         .icon(icon)

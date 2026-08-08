@@ -19,15 +19,6 @@
   gap: 10px;
 }
 
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  color: #ffffff;
-  background: var(--ui-accent);
-  box-shadow: 0 4px 12px rgba(8, 127, 245, 0.2);
-}
-
 .brand strong {
   color: var(--ui-text);
   font-size: 16px;

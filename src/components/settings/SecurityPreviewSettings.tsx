@@ -28,7 +28,12 @@ export default function SecurityPreviewSettings({
             解析
           </SettingsButton>
         }>
-          <textarea value={rawMessage} onChange={(event) => onRawMessageChange(event.target.value)} />
+          <textarea
+            className="settings-security-preview-source"
+            rows={5}
+            value={rawMessage}
+            onChange={(event) => onRawMessageChange(event.target.value)}
+          />
           {parsedPreview && (
             <div className="settings-preview-result">
               <header>

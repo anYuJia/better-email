@@ -23,6 +23,16 @@ export function joinEditableBody(editableBody: string, originalQuote: string) {
   return `${trimmedEditable}${trimmedEditable ? '\n\n' : ''}${originalQuote}`;
 }
 
+export function plainTextToRichHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\r\n?|\n/g, '<br>');
+}
+
 function stripQuotePrefix(line: string) {
   return line.replace(/^\s*(?:>\s*)+/, '').trimEnd();
 }

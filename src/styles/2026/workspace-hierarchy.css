@@ -24,9 +24,9 @@
 
 .sidebar .folder.active,
 .sidebar .folder.active:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-selected);
-  box-shadow: inset 0 1px 0 oklch(0.99 0.004 var(--primitive-hue-paper) / 0.72);
+  color: #172f49;
+  background: #c8dcf1;
+  box-shadow: none;
 }
 
 .sidebar .folder.active .folder-main {

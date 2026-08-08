@@ -97,7 +97,7 @@ export default function useComposerController({
 }: UseComposerControllerOptions) {
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
-  const [isRichComposer, setRichComposer] = useState(false);
+  const [isRichComposer, setRichComposer] = useState(true);
   const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
@@ -221,11 +221,11 @@ export default function useComposerController({
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
     setComposerContextAccountId(null);
     setSendRiskConfirm(null);
+    setRichComposer(true);
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
       setDraft(composerAutosave.draft);
-      setRichComposer(composerAutosave.isRichComposer);
       setStatus(`已恢复自动保存草稿：${formatDate(composerAutosave.saved_at)}`);
     }
     setComposerMinimized(false);

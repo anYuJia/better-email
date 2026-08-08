@@ -4,9 +4,8 @@
   z-index: 1400;
   display: grid;
   place-items: center;
-  padding: 20px;
-  background: rgba(18, 26, 36, 0.22);
-  backdrop-filter: blur(10px) saturate(1.05);
+  padding: 16px;
+  background: rgba(18, 26, 36, 0.5);
 }
 
 .deferred-surface {

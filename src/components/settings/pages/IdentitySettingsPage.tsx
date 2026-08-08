@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { emptyIdentityForm } from '../../../app/appConfig';
 import type {
   Account,
   MailIdentity,
   MailIdentityInput,
 } from '../../../app/types';
+import { isValidEmailAddress } from '../../../app/uiConfig';
 import {
   SettingsBadge,
   SettingsButton,
@@ -20,7 +22,12 @@ type IdentitySettingsPageProps = {
   onIdentityFormChange: (identity: MailIdentityInput) => void;
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
-  onSaveIdentity: () => void;
+  onSaveIdentity: () => Promise<void>;
+};
+
+type IdentitySaveIssue = {
+  field: 'name' | 'email' | 'reply_to' | 'save';
+  message: string;
 };
 
 export default function IdentitySettingsPage({
@@ -33,7 +40,56 @@ export default function IdentitySettingsPage({
   onDeleteIdentity,
   onSaveIdentity,
 }: IdentitySettingsPageProps) {
+  const [saveIssue, setSaveIssue] = useState<IdentitySaveIssue | null>(null);
+  const [saving, setSaving] = useState(false);
   const accountIdentities = identities.filter((identity) => identity.account_id === accountForm.id);
+
+  function clearSaveIssue() {
+    if (saveIssue) setSaveIssue(null);
+  }
+
+  function validateIdentity(): IdentitySaveIssue | null {
+    if (!identityForm.name.trim()) {
+      return { field: 'name', message: '请填写显示名。' };
+    }
+    const email = identityForm.email.trim();
+    if (!email) {
+      return { field: 'email', message: '请填写发件邮箱或别名。' };
+    }
+    if (!isValidEmailAddress(email)) {
+      return { field: 'email', message: '请输入有效的邮箱地址。' };
+    }
+    const duplicate = accountIdentities.some(
+      (identity) => identity.id !== identityForm.id
+        && identity.email.trim().toLowerCase() === email.toLowerCase(),
+    );
+    if (duplicate) {
+      return { field: 'email', message: '该邮箱已被其他发件身份使用。' };
+    }
+    const replyTo = identityForm.reply_to.trim();
+    if (replyTo && !isValidEmailAddress(replyTo)) {
+      return { field: 'reply_to', message: 'Reply-To 不是有效的邮箱地址。' };
+    }
+    return null;
+  }
+
+  async function handleSaveIdentity() {
+    const issue = validateIdentity();
+    if (issue) {
+      setSaveIssue(issue);
+      return;
+    }
+    setSaveIssue(null);
+    setSaving(true);
+    try {
+      await onSaveIdentity();
+    } catch (error) {
+      const message = error instanceof Error ? error.message.replace(/^Error:\s*/i, '') : String(error);
+      setSaveIssue({ field: 'save', message: message || '无法保存发件身份，请稍后重试。' });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <SettingsSection
@@ -42,7 +98,7 @@ export default function IdentitySettingsPage({
       badge={<SettingsBadge tone="neutral">{accountIdentities.length} 个身份</SettingsBadge>}
       dataSection="identities"
     >
-      <SettingsField label="账号默认签名">
+      <SettingsField label="账号默认签名" hint="用于没有专用签名的发件身份">
         <textarea
           value={accountForm.signature}
           onChange={(event) => onAccountFormChange({ ...accountForm, signature: event.target.value })}
@@ -73,44 +129,81 @@ export default function IdentitySettingsPage({
       )}
 
       <div className="st-identity-form">
-        <SettingsField label="显示名">
+        <header className="settings-identity-form-heading">
+          <strong>添加或编辑发件身份</strong>
+          <small>设置此身份显示给收件人的名称、地址和专用签名。</small>
+        </header>
+        <SettingsField
+          label="显示名"
+          hint="必填"
+          error={saveIssue?.field === 'name' ? saveIssue.message : undefined}
+        >
           <input
             value={identityForm.name}
-            onChange={(event) => onIdentityFormChange({ ...identityForm, name: event.target.value })}
+            aria-invalid={saveIssue?.field === 'name'}
+            onChange={(event) => {
+              clearSaveIssue();
+              onIdentityFormChange({ ...identityForm, name: event.target.value });
+            }}
             placeholder="显示名"
           />
         </SettingsField>
-        <SettingsField label="发件邮箱 / 别名">
+        <SettingsField
+          label="发件邮箱 / 别名"
+          hint="必填"
+          error={saveIssue?.field === 'email' ? saveIssue.message : undefined}
+        >
           <input
             value={identityForm.email}
-            onChange={(event) => onIdentityFormChange({ ...identityForm, email: event.target.value })}
+            aria-invalid={saveIssue?.field === 'email'}
+            onChange={(event) => {
+              clearSaveIssue();
+              onIdentityFormChange({ ...identityForm, email: event.target.value });
+            }}
             placeholder="发件邮箱 / 别名"
           />
         </SettingsField>
-        <SettingsField label="Reply-To（可选）">
+        <SettingsField
+          label="Reply-To（可选）"
+          error={saveIssue?.field === 'reply_to' ? saveIssue.message : undefined}
+        >
           <input
             value={identityForm.reply_to}
-            onChange={(event) => onIdentityFormChange({ ...identityForm, reply_to: event.target.value })}
+            aria-invalid={saveIssue?.field === 'reply_to'}
+            onChange={(event) => {
+              clearSaveIssue();
+              onIdentityFormChange({ ...identityForm, reply_to: event.target.value });
+            }}
             placeholder="Reply-To，可选"
           />
         </SettingsField>
-        <SettingsField label="该身份专用签名">
+        <SettingsField className="settings-identity-signature-field" label="该身份专用签名">
           <textarea
             value={identityForm.signature}
-            onChange={(event) => onIdentityFormChange({ ...identityForm, signature: event.target.value })}
+            onChange={(event) => {
+              clearSaveIssue();
+              onIdentityFormChange({ ...identityForm, signature: event.target.value });
+            }}
             placeholder="该身份专用签名"
           />
         </SettingsField>
-        <SettingsSwitch
-          label="设为默认发件身份"
-          description="新邮件将优先使用该身份"
-          checked={identityForm.is_default}
-          onChange={(checked) => onIdentityFormChange({ ...identityForm, is_default: checked })}
-        />
-        <div className="st-actions end">
-          <SettingsButton onClick={() => onIdentityFormChange(emptyIdentityForm)}>清空</SettingsButton>
-          <SettingsButton variant="primary" onClick={onSaveIdentity}>保存身份</SettingsButton>
-        </div>
+        {saveIssue?.field === 'save' && (
+          <p className="settings-identity-save-error" role="alert">无法保存发件身份：{saveIssue.message}</p>
+        )}
+        <footer className="settings-identity-form-footer">
+          <SettingsSwitch
+            label="设为默认发件身份"
+            description="新邮件将优先使用该身份"
+            checked={identityForm.is_default}
+            onChange={(checked) => onIdentityFormChange({ ...identityForm, is_default: checked })}
+          />
+          <div className="st-actions">
+            <SettingsButton disabled={saving} onClick={() => onIdentityFormChange(emptyIdentityForm)}>清空</SettingsButton>
+            <SettingsButton variant="primary" disabled={saving} onClick={() => { void handleSaveIdentity(); }}>
+              {saving ? '保存中…' : '保存身份'}
+            </SettingsButton>
+          </div>
+        </footer>
       </div>
     </SettingsSection>
   );

@@ -77,8 +77,8 @@
   --ui-shadow-float: 0 1px 3px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.06), 0 14px 36px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.1), 0 30px 72px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.05);
   --ui-shadow-tooltip: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.1), 0 6px 16px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.13);
 
-  --ui-focus-outline: 3px solid oklch(0.52 0.16 var(--primitive-hue-accent) / 0.28);
-  --ui-focus-ring: 0 0 0 3px oklch(0.52 0.16 var(--primitive-hue-accent) / 0.22);
+  --ui-focus-outline: 2px solid #6b7280;
+  --ui-focus-ring: none;
   --ui-scrollbar-thumb: oklch(0.78 0.012 var(--primitive-hue-neutral));
   --ui-scrollbar-thumb-hover: oklch(0.67 0.014 var(--primitive-hue-neutral));
 

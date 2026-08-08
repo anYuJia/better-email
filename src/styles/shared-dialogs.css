@@ -5,6 +5,65 @@
  * outlined secondary, soft danger.
  */
 
+/* Thin light scrollbars inside dialogs and popovers so long content never
+ * shows a heavy or dark slider. */
+.settings-modal,
+.contact-import-dialog,
+.dialog-card,
+.snooze-dialog,
+.context-menu,
+.custom-select-dropdown,
+.settings-mobile-menu {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.settings-modal ::-webkit-scrollbar,
+.contact-import-dialog ::-webkit-scrollbar,
+.dialog-card ::-webkit-scrollbar,
+.snooze-dialog ::-webkit-scrollbar,
+.context-menu ::-webkit-scrollbar,
+.custom-select-dropdown ::-webkit-scrollbar,
+.settings-mobile-menu ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.settings-modal ::-webkit-scrollbar-track,
+.contact-import-dialog ::-webkit-scrollbar-track,
+.dialog-card ::-webkit-scrollbar-track,
+.snooze-dialog ::-webkit-scrollbar-track,
+.context-menu ::-webkit-scrollbar-track,
+.custom-select-dropdown ::-webkit-scrollbar-track,
+.settings-mobile-menu ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-modal ::-webkit-scrollbar-thumb,
+.contact-import-dialog ::-webkit-scrollbar-thumb,
+.dialog-card ::-webkit-scrollbar-thumb,
+.snooze-dialog ::-webkit-scrollbar-thumb,
+.context-menu ::-webkit-scrollbar-thumb,
+.custom-select-dropdown ::-webkit-scrollbar-thumb,
+.settings-mobile-menu ::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #cbd5e1;
+  background-clip: padding-box;
+}
+
+.settings-modal ::-webkit-scrollbar-thumb:hover,
+.contact-import-dialog ::-webkit-scrollbar-thumb:hover,
+.dialog-card ::-webkit-scrollbar-thumb:hover,
+.snooze-dialog ::-webkit-scrollbar-thumb:hover,
+.context-menu ::-webkit-scrollbar-thumb:hover,
+.custom-select-dropdown ::-webkit-scrollbar-thumb:hover,
+.settings-mobile-menu ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: padding-box;
+}
+
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -12,19 +71,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(18, 24, 31, 0.34);
-  backdrop-filter: blur(6px);
+  padding: 16px;
+  background: rgba(18, 24, 31, 0.5);
 }
 
 .dialog-card {
   width: min(440px, 100%);
-  max-height: min(80vh, 640px);
+  max-height: min(calc(100dvh - 32px), 640px);
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--ui-border-strong, #c3ccd5);
   border-radius: 12px;
   background: var(--ui-surface, #ffffff);

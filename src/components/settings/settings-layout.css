@@ -13,10 +13,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
   animation: settings-backdrop-fade 180ms ease-out both;
 }
 
@@ -27,20 +25,18 @@
 
 /* --- Modal --- */
 .settings-modal {
-  width: min(1080px, calc(100vw - 48px));
-  height: min(800px, calc(100vh - 48px));
-  max-height: calc(100vh - 48px);
+  width: min(960px, calc(100vw - 32px));
+  height: min(760px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   margin: auto;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--st-border-subtle);
+  border: 1px solid var(--st-border-strong);
   border-radius: var(--st-radius-modal);
   background: var(--st-canvas);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  box-shadow: var(--st-shadow-modal), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  box-shadow: var(--st-shadow-modal);
   animation: settings-modal-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -68,13 +64,8 @@
   top: 0;
   z-index: 3;
   border-bottom: 1px solid var(--st-header-border);
-  border-top-color: var(--st-header-border);
-  border-right-color: var(--st-header-border);
-  border-left-color: var(--st-header-border);
-  background: rgba(249, 250, 251, 0.96);
+  background: var(--st-canvas);
   color: #111827;
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
 }
 
 .settings-title {
@@ -160,7 +151,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: none;
 }
 
 .settings-close-button {
@@ -173,8 +164,8 @@
   border: 1px solid var(--st-header-border);
   border-radius: var(--st-radius-sm);
   color: #374151;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--shadow-sm);
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .settings-close-button:hover {
@@ -243,8 +234,8 @@
 }
 
 .settings-nav-search:focus-within {
-  border-color: var(--st-focus-border);
-  box-shadow: var(--st-focus-ring);
+  border-color: #93c5fd;
+  box-shadow: none;
 }
 
 .settings-nav-search input {
@@ -306,7 +297,7 @@
   background: var(--st-surface-muted);
 }
 
-/* Floating unsaved bar (UI/UX Pro Max UX) */
+/* Floating unsaved bar */
 .settings-floating-unsaved-bar {
   position: absolute;
   bottom: 20px;
@@ -319,12 +310,10 @@
   gap: 24px;
   padding: 10px 18px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  color: #ffffff;
-  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--st-border-strong);
+  background: #ffffff;
+  color: var(--st-text);
+  box-shadow: var(--st-shadow-float);
   animation: settings-floating-bar-slide 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -352,7 +341,6 @@
   height: 8px;
   border-radius: 50%;
   background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
   animation: settings-dot-pulse 1.8s infinite;
 }
 
@@ -557,13 +545,8 @@
   top: 0;
   z-index: 3;
   border-bottom: 1px solid var(--st-header-border);
-  border-top-color: var(--st-header-border);
-  border-right-color: var(--st-header-border);
-  border-left-color: var(--st-header-border);
-  background: rgba(249, 250, 251, 0.96);
+  background: var(--st-canvas);
   color: #111827;
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
 }
 
 .settings-page-heading {
@@ -639,13 +622,13 @@
 
 @media (max-width: 900px) {
   .settings-backdrop {
-    padding: 10px;
+    padding: 8px;
   }
 
   .settings-modal {
-    width: calc(100vw - 20px);
-    height: calc(100vh - 20px);
-    max-height: calc(100vh - 20px);
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
     border-radius: 13px;
   }
 
@@ -818,14 +801,13 @@
 @media (max-width: 640px) {
   .settings-backdrop {
     padding: 0;
-    background: rgba(18, 24, 31, 0.5);
-    backdrop-filter: none;
+    background: rgba(18, 24, 31, 0.6);
   }
 
   .settings-modal {
     width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border: 0;
     border-radius: 0;
   }

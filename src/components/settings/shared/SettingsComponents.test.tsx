@@ -65,6 +65,21 @@ describe('shared settings components', () => {
     expect(checked).toBe(true);
   });
 
+  it('SettingsSwitch renders copy before the checkbox so the switch sits at the row end', () => {
+    const { container } = render(
+      <SettingsSwitch label="只提醒 VIP" description="其余静默" checked={false} onChange={() => undefined} />,
+    );
+    const switchEl = container.querySelector('.st-switch');
+    const copyEl = container.querySelector('.st-switch-copy');
+    const checkboxEl = container.querySelector('input[type="checkbox"]');
+    expect(switchEl).not.toBeNull();
+    expect(copyEl).not.toBeNull();
+    expect(checkboxEl).not.toBeNull();
+    expect(copyEl!.compareDocumentPosition(checkboxEl!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(switchEl!.children[0]).toBe(copyEl);
+    expect(switchEl!.children[switchEl!.children.length - 1]).toBe(checkboxEl);
+  });
+
   it('SettingsRow renders copy and control slots', () => {
     const { container } = render(
       <SettingsRow

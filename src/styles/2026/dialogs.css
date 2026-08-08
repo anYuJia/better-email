@@ -16,9 +16,9 @@
 
 .compact-menu[open] summary,
 .compact-menu summary:hover {
-  color: var(--ui-accent);
-  border-color: #bad8f7;
-  background: var(--ui-accent-soft);
+  color: var(--ui-text-secondary);
+  border-color: #9ca3af;
+  background: #f8fafc;
 }
 
 .compact-menu > div {
@@ -37,10 +37,14 @@
   color: var(--ui-text-secondary);
 }
 
-.compact-menu > div button:hover,
+.compact-menu > div button:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
 .compact-menu > div button.active {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+  background: #e5e7eb;
 }
 
 .composer-backdrop {
@@ -84,10 +88,14 @@
 }
 
 .composer input:focus,
-.composer select:focus,
 .composer textarea:focus {
   border-color: rgba(8, 127, 245, 0.52);
   box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.12);
+}
+
+.composer select:focus {
+  border-color: #9ca3af;
+  box-shadow: none;
 }
 
 .composer button,

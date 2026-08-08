@@ -26,11 +26,9 @@ describe('ComposerQuickTools', () => {
     const { container } = render(
       <ComposerQuickTools
         draft={draft}
-        richComposer
         dropActive={false}
         signature=""
         onPatchDraft={vi.fn()}
-        onRichComposerChange={vi.fn()}
         onInsertSignature={vi.fn()}
         onPickAttachments={vi.fn()}
         onAttachmentDrop={vi.fn()}
@@ -40,7 +38,10 @@ describe('ComposerQuickTools', () => {
       />,
     );
 
-    expect(screen.getByText('富文本')).not.toBeNull();
+    expect(screen.queryByLabelText('富文本')).toBeNull();
+    expect(screen.getByRole('button', { name: '加粗' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '斜体' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '插入列表' })).not.toBeNull();
     expect(container.querySelector('.composer-html-source')).toBeNull();
     expect(screen.queryByPlaceholderText('HTML 正文，将在保存和发送前清洗')).toBeNull();
   });

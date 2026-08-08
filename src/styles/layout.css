@@ -19,14 +19,14 @@
 
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: #3aa675;
-  font-weight: 800;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
+  border-radius: 8px;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .brand strong { display: block; font-size: 16px; }
 .brand span { color: #b6c0ca; font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: block; }

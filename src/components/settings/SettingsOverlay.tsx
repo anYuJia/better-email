@@ -35,7 +35,6 @@ import type {
   ProviderVerificationRecord,
   RemoteImageTrust,
   StorageUsage,
-  SyncRun,
   SyncSchedulePlan,
 } from '../../app/types';
 import type {
@@ -110,7 +109,6 @@ export type SettingsOverlayProps = {
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
   folders: Folder[];
-  syncRuns: SyncRun[];
   outbox: OutboxItem[];
   labels: Label[];
   rules: MailRule[];
@@ -173,7 +171,7 @@ export type SettingsOverlayProps = {
   onIdentityFormChange: Dispatch<SetStateAction<MailIdentityInput>>;
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
-  onSaveIdentity: () => void;
+  onSaveIdentity: () => Promise<void>;
   onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
@@ -198,7 +196,7 @@ export type SettingsOverlayProps = {
   filteredContacts: Contact[];
   contactQuery: string;
   onContactQueryChange: Dispatch<SetStateAction<string>>;
-  onCreateContact: () => void;
+  onCreateContact: () => Promise<void>;
   onEditNameChange: Dispatch<SetStateAction<string>>;
   onEditAliasesChange: Dispatch<SetStateAction<string>>;
   onSaveContactOverride: (contact: Contact) => void;
@@ -217,7 +215,7 @@ export type SettingsOverlayProps = {
   onRuleConditionValueChange: (value: string) => void;
   onRuleLabelActionChange: (labelName: string) => void;
   onToggleRuleAction: (action: string) => void;
-  onSaveRule: () => void;
+  onSaveRule: () => Promise<void>;
   onToggleRule: (rule: MailRule) => void;
   onEditRule: (rule: MailRule) => void;
   onRemoveRule: (rule: MailRule) => void;
@@ -339,7 +337,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     syncSchedulePlan: props.syncSchedulePlan,
     imapMailboxes: props.imapMailboxes,
     folders: props.folders,
-    syncRuns: props.syncRuns,
     outbox: props.outbox,
     writeValidationStatus: props.providerWriteValidationStatus,
     writeValidationLoading: props.providerWriteValidationLoading,
@@ -349,7 +346,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.syncSchedulePlan,
     props.imapMailboxes,
     props.folders,
-    props.syncRuns,
     props.outbox,
     props.providerWriteValidationStatus,
     props.providerWriteValidationLoading,

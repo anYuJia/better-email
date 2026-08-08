@@ -2,10 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 type TooltipState = {
   text: string;
-  placement: 'top' | 'bottom';
+  placement: 'top' | 'bottom' | 'left' | 'right';
   targetLeft: number;
   targetTop: number;
   targetWidth: number;
+  targetHeight: number;
   targetBottom: number;
 };
 
@@ -27,6 +28,20 @@ const OPEN_OVERLAY_SELECTOR = [
   '.custom-select-dropdown',
   '.settings-mobile-menu',
 ].join(',');
+
+const TOOLTIP_BOUNDARY_SELECTOR = [
+  '.settings-backdrop',
+  '.settings-modal',
+  '.contact-import-dialog',
+  '.dialog-card',
+  '.snooze-dialog',
+  '[role="dialog"]',
+].join(',');
+
+const TOOLTIP_ID = 'global-tooltip';
+
+const TOOLTIP_DELAY_MS = 60;
+const TOOLTIP_GAP = 8;
 
 export function isTextOnlyTooltipButton(element: HTMLElement) {
   const text = element.textContent?.trim() ?? '';
@@ -51,6 +66,7 @@ export function shouldShowGlobalTooltip(target: HTMLElement) {
     !text
     || target.hasAttribute('disabled')
     || target.getAttribute('aria-disabled') === 'true'
+    || target.hasAttribute('data-no-tooltip')
     || isInsideOpenOverlay(target)
   ) {
     return false;
@@ -72,6 +88,27 @@ function isInsideOpenOverlay(element: HTMLElement) {
   return element.closest(OPEN_OVERLAY_SELECTOR) !== null;
 }
 
+/**
+ * The tooltip must stay inside the nearest modal/dialog boundary, not just
+ * the viewport, so a tooltip near a dialog edge is never clipped or pushed
+ * behind the overlay.
+ */
+function getTooltipBoundary(target: HTMLElement | null) {
+  const container = target?.closest<HTMLElement>(TOOLTIP_BOUNDARY_SELECTOR);
+  if (container) {
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return rect;
+  }
+  return {
+    left: 0,
+    top: 0,
+    right: window.innerWidth,
+    bottom: window.innerHeight,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
 export default function GlobalTooltip() {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
@@ -89,23 +126,56 @@ export default function GlobalTooltip() {
 
     const width = elem.offsetWidth;
     const height = elem.offsetHeight;
+    const boundary = getTooltipBoundary(activeTargetRef.current);
+    const padding = 10;
+    const maxLeft = boundary.right - width - padding;
+    const maxTop = boundary.bottom - height - padding;
+    const minLeft = boundary.left + padding;
+    const minTop = boundary.top + padding;
 
-    let left = tooltip.targetLeft + tooltip.targetWidth / 2 - width / 2;
-    let top = tooltip.placement === 'top'
-      ? tooltip.targetTop - height - 8
-      : tooltip.targetBottom + 8;
+    const fits = (left: number, top: number) =>
+      left >= minLeft && left <= maxLeft && top >= minTop && top <= maxTop;
 
-    left = Math.round(left);
-    top = Math.round(top);
+    const target = tooltip;
+    const above = target.targetTop - boundary.top;
+    const below = boundary.bottom - target.targetBottom;
+    const right = boundary.right - (target.targetLeft + target.targetWidth);
+    const leftOf = target.targetLeft - boundary.left;
 
-    const padding = 12;
-    const maxLeft = window.innerWidth - width - padding;
-    left = Math.max(padding, Math.min(left, maxLeft));
+    let left = target.targetLeft + target.targetWidth / 2 - width / 2;
+    let top = 0;
+    let placement: TooltipState['placement'] = 'top';
 
-    const maxTop = window.innerHeight - height - padding;
-    top = Math.max(padding, Math.min(top, Math.max(padding, maxTop)));
+    const preferred: Array<[TooltipState['placement'], number, number]> = [
+      ['top', target.targetLeft + target.targetWidth / 2 - width / 2, target.targetTop - height - TOOLTIP_GAP],
+      ['bottom', target.targetLeft + target.targetWidth / 2 - width / 2, target.targetBottom + TOOLTIP_GAP],
+      ['right', target.targetLeft + target.targetWidth + TOOLTIP_GAP, target.targetTop + target.targetHeight / 2 - height / 2],
+      ['left', target.targetLeft - width - TOOLTIP_GAP, target.targetTop + target.targetHeight / 2 - height / 2],
+    ];
+
+    const spaceFor: Record<TooltipState['placement'], number> = {
+      top: above,
+      bottom: below,
+      right,
+      left: leftOf,
+    };
+
+    // Pick the placement with the most room first, then fall back through
+    // the rest so the tooltip is never placed outside the dialog.
+    const ordered = [...preferred].sort((a, b) => spaceFor[b[0]] - spaceFor[a[0]]);
+    const chosen = ordered.find(([, l, t]) => fits(l, t)) ?? ordered[0];
+    placement = chosen[0];
+    left = chosen[1];
+    top = chosen[2];
+
+    left = Math.round(Math.max(minLeft, Math.min(left, maxLeft)));
+    top = Math.round(Math.max(minTop, Math.min(top, maxTop)));
 
     setCoords({ left, top });
+    if (placement !== tooltip.placement) {
+      // Keep the state in sync so the arrow points at the right edge.
+      setTooltip({ ...tooltip, placement });
+    }
   }, [tooltip]);
 
   useEffect(() => {
@@ -118,6 +188,7 @@ export default function GlobalTooltip() {
 
     const restoreNativeTitle = (element: HTMLElement | null) => {
       if (!element) return;
+      element.removeAttribute('aria-describedby');
       const nativeTitle = element.getAttribute('data-native-title');
       if (nativeTitle !== null) {
         element.setAttribute('title', nativeTitle);
@@ -148,20 +219,21 @@ export default function GlobalTooltip() {
         target.setAttribute('data-native-title', nativeTitle);
         target.removeAttribute('title');
       }
+      target.setAttribute('aria-describedby', TOOLTIP_ID);
 
       timerRef.current = window.setTimeout(() => {
         if (activeTargetRef.current !== target) return;
         const rect = target.getBoundingClientRect();
-        const placement = rect.top > 48 ? 'top' : 'bottom';
         setTooltip({
           text,
-          placement,
+          placement: 'top',
           targetLeft: rect.left,
           targetTop: rect.top,
           targetWidth: rect.width,
+          targetHeight: rect.height,
           targetBottom: rect.bottom,
         });
-      }, 120);
+      }, TOOLTIP_DELAY_MS);
     };
 
     const handlePointerOver = (event: PointerEvent) => {
@@ -216,6 +288,7 @@ export default function GlobalTooltip() {
 
   return (
     <div
+      id={TOOLTIP_ID}
       ref={tooltipRef}
       className={`global-tooltip is-${tooltip.placement}`}
       role="tooltip"

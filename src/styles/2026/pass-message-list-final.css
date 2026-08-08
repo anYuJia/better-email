@@ -55,13 +55,16 @@
 }
 
 .message-unread-dot {
-  left: 21px;
-  top: 26px;
-  width: 5px;
-  height: 5px;
-  background: #2d73c8;
-  box-shadow: 0 0 0 2px #fff;
-  transform: translateX(-50%);
+  left: 10px;
+  top: 10px;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  background: #2677d1;
+  border: 2px solid var(--ui-list);
+  box-shadow: none;
+  pointer-events: none;
+  transform: none;
 }
 
 .message-select {
@@ -74,19 +77,27 @@
 
 .message-select input {
   box-sizing: border-box;
-  flex: 0 0 14px;
-  inline-size: 14px;
-  block-size: 14px;
-  width: 14px;
-  min-width: 14px;
-  max-width: 14px;
-  height: 14px;
-  min-height: 14px;
-  max-height: 14px;
+  flex: 0 0 16px;
+  inline-size: 16px;
+  block-size: 16px;
+  width: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  max-height: 16px;
   margin: 0;
   padding: 0;
   aspect-ratio: 1 / 1;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aab8c6;
   border-radius: 4px;
+  background: #ffffff;
+  box-shadow: none;
+  cursor: pointer;
 }
 
 .message-card:hover .message-select,
@@ -99,6 +110,62 @@
 .message-card.is-current:hover .message-select,
 .message-card.is-current:has(.message-card-main:focus-visible) .message-select {
   display: none;
+}
+
+/* The unread marker owns the selection slot until an explicit selection
+   control is shown. This keeps the list's left edge stable while preserving
+   a clear unread signal. */
+.message-card:hover > .message-unread-dot,
+.message-card:has(.message-card-main:focus-visible) > .message-unread-dot,
+.message-card:has(.message-select input:checked) > .message-unread-dot {
+  opacity: 0;
+}
+
+.message-select input::before,
+.bulk-selection > input::before {
+  width: 7px;
+  height: 4px;
+  border: solid #ffffff;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+
+.message-select input:checked,
+.bulk-selection > input:checked {
+  border-color: #2677d1;
+  background: #2677d1;
+  box-shadow: none;
+}
+
+.message-select input:checked::before,
+.bulk-selection > input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.message-select input:focus-visible,
+.bulk-selection > input:focus-visible {
+  outline: 2px solid #78aee6;
+  outline-offset: 2px;
+}
+
+.bulk-selection > input {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aab8c6;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: none;
+  cursor: pointer;
 }
 
 .message-card > .message-topline,
@@ -165,33 +232,46 @@
 .global-tooltip {
   position: fixed;
   z-index: 10000;
-  max-width: min(280px, calc(100vw - 24px));
-  padding: 6px 9px;
-  border: 1px solid rgba(31, 41, 55, 0.10);
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  color: #ffffff;
-  background: #1f242b;
-  box-shadow: var(--ui-shadow-tooltip);
+  color: #111827;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
   letter-spacing: 0;
   pointer-events: none;
   animation: global-tooltip-in 90ms ease-out both;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
 
-.global-tooltip::after {
-  position: absolute;
+.global-tooltip.is-top::after,
+.global-tooltip.is-bottom::after {
   left: 50%;
   width: 8px;
   height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.global-tooltip.is-left::after,
+.global-tooltip.is-right::after {
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.global-tooltip::after {
+  position: absolute;
   border: inherit;
   background: inherit;
   content: "";
-  transform: translateX(-50%) rotate(45deg);
 }
 
 .global-tooltip.is-top::after {
@@ -204,6 +284,18 @@
   top: -5px;
   border-right: 0;
   border-bottom: 0;
+}
+
+.global-tooltip.is-left::after {
+  right: -5px;
+  border-top: 0;
+  border-right: 0;
+}
+
+.global-tooltip.is-right::after {
+  left: -5px;
+  border-bottom: 0;
+  border-left: 0;
 }
 
 @keyframes global-tooltip-in {

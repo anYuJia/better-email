@@ -53,9 +53,13 @@
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):focus {
-  border-color: var(--st-accent);
+  border-color: var(--st-border-strong);
   outline: none;
-  box-shadow: 0 0 0 3px var(--st-accent-soft);
+  box-shadow: none;
+}
+
+.settings-modal .settings-page-content :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--st-danger);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):disabled {
@@ -67,7 +71,8 @@
 .settings-modal .settings-page-content textarea {
   min-height: 92px;
   padding: 10px 12px;
-  resize: vertical;
+  resize: none;
+  overflow-y: auto;
   line-height: 1.55;
 }
 
@@ -118,8 +123,9 @@
 }
 
 .settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
-  border-color: var(--st-focus-border);
-  box-shadow: var(--st-focus-ring);
+  border-color: #9ca3af;
+  background: #f8fafc;
+  box-shadow: none;
 }
 
 .settings-modal .settings-page-content .custom-select-summary:disabled {
@@ -133,8 +139,8 @@
 
 /* --- Focus visibility --- */
 .settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--st-accent);
-  outline-offset: 2px;
+  outline: 2px solid #6b7280;
+  outline-offset: 1px;
 }
 
 .settings-modal :is(input, select, textarea):focus {

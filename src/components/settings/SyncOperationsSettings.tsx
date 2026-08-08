@@ -22,14 +22,11 @@ import type {
   ImapMailboxState,
   ImapProbeReport,
   OutboxItem,
-  SyncRun,
   SyncSchedulePlan,
 } from '../../app/types';
-import { formatDate } from '../../mailUtils';
 import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
 import { CustomSelect } from './accounts/CustomSelect';
 import {
-  SettingsBadge,
   SettingsButton,
   SettingsEmptyState,
   SettingsSection,
@@ -43,7 +40,6 @@ type SyncOperationsSettingsProps = {
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
   folders: Folder[];
-  syncRuns: SyncRun[];
   outbox: OutboxItem[];
   writeValidationStatus: ProviderWriteValidationStatus | null;
   writeValidationLoading: boolean;
@@ -68,7 +64,6 @@ export default function SyncOperationsSettings({
   syncSchedulePlan,
   imapMailboxes,
   folders,
-  syncRuns,
   outbox,
   writeValidationStatus,
   writeValidationLoading,
@@ -96,12 +91,6 @@ export default function SyncOperationsSettings({
 
   return (
     <div className="settings-sync-stack" data-settings-section="sync">
-      <SettingsSection
-        title="同步与发信高级工具"
-        description={devMode ? '回写验收、IMAP 发现、同步演练和发件箱队列' : '管理邮件同步状态与连接'}
-        badge={<SettingsBadge tone="neutral">{syncRuns.length ? `${syncRuns.length} 次` : '待运行'}</SettingsBadge>}
-      />
-
       {devMode && (
         <ProviderWriteValidationSettings
           status={writeValidationStatus}
@@ -151,7 +140,7 @@ export default function SyncOperationsSettings({
 
       <SettingsSection
         title="同步设置"
-        description={devMode ? '检查调度批次、文件夹状态和增量同步结果' : '同步状态与手动刷新邮件头'}
+        description={devMode ? '检查调度批次和文件夹状态' : '同步状态与手动刷新邮件头'}
         actions={
           <div className="st-actions">
             {devMode && <SettingsButton onClick={onRunSyncDryRun}>演练</SettingsButton>}
@@ -170,6 +159,7 @@ export default function SyncOperationsSettings({
             </SettingsButton>
           </div>
         }
+        dataSection="sync"
       >
         {syncSchedulePlan && (
           <div className="sync-schedule-card">
@@ -257,20 +247,6 @@ export default function SyncOperationsSettings({
                         ? `历史已回填至 UID ${mailbox.lowest_uid}`
                         : '等待首次同步'}
                 </small>
-              </div>
-            ))}
-          </div>
-        )}
-        {syncRuns.length === 0 ? (
-          <SettingsEmptyState>还没有同步运行记录。</SettingsEmptyState>
-        ) : (
-          <div className="st-list">
-            {syncRuns.map((run) => (
-              <div className={run.imported_messages > 0 ? 'st-data-row ok' : 'st-data-row'} key={run.id}>
-                <span>{run.status}</span>
-                <em>扫描 {run.scanned_folders} 个文件夹 · 新增 {run.imported_messages} 封</em>
-                <small>{formatDate(run.started_at)}</small>
-                <p>{run.message}</p>
               </div>
             ))}
           </div>

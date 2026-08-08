@@ -28,7 +28,7 @@ export type ExperienceSettingsProps = {
   onIdentityFormChange: (identity: MailIdentityInput) => void;
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
-  onSaveIdentity: () => void;
+  onSaveIdentity: () => Promise<void>;
   onNavigateToAi?: () => void;
 };
 

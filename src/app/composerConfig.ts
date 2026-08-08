@@ -113,7 +113,7 @@ export function loadComposerAutosave(): ComposerAutosave | null {
     if (!draft || isDraftEmpty(draft)) return null;
     return {
       draft,
-      isRichComposer: Boolean(parsed?.isRichComposer),
+      isRichComposer: true,
       saved_at: typeof parsed?.saved_at === 'string' ? parsed.saved_at : new Date().toISOString(),
     };
   } catch {

@@ -39,7 +39,7 @@ function draft(overrides: Partial<DraftInput> = {}): DraftInput {
 
 function renderFields(
   input: DraftInput,
-  richComposer = false,
+  richComposer = true,
   onPatchDraft = vi.fn(),
 ) {
   const result = render(
@@ -94,6 +94,18 @@ describe('ComposerPrimaryFields', () => {
     expect(onPatchDraft).toHaveBeenCalledWith({ to: 'ada@example.com' });
   });
 
+  it('renders the cc field between recipients and subject', () => {
+    const { container, onPatchDraft } = renderFields(draft({ cc: 'team@example.com' }));
+    const cc = screen.getByPlaceholderText('抄送（可选）');
+
+    expect((cc as HTMLInputElement).value).toBe('team@example.com');
+    fireEvent.change(cc, { target: { value: 'design@example.com' } });
+    expect(onPatchDraft).toHaveBeenCalledWith({ cc: 'design@example.com' });
+
+    const rows = Array.from(container.querySelectorAll('.composer-field-row'));
+    expect(rows.map((row) => row.querySelector('span')?.textContent)).toEqual(['收件人', '抄送', '主题']);
+  });
+
   it('replaces a pasted image CID with its local asset URL for editor preview', async () => {
     mockLocalFileAssetUrl.mockResolvedValue('asset://localhost/temp_attachments/image.png');
     const { container } = renderFields(draft({
@@ -117,5 +129,16 @@ describe('ComposerPrimaryFields', () => {
 
     expect(image?.getAttribute('alt')).toBe('image.png');
     expect(mockLocalFileAssetUrl).toHaveBeenCalledWith('/appdata/temp_attachments/image.png');
+  });
+
+  it('hydrates the rich editor from a plain-text draft without treating it as markup', async () => {
+    const { container } = renderFields(draft({ body: 'Hello <team>\nNext line' }));
+    const editor = await waitFor(() => {
+      const nextEditor = container.querySelector<HTMLElement>('.composer-richtext-body');
+      expect(nextEditor).not.toBeNull();
+      return nextEditor;
+    });
+
+    expect(editor?.innerHTML).toBe('Hello &lt;team&gt;<br>Next line');
   });
 });

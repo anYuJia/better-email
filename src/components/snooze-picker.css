@@ -4,13 +4,15 @@
   z-index: 160;
   display: grid;
   place-items: center;
-  padding: 18px;
-  background: rgba(22, 28, 36, 0.3);
-  backdrop-filter: blur(16px) saturate(1.05);
+  padding: 16px;
+  background: rgba(22, 28, 36, 0.5);
 }
 
 .snooze-dialog {
-  width: min(440px, calc(100vw - 36px));
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(208, 214, 221, 0.96);
   border-radius: 14px;

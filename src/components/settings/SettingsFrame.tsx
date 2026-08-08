@@ -243,6 +243,7 @@ export default function SettingsFrame({
               className="settings-close-button"
               aria-label="关闭设置"
               title="关闭设置"
+              data-no-tooltip
               onClick={onClose}
             >
               <X size={16} />

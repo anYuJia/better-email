@@ -79,18 +79,74 @@
 }
 
 .settings-modal .st-identity-form {
-  margin-top: 2px;
-  padding-top: 14px;
+  margin-top: 4px;
+  padding-top: 16px;
   border-top: 1px solid var(--st-border);
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 1.15fr);
 }
 
-.settings-modal .st-identity-form .st-field textarea,
-.settings-modal .st-identity-form .st-switch,
-.settings-modal .st-identity-form .st-actions {
+.settings-modal .settings-identity-form-heading,
+.settings-modal .settings-identity-signature-field,
+.settings-modal .settings-identity-form-footer {
   grid-column: 1 / -1;
+}
+
+.settings-modal .settings-identity-form-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-identity-form-heading strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 620;
+}
+
+.settings-modal .settings-identity-form-heading small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-identity-signature-field textarea {
+  min-height: 120px;
+}
+
+.settings-modal [data-settings-section="identities"] textarea {
+  resize: none;
+}
+
+.settings-modal .settings-identity-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-identity-form-footer .st-switch {
+  flex: 1 1 auto;
+  padding: 0;
+}
+
+.settings-modal .settings-identity-save-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #e8c7c4;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-identity-form-footer .st-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
 }
 
 /* =====================================================================
@@ -385,14 +441,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(18, 24, 31, 0.32);
-  backdrop-filter: blur(6px);
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .settings-modal .settings-account-add-dialog {
   width: min(520px, 100%);
-  max-height: min(82vh, 720px);
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -403,9 +458,30 @@
 }
 
 .settings-modal .settings-account-manage-dialog {
-  height: min(82vh, 720px);
-  max-height: calc(100vh - 40px);
+  height: min(72vh, 700px);
+  max-height: calc(100dvh - 32px);
   overflow: hidden;
+}
+
+.settings-modal .settings-account-manage-dialog > .settings-account-form-grid-wrapper {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.settings-modal .settings-account-manage-dialog .settings-account-form-grid-wrapper > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 12px -16px -16px;
+  padding: 14px 16px;
+  position: sticky;
+  bottom: -16px;
+  border-top: 1px solid var(--st-border);
+  background: var(--st-surface);
 }
 
 .settings-modal .settings-account-manage-dialog > .settings-confirm-dialog-embedded {
@@ -685,7 +761,7 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  background: rgba(249, 250, 251, 0.96);
+  background: var(--st-surface);
   color: #111827;
 }
 
@@ -1220,7 +1296,9 @@
 
 .settings-cache-confirm-backdrop > .settings-cache-confirm {
   width: 440px;
-  max-width: 90vw;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
@@ -1280,15 +1358,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(18, 24, 31, 0.32);
-  backdrop-filter: blur(6px);
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .settings-modal .settings-cache-confirm,
 .settings-modal .settings-confirm-dialog {
   width: min(440px, 100%);
-  max-height: min(80vh, 640px);
+  max-height: min(calc(100dvh - 32px), 640px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2056,33 +2133,111 @@
 
 .settings-modal .settings-contact-create {
   display: grid;
+  gap: 10px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-modal .settings-contact-create-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-contact-create-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-contact-create-header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-contact-create-fields {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
 }
 
-.settings-modal .settings-contact-create .st-field textarea,
-.settings-modal .settings-contact-create .st-switch,
-.settings-modal .settings-contact-create .st-btn {
-  grid-column: 1 / -1;
+.settings-modal .settings-contact-create .st-field {
+  padding: 0;
 }
 
-.settings-modal .settings-contact-create .st-btn {
-  justify-self: end;
+.settings-modal .settings-contact-create textarea {
+  height: 72px;
+  min-height: 72px;
+  resize: none;
+}
+
+.settings-modal .settings-contact-create-footer {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-contact-create-footer .st-switch {
+  flex: 1 1 auto;
+  min-height: 42px;
+  padding: 4px 0;
+}
+
+.settings-modal .settings-contact-create-footer .st-btn {
+  flex: 0 0 auto;
+}
+
+.settings-modal .settings-contact-save-error {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #e8c7c4;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
 }
 
 .settings-modal .settings-contact-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+}
+
+.settings-modal .settings-contact-list-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.68fr);
+  gap: 10px;
+  padding: 0 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-modal .settings-contact-list-toolbar .st-field {
+  padding: 0;
+}
+
+.settings-modal .settings-contact-merge-field .st-field-hint {
+  min-height: 18px;
 }
 
 .settings-modal .settings-contact-list .contact-tool-row {
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 12px 14px;
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
+  background: var(--st-surface);
 }
 
 .settings-modal .settings-contact-main {
@@ -2129,19 +2284,33 @@
 .settings-modal .contact-tool-actions {
   display: flex;
   align-items: center;
+  align-self: stretch;
   gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--st-border);
 }
 
 .settings-modal .contact-edit-form {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 10px;
 }
 
-.settings-modal .contact-edit-form textarea,
-.settings-modal .contact-edit-form .st-actions {
+.settings-modal .contact-edit-form .st-field {
+  padding: 0;
+}
+
+.settings-modal .contact-edit-form textarea {
+  height: 84px;
+  min-height: 84px;
+  resize: none;
+}
+
+.settings-modal .contact-edit-form .contact-edit-actions {
   grid-column: 1 / -1;
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .settings-modal .settings-contact-search {
@@ -2181,13 +2350,6 @@
   color: var(--st-text);
 }
 
-.settings-modal .contact-alias-warning {
-  margin: 4px 0 0;
-  color: var(--st-warning);
-  font-size: var(--st-font-size-aux);
-  line-height: 1.5;
-}
-
 .settings-modal .contact-tool-row .contact-alias-chips {
   padding-top: 2px;
 }
@@ -2210,46 +2372,96 @@
 
 .settings-modal .settings-rule-editor {
   display: grid;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 14px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
+  gap: 14px;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .settings-modal .settings-rule-editor :is(input, select) {
   width: 100%;
 }
 
-.settings-modal .settings-rule-builder {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 10px;
-  background: rgba(248, 250, 252, 0.78);
-}
-
-.settings-modal .settings-rule-builder label {
+.settings-modal .settings-rule-editor-header > span {
   min-width: 0;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  padding: 10px 14px;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-aux);
-  font-weight: 540;
+  gap: 2px;
 }
 
-.settings-modal .settings-rule-builder label > span {
-  padding: 0 2px;
-  color: #68717d;
-  font-size: 12px;
-  font-weight: 760;
+.settings-modal .settings-rule-editor-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-rule-editor-header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-rule-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--st-border);
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-rule-builder-group {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.settings-modal .settings-rule-builder-group + .settings-rule-builder-group {
+  padding-left: 18px;
+  border-left: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-rule-builder-group > strong {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+  font-weight: 620;
+}
+
+.settings-modal .settings-rule-condition-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.settings-modal .settings-rule-condition-fields label,
+.settings-modal .settings-rule-label-action {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+  font-weight: 560;
+}
+
+.settings-modal .settings-rule-condition-fields label > span,
+.settings-modal .settings-rule-label-action > span,
+.settings-modal .settings-rule-action-row > span {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  font-weight: 560;
+}
+
+.settings-modal .settings-rule-action-row {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-modal .settings-rule-action-row .st-field-error,
+.settings-modal .settings-rule-condition-fields .st-field-error {
+  margin-top: -1px;
 }
 
 .settings-modal .settings-rule-action-chips {
@@ -2265,12 +2477,14 @@
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface);
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.22);
+  box-shadow: none;
   font-size: var(--st-font-size-secondary);
 }
 
 .settings-modal .settings-rule-action-chips button:hover {
   border-color: var(--st-border-strong);
+  color: var(--st-text);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-rule-action-chips button.active {
@@ -2282,26 +2496,45 @@
 .settings-modal .settings-rule-advanced {
   display: grid;
   gap: 6px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.7);
-  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-bottom: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .settings-modal .settings-rule-advanced summary {
-  justify-self: start;
-  padding: 7px 9px;
-  color: var(--st-accent);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 760;
+  font-weight: 580;
   cursor: pointer;
 }
 
 .settings-modal .settings-rule-advanced small {
   display: block;
-  padding: 0 9px 8px;
+  padding: 0 0 4px;
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
+}
+
+.settings-modal .settings-rule-advanced :is(input, textarea) {
+  margin-bottom: 6px;
+}
+
+.settings-modal .settings-rule-save-error {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #e8c7c4;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
 }
 
 .settings-modal .settings-rule-footer {
@@ -2310,7 +2543,10 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding-top: 4px;
+}
+
+.settings-modal .settings-rule-footer .st-switch {
+  padding: 0;
 }
 
 .settings-modal .settings-rule-list {
@@ -2321,7 +2557,7 @@
 .settings-modal .settings-rule-item {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -2353,13 +2589,31 @@
   white-space: nowrap;
 }
 
-.settings-modal .settings-rule-item > div {
+.settings-modal .settings-rule-item .settings-rule-item-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+}
+
+.settings-modal .settings-rule-item .st-switch {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.settings-modal .settings-rule-item .st-switch-copy {
+  display: none;
 }
 
 /* --- Security preview --- */
+.settings-modal .settings-page-content textarea.settings-security-preview-source {
+  height: 180px;
+  min-height: 180px;
+  resize: none;
+}
+
 .settings-modal .settings-preview-result {
   display: grid;
   gap: 8px;
@@ -2478,8 +2732,8 @@
 .settings-modal .settings-preview-metadata span,
 .settings-modal .settings-preview-metadata em {
   border-radius: 999px;
-  background: rgba(10, 132, 255, 0.10);
-  color: var(--accent-strong);
+  background: var(--st-surface-subtle);
+  color: var(--st-text-secondary);
   font-size: 12px;
   font-style: normal;
   padding: 4px 8px;
@@ -2532,7 +2786,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: none;
 }
 
 .contact-import-dialog .st-btn-secondary {
@@ -2602,7 +2856,7 @@
   min-width: 0;
   min-height: 44px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
@@ -2685,8 +2939,8 @@
 }
 
 .contact-import-dialog {
-  width: min(680px, 100%);
-  max-height: min(84vh, 720px);
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(calc(100dvh - 32px), 720px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3143,9 +3397,9 @@
 }
 
 .settings-modal .settings-ai-service-option.active {
-  border-color: var(--st-accent);
-  background: var(--st-accent-soft);
-  box-shadow: 0 0 0 1px var(--st-accent), 0 4px 12px rgba(37, 99, 235, 0.08);
+  border-color: var(--st-border-strong);
+  background: var(--st-surface-subtle);
+  box-shadow: 0 0 0 1px var(--st-border-strong);
 }
 
 .settings-modal .settings-ai-service-option input {
@@ -3261,8 +3515,8 @@
 }
 
 .settings-modal .template-search:focus-within {
-  border-color: var(--st-focus-border);
-  box-shadow: var(--st-focus-ring);
+  border-color: #93c5fd;
+  box-shadow: none;
 }
 
 .settings-modal .template-search input {
@@ -4009,6 +4263,15 @@
     grid-template-columns: 1fr;
   }
 
+  .settings-modal .settings-identity-form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-modal .settings-identity-form-footer .st-actions {
+    justify-content: flex-end;
+  }
+
   .settings-modal .notification-account-grid {
     grid-template-columns: 1fr;
   }
@@ -4020,6 +4283,13 @@
   .settings-modal .settings-rule-builder {
     grid-template-columns: 1fr;
   }
+
+  .settings-modal .settings-rule-builder-group + .settings-rule-builder-group {
+    padding-top: 14px;
+    padding-left: 0;
+    border-top: 1px solid var(--st-border);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -4030,9 +4300,19 @@
   .settings-modal .settings-account-form-grid,
   .settings-modal .settings-oauth-grid,
   .settings-modal .settings-account-protocol-grid,
-  .settings-modal .settings-contact-create,
+  .settings-modal .settings-contact-create-fields,
+  .settings-modal .settings-contact-list-toolbar,
   .settings-modal .contact-edit-form {
     grid-template-columns: 1fr;
+  }
+
+  .settings-modal .settings-contact-create-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-modal .settings-contact-create-footer .st-btn {
+    align-self: flex-end;
   }
 
   .settings-modal .settings-account-row {
@@ -4051,9 +4331,13 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .settings-modal .settings-rule-item > div {
+  .settings-modal .settings-rule-item .settings-rule-item-actions {
     grid-column: 1 / -1;
     flex-wrap: wrap;
+  }
+
+  .settings-modal .settings-rule-condition-fields {
+    grid-template-columns: 1fr;
   }
 
   .settings-modal .contact-import-history-row,
@@ -4117,11 +4401,11 @@
 /* --- Contact import dialogs: narrow viewport --- */
 @media (max-width: 900px) {
   .contact-import-backdrop {
-    padding: 12px;
+    padding: 8px;
   }
 
   .contact-import-dialog {
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 16px);
   }
 
   .contact-import-preview-row {

@@ -28,7 +28,7 @@ export type SettingsHandlers = {
   onNewAccountFormChange: (account: SetStateAction<AccountCreateInput>) => void;
   onApplyProviderPreset: SettingsOverlayProps['onApplyProviderPreset'];
   onApplyNewAccountPreset: SettingsOverlayProps['onApplyNewAccountPreset'];
-  onCreateNewAccount: (secret?: string) => Promise<void>;
+  onCreateNewAccount: SettingsOverlayProps['onCreateNewAccount'];
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onUpdateProviderVerification: SettingsOverlayProps['onUpdateProviderVerification'];
   onSaveProviderVerification: () => void;
@@ -121,7 +121,7 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onNewAccountFormChange: (account) => latest().onNewAccountFormChange(account),
     onApplyProviderPreset: (preset: AccountProviderPreset) => latest().onApplyProviderPreset(preset),
     onApplyNewAccountPreset: (preset: AccountProviderPreset) => latest().onApplyNewAccountPreset(preset),
-    onCreateNewAccount: (secret) => latest().onCreateNewAccount(secret),
+    onCreateNewAccount: (secret, onProgress) => latest().onCreateNewAccount(secret, onProgress),
     onRemoveAccount: (deleteSecret) => latest().onRemoveAccount(deleteSecret),
     onUpdateProviderVerification: (providerName: string, patch: Partial<ProviderVerificationRecord>) => latest().onUpdateProviderVerification(providerName, patch),
     onSaveProviderVerification: () => latest().onSaveProviderVerification(),

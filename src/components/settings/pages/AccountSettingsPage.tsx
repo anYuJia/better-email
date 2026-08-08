@@ -6,6 +6,10 @@ import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
 import type { AccountDialogMode } from '../accounts/accountSettingsShared';
+import {
+  accountFormForEmail,
+  accountFormForIncomingProtocol,
+} from '../accounts/accountSetupForm';
 
 function errorMessage(error: unknown) {
   return (error instanceof Error ? error.message : String(error))
@@ -125,59 +129,12 @@ export default function AccountSettingsPage({
 
   function updateNewAccountEmail(email: string) {
     setAddAccountError('');
-    const domain = email.trim().toLowerCase().split('@').pop() ?? '';
-    const preset = providerPresetForEmail(email);
-    const localPart = email.trim().split('@')[0] || '';
-    if (!preset) {
-      if (domain && domain !== email.trim().toLowerCase()) {
-        const isPop = newAccountForm.incoming_protocol === 'pop3';
-        onNewAccountFormChange({
-          ...newAccountForm,
-          email,
-          display_name: newAccountForm.display_name || localPart,
-          imap_host: isPop ? `pop.${domain}:995` : `imap.${domain}:993`,
-          smtp_host: `smtp.${domain}:465`,
-        });
-      } else {
-        onNewAccountFormChange({
-          ...newAccountForm,
-          email,
-          display_name: newAccountForm.display_name || localPart,
-        });
-      }
-      return;
-    }
-    onNewAccountFormChange({
-      ...newAccountForm,
-      email,
-      display_name: newAccountForm.display_name || preset.label,
-      provider: preset.provider,
-      imap_host: incomingHostForProtocol(preset, newAccountForm.incoming_protocol),
-      smtp_host: preset.smtp_host,
-      auth_type: 'password',
-    });
+    onNewAccountFormChange(accountFormForEmail(newAccountForm, email));
   }
 
   function switchNewAccountProtocol(nextProtocol: IncomingProtocol) {
-    const preset = providerPresetFor(newAccountForm.provider);
     setAddAccountError('');
-    let nextImapHost = newAccountForm.imap_host;
-    if (!preset) {
-      const domain = newAccountForm.email.trim().toLowerCase().split('@').pop() ?? '';
-      if (domain && domain !== newAccountForm.email.trim().toLowerCase()) {
-        nextImapHost = nextProtocol === 'pop3' ? `pop.${domain}:995` : `imap.${domain}:993`;
-      }
-    } else {
-      nextImapHost = incomingHostForProtocol(preset, nextProtocol);
-    }
-    onNewAccountFormChange({
-      ...newAccountForm,
-      incoming_protocol: nextProtocol,
-      imap_host: nextImapHost,
-      auth_type: nextProtocol === 'pop3' && newAccountForm.auth_type === 'oauth2'
-        ? 'password'
-        : newAccountForm.auth_type,
-    });
+    onNewAccountFormChange(accountFormForIncomingProtocol(newAccountForm, nextProtocol));
   }
 
   function switchAccountProtocol(nextProtocol: IncomingProtocol) {

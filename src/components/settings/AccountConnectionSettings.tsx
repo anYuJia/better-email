@@ -41,7 +41,7 @@ export type AccountConnectionSettingsProps = {
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
-  onCreateNewAccount: (secret?: string) => Promise<void>;
+  onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onUpdateProviderVerification: (
     providerName: string,

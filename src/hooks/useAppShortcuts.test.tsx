@@ -24,6 +24,7 @@ function makeOptions(): ShortcutOptions {
     isComposerMinimized: false,
     isSettingsOpen: false,
     isShortcutsOpen: false,
+    isAccountLoginRequired: false,
     closeOverlays: vi.fn(),
     clearSelection: vi.fn(),
     setStatus: vi.fn(),
@@ -70,5 +71,17 @@ describe('useAppShortcuts text selection boundary', () => {
 
     expect(options.toggleAllVisibleMessages).toHaveBeenCalledWith(true);
     expect(options.setStatus).toHaveBeenCalledWith('已选择当前列表 1 封邮件');
+  });
+
+  it('ignores app shortcuts while an account login is required', () => {
+    const options = makeOptions();
+    options.isAccountLoginRequired = true;
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'c' });
+    fireEvent.keyDown(window, { key: '?' });
+
+    expect(options.composeNew).not.toHaveBeenCalled();
+    expect(options.openShortcuts).not.toHaveBeenCalled();
   });
 });

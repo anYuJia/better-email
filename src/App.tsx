@@ -13,6 +13,7 @@ import WindowChrome from './components/WindowChrome';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
+import AccountLoginDialog from './components/AccountLoginDialog';
 import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
 import ConfirmationDialogs from './components/ConfirmationDialogs';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -162,6 +163,10 @@ export default function App() {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
+  const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
+  const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
+  const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
+  const isAccountLoginActive = needsAccountLogin || isAccountLoginProvisioning;
   const mailboxRefreshRef = useRef(0);
   const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
   const {
@@ -329,6 +334,7 @@ export default function App() {
     setFolderId,
     setStatus,
     setAppBadgeStatus,
+    onAccountListLoaded: () => setInitialAccountListLoaded(true),
   });
   const mailboxContextKey = useMemo(
     () => buildMailboxContextKey({ accountScope, folderId, query, filter, listMode }),
@@ -788,7 +794,7 @@ export default function App() {
     async function registerTrayListeners() {
       try {
         const unlistenCompose = await listen('tray://compose', () => {
-          if (!active) return;
+          if (!active || isAccountLoginActive) return;
           setRichComposer(false);
           openComposer(emptyDraft);
           setStatus('已打开新邮件');
@@ -796,13 +802,13 @@ export default function App() {
         unlisteners.push(unlistenCompose);
 
         const unlistenSync = await listen('tray://sync', () => {
-          if (!active) return;
+          if (!active || isAccountLoginActive) return;
           syncAndRefresh().catch((error) => setStatus(String(error)));
         });
         unlisteners.push(unlistenSync);
 
         const unlistenUnread = await listen('tray://open-unread', () => {
-          if (!active) return;
+          if (!active || isAccountLoginActive) return;
           const inboxFolder = folders.find((f) => f.role === 'inbox');
           if (inboxFolder) {
             setFolderId(inboxFolder.id);
@@ -815,7 +821,7 @@ export default function App() {
         unlisteners.push(unlistenUnread);
 
         const unlistenSettings = await listen('tray://settings', () => {
-          if (!active) return;
+          if (!active || isAccountLoginActive) return;
           setSettingsOpen(true);
         });
         unlisteners.push(unlistenSettings);
@@ -830,7 +836,7 @@ export default function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus]);
+  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isAccountLoginActive]);
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
@@ -1141,6 +1147,7 @@ export default function App() {
     isComposerMinimized,
     isSettingsOpen,
     isShortcutsOpen,
+    isAccountLoginRequired: isAccountLoginActive,
     closeOverlays: () => {
       closeComposer();
       setSettingsOpen(false);
@@ -1458,7 +1465,7 @@ export default function App() {
         onSendQuickReply={sendQuickReply}
       />
 
-      {isComposerOpen && (
+      {!isAccountLoginActive && isComposerOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
           <ComposerWindow
           minimized={isComposerMinimized}
@@ -1504,7 +1511,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {snoozeTarget && (
+      {!isAccountLoginActive && snoozeTarget && (
         <Suspense fallback={<DeferredSurface label="正在打开稍后处理" />}>
           <SnoozePicker
             targetCount={snoozeTarget.messages.length}
@@ -1515,7 +1522,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {isSettingsOpen && (accountForm || activeSettingsSection === 'accounts') && (
+      {!isAccountLoginActive && isSettingsOpen && (accountForm || activeSettingsSection === 'accounts') && (
         <SettingsOverlay
           accountForm={accountForm}
           accounts={accounts}
@@ -1618,9 +1625,9 @@ export default function App() {
           onNewAccountFormChange={setNewAccountForm}
           onApplyProviderPreset={applyProviderPreset}
           onApplyNewAccountPreset={applyNewAccountPreset}
-          onCreateNewAccount={async (secret) => {
+          onCreateNewAccount={async (secret, onProgress) => {
             try {
-              await createNewAccount(secret);
+              await createNewAccount(secret, onProgress);
             } catch (error) {
               setStatus(String(error));
               throw error;
@@ -1728,7 +1735,7 @@ export default function App() {
           onParseRawMessage={parseRawMessage}
         />
       )}
-      {isShortcutsOpen && (
+      {!isAccountLoginActive && isShortcutsOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>
           <ShortcutHelpModal
             open
@@ -1736,23 +1743,23 @@ export default function App() {
           />
         </Suspense>
       )}
-      <UndoSnackbarStack
+      {!isAccountLoginActive && <UndoSnackbarStack
         undoAction={undoAction}
         onUndoAction={() => {
           restoreUndoAction().catch((error) => setStatus(String(error)));
         }}
         onDismissAction={clearUndoAction}
-      />
-      <MessageToastStack
+      />}
+      {!isAccountLoginActive && <MessageToastStack
         toasts={messageToasts}
         pendingSendUndo={pendingSendUndo}
         onUndoSend={() => {
           undoPendingSend().catch((error) => setStatus(String(error)));
         }}
         onDismissSend={() => setPendingSendUndo(null)}
-      />
-      <GlobalTooltip />
-      {composerCloseConfirmOpen && (
+      />}
+      {!isAccountLoginActive && <GlobalTooltip />}
+      {!isAccountLoginActive && composerCloseConfirmOpen && (
         <ComposerCloseConfirmDialog
           setOpen={setComposerCloseConfirmOpen}
           onClose={() => setComposerCloseConfirmOpen(false)}
@@ -1764,7 +1771,7 @@ export default function App() {
           onSaveDraft={saveDraft}
         />
       )}
-      <ConfirmationDialogs
+      {!isAccountLoginActive && <ConfirmationDialogs
         confirmDeleteFolder={confirmDeleteFolder}
         confirmDeleteIdentity={confirmDeleteIdentity}
         confirmDeleteRule={confirmDeleteRule}
@@ -1786,7 +1793,22 @@ export default function App() {
         onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
         onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
         onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
-      />
+      />}
+      {isAccountLoginActive && (
+        <AccountLoginDialog
+          form={newAccountForm}
+          onFormChange={setNewAccountForm}
+          onSubmit={async (secret, onProgress) => {
+            setSettingsOpen(false);
+            setAccountLoginProvisioning(true);
+            try {
+              return await createNewAccount(secret, onProgress);
+            } finally {
+              setAccountLoginProvisioning(false);
+            }
+          }}
+        />
+      )}
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );

@@ -53,6 +53,7 @@ type UseAppMetaLoaderOptions = {
   setFolderId: Dispatch<SetStateAction<number | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
   setAppBadgeStatus: Dispatch<SetStateAction<string>>;
+  onAccountListLoaded?: () => void;
 };
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -89,6 +90,7 @@ export default function useAppMetaLoader({
   setFolderId,
   setStatus,
   setAppBadgeStatus,
+  onAccountListLoaded,
 }: UseAppMetaLoaderOptions) {
   const benchmarkSyncRef = useRef(false);
 
@@ -112,13 +114,16 @@ export default function useAppMetaLoader({
       mode,
     });
     try {
-      const released = await releaseDueSnoozedMessages();
-      if (released.released_count > 0) {
-        setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
-      }
+      const nextAccountsPromise = invoke<Account[]>('list_accounts').then((nextAccounts) => {
+        setAccounts(nextAccounts);
+        onAccountListLoaded?.();
+        return nextAccounts;
+      });
+      const releasedPromise = releaseDueSnoozedMessages();
       if (mode === 'mailbox') {
         const [
           nextAccounts,
+          released,
           nextAccount,
           nextFolders,
           nextLabels,
@@ -131,7 +136,8 @@ export default function useAppMetaLoader({
           nextRemoteImageTrusts,
           nextImapMailboxes,
         ] = await Promise.all([
-          invoke<Account[]>('list_accounts'),
+          nextAccountsPromise,
+          releasedPromise,
           invoke<Account | null>('get_account', { accountId: nextAccountId }),
           invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
           invoke<Label[]>('list_labels'),
@@ -144,7 +150,9 @@ export default function useAppMetaLoader({
           invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
           invoke<ImapMailboxState[]>('list_imap_mailboxes'),
         ]);
-        setAccounts(nextAccounts);
+        if (released.released_count > 0) {
+          setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
+        }
         setAccount(nextAccount);
         setAccountForm(nextAccount);
         setFolders(nextFolders);
@@ -176,6 +184,7 @@ export default function useAppMetaLoader({
       }
       const [
         nextAccounts,
+        released,
         nextAccount,
         nextFolders,
         nextLabels,
@@ -191,7 +200,8 @@ export default function useAppMetaLoader({
         nextImapMailboxes,
         nextOauthSessions,
       ] = await Promise.all([
-        invoke<Account[]>('list_accounts'),
+        nextAccountsPromise,
+        releasedPromise,
         invoke<Account | null>('get_account', { accountId: nextAccountId }),
         invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
         invoke<Label[]>('list_labels'),
@@ -207,7 +217,9 @@ export default function useAppMetaLoader({
         invoke<ImapMailboxState[]>('list_imap_mailboxes'),
         invoke<OAuthSession[]>('list_oauth_sessions'),
       ]);
-      setAccounts(nextAccounts);
+      if (released.released_count > 0) {
+        setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
+      }
       setAccount(nextAccount);
       setAccountForm(nextAccount);
       setFolders(nextFolders);

@@ -214,14 +214,24 @@ export default function useAccountProvisioning({
       }
       onProgress?.('已完成邮件同步，正在加载界面数据...');
       await new Promise((resolve) => setTimeout(resolve, 600));
-      const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
-      accountFlowLog('metadata loaded after create', {
-        accountId: created.id,
-        folderId: nextFolderId,
-        folderCount: nextFolders.length,
-      });
-      await loadMessages(nextFolderId, '', 'all', created.id, undefined, undefined, 'account');
-      setStatus(`已创建邮箱账号：${created.email}${trimmedSecret ? '，并完成登录验证' : ''}`);
+      try {
+        const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
+        accountFlowLog('metadata loaded after create', {
+          accountId: created.id,
+          folderId: nextFolderId,
+          folderCount: nextFolders.length,
+        });
+        await loadMessages(nextFolderId, '', 'all', created.id, undefined, undefined, 'account');
+        setStatus(`已创建邮箱账号：${created.email}${trimmedSecret ? '，并完成登录验证' : ''}`);
+      } catch (initialLoadError) {
+        const message = formatInvokeError(initialLoadError);
+        accountFlowWarn('initial mailbox data load failed after create', {
+          accountId: created.id,
+          email: maskEmailForLog(created.email),
+          error: message,
+        });
+        setStatus(`邮箱账号已创建${trimmedSecret ? '并完成登录验证' : ''}，但初始数据加载失败：${message}`);
+      }
       return created;
     } catch (error) {
       accountFlowWarn('create failed', {

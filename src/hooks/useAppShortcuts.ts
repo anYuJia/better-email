@@ -17,6 +17,7 @@ type UseAppShortcutsOptions = {
   isComposerMinimized: boolean;
   isSettingsOpen: boolean;
   isShortcutsOpen: boolean;
+  isAccountLoginRequired: boolean;
   closeOverlays: () => void;
   clearSelection: () => void;
   setStatus: (status: string) => void;
@@ -73,6 +74,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         isComposerMinimized,
         isSettingsOpen,
         isShortcutsOpen,
+        isAccountLoginRequired,
         closeOverlays,
         clearSelection,
         setStatus,
@@ -89,6 +91,8 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
       const commandModifier = event.metaKey || event.ctrlKey;
+
+      if (isAccountLoginRequired) return;
 
       if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen)) {
         event.preventDefault();

@@ -97,7 +97,11 @@ function setupInvokeMocks() {
   }) as never);
 }
 
-function renderMetaLoader() {
+function renderMetaLoader({
+  onAccountListLoaded,
+}: {
+  onAccountListLoaded?: () => void;
+} = {}) {
   const setters = {
     setAccounts: vi.fn(),
     setAccount: vi.fn(),
@@ -123,6 +127,7 @@ function renderMetaLoader() {
     folderId: 101,
     accountScope: 1,
     ...setters,
+    onAccountListLoaded,
   }));
   return { ...hook, setters };
 }
@@ -160,6 +165,44 @@ describe('useAppMetaLoader', () => {
     });
 
     expect(setters.setFolderId).toHaveBeenCalledWith(101);
+  });
+
+  it('reports account availability even when unrelated mailbox metadata fails', async () => {
+    setupInvokeMocks();
+    const onAccountListLoaded = vi.fn();
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_stats') return Promise.reject(new Error('stats unavailable'));
+      switch (command) {
+        case 'release_due_snoozed_messages':
+          return Promise.resolve({ released_count: 0 });
+        case 'list_accounts':
+          return Promise.resolve([account]);
+        case 'get_account':
+          return Promise.resolve(account);
+        case 'list_folders':
+          return Promise.resolve(folders);
+        case 'list_labels':
+        case 'list_sync_runs':
+        case 'list_identities':
+        case 'list_outbox':
+        case 'list_background_tasks':
+        case 'list_remote_image_trusts':
+        case 'list_imap_mailboxes':
+          return Promise.resolve([]);
+        case 'get_sync_schedule_plan':
+          return Promise.resolve({});
+        default:
+          return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+      }
+    }) as never);
+    const { result, setters } = renderMetaLoader({ onAccountListLoaded });
+
+    await expect(act(async () => {
+      await result.current.loadMeta(101, 1, { mode: 'mailbox' });
+    })).rejects.toThrow('stats unavailable');
+
+    expect(onAccountListLoaded).toHaveBeenCalledOnce();
+    expect(setters.setAccounts).toHaveBeenCalledWith([account]);
   });
 
   it('runs the benchmark sync at most once per session', async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import useAccountProvisioning from './useAccountProvisioning';
-import type { Account, AccountScope, FilterMode } from '../app/types';
+import type { Account, AccountCreateInput, AccountScope, FilterMode } from '../app/types';
 import { emptyAccountCreateForm } from '../app/uiConfig';
 import { invoke } from '../tauriBridge';
 
@@ -62,6 +62,41 @@ function renderRemovalHook(account: Account, accounts: Account[]) {
     loadMessages,
   }));
   return { utils, setters, loadMeta, loadMessages };
+}
+
+function renderCreationHook(
+  newAccountForm: AccountCreateInput,
+  loadMeta = vi.fn().mockResolvedValue({ folderId: 9, folders: [{ id: 9 }] }),
+) {
+  const setters = {
+    setAccount: vi.fn(),
+    setAccounts: vi.fn(),
+    setAccountScope: vi.fn(),
+    setAccountForm: vi.fn(),
+    setNewAccountForm: vi.fn(),
+    setFolderId: vi.fn(),
+    setFolders: vi.fn(),
+    setMessages: vi.fn(),
+    setSelectedId: vi.fn(),
+    setAttachments: vi.fn(),
+    setSettingsOpen: vi.fn(),
+    setCredentialStatus: vi.fn(),
+    setCredentialVerification: vi.fn(),
+    setSyncRuns: vi.fn(),
+    setStatus: vi.fn(),
+  };
+  const loadMessages = vi.fn().mockResolvedValue([]);
+  const utils = renderHook(() => useAccountProvisioning({
+    accounts: [],
+    accountForm: null,
+    newAccountForm,
+    query: '',
+    filter: 'all' as FilterMode,
+    ...setters,
+    loadMeta,
+    loadMessages,
+  }));
+  return { utils, setters, loadMessages };
 }
 
 describe('useAccountProvisioning removeCurrentAccount', () => {
@@ -193,5 +228,64 @@ describe('useAccountProvisioning removeCurrentAccount', () => {
 
     expect(invoke).not.toHaveBeenCalled();
     expect(setters.setStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAccountProvisioning createNewAccount', () => {
+  beforeEach(() => {
+    vi.mocked(invoke).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it('keeps a successfully verified account when the initial mailbox load fails', async () => {
+    vi.useFakeTimers();
+    const created = makeAccount({ id: 7, email: 'ada@qq.com' });
+    const newAccountForm: AccountCreateInput = {
+      ...emptyAccountCreateForm,
+      email: created.email,
+      display_name: 'Ada',
+      provider: 'qq',
+      imap_host: 'imap.qq.com:993',
+      smtp_host: 'smtp.qq.com:587',
+      incoming_protocol: 'imap',
+      auth_type: 'password',
+    };
+    vi.mocked(invoke).mockImplementation(((command: string) => {
+      switch (command) {
+        case 'create_account':
+          return Promise.resolve(created);
+        case 'store_account_secret':
+          return Promise.resolve({ exists: true, status: 'stored', message: 'saved' });
+        case 'verify_account_credentials_with_secret':
+          return Promise.resolve({ authenticated: true, status: 'ok', message: 'verified' });
+        case 'sync_imap_headers':
+          return Promise.resolve({ status: 'ok', scanned_folders: 1, imported_messages: 0 });
+        default:
+          return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+      }
+    }) as never);
+    const { utils, setters, loadMessages } = renderCreationHook(
+      newAccountForm,
+      vi.fn().mockRejectedValue(new Error('metadata unavailable')),
+    );
+
+    let result: Account | void = undefined;
+    await act(async () => {
+      const pending = utils.result.current.createNewAccount('mail-code');
+      await vi.runAllTimersAsync();
+      result = await pending;
+    });
+
+    expect(result).toEqual(created);
+    expect(setters.setAccount).toHaveBeenCalledWith(created);
+    expect(setters.setAccounts).toHaveBeenCalledWith(expect.any(Function));
+    expect(loadMessages).not.toHaveBeenCalled();
+    expect(setters.setStatus).toHaveBeenCalledWith(
+      '邮箱账号已创建并完成登录验证，但初始数据加载失败：metadata unavailable',
+    );
   });
 });

@@ -22,6 +22,7 @@ import type {
   RestoreMessageReport,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type UseProviderWriteValidationOptions = {
   account: Account | null;
@@ -82,7 +83,7 @@ export default function useProviderWriteValidation({
     }
     setValidationLoading(true);
     try {
-      const nextMessages = await invoke<Message[]>('list_provider_write_validation_messages', {
+      const nextMessages = await invoke<Message[]>(IPC.ListProviderWriteValidationMessages, {
         accountId,
         validationId: activeValidationId,
       });
@@ -133,22 +134,22 @@ export default function useProviderWriteValidation({
     try {
       let report: RemoteActionReport;
       if (stepId === 'read') {
-        report = await invoke<RemoteActionReport>('set_message_read', {
+        report = await invoke<RemoteActionReport>(IPC.SetMessageRead, {
           messageId: receivedMessage.id,
           isRead: true,
         });
       } else if (stepId === 'star') {
-        report = await invoke<RemoteActionReport>('set_message_starred', {
+        report = await invoke<RemoteActionReport>(IPC.SetMessageStarred, {
           messageId: receivedMessage.id,
           isStarred: true,
         });
       } else if (stepId === 'archive') {
-        report = await invoke<RemoteActionReport>('move_message_to_role', {
+        report = await invoke<RemoteActionReport>(IPC.MoveMessageToRole, {
           messageId: receivedMessage.id,
           role: 'archive',
         });
       } else {
-        const restored = await invoke<RestoreMessageReport>('restore_message_to_inbox', {
+        const restored = await invoke<RestoreMessageReport>(IPC.RestoreMessageToInbox, {
           messageId: receivedMessage.id,
         });
         report = restored.remote;

@@ -1,7 +1,6 @@
 const CHINESE_CHAR_PATTERN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 const JAPANESE_PATTERN = /[\u3040-\u309F\u30A0-\u30FF]/;
 const KOREAN_PATTERN = /[\uAC00-\uD7AF\u1100-\u11FF]/;
-const CYRILLIC_PATTERN = /[\u0400-\u04FF]/;
 const EMAIL_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"']+/g;
 const HTML_TAG_PATTERN = /<[^>]*>/g;

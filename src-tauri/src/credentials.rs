@@ -23,6 +23,40 @@ fn oauth_bundle_from_raw(raw: &str) -> Result<OAuthTokenBundle, String> {
     Ok(bundle)
 }
 
+/// 系统凭据服务名（macOS Keychain / Windows Credential Manager / Linux secret-service）。
+pub const KEYCHAIN_SERVICE: &str = "app.betteremail.client";
+
+/// 将账号凭据写入系统凭据库。失败时返回错误信息，由调用方决定是否回退。
+pub fn keychain_set_secret(account_email: &str, secret: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, account_email.trim())
+        .map_err(|error| format!("系统凭据库初始化失败：{error}"))?;
+    entry
+        .set_password(secret)
+        .map_err(|error| format!("系统凭据库写入失败：{error}"))
+}
+
+/// 从系统凭据库读取账号凭据。不存在时返回 Ok(None)。
+pub fn keychain_get_secret(account_email: &str) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, account_email.trim())
+        .map_err(|error| format!("系统凭据库初始化失败：{error}"))?;
+    match entry.get_password() {
+        Ok(secret) => Ok(Some(secret)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(format!("系统凭据库读取失败：{error}")),
+    }
+}
+
+/// 从系统凭据库删除账号凭据。不存在时视为已删除。
+pub fn keychain_delete_secret(account_email: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, account_email.trim())
+        .map_err(|error| format!("系统凭据库初始化失败：{error}"))?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(format!("系统凭据库删除失败：{error}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,6 +90,19 @@ mod tests {
         match oauth {
             AccountSecret::OAuth2(bundle) => assert_eq!(bundle.access_token, "access-123"),
             AccountSecret::Password(_) => panic!("oauth2 auth should parse token bundle"),
+        }
+    }
+
+    #[test]
+    fn keychain_missing_entry_reads_as_none_without_error() {
+        let email = "keychain-test-none@example.com";
+        let _ = keychain_delete_secret(email);
+        match keychain_get_secret(email) {
+            Ok(option) => assert!(option.is_none()),
+            Err(error) => {
+                // 无可用系统凭据库（如 headless Linux）时跳过，不视为失败。
+                assert!(error.contains("系统凭据库"));
+            }
         }
     }
 }

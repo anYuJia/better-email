@@ -22,8 +22,3 @@
   position: absolute;
   inset: 0 -3px;
 }
-
-.pane-resizer:hover {
-  background: var(--ui-accent);
-  opacity: 0.42;
-}

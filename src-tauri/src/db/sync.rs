@@ -1,9 +1,9 @@
-use super::*;
 use super::accounts::account_for_conn;
+use super::accounts::map_account;
 use super::contacts_rules::apply_enabled_rules_for_message;
 use super::folders::{folder_for_conn, folder_id_for_account_role, is_custom_folder_role};
-use super::accounts::map_account;
 use super::messages::{bool_to_int, thread_key_for_message};
+use super::*;
 
 impl MailStore {
     pub fn run_sync_dry_run(&self, account_id: Option<i64>) -> MailResult<SyncRun> {
@@ -382,6 +382,7 @@ pub(super) fn import_imap_headers_for_conn(
     mailbox_id: i64,
     batch: &ImapHeaderBatch,
 ) -> MailResult<i64> {
+    let transaction = conn.unchecked_transaction()?;
     let (account_id, local_role, local_folder_id): (i64, String, Option<i64>) = conn.query_row(
         "SELECT account_id, local_role, local_folder_id FROM imap_mailboxes WHERE id = ?1",
         params![mailbox_id],
@@ -566,6 +567,7 @@ pub(super) fn import_imap_headers_for_conn(
             Utc::now().to_rfc3339()
         ],
     )?;
+    transaction.commit()?;
     Ok(imported_messages)
 }
 pub(super) fn reconcile_imap_flag_snapshot_for_conn(
@@ -573,6 +575,7 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
     mailbox_id: i64,
     snapshot: &ImapFlagSnapshot,
 ) -> MailResult<ImapReconcileResult> {
+    let transaction = conn.unchecked_transaction()?;
     let (account_id, remote_name): (i64, String) = conn.query_row(
         "SELECT account_id, remote_name FROM imap_mailboxes WHERE id = ?1",
         params![mailbox_id],
@@ -651,6 +654,7 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
         }
     }
 
+    transaction.commit()?;
     Ok(ImapReconcileResult {
         updated_messages,
         removed_messages,
@@ -693,4 +697,3 @@ pub(super) fn infer_local_role(remote_name: &str, attributes: &[String]) -> Stri
     }
     .to_string()
 }
-

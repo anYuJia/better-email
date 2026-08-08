@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback, Dispatch, SetStateAc
 import { resolveCidInlineImages } from '../../app/inlineImages';
 import { localFileAssetUrl, invoke } from '../../tauriBridge';
 import type { Message, Attachment } from '../../app/types';
+import { IPC } from '../../ipc/commands';
 
 /** Max attachment size allowed for Data URL fallback (2 MB). Larger files stay on asset URL path only. */
 const INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES = 2 * 1024 * 1024;
@@ -116,7 +117,7 @@ export default function useInlineImages({
       // Mark attempted so we don't re-trigger fallback for this attachment.
       inlineImageDataUrlAttemptsRef.current.add(attachment.id);
       try {
-        const dataUrl = await invoke<string>('read_attachment_data_url', { attachmentId: attachment.id });
+        const dataUrl = await invoke<string>(IPC.ReadAttachmentDataUrl, { attachmentId: attachment.id });
         if (cancelled || !dataUrl.trim()) return;
         setInlineImageDataUrls((current) => ({
           ...current,

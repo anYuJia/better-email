@@ -9,7 +9,7 @@ import {
   outboxFlowLog,
   syncModeStatus,
 } from '../app/backgroundTaskFlow';
-import { invoke, isPermissionGranted } from '../tauriBridge';
+import { isPermissionGranted } from '../tauriBridge';
 
 type BackgroundSchedulerOptions = {
   account: Account | null;

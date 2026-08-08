@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { ListMode, Message, MessageSummary, UndoAction } from '../app/types';
+import type { ListMode, MessageSummary, UndoAction } from '../app/types';
 
 type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash';
 type ComposeMode = 'reply' | 'replyAll' | 'forward';

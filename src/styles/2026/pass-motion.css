@@ -60,11 +60,6 @@
   transition-property: color, background-color, border-color, opacity;
 }
 
-.message-card:hover {
-  background: var(--quiet-row-hover);
-  box-shadow: var(--quiet-row-shadow);
-}
-
 .icon-button:hover,
 .reader-actions button:hover,
 .reader-actions .reader-more-menu summary:hover,

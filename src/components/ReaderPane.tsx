@@ -1,15 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import {
-  Copy,
-  Download,
-  ExternalLink,
-  FolderOpen,
-  Image as ImageIcon,
   Mail,
   MailPlus,
-  ZoomIn,
-  ZoomOut,
-  X,
 } from 'lucide-react';
 import type {
   AccountScope,
@@ -20,9 +12,8 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
-import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted, parseMailtoUrl } from '../mailUtils';
-import { invoke, localFileAssetUrl } from '../tauriBridge';
-import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import { formatBytes, formatDate, bodyLooksLikeHtml, htmlHasRenderableContent, htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
+import ContextMenu from './ContextMenu';
 import type { BulkMessageAction } from './messageContextMenu';
 import useImagePreview, { type PreviewImage, type AttachmentContextMenu } from './reader/useImagePreview';
 import useInlineImages from './reader/useInlineImages';
@@ -33,7 +24,6 @@ import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
 import QuickReplySection from './reader/QuickReplySection';
-import { attachmentKind, attachmentIcon } from './reader/attachmentUtils';
 import AttachmentList from './reader/AttachmentList';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
@@ -41,14 +31,6 @@ import ReaderToolbar from './reader/ReaderToolbar';
 import ThreadReaderList from './reader/ThreadReaderList';
 import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
 import useMessageTranslation from '../hooks/useMessageTranslation';
-
-const readerBodyRenderDelayMs = 0;
-const readerBodyRenderIdleTimeoutMs = 50;
-
-type IdleScheduler = Window & {
-  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
@@ -119,13 +101,7 @@ export type ReaderPaneProps = {
   onSendQuickReply: (message: Message) => void;
 };
 
-function attachmentErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/^Error:\s*/i, '').trim() || '附件下载失败，请重试。';
-}
-
-
-export default function ReaderPane({
+function ReaderPane({
   activeThread,
   threadMessages,
   activeThreadSelected,
@@ -253,10 +229,7 @@ export default function ReaderPane({
     handleAttachmentDownload,
     handleDownloadAllAttachments,
     previewAttachment,
-    revealAttachmentInFinder,
-    copyAttachmentToClipboard,
     attachmentMenuItems,
-    resetAttachmentState,
   } = useReaderAttachments({
     attachments,
     selectedId,
@@ -566,3 +539,5 @@ if (activeThread && threadMessages.length > 0) {
     </section>
   );
 }
+
+export default memo(ReaderPane);

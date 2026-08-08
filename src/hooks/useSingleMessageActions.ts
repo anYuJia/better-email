@@ -12,6 +12,7 @@ import type { MessageContextAction } from '../components/messageContextMenu';
 import { copyTextToClipboard } from '../app/clipboard';
 import { invoke } from '../tauriBridge';
 import { toggleMessagesLabel } from './messageActionUtils';
+import { IPC } from '../ipc/commands';
 
 type SingleMessageActionOptions = {
   folders: Folder[];
@@ -53,7 +54,7 @@ export default function useSingleMessageActions({
     const toggleRead = async (message: MessageSummary) => {
       const undoSnapshots = snapshotMessages([message]);
       const nextRead = !message.is_read;
-      const report = await invoke<RemoteActionReport>('set_message_read', { messageId: message.id, isRead: nextRead });
+      const report = await invoke<RemoteActionReport>(IPC.SetMessageRead, { messageId: message.id, isRead: nextRead });
       onReadStateChange?.([message.id], nextRead);
       patchSelectedDetailMetadata(message.id, { is_read: nextRead });
       await refreshAll();
@@ -63,7 +64,7 @@ export default function useSingleMessageActions({
 
     const toggleStar = async (message: MessageSummary) => {
       const undoSnapshots = snapshotMessages([message]);
-      const report = await invoke<RemoteActionReport>('set_message_starred', {
+      const report = await invoke<RemoteActionReport>(IPC.SetMessageStarred, {
         messageId: message.id,
         isStarred: !message.is_starred,
       });
@@ -105,7 +106,7 @@ export default function useSingleMessageActions({
       }
 
       if (action === 'restore' || action === 'not-spam') {
-        const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: message.id });
+        const result = await invoke<RestoreMessageReport>(IPC.RestoreMessageToInbox, { messageId: message.id });
         clearSelectedDetailIf(message.id);
         setSelectedId(null);
         await refreshAll();
@@ -116,7 +117,7 @@ export default function useSingleMessageActions({
       }
 
       if (action === 'unsnooze') {
-        await invoke<Message>('unsnooze_message', { messageId: message.id });
+        await invoke<Message>(IPC.UnsnoozeMessage, { messageId: message.id });
         clearSelectedDetailIf(message.id);
         setSelectedId(null);
         await refreshAll();
@@ -126,7 +127,7 @@ export default function useSingleMessageActions({
       }
 
       const targetRole = action === 'spam' ? 'spam' : action;
-      await invoke('move_message_to_role', { messageId: message.id, role: targetRole });
+      await invoke(IPC.MoveMessageToRole, { messageId: message.id, role: targetRole });
       clearSelectedDetailIf(message.id);
       setSelectedId(null);
       await refreshAll();
@@ -142,7 +143,7 @@ export default function useSingleMessageActions({
 
     async function moveMessageToFolder(message: MessageSummary, folder: Folder) {
       const undoSnapshots = snapshotMessages([message]);
-      await invoke('move_message_to_role', { messageId: message.id, role: folder.role });
+      await invoke(IPC.MoveMessageToRole, { messageId: message.id, role: folder.role });
       clearSelectedDetailIf(message.id);
       setSelectedId(null);
       await refreshAll();

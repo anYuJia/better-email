@@ -1,4 +1,4 @@
-import type { InvokeArgs, MockCommandHandler } from './types';
+import type { MockCommandHandler } from './types';
 import {
   contacts,
   rules,

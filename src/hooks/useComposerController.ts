@@ -13,12 +13,9 @@ import {
 } from '../app/crossAccountRisk';
 import type {
   Account,
-  AccountScope,
-  Attachment,
   ComposerAutosave,
   Contact,
   DraftInput,
-  DraftSaveReport,
   Folder,
   FolderRole,
   MailIdentity,
@@ -28,21 +25,7 @@ import type {
   OutboxItem,
 } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
-import {
-  formatDate,
-  prefixedSubject,
-  quoteMessage,
-  replyThreadingHeaders,
-} from '../mailUtils';
-import { flowInfo, flowWarn } from '../app/logger';
-import { invoke } from '../tauriBridge';
-
-import {
-  accountForDraft,
-  draftInputForCurrentAccount,
-  identityForDraft,
-  threadingForDraft,
-} from '../app/composerDraftHelpers';
+import { formatDate } from '../mailUtils';
 import useComposeFromMessage from './useComposeFromMessage';
 import useComposerSend from './useComposerSend';
 import useComposerTemplates from './useComposerTemplates';
@@ -70,14 +53,6 @@ type UseComposerControllerOptions = {
   refreshAll: () => Promise<void>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
 };
-
-function composerFlowLog(event: string, details: Record<string, unknown> = {}) {
-  flowInfo('composer-flow', event, details);
-}
-
-function composerFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  flowWarn('composer-flow', event, details);
-}
 
 export default function useComposerController({
   account,

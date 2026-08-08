@@ -1,7 +1,7 @@
-use super::*;
 use super::accounts::ensure_default_account_for_conn;
 use super::messages::bool_to_int;
 use super::migrations::rebuild_thread_keys_for_conn;
+use super::*;
 
 impl MailStore {
     pub fn export_local_backup(&self) -> MailResult<LocalBackup> {
@@ -76,11 +76,14 @@ impl MailStore {
     }
 }
 
-pub(super) fn export_backup_table(conn: &Connection, table: &str) -> MailResult<Vec<LocalBackupRow>> {
+pub(super) fn export_backup_table(
+    conn: &Connection,
+    table: &str,
+) -> MailResult<Vec<LocalBackupRow>> {
     let columns = table_columns(conn, table)?;
     let filtered_columns: Vec<String> = columns
         .into_iter()
-        .filter(|col| col != "secret" && col != "authorization_code")
+        .filter(|col| col != "secret" && col != "authorization_code" && col != "code_verifier")
         .collect();
     let select_columns = filtered_columns
         .iter()
@@ -103,7 +106,11 @@ pub(super) fn export_backup_table(conn: &Connection, table: &str) -> MailResult<
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
-pub(super) fn import_backup_table(conn: &Connection, table: &str, rows: &[LocalBackupRow]) -> MailResult<()> {
+pub(super) fn import_backup_table(
+    conn: &Connection,
+    table: &str,
+    rows: &[LocalBackupRow],
+) -> MailResult<()> {
     let columns = table_columns(conn, table)?;
     for row in rows {
         let mut insert_columns = Vec::new();
@@ -191,4 +198,3 @@ pub(super) fn backup_table_count(backup: &LocalBackup, table: &str) -> i64 {
         .map(|rows| rows.len().min(i64::MAX as usize) as i64)
         .unwrap_or(0)
 }
-

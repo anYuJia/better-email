@@ -35,6 +35,7 @@ import {
   SettingsSection,
   SettingsSwitch,
 } from './shared';
+import { IPC } from '../../ipc/commands';
 
 type TemplateEditor = {
   id: string;
@@ -107,7 +108,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
   const [aiEnabled] = useState(() => loadAiServiceConfig().enabled);
 
   useEffect(() => {
-    void invoke<Account[]>('list_accounts').then(setAccounts).catch(() => undefined);
+    void invoke<Account[]>(IPC.ListAccounts).then(setAccounts).catch(() => undefined);
   }, []);
 
   const filtered = useMemo(() => {

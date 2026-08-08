@@ -37,7 +37,10 @@ pub fn parse_contact_import(raw: &str, file_name: &str) -> ParsedContactImport {
     }
 }
 
-pub fn parse_contact_import_bytes(payload: &[u8], file_name: &str) -> Result<ParsedContactImport, String> {
+pub fn parse_contact_import_bytes(
+    payload: &[u8],
+    file_name: &str,
+) -> Result<ParsedContactImport, String> {
     let lower_name = file_name.to_ascii_lowercase();
     if lower_name.ends_with(".xlsx") || lower_name.ends_with(".xlsm") {
         let parsed = parse_contacts_xlsx(payload)?;
@@ -93,11 +96,24 @@ fn parse_contact_rows(rows: Vec<Vec<String>>) -> ParsedVcards {
             skipped += 1;
             continue;
         }
-        let header_indicators = ["name", "姓名", "名字", "email", "邮箱", "邮件", "地址", "联系人"];
-        if !header_seen && cells.iter().any(|cell| {
-            let value = cell.trim().to_ascii_lowercase();
-            header_indicators.iter().any(|indicator| value == *indicator)
-        }) {
+        let header_indicators = [
+            "name",
+            "姓名",
+            "名字",
+            "email",
+            "邮箱",
+            "邮件",
+            "地址",
+            "联系人",
+        ];
+        if !header_seen
+            && cells.iter().any(|cell| {
+                let value = cell.trim().to_ascii_lowercase();
+                header_indicators
+                    .iter()
+                    .any(|indicator| value == *indicator)
+            })
+        {
             header_seen = true;
             continue;
         }
@@ -112,7 +128,11 @@ fn parse_contact_rows(rows: Vec<Vec<String>>) -> ParsedVcards {
                 .split([',', ';', ' '])
                 .filter_map(|part| {
                     let candidate = part.trim().trim_matches('"').trim().to_ascii_lowercase();
-                    if is_valid_email(&candidate) { Some(candidate) } else { None }
+                    if is_valid_email(&candidate) {
+                        Some(candidate)
+                    } else {
+                        None
+                    }
                 })
                 .collect();
             if !emails.is_empty() {
@@ -497,18 +517,24 @@ mod tests {
         );
         assert_eq!(parsed.skipped, 1);
         assert_eq!(parsed.contacts.len(), 2);
-        let ada = parsed.contacts.iter().find(|item| item.email == "ada@example.com").unwrap();
+        let ada = parsed
+            .contacts
+            .iter()
+            .find(|item| item.email == "ada@example.com")
+            .unwrap();
         assert_eq!(ada.name, "Ada, Lovelace");
         assert!(ada.aliases.contains(&"ada@work.example.com".to_string()));
-        let katherine = parsed.contacts.iter().find(|item| item.email == "katherine@example.com").unwrap();
+        let katherine = parsed
+            .contacts
+            .iter()
+            .find(|item| item.email == "katherine@example.com")
+            .unwrap();
         assert_eq!(katherine.name, "Katherine");
     }
 
     #[test]
     fn csv_parser_handles_escaped_quotes_and_detects_header() {
-        let parsed = parse_contacts_csv(
-            "name,email\n\"\"\"Dr.\"\" Grace\",grace@example.com\n",
-        );
+        let parsed = parse_contacts_csv("name,email\n\"\"\"Dr.\"\" Grace\",grace@example.com\n");
         assert_eq!(parsed.contacts.len(), 1);
         assert_eq!(parsed.contacts[0].name, "\"Dr.\" Grace");
     }

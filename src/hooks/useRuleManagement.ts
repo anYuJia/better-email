@@ -9,6 +9,7 @@ import {
 import type { MailRule, MailRuleInput } from '../app/types';
 import type { RuleConditionField } from '../app/appConfig';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type RuleManagementOptions = {
   rules: MailRule[];
@@ -17,7 +18,6 @@ type RuleManagementOptions = {
 };
 
 export default function useRuleManagement({
-  rules,
   setRules,
   setStatus,
 }: RuleManagementOptions) {
@@ -32,7 +32,7 @@ export default function useRuleManagement({
       setStatus('请填写规则名称、条件和动作');
       return;
     }
-    const saved = await invoke<MailRule>('upsert_rule', {
+    const saved = await invoke<MailRule>(IPC.UpsertRule, {
       ruleId: editingRuleId,
       input: ruleForm,
     });
@@ -46,7 +46,7 @@ export default function useRuleManagement({
   }
 
   async function toggleRule(rule: MailRule) {
-    const updated = await invoke<MailRule>('set_rule_enabled', {
+    const updated = await invoke<MailRule>(IPC.SetRuleEnabled, {
       ruleId: rule.id,
       enabled: !rule.enabled,
     });
@@ -69,7 +69,7 @@ export default function useRuleManagement({
   }
 
   async function removeRuleConfirmed(rule: MailRule) {
-    await invoke('delete_rule', { ruleId: rule.id });
+    await invoke(IPC.DeleteRule, { ruleId: rule.id });
     setRules((current) => current.filter((item) => item.id !== rule.id));
     if (editingRuleId === rule.id) {
       setEditingRuleId(null);

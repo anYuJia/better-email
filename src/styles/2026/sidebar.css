@@ -39,24 +39,10 @@
   text-transform: uppercase;
 }
 
-.compose-button {
-  min-height: 40px;
-  border: 0;
-  border-radius: var(--ui-radius-control);
-  color: #ffffff;
-  background: var(--ui-accent);
-  box-shadow: 0 4px 12px rgba(8, 127, 245, 0.18);
-  font-weight: 720;
-}
-
 .compose-button:hover {
   transform: none;
   background: var(--ui-accent-hover);
   box-shadow: 0 5px 14px rgba(8, 127, 245, 0.23);
-}
-
-.sidebar-label {
-  margin-top: 3px;
 }
 
 .folder-list {
@@ -90,15 +76,6 @@
   color: inherit;
   background: transparent;
   font-weight: 590;
-}
-
-.folder.active .folder-main {
-  color: inherit;
-  font-weight: 720;
-}
-
-.folder-name {
-  gap: 9px;
 }
 
 .folder-name svg {

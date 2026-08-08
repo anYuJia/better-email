@@ -10,7 +10,8 @@ pub(super) const MAX_ATTACHMENT_TRANSFER_BYTES: i64 = MAX_ATTACHMENT_DOWNLOAD_BY
 pub(super) const MAX_EML_IMPORT_BYTES: usize = 25 * 1024 * 1024;
 pub(super) const MAX_VCARD_IMPORT_BYTES: usize = 5 * 1024 * 1024;
 pub(super) const MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH: usize = 2;
-pub(super) const SYNCABLE_IMAP_ROLES: [&str; 6] = ["inbox", "sent", "drafts", "archive", "trash", "spam"];
+pub(super) const SYNCABLE_IMAP_ROLES: [&str; 6] =
+    ["inbox", "sent", "drafts", "archive", "trash", "spam"];
 pub(super) const VERBOSE_COMMAND_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
 
 pub(super) fn verbose_command_logs_enabled() -> bool {
@@ -214,7 +215,6 @@ pub(super) fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, 
         payload.len().min(i64::MAX as usize) as i64,
     ))
 }
-
 
 #[cfg(test)]
 mod tests {

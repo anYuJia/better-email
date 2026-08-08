@@ -12,6 +12,7 @@ import type {
 import type { LoadMetaResult } from './useAppMetaLoader';
 import { invoke } from '../tauriBridge';
 import { toggleMessagesLabel } from './messageActionUtils';
+import { IPC } from '../ipc/commands';
 
 type SelectedMessageActionOptions = {
   selected: MessageSummary | null;
@@ -60,7 +61,7 @@ export default function useSelectedMessageActions({
     async function moveSelected(role: FolderRole) {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role });
+      const report = await invoke<RemoteActionReport>(IPC.MoveMessageToRole, { messageId: selected.id, role });
       // 移动后目标文件夹会继续展示该邮件，更新 metadata；body 保持原样
       patchSelectedDetailMetadata(selected.id, { folder_role: role });
       const targetFolderId = visibleFolderIdForRole(role, selected.account_id) ?? folderId;
@@ -74,7 +75,7 @@ export default function useSelectedMessageActions({
     async function moveSelectedToFolder(folder: Folder) {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      const report = await invoke<RemoteActionReport>('move_message_to_role', { messageId: selected.id, role: folder.role });
+      const report = await invoke<RemoteActionReport>(IPC.MoveMessageToRole, { messageId: selected.id, role: folder.role });
       patchSelectedDetailMetadata(selected.id, { folder_id: folder.id, folder_role: folder.role });
       await loadMeta(folder.id);
       await loadMessages(folder.id);
@@ -86,7 +87,7 @@ export default function useSelectedMessageActions({
     async function markSelectedAsSpam() {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
+      await invoke(IPC.MoveMessageToRole, { messageId: selected.id, role: 'spam' });
       patchSelectedDetailMetadata(selected.id, { folder_role: 'spam' });
       const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
       await loadMeta(spamFolderId);
@@ -99,7 +100,7 @@ export default function useSelectedMessageActions({
     async function markSelectedNotSpam() {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+      const result = await invoke<RestoreMessageReport>(IPC.RestoreMessageToInbox, { messageId: selected.id });
       patchSelectedDetailMetadata(selected.id, {
         folder_id: result.restored.folder_id,
         folder_role: result.restored.folder_role,
@@ -119,7 +120,7 @@ export default function useSelectedMessageActions({
     async function restoreSelectedFromTrash() {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      const result = await invoke<RestoreMessageReport>('restore_message_to_inbox', { messageId: selected.id });
+      const result = await invoke<RestoreMessageReport>(IPC.RestoreMessageToInbox, { messageId: selected.id });
       patchSelectedDetailMetadata(selected.id, {
         folder_id: result.restored.folder_id,
         folder_role: result.restored.folder_role,
@@ -137,7 +138,7 @@ export default function useSelectedMessageActions({
     }
 
     async function permanentlyDeleteMessageConfirmed(message: MessageSummary) {
-      const report = await invoke<RemoteActionReport>('delete_message_permanently', { messageId: message.id });
+      const report = await invoke<RemoteActionReport>(IPC.DeleteMessagePermanently, { messageId: message.id });
       clearSelectedDetailIf(message.id);
       if (selected?.id === message.id) {
         setSelectedId(null);
@@ -149,7 +150,7 @@ export default function useSelectedMessageActions({
     async function unsnoozeSelected() {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
-      const updated = await invoke<Message>('unsnooze_message', { messageId: selected.id });
+      const updated = await invoke<Message>(IPC.UnsnoozeMessage, { messageId: selected.id });
       patchSelectedDetailMetadata(selected.id, {
         folder_id: updated.folder_id,
         folder_role: updated.folder_role,

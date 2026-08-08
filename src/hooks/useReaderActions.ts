@@ -12,6 +12,7 @@ import type {
 import { invoke } from '../tauriBridge';
 import { remoteImageTrustInput } from '../mailUtils';
 import { flowInfo, flowWarn } from '../app/logger';
+import { IPC } from '../ipc/commands';
 
 function appFlowLog(event: string, details: Record<string, unknown> = {}) {
   flowInfo('app-flow', event, details);
@@ -70,7 +71,7 @@ export default function useReaderActions({
 
   async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
     if (!messageId) return null;
-    const updated = await invoke<Message>('render_message_with_remote_image_policy', { messageId });
+    const updated = await invoke<Message>(IPC.RenderMessageWithRemoteImagePolicy, { messageId });
     const summary = toSummary(updated);
     setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     if (activeThread) {
@@ -94,7 +95,7 @@ export default function useReaderActions({
       uid: selected.remote_uid,
     });
     try {
-      const updated = await invoke<Message>('fetch_message_body', { messageId: selected.id });
+      const updated = await invoke<Message>(IPC.FetchMessageBody, { messageId: selected.id });
       const summary = toSummary(updated);
       setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
       if (activeThread) {
@@ -104,7 +105,7 @@ export default function useReaderActions({
         setSelectedDetail(updated);
       }
       onUpdateCache(updated);
-      const refreshedAttachments = await invoke<Attachment[]>('list_attachments', { messageId: updated.id });
+      const refreshedAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: updated.id });
       setAttachments(refreshedAttachments);
       appFlowLog('manualFetchBody done', {
         messageId: updated.id,
@@ -136,7 +137,7 @@ export default function useReaderActions({
 
   async function allowRemoteImagesForSelectedOnce() {
     if (!selected) return;
-    const updated = await invoke<Message>('render_message_with_remote_images_once', { messageId: selected.id });
+    const updated = await invoke<Message>(IPC.RenderMessageWithRemoteImagesOnce, { messageId: selected.id });
     const summary = toSummary(updated);
     setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     if (activeThread) {
@@ -156,7 +157,7 @@ export default function useReaderActions({
       setStatus('当前发件人地址不完整，无法加入远程图片信任列表');
       return;
     }
-    const trust = await invoke<RemoteImageTrust>('trust_remote_images', { input });
+    const trust = await invoke<RemoteImageTrust>(IPC.TrustRemoteImages, { input });
     setRemoteImageTrusts((current) => {
       const withoutDuplicate = current.filter((item) => item.id !== trust.id);
       return [...withoutDuplicate, trust].sort((a, b) => `${a.scope}:${a.value}`.localeCompare(`${b.scope}:${b.value}`));
@@ -179,7 +180,7 @@ export default function useReaderActions({
       return;
     }
     const sender = selected.sender_email.trim().toLowerCase();
-    const saved = await invoke<MailRule>('upsert_rule', {
+    const saved = await invoke<MailRule>(IPC.UpsertRule, {
       ruleId: null,
       input: {
         name: `阻止 ${sender}`,
@@ -189,7 +190,7 @@ export default function useReaderActions({
       },
     });
     setRules((current) => [...current.filter((rule) => rule.id !== saved.id), saved]);
-    await invoke('move_message_to_role', { messageId: selected.id, role: 'spam' });
+    await invoke(IPC.MoveMessageToRole, { messageId: selected.id, role: 'spam' });
     const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
     await loadMeta(spamFolderId);
     await loadMessages(spamFolderId);
@@ -199,7 +200,7 @@ export default function useReaderActions({
 
   async function downloadAttachment(attachment: Attachment) {
     try {
-      const result = await invoke<AttachmentDownload>('download_attachment', { attachmentId: attachment.id });
+      const result = await invoke<AttachmentDownload>(IPC.DownloadAttachment, { attachmentId: attachment.id });
       setAttachments((current) =>
         current.map((item) => (item.id === result.attachment.id ? result.attachment : item)),
       );
@@ -220,7 +221,7 @@ export default function useReaderActions({
       setStatus('请先下载附件');
       return;
     }
-    const message = await invoke<string>('open_attachment', { attachmentId: attachment.id });
+    const message = await invoke<string>(IPC.OpenAttachment, { attachmentId: attachment.id });
     setStatus(message);
   }
 
@@ -229,13 +230,13 @@ export default function useReaderActions({
       setStatus('请先下载附件');
       return;
     }
-    const message = await invoke<string>('save_attachment_as', { attachmentId: attachment.id });
+    const message = await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: attachment.id });
     setStatus(message);
   }
 
   async function exportSelectedMessage() {
     if (!selected) return;
-    const message = await invoke<string>('export_message_as_eml', { messageId: selected.id });
+    const message = await invoke<string>(IPC.ExportMessageAsEml, { messageId: selected.id });
     setStatus(message);
   }
 

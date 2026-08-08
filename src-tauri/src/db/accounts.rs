@@ -1,6 +1,6 @@
-use super::*;
 use super::folders::create_default_folders_for_account;
 use super::messages::bool_to_int;
+use super::*;
 
 impl MailStore {
     pub fn list_accounts(&self) -> MailResult<Vec<Account>> {
@@ -28,7 +28,25 @@ impl MailStore {
         self.with_conn(|conn| account_for_conn_optional(conn, account_id))
     }
     pub fn get_account_secret_raw(&self, account: &Account) -> MailResult<String> {
-        self.with_conn(|conn| account_secret_raw_for_conn(conn, account))
+        let email = account.email.trim().to_ascii_lowercase();
+        // 优先从系统凭据库读取；读取失败（无凭据服务）时回退 SQLite。
+        if let Ok(Some(secret)) = crate::credentials::keychain_get_secret(&email) {
+            if !secret.trim().is_empty() {
+                return Ok(secret);
+            }
+        }
+        let legacy = self.with_conn(|conn| account_secret_raw_for_conn(conn, account));
+        let raw = legacy?;
+        // 惰性迁移：SQLite 中发现的明文凭据迁移到系统凭据库后擦除。
+        if crate::credentials::keychain_set_secret(&email, &raw).is_ok() {
+            let _ = self.with_conn(|conn| {
+                Ok(conn.execute(
+                    "DELETE FROM account_credentials WHERE account_email = ?1",
+                    params![email],
+                )?)
+            });
+        }
+        Ok(raw)
     }
     pub fn get_account_secret(
         &self,
@@ -57,90 +75,131 @@ impl MailStore {
         account_email: &str,
         secret: &str,
     ) -> MailResult<CredentialStatus> {
-        self.with_conn(|conn| {
-            let email = account_email.trim().to_ascii_lowercase();
-            let secret = secret.trim().to_string();
-            if email.is_empty() {
-                return Ok(CredentialStatus {
-                    account_email: email,
-                    exists: false,
-                    status: "invalid_input".to_string(),
-                    message: "账号邮箱不能为空。".to_string(),
-                });
-            }
-            if secret.is_empty() {
-                return Ok(CredentialStatus {
-                    account_email: email,
-                    exists: false,
-                    status: "invalid_input".to_string(),
-                    message: "授权码不能为空。".to_string(),
-                });
-            }
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "
-                INSERT INTO account_credentials(account_email, secret, updated_at)
-                VALUES (?1, ?2, ?3)
-                ON CONFLICT(account_email) DO UPDATE
-                SET secret = excluded.secret,
-                    updated_at = excluded.updated_at
-                ",
-                params![email, secret, now],
-            )?;
-            Ok(CredentialStatus {
+        let email = account_email.trim().to_ascii_lowercase();
+        let secret = secret.trim().to_string();
+        if email.is_empty() {
+            return Ok(CredentialStatus {
                 account_email: email,
-                exists: true,
-                status: "exists".to_string(),
-                message: "授权码已保存到本地应用数据。".to_string(),
-            })
-        })
+                exists: false,
+                status: "invalid_input".to_string(),
+                message: "账号邮箱不能为空。".to_string(),
+            });
+        }
+        if secret.is_empty() {
+            return Ok(CredentialStatus {
+                account_email: email,
+                exists: false,
+                status: "invalid_input".to_string(),
+                message: "授权码不能为空。".to_string(),
+            });
+        }
+        match crate::credentials::keychain_set_secret(&email, &secret) {
+            Ok(()) => {
+                // 写入系统凭据库成功后，擦除 SQLite 中的明文副本。
+                self.with_conn(|conn| {
+                    conn.execute(
+                        "DELETE FROM account_credentials WHERE account_email = ?1",
+                        params![email],
+                    )?;
+                    Ok(())
+                })?;
+                Ok(CredentialStatus {
+                    account_email: email,
+                    exists: true,
+                    status: "exists".to_string(),
+                    message: "授权码已保存到系统凭据库（Keychain / Credential Manager）。"
+                        .to_string(),
+                })
+            }
+            Err(_) => {
+                // 系统凭据库不可用（如无桌面凭据服务的 Linux）时回退 SQLite 明文，
+                // 保持应用可用；消息明确说明存储位置。
+                self.with_conn(|conn| {
+                    let now = Utc::now().to_rfc3339();
+                    conn.execute(
+                        "
+                        INSERT INTO account_credentials(account_email, secret, updated_at)
+                        VALUES (?1, ?2, ?3)
+                        ON CONFLICT(account_email) DO UPDATE
+                        SET secret = excluded.secret,
+                            updated_at = excluded.updated_at
+                        ",
+                        params![email, secret, now],
+                    )?;
+                    Ok(())
+                })?;
+                Ok(CredentialStatus {
+                    account_email: email,
+                    exists: true,
+                    status: "exists".to_string(),
+                    message: "系统凭据库不可用，授权码已回退保存到本地应用数据（未加密）。"
+                        .to_string(),
+                })
+            }
+        }
     }
     pub fn check_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
-        self.with_conn(|conn| {
-            let email = account_email.trim().to_ascii_lowercase();
-            let exists = conn
+        let email = account_email.trim().to_ascii_lowercase();
+        let exists_in_keychain = match crate::credentials::keychain_get_secret(&email) {
+            Ok(Some(secret)) => !secret.trim().is_empty(),
+            Ok(None) => false,
+            Err(_) => false,
+        };
+        let exists = exists_in_keychain
+            || self.with_conn(|conn| {
+                Ok(conn
                 .query_row(
                     "SELECT length(secret) > 0 FROM account_credentials WHERE account_email = ?1",
                     params![email],
                     |row| row.get::<_, bool>(0),
                 )
                 .optional()?
-                .unwrap_or(false);
-            Ok(CredentialStatus {
-                account_email: email,
-                exists,
-                status: if exists { "exists".to_string() } else { "not_found".to_string() },
-                message: if exists {
-                    "本地应用数据中存在该账号授权码。".to_string()
-                } else {
-                    "未保存该账号授权码。".to_string()
-                },
-            })
+                .unwrap_or(false))
+            })?;
+        Ok(CredentialStatus {
+            account_email: email,
+            exists,
+            status: if exists {
+                "exists".to_string()
+            } else {
+                "not_found".to_string()
+            },
+            message: if exists {
+                "系统凭据库中存在该账号授权码。".to_string()
+            } else {
+                "未保存该账号授权码。".to_string()
+            },
         })
     }
     pub fn delete_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
-        self.with_conn(|conn| {
-            let email = account_email.trim().to_ascii_lowercase();
-            let rows_affected = conn.execute(
+        let email = account_email.trim().to_ascii_lowercase();
+        let _ = crate::credentials::keychain_delete_secret(&email);
+        let rows_affected = self.with_conn(|conn| {
+            Ok(conn.execute(
                 "DELETE FROM account_credentials WHERE account_email = ?1",
                 params![email],
-            )?;
-            if rows_affected == 0 {
-                Ok(CredentialStatus {
-                    account_email: email,
-                    exists: false,
-                    status: "not_found".to_string(),
-                    message: "本地凭据中未找到对应凭据。".to_string(),
-                })
-            } else {
-                Ok(CredentialStatus {
-                    account_email: email,
-                    exists: false,
-                    status: "deleted".to_string(),
-                    message: "本地凭据已删除。".to_string(),
-                })
-            }
-        })
+            )?)
+        })?;
+        if rows_affected == 0
+            && crate::credentials::keychain_get_secret(&email)
+                .ok()
+                .flatten()
+                .is_none()
+        {
+            Ok(CredentialStatus {
+                account_email: email,
+                exists: false,
+                status: "not_found".to_string(),
+                message: "本地凭据中未找到对应凭据。".to_string(),
+            })
+        } else {
+            Ok(CredentialStatus {
+                account_email: email,
+                exists: false,
+                status: "deleted".to_string(),
+                message: "本地凭据已删除。".to_string(),
+            })
+        }
     }
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
@@ -272,6 +331,7 @@ impl MailStore {
                     "DELETE FROM account_credentials WHERE account_email = ?1",
                     params![account_email],
                 )?;
+                let _ = crate::credentials::keychain_delete_secret(&account_email);
             }
             transaction.execute("DELETE FROM accounts WHERE id = ?1", params![account_id])?;
             ensure_default_account_for_conn(&transaction)?;
@@ -365,7 +425,10 @@ impl MailStore {
     }
 }
 
-pub(super) fn account_secret_raw_for_conn(conn: &Connection, account: &Account) -> MailResult<String> {
+pub(super) fn account_secret_raw_for_conn(
+    conn: &Connection,
+    account: &Account,
+) -> MailResult<String> {
     let raw = conn
         .query_row(
             "SELECT secret FROM account_credentials WHERE account_email = ?1",
@@ -711,4 +774,3 @@ pub(super) fn ensure_default_account_for_conn(conn: &Connection) -> MailResult<(
     )?;
     Ok(())
 }
-

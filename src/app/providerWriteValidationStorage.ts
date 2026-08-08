@@ -2,7 +2,6 @@ import { emptyDraft } from './appConfig';
 import type {
   Account,
   DraftInput,
-  Message,
   RemoteActionReport,
 } from './types';
 import {

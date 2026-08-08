@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Mail,
@@ -121,6 +121,7 @@ export default function ComposerWindow({
 }: ComposerWindowProps) {
   const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
   const dragRef = useRef<ComposerDragState | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   const title = draft.subject.trim() || '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
   const draftIdentities = identities.filter((identity) => identity.account_id === accountId);
@@ -133,6 +134,16 @@ export default function ComposerWindow({
   function patchDraft(patch: Partial<DraftInput>) {
     onDraftChange((current) => ({ ...current, ...patch }));
   }
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
+    (firstField ?? panel)?.focus();
+    return () => {
+      previouslyFocused?.focus?.();
+    };
+  }, []);
 
   function beginDrag(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0) return;
@@ -193,6 +204,9 @@ export default function ComposerWindow({
   return (
     <div
       className="composer-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="写信窗口"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -200,6 +214,7 @@ export default function ComposerWindow({
       }}
     >
       <section
+        ref={panelRef}
         className="composer"
         style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
         onMouseDown={(event) => event.stopPropagation()}

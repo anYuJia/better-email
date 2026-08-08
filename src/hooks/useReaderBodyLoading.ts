@@ -16,6 +16,7 @@ import {
   readerTrustedRemoteRenderDelayMs,
   scheduleReaderBackgroundWork,
 } from './readerSelectionState';
+import { IPC } from '../ipc/commands';
 
 type ReaderBodyLoadingOptions = {
   readerSelectedDetail: Message | null;
@@ -62,7 +63,7 @@ export default function useReaderBodyLoading({
     attachmentsOwnerRef.current = selectedMessageId;
     let cancelled = false;
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
-      invoke<Attachment[]>('list_attachments', { messageId: selectedMessageId })
+      invoke<Attachment[]>(IPC.ListAttachments, { messageId: selectedMessageId })
         .then((items) => {
           if (cancelled) return;
           startTransition(() => setAttachments(items));
@@ -97,7 +98,7 @@ export default function useReaderBodyLoading({
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
       if (!htmlHasRemoteVisualContent(selectedBody)) return;
       trustedRemoteImageRenderRef.current.add(selectedMessageId);
-      invoke<Message>('render_message_with_remote_image_policy', { messageId: selectedMessageId })
+      invoke<Message>(IPC.RenderMessageWithRemoteImagePolicy, { messageId: selectedMessageId })
         .then((updated) => {
           if (cancelled) return;
           startTransition(() => {
@@ -165,7 +166,7 @@ export default function useReaderBodyLoading({
         mailbox: selectedRemoteMailbox,
         uid: selectedRemoteUid,
       });
-      invoke<Message>('fetch_message_body', { messageId: selectedMessageId })
+      invoke<Message>(IPC.FetchMessageBody, { messageId: selectedMessageId })
         .then((updated) => {
           bodyFetchFailedRef.current.delete(updated.id);
           if (cancelled) return [];
@@ -180,7 +181,7 @@ export default function useReaderBodyLoading({
             }
             messageDetailCacheRef.current.set(updated.id, updated);
           });
-          return invoke<Attachment[]>('list_attachments', { messageId: updated.id }).then((items) => {
+          return invoke<Attachment[]>(IPC.ListAttachments, { messageId: updated.id }).then((items) => {
             if (!cancelled) startTransition(() => setAttachments(items));
             if (attachmentsOwnerRef.current === updated.id) {
               setAttachmentsLoaded(true);

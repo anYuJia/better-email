@@ -15,6 +15,7 @@ import type {
   ProviderVerificationRecord,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type AccountSaveVerifyOptions = {
   accountForm: Account | null;
@@ -81,7 +82,7 @@ export default function useAccountSaveVerify({
   }, [setAccount, setAccountForm, setAccounts]);
 
   const persistAccountSettings = useCallback(async (draft: Account) => {
-    const updated = await invoke<Account>('update_account_settings', {
+    const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
       accountId: draft.id,
       input: draft,
     });
@@ -147,7 +148,7 @@ export default function useAccountSaveVerify({
 
       activeStage = 'server';
       publish('server', 'running', '正在检查收信与发信服务器');
-      const connection = await invoke<ConnectionReport>('test_connection', { accountId: updated.id });
+      const connection = await invoke<ConnectionReport>(IPC.TestConnection, { accountId: updated.id });
       if (saveAndVerifyRunId.current !== runId) return null;
       setConnectionReport(connection);
       const reachableCount = connection.endpoints.filter((endpoint) => endpoint.reachable).length;
@@ -175,7 +176,7 @@ export default function useAccountSaveVerify({
 
       activeStage = 'credential';
       publish('credential', 'running', '正在检查系统凭据');
-      const credential = await invoke<CredentialStatus>('check_account_secret', {
+      const credential = await invoke<CredentialStatus>(IPC.CheckAccountSecret, {
         accountEmail: updated.email,
       });
       if (saveAndVerifyRunId.current !== runId) return null;
@@ -208,7 +209,7 @@ export default function useAccountSaveVerify({
       activeStage = 'incoming';
       publish('incoming', 'running', '正在验证收信登录');
       publish('smtp', 'running', '正在验证发信登录');
-      const verification = await invoke<CredentialVerificationReport>('verify_account_credentials', {
+      const verification = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
         accountId: updated.id,
       });
       if (saveAndVerifyRunId.current !== runId) return null;

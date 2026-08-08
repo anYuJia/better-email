@@ -6,7 +6,6 @@ import { canSnoozeRole } from '../app/snooze';
 import type {
   Folder,
   Label,
-  Message,
   MessageSummary,
 } from '../app/types';
 import type { BulkMessageAction } from './messageContextMenu';

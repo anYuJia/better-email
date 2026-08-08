@@ -1,5 +1,5 @@
-use super::*;
 use super::accounts::account_for_conn;
+use super::*;
 
 impl MailStore {
     pub fn save_oauth_session(
@@ -179,13 +179,15 @@ impl MailStore {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
             let now = Utc::now().to_rfc3339();
-            let message = "OAuth2 token 已交换并保存到本地 SQLite 凭据。";
+            let message = "OAuth2 token 已交换并保存到系统凭据库。";
             conn.execute(
                 "
                 UPDATE oauth_sessions
                 SET status = 'token_stored',
                     completed_at = ?2,
-                    message = ?3
+                    message = ?3,
+                    code_verifier = '',
+                    authorization_code = ''
                 WHERE id = ?1
                 ",
                 params![id, now, message],
@@ -232,4 +234,3 @@ impl MailStore {
         })
     }
 }
-

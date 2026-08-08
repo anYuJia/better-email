@@ -110,8 +110,11 @@ pub fn call_chat_completion(
     if !api_key.trim().is_empty() {
         request = request.header("Authorization", format!("Bearer {}", api_key.trim()));
     }
-    let payload = serde_json::to_vec(&body).map_err(|error| format!("AI 请求序列化失败：{error}"))?;
-    let mut response = request.send(payload).map_err(|error| format!("AI 服务请求失败：{error}"))?;
+    let payload =
+        serde_json::to_vec(&body).map_err(|error| format!("AI 请求序列化失败：{error}"))?;
+    let mut response = request
+        .send(payload)
+        .map_err(|error| format!("AI 服务请求失败：{error}"))?;
     let status = response.status();
     let raw_body = response
         .body_mut()
@@ -137,7 +140,10 @@ pub fn call_chat_completion(
         content,
         model: model.to_string(),
         prompt_tokens: payload.usage.as_ref().and_then(|usage| usage.prompt_tokens),
-        completion_tokens: payload.usage.as_ref().and_then(|usage| usage.completion_tokens),
+        completion_tokens: payload
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.completion_tokens),
         total_tokens: payload.usage.as_ref().and_then(|usage| usage.total_tokens),
         latency_ms,
     })
@@ -152,7 +158,12 @@ fn normalize_endpoint(endpoint: &str) -> String {
     }
 }
 
-fn prompt_for_operation(operation: &str, text: &str, target_language: &str, prompt: &str) -> Vec<AiChatCompletionInput> {
+fn prompt_for_operation(
+    operation: &str,
+    text: &str,
+    target_language: &str,
+    prompt: &str,
+) -> Vec<AiChatCompletionInput> {
     match operation {
         "translate" => {
             let target = if target_language.trim().is_empty() {
@@ -207,11 +218,14 @@ fn prompt_for_operation(operation: &str, text: &str, target_language: &str, prom
     }
 }
 
-pub fn run_ai_request(
-    input: &AiRequestInput,
-) -> Result<AiRequestResult, String> {
+pub fn run_ai_request(input: &AiRequestInput) -> Result<AiRequestResult, String> {
     let started_at = std::time::Instant::now();
-    let messages = prompt_for_operation(&input.operation, &input.text, &input.target_language, &input.prompt);
+    let messages = prompt_for_operation(
+        &input.operation,
+        &input.text,
+        &input.target_language,
+        &input.prompt,
+    );
     let outcome = call_chat_completion(
         &input.endpoint,
         &input.api_key,
@@ -252,8 +266,11 @@ fn json_rpc_call(
     if !api_key.trim().is_empty() {
         request = request.header("Authorization", format!("Bearer {}", api_key.trim()));
     }
-    let payload = serde_json::to_vec(&body).map_err(|error| format!("MCP 请求序列化失败：{error}"))?;
-    let mut response = request.send(payload).map_err(|error| format!("MCP 服务请求失败：{error}"))?;
+    let payload =
+        serde_json::to_vec(&body).map_err(|error| format!("MCP 请求序列化失败：{error}"))?;
+    let mut response = request
+        .send(payload)
+        .map_err(|error| format!("MCP 服务请求失败：{error}"))?;
     let status = response.status();
     let raw_body = response
         .body_mut()
@@ -299,9 +316,7 @@ fn mcp_result_content(result: &serde_json::Value) -> Option<String> {
     None
 }
 
-pub fn run_mcp_tool_call(
-    input: &AiRequestInput,
-) -> Result<AiRequestResult, String> {
+pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, String> {
     let started_at = std::time::Instant::now();
     let endpoint = input.endpoint.trim();
     if endpoint.is_empty() {
@@ -404,7 +419,11 @@ pub fn test_ai_connection(
             let _outcome = call_chat_completion(
                 endpoint,
                 api_key,
-                if model.trim().is_empty() { "gpt-4o-mini" } else { model },
+                if model.trim().is_empty() {
+                    "gpt-4o-mini"
+                } else {
+                    model
+                },
                 &[AiChatCompletionInput {
                     role: "user".to_string(),
                     content: "ping".to_string(),

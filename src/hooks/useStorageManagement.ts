@@ -8,6 +8,7 @@ import type {
 } from '../app/types';
 import { formatBytes } from '../mailUtils';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type StorageManagementOptions = {
   selected: MessageSummary | null;
@@ -33,7 +34,7 @@ export default function useStorageManagement({
   const [storageBusy, setStorageBusy] = useState(false);
 
   async function exportDiagnostics() {
-    const payload = await invoke<string>('export_diagnostics');
+    const payload = await invoke<string>(IPC.ExportDiagnostics);
     setDiagnosticExport(payload);
     try {
       await navigator.clipboard.writeText(payload);
@@ -44,13 +45,13 @@ export default function useStorageManagement({
   }
 
   async function exportLocalBackup() {
-    const summary = await invoke<LocalBackupSummary>('export_local_backup');
+    const summary = await invoke<LocalBackupSummary>(IPC.ExportLocalBackup);
     setLocalBackupSummary(summary);
     setStatus(`本地备份已导出：${summary.messages} 封邮件，${summary.accounts} 个账号`);
   }
 
   async function previewLocalBackup() {
-    const summary = await invoke<LocalBackupSummary | null>('preview_local_backup');
+    const summary = await invoke<LocalBackupSummary | null>(IPC.PreviewLocalBackup);
     if (!summary) {
       setStatus('已取消选择备份文件');
       return;
@@ -60,7 +61,7 @@ export default function useStorageManagement({
   }
 
   async function importLocalBackup() {
-    const summary = await invoke<LocalBackupSummary | null>('import_local_backup');
+    const summary = await invoke<LocalBackupSummary | null>(IPC.ImportLocalBackup);
     if (!summary) {
       setStatus('已取消恢复本地备份');
       return;
@@ -74,7 +75,7 @@ export default function useStorageManagement({
   async function refreshStorageUsage(announce = true) {
     setStorageBusy(true);
     try {
-      const usage = await invoke<StorageUsage>('get_storage_usage');
+      const usage = await invoke<StorageUsage>(IPC.GetStorageUsage);
       setStorageUsage(usage);
       if (announce) {
         setStatus(`本地存储已刷新：共 ${formatBytes(usage.total_managed_bytes)}`);
@@ -90,10 +91,10 @@ export default function useStorageManagement({
   async function clearAttachmentCache() {
     setStorageBusy(true);
     try {
-      const result = await invoke<CacheClearResult>('clear_attachment_cache');
+      const result = await invoke<CacheClearResult>(IPC.ClearAttachmentCache);
       setStorageUsage(result.storage);
       if (selected) {
-        const refreshedAttachments = await invoke<Attachment[]>('list_attachments', {
+        const refreshedAttachments = await invoke<Attachment[]>(IPC.ListAttachments, {
           messageId: selected.id,
         });
         setAttachments(refreshedAttachments);

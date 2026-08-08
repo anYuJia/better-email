@@ -87,7 +87,6 @@
   --ui-motion-slow: 240ms;
   --ui-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ui-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
-
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);
   --ui-sidebar: var(--color-surface-sidebar);
@@ -160,4 +159,56 @@
   --control-bg: var(--ui-control-bg);
   --panel-shadow: var(--ui-shadow-popover);
   --float-shadow: var(--ui-shadow-float);
+}
+
+/*
+ * Dark mode: re-map semantic colour roles for the 2026 layer (which is fully
+ * token-driven). Overlays with hard-coded light surfaces are re-themed in
+ * styles/2026/pass-dark-mode.css. The settings layer (--st-*) intentionally
+ * stays on its documented opaque light theme.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-canvas: oklch(0.205 0.014 var(--primitive-hue-neutral));
+    --color-surface-sidebar: oklch(0.232 0.016 var(--primitive-hue-neutral));
+    --color-surface-list: oklch(0.238 0.014 var(--primitive-hue-neutral));
+    --color-surface-reader: oklch(0.225 0.012 var(--primitive-hue-paper));
+    --color-surface-raised: oklch(0.262 0.016 var(--primitive-hue-neutral));
+    --color-surface-muted: oklch(0.28 0.016 var(--primitive-hue-neutral));
+    --color-surface-hover: oklch(0.32 0.024 var(--primitive-hue-accent));
+    --color-surface-selected: oklch(0.365 0.05 var(--primitive-hue-accent));
+
+    --color-text-primary: oklch(0.92 0.012 var(--primitive-hue-neutral));
+    --color-text-secondary: oklch(0.78 0.012 var(--primitive-hue-neutral));
+    --color-text-tertiary: oklch(0.64 0.012 var(--primitive-hue-neutral));
+    --color-text-on-accent: oklch(0.99 0.008 var(--primitive-hue-accent));
+
+    --color-border-subtle: oklch(0.33 0.014 var(--primitive-hue-neutral));
+    --color-border-strong: oklch(0.43 0.016 var(--primitive-hue-neutral));
+    --color-focus: oklch(0.72 0.17 var(--primitive-hue-accent));
+    --color-accent: oklch(0.7 0.16 var(--primitive-hue-accent));
+    --color-accent-hover: oklch(0.75 0.16 var(--primitive-hue-accent));
+    --color-accent-soft: oklch(0.36 0.05 var(--primitive-hue-accent));
+    --color-success: oklch(0.74 0.13 var(--primitive-hue-success));
+    --color-success-soft: oklch(0.3 0.045 var(--primitive-hue-success));
+    --color-warning: oklch(0.76 0.12 var(--primitive-hue-warning));
+    --color-warning-soft: oklch(0.32 0.045 var(--primitive-hue-warning));
+    --color-danger: oklch(0.72 0.16 var(--primitive-hue-danger));
+    --color-danger-hover: oklch(0.77 0.15 var(--primitive-hue-danger));
+    --color-danger-soft: oklch(0.32 0.05 var(--primitive-hue-danger));
+
+    --ui-focus-outline: 2px solid oklch(0.72 0.17 var(--primitive-hue-accent));
+    --ui-scrollbar-thumb: oklch(0.45 0.014 var(--primitive-hue-neutral));
+    --ui-scrollbar-thumb-hover: oklch(0.54 0.016 var(--primitive-hue-neutral));
+
+    --ui-shadow-popover: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.5), 0 10px 28px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.55), 0 24px 56px oklch(0.03 0.01 var(--primitive-hue-neutral) / 0.6);
+    --ui-shadow-float: 0 1px 3px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.45), 0 14px 36px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.5), 0 30px 72px oklch(0.03 0.01 var(--primitive-hue-neutral) / 0.55);
+    --ui-shadow-tooltip: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.5), 0 6px 16px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.55);
+
+    --quiet-row-shadow: inset 0 1px 0 oklch(0.35 0.012 var(--primitive-hue-paper) / 0.4);
+    --glass: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.82);
+    --glass-strong: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.94);
+  }
 }

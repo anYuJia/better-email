@@ -1,6 +1,5 @@
 import {
   CheckCircle2,
-  Check,
   FlaskConical,
   Globe,
   KeyRound,
@@ -20,25 +19,6 @@ import {
   SettingsSection,
   SettingsSwitch,
 } from './shared';
-
-const SERVICE_OPTIONS: Array<{ value: AiServiceType; label: string; description: string; advanced?: boolean }> = [
-  {
-    value: 'mock',
-    label: '本地演示模式',
-    description: '离线模拟翻译、摘要与模板生成，无需网络，用于体验功能。',
-  },
-  {
-    value: 'http',
-    label: 'OpenAI 兼容接口',
-    description: '连接任意兼容 OpenAI chat/completions 的服务。',
-  },
-  {
-    value: 'mcp',
-    label: 'MCP 服务',
-    description: '调用外部 MCP 服务（JSON-RPC over HTTP），适合有技术背景的用户。',
-    advanced: true,
-  },
-];
 
 const AVAILABLE_FEATURES = ['翻译', '摘要', '模板生成'];
 

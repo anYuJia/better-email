@@ -1,12 +1,11 @@
-import { movableFoldersForBulk } from '../app/appConfig';
 import type {
-  Folder,
   FolderRole,
   Label,
   MessageSummary,
 } from '../app/types';
 import type { BulkMessageAction } from '../components/messageContextMenu';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 export type MessageActionContext = 'bulk' | 'thread';
 
@@ -36,19 +35,19 @@ export function threadMovableMessages(items: MessageSummary[]) {
 
 export async function moveMessagesToRole(messages: MessageSummary[], role: FolderRole) {
   for (const message of messages) {
-    await invoke('move_message_to_role', { messageId: message.id, role });
+    await invoke(IPC.MoveMessageToRole, { messageId: message.id, role });
   }
 }
 
 export async function setMessagesRead(messages: MessageSummary[], isRead: boolean) {
   for (const message of messages) {
-    await invoke('set_message_read', { messageId: message.id, isRead });
+    await invoke(IPC.SetMessageRead, { messageId: message.id, isRead });
   }
 }
 
 export async function setMessagesStarred(messages: MessageSummary[], isStarred: boolean) {
   for (const message of messages) {
-    await invoke('set_message_starred', { messageId: message.id, isStarred });
+    await invoke(IPC.SetMessageStarred, { messageId: message.id, isStarred });
   }
 }
 

@@ -1,5 +1,5 @@
 import type { ListSort } from '../app/types';
-import type { MockContact, MockMessage } from './types';
+import type { MockMessage } from './types';
 
 export function normalizeMockSyncMode(syncMode: unknown) {
   const normalized = String(syncMode ?? '').trim();

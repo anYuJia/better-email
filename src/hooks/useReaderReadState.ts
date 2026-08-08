@@ -13,6 +13,7 @@ import {
   readerFlowWarn,
   saveManualUnreadMessageIds,
 } from './readerSelectionState';
+import { IPC } from '../ipc/commands';
 
 type ReaderReadStateOptions = {
   activeThread: ThreadSummary | null;
@@ -85,7 +86,7 @@ export default function useReaderReadState({
       mailbox: selectedRemoteMailbox,
       uid: selectedRemoteUid,
     });
-    invoke<RemoteActionReport>('set_message_read', { messageId: selectedMessageId, isRead: true })
+    invoke<RemoteActionReport>(IPC.SetMessageRead, { messageId: selectedMessageId, isRead: true })
       .then((report) => {
         startTransition(() => {
           setMessages((current) => current.map((item) => (

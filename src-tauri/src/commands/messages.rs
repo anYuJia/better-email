@@ -49,10 +49,7 @@ pub fn list_thread_messages(
 }
 
 #[tauri::command]
-pub fn get_message_detail(
-    store: State<'_, MailStore>,
-    message_id: i64,
-) -> MailResult<Message> {
+pub fn get_message_detail(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
     store.message_with_remote_image_policy(message_id)
 }
 

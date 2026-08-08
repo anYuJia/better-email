@@ -1,5 +1,4 @@
 import {
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -13,8 +12,6 @@ import { MessageDetailLRU } from './readerSelectionState';
 import useReaderBodyLoading from './useReaderBodyLoading';
 import useReaderReadState from './useReaderReadState';
 import {
-  htmlHasRemoteVisualContent,
-  isMessageBodyCorrupted,
   senderDomain,
 } from '../mailUtils';
 import {
@@ -27,10 +24,10 @@ import type {
   MailStats,
   Message,
   MessageSummary,
-  RemoteActionReport,
   RemoteImageTrust,
   ThreadSummary,
 } from '../app/types';
+import { IPC } from '../ipc/commands';
 
 export type UseMailboxSelectionControllerOptions = {
   messages: MessageSummary[];
@@ -54,10 +51,7 @@ export type UseMailboxSelectionControllerOptions = {
 export default function useMailboxSelectionController({
   messages,
   threadMessages,
-  threads,
   activeThread,
-  folders,
-  stats,
   mailboxContextKey,
   remoteImageTrusts,
   setMessages,
@@ -145,7 +139,7 @@ export default function useMailboxSelectionController({
       setSelectedDetail(null);
     }
     let cancelled = false;
-    invoke<Message>('get_message_detail', { messageId: readerSelectedId })
+    invoke<Message>(IPC.GetMessageDetail, { messageId: readerSelectedId })
       .then((detail) => {
         if (cancelled) return;
         messageDetailCacheRef.current.set(readerSelectedId, detail);

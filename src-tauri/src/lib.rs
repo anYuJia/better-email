@@ -1,7 +1,7 @@
+mod ai;
 mod commands;
 mod credentials;
 mod db;
-mod ai;
 mod imap_probe;
 mod mime;
 mod models;
@@ -14,18 +14,77 @@ mod vcard;
 
 use db::MailStore;
 pub use provider_probe::{list_provider_probe_accounts, run_provider_probe};
-use tauri::Manager;
-use tauri::Emitter;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
+use tauri::Emitter;
+use tauri::Manager;
 use tauri::Wry;
 
 pub struct TrayState {
     pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
     pub unread_item: Mutex<Option<MenuItem<Wry>>>,
     pub is_quitting: AtomicBool,
+}
+
+/// 把 Rust panic 记录到应用数据目录的 crash.log，便于用户侧可诊断。
+fn install_crash_log_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info.location().map(|loc| loc.to_string());
+        let payload = if let Some(message) = info.payload().downcast_ref::<&str>() {
+            (*message).to_string()
+        } else if let Some(message) = info.payload().downcast_ref::<String>() {
+            message.clone()
+        } else {
+            "unknown panic payload".to_string()
+        };
+        let dir = std::env::var_os("BETTER_EMAIL_CRASH_LOG_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| dirs_app_data_dir().unwrap_or_else(std::env::temp_dir));
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(dir.join("crash.log"))
+        {
+            use std::io::Write;
+            let _ = writeln!(
+                file,
+                "[{}] panic: {}\n    at {}",
+                chrono::Utc::now().to_rfc3339(),
+                payload,
+                location.as_deref().unwrap_or("unknown")
+            );
+        }
+        default_hook(info);
+    }));
+}
+
+fn dirs_app_data_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").map(|home| {
+            std::path::PathBuf::from(home)
+                .join("Library/Application Support/app.betteremail.client")
+        })
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA")
+            .map(|appdata| std::path::PathBuf::from(appdata).join("app.betteremail.client"))
+    }
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        std::env::var_os("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME").map(|home| {
+                    std::path::PathBuf::from(home).join(".local/share/app.betteremail.client")
+                })
+            })
+    }
 }
 
 #[tauri::command]
@@ -84,7 +143,13 @@ fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let unread_item = MenuItem::with_id(app, "tray_unread_label", "没有未读邮件", false, None::<&str>)?;
+    let unread_item = MenuItem::with_id(
+        app,
+        "tray_unread_label",
+        "没有未读邮件",
+        false,
+        None::<&str>,
+    )?;
     let show_item = MenuItem::with_id(app, "tray_show", "打开 Better Email", true, None::<&str>)?;
     let hide_item = MenuItem::with_id(app, "tray_hide", "隐藏窗口", true, None::<&str>)?;
     let compose_item = MenuItem::with_id(app, "tray_compose", "写邮件", true, None::<&str>)?;
@@ -93,19 +158,22 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let settings_item = MenuItem::with_id(app, "tray_settings", "设置", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "tray_quit", "退出 Better Email", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[
-        &unread_item,
-        &tauri::menu::PredefinedMenuItem::separator(app)?,
-        &show_item,
-        &hide_item,
-        &tauri::menu::PredefinedMenuItem::separator(app)?,
-        &compose_item,
-        &sync_item,
-        &unread_goto_item,
-        &settings_item,
-        &tauri::menu::PredefinedMenuItem::separator(app)?,
-        &quit_item,
-    ])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &unread_item,
+            &tauri::menu::PredefinedMenuItem::separator(app)?,
+            &show_item,
+            &hide_item,
+            &tauri::menu::PredefinedMenuItem::separator(app)?,
+            &compose_item,
+            &sync_item,
+            &unread_goto_item,
+            &settings_item,
+            &tauri::menu::PredefinedMenuItem::separator(app)?,
+            &quit_item,
+        ],
+    )?;
 
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
         .map_err(|error| format!("failed to load tray icon: {error}"))?;
@@ -170,7 +238,8 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 button: tauri::tray::MouseButton::Left,
                 button_state: tauri::tray::MouseButtonState::Up,
                 ..
-            } = event {
+            } = event
+            {
                 if let Some(window) = tray.app_handle().get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.unminimize();
@@ -190,6 +259,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run() {
+    install_crash_log_hook();
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -322,6 +392,8 @@ pub fn run() {
             commands::ai_chat_request,
             commands::ai_request,
             commands::test_ai_connection,
+            commands::save_ai_settings,
+            commands::load_ai_settings,
             commands::list_rules,
             commands::upsert_rule,
             commands::set_rule_enabled,

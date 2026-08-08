@@ -21,6 +21,7 @@ import type {
   SyncSchedulePlan,
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
+import { IPC } from '../ipc/commands';
 
 export type LoadMetaOptions = {
   mode?: 'full' | 'mailbox';
@@ -40,7 +41,7 @@ type UseAppMetaLoaderOptions = {
   setFolders: Dispatch<SetStateAction<Folder[]>>;
   setLabels: Dispatch<SetStateAction<Label[]>>;
   setStats: Dispatch<SetStateAction<MailStats | null>>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setIdentities: Dispatch<SetStateAction<MailIdentity[]>>;
   setOutbox: Dispatch<SetStateAction<OutboxItem[]>>;
   setBackgroundTasks: Dispatch<SetStateAction<BackgroundTask[]>>;
@@ -95,7 +96,7 @@ export default function useAppMetaLoader({
   const benchmarkSyncRef = useRef(false);
 
   async function releaseDueSnoozedMessages() {
-    const result = await invoke<{ released_count: number }>('release_due_snoozed_messages', { now: new Date().toISOString() });
+    const result = await invoke<{ released_count: number }>(IPC.ReleaseDueSnoozedMessages, { now: new Date().toISOString() });
     return result;
   }
 
@@ -114,7 +115,7 @@ export default function useAppMetaLoader({
       mode,
     });
     try {
-      const nextAccountsPromise = invoke<Account[]>('list_accounts').then((nextAccounts) => {
+      const nextAccountsPromise = invoke<Account[]>(IPC.ListAccounts).then((nextAccounts) => {
         setAccounts(nextAccounts);
         onAccountListLoaded?.();
         return nextAccounts;
@@ -138,17 +139,17 @@ export default function useAppMetaLoader({
         ] = await Promise.all([
           nextAccountsPromise,
           releasedPromise,
-          invoke<Account | null>('get_account', { accountId: nextAccountId }),
-          invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
-          invoke<Label[]>('list_labels'),
-          invoke<MailStats>('get_stats', { accountId: nextAccountId }),
-          invoke<SyncRun[]>('list_sync_runs'),
-          invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
-          invoke<OutboxItem[]>('list_outbox'),
-          invoke<BackgroundTask[]>('list_background_tasks'),
-          invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
-          invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
-          invoke<ImapMailboxState[]>('list_imap_mailboxes'),
+          invoke<Account | null>(IPC.GetAccount, { accountId: nextAccountId }),
+          invoke<Folder[]>(IPC.ListFolders, { accountId: nextAccountId }),
+          invoke<Label[]>(IPC.ListLabels),
+          invoke<MailStats>(IPC.GetStats, { accountId: nextAccountId }),
+          invoke<SyncRun[]>(IPC.ListSyncRuns),
+          invoke<MailIdentity[]>(IPC.ListIdentities, { accountId: nextAccountId }),
+          invoke<OutboxItem[]>(IPC.ListOutbox),
+          invoke<BackgroundTask[]>(IPC.ListBackgroundTasks),
+          invoke<SyncSchedulePlan>(IPC.GetSyncSchedulePlan, { accountId: nextAccountId }),
+          invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: nextAccountId }),
+          invoke<ImapMailboxState[]>(IPC.ListImapMailboxes),
         ]);
         if (released.released_count > 0) {
           setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
@@ -158,7 +159,7 @@ export default function useAppMetaLoader({
         setFolders(nextFolders);
         setLabels(nextLabels);
         setStats(nextStats);
-        setSyncRuns(nextSyncRuns);
+        setSyncRuns?.(nextSyncRuns);
         setIdentities(nextIdentities);
         setOutbox(nextOutbox);
         setBackgroundTasks(nextBackgroundTasks);
@@ -202,20 +203,20 @@ export default function useAppMetaLoader({
       ] = await Promise.all([
         nextAccountsPromise,
         releasedPromise,
-        invoke<Account | null>('get_account', { accountId: nextAccountId }),
-        invoke<Folder[]>('list_folders', { accountId: nextAccountId }),
-        invoke<Label[]>('list_labels'),
-        invoke<MailStats>('get_stats', { accountId: nextAccountId }),
-        invoke<SyncRun[]>('list_sync_runs'),
-        invoke<Contact[]>('list_contacts'),
-        invoke<MailIdentity[]>('list_identities', { accountId: nextAccountId }),
-        invoke<MailRule[]>('list_rules'),
-        invoke<OutboxItem[]>('list_outbox'),
-        invoke<BackgroundTask[]>('list_background_tasks'),
-        invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: nextAccountId }),
-        invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: nextAccountId }),
-        invoke<ImapMailboxState[]>('list_imap_mailboxes'),
-        invoke<OAuthSession[]>('list_oauth_sessions'),
+        invoke<Account | null>(IPC.GetAccount, { accountId: nextAccountId }),
+        invoke<Folder[]>(IPC.ListFolders, { accountId: nextAccountId }),
+        invoke<Label[]>(IPC.ListLabels),
+        invoke<MailStats>(IPC.GetStats, { accountId: nextAccountId }),
+        invoke<SyncRun[]>(IPC.ListSyncRuns),
+        invoke<Contact[]>(IPC.ListContacts),
+        invoke<MailIdentity[]>(IPC.ListIdentities, { accountId: nextAccountId }),
+        invoke<MailRule[]>(IPC.ListRules),
+        invoke<OutboxItem[]>(IPC.ListOutbox),
+        invoke<BackgroundTask[]>(IPC.ListBackgroundTasks),
+        invoke<SyncSchedulePlan>(IPC.GetSyncSchedulePlan, { accountId: nextAccountId }),
+        invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: nextAccountId }),
+        invoke<ImapMailboxState[]>(IPC.ListImapMailboxes),
+        invoke<OAuthSession[]>(IPC.ListOauthSessions),
       ]);
       if (released.released_count > 0) {
         setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
@@ -225,7 +226,7 @@ export default function useAppMetaLoader({
       setFolders(nextFolders);
       setLabels(nextLabels);
       setStats(nextStats);
-      setSyncRuns(nextSyncRuns);
+      setSyncRuns?.(nextSyncRuns);
       setContacts(nextContacts);
       setIdentities(nextIdentities);
       setRules(nextRules);
@@ -271,7 +272,7 @@ export default function useAppMetaLoader({
     }
 
     try {
-      await invoke('set_tray_unread_count', { unreadCount });
+      await invoke(IPC.SetTrayUnreadCount, { unreadCount });
     } catch (error) {
       console.warn('Failed to update tray unread count:', error);
     }
@@ -283,7 +284,7 @@ export default function useAppMetaLoader({
    */
   async function refreshUnreadIndicators(scope: AccountScope = 'all') {
     try {
-      const nextStats = await invoke<MailStats>('get_stats', {
+      const nextStats = await invoke<MailStats>(IPC.GetStats, {
         accountId: accountIdForScope(scope),
       });
       await updateAppUnreadBadge(nextStats.unread_messages);
@@ -294,16 +295,16 @@ export default function useAppMetaLoader({
 
   async function maybeRunBenchmarkSync(runSyncDryRun: () => Promise<SyncRun>) {
     if (benchmarkSyncRef.current) return;
-    const requested = await invoke<boolean>('benchmark_sync_requested');
+    const requested = await invoke<boolean>(IPC.BenchmarkSyncRequested);
     if (!requested) return;
     benchmarkSyncRef.current = true;
     try {
       const run = await runSyncDryRun();
-      await invoke('mark_benchmark_sync_complete', {
+      await invoke(IPC.MarkBenchmarkSyncComplete, {
         message: `${run.status};folders=${run.scanned_folders};imported=${run.imported_messages}`,
       });
     } catch (error) {
-      await invoke('mark_benchmark_sync_complete', {
+      await invoke(IPC.MarkBenchmarkSyncComplete, {
         message: `failed:${String(error)}`,
       });
     }

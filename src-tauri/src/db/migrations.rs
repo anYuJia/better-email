@@ -1,6 +1,6 @@
-use super::*;
 use super::accounts::ensure_default_account_for_conn;
 use super::accounts::ensure_default_identities_for_conn;
+use super::*;
 
 impl MailStore {
     pub(super) fn migrate(&self) -> MailResult<()> {
@@ -9,6 +9,9 @@ impl MailStore {
                 "
                 PRAGMA journal_mode = WAL;
                 PRAGMA foreign_keys = ON;
+                PRAGMA busy_timeout = 5000;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA wal_autocheckpoint = 1000;
 
                 CREATE TABLE IF NOT EXISTS accounts (
                     id INTEGER PRIMARY KEY,
@@ -200,7 +203,6 @@ impl MailStore {
                     privacy_acknowledged INTEGER NOT NULL DEFAULT 0,
                     updated_at TEXT NOT NULL DEFAULT ''
                 );
-
                 CREATE TABLE IF NOT EXISTS contact_import_batches (
                     id INTEGER PRIMARY KEY,
                     file_name TEXT NOT NULL,
@@ -239,6 +241,10 @@ impl MailStore {
 
                 CREATE INDEX IF NOT EXISTS idx_messages_folder_time ON messages(folder_id, received_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(folder_id, is_read);
+                CREATE INDEX IF NOT EXISTS idx_messages_subject_like ON messages(subject);
+                CREATE INDEX IF NOT EXISTS idx_messages_sender_like ON messages(sender_name, sender_email);
+                CREATE INDEX IF NOT EXISTS idx_messages_recipients_like ON messages(recipients);
+                CREATE INDEX IF NOT EXISTS idx_messages_snippet_like ON messages(snippet);
                 CREATE INDEX IF NOT EXISTS idx_muted_threads_key ON muted_threads(thread_key);
                 CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
                 CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
@@ -351,6 +357,24 @@ impl MailStore {
                 conn,
                 "oauth_sessions",
                 "authorization_code",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "ai_settings",
+                "mcp_enabled",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "ai_settings",
+                "mcp_endpoint",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "ai_settings",
+                "mcp_api_key",
                 "TEXT NOT NULL DEFAULT ''",
             )?;
             add_column_if_missing(conn, "messages", "remote_mailbox", "TEXT NOT NULL DEFAULT ''")?;
@@ -561,4 +585,3 @@ pub(super) fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> 
     conn.execute_batch("COMMIT")?;
     Ok(())
 }
-

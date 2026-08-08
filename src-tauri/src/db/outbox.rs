@@ -1,9 +1,9 @@
-use super::*;
 use super::accounts::{account_for_conn, identity_for_draft_conn};
 use super::attachments::attachments_for_message_conn;
 use super::contacts_rules::upsert_contact;
 use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
 use super::messages::{bool_to_int, normalized_subject, snippet_from_body};
+use super::*;
 
 impl MailStore {
     pub fn list_outbox(&self) -> MailResult<Vec<OutboxItem>> {
@@ -381,7 +381,10 @@ pub(super) fn create_outbound_message_for_conn(
     upsert_contact(conn, input.to.trim(), input.to.trim(), &now)?;
     Ok(message_id)
 }
-pub(super) fn update_draft_message_for_conn(conn: &Connection, input: DraftInput) -> MailResult<i64> {
+pub(super) fn update_draft_message_for_conn(
+    conn: &Connection,
+    input: DraftInput,
+) -> MailResult<i64> {
     let (existing_account_id, role): (i64, String) = conn.query_row(
         "
         SELECT m.account_id, f.role
@@ -533,7 +536,10 @@ pub(super) fn safe_attachment_filename(filename: &str) -> String {
         normalized
     }
 }
-pub(super) fn outbound_message_for_conn(conn: &Connection, message_id: i64) -> MailResult<OutboundMessage> {
+pub(super) fn outbound_message_for_conn(
+    conn: &Connection,
+    message_id: i64,
+) -> MailResult<OutboundMessage> {
     conn.query_row(
         "
         SELECT m.id, m.account_id, m.sender_name, m.sender_email,
@@ -618,4 +624,3 @@ pub(super) fn outbox_retry_delay_minutes(next_attempt_number: i64) -> i64 {
         _ => 240,
     }
 }
-

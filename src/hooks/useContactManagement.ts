@@ -10,6 +10,7 @@ import type {
 } from '../app/types';
 import type { NotificationPolicy } from '../mailUtils';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type ContactManagementOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
@@ -53,7 +54,7 @@ export default function useContactManagement({
   }
 
   async function refreshManagedContacts() {
-    const refreshed = await invoke<Contact[]>('list_contacts');
+    const refreshed = await invoke<Contact[]>(IPC.ListContacts);
     setContacts(refreshed);
     return refreshed;
   }
@@ -61,7 +62,7 @@ export default function useContactManagement({
   async function exportContactsVcard() {
     setContactTransferBusy(true);
     try {
-      const summary = await invoke<ContactExportSummary | null>('export_contacts_vcard');
+      const summary = await invoke<ContactExportSummary | null>(IPC.ExportContactsVcard);
       if (!summary) {
         setStatus('已取消联系人 vCard 导出');
         return;
@@ -78,7 +79,7 @@ export default function useContactManagement({
       setStatus('请输入联系人邮箱');
       return;
     }
-    const created = await invoke<Contact>('create_contact', {
+    const created = await invoke<Contact>(IPC.CreateContact, {
       input: {
         ...contactForm,
         email,
@@ -94,7 +95,7 @@ export default function useContactManagement({
   async function saveContactOverride(contact: Contact) {
     const aliases = normalizeContactAliases(contactEditAliases)
       .filter((alias) => alias !== contact.email.trim().toLowerCase());
-    const updated = await invoke<Contact>('update_contact', {
+    const updated = await invoke<Contact>(IPC.UpdateContact, {
       contactId: contact.id,
       input: {
         name: contactEditName.trim() || contact.name,
@@ -110,7 +111,7 @@ export default function useContactManagement({
   async function toggleContactVip(contact: Contact) {
     const nextVip = !contact.vip;
     const aliases = contact.aliases ?? [];
-    const updated = await invoke<Contact>('update_contact', {
+    const updated = await invoke<Contact>(IPC.UpdateContact, {
       contactId: contact.id,
       input: {
         name: contact.name,
@@ -135,7 +136,7 @@ export default function useContactManagement({
   }
 
   async function deleteManagedContact(contact: Contact) {
-    await invoke('delete_contact', { contactId: contact.id });
+    await invoke(IPC.DeleteContact, { contactId: contact.id });
     setContacts((current) => current.filter((item) => item.id !== contact.id));
     if (editingContactId === contact.id) {
       setEditingContactId(null);
@@ -152,7 +153,7 @@ export default function useContactManagement({
       return;
     }
     const source = contacts.find((contact) => contact.id === mergeSourceContactId);
-    const merged = await invoke<Contact>('merge_contacts', {
+    const merged = await invoke<Contact>(IPC.MergeContacts, {
       targetContactId: target.id,
       sourceContactId: mergeSourceContactId,
     });

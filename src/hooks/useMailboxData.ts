@@ -5,7 +5,6 @@ import type {
   Folder,
   ListMode,
   ListSort,
-  Message,
   MessageSummary,
   SearchScope,
   ThreadSummary,
@@ -14,6 +13,7 @@ import type {
 import { invoke } from '../tauriBridge';
 import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../app/mailboxListState';
 import { buildMailboxRequests, checkHistoryIncomplete, mailboxFlowLog, mailboxFlowWarn } from './mailboxDataRequests';
+import { IPC } from '../ipc/commands';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -169,11 +169,11 @@ export default function useMailboxData({
     try {
       if (nextIncludeThreads) {
         [nextMessages, nextThreads] = await Promise.all([
-          invoke<MessageSummary[]>('list_messages', requests.messages),
-          invoke<ThreadSummary[]>('list_threads', requests.threads),
+          invoke<MessageSummary[]>(IPC.ListMessages, requests.messages),
+          invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads),
         ]);
       } else {
-        nextMessages = await invoke<MessageSummary[]>('list_messages', requests.messages);
+        nextMessages = await invoke<MessageSummary[]>(IPC.ListMessages, requests.messages);
       }
     } catch (error) {
       mailboxFlowWarn('loadMessages failed', {
@@ -210,7 +210,7 @@ export default function useMailboxData({
     });
     if (!frontendReadyRef.current) {
       frontendReadyRef.current = true;
-      void invoke('mark_frontend_ready', {
+      void invoke(IPC.MarkFrontendReady, {
         message: `folder=${nextFolderId};messages=${visibleMessages.length};scope=${nextScope}`,
       });
       void maybeRunBenchmarkSync();

@@ -16,7 +16,6 @@ type MessageToastStackProps = {
 };
 
 const EXIT_MS = 260;
-const ENTER_DELAY_MS = 280;
 
 function remainingSeconds(expiresAt: string): number {
   return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));

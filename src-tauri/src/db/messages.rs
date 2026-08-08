@@ -1,13 +1,17 @@
-use super::*;
 use super::accounts::{account_for_conn, map_account};
 use super::attachments::attachment_count_for_message;
 use super::contacts_rules::apply_enabled_rules_for_message;
 use super::contacts_rules::upsert_contact;
-use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
-use super::outbox::{create_outbound_message_for_conn, outbound_message_for_conn, update_draft_message_for_conn};
-use super::outbox::{fallback_mime_type, get_outbox_item_for_conn, safe_attachment_filename};
-use super::search::{SearchCriteria, build_message_filter_clause, build_message_summary_query, thread_order_clause};
 use super::folders::role_for_virtual_folder_id;
+use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
+use super::outbox::{
+    create_outbound_message_for_conn, outbound_message_for_conn, update_draft_message_for_conn,
+};
+use super::outbox::{fallback_mime_type, get_outbox_item_for_conn, safe_attachment_filename};
+use super::search::{
+    build_message_filter_clause, build_message_summary_query, thread_order_clause, SearchCriteria,
+};
+use super::*;
 
 impl MailStore {
     #[allow(dead_code)]
@@ -1040,20 +1044,21 @@ impl MailStore {
                     .into_iter()
                     .collect::<Vec<_>>()
             };
-            let total_messages = scalar_count_values(
-                conn,
-                &format!("SELECT COUNT(*) FROM messages m WHERE 1 = 1{account_filter}"),
-                account_params(),
-            )?;
-            let unread_messages = scalar_count_values(
-                conn,
-                &format!("SELECT COUNT(*) FROM messages m WHERE m.is_read = 0{account_filter}"),
-                account_params(),
-            )?;
-            let starred_messages = scalar_count_values(
-                conn,
-                &format!("SELECT COUNT(*) FROM messages m WHERE m.is_starred = 1{account_filter}"),
-                account_params(),
+            let (total_messages, unread_messages, starred_messages, attachment_messages): (
+                i64,
+                i64,
+                i64,
+                i64,
+            ) = conn.query_row(
+                &format!(
+                    "SELECT COUNT(*),
+                            COALESCE(SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END), 0),
+                            COALESCE(SUM(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END), 0),
+                            COALESCE(SUM(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END), 0)
+                     FROM messages m WHERE 1 = 1{account_filter}"
+                ),
+                params_from_iter(account_params()),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )?;
             let draft_messages = scalar_count_values(
                 conn,
@@ -1061,13 +1066,6 @@ impl MailStore {
                     "SELECT COUNT(*)
                  FROM messages m JOIN folders f ON f.id = m.folder_id
                  WHERE f.role = 'drafts'{account_filter}"
-                ),
-                account_params(),
-            )?;
-            let attachment_messages = scalar_count_values(
-                conn,
-                &format!(
-                    "SELECT COUNT(*) FROM messages m WHERE m.has_attachments = 1{account_filter}"
                 ),
                 account_params(),
             )?;
@@ -1304,7 +1302,9 @@ pub(super) fn normalize_remote_image_trust_value(scope: &str, value: &str) -> Ma
         ))
     }
 }
-pub(super) fn map_remote_image_trust(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteImageTrust> {
+pub(super) fn map_remote_image_trust(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<RemoteImageTrust> {
     Ok(RemoteImageTrust {
         id: row.get(0)?,
         account_id: row.get(1)?,
@@ -1336,7 +1336,8 @@ pub(super) fn should_allow_remote_images_for_message(
     message: &Message,
 ) -> MailResult<bool> {
     let account = account_for_conn(conn, Some(message.account_id))?;
-    if account.block_external_mailboxes && sender_is_external_mailbox(&account, &message.sender_email)
+    if account.block_external_mailboxes
+        && sender_is_external_mailbox(&account, &message.sender_email)
     {
         return Ok(false);
     }
@@ -1618,7 +1619,10 @@ pub(super) fn hydrate_message_summary_list_metadata(
     }
     Ok(messages)
 }
-pub(super) fn message_remote_ref_for_conn(conn: &Connection, message_id: i64) -> MailResult<MessageRemoteRef> {
+pub(super) fn message_remote_ref_for_conn(
+    conn: &Connection,
+    message_id: i64,
+) -> MailResult<MessageRemoteRef> {
     conn.query_row(
         "
         SELECT account_id, remote_mailbox, remote_uid, message_id_header
@@ -1699,7 +1703,10 @@ pub(super) fn due_snoozed_message_ids(now: &str, rows: Vec<(i64, String)>) -> Ve
         })
         .collect()
 }
-pub(super) fn labels_for_message(conn: &Connection, message_id: i64) -> rusqlite::Result<Vec<String>> {
+pub(super) fn labels_for_message(
+    conn: &Connection,
+    message_id: i64,
+) -> rusqlite::Result<Vec<String>> {
     let mut stmt = conn.prepare(
         "
         SELECT l.name
@@ -1714,7 +1721,11 @@ pub(super) fn labels_for_message(conn: &Connection, message_id: i64) -> rusqlite
         .collect::<Result<Vec<_>, _>>()?;
     Ok(labels)
 }
-pub(super) fn scalar_count_values(conn: &Connection, sql: &str, values: Vec<Value>) -> MailResult<i64> {
+pub(super) fn scalar_count_values(
+    conn: &Connection,
+    sql: &str,
+    values: Vec<Value>,
+) -> MailResult<i64> {
     conn.query_row(sql, params_from_iter(values), |row| row.get(0))
         .map_err(Into::into)
 }
@@ -1800,4 +1811,3 @@ pub(super) fn snippet_from_body(body: &str) -> String {
         .take(120)
         .collect()
 }
-

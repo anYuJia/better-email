@@ -8,6 +8,7 @@ import type {
 } from '../app/types';
 import { formatDate } from '../mailUtils';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 export type SnoozeTarget = {
   messages: MessageSummary[];
@@ -79,7 +80,7 @@ export default function useSnoozeController({
 
     const undoSnapshots = snapshotMessages(target.messages);
     for (const message of target.messages) {
-      await invoke<Message>('snooze_message', { messageId: message.id, snoozedUntil });
+      await invoke<Message>(IPC.SnoozeMessage, { messageId: message.id, snoozedUntil });
     }
 
     const targetIds = new Set(target.messages.map((message) => message.id));

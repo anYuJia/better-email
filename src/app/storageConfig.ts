@@ -2,14 +2,12 @@ import type {
   AccountScope,
   AppLayout,
   BackgroundTaskKind,
-  ComposeTemplate,
   FilterMode,
   ProviderVerificationRecord,
   SavedSearch,
   SearchScope,
 } from './types';
 import type { ListSort } from './types';
-import type { NotificationPolicy } from '../mailUtils';
 
 export const notificationPolicyStorageKey = 'better-email.notificationPolicy';
 export const providerVerificationStorageKey = 'better-email.providerVerifications';

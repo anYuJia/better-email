@@ -1,4 +1,4 @@
-import React, {
+import {
   Suspense,
   lazy,
   memo,
@@ -53,7 +53,6 @@ import type { NotificationPolicy } from '../../mailUtils';
 import type { SettingsSectionId } from './SettingsFrame';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
-import { invoke } from '../../tauriBridge';
 import { createSettingsHandlers } from './settingsOverlayHandlers';
 
 const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));

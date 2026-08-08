@@ -15,6 +15,7 @@ import type { SettingsSectionId } from '../components/settings/SettingsFrame';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
 import type { MailboxDataController } from './useMailboxData';
+import { IPC } from '../ipc/commands';
 
 type UseMailboxNavigationOptions = {
   account: Account | null;
@@ -245,7 +246,7 @@ export default function useMailboxNavigation({
   }, [folders]);
 
   const openThread = useCallback(async (thread: ThreadSummary, announce = true) => {
-    const nextMessages = await invoke<MessageSummary[]>('list_thread_messages', {
+    const nextMessages = await invoke<MessageSummary[]>(IPC.ListThreadMessages, {
       accountId: accountIdForScope(accountScope),
       threadKey: thread.thread_key,
       limit: 80,

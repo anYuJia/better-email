@@ -1,5 +1,5 @@
-use super::*;
 use super::migrations::path_with_suffix;
+use super::*;
 
 pub(super) type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf)>);
 
@@ -170,7 +170,10 @@ impl MailStore {
     }
 }
 
-pub(super) fn attachment_count_for_message(conn: &Connection, message_id: i64) -> rusqlite::Result<i64> {
+pub(super) fn attachment_count_for_message(
+    conn: &Connection,
+    message_id: i64,
+) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COUNT(*) FROM attachments WHERE message_id = ?1",
         params![message_id],
@@ -260,7 +263,10 @@ pub(super) fn collect_regular_files(root: &Path) -> MailResult<Vec<(PathBuf, i64
     collect_regular_files_into(root, &mut files)?;
     Ok(files)
 }
-pub(super) fn collect_regular_files_into(root: &Path, files: &mut Vec<(PathBuf, i64)>) -> MailResult<()> {
+pub(super) fn collect_regular_files_into(
+    root: &Path,
+    files: &mut Vec<(PathBuf, i64)>,
+) -> MailResult<()> {
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
@@ -297,4 +303,3 @@ pub(super) fn prune_empty_directories(root: &Path, preserve_root: bool) -> MailR
     }
     Ok(empty)
 }
-

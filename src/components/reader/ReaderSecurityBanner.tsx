@@ -22,7 +22,6 @@ export default function ReaderSecurityBanner({
   hasRenderableHtml,
   selectedSenderTrusted,
   selectedSenderDomain,
-  selectedSenderIsExternal,
   selectedExternalBlocked,
   showLinkAction,
   linkActionLabel,

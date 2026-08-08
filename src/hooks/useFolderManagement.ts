@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { Folder, FolderReadReport } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type FolderManagementOptions = {
   folderId: number | null;
@@ -37,7 +38,7 @@ export default function useFolderManagement({
       setStatus('请先创建或选择邮箱账号');
       return;
     }
-    const folder = await invoke<Folder>('create_custom_folder', { accountId, name });
+    const folder = await invoke<Folder>(IPC.CreateCustomFolder, { accountId, name });
     setCustomFolderName('');
     const { folderId: nextFolderId } = await loadMeta(folderId);
     await loadMessages(nextFolderId);
@@ -55,7 +56,7 @@ export default function useFolderManagement({
       setStatus('请输入新的文件夹名称');
       return;
     }
-    const renamed = await invoke<Folder>('rename_custom_folder', { folderId: folder.id, name });
+    const renamed = await invoke<Folder>(IPC.RenameCustomFolder, { folderId: folder.id, name });
     setRenamingFolderId(null);
     setRenamingFolderName('');
     const { folderId: nextFolderId } = await loadMeta(folderId);
@@ -64,7 +65,7 @@ export default function useFolderManagement({
   }
 
   async function deleteCustomFolderConfirmed(folder: Folder) {
-    await invoke('delete_custom_folder', { folderId: folder.id });
+    await invoke(IPC.DeleteCustomFolder, { folderId: folder.id });
     const inboxFolderId = visibleFolderIdForRole('inbox', folder.account_id);
     const { folderId: nextFolderId } = await loadMeta(folderId === folder.id ? inboxFolderId : folderId);
     await loadMessages(nextFolderId);
@@ -77,7 +78,7 @@ export default function useFolderManagement({
 
   async function markFolderRead(folder: Folder) {
     const visibleUnreadCount = folder.unread_count;
-    const report = await invoke<FolderReadReport>('mark_folder_read', {
+    const report = await invoke<FolderReadReport>(IPC.MarkFolderRead, {
       folderId: folder.id,
       role: folder.role,
       isVirtual: folder.is_virtual,

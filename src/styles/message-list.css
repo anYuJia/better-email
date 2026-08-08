@@ -8,7 +8,6 @@
   background: #fbfcfd;
   overflow-x: auto;
 }
-.bulk-toolbar.active { background: #eef7f2; }
 .bulk-toolbar label {
   display: inline-flex;
   align-items: center;
@@ -27,15 +26,10 @@
   font-size: 12px;
   white-space: nowrap;
 }
-.bulk-toolbar.active button { border-color: #a8d8be; }
 
 .bulk-selection {
   padding-right: 4px;
   font-weight: 750;
-}
-
-.compact-menu {
-  position: relative;
 }
 
 .compact-menu summary {
@@ -67,13 +61,6 @@
   border-right: 1.7px solid currentColor;
   border-bottom: 1.7px solid currentColor;
   transform: rotate(45deg) translateY(-1px);
-}
-
-.compact-menu[open] summary,
-.compact-menu summary:hover {
-  background: #fff;
-  color: var(--accent-strong, #0066d6);
-  border-color: rgba(10, 132, 255, 0.30);
 }
 
 .compact-menu > div {
@@ -201,7 +188,6 @@
   place-items: center;
   transform: translate(-50%, -50%);
 }
-.message-select input { width: 15px; height: 15px; }
 .message-unread-dot {
   position: absolute;
   left: 27px;
@@ -226,17 +212,6 @@ time { color: #7a8490; font-size: 12px; white-space: nowrap; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.message-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-.message-chips span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 999px;
-  background: #edf0f3;
-  color: #54606c;
-  font-size: 11px;
-  padding: 3px 7px;
 }
 .message-list-footer {
   display: flex;

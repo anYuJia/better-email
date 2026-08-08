@@ -1,7 +1,7 @@
-use super::*;
 use super::folders::folder_id_for_message_role;
 use super::messages::bool_to_int;
 use super::messages::message_for_conn;
+use super::*;
 
 impl MailStore {
     pub fn list_contacts(&self) -> MailResult<Vec<Contact>> {
@@ -258,10 +258,7 @@ impl MailStore {
             Ok(batches)
         })
     }
-    pub fn undo_contact_import_batch(
-        &self,
-        batch_id: i64,
-    ) -> MailResult<ContactImportUndoReport> {
+    pub fn undo_contact_import_batch(&self, batch_id: i64) -> MailResult<ContactImportUndoReport> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
             let created_contact_ids: Vec<i64> = {
@@ -526,10 +523,8 @@ fn merge_imported_contact(
     let differs = !existing.name.trim().is_empty()
         && !existing.name.eq_ignore_ascii_case(imported_name)
         && existing.name != existing.email;
-    let name = if !imported_name.is_empty() && differs {
-        imported_name
-    } else if (existing.name.trim().is_empty() || existing.name == existing.email)
-        && !imported_name.is_empty()
+    let name = if !imported_name.is_empty()
+        && (differs || existing.name.trim().is_empty() || existing.name == existing.email)
     {
         imported_name
     } else {
@@ -667,7 +662,12 @@ pub(super) fn get_contact_for_conn(conn: &Connection, contact_id: i64) -> MailRe
     )
     .map_err(Into::into)
 }
-pub(super) fn upsert_contact(conn: &Connection, name: &str, email: &str, seen_at: &str) -> MailResult<()> {
+pub(super) fn upsert_contact(
+    conn: &Connection,
+    name: &str,
+    email: &str,
+    seen_at: &str,
+) -> MailResult<()> {
     if email.trim().is_empty() {
         return Ok(());
     }
@@ -700,7 +700,10 @@ pub(super) fn rule_for_conn(conn: &Connection, rule_id: i64) -> MailResult<MailR
     )
     .map_err(Into::into)
 }
-pub(super) fn apply_enabled_rules_for_message(conn: &Connection, message_id: i64) -> MailResult<i64> {
+pub(super) fn apply_enabled_rules_for_message(
+    conn: &Connection,
+    message_id: i64,
+) -> MailResult<i64> {
     let message = message_for_conn(conn, message_id)?;
     let mut stmt =
         conn.prepare("SELECT condition, action FROM mail_rules WHERE enabled = 1 ORDER BY id")?;
@@ -756,7 +759,11 @@ pub(super) fn apply_rule_actions(
     }
     Ok((applied, should_stop))
 }
-pub(super) fn apply_rule_action(conn: &Connection, message_id: i64, action: &str) -> MailResult<i64> {
+pub(super) fn apply_rule_action(
+    conn: &Connection,
+    message_id: i64,
+    action: &str,
+) -> MailResult<i64> {
     let trimmed = action.trim();
     let normalized = trimmed.to_lowercase();
     if let Some(label_name) = normalized
@@ -817,4 +824,3 @@ pub(super) fn apply_rule_action(conn: &Connection, message_id: i64, action: &str
     }
     Ok(0)
 }
-

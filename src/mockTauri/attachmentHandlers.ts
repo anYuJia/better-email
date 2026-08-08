@@ -13,7 +13,7 @@ import {
   clearMockAttachmentCache,
 } from './state';
 
-function handleLocalBackup(args?: InvokeArgs) {
+function handleLocalBackup(_args?: InvokeArgs) {
   return {
     path: '/tmp/better-email-backup.json',
     exported_at: now,

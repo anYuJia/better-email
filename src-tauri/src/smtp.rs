@@ -144,10 +144,7 @@ fn is_inline_attachment(attachment: &Attachment, html_uses_cid: bool) -> bool {
     html_uses_cid && attachment.is_inline && !attachment.content_id.trim().is_empty()
 }
 
-fn build_body_part(
-    message: &OutboundMessage,
-    html_uses_cid: bool,
-) -> Result<MultiPart, MailError> {
+fn build_body_part(message: &OutboundMessage, html_uses_cid: bool) -> Result<MultiPart, MailError> {
     let alternative = if message.html_body.trim().is_empty() {
         MultiPart::alternative().singlepart(SinglePart::plain(message.body.clone()))
     } else {
@@ -179,7 +176,10 @@ fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailErr
         )));
     }
     let bytes = fs::read(&attachment.local_path).map_err(|error| {
-        MailError::Smtp(format!("读取内嵌图片失败 {}：{error}", attachment.local_path))
+        MailError::Smtp(format!(
+            "读取内嵌图片失败 {}：{error}",
+            attachment.local_path
+        ))
     })?;
     let content_type = ContentType::parse(&attachment.mime_type)
         .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
@@ -511,7 +511,8 @@ mod tests {
             bcc: String::new(),
             subject: "Inline image".to_string(),
             body: "See the image".to_string(),
-            html_body: "<p>See the image</p><img src=\"cid:inline-1@better-email.local\">".to_string(),
+            html_body: "<p>See the image</p><img src=\"cid:inline-1@better-email.local\">"
+                .to_string(),
             in_reply_to_header: String::new(),
             references_header: String::new(),
             attachments: vec![

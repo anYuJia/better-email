@@ -1,4 +1,4 @@
-import type { Message, MessageSummary } from '../../app/types';
+import type { MessageSummary } from '../../app/types';
 import { senderAvatarTone } from '../../app/messageDetailUtils';
 import Avatar from '../Avatar';
 

@@ -1029,7 +1029,7 @@ export function completeMockOAuth2Callback(args?: InvokeArgs) {
   };
 }
 
-export function waitForMockOAuth2Callback(args?: InvokeArgs) {
+export function waitForMockOAuth2Callback(_args?: InvokeArgs) {
   const session = oauthSessions[0];
   if (!session) throw new Error('OAuth2 session not found');
   oauthSessions = oauthSessions.map((item) => item.id === session.id
@@ -1312,6 +1312,51 @@ export function removeMockLabelFromMessage(args?: InvokeArgs) {
   return undefined;
 }
 
+export function createMockLabel(args?: InvokeArgs) {
+  const name = String(args?.name ?? '').trim();
+  if (!name) throw new Error('标签名称不能为空。');
+  const color = String(args?.color ?? '#6366f1').trim() || '#6366f1';
+  const nextId = Math.max(0, ...labels.map((label) => label.id)) + 1;
+  const created = { id: nextId, name, color, message_count: 0 };
+  labels = [...labels, created];
+  return created;
+}
+
+export function updateMockLabel(args?: InvokeArgs) {
+  const id = Number(args?.id);
+  const name = String(args?.name ?? '').trim();
+  if (!name) throw new Error('标签名称不能为空。');
+  const color = String(args?.color ?? '').trim() || '#6366f1';
+  let updated: typeof labels[number] | undefined;
+  labels = labels.map((label) => {
+    if (label.id !== id) return label;
+    updated = { ...label, name, color };
+    return updated;
+  });
+  if (!updated) throw new Error('标签不存在。');
+  return undefined;
+}
+
+export function deleteMockLabel(args?: InvokeArgs) {
+  const id = Number(args?.id);
+  const target = labels.find((label) => label.id === id);
+  if (!target) throw new Error('标签不存在。');
+  labels = labels.filter((label) => label.id !== id);
+  messages = messages.map((message) => ({
+    ...message,
+    labels: message.labels.filter((name) => name !== target.name),
+  }));
+  return undefined;
+}
+
+export function mockSetTrayUnreadCount() {
+  return undefined;
+}
+
+export function mockWindowChromeReady() {
+  return undefined;
+}
+
 export function upsertMockIdentity(args?: InvokeArgs) {
   const input = args?.input as Partial<MockIdentity>;
   const accountId = Number(input.account_id || account.id);
@@ -1420,7 +1465,7 @@ export function cancelMockOutboxItem(args?: InvokeArgs) {
   return updated;
 }
 
-export function flushMockOutboxDryRun(args?: InvokeArgs) {
+export function flushMockOutboxDryRun(_args?: InvokeArgs) {
   outbox = outbox.map((item) =>
     ['queued', 'retry', 'failed', 'scheduled'].includes(item.status) &&
     (!item.next_attempt_at || Date.parse(item.next_attempt_at) <= Date.now())
@@ -1430,7 +1475,7 @@ export function flushMockOutboxDryRun(args?: InvokeArgs) {
   return outbox;
 }
 
-export function releaseMockDueOutboxItems(args?: InvokeArgs) {
+export function releaseMockDueOutboxItems(_args?: InvokeArgs) {
   outbox = outbox.map((item) =>
     item.status === 'scheduled' && item.next_attempt_at && Date.parse(item.next_attempt_at) <= Date.now()
       ? { ...item, status: 'queued', last_error: '已到发送时间，等待手动点击真实发送。', next_attempt_at: '' }
@@ -1439,7 +1484,7 @@ export function releaseMockDueOutboxItems(args?: InvokeArgs) {
   return outbox;
 }
 
-export function flushMockOutboxSmtp(args?: InvokeArgs) {
+export function flushMockOutboxSmtp(_args?: InvokeArgs) {
   const sentMessageIds = new Set(
     outbox
       .filter(
@@ -1750,7 +1795,7 @@ export function mergeMockContacts(args?: InvokeArgs) {
   return merged;
 }
 
-export function importMockContactsVCard(args?: InvokeArgs) {
+export function importMockContactsVCard(_args?: InvokeArgs) {
   const importedEmail = 'vcard.person@example.com';
   const existingImported = contacts.find((contact) => contact.email === importedEmail);
   const importedContact = existingImported ?? {
@@ -1950,7 +1995,7 @@ export function mockUndoContactImportBatch(args?: InvokeArgs) {
   };
 }
 
-export function clearMockAttachmentCache(args?: InvokeArgs) {
+export function clearMockAttachmentCache(_args?: InvokeArgs) {
   const releasedBytes = mockReclaimableCacheBytes;
   const removedFileCount = mockReclaimableFileCount;
   const resetAttachmentCount = mockCachedAttachmentCount;

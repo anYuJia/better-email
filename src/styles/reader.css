@@ -13,20 +13,11 @@
   padding: 16px;
   cursor: pointer;
 }
-.thread-message.active {
-  border-color: #3aa675;
-  box-shadow: 0 0 0 1px rgba(58, 166, 117, 0.14);
-}
 .thread-message header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
-}
-.thread-message p {
-  margin: 0 0 10px;
-  color: #54606c;
-  line-height: 1.55;
 }
 .reader-header {
   display: grid;
@@ -77,16 +68,6 @@ h1 {
   font-size: 12px;
   font-weight: 700;
 }
-.reader-actions .reader-translate-action:hover {
-  color: #ffffff;
-  border-color: #0a7aff;
-  background: #0a7aff;
-}
-.reader-actions .reader-translate-action.active {
-  color: #ffffff;
-  border-color: #0a7aff;
-  background: #0a7aff;
-}
 .reader-actions .reader-translate-action:disabled {
   color: #68717d;
   border-color: #d8dde4;
@@ -110,10 +91,6 @@ h1 {
   margin-left: 2px;
 }
 
-.label-tools .label-menu summary {
-  min-height: 30px;
-}
-
 .label-empty,
 .active-label-chip {
   min-height: 28px;
@@ -127,11 +104,6 @@ h1 {
   color: var(--text-soft, #3f4a56);
   font-size: 12px;
   font-weight: 700;
-}
-
-.label-empty {
-  color: var(--muted, #68717d);
-  font-weight: 650;
 }
 .attachments {
   max-width: 760px;
@@ -188,11 +160,6 @@ h1 {
   resize: vertical;
   outline: none;
   padding: 11px 12px;
-}
-
-.quick-reply textarea:focus {
-  border-color: rgba(10, 132, 255, 0.36);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.10);
 }
 
 .quick-reply footer div {
@@ -286,19 +253,8 @@ h1 {
   font-weight: 700;
   padding: 4px 9px;
 }
-.reader-warning-panel p {
-  margin: 4px 0;
-  font-size: 13px;
-}
 .reader-warning-actions {
   display: inline-block;
-  margin-top: 10px;
-}
-
-.reader-warning-action-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin-top: 10px;
 }
 

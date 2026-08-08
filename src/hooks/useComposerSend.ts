@@ -10,13 +10,13 @@ import type {
   DraftSaveReport,
   FolderRole,
   Message,
-  MessageSummary,
   OutboxItem,
 } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
 import { formatDate, prefixedSubject, quoteMessage, replyThreadingHeaders } from '../mailUtils';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type ComposerSendOptions = {
   draft: DraftInput;
@@ -82,7 +82,7 @@ export default function useComposerSend({
       setStatus('草稿为空，未保存');
       return;
     }
-    const report = await invoke<DraftSaveReport>('save_draft', {
+    const report = await invoke<DraftSaveReport>(IPC.SaveDraft, {
       input: draftInputForCurrentAccount(draft),
       threading: threadingForDraft(draft),
     });
@@ -109,7 +109,7 @@ export default function useComposerSend({
     });
     if (sendUndoDelaySeconds === 0) {
       try {
-        const messageId = await invoke<number>('send_message', {
+        const messageId = await invoke<number>(IPC.SendMessage, {
           input,
           threading: threadingForDraft(draft),
         });
@@ -137,7 +137,7 @@ export default function useComposerSend({
     }
 
     const expiresAt = new Date(Date.now() + sendUndoDelaySeconds * 1000).toISOString();
-    const item = await invoke<OutboxItem>('queue_outbox_message', {
+    const item = await invoke<OutboxItem>(IPC.QueueOutboxMessage, {
       input: {
         ...input,
         draft_id: 0,
@@ -190,7 +190,7 @@ export default function useComposerSend({
     });
     if (sendUndoDelaySeconds === 0) {
       try {
-        const messageId = await invoke<number>('send_message', {
+        const messageId = await invoke<number>(IPC.SendMessage, {
           input,
           threading: replyThreadingHeaders(message),
         });
@@ -218,7 +218,7 @@ export default function useComposerSend({
 
     try {
       const expiresAt = new Date(Date.now() + sendUndoDelaySeconds * 1000).toISOString();
-      const item = await invoke<OutboxItem>('queue_outbox_message', {
+      const item = await invoke<OutboxItem>(IPC.QueueOutboxMessage, {
         input: {
           ...input,
           send_at: expiresAt,
@@ -263,7 +263,7 @@ export default function useComposerSend({
       draft_id: 0,
       send_at: sendAt ? new Date(sendAt).toISOString() : '',
     };
-    const item = await invoke<OutboxItem>('queue_outbox_message', {
+    const item = await invoke<OutboxItem>(IPC.QueueOutboxMessage, {
       input,
       threading: threadingForDraft(draft),
     });
@@ -280,7 +280,7 @@ export default function useComposerSend({
   }, [draft, draftInputForCurrentAccount, threadingForDraft, setDraft, clearComposerAutosave, forceCloseComposer, focusMailboxRole, account, setStatus]);
 
   const cancelOutboxItem = useCallback(async (item: OutboxItem) => {
-    const updated = await invoke<OutboxItem>('cancel_outbox_item', { outboxId: item.id });
+    const updated = await invoke<OutboxItem>(IPC.CancelOutboxItem, { outboxId: item.id });
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
     setPendingSendUndo((current) => (current?.outboxId === item.id ? null : current));
     await loadMeta();
@@ -291,7 +291,7 @@ export default function useComposerSend({
     const pending = pendingSendUndo;
     if (!pending) return;
     setPendingSendUndo(null);
-    const updated = await invoke<OutboxItem>('cancel_outbox_item', { outboxId: pending.outboxId });
+    const updated = await invoke<OutboxItem>(IPC.CancelOutboxItem, { outboxId: pending.outboxId });
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
     await refreshAll();
     setStatus(`已撤回发送：${pending.subject}`);

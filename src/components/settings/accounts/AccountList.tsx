@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Mail, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { Account } from '../../../app/types';
 import type { AccountDialogMode } from './accountSettingsShared';
 import { SettingsButton } from '../shared';

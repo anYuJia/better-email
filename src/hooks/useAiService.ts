@@ -3,8 +3,10 @@ import type { AiServiceConfig, AiTestConnectionResult } from '../app/types/ai';
 import {
   defaultAiServiceConfig,
   loadAiServiceConfig,
+  loadAiSettingsFromBackend,
   maskApiKey,
   saveAiServiceConfig,
+  saveAiSettingsToBackend,
 } from '../app/aiServiceConfig';
 import { testAiConnection } from '../app/aiService';
 
@@ -17,10 +19,38 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AiTestConnectionResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [secretsLoaded, setSecretsLoaded] = useState(false);
 
   useEffect(() => {
     saveAiServiceConfig(config);
   }, [config]);
+
+  // 从后端系统凭据库恢复 API Key，不回写 localStorage。
+  useEffect(() => {
+    let cancelled = false;
+    loadAiSettingsFromBackend().then((report) => {
+      if (cancelled || !report) return;
+      setConfig((current) => ({
+        ...current,
+        enabled: report.enabled,
+        serviceType: report.service_type === 'mcp' || report.service_type === 'mock'
+          ? report.service_type
+          : 'http',
+        endpoint: report.endpoint,
+        apiKey: report.api_key,
+        defaultModel: report.model || current.defaultModel,
+        timeoutSeconds: report.timeout_seconds || current.timeoutSeconds,
+        privacyAcknowledged: report.privacy_acknowledged,
+        mcpEnabled: report.mcp_enabled,
+        mcpEndpoint: report.mcp_endpoint || current.mcpEndpoint,
+        mcpApiKey: report.mcp_api_key,
+      }));
+      setSecretsLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const maskedApiKey = useMemo(() => maskApiKey(config.apiKey), [config.apiKey]);
 
@@ -43,11 +73,13 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
   const saveConfig = useCallback(async () => {
     setSaving(true);
     try {
-      setStatus('AI 服务设置已保存');
+      const message = await saveAiSettingsToBackend(config);
+      setStatus(message);
+      return message;
     } finally {
       setSaving(false);
     }
-  }, [setStatus]);
+  }, [config, setStatus]);
 
   return {
     config,
@@ -60,5 +92,6 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
     saveConfig,
     runTestConnection,
     defaultConfig: defaultAiServiceConfig,
+    secretsLoaded,
   };
 }

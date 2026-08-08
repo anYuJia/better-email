@@ -6,8 +6,6 @@ import {
   EyeOff,
   RefreshCw,
   ScanSearch,
-  Server,
-  ShieldCheck,
   Sparkles,
   TimerReset,
   UserRound,

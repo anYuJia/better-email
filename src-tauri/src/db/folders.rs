@@ -1,5 +1,5 @@
-use super::*;
 use super::accounts::account_for_conn;
+use super::*;
 
 impl MailStore {
     pub fn list_folders_for_account(&self, account_id: Option<i64>) -> MailResult<Vec<Folder>> {
@@ -150,7 +150,10 @@ pub(super) fn folder_id_for_role(conn: &Connection, role: &str) -> MailResult<i6
     let account = account_for_conn(conn, None)?;
     folder_id_for_account_role(conn, account.id, role)
 }
-pub(super) fn create_default_folders_for_account(conn: &Connection, account_id: i64) -> MailResult<()> {
+pub(super) fn create_default_folders_for_account(
+    conn: &Connection,
+    account_id: i64,
+) -> MailResult<()> {
     for (name, role, sort_order) in [
         ("收件箱", "inbox", 10),
         ("已发送", "sent", 20),
@@ -168,7 +171,11 @@ pub(super) fn create_default_folders_for_account(conn: &Connection, account_id: 
     }
     Ok(())
 }
-pub(super) fn folder_id_for_account_role(conn: &Connection, account_id: i64, role: &str) -> MailResult<i64> {
+pub(super) fn folder_id_for_account_role(
+    conn: &Connection,
+    account_id: i64,
+    role: &str,
+) -> MailResult<i64> {
     conn.query_row(
         "SELECT id FROM folders WHERE account_id = ?1 AND role = ?2 LIMIT 1",
         params![account_id, role],
@@ -177,7 +184,11 @@ pub(super) fn folder_id_for_account_role(conn: &Connection, account_id: i64, rol
     .optional()?
     .ok_or_else(|| MailError::MissingFolderRole(role.to_string()))
 }
-pub(super) fn folder_id_for_message_role(conn: &Connection, message_id: i64, role: &str) -> MailResult<i64> {
+pub(super) fn folder_id_for_message_role(
+    conn: &Connection,
+    message_id: i64,
+    role: &str,
+) -> MailResult<i64> {
     let account_id: i64 = conn.query_row(
         "SELECT account_id FROM messages WHERE id = ?1",
         params![message_id],
@@ -287,4 +298,3 @@ pub(super) fn folder_name_for_role(role: &str) -> &str {
         _ => "全部自定义文件夹",
     }
 }
-

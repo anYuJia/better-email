@@ -20,5 +20,5 @@ const handlers: Record<string, MockCommandHandler> = {
 export function routeCommand(command: string, args?: InvokeArgs): unknown {
   const handler = handlers[command];
   if (handler) return handler(args);
-  return Array.isArray(args) ? [] : undefined;
+  throw new Error(`Unknown IPC command in mock mode: '${command}'. 该命令未在 mockTauri 注册，请先在 src/mockTauri 补 handler。`);
 }

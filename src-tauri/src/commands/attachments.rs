@@ -328,7 +328,6 @@ pub fn auto_download_attachments_for_message(
     outcome
 }
 
-
 #[allow(deprecated)]
 #[tauri::command]
 pub fn open_attachment(
@@ -655,9 +654,7 @@ pub fn save_temp_attachment(
         })?;
 
     let data_dir = app.path().app_data_dir().map_err(|error| {
-        crate::db::MailError::Io(std::io::Error::other(
-            format!("获取数据目录失败：{error}"),
-        ))
+        crate::db::MailError::Io(std::io::Error::other(format!("获取数据目录失败：{error}")))
     })?;
 
     let temp_dir = data_dir.join("temp_attachments");
@@ -669,7 +666,7 @@ pub fn save_temp_attachment(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis(),
-        filename
+        sanitize_filename(&filename)
     );
     let file_path = temp_dir.join(unique_filename);
     std::fs::write(&file_path, bytes)?;

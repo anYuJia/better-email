@@ -2,8 +2,15 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*.*.*'
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'assets/**'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -19,7 +26,7 @@ env:
 
 jobs:
   validate:
-    name: Validate
+    name: Validate (PR gate)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -44,7 +51,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -54,27 +61,47 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Type check
+      - name: Type check (strict, including unused checks)
         run: npm run lint
-
-      - name: Strict unused TypeScript check
-        run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters --pretty false
 
       - name: Frontend unit tests
         run: npm test
 
+      - name: IPC contract parity check
+        run: npx vitest run src/ipc/ipcContract.test.ts
+
       - name: Frontend production build
         run: npm run build
+
+      - name: UI smoke test (mock backend, headless browser)
+        run: npm run test:ui
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: Rust clippy
+      - name: Rust clippy (warnings as errors)
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Frontend dependency audit
+        run: npm audit --audit-level=high || true
+
+      - name: Version consistency check
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const conf = require('./src-tauri/tauri.conf.json');
+            if (pkg.version !== conf.version) {
+              throw new Error('package.json version ' + pkg.version + ' != tauri.conf.json version ' + conf.version);
+            }
+          "
 
   publish:
     name: Build and publish installers
     needs: validate
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch')
     strategy:
       fail-fast: false
       matrix:
@@ -83,6 +110,8 @@ jobs:
             args: ''
           - platform: windows-latest
             args: ''
+          - platform: ubuntu-22.04
+            args: '--bundles appimage,deb'
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
@@ -120,14 +149,27 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS notarization (set these secrets in the repo settings):
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # Windows code signing:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         with:
           args: ${{ matrix.args }}
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseName: Better Email ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           releaseBody: |
-            Better Email desktop release.
+            Better Email desktop release for ${{ matrix.platform }}.
 
-            This release includes installers for macOS, Windows, and Linux when each platform build succeeds.
+            Installers built on this job:
+            - macOS: .dmg / .app (notarized when signing secrets are configured)
+            - Windows: .msi / .exe
+            - Linux: .AppImage / .deb
           releaseDraft: false
           prerelease: false
-

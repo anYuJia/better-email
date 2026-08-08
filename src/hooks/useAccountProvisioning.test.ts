@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import useAccountProvisioning from './useAccountProvisioning';
-import type { Account, AccountCreateInput, AccountScope, FilterMode } from '../app/types';
+import type { Account, AccountCreateInput, FilterMode } from '../app/types';
 import { emptyAccountCreateForm } from '../app/uiConfig';
 import { invoke } from '../tauriBridge';
 

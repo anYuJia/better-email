@@ -12,7 +12,6 @@ import type {
   Label,
   ListMode,
   ListSort,
-  Message,
   MessageSummary,
   SearchScope,
   ThreadSummary,

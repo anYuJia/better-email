@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { OutboundAttachmentInput } from '../app/types';
 import { getCurrentWindow, invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type ComposerAttachmentsOptions = {
   isComposerOpen: boolean;
@@ -55,7 +56,7 @@ export default function useComposerAttachments({
         return;
       }
       try {
-        const newAttachments = await invoke<OutboundAttachmentInput[]>('outbound_attachments_from_paths', { paths });
+        const newAttachments = await invoke<OutboundAttachmentInput[]>(IPC.OutboundAttachmentsFromPaths, { paths });
         onAttachmentsReady(newAttachments, '已拖入附件');
       } catch (error) {
         setStatus(`附件拖入失败：${String(error)}`);
@@ -80,7 +81,7 @@ export default function useComposerAttachments({
   }
 
   async function pickDraftAttachments() {
-    const newAttachments = await invoke<OutboundAttachmentInput[]>('pick_outbound_attachments');
+    const newAttachments = await invoke<OutboundAttachmentInput[]>(IPC.PickOutboundAttachments);
     if (newAttachments.length === 0) {
       setStatus('已取消选择附件');
       return;
@@ -92,7 +93,7 @@ export default function useComposerAttachments({
     const savedAttachments: OutboundAttachmentInput[] = [];
     for (const [index, file] of files.entries()) {
       const base64Data = await readFileAsBase64(file);
-      const savedPath = await invoke<string>('save_temp_attachment', {
+      const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
         filename: file.name,
         base64Data,
       });
@@ -117,7 +118,7 @@ export default function useComposerAttachments({
       const savedAttachments: OutboundAttachmentInput[] = [];
       for (const file of validFiles) {
         const base64Data = await readFileAsBase64(file);
-        const savedPath = await invoke<string>('save_temp_attachment', {
+        const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
           filename: file.name,
           base64Data,
         });

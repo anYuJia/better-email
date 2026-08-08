@@ -2,6 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import { emptyIdentityForm } from '../app/appConfig';
 import type { Account, MailIdentity, MailIdentityInput } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type IdentityManagementOptions = {
   accountForm: Account | null;
@@ -12,7 +13,6 @@ type IdentityManagementOptions = {
 
 export default function useIdentityManagement({
   accountForm,
-  identities,
   setIdentities,
   setStatus,
 }: IdentityManagementOptions) {
@@ -21,7 +21,7 @@ export default function useIdentityManagement({
 
   async function saveIdentity() {
     if (!accountForm) return;
-    const saved = await invoke<MailIdentity>('upsert_identity', {
+    const saved = await invoke<MailIdentity>(IPC.UpsertIdentity, {
       input: { ...identityForm, account_id: accountForm.id },
     });
     setIdentities((current) => {
@@ -51,7 +51,7 @@ export default function useIdentityManagement({
   }
 
   async function deleteIdentityConfirmed(identity: MailIdentity) {
-    await invoke('delete_identity', { identityId: identity.id });
+    await invoke(IPC.DeleteIdentity, { identityId: identity.id });
     setIdentities((current) => current.filter((item) => item.id !== identity.id));
     setStatus(`发件身份已删除：${identity.email}`);
   }

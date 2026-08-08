@@ -16,7 +16,6 @@ import GlobalTooltip from './components/GlobalTooltip';
 import AccountLoginDialog from './components/AccountLoginDialog';
 import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
 import ConfirmationDialogs from './components/ConfirmationDialogs';
-import ConfirmDialog from './components/ConfirmDialog';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import MessageToastStack, { type MessageToast } from './components/MessageToastStack';
@@ -55,17 +54,11 @@ import {
 import { getCurrentWindow, invoke, listen } from './tauriBridge';
 
 import type {
-  FolderRole,
-  FilterMode,
-  ListMode,
-  ListSort,
   AccountScope,
   Account,
   AccountCreateInput,
   Folder,
   Label,
-  SavedSearch,
-  SearchScope,
   Attachment,
   Message,
   MessageSummary,
@@ -77,15 +70,12 @@ import type {
   CredentialVerificationReport,
   ImapProbeReport,
   ImapMailboxState,
-  SyncRun,
   SyncSchedulePlan,
   ParsedMessagePreview,
-  Contact,
   MailRule,
   ThreadSummary,
   OutboxItem,
   CredentialStatus,
-  OAuthSession,
   ProviderVerificationRecord,
   BackgroundTask,
 } from './app/types';
@@ -97,13 +87,11 @@ import {
   loadAccountScope,
   isDraftEmpty,
   sampleRawMessage,
-  messagePageSize,
   emptyAccountCreateForm,
 } from './app/appConfig';
 import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
-import { flowInfo, flowWarn } from './app/logger';
 import { buildMailboxContextKey } from './app/mailboxContext';
 import './ui-2026.css';
 
@@ -113,14 +101,6 @@ import DeferredSurface from './components/DeferredSurface';
 import SettingsOverlay from './components/settings/SettingsOverlay';
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
 
-function appFlowLog(event: string, details: Record<string, unknown> = {}) {
-  flowInfo('app-flow', event, details);
-}
-
-function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
-  flowWarn('app-flow', event, details);
-}
-
 import {
   buildMailboxListStateKey,
   loadMailboxListStates,
@@ -128,6 +108,7 @@ import {
   saveMailboxListState,
 } from './app/mailboxListState';
 import { accountScopeStorageKey } from './app/storageConfig';
+import { IPC } from './ipc/commands';
 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -140,7 +121,6 @@ export default function App() {
   const [stats, setStats] = useState<MailStats | null>(null);
   const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
   const [credentialVerification, setCredentialVerification] = useState<CredentialVerificationReport | null>(null);
-  const [syncRuns, setSyncRuns] = useState<SyncRun[]>([]);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
   const [rules, setRules] = useState<MailRule[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -173,7 +153,6 @@ export default function App() {
     query,
     setQuery,
     searchScope,
-    setSearchScope,
     filter,
     setFilter,
     listMode,
@@ -181,7 +160,6 @@ export default function App() {
     listSort,
     setListSort,
     savedSearches,
-    setSavedSearches,
     savedSearchName,
     setSavedSearchName,
     messageLimit,
@@ -191,9 +169,6 @@ export default function App() {
     loadMoreStatus,
     searchInputRef,
     runSearch,
-    changeSearchScope,
-    applySearchShortcut,
-    clearSearchAndFilter,
     loadMoreMessages,
     runSavedSearch,
     saveCurrentSearch,
@@ -321,7 +296,6 @@ export default function App() {
     setFolders,
     setLabels,
     setStats,
-    setSyncRuns,
     setIdentities,
     setOutbox,
     setBackgroundTasks,
@@ -356,7 +330,6 @@ export default function App() {
     invalidateSelectedDetail,
     clearSelectedDetailIf,
     rememberManualReadState,
-    clearManualUnreadSuppression,
     markMessageReadAfterReading,
     updateDetailCache,
     attachmentsLoaded,
@@ -439,7 +412,6 @@ export default function App() {
     setBackgroundTasks,
     setBackgroundSyncStatus,
     setSyncSchedulePlan,
-    setSyncRuns,
     setLastNewMailNotice,
     setNotificationStatus,
     setPendingSendUndo,
@@ -503,7 +475,6 @@ export default function App() {
     setCredentialStatus,
     setImapProbe,
     setImapMailboxes,
-    setSyncRuns,
     setStatus,
     loadMeta,
     loadMessages,
@@ -529,7 +500,6 @@ export default function App() {
     setStatus,
   });
   const {
-    accountIdForScope,
     scrollSettingsSection,
     openSettingsHome,
     locateProviderWriteValidation,
@@ -713,7 +683,6 @@ export default function App() {
     loadMeta: (nextFolderId, nextScope, options) => loadMeta(nextFolderId, nextScope, options),
     loadMessagesWithVisibleFallback,
     openThread,
-    setSyncRuns,
     setStatus,
   });
 
@@ -725,13 +694,10 @@ export default function App() {
     isRichComposer,
     setRichComposer,
     composeTemplates,
-    setComposeTemplates,
     templateName,
     setTemplateName,
     composerAutosave,
-    setComposerAutosave,
     isComposerOpen,
-    setComposerOpen,
     isComposerMinimized,
     setComposerMinimized,
     isComposerDropActive,
@@ -758,13 +724,11 @@ export default function App() {
     composeFromMessage,
     editDraftMessage,
     saveDraft,
-    sendDraft,
     requestSend,
     confirmSendRisk,
     sendRiskConfirm,
     setSendRiskConfirm,
     crossAccountRisks,
-    composerContextAccountId,
     sendQuickReply,
     queueDraft,
     cancelOutboxItem,
@@ -1035,11 +999,8 @@ export default function App() {
     ruleForm,
     setRuleForm,
     ruleBuilderField,
-    setRuleBuilderField,
     ruleBuilderNeedle,
-    setRuleBuilderNeedle,
     editingRuleId,
-    setEditingRuleId,
     confirmDeleteRule,
     setConfirmDeleteRule,
     saveRule,
@@ -1088,7 +1049,7 @@ export default function App() {
   });
 
   async function importEmlFile() {
-    const imported = await invoke<Message | null>('import_eml_file', {
+    const imported = await invoke<Message | null>(IPC.ImportEmlFile, {
       accountId: currentFolderAccountId(),
     });
     if (!imported) {
@@ -1118,7 +1079,7 @@ export default function App() {
   }
 
   async function deleteRemoteImageTrust(trust: RemoteImageTrust) {
-    await invoke('delete_remote_image_trust', { trustId: trust.id });
+    await invoke(IPC.DeleteRemoteImageTrust, { trustId: trust.id });
     setRemoteImageTrusts((current) => current.filter((item) => item.id !== trust.id));
     if (selected?.account_id === trust.account_id) {
       await renderSelectedWithRemoteImagePolicy(selected.id);
@@ -1127,7 +1088,7 @@ export default function App() {
   }
 
   async function parseRawMessage() {
-    const preview = await invoke<ParsedMessagePreview>('parse_raw_message', {
+    const preview = await invoke<ParsedMessagePreview>(IPC.ParseRawMessage, {
       input: { raw: rawMessage },
     });
     setParsedPreview(preview);
@@ -1215,6 +1176,64 @@ export default function App() {
   const handleLoadMore = useCallback(() => {
     loadMoreMessages().catch((error) => setStatus(String(error)));
   }, [loadMoreMessages, setStatus]);
+
+  const handleOpenHttpsLink = useCallback((href: string) => {
+    invoke(IPC.OpenUrl, { url: href }).catch((error) => setStatus(String(error)));
+  }, [setStatus]);
+
+  const handleComposeNew = useCallback((fields: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string } | undefined) => {
+    setRichComposer(true);
+    openComposer({
+      ...emptyDraft,
+      account_id: account?.id ?? accounts[0]?.id ?? 0,
+      to: fields?.to || '',
+      cc: fields?.cc || '',
+      bcc: fields?.bcc || '',
+      subject: fields?.subject || '',
+      body: fields?.body || '',
+    });
+    setStatus('已打开新邮件');
+  }, [account, accounts, openComposer, setStatus]);
+
+  const handleRunActiveThreadAction = useCallback((action: BulkMessageAction) => {
+    if (!activeThread) return;
+    runThreadAction(activeThread, threadMessages, action).catch((error) => setStatus(String(error)));
+  }, [activeThread, threadMessages, runThreadAction, setStatus]);
+
+  const handleMoveActiveThreadToFolder = useCallback((folder: Folder) => {
+    if (!activeThread) return;
+    moveThreadToFolder(activeThread, threadMessages, folder).catch((error) => setStatus(String(error)));
+  }, [activeThread, threadMessages, moveThreadToFolder, setStatus]);
+
+  const handleToggleActiveThreadLabel = useCallback((label: Label) => {
+    if (!activeThread) return;
+    toggleThreadLabel(activeThread, threadMessages, label).catch((error) => setStatus(String(error)));
+  }, [activeThread, threadMessages, toggleThreadLabel, setStatus]);
+
+  const handleToggleActiveThreadMute = useCallback(() => {
+    if (!activeThread) return;
+    toggleThreadMuted(activeThread, threadMessages).catch((error) => setStatus(String(error)));
+  }, [activeThread, threadMessages, toggleThreadMuted, setStatus]);
+
+  const handleMoveArchive = useCallback(() => {
+    moveSelected('archive').catch((error) => setStatus(String(error)));
+  }, [moveSelected, setStatus]);
+
+  const handleMoveTrash = useCallback(() => {
+    moveSelected('trash').catch((error) => setStatus(String(error)));
+  }, [moveSelected, setStatus]);
+
+  const handleAllowRemoteImagesOnce = useCallback(() => {
+    allowRemoteImagesForSelectedOnce().catch((error) => setStatus(String(error)));
+  }, [allowRemoteImagesForSelectedOnce, setStatus]);
+
+  const handlePermanentlyDelete = useCallback(() => {
+    if (selected) requestPermanentlyDeleteMessage(selected);
+  }, [selected, requestPermanentlyDeleteMessage]);
+
+  const handleMoveToFolder = useCallback((folder: Folder) => {
+    moveSelectedToFolder(folder).catch((error) => setStatus(String(error)));
+  }, [moveSelectedToFolder, setStatus]);
 
   const [shellWidth, setShellWidth] = useState<number>(() => window.innerWidth);
   useEffect(() => {
@@ -1400,46 +1419,20 @@ export default function App() {
         selectedSenderIsExternal={selectedSenderIsExternal}
         selectedExternalBlocked={selectedExternalBlocked}
         selectedInterceptsHttps={selectedInterceptsHttps}
-        onOpenHttpsLink={(href) => {
-          invoke('open_url', { url: href }).catch((error) => setStatus(String(error)));
-        }}
+        onOpenHttpsLink={handleOpenHttpsLink}
         quickReplyBody={quickReplyBody}
         onSelectMessage={selectMessageForReading}
-        onComposeNew={(fields) => {
-          setRichComposer(true);
-          openComposer({
-            ...emptyDraft,
-            account_id: account?.id ?? accounts[0]?.id ?? 0,
-            to: fields?.to || '',
-            cc: fields?.cc || '',
-            bcc: fields?.bcc || '',
-            subject: fields?.subject || '',
-            body: fields?.body || '',
-          });
-          setStatus('已打开新邮件');
-        }}
+        onComposeNew={handleComposeNew}
         onComposeFromMessage={composeFromMessage}
-        onRunThreadAction={(action) => {
-          if (!activeThread) return;
-          runThreadAction(activeThread, threadMessages, action).catch((error) => setStatus(String(error)));
-        }}
-        onMoveThreadToFolder={(folder) => {
-          if (!activeThread) return;
-          moveThreadToFolder(activeThread, threadMessages, folder).catch((error) => setStatus(String(error)));
-        }}
-        onToggleThreadLabel={(label) => {
-          if (!activeThread) return;
-          toggleThreadLabel(activeThread, threadMessages, label).catch((error) => setStatus(String(error)));
-        }}
-        onToggleThreadMute={() => {
-          if (!activeThread) return;
-          toggleThreadMuted(activeThread, threadMessages).catch((error) => setStatus(String(error)));
-        }}
+        onRunThreadAction={handleRunActiveThreadAction}
+        onMoveThreadToFolder={handleMoveActiveThreadToFolder}
+        onToggleThreadLabel={handleToggleActiveThreadLabel}
+        onToggleThreadMute={handleToggleActiveThreadMute}
         onToggleStar={toggleStar}
         onEditDraft={editDraftMessage}
         onRestoreFromTrash={restoreSelectedFromTrash}
-        onMoveArchive={() => { moveSelected('archive').catch((error) => setStatus(String(error))); }}
-        onMoveTrash={() => { moveSelected('trash').catch((error) => setStatus(String(error))); }}
+        onMoveArchive={handleMoveArchive}
+        onMoveTrash={handleMoveTrash}
         onToggleRead={toggleRead}
         onReadComplete={markMessageReadAfterReading}
         onUnsnooze={unsnoozeSelected}
@@ -1448,12 +1441,12 @@ export default function App() {
         onFetchBody={fetchSelectedBody}
         onMarkNotSpam={markSelectedNotSpam}
         onMarkAsSpam={markSelectedAsSpam}
-        onAllowRemoteImagesOnce={() => { allowRemoteImagesForSelectedOnce().catch((error) => setStatus(String(error))); }}
+        onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
         onTrustRemoteImages={trustRemoteImagesForSelected}
         onBlockSender={blockSelectedSender}
-        onPermanentlyDelete={() => { if (selected) requestPermanentlyDeleteMessage(selected); }}
+        onPermanentlyDelete={handlePermanentlyDelete}
         onEmptyTrash={emptyCurrentTrash}
-        onMoveToFolder={(folder) => { moveSelectedToFolder(folder).catch((error) => setStatus(String(error))); }}
+        onMoveToFolder={handleMoveToFolder}
         onToggleLabel={toggleLabel}
         onCreateLabel={handleCreateLabel}
         onUpdateLabel={handleUpdateLabel}
@@ -1616,7 +1609,7 @@ export default function App() {
           onAccountFormChange={setAccountForm}
           onSelectAccount={(next) => {
             setAccountForm(next);
-            invoke<RemoteImageTrust[]>('list_remote_image_trusts', { accountId: next.id })
+            invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: next.id })
               .then(setRemoteImageTrusts)
               .catch((error) => setStatus(String(error)));
           }}
@@ -1635,7 +1628,7 @@ export default function App() {
           onUpdateProviderVerification={updateProviderVerification}
           onSaveProviderVerification={saveProviderVerification}
           onSaveAccountSettings={async (updatedAccount) => {
-            const updated = await invoke<Account>('update_account_settings', {
+            const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
               accountId: updatedAccount.id,
               input: updatedAccount,
             });

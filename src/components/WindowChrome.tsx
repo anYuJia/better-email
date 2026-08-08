@@ -2,6 +2,7 @@ import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEven
 import { Maximize2, Minus, X } from 'lucide-react';
 import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
 
@@ -58,7 +59,7 @@ export default function WindowChrome() {
   useEffect(() => {
     if (platform === 'web') return undefined;
     document.body.classList.add(`platform-${platform}`);
-    void invoke('window_chrome_ready').catch((error) => {
+    void invoke(IPC.WindowChromeReady).catch((error) => {
       console.error('Failed to apply native window chrome', error);
     });
     return () => {

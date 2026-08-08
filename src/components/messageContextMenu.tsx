@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { movableFoldersForBulk } from '../app/appConfig';
 import { canSnoozeRole } from '../app/snooze';
-import type { Folder, Label, Message, MessageSummary } from '../app/types';
+import type { Folder, Label, MessageSummary } from '../app/types';
 import type { ContextMenuItem } from './ContextMenu';
 
 export type BulkMessageAction = 'archive' | 'star' | 'unstar' | 'trash' | 'read' | 'unread';

@@ -16,33 +16,21 @@ pub struct Pop3Message {
     pub raw: String,
 }
 
-enum Pop3Stream {
-    Plain(TcpStream),
-    Tls(TlsStream<TcpStream>),
-}
+struct Pop3Stream(TlsStream<TcpStream>);
 
 impl Read for Pop3Stream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            Pop3Stream::Plain(stream) => stream.read(buf),
-            Pop3Stream::Tls(stream) => stream.read(buf),
-        }
+        self.0.read(buf)
     }
 }
 
 impl Write for Pop3Stream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self {
-            Pop3Stream::Plain(stream) => stream.write(buf),
-            Pop3Stream::Tls(stream) => stream.write(buf),
-        }
+        self.0.write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            Pop3Stream::Plain(stream) => stream.flush(),
-            Pop3Stream::Tls(stream) => stream.flush(),
-        }
+        self.0.flush()
     }
 }
 
@@ -80,21 +68,22 @@ struct Pop3Client {
 impl Pop3Client {
     fn connect(account: &Account) -> Result<Self, MailError> {
         let (host, port) = parse_pop3_endpoint(&account.imap_host)?;
+        if port != DEFAULT_POP3_TLS_PORT {
+            return Err(MailError::Imap(format!(
+                "POP3 仅支持 TLS 端口 {DEFAULT_POP3_TLS_PORT}（隐式 TLS），端口 {port} 会明文传输密码，已拒绝连接。请使用 995 端口。"
+            )));
+        }
         let tcp = TcpStream::connect((host.as_str(), port))
             .map_err(|error| MailError::Imap(format!("POP3 连接失败：{error}")))?;
         tcp.set_read_timeout(Some(POP3_TIMEOUT)).ok();
         tcp.set_write_timeout(Some(POP3_TIMEOUT)).ok();
-        let stream = if port == DEFAULT_POP3_TLS_PORT {
-            let connector = TlsConnector::new()
-                .map_err(|error| MailError::Imap(format!("POP3 TLS 初始化失败：{error}")))?;
-            Pop3Stream::Tls(
-                connector
-                    .connect(&host, tcp)
-                    .map_err(|error| MailError::Imap(format!("POP3 TLS 握手失败：{error}")))?,
-            )
-        } else {
-            Pop3Stream::Plain(tcp)
-        };
+        let connector = TlsConnector::new()
+            .map_err(|error| MailError::Imap(format!("POP3 TLS 初始化失败：{error}")))?;
+        let stream = Pop3Stream(
+            connector
+                .connect(&host, tcp)
+                .map_err(|error| MailError::Imap(format!("POP3 TLS 握手失败：{error}")))?,
+        );
         let mut client = Self {
             reader: BufReader::new(stream),
         };
@@ -233,6 +222,34 @@ mod tests {
             parse_pop3_endpoint("pop.example.com:110").unwrap(),
             ("pop.example.com".to_string(), 110)
         );
+    }
+
+    #[test]
+    fn rejects_non_tls_port_when_connecting() {
+        let account = crate::models::Account {
+            id: 1,
+            email: "a@example.com".to_string(),
+            display_name: "A".to_string(),
+            provider: "custom".to_string(),
+            imap_host: "pop.example.com:110".to_string(),
+            smtp_host: "smtp.example.com".to_string(),
+            incoming_protocol: "pop3".to_string(),
+            auth_type: "password".to_string(),
+            sync_mode: "manual".to_string(),
+            remote_images_allowed: false,
+            signature: String::new(),
+            cross_account_risk_warning: false,
+            block_external_mailboxes: false,
+            intercept_https_links: true,
+            auto_download_attachments: false,
+            is_default: true,
+        };
+        let result = Pop3Client::connect(&account);
+        let error = match result {
+            Ok(_) => panic!("expected rejection before network I/O"),
+            Err(error) => format!("{error}"),
+        };
+        assert!(error.contains("明文传输密码"));
     }
 
     #[test]

@@ -23,22 +23,10 @@ textarea:focus-visible {
   box-shadow: none;
 }
 
-.sidebar .folder.active,
-.sidebar .folder.active:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-selected);
-  box-shadow: none;
-}
-
 /* Unread state is carried by font weight and the unread dot, not by
    background color: read and unread rows share the same surface. */
 .message-card.is-unread {
   background: transparent;
-}
-
-.message-card:hover {
-  background: var(--quiet-row-hover);
-  box-shadow: none;
 }
 
 /* Every card state shares the same flat geometry. The selected row is a
@@ -67,11 +55,6 @@ textarea:focus-visible {
 .thread-message.active {
   background: var(--ui-accent-soft);
   box-shadow: inset 3px 0 0 var(--ui-accent);
-}
-
-.message-unread-dot {
-  background: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-surface);
 }
 
 .message-chips {

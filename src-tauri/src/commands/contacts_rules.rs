@@ -3,8 +3,8 @@ use crate::db::{MailResult, MailStore};
 use crate::models::{
     Contact, ContactCreateInput, ContactExportSummary, ContactImportBatch,
     ContactImportCommitSummary, ContactImportEntryInput, ContactImportPreview,
-    ContactImportSelection, ContactImportSummary, ContactImportUndoReport, ContactInput,
-    MailRule, MailRuleInput,
+    ContactImportSelection, ContactImportSummary, ContactImportUndoReport, ContactInput, MailRule,
+    MailRuleInput,
 };
 use crate::vcard;
 use chrono::Utc;
@@ -57,9 +57,8 @@ pub async fn preview_contact_import(
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportPreview> {
     let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
-    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name).map_err(
-        |message| crate::db::MailError::Imap(message),
-    )?;
+    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name)
+        .map_err(crate::db::MailError::Imap)?;
     let entries = store.classify_contact_import(parsed.contacts)?;
     let mut new_count = 0_i64;
     let mut merge_count = 0_i64;
@@ -94,12 +93,16 @@ pub fn commit_contact_import(
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
     let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
-    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name).map_err(
-        |message| crate::db::MailError::Imap(message),
-    )?;
+    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name)
+        .map_err(crate::db::MailError::Imap)?;
     let action_by_email: std::collections::HashMap<String, String> = selections
         .into_iter()
-        .map(|selection| (selection.email.trim().to_ascii_lowercase(), selection.action))
+        .map(|selection| {
+            (
+                selection.email.trim().to_ascii_lowercase(),
+                selection.action,
+            )
+        })
         .collect();
     let inputs: Vec<(ContactCreateInput, String)> = parsed
         .contacts
@@ -112,7 +115,11 @@ pub fn commit_contact_import(
             (contact, action)
         })
         .collect();
-    store.commit_contact_import(inputs, &file_name, scope.unwrap_or_else(|| "global".to_string()).as_str())
+    store.commit_contact_import(
+        inputs,
+        &file_name,
+        scope.unwrap_or_else(|| "global".to_string()).as_str(),
+    )
 }
 
 #[tauri::command]
@@ -136,11 +143,17 @@ pub fn commit_contact_import_entries(
             )
         })
         .collect();
-    store.commit_contact_import_entries(inputs, &file_name, scope.unwrap_or_else(|| "global".to_string()).as_str())
+    store.commit_contact_import_entries(
+        inputs,
+        &file_name,
+        scope.unwrap_or_else(|| "global".to_string()).as_str(),
+    )
 }
 
 #[tauri::command]
-pub fn list_contact_import_batches(store: State<'_, MailStore>) -> MailResult<Vec<ContactImportBatch>> {
+pub fn list_contact_import_batches(
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<ContactImportBatch>> {
     store.list_contact_import_batches()
 }
 

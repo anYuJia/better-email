@@ -8,6 +8,7 @@ import {
   runDueOutboxSmtp,
 } from '../app/backgroundTaskFlow';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type OutboxFlushOptions = {
   setOutbox: Dispatch<SetStateAction<OutboxItem[]>>;
@@ -21,7 +22,7 @@ export default function useOutboxFlush({
   refreshMailboxContext,
 }: OutboxFlushOptions) {
   const flushOutboxDryRun = useCallback(async (): Promise<string> => {
-    const items = await invoke<OutboxItem[]>('flush_outbox_dry_run');
+    const items = await invoke<OutboxItem[]>(IPC.FlushOutboxDryRun);
     setOutbox(items);
     await refreshMailboxContext();
     const message = '发件箱队列已完成本地发送演练';
@@ -31,7 +32,7 @@ export default function useOutboxFlush({
 
   const flushOutboxSmtp = useCallback(async (): Promise<string> => {
     outboxFlowLog('manual smtp flush start');
-    const items = await invoke<OutboxItem[]>('flush_outbox_smtp');
+    const items = await invoke<OutboxItem[]>(IPC.FlushOutboxSmtp);
     setOutbox(items);
     await refreshMailboxContext();
     const message = outboxFlushMessage(items);

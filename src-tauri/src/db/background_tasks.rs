@@ -105,7 +105,10 @@ impl MailStore {
     }
 }
 
-pub(super) fn get_background_task_for_conn(conn: &Connection, id: i64) -> MailResult<BackgroundTask> {
+pub(super) fn get_background_task_for_conn(
+    conn: &Connection,
+    id: i64,
+) -> MailResult<BackgroundTask> {
     conn.query_row(
         "
         SELECT id, kind, title, source, status, message, created_at, started_at, finished_at
@@ -166,4 +169,3 @@ pub(super) fn background_task_title(kind: &str, source: &str) -> &'static str {
         _ => "后台任务",
     }
 }
-

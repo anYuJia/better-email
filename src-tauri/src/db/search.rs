@@ -120,7 +120,7 @@ impl SearchCriteria {
             } else {
                 build_like_query(text)
             };
-            let repeat = if should_use_fts(text) { 1 } else { 6 };
+            let repeat = if should_use_fts(text) { 1 } else { 5 };
             params.extend(std::iter::repeat_n(value, repeat));
         }
         if let Some(from) = &self.from {
@@ -247,7 +247,6 @@ pub(super) fn build_message_filter_clause(search: &SearchCriteria, filter: &str)
                     OR m.sender_email LIKE ? ESCAPE '\\'
                     OR m.recipients LIKE ? ESCAPE '\\'
                     OR m.snippet LIKE ? ESCAPE '\\'
-                    OR m.body LIKE ? ESCAPE '\\'
                 ) ",
             );
         }
@@ -355,4 +354,3 @@ pub(super) fn normalize_search_date_end(value: &str) -> String {
         trimmed.to_string()
     }
 }
-

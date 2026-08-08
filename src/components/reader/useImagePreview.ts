@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { invoke } from '../../tauriBridge';
 import type { Message, Attachment } from '../../app/types';
+import { IPC } from '../../ipc/commands';
 
 export type PreviewImage = { src: string; alt: string; attachmentId: number | null };
 export type AttachmentContextMenu = { attachment: Attachment; x: number; y: number } | null;
@@ -210,7 +211,7 @@ export default function useImagePreview(
 
   const saveImageAs = useCallback(async (image: PreviewImage) => {
     if (image.attachmentId) {
-      await invoke<string>('save_attachment_as', { attachmentId: image.attachmentId });
+      await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: image.attachmentId });
       return;
     }
     downloadImage(image);

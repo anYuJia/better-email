@@ -27,7 +27,7 @@
   --st-header-border: #e5e7eb;
   --st-text: #111827;
   --st-text-secondary: #6b7280;
-  --st-text-tertiary: #9ca3af;
+  --st-text-tertiary: #6b7280;
 
   /* Interaction and Accent Gradient Colors */
   --st-accent: #2563eb;
@@ -37,10 +37,10 @@
   --st-danger: #dc2626;
   --st-danger-hover: #b91c1c;
   --st-danger-soft: rgba(220, 38, 38, 0.08);
-  --st-success: #10b981;
-  --st-success-soft: rgba(16, 185, 129, 0.08);
-  --st-warning: #d97706;
-  --st-warning-soft: rgba(245, 158, 11, 0.12);
+  --st-success: #0f766e;
+  --st-success-soft: rgba(15, 118, 110, 0.08);
+  --st-warning: #92400e;
+  --st-warning-soft: rgba(146, 64, 14, 0.12);
   --st-info: #2563eb;
   --st-info-soft: rgba(37, 99, 235, 0.08);
 

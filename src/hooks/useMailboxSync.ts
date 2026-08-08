@@ -20,6 +20,7 @@ import { loadMailboxMessageLimit } from '../app/mailboxListState';
 import type { LoadMetaResult } from './useAppMetaLoader';
 import type { MailboxDataController } from './useMailboxData';
 import { invoke, listen } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type MailboxSyncOptions = {
   folderId: number | null;
@@ -38,7 +39,7 @@ type MailboxSyncOptions = {
   ) => Promise<LoadMetaResult>;
   loadMessagesWithVisibleFallback: MailboxDataController['loadMessagesWithVisibleFallback'];
   openThread: (thread: ThreadSummary, announce?: boolean) => Promise<MessageSummary[]>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
 };
 
@@ -117,8 +118,8 @@ export default function useMailboxSync({
     setRefreshNotice(null);
     setStatus('正在同步服务器邮件...');
     try {
-      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
-      setSyncRuns((current) => [run, ...current].slice(0, 10));
+      const run = await invoke<SyncRun>(IPC.SyncImapHeaders, { accountId: syncAccountId });
+      setSyncRuns?.((current) => [run, ...current].slice(0, 10));
       const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
       const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
       await loadMessagesWithVisibleFallback(
@@ -185,6 +186,29 @@ export default function useMailboxSync({
   useEffect(() => {
     let unlistenProgress: (() => void) | undefined;
 
+    let latestPayload: {
+      account_email: string;
+      folder_name: string;
+      current_folder_index: number;
+      total_folders: number;
+      scanned_folders: number;
+      imported_messages: number;
+      status_text: string;
+    } | null = null;
+    let flushTimer: ReturnType<typeof window.setTimeout> | null = null;
+    const flush = () => {
+      flushTimer = null;
+      if (!latestPayload) return;
+      const payload = latestPayload;
+      latestPayload = null;
+      setStatus(payload.status_text);
+      if (payload.folder_name) {
+        setRefreshNotice(`${payload.folder_name} (${payload.current_folder_index}/${payload.total_folders})`);
+      } else {
+        setRefreshNotice('正在连接...');
+      }
+    };
+
     listen<{
       account_email: string;
       folder_name: string;
@@ -194,12 +218,9 @@ export default function useMailboxSync({
       imported_messages: number;
       status_text: string;
     }>('sync-progress', (event) => {
-      const payload = event.payload;
-      setStatus(payload.status_text);
-      if (payload.folder_name) {
-        setRefreshNotice(`${payload.folder_name} (${payload.current_folder_index}/${payload.total_folders})`);
-      } else {
-        setRefreshNotice('正在连接...');
+      latestPayload = event.payload;
+      if (flushTimer === null) {
+        flushTimer = window.setTimeout(flush, 250);
       }
     })
       .then((nextUnlisten) => {
@@ -211,6 +232,9 @@ export default function useMailboxSync({
 
     return () => {
       unlistenProgress?.();
+      if (flushTimer !== null) {
+        window.clearTimeout(flushTimer);
+      }
     };
   }, [setStatus]);
 

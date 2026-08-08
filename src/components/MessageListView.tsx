@@ -2,7 +2,6 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Search } from 'lucide-react';
 import type {
   FilterMode,
-  Message,
   MessageSummary,
 } from '../app/types';
 import MessageListCard from './MessageListCard';
@@ -337,7 +336,7 @@ export default function MessageListView({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '11px',
-              color: '#8b96a4',
+              color: '#64748b',
               borderTop: '1px solid #e7ebf0',
               background: '#fafbfc',
             }}

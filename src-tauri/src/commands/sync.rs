@@ -247,7 +247,6 @@ pub fn get_sync_schedule_plan(
     Ok(plan)
 }
 
-
 #[tauri::command]
 pub async fn sync_imap_headers(
     store: State<'_, MailStore>,
@@ -612,7 +611,11 @@ fn sync_imap_headers_for_account(
         return Err(crate::db::MailError::Imap(message));
     }
 
-    let body_note = if fetched_bodies > 0 || body_failures > 0 || auto_downloaded_attachments > 0 || auto_download_failures > 0 {
+    let body_note = if fetched_bodies > 0
+        || body_failures > 0
+        || auto_downloaded_attachments > 0
+        || auto_download_failures > 0
+    {
         let mut parts = Vec::new();
         if fetched_bodies > 0 || body_failures > 0 {
             let mut part = format!("获取正文 {fetched_bodies} 封");
@@ -749,11 +752,8 @@ fn sync_mailbox_bodies(
         auto_downloaded: 0,
         auto_download_failures: 0,
     };
-    let pending = store.list_messages_missing_body(
-        account.id,
-        remote_name,
-        BODY_SYNC_LIMIT_PER_MAILBOX,
-    )?;
+    let pending =
+        store.list_messages_missing_body(account.id, remote_name, BODY_SYNC_LIMIT_PER_MAILBOX)?;
     if pending.is_empty() {
         return Ok(stats);
     }

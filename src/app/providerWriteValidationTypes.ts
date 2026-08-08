@@ -1,10 +1,3 @@
-import type {
-  Message,
-  OutboxItem,
-  RemoteActionReport,
-} from './types';
-import type { Account, DraftInput } from './types';
-
 export const providerWriteValidationStorageKey = 'better-email.providerWriteValidationIds.v1';
 export const providerWritebackValidationStorageKey = 'better-email.providerWritebackValidation.v1';
 

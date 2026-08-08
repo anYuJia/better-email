@@ -3,50 +3,6 @@
   font-size: 14px;
 }
 
-.sidebar {
-  font-size: 13px;
-}
-
-.brand strong,
-.account-switcher-copy strong,
-.compose-button,
-.folder-main,
-.sidebar-disclosure summary,
-.settings-button {
-  font-size: 13px;
-}
-
-.account-switcher .account-switcher-copy > span,
-.sidebar-label,
-.badge,
-.sidebar-disclosure summary em,
-.sidebar-tool-heading span,
-.sidebar-tool-section small,
-.background-sync-card > span,
-.background-sync-card > em,
-.background-sync-card > small {
-  font-size: 11.5px;
-}
-
-.sender,
-.subject,
-.reader-sender-copy strong {
-  font-size: 13.5px;
-}
-
-.message-card p,
-.reader-header p,
-.message-chips span,
-.active-label-chip,
-.reader-meta span {
-  font-size: 12px;
-}
-
-.message-card time,
-.reader-sender-copy > span {
-  font-size: 11.5px;
-}
-
 .sidebar-quick-menus .sidebar-disclosure > :not(summary),
 .sidebar-tools > .sidebar-tool-stack {
   position: static !important;

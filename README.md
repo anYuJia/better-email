@@ -36,7 +36,7 @@
 
 ### 1. 🔒 本地优先与系统级安全 (Local-First & OS Security)
 * **SQLite 本地索引**：所有邮件正文、联系人、标签与元数据全量保存在本地 SQLite 数据库中，秒级全文搜索，离线随时查阅。
-* **系统凭据安全 (Keychain / Credential Manager)**：账号密码、App 授权码与 OAuth Token 严格存储于系统 OS 级凭据管理器中（macOS Keychain / Windows Credential Vault），绝不上传第三方服务器。
+* **系统凭据安全 (Keychain / Credential Manager)**：账号密码、App 授权码与 OAuth Token 优先存储于系统 OS 级凭据管理器中（macOS Keychain / Windows Credential Vault / Linux secret-service），并在启动与读取时自动迁移存量明文凭据；系统凭据库不可用时回退本地数据库并明确提示。凭据绝不上传第三方服务器。
 * **隐私追踪拦截 (Tracker Blocking)**：默认拦截邮件中的像素追踪图片与第三方跨站 Link，邮件浏览更无痕。
 
 ### 2. 🚀 极致性能与低资源占用 (Rust Core Engine)
@@ -44,7 +44,7 @@
 * **增量并发拉取**：支持离线与背景增量同步，附件按需拉取，大容量邮箱依旧流畅。
 
 ### 3. 🎨 现代三栏极简设计 (Modern 3-Pane Experience)
-* **清晰视效与高度自定义**：三栏流式布局（文件夹导航 → 邮件列表 → 阅读与沉浸编辑），支持系统暗黑/白天模式随心切换。
+* **清晰视效与高度自定义**：三栏流式布局（文件夹导航 → 邮件列表 → 阅读与沉浸编辑），界面跟随系统暗黑/白天模式自动切换。
 * **富文本/Markdown 编辑器**：支持内联图片、语法高亮、快速模板与快捷键流式回复。
 * **多账号无缝统一**：聚合收件箱 (Unified Inbox) 与单账号独立视角的快速切换。
 
@@ -73,7 +73,7 @@ Better Email 内置多款常用邮件服务商预设，支持 **IMAP / POP3 / SM
 | <kbd>Cmd / Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> | 回复全部 |
 | <kbd>Cmd / Ctrl</kbd> + <kbd>F</kbd> | 聚焦搜索框 / 聚焦邮件全文 |
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | 移至垃圾桶/归档 |
-| <kbd>Cmd / Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | 切换暗黑 / 亮色主题 |
+> 主题跟随系统外观自动切换（macOS/Windows 系统设置中切换深色/浅色外观）。
 
 ---
 

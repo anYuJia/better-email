@@ -2,13 +2,13 @@ use crate::models::{
     Account, AccountCreateInput, AccountSettingsInput, Attachment, BackgroundTask,
     BackgroundTaskInput, CacheClearResult, Contact, ContactCreateInput, ContactImportBatch,
     ContactImportCommitSummary, ContactImportPreviewEntry, ContactImportUndoReport, ContactInput,
-    CredentialStatus, DraftInput, Folder, ImapFlagSnapshot,
-    ImapFolderProbe, ImapHeaderBatch, ImapMailboxState, ImapReconcileResult, Label, LocalBackup,
-    LocalBackupRow, LocalBackupSummary, MailIdentity, MailIdentityInput, MailRule, MailRuleInput,
-    MailStats, Message, MessageSummary, MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    CredentialStatus, DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch,
+    ImapMailboxState, ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageSummary,
+    MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
-    SyncSchedulePlan, ThreadSummary,
+    ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage,
+    SyncRun, SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -25,6 +25,7 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 mod accounts;
+pub(crate) mod ai_settings;
 mod attachments;
 mod background_tasks;
 mod backup;
@@ -211,6 +212,7 @@ impl MailStore {
             database_path: path,
         };
         store.migrate()?;
+        store.migrate_legacy_secrets_to_keychain()?;
         if !seed_demo_data {
             store.remove_demo_seed_data()?;
         }
@@ -225,6 +227,43 @@ impl MailStore {
             .lock()
             .map_err(|_| MailError::DatabaseLockPoisoned)?;
         f(&conn)
+    }
+
+    /// 把旧版本保存在 SQLite `account_credentials` 中的明文凭据迁移到系统凭据库，
+    /// 迁移成功后擦除明文行。系统凭据库不可用时保留原样（运行时回退路径仍可用）。
+    fn migrate_legacy_secrets_to_keychain(&self) -> MailResult<()> {
+        let pending: Vec<(String, String)> = self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT account_email, secret FROM account_credentials WHERE length(secret) > 0",
+            )?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        })?;
+        if pending.is_empty() {
+            return Ok(());
+        }
+        let mut migrated = 0_usize;
+        for (email, secret) in &pending {
+            if crate::credentials::keychain_set_secret(email, secret).is_ok() {
+                let _ = self.with_conn(|conn| {
+                    Ok(conn.execute(
+                        "DELETE FROM account_credentials WHERE account_email = ?1",
+                        params![email],
+                    )?)
+                });
+                migrated += 1;
+            }
+        }
+        db_info(format!(
+            "[better-email][db] keychain migration migrated={} pending={}",
+            migrated,
+            pending.len()
+        ));
+        Ok(())
     }
 
     fn seed_if_empty(&self, should_seed_demo_data: bool) -> MailResult<()> {
@@ -496,9 +535,9 @@ fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::migrations::{migrate_legacy_database, path_with_suffix};
     use super::search::{message_order_clause, normalized_list_sort, thread_order_clause};
+    use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -581,8 +620,7 @@ mod tests {
         assert_eq!(fetched.id, account.id);
         assert_eq!(fetched.email, account.email);
         assert_eq!(
-            fetched.cross_account_risk_warning,
-            account.cross_account_risk_warning,
+            fetched.cross_account_risk_warning, account.cross_account_risk_warning,
             "cross_account_risk_warning column must be selected to keep map_account column order"
         );
         assert_eq!(fetched.is_default, account.is_default);
@@ -778,9 +816,11 @@ mod tests {
         let body_matches = store
             .list_messages_for_scope(None, inbox.id, Some("SQLite FTS5".to_string()), None, 50)
             .unwrap();
-        assert!(body_matches
-            .iter()
-            .any(|message| store.get_message(message.id).unwrap().body.contains("SQLite FTS5")));
+        assert!(body_matches.iter().any(|message| store
+            .get_message(message.id)
+            .unwrap()
+            .body
+            .contains("SQLite FTS5")));
         let from_matches = store
             .list_messages_for_scope(None, inbox.id, Some("from:security".to_string()), None, 50)
             .unwrap();
@@ -1404,7 +1444,11 @@ mod tests {
             .unwrap();
         assert_eq!(outbox_message.sender_name, "Demo Support");
         assert_eq!(outbox_message.sender_email, "support@better-email.local");
-        assert!(store.get_message(queued.message_id).unwrap().body.contains("Support signature"));
+        assert!(store
+            .get_message(queued.message_id)
+            .unwrap()
+            .body
+            .contains("Support signature"));
 
         let outbound = store
             .pending_outbox_messages()
@@ -2325,11 +2369,17 @@ mod tests {
             .store_account_secret(&second_account.email, "keep-me")
             .unwrap();
 
-        let next_account = store.remove_account(second_account.id, false).unwrap().unwrap();
+        let next_account = store
+            .remove_account(second_account.id, false)
+            .unwrap()
+            .unwrap();
         assert_eq!(next_account.id, first_account.id);
         assert!(next_account.is_default);
         let status = store.check_account_secret(&second_account.email).unwrap();
-        assert!(status.exists, "credentials must survive removal when disabled");
+        assert!(
+            status.exists,
+            "credentials must survive removal when disabled"
+        );
     }
 
     #[test]
@@ -2337,11 +2387,23 @@ mod tests {
         let store = test_store();
         let first_account = store.get_account().unwrap();
         let second_account = create_additional_account(&store, "no-secret@better-email.local");
-        assert!(!store.check_account_secret(&second_account.email).unwrap().exists);
+        assert!(
+            !store
+                .check_account_secret(&second_account.email)
+                .unwrap()
+                .exists
+        );
 
-        let next_account = store.remove_account(second_account.id, true).unwrap().unwrap();
+        let next_account = store
+            .remove_account(second_account.id, true)
+            .unwrap()
+            .unwrap();
         assert_eq!(next_account.id, first_account.id);
-        assert!(store.list_accounts().unwrap().iter().all(|account| account.id != second_account.id));
+        assert!(store
+            .list_accounts()
+            .unwrap()
+            .iter()
+            .all(|account| account.id != second_account.id));
     }
 
     #[test]
@@ -2351,11 +2413,19 @@ mod tests {
         let second_account = create_additional_account(&store, "default-switch@better-email.local");
         store.set_default_account(second_account.id).unwrap();
 
-        let next_account = store.remove_account(second_account.id, true).unwrap().unwrap();
+        let next_account = store
+            .remove_account(second_account.id, true)
+            .unwrap()
+            .unwrap();
         assert_eq!(next_account.id, first_account.id);
         assert!(next_account.is_default);
         assert_eq!(
-            store.list_accounts().unwrap().iter().filter(|account| account.is_default).count(),
+            store
+                .list_accounts()
+                .unwrap()
+                .iter()
+                .filter(|account| account.is_default)
+                .count(),
             1
         );
     }
@@ -2364,7 +2434,9 @@ mod tests {
     fn remove_account_failure_leaves_accounts_and_credentials_untouched() {
         let store = test_store();
         let account = store.get_account().unwrap();
-        store.store_account_secret(&account.email, "still-here").unwrap();
+        store
+            .store_account_secret(&account.email, "still-here")
+            .unwrap();
 
         let error = store.remove_account(999_999, true).unwrap_err().to_string();
         assert!(error.contains("邮箱账号不存在"));
@@ -3448,7 +3520,9 @@ mod tests {
             .unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].1, 5);
-        let uids = store.list_remote_uids_for_mailbox(account_id, "INBOX").unwrap();
+        let uids = store
+            .list_remote_uids_for_mailbox(account_id, "INBOX")
+            .unwrap();
         assert!(uids.contains(&5));
 
         store
@@ -3722,7 +3796,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn contact_import_creates_and_merges_by_primary_email() {
         let store = test_store();
         let (created, updated) = store
@@ -3847,7 +3920,9 @@ mod tests {
             .aliases
             .contains(&"existing.new@example.com".to_string()));
         assert!(merged_contact.vip);
-        assert!(!contacts.iter().any(|contact| contact.email == "skip@example.com"));
+        assert!(!contacts
+            .iter()
+            .any(|contact| contact.email == "skip@example.com"));
         assert!(contacts
             .iter()
             .any(|contact| contact.email == "new.person@example.com"));
@@ -4653,15 +4728,17 @@ mod tests {
         // 3. Exclude checking account_credentials table entirely
         assert!(!backup.tables.contains_key("account_credentials"));
 
-        // 4. Check for 'secret' or 'authorization_code' columns in oauth_sessions or accounts
+        // 4. Check for sensitive columns in oauth_sessions or accounts
         if let Some(oauth_rows) = backup.tables.get("oauth_sessions") {
             for row in oauth_rows {
                 assert!(!row.contains_key("authorization_code"));
                 assert!(!row.contains_key("secret"));
+                assert!(!row.contains_key("code_verifier"));
                 for val in row.values() {
                     let val_str = format!("{:?}", val);
                     assert!(!val_str.contains("AUTH_CODE_LEAK"));
                     assert!(!val_str.contains("SUPER_SECRET_PASSWORD"));
+                    assert!(!val_str.contains("verifier"));
                 }
             }
         }

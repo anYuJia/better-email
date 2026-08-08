@@ -6,6 +6,7 @@ import { attachmentErrorMessage } from '../components/reader/useInlineImages';
 import type { PreviewImage } from '../components/reader/useImagePreview';
 import type { ContextMenuItem } from '../components/ContextMenu';
 import { localFileAssetUrl, invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type ReaderAttachmentsOptions = {
   attachments: Attachment[];
@@ -18,7 +19,6 @@ type ReaderAttachmentsOptions = {
 
 export default function useReaderAttachments({
   attachments,
-  selectedId,
   onDownloadAttachment,
   onOpenAttachment,
   onSaveAttachmentAs,
@@ -109,7 +109,7 @@ export default function useReaderAttachments({
       const downloaded = await handleAttachmentDownload(attachment);
       if (!downloaded) return;
     }
-    await invoke<string>('reveal_attachment_in_finder', { attachmentId: attachment.id });
+    await invoke<string>(IPC.RevealAttachmentInFinder, { attachmentId: attachment.id });
   }, [handleAttachmentDownload]);
 
   const copyAttachmentToClipboard = useCallback(async (attachment: Attachment) => {
@@ -119,7 +119,7 @@ export default function useReaderAttachments({
     }
 
     try {
-      await invoke<string>('copy_attachment_file_to_clipboard', { attachmentId: attachment.id });
+      await invoke<string>(IPC.CopyAttachmentFileToClipboard, { attachmentId: attachment.id });
     } catch (error) {
       setAttachmentErrors((current) => ({
         ...current,

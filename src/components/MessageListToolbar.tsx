@@ -16,7 +16,6 @@ import type {
   FilterMode,
   ListMode,
   ListSort,
-  Message,
   MessageSummary,
   SearchScope,
 } from '../app/types';

@@ -102,4 +102,25 @@
     min-width: 64px;
   }
 
+  .app-shell {
+    grid-template-columns: 170px 300px minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
+    overflow-y: auto;
+  }
+
+  .app-shell > .window-chrome,
+  .app-shell > .sidebar {
+    display: none;
+  }
+
+  .message-list-panel,
+  .reader {
+    min-width: 0;
+  }
 }

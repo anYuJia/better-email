@@ -15,6 +15,7 @@ import type {
   SyncRun,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type AccountSyncOperationsOptions = {
   accountForm: Account | null;
@@ -25,7 +26,7 @@ type AccountSyncOperationsOptions = {
   setCredentialVerification: Dispatch<SetStateAction<CredentialVerificationReport | null>>;
   setImapProbe: Dispatch<SetStateAction<ImapProbeReport | null>>;
   setImapMailboxes: Dispatch<SetStateAction<ImapMailboxState[]>>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
   updateProviderVerification: (
     providerName: string,
@@ -63,9 +64,9 @@ export default function useAccountSyncOperations({
   const providerValidationRunId = useRef(0);
 
   const discoverImapFolders = useCallback(async () => {
-    const report = await invoke<ImapProbeReport>('discover_imap_folders', { accountId: accountForm?.id });
+    const report = await invoke<ImapProbeReport>(IPC.DiscoverImapFolders, { accountId: accountForm?.id });
     setImapProbe(report);
-    const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
+    const mailboxes = await invoke<ImapMailboxState[]>(IPC.ListImapMailboxes);
     setImapMailboxes(mailboxes);
     setStatus(report.message);
     return report;
@@ -80,14 +81,14 @@ export default function useAccountSyncOperations({
       const report = await runProviderValidation(validationAccount.email, {
         incomingProtocol: validationAccount.incoming_protocol,
         testConnection: async () => {
-          const result = await invoke<ConnectionReport>('test_connection', {
+          const result = await invoke<ConnectionReport>(IPC.TestConnection, {
             accountId: validationAccount.id,
           });
           setConnectionReport(result);
           return result;
         },
         verifyCredentials: async () => {
-          const result = await invoke<CredentialVerificationReport>('verify_account_credentials', {
+          const result = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
             accountId: validationAccount.id,
           });
           setCredentialVerification(result);
@@ -113,19 +114,19 @@ export default function useAccountSyncOperations({
             setImapMailboxes([]);
             return result;
           }
-          const result = await invoke<ImapProbeReport>('discover_imap_folders', {
+          const result = await invoke<ImapProbeReport>(IPC.DiscoverImapFolders, {
             accountId: validationAccount.id,
           });
           setImapProbe(result);
-          const mailboxes = await invoke<ImapMailboxState[]>('list_imap_mailboxes');
+          const mailboxes = await invoke<ImapMailboxState[]>(IPC.ListImapMailboxes);
           setImapMailboxes(mailboxes);
           return result;
         },
         syncHeaders: async () => {
-          const result = await invoke<SyncRun>('sync_imap_headers', {
+          const result = await invoke<SyncRun>(IPC.SyncImapHeaders, {
             accountId: validationAccount.id,
           });
-          setSyncRuns((current) => [result, ...current].slice(0, 10));
+          setSyncRuns?.((current) => [result, ...current].slice(0, 10));
           await loadMeta(folderId, validationAccount.id);
           await loadMessages(folderId, query, filter, validationAccount.id);
           return result;
@@ -166,7 +167,7 @@ export default function useAccountSyncOperations({
     mailbox: ImapMailboxState,
     targetFolderId: number | null,
   ) => {
-    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
+    const mapped = await invoke<ImapMailboxState>(IPC.MapImapMailbox, {
       mailboxId: mailbox.id,
       folderId: targetFolderId,
     });
@@ -185,11 +186,11 @@ export default function useAccountSyncOperations({
       .map((part) => part.trim())
       .filter(Boolean)
       .pop() || mailbox.remote_name.trim() || '远端文件夹';
-    const folder = await invoke<Folder>('create_custom_folder', {
+    const folder = await invoke<Folder>(IPC.CreateCustomFolder, {
       accountId: mailbox.account_id,
       name: suggestedName,
     });
-    const mapped = await invoke<ImapMailboxState>('map_imap_mailbox', {
+    const mapped = await invoke<ImapMailboxState>(IPC.MapImapMailbox, {
       mailboxId: mailbox.id,
       folderId: folder.id,
     });
@@ -199,16 +200,16 @@ export default function useAccountSyncOperations({
   }, [folderId, loadMeta, setImapMailboxes, setStatus]);
 
   const runSyncDryRun = useCallback(async () => {
-    const run = await invoke<SyncRun>('run_sync_dry_run', { accountId: accountForm?.id });
-    setSyncRuns((current) => [run, ...current].slice(0, 10));
+    const run = await invoke<SyncRun>(IPC.RunSyncDryRun, { accountId: accountForm?.id });
+    setSyncRuns?.((current) => [run, ...current].slice(0, 10));
     await loadMeta(folderId);
     setStatus('同步演练已完成并记录');
     return run;
   }, [accountForm?.id, folderId, loadMeta, setStatus, setSyncRuns]);
 
   const syncImapHistoryPage = useCallback(async (targetAccountId?: number | null) => {
-    const run = await invoke<SyncRun>('sync_imap_history', { accountId: targetAccountId ?? accountForm?.id });
-    setSyncRuns((current) => [run, ...current].slice(0, 10));
+    const run = await invoke<SyncRun>(IPC.SyncImapHistory, { accountId: targetAccountId ?? accountForm?.id });
+    setSyncRuns?.((current) => [run, ...current].slice(0, 10));
     await loadMeta(folderId);
     await loadMessages(folderId, query, filter);
     setStatus(run.message);

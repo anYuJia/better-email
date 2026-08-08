@@ -1,0 +1,165 @@
+/*
+ * Dark mode overlay for surfaces that predate the token layer or hard-code
+ * light colors (composer, dialogs, context menu, account switcher, snooze
+ * picker, toasts). The settings layer (--st-*) intentionally stays on its
+ * documented opaque light theme.
+ *
+ * Rules here mirror the target selectors from the pre-2026 files and only
+ * apply when the OS requests dark appearance.
+ */
+
+@media (prefers-color-scheme: dark) {
+  .composer-backdrop .composer,
+  .composer {
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border-color: var(--ui-border-strong);
+  }
+
+  .composer-backdrop .composer header,
+  .composer header {
+    background: var(--ui-surface-muted);
+  }
+
+  .composer input,
+  .composer textarea,
+  .composer select,
+  .composer .field-shell,
+  .composer .composer-recipient-grid,
+  .composer .composer-advanced,
+  .composer .composer-toolbar,
+  .composer .composer-attachments,
+  .composer .composer-from {
+    background: var(--ui-surface-muted);
+    color: var(--ui-text);
+    border-color: var(--ui-border);
+  }
+
+  .composer ::placeholder {
+    color: var(--ui-text-tertiary);
+  }
+
+  .composer-advanced-panel,
+  .composer-backdrop-minimized {
+    background: var(--ui-surface);
+  }
+
+  .dialog-backdrop .dialog,
+  .dialog,
+  .dialog-card,
+  .confirm-dialog,
+  .snooze-picker,
+  .snooze-picker-menu,
+  .account-switcher-menu,
+  .account-switcher-dropdown,
+  .account-login-dialog {
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border-color: var(--ui-border-strong);
+  }
+
+  .dialog h2,
+  .dialog h3,
+  .confirm-dialog h2,
+  .snooze-picker h2,
+  .account-switcher-menu h3,
+  .account-login-dialog h2,
+  .snooze-picker strong {
+    color: var(--ui-text);
+  }
+
+  .dialog p,
+  .confirm-dialog p,
+  .snooze-picker small,
+  .account-switcher-menu small {
+    color: var(--ui-text-secondary);
+  }
+
+  .dialog-backdrop,
+  .confirm-dialog-backdrop,
+  .snooze-backdrop,
+  .account-login-backdrop {
+    background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
+  }
+
+  body .context-menu,
+  .context-menu,
+  .context-menu-panel {
+    background: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.98);
+    border-color: var(--ui-border-strong);
+  }
+
+  .context-menu-item,
+  .context-menu button,
+  .context-menu .menu-item {
+    color: var(--ui-text);
+  }
+
+  .context-menu-item:hover,
+  .context-menu-item:focus-visible {
+    background: var(--ui-accent-soft);
+  }
+
+  .context-menu-separator,
+  .menu-separator {
+    background: var(--ui-border);
+  }
+
+  .account-switcher-trigger,
+  .account-row,
+  .account-menu-row {
+    background: var(--ui-surface-muted);
+    color: var(--ui-text);
+  }
+
+  .snooze-picker button,
+  .snooze-picker .snooze-option,
+  .snooze-picker summary {
+    background: var(--ui-surface-muted);
+    color: var(--ui-text);
+  }
+
+  .snooze-picker button:hover {
+    background: var(--ui-accent-soft);
+  }
+
+  body .toast,
+  .toast,
+  .message-toast,
+  .undo-snackbar,
+  .undo-card {
+    background: var(--ui-surface-raised);
+    color: var(--ui-text);
+    border-color: var(--ui-border-strong);
+  }
+
+  .toast small,
+  .undo-card small {
+    color: var(--ui-text-secondary);
+  }
+
+  body .emoji-picker,
+  .emoji-picker,
+  .template-picker,
+  .dropdown-panel,
+  .custom-select-menu {
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border-color: var(--ui-border-strong);
+  }
+
+  .dropdown-item:hover,
+  .custom-select-menu li:hover,
+  .template-picker li:hover {
+    background: var(--ui-accent-soft);
+  }
+
+  .image-preview-overlay {
+    background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.9);
+  }
+
+  .window-chrome {
+    background: var(--ui-surface-sidebar);
+    color: var(--ui-text);
+  }
+}

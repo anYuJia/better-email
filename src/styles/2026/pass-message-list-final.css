@@ -10,11 +10,6 @@
   overflow: hidden;
 }
 
-.message-card:hover {
-  background: #f6f8fb;
-  box-shadow: inset 0 0 0 1px rgba(86, 103, 123, 0.08);
-}
-
 .message-leading {
   position: absolute;
   left: 13px;
@@ -223,10 +218,6 @@
 .message-date-section {
   max-width: 100%;
   overflow-x: hidden;
-}
-
-.message-chips {
-  display: none;
 }
 
 .global-tooltip {

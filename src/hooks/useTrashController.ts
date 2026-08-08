@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { Account, AccountScope, TrashActionReport } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 export type ConfirmEmptyTrashState = {
   accountId: number;
@@ -24,7 +25,7 @@ export default function useTrashController({
   const [confirmEmptyTrashState, setConfirmEmptyTrashState] = useState<ConfirmEmptyTrashState | null>(null);
 
   async function emptyCurrentTrashConfirmed(targetAccountId: number) {
-    const report = await invoke<TrashActionReport>('empty_trash', { accountId: targetAccountId });
+    const report = await invoke<TrashActionReport>(IPC.EmptyTrash, { accountId: targetAccountId });
     await refreshAll();
     setStatus(report.message);
   }

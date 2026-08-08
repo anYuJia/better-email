@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import type { Label } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type LabelManagementOptions = {
   labels: Label[];
@@ -11,18 +12,17 @@ type LabelManagementOptions = {
 export default function useLabelManagement({
   labels,
   setLabels,
-  setStatus,
 }: LabelManagementOptions) {
   const [confirmDeleteLabel, setConfirmDeleteLabel] = useState<Label | null>(null);
 
   async function handleCreateLabel(name: string, color: string) {
-    const newLabel = await invoke<Label>('create_label', { name, color });
+    const newLabel = await invoke<Label>(IPC.CreateLabel, { name, color });
     setLabels((current) => [...current, newLabel].sort((a, b) => a.name.localeCompare(b.name)));
     return newLabel;
   }
 
   async function handleUpdateLabel(id: number, name: string, color: string) {
-    await invoke('update_label', { id, name, color });
+    await invoke(IPC.UpdateLabel, { id, name, color });
     setLabels((current) =>
       current
         .map((l) => (l.id === id ? { ...l, name, color } : l))
@@ -31,7 +31,7 @@ export default function useLabelManagement({
   }
 
   async function handleDeleteLabelConfirmed(id: number) {
-    await invoke('delete_label', { id });
+    await invoke(IPC.DeleteLabel, { id });
     setLabels((current) => current.filter((l) => l.id !== id));
   }
 

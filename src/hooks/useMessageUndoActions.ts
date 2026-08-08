@@ -12,6 +12,7 @@ import { movableFoldersForBulk } from '../app/appConfig';
 import type { LoadMetaResult } from './useAppMetaLoader';
 import { invoke } from '../tauriBridge';
 import { crossAccountBlockReason, moveMessagesToRole } from './messageActionUtils';
+import { IPC } from '../ipc/commands';
 
 type MessageUndoActionOptions = {
   folders: Folder[];
@@ -61,12 +62,12 @@ export default function useMessageUndoActions({
       if (!action) return;
       for (const snapshot of action.snapshots) {
         if (snapshot.folder_role === 'snoozed' && snapshot.snoozed_until) {
-          await invoke('snooze_message', { messageId: snapshot.id, snoozedUntil: snapshot.snoozed_until });
+          await invoke(IPC.SnoozeMessage, { messageId: snapshot.id, snoozedUntil: snapshot.snoozed_until });
         } else {
-          await invoke('move_message_to_role', { messageId: snapshot.id, role: snapshot.folder_role });
+          await invoke(IPC.MoveMessageToRole, { messageId: snapshot.id, role: snapshot.folder_role });
         }
-        await invoke('set_message_read', { messageId: snapshot.id, isRead: snapshot.is_read });
-        await invoke('set_message_starred', { messageId: snapshot.id, isStarred: snapshot.is_starred });
+        await invoke(IPC.SetMessageRead, { messageId: snapshot.id, isRead: snapshot.is_read });
+        await invoke(IPC.SetMessageStarred, { messageId: snapshot.id, isStarred: snapshot.is_starred });
         for (const label of labels) {
           const shouldHaveLabel = snapshot.labels.includes(label.name);
           await invoke(shouldHaveLabel ? 'apply_label_to_message' : 'remove_label_from_message', {

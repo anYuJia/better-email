@@ -250,17 +250,6 @@ input[type="checkbox"]:checked::before {
   color: var(--text);
 }
 
-.compose-button {
-  min-height: 42px;
-  border-radius: 8px;
-  background: var(--accent);
-  box-shadow: 0 10px 22px rgba(10, 132, 255, 0.24);
-}
-
-.compose-button:hover {
-  background: var(--accent-strong);
-}
-
 .settings-button {
   min-height: 40px;
   border: 1px solid var(--line);
@@ -472,32 +461,11 @@ kbd {
   gap: 0;
 }
 
-.sidebar-footer-actions .settings-button span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .sidebar-disclosure:hover,
 .sidebar-disclosure[open] {
   border-color: var(--line);
   background: rgba(255, 255, 255, 0.68);
   box-shadow: var(--shadow-sm);
-}
-
-.sidebar-disclosure summary {
-  color: var(--text-soft);
-}
-
-.sidebar-disclosure summary:hover {
-  color: var(--text);
-}
-
-.sidebar-disclosure summary em {
-  color: var(--muted);
 }
 
 .sidebar-disclosure[open] summary {
@@ -536,28 +504,10 @@ kbd {
   margin-bottom: 8px;
 }
 
-.folder {
-  min-height: 38px;
-  border-radius: 8px;
-  color: var(--text-soft);
-  padding: 9px 10px;
-}
-
 .folder:hover {
   background: rgba(255, 255, 255, 0.78);
   color: var(--text);
   box-shadow: var(--shadow-sm);
-}
-
-.folder.active {
-  background: var(--surface-active);
-  color: var(--accent-strong);
-  box-shadow: inset 3px 0 0 var(--accent), var(--shadow-sm);
-}
-
-.badge {
-  background: rgba(10, 132, 255, 0.14);
-  color: var(--accent-strong);
 }
 
 .sidebar-section,
@@ -584,22 +534,12 @@ kbd {
   backdrop-filter: blur(18px) saturate(1.2);
 }
 
-.search-cluster {
-  gap: 7px;
-}
-
 .search-box {
   height: 40px;
   border-color: transparent;
   border-radius: 8px;
   background: rgba(242, 245, 249, 0.95);
   color: var(--muted);
-  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.06);
-}
-
-.search-box:focus-within {
-  background: #fff;
-  border-color: #93c5fd;
   box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.06);
 }
 
@@ -689,20 +629,6 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.list-summary strong {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.list-summary span,
-.list-summary em {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-  white-space: nowrap;
 }
 
 .list-summary em {
@@ -826,10 +752,6 @@ kbd {
   opacity: 1;
 }
 
-.message-card:hover {
-  background: rgba(10, 132, 255, 0.06);
-}
-
 .message-card p,
 .thread-card p,
 .reader-header p,
@@ -839,11 +761,6 @@ kbd {
 .attachments em,
 .mailbox-grid span {
   color: var(--muted);
-}
-
-.message-chips span {
-  background: rgba(17, 24, 39, 0.06);
-  color: var(--text-soft);
 }
 
 .thread-card,
@@ -864,19 +781,6 @@ kbd {
   border-color: rgba(10, 132, 255, 0.35);
   background: var(--surface-active);
   box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.12), var(--shadow-sm);
-}
-
-.reader-panel {
-  background: linear-gradient(180deg, #fbfcff 0%, #f4f6fa 100%);
-}
-
-.reader {
-  padding: 32px 38px;
-}
-
-.reader-header {
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
 }
 
 h1 {
@@ -905,11 +809,6 @@ h1 {
   color: #fff;
   border-color: transparent;
   box-shadow: 0 8px 18px rgba(10, 132, 255, 0.20);
-}
-
-.reader-actions .primary-action:hover {
-  background: var(--accent-strong);
-  color: #fff;
 }
 
 .reader-actions .icon-only-action {
@@ -946,12 +845,6 @@ h1 {
 
 .reader-html img {
   border-radius: 8px;
-}
-
-.composer-backdrop {
-  background: rgba(15, 23, 42, 0.30);
-  backdrop-filter: blur(14px) saturate(1.1);
-  z-index: 60;
 }
 
 .composer-backdrop-minimized {
@@ -1115,11 +1008,6 @@ h1 {
   border-color: rgba(10, 132, 255, 0.28);
 }
 
-.composer footer {
-  background: rgba(249, 250, 252, 0.90);
-  border-top: 1px solid var(--line);
-}
-
 .composer input,
 .composer select {
   min-height: 42px;
@@ -1192,12 +1080,6 @@ h1 {
 .composer-advanced-panel {
   max-height: 260px;
   overflow: auto;
-}
-
-.composer-tool-card {
-  border-color: var(--line);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: var(--shadow-sm);
 }
 
 .composer-tool-card > strong {
@@ -1370,30 +1252,6 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.undo-snackbar strong {
-  font-size: 13px;
-  font-weight: 780;
-}
-
-.undo-snackbar span {
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 12px;
-}
-
-.undo-snackbar button {
-  min-height: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.10);
-  color: #fff;
-  font-weight: 760;
-  padding: 0 11px;
-}
-
-.undo-snackbar button:hover {
-  background: rgba(255, 255, 255, 0.18);
 }
 
 .undo-snackbar button:last-child {

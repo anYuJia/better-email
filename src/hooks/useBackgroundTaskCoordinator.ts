@@ -1,29 +1,14 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import {
-  newMailNotificationDecision,
-  notificationThreadScopeKey,
-  syncIntervalMs,
   syncStatusLabel,
   type NotificationPolicy,
 } from '../mailUtils';
 import {
-  diagnosticInfo,
-  diagnosticWarn,
-  flowInfo,
-  flowWarn,
-} from '../app/logger';
-import {
   invoke,
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
 } from '../tauriBridge';
 import {
   fetchTimerLog,
   fetchTimerWarn,
-  nextOutboxWakeItem,
-  outboxFlowLog,
-  syncModeStatus,
 } from '../app/backgroundTaskFlow';
 import type {
   Account,
@@ -41,6 +26,7 @@ import type { PendingSendUndo } from '../components/UndoSnackbarStack';
 import useBackgroundScheduler from './useBackgroundScheduler';
 import useNewMailNotifier from './useNewMailNotifier';
 import useOutboxFlush from './useOutboxFlush';
+import { IPC } from '../ipc/commands';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -60,7 +46,7 @@ type UseBackgroundTaskCoordinatorOptions = {
   setBackgroundTasks: Dispatch<SetStateAction<BackgroundTask[]>>;
   setBackgroundSyncStatus: Dispatch<SetStateAction<string>>;
   setSyncSchedulePlan: Dispatch<SetStateAction<SyncSchedulePlan | null>>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setLastNewMailNotice: Dispatch<SetStateAction<string | null>>;
   setNotificationStatus: Dispatch<SetStateAction<string>>;
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
@@ -166,7 +152,7 @@ export default function useBackgroundTaskCoordinator({
   });
 
   const refreshBackgroundTasks = useCallback(async () => {
-    const tasks = await invoke<BackgroundTask[]>('list_background_tasks');
+    const tasks = await invoke<BackgroundTask[]>(IPC.ListBackgroundTasks);
     setBackgroundTasks(tasks);
     return tasks;
   }, [setBackgroundTasks]);
@@ -190,7 +176,7 @@ export default function useBackgroundTaskCoordinator({
     });
     setBackgroundSyncStatus(reason === 'timer' ? '后台同步中...' : '手动同步中...');
     try {
-      const plan = await invoke<SyncSchedulePlan>('get_sync_schedule_plan', { accountId: syncAccountId });
+      const plan = await invoke<SyncSchedulePlan>(IPC.GetSyncSchedulePlan, { accountId: syncAccountId });
       fetchTimerLog('sync plan', {
         reason,
         accountId: syncAccountId,
@@ -206,9 +192,9 @@ export default function useBackgroundTaskCoordinator({
             ? '后台同步中...'
             : '手动同步中...',
       );
-      const run = await invoke<SyncRun>('sync_imap_headers', { accountId: syncAccountId });
+      const run = await invoke<SyncRun>(IPC.SyncImapHeaders, { accountId: syncAccountId });
       const released = await current.releaseDueSnoozedMessages();
-      setSyncRuns((existing) => [run, ...existing].slice(0, 10));
+      setSyncRuns?.((existing) => [run, ...existing].slice(0, 10));
       await current.loadMeta(current.folderId, current.accountScope, { mode: 'mailbox' });
       const latestMessages = await current.loadMessages(
         current.folderId,
@@ -270,15 +256,15 @@ export default function useBackgroundTaskCoordinator({
     backgroundTaskWorkerRef.current = true;
     try {
       while (true) {
-        const nextTask = await invoke<BackgroundTask | null>('next_background_task');
+        const nextTask = await invoke<BackgroundTask | null>(IPC.NextBackgroundTask);
         if (!nextTask) break;
 
-        const runningTask = await invoke<BackgroundTask>('mark_background_task_running', { taskId: nextTask.id });
+        const runningTask = await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId: nextTask.id });
         await refreshBackgroundTasks();
         setBackgroundSyncStatus(`${runningTask.title}执行中...`);
         try {
           const message = await executeBackgroundTask(runningTask);
-          await invoke<BackgroundTask>('complete_background_task', {
+          await invoke<BackgroundTask>(IPC.CompleteBackgroundTask, {
             taskId: runningTask.id,
             message,
           });
@@ -286,7 +272,7 @@ export default function useBackgroundTaskCoordinator({
           setBackgroundSyncStatus(message);
         } catch (error) {
           const message = String(error);
-          await invoke<BackgroundTask>('fail_background_task', {
+          await invoke<BackgroundTask>(IPC.FailBackgroundTask, {
             taskId: runningTask.id,
             message,
           });
@@ -310,7 +296,7 @@ export default function useBackgroundTaskCoordinator({
     source: 'manual' | 'timer' = 'manual',
   ) => {
     fetchTimerLog('enqueue start', { kind, source });
-    const task = await invoke<BackgroundTask>('enqueue_background_task', { input: { kind, source } });
+    const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, { input: { kind, source } });
     const tasks = await refreshBackgroundTasks();
     const isReusedActiveTask = task.kind === 'sync' && task.status !== 'queued';
     fetchTimerLog('enqueue done', {

@@ -27,7 +27,9 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
-    haystack.windows(needle.len()).position(|window| window == needle)
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn strip_utf8_bom(bytes: &[u8]) -> &[u8] {
@@ -103,7 +105,9 @@ fn decode_encoded_word_at(bytes: &[u8], start: usize) -> Option<(String, usize)>
     let data_start = charset_end + 3;
     let data_end = find_subsequence(&bytes[data_start..], b"?=")? + data_start;
     let raw = match encoding {
-        b'B' | b'b' => decode_base64_loose(std::str::from_utf8(&bytes[data_start..data_end]).ok()?)?,
+        b'B' | b'b' => {
+            decode_base64_loose(std::str::from_utf8(&bytes[data_start..data_end]).ok()?)?
+        }
         b'Q' | b'q' => decode_quoted_printable_word(&bytes[data_start..data_end]),
         _ => return None,
     };
@@ -300,7 +304,10 @@ pub fn decode_rfc2231_params(params: &[(Cow<'_, str>, Cow<'_, str>)]) -> Option<
 }
 
 fn decode_base64_loose(data: &str) -> Option<Vec<u8>> {
-    let compact = data.chars().filter(|ch| !ch.is_whitespace()).collect::<String>();
+    let compact = data
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>();
     // Some real-world senders emit padding that is off by a character;
     // strip existing padding and re-add the exact amount required.
     let stripped = compact.trim_end_matches('=');
@@ -349,9 +356,7 @@ pub fn decode_quoted_printable_body(data: &[u8]) -> Vec<u8> {
     let mut index = 0;
     while index < data.len() {
         if data[index] == b'=' {
-            if data.get(index + 1) == Some(&b'\r')
-                && data.get(index + 2) == Some(&b'\n')
-            {
+            if data.get(index + 1) == Some(&b'\r') && data.get(index + 2) == Some(&b'\n') {
                 index += 3;
                 continue;
             }
@@ -441,7 +446,10 @@ pub fn extract_header_fields(raw: &[u8]) -> Vec<(String, Vec<u8>)> {
         if line.is_empty() {
             break;
         }
-        if line.first().is_some_and(|byte| *byte == b' ' || *byte == b'\t') {
+        if line
+            .first()
+            .is_some_and(|byte| *byte == b' ' || *byte == b'\t')
+        {
             if current_name.is_some() {
                 let continuation = trim_ascii_bytes(line);
                 if !continuation.is_empty() {
@@ -501,7 +509,10 @@ pub fn charset_from_content_type(value: &[u8]) -> Option<String> {
     let needle = b"charset=";
     let position = find_subsequence(&lower, needle)?;
     let rest = &value[position + needle.len()..];
-    let end = rest.iter().position(|&byte| byte == b';').unwrap_or(rest.len());
+    let end = rest
+        .iter()
+        .position(|&byte| byte == b';')
+        .unwrap_or(rest.len());
     let label = String::from_utf8_lossy(&rest[..end])
         .trim()
         .trim_matches(['"', '\''])
@@ -518,11 +529,7 @@ pub fn content_transfer_encoding(fields: &[(String, Vec<u8>)]) -> Option<String>
     fields
         .iter()
         .find(|(name, _)| name == "content-transfer-encoding")
-        .map(|(_, value)| {
-            String::from_utf8_lossy(value)
-                .trim()
-                .to_ascii_lowercase()
-        })
+        .map(|(_, value)| String::from_utf8_lossy(value).trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty())
 }
 
@@ -548,7 +555,8 @@ pub fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
 mod tests {
     use super::*;
 
-    const UTF8_B_SUBJECT: &str = "=?UTF-8?B?55So5oi35pWw5o2u6K6h566X6L+H56iLMjbml6U35pyI5rGH5oC7ICgxKQ==?=";
+    const UTF8_B_SUBJECT: &str =
+        "=?UTF-8?B?55So5oi35pWw5o2u6K6h566X6L+H56iLMjbml6U35pyI5rGH5oC7ICgxKQ==?=";
     const GBK_B_SUBJECT: &str = "=?GBK?B?08O7p8r9vt28xsvjuf2zzDI2yNU31MK749fcICgxKQ==?=";
     const GB2312_Q_SUBJECT: &str =
         "=?GB2312?Q?=D3=C3=BB=A7=CA=FD=BE=DD=BC=C6=CB=E3=B9=FD=B3=CC26=C8=D57=D4=C2=BB=E3=D7=DC=20(1)?=";
@@ -659,10 +667,7 @@ mod tests {
                 Cow::Borrowed("%E6%95%B0%E6%8D%AE.xlsx"),
             ),
         ];
-        assert_eq!(
-            decode_rfc2231_params(&parts).unwrap(),
-            "用户数据.xlsx"
-        );
+        assert_eq!(decode_rfc2231_params(&parts).unwrap(), "用户数据.xlsx");
     }
 
     #[test]
@@ -671,10 +676,7 @@ mod tests {
             Cow::Borrowed("filename"),
             Cow::Borrowed("=?GBK?B?08O7p8r9vt28xsvjuf2zzDI2yNU31MK749fcICgxKQ==?="),
         )];
-        assert_eq!(
-            decode_rfc2231_params(&parts).unwrap(),
-            EXPECTED_SUBJECT
-        );
+        assert_eq!(decode_rfc2231_params(&parts).unwrap(), EXPECTED_SUBJECT);
     }
 
     #[test]
@@ -688,7 +690,10 @@ mod tests {
             "张健 <zhang@example.com>"
         );
         assert_eq!(decode_mime_header_value("Hello World"), "Hello World");
-        assert_eq!(decode_address_header_value("Ada <ada@example.com>"), "Ada <ada@example.com>");
+        assert_eq!(
+            decode_address_header_value("Ada <ada@example.com>"),
+            "Ada <ada@example.com>"
+        );
     }
 
     #[test]
@@ -699,7 +704,10 @@ mod tests {
         assert_eq!(decode_mime_header_value(truncated), truncated);
         let bad_charset = "=?not-a-charset?B?SGVsbG8=?=";
         assert_eq!(decode_mime_header_value(bad_charset), "Hello");
-        assert_eq!(decode_mime_header_value("=?UTF-8?Z?5byg?="), "=?UTF-8?Z?5byg?=");
+        assert_eq!(
+            decode_mime_header_value("=?UTF-8?Z?5byg?="),
+            "=?UTF-8?Z?5byg?="
+        );
     }
 
     #[test]
@@ -721,8 +729,14 @@ mod tests {
         assert_eq!(decode_bytes_with_charset(&big5, "big5"), "你好");
         // ISO-8859-1 / windows-1252.
         let latin1 = [0x48, 0x6F, 0x6C, 0x61, 0x20, 0x4D, 0x75, 0x6E, 0x64, 0x6F];
-        assert_eq!(decode_bytes_with_charset(&latin1, "iso-8859-1"), "Hola Mundo");
-        assert_eq!(decode_bytes_with_charset(&latin1, "windows-1252"), "Hola Mundo");
+        assert_eq!(
+            decode_bytes_with_charset(&latin1, "iso-8859-1"),
+            "Hola Mundo"
+        );
+        assert_eq!(
+            decode_bytes_with_charset(&latin1, "windows-1252"),
+            "Hola Mundo"
+        );
         // UTF-8 BOM is stripped.
         assert_eq!(
             decode_bytes_with_charset(&[0xEF, 0xBB, 0xBF, b'A'], "utf-8"),
@@ -800,8 +814,9 @@ mod tests {
             b"Content-Type: TEXT/HTML; charset=GBK",
             b"content-type: text/html"
         ));
-        assert!(!contains_ascii_case_insensitive(b"Subject: Hi", b"content-type"));
+        assert!(!contains_ascii_case_insensitive(
+            b"Subject: Hi",
+            b"content-type"
+        ));
     }
 }
-
-

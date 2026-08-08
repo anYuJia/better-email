@@ -8,6 +8,7 @@ import type {
   OAuthTokenExchangeReport,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type OAuthFlowOptions = {
   accountForm: Account | null;
@@ -30,7 +31,7 @@ export default function useOAuthFlow({
   const [oauthRefreshReport, setOauthRefreshReport] = useState<OAuthRefreshReport | null>(null);
 
   async function reloadOAuthSessions() {
-    setOauthSessions(await invoke<OAuthSession[]>('list_oauth_sessions'));
+    setOauthSessions(await invoke<OAuthSession[]>(IPC.ListOauthSessions));
   }
 
   async function startOAuth2Pkce() {
@@ -43,7 +44,7 @@ export default function useOAuthFlow({
       setStatus('请先填写 OAuth2 Client ID');
       return;
     }
-    const report = await invoke<OAuthStartReport>('start_oauth2_pkce', {
+    const report = await invoke<OAuthStartReport>(IPC.StartOauth2Pkce, {
       input: {
         provider: accountForm.provider,
         client_id: oauthClientId,
@@ -61,7 +62,7 @@ export default function useOAuthFlow({
       setStatus('请填写 OAuth2 回调里的 state 和 code');
       return;
     }
-    const report = await invoke<OAuthCallbackReport>('complete_oauth2_callback', {
+    const report = await invoke<OAuthCallbackReport>(IPC.CompleteOauth2Callback, {
       input: {
         state: oauthCallbackState,
         code: oauthCallbackCode,
@@ -75,7 +76,7 @@ export default function useOAuthFlow({
 
   async function waitForOAuth2Callback() {
     setStatus('正在监听 OAuth2 本地回调，请在浏览器完成授权');
-    const report = await invoke<OAuthCallbackReport>('wait_for_oauth2_callback', {
+    const report = await invoke<OAuthCallbackReport>(IPC.WaitForOauth2Callback, {
       input: {
         redirect_uri: oauthRedirectUri,
         timeout_seconds: 180,
@@ -93,7 +94,7 @@ export default function useOAuthFlow({
       setStatus('请先填写 OAuth2 Client ID');
       return;
     }
-    const report = await invoke<OAuthTokenExchangeReport>('exchange_oauth2_token', {
+    const report = await invoke<OAuthTokenExchangeReport>(IPC.ExchangeOauth2Token, {
       input: {
         session_id: sessionId,
         client_id: oauthClientId,
@@ -111,7 +112,7 @@ export default function useOAuthFlow({
       setStatus('请先填写 OAuth2 Client ID');
       return;
     }
-    const report = await invoke<OAuthRefreshReport>('refresh_oauth2_token', {
+    const report = await invoke<OAuthRefreshReport>(IPC.RefreshOauth2Token, {
       input: {
         client_id: oauthClientId,
         client_secret: oauthClientSecret,

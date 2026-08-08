@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { emptyAccountCreateForm } from '../app/appConfig';
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import {
   authTypeChangeMessage,
   isAccountConnectionDirty,
@@ -33,6 +32,7 @@ import { invoke } from '../tauriBridge';
 import useAccountProvisioning from './useAccountProvisioning';
 import useAccountSaveVerify from './useAccountSaveVerify';
 import useAccountSyncOperations from './useAccountSyncOperations';
+import { IPC } from '../ipc/commands';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -65,7 +65,7 @@ type UseAccountConnectionControllerOptions = {
   setCredentialStatus: Dispatch<SetStateAction<CredentialStatus | null>>;
   setImapProbe: Dispatch<SetStateAction<ImapProbeReport | null>>;
   setImapMailboxes: Dispatch<SetStateAction<ImapMailboxState[]>>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
   loadMeta: (nextFolderId?: number | null, nextScope?: AccountScope) => Promise<LoadMetaResult>;
   loadMessages: (
@@ -158,7 +158,6 @@ export default function useAccountConnectionController({
     saveAndVerifyRunning,
     accountSettingsSaving,
     resetSaveAndVerifyReport,
-    persistAccountSettings,
     saveSettings,
     saveAndVerify,
   } = useAccountSaveVerify({
@@ -264,7 +263,7 @@ export default function useAccountConnectionController({
   }, [accountForm, diagnosticExport, setStatus, updateProviderVerification]);
 
   const testConnection = useCallback(async () => {
-    const report = await invoke<ConnectionReport>('test_connection', { accountId: accountForm?.id });
+    const report = await invoke<ConnectionReport>(IPC.TestConnection, { accountId: accountForm?.id });
     setConnectionReport(report);
     setStatus(
       report.ready_for_credentials
@@ -275,7 +274,7 @@ export default function useAccountConnectionController({
   }, [accountForm?.id, setConnectionReport, setStatus]);
 
   const verifyAccountCredentials = useCallback(async () => {
-    const report = await invoke<CredentialVerificationReport>('verify_account_credentials', {
+    const report = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
       accountId: accountForm?.id,
     });
     setCredentialVerification(report);

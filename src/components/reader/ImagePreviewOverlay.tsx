@@ -1,4 +1,4 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { MutableRefObject } from 'react';
 import { Download, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { PreviewImage } from './useImagePreview';
 

@@ -7,6 +7,7 @@ import type {
 } from './types/ai';
 import { loadAiServiceConfig } from './aiServiceConfig';
 import { mockMode, invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 const MAX_INPUT_CHARS = 40_000;
 
@@ -93,7 +94,7 @@ async function requestExternal(
     timeout_seconds: config.timeoutSeconds,
     service_type: config.serviceType,
   };
-  return invoke<AiRequestResult>('ai_request', { input });
+  return invoke<AiRequestResult>(IPC.AiRequest, { input });
 }
 
 export async function runAiOperation(

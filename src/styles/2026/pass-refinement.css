@@ -65,20 +65,6 @@ body {
   box-shadow: none;
 }
 
-.compose-button {
-  min-height: 34px;
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-accent);
-  box-shadow: none;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.compose-button:hover {
-  background: var(--ui-accent-hover);
-  box-shadow: none;
-}
-
 .sidebar-label {
   margin: 5px 0 1px;
   padding: 0 8px;
@@ -119,10 +105,6 @@ body {
   min-height: 31px;
   padding: 0 8px;
   font-weight: 540;
-}
-
-.folder.active .folder-main {
-  font-weight: 650;
 }
 
 .folder-name svg {
@@ -390,13 +372,6 @@ body {
   font-size: 11px;
 }
 
-.list-control-actions > button.active,
-.list-control-actions .compact-menu summary.active {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  box-shadow: none;
-}
-
 .bulk-toolbar {
   min-height: 38px;
   background: #f7f9fb;
@@ -446,47 +421,16 @@ body {
   background: #e5e8ec;
 }
 
-.message-select {
-  left: 16px;
-  top: 15px;
-}
-
-.sender,
-.subject {
-  font-size: 12.5px;
-}
-
-.sender {
-  color: var(--ui-text-secondary);
-  font-weight: 560;
-}
-
-.sender.unread,
-.subject.unread {
-  color: var(--ui-text);
-  font-weight: 700;
-}
-
 .message-card time,
 .reader-sender-copy > span {
   color: var(--ui-text-tertiary);
   font-size: 10.5px;
 }
 
-.subject {
-  color: var(--ui-text);
-  font-weight: 560;
-}
-
 .message-card p {
   margin-top: 2px;
   color: var(--ui-text-tertiary);
   font-size: 11.5px;
-}
-
-.message-chips {
-  margin-top: 3px;
-  gap: 6px;
 }
 
 .message-chips span,
@@ -514,10 +458,6 @@ body {
   padding: 32px;
   background: var(--ui-list);
   color: var(--ui-text-secondary);
-}
-
-.empty-state-mark {
-  display: none;
 }
 
 .mailbox-empty-state strong,
@@ -616,24 +556,10 @@ body {
   margin-top: 14px;
 }
 
-.attachments .attachment-item {
-  min-height: 58px;
-  padding: 8px 10px;
-}
-
 .quick-reply {
   margin-top: 18px;
   padding-top: 12px;
   border-top: 1px solid var(--ui-border);
-}
-
-.reader-warning-panel {
-  margin: 12px 0;
-  padding: 10px 12px;
-  border: 1px solid #ead8b8;
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-warning-bg);
-  color: #704a00;
 }
 
 .context-menu,

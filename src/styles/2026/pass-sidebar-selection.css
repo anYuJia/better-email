@@ -5,23 +5,6 @@
   border-radius: 7px;
 }
 
-.sidebar .folder:hover,
-.sidebar .folder:focus-within {
-  background: var(--quiet-row-hover);
-  box-shadow: none;
-}
-
-.sidebar .folder.active,
-.sidebar .folder.active:hover {
-  color: #17202b;
-  background: var(--quiet-row-selected);
-  box-shadow: none;
-}
-
-.sidebar .folder.active .folder-main {
-  font-weight: 680;
-}
-
 .sidebar .folder.active .folder-name svg {
   color: #3f6594;
 }

@@ -16,6 +16,7 @@ import {
   forwardAttachmentStatus,
 } from '../app/forwarding';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type ComposeFromMessageOptions = {
   account: Account | null;
@@ -33,7 +34,7 @@ export default function useComposeFromMessage({
     if ('body' in message && typeof (message as Message).body === 'string') {
       fullMessage = message as Message;
     } else {
-      fullMessage = await invoke<Message>('get_message_detail', { messageId: message.id });
+      fullMessage = await invoke<Message>(IPC.GetMessageDetail, { messageId: message.id });
     }
     const threading = mode === 'forward' ? null : replyThreadingHeaders(fullMessage);
     const replyRecipients = mode === 'forward' ? '' : fullMessage.sender_email;
@@ -48,7 +49,7 @@ export default function useComposeFromMessage({
     let forwardPlan = buildForwardAttachmentPlan([]);
     if (mode === 'forward' && fullMessage.has_attachments) {
       try {
-        const sourceAttachments = await invoke<Attachment[]>('list_attachments', {
+        const sourceAttachments = await invoke<Attachment[]>(IPC.ListAttachments, {
           messageId: fullMessage.id,
         });
         forwardPlan = buildForwardAttachmentPlan(
@@ -88,7 +89,7 @@ export default function useComposeFromMessage({
   }, [account, openComposer, setStatus]);
 
   const editDraftMessage = useCallback(async (message: Message) => {
-    const draftAttachments = await invoke<Attachment[]>('list_attachments', { messageId: message.id });
+    const draftAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: message.id });
     openComposer({
       draft_id: message.id,
       account_id: message.account_id,

@@ -19,6 +19,7 @@ import {
   uniqueMessages,
 } from './messageActionUtils';
 import { movableFoldersForBulk } from '../app/appConfig';
+import { IPC } from '../ipc/commands';
 
 type BulkMessageActionOptions = {
   folders: Folder[];
@@ -221,7 +222,7 @@ export default function useBulkMessageActions({
         return;
       }
       const muted = !thread.is_muted;
-      const updatedScopes = await invoke<number>('set_threads_muted', {
+      const updatedScopes = await invoke<number>(IPC.SetThreadsMuted, {
         messageIds: targetMessages.map((message) => message.id),
         muted,
       });

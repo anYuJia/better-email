@@ -8,6 +8,7 @@ import type {
   ContactImportUndoReport,
 } from '../app/types/contact';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 export type ImportSelectionMap = Record<string, 'create' | 'merge' | 'skip'>;
 
@@ -41,12 +42,12 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
   const startImport = useCallback(async () => {
     setPreviewing(true);
     try {
-      const path = await invoke<string | null>('pick_contact_import_file');
+      const path = await invoke<string | null>(IPC.PickContactImportFile);
       if (!path) {
         setStatus('已取消选择联系人导入文件');
         return;
       }
-      const nextPreview = await invoke<ContactImportPreview>('preview_contact_import', { path });
+      const nextPreview = await invoke<ContactImportPreview>(IPC.PreviewContactImport, { path });
       setPreview(nextPreview);
       setCommitResult(null);
       setEntryEdits({});
@@ -105,7 +106,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
           action: action === 'skip' ? 'skip' : action,
         };
       });
-      const summary = await invoke<ContactImportCommitSummary>('commit_contact_import_entries', {
+      const summary = await invoke<ContactImportCommitSummary>(IPC.CommitContactImportEntries, {
         file_name: preview.file_name,
         entries,
         scope: 'global',
@@ -130,7 +131,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
 
   const refreshBatches = useCallback(async () => {
     try {
-      const next = await invoke<ContactImportBatch[]>('list_contact_import_batches');
+      const next = await invoke<ContactImportBatch[]>(IPC.ListContactImportBatches);
       setBatches(next);
     } catch {
       setBatches([]);
@@ -140,7 +141,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
   const undoBatch = useCallback(async (batchId: number) => {
     setUndoingBatchId(batchId);
     try {
-      const report = await invoke<ContactImportUndoReport>('undo_contact_import_batch', { batchId });
+      const report = await invoke<ContactImportUndoReport>(IPC.UndoContactImportBatch, { batchId });
       setConfirmUndoBatch(null);
       await refreshBatches();
       setStatus(`已撤销导入批次：删除 ${report.removed} 位新增联系人。${report.note}`);

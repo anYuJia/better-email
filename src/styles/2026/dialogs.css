@@ -87,17 +87,6 @@
   border-color: var(--ui-border-strong);
 }
 
-.composer input:focus,
-.composer textarea:focus {
-  border-color: rgba(8, 127, 245, 0.52);
-  box-shadow: 0 0 0 3px rgba(8, 127, 245, 0.12);
-}
-
-.composer select:focus {
-  border-color: #9ca3af;
-  box-shadow: none;
-}
-
 .composer button,
 .shortcut-modal button {
   border-radius: 8px;

@@ -11,6 +11,7 @@ import {
   sendNotification,
 } from '../tauriBridge';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type NewMailNotifierOptions = {
   notificationPolicy: NotificationPolicy;
@@ -36,7 +37,7 @@ export default function useNewMailNotifier({
     )];
     const mutedThreadScopes = (
       await Promise.all(accountIds.map(async (accountId) => {
-        const threadKeys = await invoke<string[]>('list_muted_thread_keys', { accountId });
+        const threadKeys = await invoke<string[]>(IPC.ListMutedThreadKeys, { accountId });
         return threadKeys.map((threadKey) => notificationThreadScopeKey({
           account_id: accountId,
           thread_key: threadKey,

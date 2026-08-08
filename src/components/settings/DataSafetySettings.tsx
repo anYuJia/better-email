@@ -45,7 +45,6 @@ export default function DataSafetySettings({
   connectionReport,
   storageUsage,
   storageBusy,
-  onExportDiagnostics,
   onImportEml,
   onPreviewBackup,
   onImportBackup,

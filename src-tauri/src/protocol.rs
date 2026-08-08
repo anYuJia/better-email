@@ -203,49 +203,48 @@ pub fn parse_imported_eml_bytes(raw: &[u8]) -> ImportedEmlMessage {
         })
         .map(|value| value.with_timezone(&Utc).to_rfc3339())
         .unwrap_or_else(|| Utc::now().to_rfc3339());
-    let message_id_header =
-        header_field("message-id").unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
+    let message_id_header = header_field("message-id")
+        .unwrap_or_else(|| format!("local-eml-{}", Utc::now().timestamp_micros()));
     let in_reply_to_header = header_field("in-reply-to").unwrap_or_default();
     let references_header = header_field("references").unwrap_or_default();
-    let attachments =
-        parsed
-            .as_ref()
-            .map(|message| {
-                message
-                    .attachments()
-                    .enumerate()
-                    .map(|(index, part)| {
-                        let mime_type = part
-                            .content_type()
-                            .map(|content_type| {
-                                content_type
-                                    .c_subtype
-                                    .as_ref()
-                                    .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
-                                    .unwrap_or_else(|| content_type.c_type.to_string())
-                            })
-                            .unwrap_or_else(|| "application/octet-stream".to_string());
-                        let content_id = normalize_content_id(part.content_id());
-                        let is_inline = part
-                            .content_disposition()
-                            .is_some_and(|disposition| disposition.is_inline())
-                            || !content_id.is_empty();
-                        ImportedEmlAttachment {
-                            filename: part
-                                .attachment_name()
-                                .map(crate::mime::decode_attachment_filename)
-                                .unwrap_or_else(|| {
-                                    inline_attachment_filename(&mime_type, &content_id, index)
-                                }),
-                            mime_type,
-                            bytes: part.contents().to_vec(),
-                            content_id,
-                            is_inline,
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+    let attachments = parsed
+        .as_ref()
+        .map(|message| {
+            message
+                .attachments()
+                .enumerate()
+                .map(|(index, part)| {
+                    let mime_type = part
+                        .content_type()
+                        .map(|content_type| {
+                            content_type
+                                .c_subtype
+                                .as_ref()
+                                .map(|subtype| format!("{}/{}", content_type.c_type, subtype))
+                                .unwrap_or_else(|| content_type.c_type.to_string())
+                        })
+                        .unwrap_or_else(|| "application/octet-stream".to_string());
+                    let content_id = normalize_content_id(part.content_id());
+                    let is_inline = part
+                        .content_disposition()
+                        .is_some_and(|disposition| disposition.is_inline())
+                        || !content_id.is_empty();
+                    ImportedEmlAttachment {
+                        filename: part
+                            .attachment_name()
+                            .map(crate::mime::decode_attachment_filename)
+                            .unwrap_or_else(|| {
+                                inline_attachment_filename(&mime_type, &content_id, index)
+                            }),
+                        mime_type,
+                        bytes: part.contents().to_vec(),
+                        content_id,
+                        is_inline,
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
 
     ImportedEmlMessage {
         sender_name: display_name_from_address(&from),

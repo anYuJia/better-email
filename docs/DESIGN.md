@@ -6,7 +6,7 @@ Better Email 是一个桌面端邮箱客户端实验。
 
 它保留传统邮箱的三栏工作方式。文件夹、邮件列表和阅读面板同时可见。常用动作直接出现，低频设置按需展开。
 
-它优先把数据留在本机。账号、文件夹、邮件、联系人、规则、发件箱、同步记录和附件元数据由 SQLite 管理。敏感凭据交给系统 Keychain。
+它优先把数据留在本机。账号、文件夹、邮件、联系人、规则、发件箱、同步记录和附件元数据由 SQLite 管理。敏感凭据优先交给系统 Keychain / Credential Manager（不可用时回退本地数据库并提示）。
 
 它不以“做全”为第一目标。当前阶段先保证本地工作台清楚、可恢复、可诊断，再逐步校准 IMAP、SMTP 和 OAuth2 的真实服务商表现。
 
@@ -145,7 +145,7 @@ SQLite local store + OS keychain
 - `src-tauri/src/commands.rs`：Tauri 命令，保持薄层。
 - `src-tauri/src/protocol.rs`：服务器网络测试、MIME 预览解析和 `ammonia` HTML sanitizer 清洗。
 - `src-tauri/src/imap_probe.rs` / `smtp.rs`：复用真实登录与发信传输配置执行凭据验证；SMTP 验证只完成 TLS、认证与 `NOOP`，不会发送邮件。
-- `src-tauri/src/credentials.rs`：系统 Keychain 凭据读写边界，保存应用专用密码、授权码或 OAuth2 token，并在 access token 临近过期时触发 refresh token 自动刷新。
+- `src-tauri/src/credentials.rs`：系统凭据库读写边界（macOS Keychain / Windows Credential Manager / Linux secret-service），保存应用专用密码、授权码或 OAuth2 token；写入失败时回退 SQLite `account_credentials` 表并明确提示，读取时优先系统凭据库并自动迁移存量明文。
 - `src-tauri/src/oauth.rs`：OAuth2 PKCE 授权 URL 生成、授权码 token 交换和 refresh token 刷新，支持 Gmail/Outlook 授权页启动与 token 端点请求。
 - `src-tauri/src/provider_probe.rs` + `src-tauri/examples/provider_probe.rs`：只读服务商验收内核与命令行入口；数据库以 SQLite 只读模式打开，按账号 ID 从 Keychain 读取凭据，只执行 IMAP/SMTP 登录、SMTP `NOOP`、文件夹发现和收件箱邮件头样本，报告只保留脱敏账号、阶段状态、耗时与数量。
 - `src-tauri/src/smtp.rs`：基于 `lettre` 的真实 SMTP 发件箱发送路径，支持密码/授权码、XOAUTH2 认证、纯文本/HTML `multipart/alternative` 和带附件的 `multipart/mixed`；发送时生成稳定 Message-ID，并在成功后返回同一份原始 MIME 供远端留档。
@@ -154,7 +154,7 @@ SQLite local store + OS keychain
 - `imap_mailboxes`：远端文件夹映射、系统角色推断、可空的本地自定义文件夹引用、UIDVALIDITY、最高/最低 UID 双游标、历史回填完成状态和最近历史回填时间。
 - `messages.remote_mailbox/remote_uid/message_id_header`：远端邮件头导入去重和后续正文拉取锚点。
 - `outbox_queue.status/message_id_header/remote_archive_*`：区分 SMTP 发送与远端已发送目录留档；`sent_remote_pending` 表示邮件已成功投递但 IMAP 留档待重试，绝不重新执行 SMTP。
-- `oauth_sessions`：OAuth2 PKCE 授权会话，保存 state、code challenge、verifier、scopes、授权码和交换状态，用于本地回调/token 交换恢复；access/refresh token 和 client 元数据只写入系统 Keychain。
+- `oauth_sessions`：OAuth2 PKCE 授权会话，保存 state、code challenge、scopes 和交换状态，用于本地回调/token 交换恢复；`code_verifier` 与 `authorization_code` 在 token 交换成功后擦除；access/refresh token 优先写入系统 Keychain。
 - 品牌升级迁移：新安装使用 `better-email` 包名、`Better Email` 产品名、`app.betteremail.client` 标识、`better-email.sqlite3` 数据库和 `Better Email` Keychain 服务；升级时自动读取并迁移旧 `swiftmail.*` localStorage、`swiftmail.sqlite3`/旧应用数据目录和 `SwiftMail` Keychain 凭据。
 - 未来模块：`sync/imap.rs`、`oauth.rs`、`attachments.rs`、`security.rs`、`rules.rs`。
 
@@ -192,7 +192,7 @@ SQLite local store + OS keychain
 
 ## 7. 安全策略
 
-- 账号密码/OAuth refresh token 永不进入普通数据库，使用系统 Keychain。
+- 账号密码/OAuth refresh token 优先写入系统 Keychain / Credential Manager；系统凭据库不可用时回退本地数据库（明文）并提示用户。
 - HTML 邮件默认清洗：移除脚本、事件属性、危险链接，并提示链接显示域名与真实跳转域名不一致、IP 地址跳转和登录/验证路径风险。
 - 远程图片默认阻止，用户可按发件人信任；信任后 sanitizer 与 CSP 仍只允许 HTTPS 图片，普通 HTTP tracker 和远程 HTTP/HTTPS 链接不因图片信任进入渲染面。
 - 所有同步错误可诊断，但日志自动脱敏邮箱地址、token、服务器密码。

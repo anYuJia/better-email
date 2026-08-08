@@ -1537,8 +1537,7 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         .map(protocol::format_address_list)
         .or_else(|| header_field("to"))
         .unwrap_or_default();
-    let message_id =
-        header_field("message-id").unwrap_or_else(|| format!("imap-{uid}"));
+    let message_id = header_field("message-id").unwrap_or_else(|| format!("imap-{uid}"));
     let in_reply_to = header_field("in-reply-to").unwrap_or_default();
     let references = header_field("references").unwrap_or_default();
     let received_at = fetch
@@ -2460,7 +2459,10 @@ mod tests {
         assert!(body.body.contains("用户数据计算过程"));
         assert!(body.snippet.contains("用户数据计算过程"));
         assert_eq!(body.attachments.len(), 1);
-        assert_eq!(body.attachments[0].filename, "用户数据计算过程26日7月汇总 (1).xlsx");
+        assert_eq!(
+            body.attachments[0].filename,
+            "用户数据计算过程26日7月汇总 (1).xlsx"
+        );
     }
 
     #[test]
@@ -2487,7 +2489,10 @@ mod tests {
         );
 
         assert_eq!(body.attachments.len(), 1);
-        assert_eq!(body.attachments[0].filename, "用户数据计算过程26日7月汇总 (1).xlsx");
+        assert_eq!(
+            body.attachments[0].filename,
+            "用户数据计算过程26日7月汇总 (1).xlsx"
+        );
     }
 
     #[test]
@@ -2529,7 +2534,9 @@ mod tests {
     fn parse_body_from_raw_falls_back_to_charset_decoded_text() {
         // Message that mail-parser fails to structure (no MIME headers at all)
         // with GBK bytes: the fallback path must not corrupt to U+FFFD.
-        let body = parse_body_from_raw(b"Content-Type: text/plain; charset=GBK\r\n\r\n\xD3\xC3\xBB\xA7\xCA\xFD\xBE\xDD");
+        let body = parse_body_from_raw(
+            b"Content-Type: text/plain; charset=GBK\r\n\r\n\xD3\xC3\xBB\xA7\xCA\xFD\xBE\xDD",
+        );
         assert!(body.body.contains("用户数据"), "got: {:?}", body.body);
     }
 }

@@ -51,7 +51,7 @@ Clippy 通过。
 | 功能域 | 状态 | 验证边界 |
 | --- | --- | --- |
 | 桌面壳 | 已验证 | Tauri + 系统 WebView；release 图标资源已重建为 PNG/ICNS/ICO 多尺寸资产。 |
-| 本地数据库 | 已验证 | SQLite + WAL；账号、文件夹、邮件、标签、附件元数据、本地备份和恢复路径可用；Keychain 凭据不进入备份。 |
+| 本地数据库 | 已验证 | SQLite + WAL；账号、文件夹、邮件、标签、附件元数据、本地备份和恢复路径可用；凭据优先入系统 Keychain，明文仅存在于回退路径，且不进入备份。 |
 | 三栏界面 | 已验证 | 文件夹、邮件列表、线程列表和阅读面板可拖拽、持久化和恢复默认宽度；低频设置分组折叠。 |
 | 设置中心 | 已验证 | 12 个设置页面一次只渲染当前页；桌面侧栏和窄屏分组选择器均有回归覆盖。 |
 | 多账号 | 部分验证 | 创建、切换、默认发件账号、统一邮箱视图和安全移除可用；真实多账号服务商样本仍需补充。 |
@@ -60,7 +60,7 @@ Clippy 通过。
 | 撰写与草稿 | 已验证 | 草稿保存、刷新后恢复、模板、附件元数据、回复线程头和远端 Drafts 替换路径有测试覆盖。 |
 | 发件箱 | 部分验证 | 撤销发送、稍后发送、SMTP 队列、失败重试和 Sent 留档重试路径可用；真实发送样本仍不足。 |
 | 附件 | 部分验证 | BODYSTRUCTURE、BODY.PEEK 分段写入、断点续传和流式解码可用；partial offset 和退避参数仍需真实服务商校准。 |
-| 安全 | 已验证 | Keychain、HTML sanitizer、远程图片默认阻止、信任后仅放行 HTTPS 图片且不恢复普通远程链接、钓鱼链接提示和脱敏诊断导出可用。 |
+| 安全 | 已验证 | 系统凭据库（Keychain / Credential Manager，含回退）、POP3 强制 TLS、HTML sanitizer、远程图片默认阻止、信任后仅放行 HTTPS 图片且不恢复普通远程链接、钓鱼链接提示和脱敏诊断导出可用。 |
 | 通知 | 部分验证 | 新邮件摘要、免打扰、VIP、账号静音、会话静音和角标入口可用；Windows overlay icon 仍需环境样本。 |
 | 联系人与规则 | 已验证 | 联系人新建、编辑、删除、合并建议、vCard 导入导出和规则处理路径可用；写信联系人建议限制候选数量并覆盖非正 limit 边界；CardDAV 不在当前阶段。 |
 | OAuth2 | 部分验证 | PKCE、回调、token 交换、refresh token 刷新和 XOAUTH2 登录路径可用；真实 Gmail/Outlook 样本仍需补充。 |
@@ -77,7 +77,7 @@ Clippy 通过。
 
 只读探测工具可用。
 
-`npm run probe:provider -- --list` 以 SQLite 只读模式列出脱敏账号。`npm run probe:provider -- --account-id <id>` 从 Keychain 读取凭据后，只执行 IMAP 登录、SMTP 认证 + `NOOP`、文件夹发现和收件箱邮件头抓取。JSON 不包含完整邮箱、密码、Token、主题、发件人或文件夹名称。
+`npm run probe:provider -- --list` 以 SQLite 只读模式列出脱敏账号。`npm run probe:provider -- --account-id <id>` 优先从系统凭据库读取凭据（回退 SQLite）后，只执行 IMAP 登录、SMTP 认证 + `NOOP`、文件夹发现和收件箱邮件头抓取。JSON 不包含完整邮箱、密码、Token、主题、发件人或文件夹名称。
 
 ## 当前缺口
 

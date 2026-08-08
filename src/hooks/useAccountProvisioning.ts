@@ -21,6 +21,7 @@ import type {
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type AccountProvisioningOptions = {
   accounts: Account[];
@@ -41,7 +42,7 @@ type AccountProvisioningOptions = {
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   setCredentialStatus: Dispatch<SetStateAction<CredentialStatus | null>>;
   setCredentialVerification: Dispatch<SetStateAction<CredentialVerificationReport | null>>;
-  setSyncRuns: Dispatch<SetStateAction<SyncRun[]>>;
+  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
   loadMeta: (
     nextFolderId?: number | null,
@@ -67,7 +68,6 @@ function accountFlowWarn(event: string, details: Record<string, unknown> = {}) {
 }
 
 export default function useAccountProvisioning({
-  accounts,
   accountForm,
   newAccountForm,
   query,
@@ -106,7 +106,7 @@ export default function useAccountProvisioning({
     try {
       onProgress?.('正在创建本地邮箱账号...');
       await new Promise((resolve) => setTimeout(resolve, 600));
-      const created = await invoke<Account>('create_account', { input: newAccountForm });
+      const created = await invoke<Account>(IPC.CreateAccount, { input: newAccountForm });
       accountFlowLog('create account stored', {
         accountId: created.id,
         email: maskEmailForLog(created.email),
@@ -116,7 +116,7 @@ export default function useAccountProvisioning({
       if (trimmedSecret) {
         onProgress?.('正在保存本机本地凭据...');
         await new Promise((resolve) => setTimeout(resolve, 600));
-        const credentialResult = await invoke<CredentialStatus>('store_account_secret', {
+        const credentialResult = await invoke<CredentialStatus>(IPC.StoreAccountSecret, {
           input: { account_email: created.email, secret: trimmedSecret },
         });
         setCredentialStatus(credentialResult);
@@ -133,7 +133,7 @@ export default function useAccountProvisioning({
             message: credentialResult.message,
           });
           try {
-            await invoke<Account | null>('delete_account', { accountId: created.id });
+            await invoke<Account | null>(IPC.DeleteAccount, { accountId: created.id });
           } catch (rollbackError) {
             accountFlowWarn('credential rollback failed', {
               accountId: created.id,
@@ -145,7 +145,7 @@ export default function useAccountProvisioning({
         }
         onProgress?.('正在连接服务器验证登录凭据...');
         await new Promise((resolve) => setTimeout(resolve, 600));
-        verification = await invoke<CredentialVerificationReport>('verify_account_credentials_with_secret', {
+        verification = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentialsWithSecret, {
           input: {
             account_id: created.id,
             secret: trimmedSecret,
@@ -165,7 +165,7 @@ export default function useAccountProvisioning({
             message: verification.message,
           });
           try {
-            await invoke<Account | null>('delete_account', { accountId: created.id });
+            await invoke<Account | null>(IPC.DeleteAccount, { accountId: created.id });
           } catch (rollbackError) {
             accountFlowWarn('verification rollback failed', {
               accountId: created.id,
@@ -194,10 +194,10 @@ export default function useAccountProvisioning({
         try {
           onProgress?.('已成功登录！正在同步服务器邮件列表...');
           await new Promise((resolve) => setTimeout(resolve, 600));
-          const syncRun = await invoke<SyncRun>('sync_imap_headers', {
+          const syncRun = await invoke<SyncRun>(IPC.SyncImapHeaders, {
             accountId: created.id,
           });
-          setSyncRuns((current) => [syncRun, ...current].slice(0, 10));
+          setSyncRuns?.((current) => [syncRun, ...current].slice(0, 10));
           accountFlowLog('initial mailbox sync done', {
             accountId: created.id,
             status: syncRun.status,
@@ -270,7 +270,7 @@ export default function useAccountProvisioning({
 
     let nextAccount: Account | null = null;
     try {
-      nextAccount = await invoke<Account | null>('remove_account', {
+      nextAccount = await invoke<Account | null>(IPC.RemoveAccount, {
         accountId: removedAccount.id,
         deleteCredentials: deleteSecret,
       });
@@ -341,7 +341,7 @@ export default function useAccountProvisioning({
   ]);
 
   const setDefaultAccount = useCallback(async (accountId: number) => {
-    const updated = await invoke<Account>('set_default_account', { accountId });
+    const updated = await invoke<Account>(IPC.SetDefaultAccount, { accountId });
     setAccounts((current) => current
       .map((item) => ({ ...item, is_default: item.id === updated.id }))
       .sort((left, right) => Number(right.is_default) - Number(left.is_default) || left.id - right.id));

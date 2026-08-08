@@ -507,8 +507,7 @@ kbd {
 }
 
 .label-list,
-.saved-search-list,
-.folded-folder-list {
+.saved-search-list {
   background: rgba(255, 255, 255, 0.34);
 }
 

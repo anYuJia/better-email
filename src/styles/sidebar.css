@@ -124,8 +124,7 @@
 }
 
 .label-list,
-.saved-search-list,
-.folded-folder-list {
+.saved-search-list {
   padding: 8px;
 }
 
@@ -161,15 +160,6 @@
   color: #8fa0af;
   font-size: 11px;
   white-space: nowrap;
-}
-
-.folded-folder-list {
-  gap: 2px;
-}
-
-.folded-folder-list .folder {
-  min-height: 34px;
-  padding: 7px 8px;
 }
 
 .sidebar-utility-actions {

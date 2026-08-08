@@ -16,15 +16,13 @@
 }
 
 .folder,
-.sidebar-disclosure summary,
-.folded-folder-list .folder {
+.sidebar-disclosure summary {
   background: transparent;
   box-shadow: none;
 }
 
 .folder:hover,
 .sidebar-disclosure summary:hover,
-.folded-folder-list .folder:hover,
 .folder:focus-within {
   color: var(--ui-text);
   background: var(--quiet-row-hover);

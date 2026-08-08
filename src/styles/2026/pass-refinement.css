@@ -105,8 +105,7 @@ body {
 }
 
 .folder,
-.sidebar-disclosure summary,
-.folded-folder-list .folder {
+.sidebar-disclosure summary {
   min-height: 31px;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
@@ -114,8 +113,7 @@ body {
 }
 
 .folder:hover,
-.sidebar-disclosure summary:hover,
-.folded-folder-list .folder:hover {
+.sidebar-disclosure summary:hover {
   color: var(--ui-text);
   background: rgba(31, 35, 40, 0.045);
 }

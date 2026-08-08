@@ -48,7 +48,6 @@
 }
 
 .sidebar-quick-menus .sidebar-disclosure > :not(summary),
-.sidebar-quick-menus .more-mailboxes > .folded-folder-list,
 .sidebar-tools > .sidebar-tool-stack {
   position: static !important;
   left: auto !important;

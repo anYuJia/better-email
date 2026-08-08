@@ -200,10 +200,6 @@
   color: var(--ui-text-secondary) !important;
 }
 
-.folded-folder-list {
-  padding: 3px 0 4px 7px;
-}
-
 .sidebar-tool-stack {
   max-height: 45vh;
   gap: 8px;

@@ -12,9 +12,6 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
-.settings-modal input:focus,
-.settings-modal select:focus,
-.settings-modal textarea:focus,
 .composer input:focus,
 .composer select:focus,
 .composer textarea:focus {

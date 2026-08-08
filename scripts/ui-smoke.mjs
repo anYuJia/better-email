@@ -325,7 +325,8 @@ async function openSettingsSection(cdp, label, section, expectedSelector) {
       && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(label)})
       && document.querySelector(${JSON.stringify(expectedSelector)})
       && [...document.querySelectorAll('[data-settings-section]')]
-        .every((item) => item.dataset.settingsSection === ${JSON.stringify(section)})`,
+        .every((item) => item.dataset.settingsSection === ${JSON.stringify(section)}
+          || item.dataset.settingsSection.startsWith(${JSON.stringify(section)} + '-'))`,
   );
 }
 
@@ -339,6 +340,366 @@ async function openDetails(cdp, selector) {
       details.dispatchEvent(new Event('toggle', { bubbles: true }));
     })()`,
   );
+}
+
+async function rectDetails(cdp, selector) {
+  return evalInPage(
+    cdp,
+    `(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element) throw new Error('Rect target not found: ${selector}');
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+        marginLeft: style.marginLeft,
+        marginRight: style.marginRight,
+        paddingLeft: style.paddingLeft,
+        paddingRight: style.paddingRight,
+      };
+    })()`,
+  );
+}
+
+async function assertSettingsEdgesAligned(cdp, label, pairName, selectorA, selectorB, tolerance = 1) {
+  const rectA = await rectDetails(cdp, selectorA);
+  const rectB = await rectDetails(cdp, selectorB);
+  const diffLeft = Math.abs(rectA.left - rectB.left);
+  const diffRight = Math.abs(rectA.right - rectB.right);
+  console.log(`${label}: ${pairName} leftDiff=${diffLeft.toFixed(3)}px rightDiff=${diffRight.toFixed(3)}px`);
+  if (diffLeft > tolerance || diffRight > tolerance) {
+    throw new Error(
+      `${label}: ${pairName} edges misaligned (leftDiff=${diffLeft.toFixed(3)}px rightDiff=${diffRight.toFixed(3)}px); rectA=${JSON.stringify(rectA)} rectB=${JSON.stringify(rectB)}`,
+    );
+  }
+  return { rectA, rectB, diffLeft, diffRight };
+}
+
+async function assertSettingsProvidersGeometry(cdp, label) {
+  await assertSettingsEdgesAligned(
+    cdp,
+    label,
+    '连接参数卡片 vs 兼容性验证卡片',
+    '.settings-page[data-settings-page="providers"] .st-section',
+    '.settings-page[data-settings-page="providers"] details[data-settings-section="providers"]',
+  );
+  const content = await rectDetails(cdp, '.settings-provider-advanced-content');
+  const matrix = await rectDetails(cdp, '.settings-provider-matrix');
+  const padLeft = Number.parseFloat(content.paddingLeft) || 0;
+  const padRight = Number.parseFloat(content.paddingRight) || 0;
+  const expectedLeft = content.left + padLeft;
+  const expectedRight = content.right - padRight;
+  const diffLeft = Math.abs(matrix.left - expectedLeft);
+  const diffRight = Math.abs(matrix.right - expectedRight);
+  const insideLeft = matrix.left >= expectedLeft - 0.5;
+  const insideRight = matrix.right <= expectedRight + 0.5;
+  const edgeFit = diffLeft <= 0.5 && diffRight <= 0.5;
+  const legacyMargin = Math.max(
+    Math.abs(Number.parseFloat(matrix.marginLeft) || 0),
+    Math.abs(Number.parseFloat(matrix.marginRight) || 0),
+  );
+  console.log(`${label}: 兼容性矩阵 insideContent=${insideLeft && insideRight} edgeFit=${edgeFit} diffLeft=${diffLeft.toFixed(3)}px diffRight=${diffRight.toFixed(3)}px expectedLeft=${expectedLeft} expectedRight=${expectedRight} legacyMargin=${legacyMargin}px content=${JSON.stringify(content)} matrix=${JSON.stringify(matrix)}`);
+  if (!insideLeft || !insideRight || !edgeFit || legacyMargin > 0.5) {
+    throw new Error(
+      `${label}: 兼容性矩阵边缘越界、残留旧外边距或未精确贴边 (insideLeft=${insideLeft} insideRight=${insideRight} edgeFit=${edgeFit} diffLeft=${diffLeft.toFixed(3)}px diffRight=${diffRight.toFixed(3)}px expectedLeft=${expectedLeft} expectedRight=${expectedRight} legacyMargin=${legacyMargin}px); content=${JSON.stringify(content)} matrix=${JSON.stringify(matrix)}`,
+    );
+  }
+}
+
+async function assertSettingsAuthAlignment(cdp, label) {
+  await assertSettingsEdgesAligned(
+    cdp,
+    label,
+    '登录方式卡片 vs 授权码引导卡片',
+    '.settings-page[data-settings-page="auth"] .st-section',
+    '.settings-page[data-settings-page="auth"] .settings-auth-guide',
+  );
+}
+
+async function assertSettingsAuthOAuth2Alignment(cdp, label) {
+  await assertSettingsAuthAlignment(cdp, label);
+  await assertSettingsEdgesAligned(
+    cdp,
+    label,
+    '登录方式卡片 vs OAuth2 授权卡片',
+    '.settings-page[data-settings-page="auth"] .st-section',
+    '.settings-page[data-settings-page="auth"] .settings-oauth-primary',
+  );
+  await openDetails(cdp, '.settings-oauth-advanced');
+  await assertSettingsEdgesAligned(
+    cdp,
+    label,
+    '登录方式卡片 vs OAuth 高级详情卡片',
+    '.settings-page[data-settings-page="auth"] .st-section',
+    '.settings-page[data-settings-page="auth"] .settings-oauth-advanced',
+  );
+}
+
+async function probeOAuthResultCards(cdp) {
+  return evalInPage(
+    cdp,
+    `(() => {
+      const cardEls = [...document.querySelectorAll('.settings-oauth-result')];
+      const readCard = (el) => {
+        const cs = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return {
+          rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+          display: cs.display,
+          gap: cs.gap,
+          paddingTop: cs.paddingTop,
+          paddingRight: cs.paddingRight,
+          paddingBottom: cs.paddingBottom,
+          paddingLeft: cs.paddingLeft,
+          borderWidth: cs.borderWidth,
+          borderColor: cs.borderColor,
+          borderRadius: cs.borderRadius,
+          backgroundColor: cs.backgroundColor,
+          color: cs.color,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          fontStyle: cs.fontStyle,
+          whiteSpace: cs.whiteSpace,
+          overflowX: cs.overflowX,
+          overflowY: cs.overflowY,
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+        };
+      };
+      const cards = cardEls.map(readCard);
+      const first = cardEls[0];
+      const children = {};
+      for (const sel of ['strong', 'span', 'small', 'em']) {
+        const el = first?.querySelector(':scope > ' + sel);
+        if (!el) { children[sel] = null; continue; }
+        const cs = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        children[sel] = {
+          rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+          display: cs.display,
+          color: cs.color,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          fontStyle: cs.fontStyle,
+          whiteSpace: cs.whiteSpace,
+          overflowX: cs.overflowX,
+          overflowY: cs.overflowY,
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+        };
+      }
+      const page = document.querySelector('.settings-page');
+      const pageContent = document.querySelector('.settings-page-content');
+      const content = document.querySelector('.settings-content');
+      return {
+        cardCount: cardEls.length,
+        hasLegacyClass: !!document.querySelector('.oauth-result'),
+        cards,
+        children,
+        page: page
+          ? { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth }
+          : null,
+        pageContent: pageContent
+          ? (() => { const r = pageContent.getBoundingClientRect(); return { left: r.left, right: r.right }; })()
+          : null,
+        content: content
+          ? { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth }
+          : null,
+      };
+    })()`,
+  );
+}
+
+async function assertOAuthResultCardGeometry(cdp, label) {
+  const data = await probeOAuthResultCards(cdp);
+  console.log(`${label}: ${JSON.stringify(data)}`);
+  const failures = [];
+  if (data.cardCount !== 4) failures.push(`cardCount=${data.cardCount}`);
+  if (data.hasLegacyClass) failures.push('legacy .oauth-result present');
+  if (!data.cards.every((card) => card.scrollWidth <= card.clientWidth)) failures.push('card horizontal overflow');
+  if (data.page && data.page.scrollWidth > data.page.clientWidth) failures.push('page horizontal overflow');
+  if (data.content && data.content.scrollWidth > data.content.clientWidth) failures.push('content horizontal overflow');
+  if (data.pageContent) {
+    if (!data.cards.every((card) => card.rect.left >= data.pageContent.left - 1 && card.rect.right <= data.pageContent.right + 1)) {
+      failures.push('card outside page content area');
+    }
+  }
+  const first = data.cards[0];
+  if (first) {
+    if (first.display !== 'grid') failures.push(`container display=${first.display}`);
+    if (first.gap !== '3px') failures.push(`container gap=${first.gap}`);
+    if (!(first.paddingTop === '10px' && first.paddingRight === '12px' && first.paddingBottom === '10px' && first.paddingLeft === '12px')) {
+      failures.push(`container padding=${first.paddingTop}/${first.paddingRight}/${first.paddingBottom}/${first.paddingLeft}`);
+    }
+  }
+  const expectedChildren = {
+    strong: { fontSize: '13.5px', fontWeight: '580', fontStyle: 'normal' },
+    span: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
+    small: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
+    em: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
+  };
+  for (const [sel, exp] of Object.entries(expectedChildren)) {
+    const child = data.children[sel];
+    if (!child) { failures.push(`child ${sel} missing`); continue; }
+    if (child.fontSize !== exp.fontSize) failures.push(`${sel} fontSize=${child.fontSize}`);
+    if (child.fontWeight !== exp.fontWeight) failures.push(`${sel} fontWeight=${child.fontWeight}`);
+    if (child.fontStyle !== exp.fontStyle) failures.push(`${sel} fontStyle=${child.fontStyle}`);
+    if (child.scrollWidth > child.clientWidth) failures.push(`${sel} horizontal overflow`);
+  }
+  if (failures.length > 0) {
+    throw new Error(`${label}: oauth result card contract violated (${failures.join('; ')}); data=${JSON.stringify(data)}`);
+  }
+}
+
+async function assertSettingsNoHorizontalOverflow(cdp, label) {
+  const metrics = await evalInPage(
+    cdp,
+    `(() => {
+      const content = document.querySelector('.settings-content');
+      if (!content) throw new Error('Settings content not found');
+      return { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth };
+    })()`,
+  );
+  console.log(`${label}: settings-content scrollWidth=${metrics.scrollWidth} clientWidth=${metrics.clientWidth}`);
+  if (metrics.scrollWidth > metrics.clientWidth) {
+    throw new Error(`${label}: settings content overflows horizontally: ${JSON.stringify(metrics)}`);
+  }
+}
+
+async function assertSettingsV2LayoutContract(cdp, label, viewport) {
+  const data = await evalInPage(
+    cdp,
+    `(() => {
+      const out = { viewport: { width: window.innerWidth, height: window.innerHeight } };
+      const pick = (name, selector, props) => {
+        const el = document.querySelector(selector);
+        if (!el) { out[name] = null; return; }
+        const cs = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        const style = {};
+        for (const p of props) style[p] = cs[p];
+        out[name] = { rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }, style };
+      };
+      pick('modal', '.settings-modal', ['display', 'flexDirection', 'width', 'height', 'borderRadius', 'overflow']);
+      pick('mainHeader', '.settings-main-header', ['display', 'position', 'minHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'backgroundColor']);
+      pick('nav', '.settings-nav', ['display', 'flexDirection', 'width', 'borderRightWidth']);
+      pick('content', '.settings-content', ['display', 'paddingTop', 'paddingBottom', 'overflow']);
+      pick('page', '.settings-page', ['display', 'width', 'overflowY']);
+      pick('pageHeader', '.settings-page-header', ['display', 'position', 'minHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'backgroundColor']);
+      pick('mobileToolbar', '.settings-mobile-toolbar', ['display', 'position']);
+      pick('pageContent', '.settings-page-content', ['display', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
+      const content = document.querySelector('.settings-content');
+      if (content) {
+        out.contentOverflow = { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth };
+      }
+      out.pageData = document.querySelector('.settings-page')?.dataset.settingsPage ?? null;
+      return out;
+    })()`,
+  );
+  const failures = [];
+  const rect = (name) => data[name]?.rect ?? null;
+  const style = (name, prop) => data[name]?.style?.[prop] ?? null;
+  if (!data.modal) failures.push('modal missing');
+  if (viewport === 'desktop') {
+    if (data.nav && style('nav', 'display') !== 'flex') failures.push(`nav display=${style('nav', 'display')}`);
+    if (data.mobileToolbar && style('mobileToolbar', 'display') !== 'none') failures.push(`mobileToolbar display=${style('mobileToolbar', 'display')}`);
+    if (data.mainHeader && style('mainHeader', 'minHeight') !== '48px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
+    if (data.mainHeader && style('mainHeader', 'position') !== 'sticky') failures.push(`mainHeader position=${style('mainHeader', 'position')}`);
+    if (data.pageHeader && style('pageHeader', 'minHeight') !== '48px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
+    if (data.content && style('content', 'paddingTop') !== '16px') failures.push(`content paddingTop=${style('content', 'paddingTop')}`);
+    if (data.content && style('content', 'paddingBottom') !== '30px') failures.push(`content paddingBottom=${style('content', 'paddingBottom')}`);
+    const m = rect('modal');
+    if (m && m.width > 1081) failures.push(`modal width=${m.width}`);
+  } else if (viewport === 'narrow') {
+    if (data.nav && style('nav', 'display') === 'flex') failures.push('nav visible on narrow');
+    if (data.mobileToolbar && style('mobileToolbar', 'display') !== 'block') failures.push(`mobileToolbar display=${style('mobileToolbar', 'display')}`);
+    const m = rect('modal');
+    if (m && Math.abs(m.width - data.viewport.width) > 1) failures.push(`modal width=${m.width} vs viewport=${data.viewport.width}`);
+  }
+  if (data.contentOverflow && data.contentOverflow.scrollWidth > data.contentOverflow.clientWidth) {
+    failures.push(`content horizontal overflow ${JSON.stringify(data.contentOverflow)}`);
+  }
+  console.log(`${label}: ${JSON.stringify(data)}`);
+  if (failures.length > 0) {
+    throw new Error(`${label}: layout contract violated (${failures.join('; ')}); data=${JSON.stringify(data)}`);
+  }
+}
+
+async function assertSettingsPagesEnterable(cdp, label, pages) {
+  const failures = [];
+  for (const page of pages) {
+    const state = await evalInPage(
+      cdp,
+      `(() => {
+        const label = ${JSON.stringify(page.label)};
+        let button = null;
+        if (${JSON.stringify(page.tab === true)}) {
+          button = [...document.querySelectorAll('.settings-connection-tabs button')]
+            .find((item) => item.textContent.trim() === label);
+        }
+        if (!button) {
+          button = [...document.querySelectorAll('.settings-nav-section > button')]
+            .find((item) => item.textContent.trim() === label);
+        }
+        if (!button) return { entered: false, reason: 'nav button missing' };
+        button.click();
+        return { entered: true, label };
+      })()`,
+    );
+    if (!state.entered) { failures.push(`${page.id}: ${state.reason}`); continue; }
+    try {
+      await waitForExpression(
+        cdp,
+        `document.querySelector('.settings-page')?.dataset.settingsPage === ${JSON.stringify(page.id)}
+          && document.querySelector('.settings-page-header strong')?.textContent.trim() === ${JSON.stringify(page.headerLabel ?? page.label)}`,
+      );
+    } catch (error) {
+      const probe = await evalInPage(
+        cdp,
+        `(() => ({
+          modalOpen: !!document.querySelector('.settings-modal'),
+          page: document.querySelector('.settings-page')?.dataset.settingsPage ?? null,
+          header: document.querySelector('.settings-page-header strong')?.textContent.trim() ?? null,
+          navButtons: [...document.querySelectorAll('.settings-nav-section > button')].map((b) => b.textContent.trim()),
+          tabs: [...document.querySelectorAll('.settings-connection-tabs button')].map((b) => b.textContent.trim()),
+        }))()`,
+      );
+      throw new Error(`${label}: ${page.id} navigation timed out; state=${JSON.stringify(probe)}; original=${error.message}`);
+    }
+    await waitForSettingsPageStable(cdp);
+    const pageState = await evalInPage(
+      cdp,
+      `(() => {
+        const page = document.querySelector('.settings-page');
+        const rect = page?.getBoundingClientRect();
+        const style = page ? getComputedStyle(page) : null;
+        return {
+          id: page?.dataset.settingsPage ?? null,
+          title: document.querySelector('.settings-page-header strong')?.textContent.trim() ?? null,
+          rect: rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height } : null,
+          overflowY: style?.overflowY ?? null,
+          scrollWidth: page?.scrollWidth ?? null,
+          clientWidth: page?.clientWidth ?? null,
+        };
+      })()`,
+    );
+    console.log(`${label}: ${page.id} page=${JSON.stringify(pageState)}`);
+    if (pageState.id !== page.id || pageState.title !== (page.headerLabel ?? page.label)) {
+      failures.push(`${page.id}: entered but state mismatch ${JSON.stringify(pageState)}`);
+    }
+    if (pageState.rect && pageState.rect.width < 100) {
+      failures.push(`${page.id}: page too narrow ${JSON.stringify(pageState.rect)}`);
+    }
+    if (pageState.scrollWidth != null && pageState.scrollWidth > pageState.clientWidth + 1) {
+      failures.push(`${page.id}: page horizontal overflow ${JSON.stringify(pageState)}`);
+    }
+  }
+  if (failures.length > 0) throw new Error(`${label}: page enterability failed (${failures.join('; ')})`);
 }
 
 async function fillInput(cdp, selector, value, index = 0) {
@@ -960,7 +1321,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page-header')?.innerText.includes('账号') && !document.body.innerText.includes('OAuth2 向导')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-section > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置页面\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-section > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label^=\"搜索设置页面\"]')");
     await evalInPage(
       cdp,
       `(() => {
@@ -990,17 +1351,45 @@ async function main() {
     await clickButton(cdp, '认证', "document.querySelector('.settings-connection-tabs')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'auth' && document.querySelector('.settings-oauth-primary')");
     await openDetails(cdp, '.settings-provider-advanced');
+    await assertSettingsAuthOAuth2Alignment(cdp, '认证 OAuth2 模式 1440x980');
     await fillInput(cdp, '.settings-provider-advanced-content input[placeholder*="Client ID"]', 'smoke-client-id');
     await clickButton(cdp, '开始授权', "document.querySelector('.settings-oauth-primary')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('outlook · Session #1') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('authorization_pending')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('outlook · Session #1') && [...document.querySelectorAll('.settings-oauth-result')].some((el) => el.textContent.includes('Session #1')) && !document.querySelector('.oauth-result') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('authorization_pending')");
     await fillInput(cdp, '.settings-oauth-callback input[placeholder="回调 state"]', 'mock-state-1');
     await fillInput(cdp, '.settings-oauth-callback input[placeholder="授权码 code"]', 'smoke-authorization-code');
     await clickButton(cdp, '记录回调授权码', "document.querySelector('.settings-oauth-callback')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('code_received') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('交换并保存 Token')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('code_received') && [...document.querySelectorAll('.settings-oauth-result')].some((el) => el.textContent.includes('code_received')) && !document.querySelector('.oauth-result') && document.querySelector('.settings-oauth-sessions')?.innerText.includes('交换并保存 Token')");
     await clickButton(cdp, '交换并保存 Token', "document.querySelector('.settings-oauth-sessions')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('token_stored')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('token_stored') && [...document.querySelectorAll('.settings-oauth-result')].some((el) => el.textContent.includes('token_stored')) && !document.querySelector('.oauth-result')");
     await clickButton(cdp, '刷新已保存 Token', "document.querySelector('.settings-page[data-settings-page=\"auth\"]')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('refreshed') && document.querySelector('.status-line')?.textContent.includes('OAuth2 Token 已刷新')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"auth\"]')?.innerText.includes('refreshed') && [...document.querySelectorAll('.settings-oauth-result')].some((el) => el.textContent.includes('refreshed')) && !document.querySelector('.oauth-result') && document.querySelector('.status-line')?.textContent.includes('OAuth2 Token 已刷新')");
+    await assertOAuthResultCardGeometry(cdp, 'OAuth 结果卡 1440x980');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1180,
+      height: 760,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1180');
+    await waitForSettingsPageStable(cdp);
+    await assertOAuthResultCardGeometry(cdp, 'OAuth 结果卡 1180x760');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 430,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 430');
+    await waitForSettingsPageStable(cdp);
+    await assertOAuthResultCardGeometry(cdp, 'OAuth 结果卡 430x780');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1440');
+    await waitForSettingsPageStable(cdp);
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
 
     await evalInPage(cdp, "document.querySelector('.account-switcher-trigger').click()");
@@ -1065,11 +1454,41 @@ async function main() {
     await waitForExpression(cdp, "(() => { const header = document.querySelector('.settings-page-header')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return header && content && header.bottom <= content.top + 1; })()");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-desktop');
+    await assertSettingsProvidersGeometry(cdp, '服务器页 1440x980');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1180,
+      height: 760,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1180');
+    await waitForSettingsPageStable(cdp);
+    await assertSettingsProvidersGeometry(cdp, '服务器页 1180x760');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 430,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 430');
+    await assertSettingsNoHorizontalOverflow(cdp, '服务器页 430x780');
+    await assertSettingsV2LayoutContract(cdp, '服务器页 窄屏布局契约 430x780', 'narrow');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1440');
+    await waitForSettingsPageStable(cdp);
     await clickButton(cdp, '认证', "document.querySelector('.settings-connection-tabs')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('本地凭据存储') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后立即清空输入框') && document.querySelector('.settings-credential-panel')?.innerText.includes('验证登录')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel .credential-guide-card') && document.querySelector('.credential-provider-tag')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-auth-desktop');
+    await waitForExpression(cdp, "document.querySelector('.settings-auth-guide')?.innerText.includes('授权码模式')");
+    await assertSettingsAuthAlignment(cdp, '认证 授权码模式 1440x980');
+    await assertSettingsV2LayoutContract(cdp, '认证页 桌面布局契约 1440x980', 'desktop');
     await fillInput(cdp, '.credential-input-shell input', 'local-smoke-app-password');
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('保存并验证') && document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]')");
     await evalInPage(cdp, "document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]').click()");
@@ -1182,20 +1601,180 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已导出') && document.querySelector('.status-line')?.textContent.includes('/tmp/better-email-contacts.vcf')");
 
     await openSettingsSection(cdp, '规则', 'rules', '.settings-page[data-settings-page="rules"]');
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"rules\"] .rule-editor input[placeholder=\"规则名称\"]')");
-    await fillInput(cdp, '.rule-editor input[placeholder=\"规则名称\"]', 'Smoke Rule');
-    await pickCustomSelect(cdp, '.rule-builder .custom-select-summary[aria-label="规则条件字段"]', '主题');
-    await fillInput(cdp, '.rule-builder input[placeholder=\"关键词或邮箱\"]', 'Smoke');
-    await pickCustomSelect(cdp, '.rule-builder .custom-select-summary[aria-label="规则标签动作"]', '工作');
-    await clickButton(cdp, '加星标', "document.querySelector('.rule-action-chips')");
+    await waitForExpression(cdp, "document.querySelector('.settings-rule-editor') && document.querySelector('.settings-rule-builder') && document.querySelector('.settings-rule-action-chips') && document.querySelector('.settings-rule-advanced') && document.querySelector('.settings-rule-item') && document.querySelector('.settings-page[data-settings-page=\"rules\"] .settings-rule-editor input[placeholder=\"规则名称\"]')");
+    const ruleOverflow1440 = await evalInPage(
+      cdp,
+      `(() => {
+        const page = document.querySelector('.settings-page');
+        const content = document.querySelector('.settings-content');
+        return {
+          page: { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth },
+          content: { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth },
+        };
+      })()`,
+    );
+    console.log(`规则页 1440x980 溢出检查: ${JSON.stringify(ruleOverflow1440)}`);
+    if (ruleOverflow1440.page.scrollWidth > ruleOverflow1440.page.clientWidth || ruleOverflow1440.content.scrollWidth > ruleOverflow1440.content.clientWidth) {
+      throw new Error(`规则页 1440x980 横向溢出: ${JSON.stringify(ruleOverflow1440)}`);
+    }
+    await evalInPage(cdp, "(() => { const d = document.querySelector('.settings-rule-advanced'); d.open = true; d.dispatchEvent(new Event('toggle', { bubbles: true })); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-rule-advanced')?.open");
+    await evalInPage(cdp, "(() => { const d = document.querySelector('.settings-rule-advanced'); d.open = false; d.dispatchEvent(new Event('toggle', { bubbles: true })); })()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-rule-advanced')?.open");
+    await evalInPage(cdp, "(() => { const d = document.querySelector('.settings-rule-advanced'); d.open = true; d.dispatchEvent(new Event('toggle', { bubbles: true })); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-rule-advanced')?.open");
+    await fillInput(cdp, '.settings-rule-editor input[placeholder="规则名称"]', 'Smoke Rule');
+    await pickCustomSelect(cdp, '.settings-rule-builder .custom-select-summary[aria-label="规则条件字段"]', '主题');
+    await fillInput(cdp, '.settings-rule-builder input[placeholder="关键词或邮箱"]', 'Smoke');
+    await pickCustomSelect(cdp, '.settings-rule-builder .custom-select-summary[aria-label="规则标签动作"]', '工作');
+    await clickButton(cdp, '加星标', "document.querySelector('.settings-rule-action-chips')");
     await waitForExpression(cdp, "document.querySelector('input[aria-label=\"规则条件语法\"]').value === 'subject contains Smoke' && document.querySelector('input[aria-label=\"规则动作语法\"]').value.includes('apply label 工作') && document.querySelector('input[aria-label=\"规则动作语法\"]').value.includes('star')");
-    await clickButton(cdp, '新增规则', "document.querySelector('.rule-editor')");
+    await clickButton(cdp, '新增规则', "document.querySelector('.settings-rule-editor')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('规则已保存：Smoke Rule') && document.querySelector('.settings-page[data-settings-page=\"rules\"]')?.innerText.includes('Smoke Rule')");
+    await clickButton(cdp, '编辑', "[...document.querySelectorAll('.settings-rule-item')].find((item) => item.textContent.includes('Smoke Rule'))");
+    await waitForExpression(cdp, "document.querySelector('.settings-rule-editor input[placeholder=\"规则名称\"]')?.value === 'Smoke Rule'");
+    await fillInput(cdp, '.settings-rule-editor input[placeholder="规则名称"]', 'Smoke Rule 改');
+    await clickButton(cdp, '更新规则', "document.querySelector('.settings-rule-editor')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('规则已保存：Smoke Rule 改') && [...document.querySelectorAll('.settings-rule-item')].some((item) => item.textContent.includes('Smoke Rule 改'))");
+    await clickButton(cdp, '删除', "[...document.querySelectorAll('.settings-rule-item')].find((item) => item.textContent.includes('Smoke Rule 改'))");
+    await waitForExpression(cdp, "document.querySelector('.dialog-card') && document.querySelector('.dialog-card')?.innerText.includes('删除规则')");
+    await clickButton(cdp, '确认', "document.querySelector('.dialog-card')");
+    await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('规则已删除：Smoke Rule 改') && ![...document.querySelectorAll('.settings-rule-item')].some((item) => item.textContent.includes('Smoke Rule 改'))");
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 430,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 430');
+    await waitForSettingsPageStable(cdp);
+    const ruleOverflow430 = await evalInPage(
+      cdp,
+      `(() => {
+        const page = document.querySelector('.settings-page');
+        const content = document.querySelector('.settings-content');
+        return {
+          page: { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth },
+          content: { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth },
+        };
+      })()`,
+    );
+    console.log(`规则页 430x780 溢出检查: ${JSON.stringify(ruleOverflow430)}`);
+    if (ruleOverflow430.page.scrollWidth > ruleOverflow430.page.clientWidth || ruleOverflow430.content.scrollWidth > ruleOverflow430.content.clientWidth) {
+      throw new Error(`规则页 430x780 横向溢出: ${JSON.stringify(ruleOverflow430)}`);
+    }
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1440');
+    await waitForSettingsPageStable(cdp);
 
     await openSettingsSection(cdp, '安全预览', 'security-preview', '.settings-page[data-settings-page="security-preview"]');
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"security-preview\"] button')].some((item) => item.textContent.includes('解析'))");
     await clickButton(cdp, '解析', "document.querySelector('.settings-page[data-settings-page=\"security-preview\"]')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"security-preview\"] .preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-page[data-settings-page=\"security-preview\"] .preview-result')?.innerText.includes('HTML 正文包含 script 标签')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"security-preview\"] .settings-preview-result')?.innerText.includes('安全预览样例') && document.querySelector('.settings-page[data-settings-page=\"security-preview\"] .settings-preview-result')?.innerText.includes('HTML 正文包含 script 标签') && document.querySelector('.settings-preview-result') && document.querySelector('.settings-sanitized-html-preview') && document.querySelector('.settings-sanitized-html-preview img') && document.querySelector('.settings-sanitized-html-preview p')?.textContent.includes('这是一封用于验证 MIME/HTML 安全预览的原始邮件') && document.querySelector('.settings-preview-result details') && document.querySelector('.settings-preview-result summary')");
+    await waitForExpression(cdp, "document.querySelector('.settings-preview-metadata') && document.querySelector('.settings-preview-metadata span')?.textContent.includes('附件 1') && [...document.querySelectorAll('.settings-preview-metadata em')].some((item) => item.textContent.includes('security-checklist.pdf'))");
+    const previewMetadata1440 = await evalInPage(
+      cdp,
+      `(() => {
+        const container = document.querySelector('.settings-preview-metadata');
+        const span = container?.querySelector(':scope > span');
+        const em = container?.querySelector(':scope > em');
+        const read = (el) => {
+          if (!el) return null;
+          const cs = getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          return {
+            rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+            display: cs.display, flexWrap: cs.flexWrap, gap: cs.gap, alignItems: cs.alignItems,
+            borderRadius: cs.borderRadius, backgroundColor: cs.backgroundColor, color: cs.color,
+            fontSize: cs.fontSize, fontStyle: cs.fontStyle, paddingTop: cs.paddingTop, paddingRight: cs.paddingRight,
+            paddingBottom: cs.paddingBottom, paddingLeft: cs.paddingLeft,
+            overflow: { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth },
+          };
+        };
+        return { container: read(container), span: read(span), em: read(em) };
+      })()`,
+    );
+    console.log(`安全预览 metadata 1440x980: ${JSON.stringify(previewMetadata1440)}`);
+    const metadataBad1440 = [previewMetadata1440.container, previewMetadata1440.span, previewMetadata1440.em]
+      .some((entry) => entry && entry.overflow && entry.overflow.scrollWidth > entry.overflow.clientWidth);
+    if (metadataBad1440) throw new Error(`安全预览 metadata 1440x980 横向溢出: ${JSON.stringify(previewMetadata1440)}`);
+    const previewOverflow1440 = await evalInPage(
+      cdp,
+      `(() => {
+        const page = document.querySelector('.settings-page');
+        const content = document.querySelector('.settings-content');
+        return {
+          page: { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth },
+          content: { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth },
+        };
+      })()`,
+    );
+    console.log(`安全预览页 1440x980 溢出检查: ${JSON.stringify(previewOverflow1440)}`);
+    if (previewOverflow1440.page.scrollWidth > previewOverflow1440.page.clientWidth || previewOverflow1440.content.scrollWidth > previewOverflow1440.content.clientWidth) {
+      throw new Error(`安全预览页 1440x980 横向溢出: ${JSON.stringify(previewOverflow1440)}`);
+    }
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 430,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 430');
+    await waitForSettingsPageStable(cdp);
+    const previewMetadata430 = await evalInPage(
+      cdp,
+      `(() => {
+        const container = document.querySelector('.settings-preview-metadata');
+        const span = container?.querySelector(':scope > span');
+        const em = container?.querySelector(':scope > em');
+        const read = (el) => {
+          if (!el) return null;
+          const cs = getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          return {
+            rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+            display: cs.display, flexWrap: cs.flexWrap, gap: cs.gap, alignItems: cs.alignItems,
+            borderRadius: cs.borderRadius, backgroundColor: cs.backgroundColor, color: cs.color,
+            fontSize: cs.fontSize, fontStyle: cs.fontStyle, paddingTop: cs.paddingTop, paddingRight: cs.paddingRight,
+            paddingBottom: cs.paddingBottom, paddingLeft: cs.paddingLeft,
+            overflow: { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth },
+          };
+        };
+        return { container: read(container), span: read(span), em: read(em) };
+      })()`,
+    );
+    console.log(`安全预览 metadata 430x780: ${JSON.stringify(previewMetadata430)}`);
+    const metadataBad430 = [previewMetadata430.container, previewMetadata430.span, previewMetadata430.em]
+      .some((entry) => entry && entry.overflow && entry.overflow.scrollWidth > entry.overflow.clientWidth);
+    if (metadataBad430) throw new Error(`安全预览 metadata 430x780 横向溢出: ${JSON.stringify(previewMetadata430)}`);
+    const previewOverflow430 = await evalInPage(
+      cdp,
+      `(() => {
+        const page = document.querySelector('.settings-page');
+        const content = document.querySelector('.settings-content');
+        return {
+          page: { scrollWidth: page.scrollWidth, clientWidth: page.clientWidth },
+          content: { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth },
+        };
+      })()`,
+    );
+    console.log(`安全预览页 430x780 溢出检查: ${JSON.stringify(previewOverflow430)}`);
+    if (previewOverflow430.page.scrollWidth > previewOverflow430.page.clientWidth || previewOverflow430.content.scrollWidth > previewOverflow430.content.clientWidth) {
+      throw new Error(`安全预览页 430x780 横向溢出: ${JSON.stringify(previewOverflow430)}`);
+    }
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1440');
+    await waitForSettingsPageStable(cdp);
 
     await openSettingsSection(cdp, '同步', 'sync', '.settings-page[data-settings-page="sync"]');
     await clickButton(cdp, '撤回', "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
@@ -1211,6 +1790,16 @@ async function main() {
     await clickButton(cdp, '刷新状态', "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('暂未找到已发送或收件副本') && document.querySelector('[data-validation-stage=\"smtp\"]')?.innerText.includes('真实发送仍需手动确认')");
     await waitForExpression(cdp, "document.querySelector('.writeback-validation-panel')?.innerText.includes('等待自发自收邮件') && document.querySelectorAll('[data-writeback-step]').length === 4 && [...document.querySelectorAll('[data-writeback-step-action]')].every((button) => button.disabled)");
+
+    await assertSettingsPagesEnterable(cdp, 'settings-v2 五页可进入 1440x980', [
+      { id: 'sending', label: '发送' },
+      { id: 'ai', label: 'AI 服务' },
+      { id: 'accounts', label: '账号' },
+      { id: 'providers', label: '服务器', tab: true, headerLabel: '账号' },
+      { id: 'auth', label: '认证', tab: true, headerLabel: '账号' },
+    ]);
+    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelector('.settings-page-header strong')?.textContent.trim() === '账号'");
 
     await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     await clickButton(cdp, '保存并验证', "document.querySelector('.settings-header-actions')");
@@ -1329,11 +1918,12 @@ async function main() {
       "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true, cancelable: true }))",
     );
     await waitForExpression(cdp, "document.body.innerText.includes('已撤销：归档') && document.body.innerText.includes('安全检查清单')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Imported EML Sample'))");
     await evalInPage(
       cdp,
-      "(() => { const other = [...document.querySelectorAll('.message-card')].find((item) => !item.textContent.includes('安全检查清单')); if (!other) throw new Error('No alternate message card for reader refresh'); other.click(); })()",
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Imported EML Sample')); if (!card) throw new Error('Imported EML Sample card not found for reader refresh'); card.click(); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.reader-html')");
+    await waitForExpression(cdp, "document.querySelector('.reader-html')?.shadowRoot?.textContent.includes('本地 EML 已安全解析')");
     await evalInPage(
       cdp,
       "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')); if (!card) throw new Error('安全检查清单 card not found for reader refresh'); card.click(); })()",
@@ -1358,11 +1948,12 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已取消稍后处理') && document.body.innerText.includes('安全检查清单')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2 && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Imported EML Sample'))");
     await evalInPage(
       cdp,
-      "(() => { const other = [...document.querySelectorAll('.message-card')].find((item) => !item.textContent.includes('安全检查清单')); if (!other) throw new Error('No alternate message card for reader refresh'); other.click(); })()",
+      "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Imported EML Sample')); if (!card) throw new Error('Imported EML Sample card not found for reader refresh'); card.click(); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.reader-html')");
+    await waitForExpression(cdp, "document.querySelector('.reader-html')?.shadowRoot?.textContent.includes('本地 EML 已安全解析')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-html') && document.querySelector('.reader-more-menu')");
     await openDetails(cdp, '.reader-more-menu');
@@ -1470,7 +2061,8 @@ async function main() {
     await sleep(800);
     await evalInPage(cdp, "(() => { const checkbox = [...document.querySelectorAll('.settings-page[data-settings-page=\"ai\"] input[type=\"checkbox\"]')][0]; if (!checkbox) throw new Error('AI enable checkbox not found'); if (!checkbox.checked) checkbox.click(); })()");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"ai\"] input[type=\"checkbox\"]')][0]?.checked");
-    await evalInPage(cdp, "(() => { const radio = [...document.querySelectorAll('.settings-ai-service-option input')].find((item) => item.value === 'mock'); if (!radio) throw new Error('Mock radio not found'); radio.click(); })()");
+    await pickCustomSelect(cdp, '.settings-page[data-settings-page="ai"] .custom-select-summary', '本地演示模式 (Mock)');
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"ai\"] .custom-select-summary')?.innerText.includes('本地演示模式 (Mock)')");
     await clickButton(cdp, '测试连接', "document.querySelector('.settings-page[data-settings-page=\"ai\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-ai-test-result.ok')?.innerText.includes('模拟 AI 服务连接正常')");
     await openSettingsSection(cdp, '模板', 'templates', '.settings-page[data-settings-page="templates"]');
@@ -1554,6 +2146,11 @@ async function main() {
         'settings desktop sidebar switches standalone pages',
         'settings narrow layout uses grouped page selector',
         'settings page hierarchy stays isolated from legacy header and footer styles',
+        'settings v2 provider and auth cards stay edge-aligned at desktop sizes',
+        'settings v2 compatibility matrix stays inside advanced content without legacy margins',
+        'settings v2 content column has no horizontal overflow on narrow viewports',
+        'settings v2 desktop and narrow layout contracts hold',
+        'settings v2 five core pages stay enterable',
         'settings low-frequency account creation stays folded and background feedback stays hidden',
         'settings connection test only appears on relevant pages',
         'settings primary sections open without redundant disclosure',
@@ -1568,6 +2165,8 @@ async function main() {
         'account switcher right click sets and labels default sender account',
         'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
+        'settings v2 oauth result cards own namespaced classes',
+        'settings v2 oauth result cards preserve style and overflow contracts across viewports',
         'multi-account diagnostics target selected account',
         'provider-aware secure credential controls protect and clear local input',
         'provider-aware credential diagnostics guide recovery and fold technical details',
@@ -1586,7 +2185,11 @@ async function main() {
         'contact create edit suggested merge manual merge delete and VIP sync works',
         'contact vCard import export works',
         'rules create flow works',
+        'settings v2 rule automation page owns namespaced rule classes',
+        'rule editor create edit delete flows and advanced toggle work',
         'raw MIME preview works',
+        'settings v2 security preview page owns namespaced preview classes',
+        'settings v2 security preview metadata tags own namespaced styles',
         'snooze and unsnooze flow works',
         'global keyboard undo restores archived message',
         'inline quick reply sends from reader',

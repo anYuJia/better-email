@@ -163,7 +163,7 @@ export default function ProviderSettingsPage({
       </SettingsSection>
 
       <details
-        className="settings-disclosure settings-provider-advanced"
+        className="settings-provider-advanced"
         data-settings-section="providers"
       >
         <summary>
@@ -174,7 +174,7 @@ export default function ProviderSettingsPage({
           <b>{providerVerificationLabel(activeProviderVerification?.status ?? 'untested')}</b>
         </summary>
         <div className="settings-provider-advanced-content">
-          <section className="provider-matrix settings-provider-matrix" aria-label="服务商兼容性矩阵">
+          <section className="settings-provider-matrix" aria-label="服务商兼容性矩阵">
             <header>
               <strong>兼容性矩阵</strong>
               <span>排查服务商差异</span>

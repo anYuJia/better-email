@@ -21,6 +21,9 @@
   --st-border: rgba(226, 232, 240, 0.8);
   --st-border-strong: rgba(203, 213, 225, 0.9);
   --st-border-subtle: rgba(255, 255, 255, 0.6);
+  /* Header chrome border: matches the app-level border-subtle token the
+   * legacy global header rules applied inside the settings modal. */
+  --st-header-border: oklch(0.885 0.007 255);
   --st-text: #0f172a;
   --st-text-secondary: #475569;
   --st-text-tertiary: #64748b;

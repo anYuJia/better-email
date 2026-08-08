@@ -94,7 +94,7 @@ export default function useAppGlobalEffects({
       'details.compact-menu',
       'details.sidebar-disclosure',
       'details.composer-advanced',
-      'details.rule-advanced',
+      'details.settings-rule-advanced',
     ].join(',');
 
     function closestDropdown(target: EventTarget | null) {

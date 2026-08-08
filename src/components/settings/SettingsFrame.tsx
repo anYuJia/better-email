@@ -177,7 +177,7 @@ export default function SettingsFrame({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="settings-modal" role="dialog" aria-modal="true" aria-label={title} ref={modalRef}>
+      <section className="settings-modal" data-ui="settings-v2" role="dialog" aria-modal="true" aria-label={title} ref={modalRef}>
         <header className="settings-main-header">
           <div className="settings-title">
             <span className="settings-title-copy">

@@ -62,7 +62,7 @@ export default function RuleAutomationSettings({
       badge={<SettingsBadge tone="neutral">{rules.length} 条规则</SettingsBadge>}
       dataSection="rules"
     >
-      <div className="rule-editor settings-rule-editor">
+      <div className="settings-rule-editor">
         <SettingsField label="规则名称">
           <input
             value={ruleForm.name}
@@ -70,7 +70,7 @@ export default function RuleAutomationSettings({
             placeholder="规则名称"
           />
         </SettingsField>
-        <div className="rule-builder">
+        <div className="settings-rule-builder">
           <label>
             <span>如果</span>
             <CustomSelect
@@ -107,7 +107,7 @@ export default function RuleAutomationSettings({
               onChange={onRuleLabelActionChange}
             />
           </label>
-          <div className="rule-action-chips">
+          <div className="settings-rule-action-chips">
             {ruleActionPresets.map((item) => (
               <button
                 type="button"
@@ -122,7 +122,7 @@ export default function RuleAutomationSettings({
             ))}
           </div>
         </div>
-        <details className="rule-advanced">
+        <details className="settings-rule-advanced">
           <summary>规则语法</summary>
           <small>可手动组合多个动作，用分号分隔。</small>
           <input
@@ -156,7 +156,7 @@ export default function RuleAutomationSettings({
       ) : (
         <div className="settings-rule-list">
           {rules.map((rule) => (
-            <div className="rule-item" key={rule.id}>
+            <div className="settings-rule-item" key={rule.id}>
               <span>
                 <strong>{rule.name}</strong>
                 <small>{rule.condition} → {rule.action}</small>

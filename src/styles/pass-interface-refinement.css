@@ -76,8 +76,7 @@
 }
 
 .account-switcher select,
-.composer select,
-.settings-modal select {
+.composer select {
   color: var(--ink-0);
   min-height: 36px;
   border-radius: 10px;
@@ -871,4 +870,3 @@
     padding-inline: 9px;
   }
 }
-

@@ -16,7 +16,7 @@ export default function ProviderPresetGrid({
 }: ProviderPresetGridProps) {
   return (
     <section
-      className={`provider-presets settings-provider-presets${compact ? ' compact' : ''}`}
+      className={`settings-provider-presets${compact ? ' compact' : ''}`}
       aria-label={compact ? '新账号服务商预设' : '服务商预设'}
     >
       {providerPresets.map((preset) => (

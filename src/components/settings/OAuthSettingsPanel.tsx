@@ -60,7 +60,7 @@ export default function OAuthSettingsPanel({
 
   return (
     <>
-      <section className="oauth-guide settings-auth-guide" data-settings-section="auth">
+      <section className="settings-auth-guide" data-settings-section="auth">
         <span>
           {authType === 'oauth2' ? <ShieldCheck size={17} /> : <KeyRound size={17} />}
         </span>
@@ -94,7 +94,7 @@ export default function OAuthSettingsPanel({
             </SettingsButton>
             {!clientId.trim() && <em>开始前需要在高级设置中填写 OAuth2 Client ID</em>}
           </section>
-          <details className="settings-disclosure settings-provider-advanced settings-oauth-advanced">
+          <details className="settings-provider-advanced settings-oauth-advanced">
             <summary>
               <span>
                 <strong>自带 OAuth 客户端（高级）</strong>
@@ -141,7 +141,7 @@ export default function OAuthSettingsPanel({
                   </SettingsButton>
                 </div>
                 {report && (
-                  <div className="oauth-result">
+                  <div className="settings-oauth-result">
                     <strong>{report.provider} · Session #{report.session_id}</strong>
                     <span>{report.code_verifier_hint}</span>
                     <small>Scopes: {report.scopes.join(', ')}</small>
@@ -164,14 +164,14 @@ export default function OAuthSettingsPanel({
                   <SettingsButton onClick={onWaitForCallback}>监听本地回调</SettingsButton>
                 </div>
                 {callbackReport && (
-                  <div className="oauth-result">
+                  <div className="settings-oauth-result">
                     <strong>{callbackReport.provider} · {callbackReport.status}</strong>
                     <span>Session #{callbackReport.session_id}</span>
                     <small>{callbackReport.message}</small>
                   </div>
                 )}
                 {exchangeReport && (
-                  <div className="oauth-result">
+                  <div className="settings-oauth-result">
                     <strong>{exchangeReport.provider} · {exchangeReport.status}</strong>
                     <span>Session #{exchangeReport.session_id}</span>
                     <small>
@@ -182,7 +182,7 @@ export default function OAuthSettingsPanel({
                   </div>
                 )}
                 {refreshReport && (
-                  <div className="oauth-result">
+                  <div className="settings-oauth-result">
                     <strong>{refreshReport.provider} · {refreshReport.status}</strong>
                     <span>{refreshReport.message}</span>
                     <small>Access token 过期时间：{formatDate(refreshReport.expires_at)}</small>

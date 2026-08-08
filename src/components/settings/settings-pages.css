@@ -424,6 +424,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
   border-bottom: 1px solid var(--st-border);
 }
 
@@ -515,6 +518,7 @@
   min-width: 0;
   display: grid;
   gap: 6px;
+  padding: 10px 14px;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   font-weight: 540;
@@ -634,6 +638,7 @@
   border-radius: var(--st-radius-md);
   color: var(--st-text-secondary);
   background: var(--st-surface-subtle);
+  box-shadow: var(--shadow-sm);
   text-align: left;
 }
 
@@ -676,6 +681,12 @@
   justify-content: space-between;
   gap: 12px;
   padding: 0 2px 2px;
+  min-height: 48px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: rgba(249, 250, 251, 0.96);
+  color: #111827;
 }
 
 .settings-modal .settings-provider-matrix > header strong {
@@ -698,6 +709,7 @@
   border-radius: var(--st-radius-md);
   color: var(--st-text-secondary);
   background: var(--st-surface-subtle);
+  box-shadow: var(--shadow-sm);
   text-align: left;
 }
 
@@ -832,6 +844,34 @@
 
 .settings-modal .settings-provider-advanced-content .tool-panel {
   margin: 0;
+}
+
+/* =====================================================================
+ * Settings v2 isolation.
+ * The v2 shell (data-ui="settings-v2") has explicit ownership of these
+ * dimensions, keeping top-level cards and the compatibility matrix
+ * edge-aligned with the surrounding st-section cards inside the page content
+ * column.
+ * ===================================================================== */
+
+.settings-modal[data-ui="settings-v2"] .settings-provider-advanced:not(.settings-provider-server-advanced),
+.settings-modal[data-ui="settings-v2"] .settings-auth-guide,
+.settings-modal[data-ui="settings-v2"] .settings-oauth-primary {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.settings-modal[data-ui="settings-v2"] .settings-provider-matrix {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* --- Auth & OAuth --- */
@@ -976,7 +1016,7 @@
   font-size: var(--st-font-size-secondary);
 }
 
-.settings-modal .oauth-result {
+.settings-modal .settings-oauth-result {
   display: grid;
   gap: 3px;
   padding: 10px 12px;
@@ -985,15 +1025,15 @@
   background: var(--st-info-soft);
 }
 
-.settings-modal .oauth-result strong {
+.settings-modal .settings-oauth-result strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
   font-weight: 580;
 }
 
-.settings-modal .oauth-result span,
-.settings-modal .oauth-result small,
-.settings-modal .oauth-result em {
+.settings-modal .settings-oauth-result span,
+.settings-modal .settings-oauth-result small,
+.settings-modal .settings-oauth-result em {
   color: var(--st-text-secondary);
    font-size: var(--st-font-size-secondary);
    font-style: normal;
@@ -1164,6 +1204,74 @@
 }
 
 /* --- Cache clear / confirm dialogs --- */
+/* The storage cache-confirm dialog is rendered through a portal into <body>,
+ * outside .settings-modal, so the modal-scoped rules below cannot reach it.
+ * These rules keep its current chrome owned by the settings stylesheet; they
+ * are placed before the modal-scoped rules so the inline confirm dialogs
+ * (template / contact delete) keep their v2 values via the later cascade. */
+.settings-cache-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm {
+  width: 440px;
+  max-width: 90vw;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > header > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > header strong {
+  font-size: 15px;
+  color: #111827;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > header small {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.settings-cache-confirm-backdrop .settings-cache-confirm-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > .settings-cache-confirm-summary {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-cache-confirm-backdrop > .settings-cache-confirm > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
 .settings-modal .settings-cache-confirm-backdrop,
 .settings-modal .settings-confirm-overlay {
   position: fixed;
@@ -1196,6 +1304,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .settings-modal .settings-cache-confirm-mark {
@@ -1295,6 +1406,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .settings-modal .settings-confirm-dialog > header > div {
@@ -2094,73 +2208,98 @@
   width: 100%;
 }
 
-.settings-modal .rule-editor {
+.settings-modal .settings-rule-editor {
   display: grid;
   gap: 10px;
+  margin-top: 8px;
   padding: 14px;
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
   background: var(--st-surface-subtle);
 }
 
-.settings-modal .rule-builder {
+.settings-modal .settings-rule-editor :is(input, select) {
+  width: 100%;
+}
+
+.settings-modal .settings-rule-builder {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.78);
 }
 
-.settings-modal .rule-builder label {
+.settings-modal .settings-rule-builder label {
   min-width: 0;
   display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
   gap: 4px;
+  margin: 0;
+  padding: 10px 14px;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-aux);
   font-weight: 540;
 }
 
-.settings-modal .rule-builder label > span {
+.settings-modal .settings-rule-builder label > span {
   padding: 0 2px;
+  color: #68717d;
+  font-size: 12px;
+  font-weight: 760;
 }
 
-.settings-modal .rule-action-chips {
+.settings-modal .settings-rule-action-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.settings-modal .rule-action-chips button {
+.settings-modal .settings-rule-action-chips button {
   min-height: 32px;
   padding: 0 10px;
   border: 1px solid var(--st-border);
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface);
+  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.22);
   font-size: var(--st-font-size-secondary);
 }
 
-.settings-modal .rule-action-chips button:hover {
+.settings-modal .settings-rule-action-chips button:hover {
   border-color: var(--st-border-strong);
 }
 
-.settings-modal .rule-action-chips button.active {
+.settings-modal .settings-rule-action-chips button.active {
   border-color: #a9cdf1;
   color: var(--st-accent);
   background: var(--st-accent-soft);
 }
 
-.settings-modal .rule-advanced {
+.settings-modal .settings-rule-advanced {
   display: grid;
   gap: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
 }
 
-.settings-modal .rule-advanced summary {
+.settings-modal .settings-rule-advanced summary {
   justify-self: start;
+  padding: 7px 9px;
   color: var(--st-accent);
   font-size: var(--st-font-size-secondary);
+  font-weight: 760;
   cursor: pointer;
 }
 
-.settings-modal .rule-advanced small {
+.settings-modal .settings-rule-advanced small {
+  display: block;
+  padding: 0 9px 8px;
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
 }
@@ -2179,7 +2318,7 @@
   gap: 8px;
 }
 
-.settings-modal .rule-item {
+.settings-modal .settings-rule-item {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -2191,13 +2330,13 @@
   background: var(--st-surface-subtle);
 }
 
-.settings-modal .rule-item > span {
+.settings-modal .settings-rule-item > span {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
-.settings-modal .rule-item > span strong {
+.settings-modal .settings-rule-item > span strong {
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
@@ -2206,7 +2345,7 @@
   white-space: nowrap;
 }
 
-.settings-modal .rule-item > span small {
+.settings-modal .settings-rule-item > span small {
   overflow: hidden;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
@@ -2214,14 +2353,14 @@
   white-space: nowrap;
 }
 
-.settings-modal .rule-item > div {
+.settings-modal .settings-rule-item > div {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 /* --- Security preview --- */
-.settings-modal .preview-result {
+.settings-modal .settings-preview-result {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
@@ -2230,39 +2369,41 @@
   background: var(--st-surface-subtle);
 }
 
-.settings-modal .preview-result > header {
+.settings-modal .settings-preview-result > header {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.settings-modal .preview-result > header svg {
+.settings-modal .settings-preview-result > header svg {
   flex: 0 0 auto;
   color: var(--st-success);
 }
 
-.settings-modal .preview-result > header span {
+.settings-modal .settings-preview-result > header span {
   min-width: 0;
   display: grid;
   gap: 2px;
+  color: #6b7280;
 }
 
-.settings-modal .preview-result > header strong {
+.settings-modal .settings-preview-result > header strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
   font-weight: 600;
 }
 
-.settings-modal .preview-result > header small {
+.settings-modal .settings-preview-result > header small {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
 }
 
-.settings-modal .preview-result pre,
-.settings-modal .sanitized-html-preview {
+.settings-modal .settings-preview-result pre,
+.settings-modal .settings-sanitized-html-preview {
   margin: 0;
   padding: 10px 12px;
   overflow-x: auto;
+  overflow-y: auto;
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
   background: var(--st-surface);
@@ -2270,6 +2411,45 @@
   font-size: var(--st-font-size-secondary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.settings-modal .settings-preview-result pre {
+  max-height: 120px;
+  overflow-wrap: anywhere;
+}
+
+.settings-modal .settings-sanitized-html-preview {
+  max-height: 180px;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-modal .settings-preview-result details {
+  padding: 8px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-modal .settings-preview-result summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.settings-modal .settings-sanitized-html-preview :is(p, ul, ol, blockquote, table) {
+  margin: 0 0 8px;
+}
+
+.settings-modal .settings-sanitized-html-preview p {
+  margin: 0;
+  color: #b7791f;
+  line-height: 1.4;
+}
+
+.settings-modal .settings-sanitized-html-preview img {
+  max-width: 100%;
+  height: auto;
 }
 
 .settings-modal .settings-warning-list {
@@ -2286,6 +2466,23 @@
   background: var(--st-warning-soft);
   font-size: var(--st-font-size-secondary);
   line-height: 1.45;
+}
+
+.settings-modal .settings-preview-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.settings-modal .settings-preview-metadata span,
+.settings-modal .settings-preview-metadata em {
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.10);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-style: normal;
+  padding: 4px 8px;
 }
 
 /* --- Contact import preview/history --- */
@@ -3820,7 +4017,7 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .settings-modal .rule-builder {
+  .settings-modal .settings-rule-builder {
     grid-template-columns: 1fr;
   }
 }
@@ -3850,11 +4047,11 @@
     grid-template-columns: 1fr;
   }
 
-  .settings-modal .rule-item {
+  .settings-modal .settings-rule-item {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .settings-modal .rule-item > div {
+  .settings-modal .settings-rule-item > div {
     grid-column: 1 / -1;
     flex-wrap: wrap;
   }

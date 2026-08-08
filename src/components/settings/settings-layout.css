@@ -32,6 +32,7 @@
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
+  margin: auto;
   overflow: hidden;
   isolation: isolate;
   border: 1px solid var(--st-border-subtle);
@@ -56,14 +57,24 @@
 
 /* --- Header --- */
 .settings-main-header {
-  min-height: 60px;
+  min-height: 48px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 16px 0 20px;
-  border-bottom: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
-  background: var(--st-surface);
+  padding: 0 14px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-bottom: 1px solid var(--st-header-border);
+  border-top-color: var(--st-header-border);
+  border-right-color: var(--st-header-border);
+  border-left-color: var(--st-header-border);
+  background: rgba(249, 250, 251, 0.96);
+  color: #111827;
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
 }
 
 .settings-title {
@@ -86,14 +97,19 @@
 }
 
 .settings-title-copy strong {
+  min-width: 0;
+}
+
+.settings-title-copy strong {
   color: var(--st-text);
   font-size: 14px;
-  font-weight: 640;
+  font-weight: 750;
 }
 
 .settings-title-copy small {
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
+  font-weight: 600;
 }
 
 .settings-header-actions {
@@ -104,15 +120,15 @@
 }
 
 .settings-header-button {
-  min-height: var(--st-control-height);
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
   font-size: 13px;
   font-weight: 580;
   transition:
@@ -150,20 +166,25 @@
 .settings-close-button {
   width: var(--st-control-height);
   min-width: var(--st-control-height);
-  min-height: var(--st-control-height);
+  min-height: 36px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--st-header-border);
   border-radius: var(--st-radius-sm);
-  color: var(--st-text-secondary);
-  background: transparent;
-  box-shadow: none;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-close-button:hover {
   color: var(--st-text);
   background: var(--st-surface-muted);
+}
+
+.settings-modal .settings-close-button:focus-visible,
+.settings-modal .settings-header-button:focus-visible {
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-action-spinner {
@@ -232,6 +253,7 @@
   flex: 1;
   padding: 0;
   border: 0;
+  border-radius: 8px;
   outline: 0;
   color: var(--st-text);
   background: transparent;
@@ -486,6 +508,11 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  padding: 16px 0 30px;
+  overflow: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.36) transparent;
   background: var(--st-canvas);
 }
 
@@ -520,11 +547,23 @@
 
 .settings-page-header {
   flex: 0 0 auto;
-  display: grid;
-  gap: 4px;
-  padding: 18px 28px 12px;
-  border-bottom: 0;
-  background: var(--st-canvas);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 14px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-bottom: 1px solid var(--st-header-border);
+  border-top-color: var(--st-header-border);
+  border-right-color: var(--st-header-border);
+  border-left-color: var(--st-header-border);
+  background: rgba(249, 250, 251, 0.96);
+  color: #111827;
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
 }
 
 .settings-page-heading {
@@ -540,10 +579,11 @@
 }
 
 .settings-page-heading strong {
+  min-width: 0;
   overflow: hidden;
   color: var(--st-text);
-  font-size: var(--st-font-size-page-title);
-  font-weight: 680;
+  font-size: 14px;
+  font-weight: 750;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -790,11 +830,6 @@
     border-radius: 0;
   }
 
-  .settings-main-header {
-    min-height: 56px;
-    padding: 0 8px 0 12px;
-  }
-
   .settings-title-copy small,
   .settings-header-button span {
     display: none;
@@ -821,14 +856,6 @@
   .settings-mobile-menu {
     right: 12px;
     left: 12px;
-  }
-
-  .settings-page-header {
-    padding: 18px 16px 14px;
-  }
-
-  .settings-page-heading strong {
-    font-size: 20px;
   }
 
   .settings-page-content {

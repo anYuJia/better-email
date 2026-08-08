@@ -102,28 +102,4 @@
     min-width: 64px;
   }
 
-  .settings-body {
-    grid-template-columns: 78px minmax(0, 1fr);
-  }
-
-  .settings-nav .settings-nav-group,
-  .settings-nav > strong,
-  .settings-nav > span:not(.settings-nav-group) {
-    display: none;
-  }
-
-  .settings-nav button {
-    padding: 0 5px;
-    text-align: center;
-    font-size: 10.5px;
-  }
-
-  .settings-action-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .settings-action-bar > div {
-    justify-content: flex-end;
-  }
 }

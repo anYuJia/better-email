@@ -35,21 +35,30 @@
   flex-wrap: wrap;
   gap: 12px 16px;
   padding: 12px 18px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  color: #111827;
   border-bottom: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
+  border-top-color: var(--st-header-border);
+  border-right-color: var(--st-header-border);
+  border-left-color: var(--st-header-border);
   background: var(--st-surface);
-}
-
-.settings-modal .st-section-heading {
+}.settings-modal .st-section-heading {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
 .settings-modal .st-section-heading strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
   font-weight: 620;
   letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-modal .st-section-heading small,
@@ -224,10 +233,30 @@
   align-content: start;
 }
 
+/* Legacy label chrome: the old global `.settings-modal label` rules only ever
+ * reached the <label> variant of SettingsField, so the type scale and inset
+ * padding below are scoped to label.st-field. */
+.settings-modal label.st-field {
+  padding: 10px 14px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-modal .settings-rule-editor label.st-field {
+  align-items: center;
+}
+
 .settings-modal .st-field-label {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   font-weight: 560;
+}
+
+/* Raw <label class="st-field-label"> rows keep the inset the legacy
+ * `.settings-modal label` rules applied; SettingsField spans stay flush. */
+.settings-modal label.st-field-label {
+  padding: 10px 14px;
 }
 
 .settings-modal .st-field > :is(input, select, textarea) {
@@ -258,6 +287,9 @@
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   background: transparent;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 650;
   cursor: pointer;
   transition:
     border-color 140ms ease,

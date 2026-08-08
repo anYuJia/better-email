@@ -13,6 +13,7 @@ type SettingsNoticeProps = {
   action?: React.ReactNode;
   icon?: LucideIcon;
   className?: string;
+  style?: React.CSSProperties;
 };
 
 const toneIcons: Record<NonNullable<SettingsNoticeProps['tone']>, LucideIcon> = {
@@ -32,10 +33,11 @@ export default function SettingsNotice({
   action,
   icon: IconOverride,
   className = '',
+  style,
 }: SettingsNoticeProps) {
   const Icon = IconOverride ?? toneIcons[tone];
   return (
-    <div className={`st-notice st-notice-${tone} ${className}`.trim()} role={tone === 'danger' ? 'alert' : 'note'}>
+    <div className={`st-notice st-notice-${tone} ${className}`.trim()} role={tone === 'danger' ? 'alert' : 'note'} style={style}>
       <span className="st-notice-icon" aria-hidden="true">
         <Icon size={15} />
       </span>

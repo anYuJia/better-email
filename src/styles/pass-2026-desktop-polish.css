@@ -207,8 +207,6 @@ input[type="checkbox"]:checked::before {
 .brand strong,
 .sender,
 .subject,
-.tool-row p,
-.rule-item p,
 .mailbox-grid strong {
   color: var(--text);
 }
@@ -636,20 +634,13 @@ kbd {
 .reader-actions button,
 .reader-actions select,
 .composer header button,
-.settings-modal header button,
 .bulk-toolbar button,
 .bulk-toolbar select,
 .label-tools button,
 .attachments button,
 .composer-signature button,
 .composer-attachment-button,
-.rich-toolbar button,
-.tool-header button,
-.tool-actions button,
-.credential-actions button,
-.rule-editor button,
-.rule-item button,
-.tool-row .inline-action {
+.rich-toolbar button {
   min-height: var(--control-h);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -661,8 +652,7 @@ kbd {
 .reader-actions button,
 .reader-actions select,
 .bulk-toolbar button,
-.bulk-toolbar select,
-.tool-row .inline-action {
+.bulk-toolbar select {
   backdrop-filter: blur(12px) saturate(1.1);
 }
 
@@ -670,15 +660,12 @@ kbd {
 .reader-actions button:hover,
 .reader-actions select:hover,
 .composer header button:hover,
-.settings-modal header button:hover,
 .bulk-toolbar button:hover,
 .label-tools button:hover,
 .attachments button:hover,
 .composer-signature button:hover,
 .composer-attachment-button:hover,
-.rich-toolbar button:hover,
-.rule-item button:hover,
-.tool-row .inline-action:hover {
+.rich-toolbar button:hover {
   background: #fff;
   border-color: rgba(10, 132, 255, 0.28);
   color: var(--accent-strong);
@@ -849,12 +836,7 @@ kbd {
 .label-tools,
 .attachments span,
 .attachments em,
-.tool-row em,
-.tool-row small,
-.tool-panel > p,
-.mailbox-grid span,
-.rule-item small,
-.preview-result span {
+.mailbox-grid span {
   color: var(--muted);
 }
 
@@ -867,12 +849,7 @@ kbd {
 .thread-message,
 .body-text,
 .reader-html,
-.attachments div,
-.tool-panel,
-.provider-matrix,
-.oauth-pkce-panel,
-.preview-result details,
-.sanitized-html-preview {
+.attachments div {
   border-color: var(--line);
   border-radius: 8px;
   background: var(--surface-solid);
@@ -882,9 +859,7 @@ kbd {
 .thread-card:hover,
 .thread-card.selected,
 .thread-message.active,
-.label-tools button.active,
-.provider-presets button.active,
-.provider-matrix button.active {
+.label-tools button.active {
   border-color: rgba(10, 132, 255, 0.35);
   background: var(--surface-active);
   box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.12), var(--shadow-sm);
@@ -984,8 +959,7 @@ h1 {
   backdrop-filter: none;
 }
 
-.composer,
-.settings-modal {
+.composer {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
@@ -1003,14 +977,7 @@ h1 {
   will-change: transform;
 }
 
-.settings-modal {
-  width: min(980px, calc(100vw - 48px));
-  display: block;
-  padding-bottom: 16px;
-}
-
-.composer header,
-.settings-modal header {
+.composer header {
   background: rgba(249, 250, 252, 0.90);
   color: var(--text);
   border-bottom: 1px solid var(--line);
@@ -1025,8 +992,7 @@ h1 {
   cursor: grabbing;
 }
 
-.composer header strong,
-.settings-modal header strong {
+.composer header strong {
   font-size: 14px;
   font-weight: 750;
   min-width: 0;
@@ -1148,44 +1114,13 @@ h1 {
   border-color: rgba(10, 132, 255, 0.28);
 }
 
-.composer footer,
-.settings-modal footer {
+.composer footer {
   background: rgba(249, 250, 252, 0.90);
   border-top: 1px solid var(--line);
 }
 
-.credential-actions button,
-.tool-actions button:not(.secondary),
-.tool-header button,
-.oauth-pkce-panel button,
-.rule-editor button {
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.22);
-}
-
-.credential-actions button:hover,
-.tool-actions button:not(.secondary):hover,
-.tool-header button:hover,
-.oauth-pkce-panel button:hover,
-.rule-editor button:hover {
-  background: var(--accent-strong);
-  color: #fff;
-}
-
-.credential-actions button.secondary,
-.tool-actions button.secondary {
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--text-soft);
-  box-shadow: var(--shadow-sm);
-}
-
 .composer input,
-.composer select,
-.settings-modal input,
-.settings-modal select {
+.composer select {
   min-height: 42px;
   border: 1px solid transparent;
   border-bottom: 1px solid var(--line);
@@ -1202,25 +1137,6 @@ h1 {
     0 0 0 3px rgba(10, 132, 255, 0.10);
 }
 
-.settings-modal > label {
-  margin: 10px 16px;
-  padding: 0;
-  gap: 8px;
-  color: var(--text-soft);
-  font-size: 12px;
-  font-weight: 720;
-}
-
-.settings-modal > label > input,
-.settings-modal > label > select,
-.settings-modal > label > textarea,
-.settings-modal .tool-panel label > input,
-.settings-modal .tool-panel label > select,
-.settings-modal .tool-panel label > textarea,
-.identity-form input,
-.identity-form textarea,
-.oauth-callback-form input,
-.rule-editor input,
 .raw-preview textarea {
   width: 100%;
   min-height: 42px;
@@ -1231,9 +1147,6 @@ h1 {
   padding: 10px 12px;
 }
 
-.settings-modal > label > textarea,
-.settings-modal .tool-panel label > textarea,
-.identity-form textarea,
 .raw-preview textarea {
   min-height: 96px;
 }
@@ -1355,137 +1268,26 @@ h1 {
   color: var(--danger);
 }
 
-.settings-modal {
-  background: rgba(248, 250, 252, 0.96);
-}
-
-.settings-modal label {
-  color: var(--text-soft);
-  font-weight: 650;
-}
-
-.settings-modal > .checkbox-row {
-  margin: 10px 16px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--shadow-sm);
-}
-
-.settings-modal .checkbox-row,
-.tool-panel .checkbox-row,
 .composer-rich-toggle .checkbox-row {
   border-radius: 8px;
 }
 
-.settings-modal textarea,
-.raw-preview textarea,
-.rule-editor input {
+.raw-preview textarea {
   border-color: var(--line);
   border-radius: 8px;
   background: #fff;
   color: var(--text);
   box-shadow: var(--shadow-sm);
-}
-
-.provider-presets button,
-.provider-matrix button {
-  border-color: var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: var(--shadow-sm);
-}
-
-.provider-presets button:hover,
-.provider-matrix button:hover {
-  border-color: rgba(10, 132, 255, 0.32);
-  background: #fff;
-}
-
-.oauth-guide {
-  border-color: rgba(10, 132, 255, 0.20);
-  background: rgba(232, 243, 255, 0.92);
-  color: #17436b;
-}
-
-.oauth-result {
-  border-color: rgba(34, 160, 107, 0.26);
-  background: rgba(239, 250, 245, 0.92);
-}
-
-.tool-panel {
-  margin: 12px 16px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.90) inset,
-    var(--shadow-sm);
-}
-
-.tool-panel > label {
-  padding: 0;
-}
-
-.tool-panel > label + label {
-  margin-top: 2px;
-}
-
-.tool-panel > .tool-header:first-child {
-  margin-bottom: 6px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.tool-header span {
-  color: var(--muted);
-}
-
-.tool-row {
-  border-top-color: var(--line);
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  min-height: 38px;
-}
-
-.tool-row button:not(.inline-action) {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text-soft);
-  box-shadow: var(--shadow-sm);
-  padding: 6px 10px;
-}
-
-.tool-row span {
-  color: var(--text);
-}
-
-.tool-row.ok span {
-  color: var(--success);
-}
-
-.tool-row.warn span,
-.provider-matrix em,
-.preview-result p {
-  color: var(--warning);
 }
 
 .mailbox-grid div,
 .sync-schedule-card,
-.notification-account-grid > div,
-.preview-result pre,
-.oauth-session-list div {
+.notification-account-grid > div {
   border-color: var(--line);
   border-radius: 8px;
   background: #fff;
 }
 
-.preview-metadata span,
-.preview-metadata em {
-  background: rgba(10, 132, 255, 0.10);
-  color: var(--accent-strong);
-}
 
 .status-line {
   left: 284px;
@@ -1593,35 +1395,6 @@ h1 {
   padding: 0;
   display: grid;
   place-items: center;
-}
-
-.provider-presets {
-  padding: 8px 0 4px;
-}
-
-.provider-presets.compact {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.provider-presets button {
-  min-height: 74px;
-}
-
-.settings-modal footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  margin-top: 12px;
-  border-top: 1px solid var(--line);
-  backdrop-filter: blur(18px) saturate(1.15);
-}
-
-.settings-modal header {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  backdrop-filter: blur(18px) saturate(1.15);
 }
 
 .composer-attachments {

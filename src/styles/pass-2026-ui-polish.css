@@ -79,8 +79,7 @@ body {
 }
 
 .account-switcher select,
-.composer select,
-.settings-modal select {
+.composer select {
   min-height: 36px;
   border-radius: 10px;
   border-color: rgba(18, 28, 45, 0.10);
@@ -503,7 +502,6 @@ h1 {
 }
 
 .composer,
-.settings-modal,
 .shortcut-modal {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 18px;
@@ -512,46 +510,29 @@ h1 {
 }
 
 .composer header,
-.settings-modal header,
 .shortcut-modal header {
   border-bottom-color: rgba(18, 28, 45, 0.07);
   background: rgba(255, 255, 255, 0.68);
 }
 
-.composer footer,
-.settings-modal footer {
+.composer footer {
   border-top: 1px solid rgba(18, 28, 45, 0.07);
   background: rgba(248, 250, 252, 0.86);
 }
 
 .composer input,
 .composer textarea,
-.composer select,
-.settings-modal input,
-.settings-modal textarea,
-.settings-modal select {
+.composer select {
   border-radius: 12px;
 }
 
-.composer textarea,
-.settings-modal textarea {
+.composer textarea {
   line-height: 1.55;
 }
 
 .composer-advanced,
-.settings-disclosure,
-.tool-panel,
 .composer-tool-card {
   border-radius: 14px;
-}
-
-.settings-nav button {
-  border-radius: 11px;
-}
-
-.settings-content {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.50), rgba(248, 250, 252, 0.70));
 }
 
 @media (max-width: 1120px) {

@@ -30,7 +30,7 @@ export default function SecurityPreviewSettings({
         }>
           <textarea value={rawMessage} onChange={(event) => onRawMessageChange(event.target.value)} />
           {parsedPreview && (
-            <div className="preview-result">
+            <div className="settings-preview-result">
               <header>
                 <ShieldCheck size={17} />
                 <span>
@@ -42,7 +42,7 @@ export default function SecurityPreviewSettings({
               {parsedPreview.sanitized_html && (
                 <>
                   <div
-                    className="sanitized-html-preview"
+                    className="settings-sanitized-html-preview"
                     dangerouslySetInnerHTML={{ __html: parsedPreview.sanitized_html }}
                   />
                   <details>
@@ -52,7 +52,7 @@ export default function SecurityPreviewSettings({
                 </>
               )}
               {parsedPreview.attachment_count > 0 && (
-                <div className="preview-metadata">
+                <div className="settings-preview-metadata">
                   <span>附件 {parsedPreview.attachment_count}</span>
                   {parsedPreview.attachment_names.map((name) => <em key={name}>{name}</em>)}
                 </div>

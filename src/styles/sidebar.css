@@ -455,7 +455,7 @@
   font-weight: 720;
   white-space: nowrap;
 }
-.icon-button, .reader-actions button, .reader-actions select, .composer header button, .settings-modal header button {
+.icon-button, .reader-actions button, .reader-actions select, .composer header button {
   border: 1px solid #d8dde4;
   border-radius: 7px;
   background: #fff;

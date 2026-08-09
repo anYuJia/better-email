@@ -166,11 +166,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.platform }}
-          path: |
-            src-tauri/target/release/bundle/**/Better_Email_*.dmg
-            src-tauri/target/release/bundle/**/Better_Email_*.app.tar.gz
-            src-tauri/target/release/bundle/**/Better_Email_*.msi
-            src-tauri/target/release/bundle/**/*.sig
+          # release-assets/ 由 ci-prepare-assets.mjs 平铺生成，
+          # 保证下载侧文件名与 latest.json 中的 URL 完全一致。
+          path: release-assets/*
           if-no-files-found: error
 
   publish:

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 tmp-ui-qa/
+release-assets/
 src-tauri/target/
 *.log
 .DS_Store

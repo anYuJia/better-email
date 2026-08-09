@@ -1,24 +1,34 @@
 // scripts/ci-prepare-assets.mjs
 //
-// Renames Tauri bundle outputs to the canonical public artifact names and
+// Renames Tauri bundle outputs to the canonical public artifact names,
 // removes non-installer outputs (the raw .app bundle) so they can never be
-// uploaded to the GitHub Release.
+// uploaded to the GitHub Release, and stages flat copies of every release
+// asset into <cwd>/release-assets/. The workflow uploads that flat directory,
+// which keeps artifact paths deterministic inside actions/upload-artifact.
 //
 // Usage:
 //   node scripts/ci-prepare-assets.mjs --version 1.0.11 [--bundle <dir>]
 //
-// Prints a JSON payload describing the renamed assets:
+// Prints a JSON payload describing the staged assets:
 //   {
 //     "platform": "mac" | "windows",
 //     "version": "1.0.11",
 //     "installer": { "name": "...", "path": "..." },
 //     "payload": { "name": "...", "path": "..." },
-//     "signature": { "name": "...", "path": "..." } | null,
+//     "signature": { "name": "...", "path": "..." },
 //     "removed": ["..."]
 //   }
 
-import { readdirSync, existsSync, renameSync, rmSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -68,6 +78,23 @@ function findFile(files, predicate, label) {
   return match;
 }
 
+// 把重命名后的产物平铺复制到 release-assets/，返回各资产的扁平路径。
+// actions/upload-artifact 会保留 glob 的目录结构，扁平目录可以保证
+// 下载侧的文件名与最新版 latest.json 中的 URL 完全一致。
+function stageAssets(files) {
+  const stagingDir = join(process.cwd(), 'release-assets');
+  rmSync(stagingDir, { recursive: true, force: true });
+  mkdirSync(stagingDir, { recursive: true });
+  const staged = {};
+  for (const [key, path] of Object.entries(files)) {
+    const name = path.split(/[\\/]/).pop();
+    const dest = join(stagingDir, name);
+    copyFileSync(path, dest);
+    staged[key] = { name, path: dest };
+  }
+  return staged;
+}
+
 function main() {
   const { version, bundle } = parseArgs(process.argv);
   if (!version) {
@@ -107,12 +134,16 @@ function main() {
       rmSync(join(resolvedBundleRoot, 'macos', dir), { recursive: true, force: true });
     }
 
+    const staged = stageAssets({
+      installer: installerPath,
+      payload: payloadPath,
+      signature: sigPath,
+    });
+
     console.log(JSON.stringify({
       platform,
       version,
-      installer: { name: installerName, path: installerPath },
-      payload: { name: payloadName, path: payloadPath },
-      signature: { name: sigName, path: sigPath },
+      ...staged,
       removed: appDirs.map((dir) => join(resolvedBundleRoot, 'macos', dir)),
     }, null, 2));
     return;
@@ -131,12 +162,16 @@ function main() {
     renameSync(msi, installerPath);
     renameSync(sig, sigPath);
 
+    const staged = stageAssets({
+      installer: installerPath,
+      payload: installerPath,
+      signature: sigPath,
+    });
+
     console.log(JSON.stringify({
       platform,
       version,
-      installer: { name: installerName, path: installerPath },
-      payload: { name: installerName, path: installerPath },
-      signature: { name: sigName, path: sigPath },
+      ...staged,
       removed: [],
     }, null, 2));
     return;

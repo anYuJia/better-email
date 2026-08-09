@@ -1299,7 +1299,7 @@
   max-width: calc(100vw - 32px);
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
-  background: #fff;
+  background: var(--st-surface);
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   padding: 20px;
@@ -4618,4 +4618,65 @@
   .contact-import-backdrop .spinning {
     animation: none;
   }
+}
+
+/* =====================================================================
+ * Appearance page: theme preference cards.
+ * ===================================================================== */
+
+.settings-modal .settings-theme-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.settings-modal .settings-theme-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.settings-modal .settings-theme-option:hover {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-theme-option.active {
+  border-color: var(--st-accent);
+  background: var(--st-accent-soft);
+  box-shadow: 0 0 0 1px var(--st-accent);
+}
+
+.settings-modal .settings-theme-option > svg {
+  grid-row: 1 / -1;
+  color: var(--st-text-secondary);
+}
+
+.settings-modal .settings-theme-option.active > svg {
+  color: var(--st-accent);
+}
+
+.settings-modal .settings-theme-option strong {
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-theme-option small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
 }

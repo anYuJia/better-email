@@ -50,6 +50,7 @@ import type {
   ProviderWriteValidationStatus,
 } from '../../app/providerWriteValidation';
 import type { NotificationPolicy } from '../../mailUtils';
+import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
@@ -58,6 +59,7 @@ import { createSettingsHandlers } from './settingsOverlayHandlers';
 const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));
 const CredentialSecuritySettings = lazy(() => import('./CredentialSecuritySettings'));
 const ExperienceSettings = lazy(() => import('./ExperienceSettings'));
+const AppearanceSettings = lazy(() => import('./AppearanceSettings'));
 const DataSafetySettings = lazy(() => import('./DataSafetySettings'));
 const SyncOperationsSettings = lazy(() => import('./SyncOperationsSettings'));
 const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings'));
@@ -70,6 +72,8 @@ export type SettingsOverlayProps = {
   accountForm: Account | null;
   accounts: Account[];
   newAccountForm: AccountCreateInput;
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
   activeSettingsSection: SettingsSectionId;
   accountSettingsDirty: boolean;
   accountSettingsSaving: boolean;
@@ -222,6 +226,7 @@ export type SettingsOverlayProps = {
 const MemoizedAccountConnection = memo(AccountConnectionSettings);
 const MemoizedCredentialSecurity = memo(CredentialSecuritySettings);
 const MemoizedExperience = memo(ExperienceSettings);
+const MemoizedAppearance = memo(AppearanceSettings);
 const MemoizedDataSafety = memo(DataSafetySettings);
 const MemoizedSyncOperations = memo(SyncOperationsSettings);
 const MemoizedContactAutomation = memo(ContactAutomationSettings);
@@ -483,6 +488,12 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
             <MemoizedSecurityPreview
               {...securityPreviewProps}
               {...handlers}
+            />
+          )}
+          {activeSettingsSection === 'appearance' && (
+            <MemoizedAppearance
+              themeMode={props.themeMode}
+              onThemeModeChange={props.onThemeModeChange}
             />
           )}
           {activeSettingsSection === 'ai' && (

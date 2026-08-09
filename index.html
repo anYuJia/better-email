@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.png" type="image/png" />
     <title>Better Email</title>
+    <script>
+      /* Apply the resolved theme before first paint to avoid a light flash. */
+      (function () {
+        var theme = 'light';
+        try {
+          var mode = localStorage.getItem('better-email.theme-mode') || 'system';
+          theme = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            ? 'dark'
+            : 'light';
+        } catch (error) {
+          /* localStorage may be unavailable; fall back to light. */
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

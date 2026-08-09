@@ -1,165 +1,685 @@
 /*
- * Dark mode overlay for surfaces that predate the token layer or hard-code
- * light colors (composer, dialogs, context menu, account switcher, snooze
- * picker, toasts). The settings layer (--st-*) intentionally stays on its
- * documented opaque light theme.
+ * Dark mode overlay.
  *
- * Rules here mirror the target selectors from the pre-2026 files and only
- * apply when the OS requests dark appearance.
+ * The token layer (design-tokens.css) re-maps the semantic colours for
+ * <html data-theme="dark">, which covers everything built on the ui tokens.
+ * This sheet re-themes the surfaces that predate the token layer or
+ * hard-code light colors: composer, dialogs, context menu, account switcher,
+ * snooze picker, toasts, and the translucent-glass main workspace (message
+ * list, reader, sidebar, toolbars).
+ *
+ * The resolved theme is applied to <html data-theme="dark"> by the inline
+ * bootstrap script in index.html and kept in sync by useThemeMode, so a
+ * manual light/dark/system preference drives these rules.
  */
 
-@media (prefers-color-scheme: dark) {
-  .composer-backdrop .composer,
-  .composer {
-    background: var(--ui-surface);
-    color: var(--ui-text);
-    border-color: var(--ui-border-strong);
-  }
+/* --- Legacy surface variables used by pre-token sheets --- */
+:root[data-theme="dark"] {
+  --app-bg: #0f1319;
+  --surface: rgba(23, 28, 35, 0.86);
+  --surface-solid: #171c23;
+  --surface-soft: #1c222b;
+  --surface-hover: #243042;
+  --surface-active: #26364d;
+  --text: #e6eaf0;
+  --text-soft: #a9b3bf;
+  --muted: #7c8794;
+  --muted-2: #5d6875;
+  --line: rgba(148, 163, 184, 0.16);
+  --line-strong: rgba(148, 163, 184, 0.28);
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --glass: rgba(23, 28, 35, 0.82);
+  --glass-strong: rgba(23, 28, 35, 0.94);
+  --control-bg: rgba(23, 28, 35, 0.82);
+  --hairline: rgba(148, 163, 184, 0.14);
+  --panel-shadow: 0 22px 58px rgba(0, 0, 0, 0.5);
+  --float-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
 
-  .composer-backdrop .composer header,
-  .composer header {
-    background: var(--ui-surface-muted);
-  }
+:root[data-theme="dark"] body {
+  background:
+    linear-gradient(180deg, #151a21 0%, #0e1217 100%);
+}
 
-  .composer input,
-  .composer textarea,
-  .composer select,
-  .composer .field-shell,
-  .composer .composer-recipient-grid,
-  .composer .composer-advanced,
-  .composer .composer-toolbar,
-  .composer .composer-attachments,
-  .composer .composer-from {
-    background: var(--ui-surface-muted);
-    color: var(--ui-text);
-    border-color: var(--ui-border);
-  }
+:root[data-theme="dark"] .app-shell {
+  background: var(--app-bg);
+}
 
-  .composer ::placeholder {
-    color: var(--ui-text-tertiary);
-  }
+:root[data-theme="dark"] .composer-backdrop .composer,
+:root[data-theme="dark"] .composer {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
 
-  .composer-advanced-panel,
-  .composer-backdrop-minimized {
-    background: var(--ui-surface);
-  }
+:root[data-theme="dark"] .composer-backdrop .composer header,
+:root[data-theme="dark"] .composer header {
+  background: var(--ui-surface-muted);
+}
 
-  .dialog-backdrop .dialog,
-  .dialog,
-  .dialog-card,
-  .confirm-dialog,
-  .snooze-picker,
-  .snooze-picker-menu,
-  .account-switcher-menu,
-  .account-switcher-dropdown,
-  .account-login-dialog {
-    background: var(--ui-surface);
-    color: var(--ui-text);
-    border-color: var(--ui-border-strong);
-  }
+:root[data-theme="dark"] .composer input,
+:root[data-theme="dark"] .composer textarea,
+:root[data-theme="dark"] .composer select,
+:root[data-theme="dark"] .composer .field-shell,
+:root[data-theme="dark"] .composer .composer-recipient-grid,
+:root[data-theme="dark"] .composer .composer-advanced,
+:root[data-theme="dark"] .composer .composer-toolbar,
+:root[data-theme="dark"] .composer .composer-attachments,
+:root[data-theme="dark"] .composer .composer-from {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
 
-  .dialog h2,
-  .dialog h3,
-  .confirm-dialog h2,
-  .snooze-picker h2,
-  .account-switcher-menu h3,
-  .account-login-dialog h2,
-  .snooze-picker strong {
-    color: var(--ui-text);
-  }
+:root[data-theme="dark"] .composer ::placeholder {
+  color: var(--ui-text-tertiary);
+}
 
-  .dialog p,
-  .confirm-dialog p,
-  .snooze-picker small,
-  .account-switcher-menu small {
-    color: var(--ui-text-secondary);
-  }
+:root[data-theme="dark"] .composer-advanced-panel,
+:root[data-theme="dark"] .composer-backdrop-minimized {
+  background: var(--ui-surface);
+}
 
-  .dialog-backdrop,
-  .confirm-dialog-backdrop,
-  .snooze-backdrop,
-  .account-login-backdrop {
-    background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
-  }
+:root[data-theme="dark"] .dialog-backdrop .dialog,
+:root[data-theme="dark"] .dialog,
+:root[data-theme="dark"] .dialog-card,
+:root[data-theme="dark"] .confirm-dialog,
+:root[data-theme="dark"] .snooze-picker,
+:root[data-theme="dark"] .snooze-picker-menu,
+:root[data-theme="dark"] .account-switcher-menu,
+:root[data-theme="dark"] .account-switcher-dropdown,
+:root[data-theme="dark"] .account-login-dialog {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
 
-  body .context-menu,
-  .context-menu,
-  .context-menu-panel {
-    background: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.98);
-    border-color: var(--ui-border-strong);
-  }
+:root[data-theme="dark"] .dialog h2,
+:root[data-theme="dark"] .dialog h3,
+:root[data-theme="dark"] .confirm-dialog h2,
+:root[data-theme="dark"] .snooze-picker h2,
+:root[data-theme="dark"] .account-switcher-menu h3,
+:root[data-theme="dark"] .account-login-dialog h2,
+:root[data-theme="dark"] .snooze-picker strong {
+  color: var(--ui-text);
+}
 
-  .context-menu-item,
-  .context-menu button,
-  .context-menu .menu-item {
-    color: var(--ui-text);
-  }
+:root[data-theme="dark"] .dialog p,
+:root[data-theme="dark"] .confirm-dialog p,
+:root[data-theme="dark"] .snooze-picker small,
+:root[data-theme="dark"] .account-switcher-menu small {
+  color: var(--ui-text-secondary);
+}
 
-  .context-menu-item:hover,
-  .context-menu-item:focus-visible {
-    background: var(--ui-accent-soft);
-  }
+:root[data-theme="dark"] .dialog-backdrop,
+:root[data-theme="dark"] .confirm-dialog-backdrop,
+:root[data-theme="dark"] .snooze-backdrop,
+:root[data-theme="dark"] .account-login-backdrop {
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
+}
 
-  .context-menu-separator,
-  .menu-separator {
-    background: var(--ui-border);
-  }
+:root[data-theme="dark"] body .context-menu,
+:root[data-theme="dark"] .context-menu,
+:root[data-theme="dark"] .context-menu-panel {
+  background: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.98);
+  border-color: var(--ui-border-strong);
+}
 
-  .account-switcher-trigger,
-  .account-row,
-  .account-menu-row {
-    background: var(--ui-surface-muted);
-    color: var(--ui-text);
-  }
+:root[data-theme="dark"] .context-menu-item,
+:root[data-theme="dark"] .context-menu button,
+:root[data-theme="dark"] .context-menu .menu-item {
+  color: var(--ui-text);
+}
 
-  .snooze-picker button,
-  .snooze-picker .snooze-option,
-  .snooze-picker summary {
-    background: var(--ui-surface-muted);
-    color: var(--ui-text);
-  }
+:root[data-theme="dark"] .context-menu-item:hover,
+:root[data-theme="dark"] .context-menu-item:focus-visible {
+  background: var(--ui-accent-soft);
+}
 
-  .snooze-picker button:hover {
-    background: var(--ui-accent-soft);
-  }
+:root[data-theme="dark"] .context-menu-separator,
+:root[data-theme="dark"] .menu-separator {
+  background: var(--ui-border);
+}
 
-  body .toast,
-  .toast,
-  .message-toast,
-  .undo-snackbar,
-  .undo-card {
-    background: var(--ui-surface-raised);
-    color: var(--ui-text);
-    border-color: var(--ui-border-strong);
-  }
+:root[data-theme="dark"] .account-switcher-trigger,
+:root[data-theme="dark"] .account-row,
+:root[data-theme="dark"] .account-menu-row {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
 
-  .toast small,
-  .undo-card small {
-    color: var(--ui-text-secondary);
-  }
+:root[data-theme="dark"] .snooze-picker button,
+:root[data-theme="dark"] .snooze-picker .snooze-option,
+:root[data-theme="dark"] .snooze-picker summary {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
 
-  body .emoji-picker,
-  .emoji-picker,
-  .template-picker,
-  .dropdown-panel,
-  .custom-select-menu {
-    background: var(--ui-surface);
-    color: var(--ui-text);
-    border-color: var(--ui-border-strong);
-  }
+:root[data-theme="dark"] .snooze-picker button:hover {
+  background: var(--ui-accent-soft);
+}
 
-  .dropdown-item:hover,
-  .custom-select-menu li:hover,
-  .template-picker li:hover {
-    background: var(--ui-accent-soft);
-  }
+:root[data-theme="dark"] body .toast,
+:root[data-theme="dark"] .toast,
+:root[data-theme="dark"] .message-toast,
+:root[data-theme="dark"] .undo-snackbar,
+:root[data-theme="dark"] .undo-card {
+  background: var(--ui-surface-raised);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
 
-  .image-preview-overlay {
-    background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.9);
-  }
+:root[data-theme="dark"] .toast small,
+:root[data-theme="dark"] .undo-card small {
+  color: var(--ui-text-secondary);
+}
 
-  .window-chrome {
-    background: var(--ui-surface-sidebar);
-    color: var(--ui-text);
-  }
+:root[data-theme="dark"] body .emoji-picker,
+:root[data-theme="dark"] .emoji-picker,
+:root[data-theme="dark"] .template-picker,
+:root[data-theme="dark"] .dropdown-panel,
+:root[data-theme="dark"] .custom-select-menu {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .dropdown-item:hover,
+:root[data-theme="dark"] .custom-select-menu li:hover,
+:root[data-theme="dark"] .template-picker li:hover {
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .image-preview-overlay {
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.9);
+}
+
+:root[data-theme="dark"] .window-chrome {
+  background: var(--ui-surface-sidebar);
+  color: var(--ui-text);
+}
+
+/* =====================================================================
+ * Main workspace: translucent-glass surfaces that hard-code light colours.
+ * ===================================================================== */
+
+/* --- Toolbar / list controls --- */
+:root[data-theme="dark"] .toolbar {
+  background: rgba(23, 28, 35, 0.9);
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .search-box {
+  background: #1a2028;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .list-control-strip {
+  background: #171c22;
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .list-control-actions {
+  background: #1c222b;
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .list-control-actions > button {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .list-control-actions > button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .list-control-actions > button.active {
+  background: #262e3a;
+  color: var(--ui-accent);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .list-summary .search-scope-indicator {
+  color: var(--ui-text-secondary);
+  background: #232b36;
+}
+
+:root[data-theme="dark"] .list-summary small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .stats-strip {
+  background: rgba(15, 19, 24, 0.7);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .search-shortcuts button {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ui-text-secondary);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .search-shortcuts button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .compact-menu summary {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .compact-menu > div {
+  background: #1d242d;
+  border-color: var(--ui-border-strong);
+}
+
+/* --- Message list --- */
+:root[data-theme="dark"] .message-date-section + .message-date-section {
+  border-top-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .message-date-header {
+  color: var(--ui-text-tertiary);
+  background: rgba(15, 19, 24, 0.92);
+}
+
+:root[data-theme="dark"] .message-date-header em {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .message-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(96, 165, 250, 0.24);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] .message-card.selected {
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .message-avatar {
+  color: #cfe0f2;
+  background: #26334a;
+}
+
+:root[data-theme="dark"] .message-chips span {
+  color: var(--ui-text-tertiary);
+  background: #232b36;
+}
+
+:root[data-theme="dark"] .message-list-footer {
+  background: #171c22;
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .bulk-toolbar {
+  border-color: #3a4654;
+  color: var(--ui-text);
+  background: #1d242d;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .bulk-toolbar.active {
+  background: #20262f;
+}
+
+:root[data-theme="dark"] .bulk-toolbar button,
+:root[data-theme="dark"] .bulk-toolbar select {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ui-text-secondary);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .bulk-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .empty-reader {
+  color: var(--ui-text-secondary);
+}
+
+/* --- Reader --- */
+:root[data-theme="dark"] .reader-avatar {
+  color: #cfe0f2;
+  background: #26334a;
+}
+
+:root[data-theme="dark"] .reader-actions {
+  background: rgba(23, 28, 35, 0.85);
+  border-color: var(--ui-border);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.4),
+    inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .reader-actions button,
+:root[data-theme="dark"] .reader-actions select {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ui-text-secondary);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .reader-actions button:hover,
+:root[data-theme="dark"] .reader-actions select:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+:root[data-theme="dark"] .reader-actions .reader-more-menu summary:hover {
+  color: var(--ui-text-secondary);
+  border-color: var(--ui-border-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .reader-actions .danger-action:hover {
+  color: var(--ui-danger);
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.14);
+}
+
+:root[data-theme="dark"] .body-text,
+:root[data-theme="dark"] .reader-html {
+  background: #1a2029;
+  border-color: var(--ui-border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="dark"] .quick-reply {
+  background: rgba(23, 28, 35, 0.85);
+}
+
+:root[data-theme="dark"] .reader-warning-panel {
+  background: rgba(146, 64, 14, 0.22);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+:root[data-theme="dark"] .status-line {
+  background: rgba(23, 28, 35, 0.9);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+/* --- Sidebar --- */
+:root[data-theme="dark"] .sidebar {
+  background:
+    linear-gradient(180deg, rgba(23, 28, 35, 0.9), rgba(19, 24, 30, 0.9));
+  border-right-color: var(--ui-border);
+  box-shadow:
+    inset -1px 0 rgba(255, 255, 255, 0.04),
+    10px 0 34px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="dark"] .brand span {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .account-switcher {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .account-switcher span {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .folder-main {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .folder:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .folder.active {
+  color: var(--ui-accent);
+  background: rgba(96, 165, 250, 0.14);
+}
+
+:root[data-theme="dark"] .badge,
+:root[data-theme="dark"] .sidebar-disclosure summary em {
+  color: var(--ui-accent);
+  background: rgba(96, 165, 250, 0.16);
+}
+
+:root[data-theme="dark"] .sidebar-disclosure {
+  border-color: var(--ui-border);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .sidebar-disclosure summary {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .sidebar-disclosure summary:hover {
+  color: var(--ui-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme="dark"] .sidebar-disclosure[open] summary {
+  color: var(--ui-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme="dark"] .sidebar-tool-section {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .sidebar-quick-menus .sidebar-disclosure > :not(summary) {
+  background: #1d242d;
+  border-color: rgba(148, 163, 184, 0.2);
+  box-shadow: var(--shadow-lg);
+}
+
+:root[data-theme="dark"] .label-list,
+:root[data-theme="dark"] .saved-search-list {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="dark"] .account-switcher select,
+:root[data-theme="dark"] .saved-search-form input,
+:root[data-theme="dark"] .saved-search-form button,
+:root[data-theme="dark"] .saved-search-row > button,
+:root[data-theme="dark"] .background-sync-card,
+:root[data-theme="dark"] .background-sync-card button,
+:root[data-theme="dark"] .folder-actions button,
+:root[data-theme="dark"] .folder-rename button,
+:root[data-theme="dark"] .custom-folder-form button,
+:root[data-theme="dark"] .folder-rename input,
+:root[data-theme="dark"] .custom-folder-form input {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .saved-search-form input:hover,
+:root[data-theme="dark"] .folder-rename input:hover,
+:root[data-theme="dark"] .custom-folder-form input:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+:root[data-theme="dark"] .settings-button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .settings-button:hover,
+:root[data-theme="dark"] .sidebar-footer-actions .settings-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .layout-reset-button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .layout-reset-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .label-row {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .task-stack {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--ui-border);
+}
+
+/* --- Icon buttons (toolbar / reader / composer chrome) --- */
+:root[data-theme="dark"] .icon-button,
+:root[data-theme="dark"] .composer header button,
+:root[data-theme="dark"] .label-tools button,
+:root[data-theme="dark"] .attachments button,
+:root[data-theme="dark"] .composer-signature button,
+:root[data-theme="dark"] .composer-attachment-button,
+:root[data-theme="dark"] .rich-toolbar button,
+:root[data-theme="dark"] .composer-mini-actions button {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .icon-button:hover,
+:root[data-theme="dark"] .composer header button:hover,
+:root[data-theme="dark"] .label-tools button:hover,
+:root[data-theme="dark"] .attachments button:hover,
+:root[data-theme="dark"] .composer-signature button:hover,
+:root[data-theme="dark"] .composer-attachment-button:hover,
+:root[data-theme="dark"] .rich-toolbar button:hover,
+:root[data-theme="dark"] .composer-mini-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(96, 165, 250, 0.3);
+  color: var(--ui-accent);
+}
+
+/* --- Shortcut modal --- */
+:root[data-theme="dark"] .shortcut-modal {
+  background: #1a2029;
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .shortcut-modal header {
+  background: rgba(15, 19, 24, 0.8);
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .shortcut-modal header button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .shortcut-modal header button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .shortcut-group {
+  background: rgba(23, 28, 35, 0.7);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .shortcut-row {
+  border-top-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] kbd {
+  background: linear-gradient(180deg, #232b36, #1b2129);
+  border-color: rgba(148, 163, 184, 0.25);
+  border-bottom-color: rgba(148, 163, 184, 0.4);
+  color: var(--ui-text);
+  box-shadow: inset 0 -1px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Composer internals (post-token surfaces) --- */
+:root[data-theme="dark"] .composer input,
+:root[data-theme="dark"] .composer select {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .composer input:focus,
+:root[data-theme="dark"] .composer textarea:focus {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .composer select:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .composer textarea {
+  background: #171c22;
+}
+
+:root[data-theme="dark"] .composer-from select {
+  background: #1d242d;
+}
+
+:root[data-theme="dark"] .composer-advanced {
+  background: rgba(15, 19, 24, 0.8);
+}
+
+:root[data-theme="dark"] .composer-advanced[open] summary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .composer-tool-card input,
+:root[data-theme="dark"] .composer-tool-card select {
+  background: #1d242d;
+}
+
+:root[data-theme="dark"] .recipient-suggestions,
+:root[data-theme="dark"] .composer-rich-toggle,
+:root[data-theme="dark"] .composer-signature,
+:root[data-theme="dark"] .composer-attachments,
+:root[data-theme="dark"] .composer-schedule {
+  background: rgba(15, 19, 24, 0.8);
+}
+
+:root[data-theme="dark"] .recipient-suggestions button,
+:root[data-theme="dark"] .composer-attachment-chip {
+  background: #1d242d;
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .raw-preview textarea {
+  background: #171c22;
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .composer-minimized {
+  background: #1d242d;
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] input[type="checkbox"] {
+  background: linear-gradient(180deg, #262e3a 0%, #1d242d 100%);
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] input[type="checkbox"]:checked {
+  background: linear-gradient(180deg, #3b82f6 0%, var(--ui-accent) 100%);
+  border-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .mailbox-grid div,
+:root[data-theme="dark"] .sync-schedule-card,
+:root[data-theme="dark"] .notification-account-grid > div {
+  background: #171c22;
+  border-color: var(--ui-border);
 }

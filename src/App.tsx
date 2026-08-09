@@ -48,6 +48,7 @@ import useSelectedMessageActions from './hooks/useSelectedMessageActions';
 import useSingleMessageActions from './hooks/useSingleMessageActions';
 import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
+import useThemeMode from './hooks/useThemeMode';
 import {
   type NotificationPolicy,
 } from './mailUtils';
@@ -141,6 +142,7 @@ export default function App() {
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
+  const themeMode = useThemeMode();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
@@ -1514,6 +1516,8 @@ export default function App() {
           accountForm={accountForm}
           accounts={accounts}
           newAccountForm={newAccountForm}
+          themeMode={themeMode.mode}
+          onThemeModeChange={themeMode.setMode}
           activeSettingsSection={activeSettingsSection}
           accountSettingsDirty={accountSettingsDirty}
           accountSettingsSaving={accountSettingsSaving}

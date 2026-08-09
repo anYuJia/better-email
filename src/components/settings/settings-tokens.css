@@ -83,3 +83,124 @@
   --st-breakpoint-mobile: 640px;
 }
 
+/*
+ * Dark appearance for the settings layer. The resolved theme lives on
+ * <html data-theme="dark"> (set by useThemeMode / the index.html bootstrap
+ * script), so the modal re-maps every --st-* token the same way the 2026
+ * token layer does.
+ */
+:root[data-theme="dark"] .settings-backdrop {
+  --st-canvas: #12161c;
+  --st-surface: #1a2028;
+  --st-surface-subtle: #1e2530;
+  --st-surface-muted: #252d39;
+  --st-sidebar: #161b22;
+
+  --st-border: #2a3340;
+  --st-border-strong: #3a4656;
+  --st-border-subtle: #2a3340;
+  --st-header-border: #2a3340;
+  --st-text: #e6eaf0;
+  --st-text-secondary: #9aa5b3;
+  --st-text-tertiary: #66707f;
+
+  --st-accent: #3b82f6;
+  --st-accent-hover: #4f92ff;
+  --st-accent-soft: rgba(59, 130, 246, 0.15);
+  --st-on-accent: #ffffff;
+  --st-danger: #f87171;
+  --st-danger-hover: #fca5a5;
+  --st-danger-soft: rgba(248, 113, 113, 0.14);
+  --st-success: #34d399;
+  --st-success-soft: rgba(52, 211, 153, 0.13);
+  --st-warning: #fbbf24;
+  --st-warning-soft: rgba(251, 191, 36, 0.14);
+  --st-info: #60a5fa;
+  --st-info-soft: rgba(96, 165, 250, 0.14);
+
+  --st-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px -1px rgba(0, 0, 0, 0.4);
+  --st-shadow-float: 0 4px 16px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --st-shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.65), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+
+  --st-focus-border: #7c8ba0;
+}
+
+:root[data-theme="dark"] .settings-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/*
+ * Filled danger buttons keep a saturated red so white labels stay readable;
+ * the lighter --st-danger remains for danger text and soft badges.
+ */
+:root[data-theme="dark"] .settings-modal .st-btn-danger {
+  color: #ffffff;
+  border-color: #dc2626;
+  background: #dc2626;
+}
+
+:root[data-theme="dark"] .settings-modal .st-btn-danger:hover:not(:disabled) {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
+/* Hard-coded light surfaces inside settings that the token layer cannot reach. */
+:root[data-theme="dark"] .settings-modal .settings-close-button {
+  background: #1a2028;
+}
+
+:root[data-theme="dark"] .settings-modal .settings-floating-unsaved-bar {
+  background: #1d242d;
+}
+
+:root[data-theme="dark"] .settings-modal .st-switch input[type="checkbox"] {
+  background: #3a4350;
+}
+
+:root[data-theme="dark"] .settings-modal .settings-preview-result details {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: #171c22;
+}
+
+:root[data-theme="dark"] .settings-modal .settings-oauth-result {
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+:root[data-theme="dark"] .settings-modal .settings-provider-presets button.active,
+:root[data-theme="dark"] .settings-modal .settings-provider-matrix > button.active,
+:root[data-theme="dark"] .settings-modal .settings-rule-action-chips button.active,
+:root[data-theme="dark"] .settings-modal .template-filter-button.active,
+:root[data-theme="dark"] .settings-modal .write-validation-stage.active {
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+/*
+ * The cache-clear confirm dialog portals into <body>, outside the modal, so
+ * it re-declares the small token set it needs and follows the dark theme
+ * through the html attribute.
+ */
+.settings-cache-confirm-backdrop {
+  --st-text: #1f2937;
+  --st-text-secondary: #6b7280;
+  --st-text-tertiary: #9ca3af;
+  --st-surface: #ffffff;
+  --st-surface-muted: #f1f3f5;
+  --st-border-strong: #c3ccd5;
+  --st-accent: #0a63c4;
+  --st-danger: #b3261e;
+  --st-danger-hover: #941d16;
+}
+
+:root[data-theme="dark"] .settings-cache-confirm-backdrop {
+  --st-text: #e6eaf0;
+  --st-text-secondary: #9aa5b3;
+  --st-text-tertiary: #66707f;
+  --st-surface: #1a2028;
+  --st-surface-muted: #252d39;
+  --st-border-strong: #3a4656;
+  --st-accent: #60a5fa;
+  --st-danger: #f87171;
+  --st-danger-hover: #fca5a5;
+  background: rgba(0, 0, 0, 0.6);
+}
+

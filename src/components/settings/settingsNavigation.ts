@@ -4,6 +4,7 @@ import {
   ContactRound,
   DatabaseBackup,
   EyeOff,
+  MoonStar,
   RefreshCw,
   ScanSearch,
   Sparkles,
@@ -17,6 +18,7 @@ export type SettingsSectionId =
   | 'accounts'
   | 'providers'
   | 'auth'
+  | 'appearance'
   | 'sending'
   | 'notifications'
   | 'privacy'
@@ -63,6 +65,13 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
   {
     label: '使用偏好',
     items: [
+      {
+        id: 'appearance',
+        label: '外观',
+        description: '切换亮色、暗色或跟随系统外观。',
+        keywords: ['外观', '主题', '亮色', '暗色', '深色', '浅色', '跟随系统', 'appearance', 'theme', 'dark mode', 'light mode', '皮肤'],
+        icon: MoonStar,
+      },
       {
         id: 'sending',
         label: '发送',

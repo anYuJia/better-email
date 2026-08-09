@@ -163,13 +163,14 @@
 
 /*
  * Dark mode: re-map semantic colour roles for the 2026 layer (which is fully
- * token-driven). Overlays with hard-coded light surfaces are re-themed in
- * styles/2026/pass-dark-mode.css. The settings layer (--st-*) intentionally
- * stays on its documented opaque light theme.
+ * token-driven). Overlays and legacy sheets with hard-coded light surfaces
+ * are re-themed in styles/2026/pass-dark-mode.css. The resolved theme is
+ * applied to <html data-theme="dark"> by the inline bootstrap script (and
+ * kept in sync by useThemeMode), so a manual light/dark/system preference is
+ * honoured without a flash of the wrong theme.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
     --color-canvas: oklch(0.205 0.014 var(--primitive-hue-neutral));
     --color-surface-sidebar: oklch(0.232 0.016 var(--primitive-hue-neutral));
@@ -210,5 +211,4 @@
     --quiet-row-shadow: inset 0 1px 0 oklch(0.35 0.012 var(--primitive-hue-paper) / 0.4);
     --glass: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.82);
     --glass-strong: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.94);
-  }
 }

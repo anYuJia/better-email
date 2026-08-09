@@ -39,9 +39,9 @@ describe('settingsNavigation controls and fallback', () => {
     expect(accountsItem?.keywords).toContain('密码');
   });
 
-  it('groups sending and notifications under 使用偏好', () => {
+  it('groups appearance, sending and notifications under 使用偏好', () => {
     const group = settingsNavigationGroups.find((candidate) => candidate.label === '使用偏好');
-    expect(group?.items.map((item) => item.id)).toEqual(['sending', 'notifications']);
+    expect(group?.items.map((item) => item.id)).toEqual(['appearance', 'sending', 'notifications']);
   });
 
   it('groups privacy and identities under 安全与隐私', () => {

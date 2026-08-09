@@ -15,33 +15,32 @@
 
 /* --- Legacy surface variables used by pre-token sheets --- */
 :root[data-theme="dark"] {
-  --app-bg: #0f1319;
-  --surface: rgba(23, 28, 35, 0.86);
-  --surface-solid: #171c23;
-  --surface-soft: #1c222b;
-  --surface-hover: #243042;
-  --surface-active: #26364d;
-  --text: #e6eaf0;
-  --text-soft: #a9b3bf;
-  --muted: #7c8794;
-  --muted-2: #5d6875;
-  --line: rgba(148, 163, 184, 0.16);
-  --line-strong: rgba(148, 163, 184, 0.28);
-  --accent-soft: rgba(96, 165, 250, 0.16);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
-  --glass: rgba(23, 28, 35, 0.82);
-  --glass-strong: rgba(23, 28, 35, 0.94);
-  --control-bg: rgba(23, 28, 35, 0.82);
-  --hairline: rgba(148, 163, 184, 0.14);
-  --panel-shadow: 0 22px 58px rgba(0, 0, 0, 0.5);
-  --float-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  --app-bg: var(--ui-bg);
+  --surface: var(--ui-surface);
+  --surface-solid: var(--ui-surface);
+  --surface-soft: var(--ui-surface-muted);
+  --surface-hover: var(--quiet-row-hover);
+  --surface-active: var(--quiet-row-selected);
+  --text: var(--ui-text);
+  --text-soft: var(--ui-text-secondary);
+  --muted: var(--ui-text-tertiary);
+  --muted-2: var(--ui-text-tertiary);
+  --line: var(--ui-border);
+  --line-strong: var(--ui-border-strong);
+  --accent-soft: var(--ui-accent-soft);
+  --shadow-sm: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.34);
+  --shadow-md: var(--ui-shadow-popover);
+  --shadow-lg: var(--ui-shadow-float);
+  --glass: var(--ui-surface);
+  --glass-strong: var(--ui-surface);
+  --control-bg: var(--ui-surface-muted);
+  --hairline: var(--ui-border);
+  --panel-shadow: var(--ui-shadow-popover);
+  --float-shadow: var(--ui-shadow-float);
 }
 
 :root[data-theme="dark"] body {
-  background:
-    linear-gradient(180deg, #151a21 0%, #0e1217 100%);
+  background: var(--ui-bg);
 }
 
 :root[data-theme="dark"] .app-shell {
@@ -167,7 +166,7 @@
 :root[data-theme="dark"] .message-toast,
 :root[data-theme="dark"] .undo-snackbar,
 :root[data-theme="dark"] .undo-card {
-  background: var(--ui-surface-raised);
+  background: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border-strong);
 }
@@ -682,4 +681,292 @@
 :root[data-theme="dark"] .notification-account-grid > div {
   background: #171c22;
   border-color: var(--ui-border);
+}
+
+/* ---------------------------------------------------------------------
+ * Workspace reconciliation.
+ *
+ * A few older passes are intentionally more decorative in light mode. In
+ * dark mode those translucent whites, paper surfaces and elevated cards turn
+ * into unrelated patches. Keep all persistent workspace surfaces on the
+ * semantic neutral scale; reserve elevation for menus and dialogs.
+ * --------------------------------------------------------------------- */
+
+:root[data-theme="dark"] :is(.toolbar, .list-control-strip, .message-list, .thread-list, .message-list-footer) {
+  background: var(--ui-list);
+}
+
+:root[data-theme="dark"] .search-box,
+:root[data-theme="dark"] .list-control-actions,
+:root[data-theme="dark"] .compact-menu summary,
+:root[data-theme="dark"] .search-shortcuts button,
+:root[data-theme="dark"] .list-summary .search-scope-indicator {
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] :is(.list-control-actions > button, .search-shortcuts button, .compact-menu summary):hover,
+:root[data-theme="dark"] :is(.list-control-actions > button, .search-shortcuts button, .compact-menu summary).active {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .message-date-header {
+  background: var(--ui-list);
+}
+
+/* Initial avatars remain deliberately muted, but retain the distinct hue
+   families available in light mode so a dense list stays scannable. */
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar) {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-0 {
+  color: oklch(0.80 0.045 250);
+  background: oklch(0.315 0.028 250);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-1 {
+  color: oklch(0.80 0.040 305);
+  background: oklch(0.312 0.026 305);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-2 {
+  color: oklch(0.80 0.040 152);
+  background: oklch(0.310 0.026 152);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-3 {
+  color: oklch(0.83 0.045 var(--primitive-hue-warning));
+  background: oklch(0.320 0.030 var(--primitive-hue-warning));
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-4 {
+  color: oklch(0.80 0.035 225);
+  background: oklch(0.312 0.022 225);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-5 {
+  color: oklch(0.80 0.040 15);
+  background: oklch(0.312 0.025 15);
+}
+
+:root[data-theme="dark"] .message-chips span,
+:root[data-theme="dark"] .message-attachment {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .reader-actions {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary) {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] :is(.body-text, .reader-html) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .reader-warning-panel {
+  border-color: var(--ui-warning-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-warning-bg);
+}
+
+:root[data-theme="dark"] .reader-warning-badge {
+  border-color: transparent;
+  color: var(--ui-warning);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply textarea {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .quick-reply textarea::placeholder,
+:root[data-theme="dark"] .quick-reply > footer > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .quick-reply > footer button {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply > footer button:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send:disabled {
+  color: var(--ui-text-tertiary);
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .sidebar {
+  border-right-color: var(--ui-border);
+  background: var(--ui-sidebar);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] :is(.account-switcher, .sidebar-disclosure, .sidebar-tool-section, .label-list, .saved-search-list, .task-stack) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .sidebar .folder:hover,
+:root[data-theme="dark"] .sidebar-disclosure summary:hover,
+:root[data-theme="dark"] .sidebar-disclosure[open] summary {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .sidebar .folder:hover .folder-main {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .sidebar .folder.active,
+:root[data-theme="dark"] .sidebar .folder.active:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+}
+
+:root[data-theme="dark"] .sidebar .folder.active .folder-name svg,
+:root[data-theme="dark"] .sidebar .folder.active .badge {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button):hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] :is(
+  .icon-button,
+  .composer header button,
+  .label-tools button,
+  .attachments button,
+  .composer-signature button,
+  .composer-attachment-button,
+  .rich-toolbar button,
+  .composer-mini-actions button
+) {
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] :is(
+  .icon-button,
+  .composer header button,
+  .label-tools button,
+  .attachments button,
+  .composer-signature button,
+  .composer-attachment-button,
+  .rich-toolbar button,
+  .composer-mini-actions button
+):hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] :is(.composer input, .composer textarea, .composer select, .composer .field-shell) {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] :is(.composer input, .composer textarea, .composer select):focus {
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] :is(.global-tooltip, .compact-menu > div, .search-options-menu > div, .search-scope-menu > div) {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-tooltip);
+}
+
+/* The thread list intentionally uses !important in its local layout pass. */
+:root[data-theme="dark"] .thread-card {
+  border-color: transparent !important;
+  color: var(--ui-text) !important;
+  background: var(--ui-surface) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .thread-card:hover {
+  border-color: transparent !important;
+  background: var(--quiet-row-hover) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .thread-card.selected,
+:root[data-theme="dark"] .thread-card.selected:hover {
+  border-color: transparent !important;
+  background: var(--quiet-row-selected) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .thread-card.is-unread :is(.thread-subject, .thread-participants) {
+  color: var(--ui-text) !important;
+}
+
+:root[data-theme="dark"] .thread-count-badge {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .thread-unread-dot {
+  box-shadow: 0 0 0 2px var(--ui-surface);
 }

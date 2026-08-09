@@ -227,3 +227,114 @@
     overflow-y: auto;
   }
 }
+
+/* SnoozePicker is lazy-loaded, after the main dark-mode sheet. Keep every
+ * local surface token-driven so the dialog cannot reintroduce light cards. */
+:root[data-theme="dark"] .snooze-dialog {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+}
+
+:root[data-theme="dark"] .snooze-dialog > header {
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .snooze-dialog-icon {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .snooze-dialog > header strong,
+:root[data-theme="dark"] .snooze-preset-grid strong,
+:root[data-theme="dark"] .snooze-custom > span strong {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .snooze-dialog > header small,
+:root[data-theme="dark"] .snooze-preset-grid small,
+:root[data-theme="dark"] .snooze-custom > span small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .snooze-dialog > header button {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .snooze-dialog > header button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .snooze-preset-grid > button {
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .snooze-preset-grid > button:hover {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .snooze-preset-grid > button:focus-visible {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+:root[data-theme="dark"] .snooze-preset-grid > button > span {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .snooze-custom {
+  border-top-color: var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .snooze-custom input {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .snooze-custom input:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .snooze-custom button {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .snooze-custom button:hover {
+  background: var(--ui-accent-hover);
+}
+
+:root[data-theme="dark"] .snooze-custom p {
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .snooze-preset-grid {
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+}
+
+:root[data-theme="dark"] .snooze-preset-grid::-webkit-scrollbar-thumb {
+  background: var(--ui-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+:root[data-theme="dark"] .snooze-preset-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}

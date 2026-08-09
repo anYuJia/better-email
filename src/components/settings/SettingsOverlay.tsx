@@ -67,6 +67,7 @@ const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
 const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
 const TemplateSettings = lazy(() => import('./TemplateSettings'));
+const AboutSettings = lazy(() => import('./AboutSettings'));
 
 export type SettingsOverlayProps = {
   accountForm: Account | null;
@@ -234,6 +235,7 @@ const MemoizedRuleAutomation = memo(RuleAutomationSettings);
 const MemoizedSecurityPreview = memo(SecurityPreviewSettings);
 const MemoizedAiService = memo(AiServiceSettings);
 const MemoizedTemplates = memo(TemplateSettings);
+const MemoizedAbout = memo(AboutSettings);
 
 export default function SettingsOverlay(props: SettingsOverlayProps) {
   const {
@@ -501,6 +503,9 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
           )}
           {activeSettingsSection === 'templates' && (
             <MemoizedTemplates onNavigateToAi={() => handlers.onNavigate('ai')} />
+          )}
+          {activeSettingsSection === 'about' && (
+            <MemoizedAbout />
           )}
         </Suspense>
       </SettingsFrame>

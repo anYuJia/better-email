@@ -4,6 +4,7 @@ import {
   ContactRound,
   DatabaseBackup,
   EyeOff,
+  Info,
   MoonStar,
   RefreshCw,
   ScanSearch,
@@ -29,7 +30,8 @@ export type SettingsSectionId =
   | 'rules'
   | 'security-preview'
   | 'ai'
-  | 'templates';
+  | 'templates'
+  | 'about';
 
 export type SettingsNavigationItem = {
   id: SettingsSectionId;
@@ -167,6 +169,18 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
         description: '按发件人、主题和内容处理新邮件。',
         keywords: ['规则', '自动化', '过滤', '标签', '发件人', '主题', 'rule'],
         icon: Workflow,
+      },
+    ],
+  },
+  {
+    label: '应用',
+    items: [
+      {
+        id: 'about',
+        label: '关于应用',
+        description: '了解 Better Email、开源许可和安全更新。',
+        keywords: ['关于', '应用', '版本', 'github', '开源', '免费', '更新', 'about', 'update', 'release'],
+        icon: Info,
       },
     ],
   },

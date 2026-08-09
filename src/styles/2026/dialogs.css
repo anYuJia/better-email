@@ -44,7 +44,7 @@
 
 .compact-menu > div button.active {
   color: var(--ui-text);
-  background: #e5e7eb;
+  background: var(--quiet-row-selected);
 }
 
 .composer-backdrop {
@@ -125,7 +125,7 @@
 .context-menu button:focus-visible,
 .context-menu-branch:focus-within > button {
   color: var(--ui-text);
-  background: #f0f3f6;
+  background: var(--quiet-row-hover);
 }
 
 .context-menu-heading {

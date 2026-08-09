@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import type { Contact, DraftInput } from '../../app/types';
 import ComposerPrimaryFields from './ComposerPrimaryFields';
 import { localFileAssetUrl } from '../../tauriBridge';
@@ -77,6 +78,28 @@ function renderFields(
 function recipientInput(container: HTMLElement, index = 0) {
   const inputs = Array.from(container.querySelectorAll<HTMLInputElement>('.composer-recipient-editor input'));
   return inputs[index];
+}
+
+function ControlledComposerFields({ initialDraft }: { initialDraft: DraftInput }) {
+  const [currentDraft, setCurrentDraft] = useState(initialDraft);
+  return (
+    <ComposerPrimaryFields
+      draft={currentDraft}
+      contacts={[ada, adaWu]}
+      richComposer
+      dropActive={false}
+      onPatchDraft={(patch) => setCurrentDraft((current) => ({ ...current, ...patch }))}
+      onPickAttachments={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onAttachmentDrop={vi.fn()}
+      onAttachmentDragEnter={vi.fn()}
+      onAttachmentDragLeave={vi.fn()}
+      onAttachmentDragOver={vi.fn()}
+      onAttachmentPaste={vi.fn()}
+      buildInlineImageAttachments={vi.fn(async () => [])}
+      onInlineImagesAdded={vi.fn()}
+    />
+  );
 }
 
 describe('ComposerPrimaryFields', () => {
@@ -165,6 +188,21 @@ describe('ComposerPrimaryFields', () => {
 
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada@example.com, ada.wu@example.com' });
     expect(container.querySelectorAll('.composer-recipient-chip')).toHaveLength(2);
+  });
+
+  it('removes only the clicked chip when the draft is parent-controlled', () => {
+    const { container } = render(
+      <ControlledComposerFields
+        initialDraft={draft({ to: 'first@example.com, second@example.com, last@example.com' })}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('移除 last@example.com'));
+
+    expect(screen.queryByLabelText('移除 last@example.com')).toBeNull();
+    expect(container.querySelectorAll('.composer-recipient-chip')).toHaveLength(2);
+    expect(screen.getByLabelText('移除 first@example.com')).not.toBeNull();
+    expect(screen.getByLabelText('移除 second@example.com')).not.toBeNull();
   });
 
   it('commits a fully typed address as a chip on blur', () => {

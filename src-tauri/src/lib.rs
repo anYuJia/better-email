@@ -175,11 +175,12 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
 
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/v4/tray-icon.png"))
         .map_err(|error| format!("failed to load tray icon: {error}"))?;
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
+        .icon_as_template(false)
         .menu(&menu)
         .tooltip("Better Email")
         .on_menu_event(move |app_handle, event| {
@@ -264,6 +265,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let store = MailStore::open(app.handle())?;
             app.manage(store);

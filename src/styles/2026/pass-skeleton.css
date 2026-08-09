@@ -71,6 +71,19 @@
   animation: shimmer 1.6s infinite ease-out;
 }
 
+/* A white loading sweep blooms against the dark reader surface. Keep the
+ * motion visible without turning it into a bright stripe. */
+:root[data-theme="dark"] .skeleton-line::after,
+:root[data-theme="dark"] .skeleton-avatar::after {
+  background: linear-gradient(
+    90deg,
+    oklch(0.78 0.014 var(--primitive-hue-neutral) / 0) 0%,
+    oklch(0.78 0.014 var(--primitive-hue-neutral) / 0.16) 20%,
+    oklch(0.78 0.014 var(--primitive-hue-neutral) / 0.16) 60%,
+    oklch(0.78 0.014 var(--primitive-hue-neutral) / 0) 100%
+  );
+}
+
 .skeleton-title {
   height: 20px;
   width: 100%;

@@ -1,36 +1,37 @@
-/* Custom premium style overrides for the session (thread) list view */
+/* Session list follows the same quiet, borderless row language as mail. */
 .thread-list {
   padding: 12px 14px !important;
   gap: 10px !important;
+  background: var(--ui-list);
 }
 
 .thread-card {
   position: relative;
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--ui-radius-sm) !important;
+  background: var(--ui-surface) !important;
   padding: 12px 16px 12px 28px !important;
   text-align: left;
   display: grid;
   gap: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.015), 0 4px 12px rgba(0, 0, 0, 0.005) !important;
+  box-shadow: none !important;
   transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
   min-width: 0;
   box-sizing: border-box !important;
 }
 
 .thread-card:hover {
-  border-color: rgba(8, 127, 245, 0.25) !important;
-  background: #fcfdfe !important;
-  box-shadow: 0 4px 16px rgba(8, 127, 245, 0.03) !important;
+  border-color: transparent !important;
+  background: var(--quiet-row-hover) !important;
+  box-shadow: none !important;
 }
 
 .thread-card.selected,
 .thread-card.selected:hover {
-  background: var(--ui-accent-soft) !important;
-  border-color: rgba(8, 127, 245, 0.4) !important;
-  box-shadow: inset 3px 0 0 var(--ui-accent, #087ff5) !important;
+  background: var(--quiet-row-selected) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .thread-unread-dot {
@@ -40,8 +41,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--ui-accent, #087ff5);
-  box-shadow: 0 0 0 2px #ffffff;
+  background-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-surface);
 }
 
 .thread-topline {
@@ -58,7 +59,7 @@
   min-width: 0;
   font-size: 13.5px;
   font-weight: 550;
-  color: var(--ui-text, #1f2937);
+  color: var(--ui-text);
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
@@ -66,12 +67,12 @@
 
 .thread-card.is-unread .thread-subject {
   font-weight: 750;
-  color: #111827;
+  color: var(--ui-text);
 }
 
 .thread-card time {
   font-size: 11px;
-  color: var(--ui-text-tertiary, #9ca3af) !important;
+  color: var(--ui-text-tertiary) !important;
   flex-shrink: 0;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -79,14 +80,14 @@
 }
 
 .thread-card.is-unread time {
-  color: var(--ui-accent, #087ff5) !important;
+  color: var(--ui-accent) !important;
   font-weight: 600;
 }
 
 .thread-participants {
   margin: 0 !important;
   font-size: 12px !important;
-  color: var(--ui-text-secondary, #4b5563) !important;
+  color: var(--ui-text-secondary) !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -94,7 +95,7 @@
 }
 
 .thread-card.is-unread .thread-participants {
-  color: #1f2937 !important;
+  color: var(--ui-text) !important;
   font-weight: 600;
 }
 
@@ -103,23 +104,23 @@
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--ui-text-tertiary, #6b7280);
+  color: var(--ui-text-tertiary);
   margin-top: 2px;
 }
 
 .thread-count-badge {
   padding: 1.5px 6px;
   border-radius: 5px;
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
   font-weight: 500;
 }
 
 .thread-unread-badge {
   padding: 1.5px 6px;
   border-radius: 5px;
-  background: rgba(8, 127, 245, 0.08);
-  color: var(--ui-accent, #087ff5);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
   font-weight: 600;
 }
 
@@ -127,7 +128,7 @@
   display: inline-flex !important;
   align-items: center;
   gap: 3px;
-  color: var(--ui-text-tertiary, #9ca3af) !important;
+  color: var(--ui-text-tertiary) !important;
   font-size: 10.5px;
   font-style: normal;
   margin-left: 4px;

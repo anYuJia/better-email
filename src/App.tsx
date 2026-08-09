@@ -1511,7 +1511,7 @@ export default function App() {
         </Suspense>
       )}
 
-      {!isAccountLoginActive && isSettingsOpen && (accountForm || activeSettingsSection === 'accounts') && (
+      {!isAccountLoginActive && isSettingsOpen && (
         <SettingsOverlay
           accountForm={accountForm}
           accounts={accounts}

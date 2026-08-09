@@ -1,17 +1,17 @@
 /* Message list density pass: compact rows, low-saturation color, clearer state. */
 .message-list {
-  background: #fafbfc;
+  background: var(--ui-list);
 }
 
 .message-date-section + .message-date-section {
-  border-top: 1px solid #e7ebf0;
+  border-top: 1px solid var(--ui-border);
 }
 
 .message-date-header {
   min-height: 23px;
   padding: 5px 12px 3px;
-  color: #7f8894;
-  background: #fafbfc;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
   font-size: 10.5px;
   letter-spacing: 0;
 }

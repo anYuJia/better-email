@@ -308,7 +308,7 @@
   gap: 10px;
   padding: 6px 0;
   border: 0;
-  border-top: 1px solid oklch(0.95 0.005 var(--primitive-hue-neutral));
+  border-top: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
   box-shadow: none;

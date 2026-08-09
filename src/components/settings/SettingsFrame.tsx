@@ -225,7 +225,7 @@ export default function SettingsFrame({
                 <FlaskConical size={15} />
                 <span>测试连接</span>
               </button>
-            ) : (
+            ) : activeSection === 'about' ? null : (
               <button
                 type="button"
                 className="settings-header-button primary"

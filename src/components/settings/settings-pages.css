@@ -42,6 +42,139 @@
   font-size: var(--st-font-size-secondary);
 }
 
+/* --- About application --- */
+.settings-modal .settings-about-stack {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.settings-modal .settings-about-hero .st-section-body {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-modal .settings-about-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-modal .settings-about-brand-mark {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 14px;
+  background: var(--st-surface-subtle);
+  padding: 8px;
+}
+
+.settings-modal .settings-about-brand strong {
+  display: block;
+  color: var(--st-text);
+  font-size: 18px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.settings-modal .settings-about-brand p,
+.settings-modal .settings-about-copy {
+  margin: 2px 0 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.55;
+}
+
+.settings-modal .settings-about-copy {
+  margin: 0;
+  max-width: 680px;
+}
+
+.settings-modal .settings-about-value,
+.settings-modal .settings-about-license,
+.settings-modal .settings-about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  white-space: nowrap;
+}
+
+.settings-modal .settings-about-license {
+  color: var(--st-success);
+}
+
+.settings-modal .settings-about-link {
+  color: var(--st-accent);
+  text-decoration: none;
+}
+
+.settings-modal .settings-about-link:hover {
+  color: var(--st-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.settings-modal .settings-about-update-status {
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-about-update-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-about-update-result > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-modal .settings-about-update-result strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+}
+
+.settings-modal .settings-about-update-result small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+}
+
+.settings-modal .settings-about-update-result a.st-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-about-update-footnote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+}
+
+@media (max-width: 640px) {
+  .settings-modal .settings-about-update-result {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .settings-modal .settings-page-content .settings-empty-hint {
   margin: 0;
   padding: 12px 14px;
@@ -3557,10 +3690,10 @@
   display: grid;
   gap: 6px;
   padding: 14px 16px;
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
   background: var(--st-surface);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
+  box-shadow: var(--st-shadow-card);
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -3570,9 +3703,9 @@
 }
 
 .settings-modal .settings-ai-service-option:hover {
-  border-color: rgba(203, 213, 225, 0.9);
-  background: var(--st-surface);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  border-color: var(--st-border-strong);
+  background: var(--st-surface-subtle);
+  box-shadow: var(--st-shadow-card);
 }
 
 .settings-modal .settings-ai-service-option.active {
@@ -4621,62 +4754,86 @@
 }
 
 /* =====================================================================
- * Appearance page: theme preference cards.
+ * Appearance page: compact theme preference control.
  * ===================================================================== */
+
+.settings-modal .settings-theme-preference {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 9px;
+}
 
 .settings-modal .settings-theme-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-theme-option {
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 36px;
+  display: inline-flex;
   align-items: center;
-  gap: 4px 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text);
-  background: var(--st-surface);
-  box-shadow: var(--st-shadow-card);
-  text-align: left;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--st-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--st-font-size-secondary);
+  font-weight: 580;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 140ms ease,
     background-color 140ms ease,
+    color 140ms ease,
     box-shadow 140ms ease;
 }
 
 .settings-modal .settings-theme-option:hover {
-  border-color: var(--st-border-strong);
+  color: var(--st-text);
   background: var(--st-surface-subtle);
 }
 
 .settings-modal .settings-theme-option.active {
-  border-color: var(--st-accent);
-  background: var(--st-accent-soft);
-  box-shadow: 0 0 0 1px var(--st-accent);
+  color: var(--st-text);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-card);
 }
 
 .settings-modal .settings-theme-option > svg {
-  grid-row: 1 / -1;
-  color: var(--st-text-secondary);
+  flex: 0 0 auto;
+  color: currentColor;
 }
 
 .settings-modal .settings-theme-option.active > svg {
   color: var(--st-accent);
 }
 
-.settings-modal .settings-theme-option strong {
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
+.settings-modal .settings-theme-option > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.settings-modal .settings-theme-option small {
+.settings-modal .settings-theme-description {
+  min-height: 19px;
+  margin: 0;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .settings-modal .settings-theme-option {
+    gap: 5px;
+    padding-inline: 6px;
+    font-size: var(--st-font-size-aux);
+  }
 }

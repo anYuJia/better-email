@@ -117,3 +117,41 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* The original-message card is rendered by the reader (not the lazy
+ * composer), so it needs its own dark surface mapping. Keep the metadata
+ * hierarchy readable without bringing the light paper card into dark mode. */
+:root[data-theme="dark"] .original-message-block {
+  border-color: var(--ui-border);
+  border-left-color: var(--ui-border-strong);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .original-message-block header span {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .original-message-block header small,
+:root[data-theme="dark"] .original-message-block dt {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .original-message-block dd,
+:root[data-theme="dark"] .original-message-block pre {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .original-message-block dl {
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .reader-html blockquote {
+  border-left-color: var(--ui-border-strong);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .thread-stack {
+  border-top-color: var(--ui-border);
+}

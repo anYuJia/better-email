@@ -441,7 +441,7 @@
 
 .settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary:hover:not(:disabled) {
   color: var(--st-text);
-  border-color: #aeb9c5;
+  border-color: var(--st-focus-border);
   background: var(--st-surface-muted);
 }
 
@@ -465,7 +465,7 @@
 .settings-modal .st-btn-danger-secondary:hover:not(:disabled) {
   color: var(--st-danger-hover);
   border-color: transparent;
-  background: #fbe0de;
+  background: var(--st-danger-soft);
 }
 
 .settings-modal .st-btn-ghost {

@@ -195,3 +195,78 @@
     }
   }
 }
+
+/* Context menus render through a portal, so their nested submenus and
+ * interaction states need their own dark-theme treatment. */
+:root[data-theme="dark"] .context-menu-heading {
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .context-menu-heading strong {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .context-menu-heading span,
+:root[data-theme="dark"] .context-menu-copy small,
+:root[data-theme="dark"] .context-menu kbd,
+:root[data-theme="dark"] .context-menu-chevron {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .context-menu-icon {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .context-submenu {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+:root[data-theme="dark"] .context-menu button:hover,
+:root[data-theme="dark"] .context-menu button:focus-visible,
+:root[data-theme="dark"] .context-menu-branch:focus-within > button {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .context-menu button:hover .context-menu-copy small,
+:root[data-theme="dark"] .context-menu button:focus-visible .context-menu-copy small {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .context-menu button:disabled {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .context-menu button.danger {
+  color: var(--ui-danger);
+}
+
+:root[data-theme="dark"] .context-menu button.danger .context-menu-icon {
+  color: currentColor;
+}
+
+:root[data-theme="dark"] .context-menu button.danger:hover,
+:root[data-theme="dark"] .context-menu button.danger:focus-visible {
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .context-menu,
+:root[data-theme="dark"] .context-submenu {
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+}
+
+:root[data-theme="dark"] :is(.context-menu, .context-submenu)::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] :is(.context-menu, .context-submenu) ::-webkit-scrollbar-thumb {
+  background: var(--ui-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+:root[data-theme="dark"] :is(.context-menu, .context-submenu)::-webkit-scrollbar-thumb:hover,
+:root[data-theme="dark"] :is(.context-menu, .context-submenu) ::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}

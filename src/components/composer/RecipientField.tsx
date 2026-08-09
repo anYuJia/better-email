@@ -48,7 +48,14 @@ export default function RecipientField({
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const lastValueRef = useRef(value);
+  // Chip actions can run between controlled parent updates. Keep the latest
+  // local state in refs so a click always removes exactly one chip.
+  const chipsRef = useRef(chips);
+  const queryRef = useRef(query);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  chipsRef.current = chips;
+  queryRef.current = query;
 
   const matches = useMemo(
     () => (query.trim() ? matchingContacts(contactSearchEntries, query, suggestionLimit) : []),
@@ -59,6 +66,8 @@ export default function RecipientField({
     if (value === lastValueRef.current) return;
     lastValueRef.current = value;
     const { chips: nextChips, query: nextQuery } = initialParse(value);
+    chipsRef.current = nextChips;
+    queryRef.current = nextQuery;
     setChips(nextChips);
     setQuery(nextQuery);
     setHighlight(0);
@@ -72,9 +81,12 @@ export default function RecipientField({
 
   function commitEmail(email: string) {
     const normalized = email.trim().toLowerCase();
-    const nextChips = chips.some((chip) => chip.toLowerCase() === normalized)
-      ? chips
-      : [...chips, email.trim()];
+    const currentChips = chipsRef.current;
+    const nextChips = currentChips.some((chip) => chip.toLowerCase() === normalized)
+      ? currentChips
+      : [...currentChips, email.trim()];
+    chipsRef.current = nextChips;
+    queryRef.current = '';
     setChips(nextChips);
     setQuery('');
     emit(nextChips, '');
@@ -82,9 +94,12 @@ export default function RecipientField({
   }
 
   function removeChip(index: number) {
-    const nextChips = chips.filter((_, chipIndex) => chipIndex !== index);
+    const currentChips = chipsRef.current;
+    if (index < 0 || index >= currentChips.length) return;
+    const nextChips = currentChips.filter((_, chipIndex) => chipIndex !== index);
+    chipsRef.current = nextChips;
     setChips(nextChips);
-    emit(nextChips, query);
+    emit(nextChips, queryRef.current);
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -92,14 +107,17 @@ export default function RecipientField({
     const parts = raw.split(/[;,]/);
     if (parts.length > 1) {
       const committed = parts.slice(0, -1).map((part) => part.trim()).filter(Boolean);
-      const nextChips = [...chips, ...committed];
+      const nextChips = [...chipsRef.current, ...committed];
       const nextQuery = parts[parts.length - 1];
+      chipsRef.current = nextChips;
+      queryRef.current = nextQuery;
       setChips(nextChips);
       setQuery(nextQuery);
       emit(nextChips, nextQuery);
     } else {
+      queryRef.current = raw;
       setQuery(raw);
-      emit(chips, raw);
+      emit(chipsRef.current, raw);
     }
     setHighlight(0);
   }
@@ -135,9 +153,9 @@ export default function RecipientField({
       }
       return;
     }
-    if (event.key === 'Backspace' && query === '' && chips.length > 0) {
+    if (event.key === 'Backspace' && queryRef.current === '' && chipsRef.current.length > 0) {
       event.preventDefault();
-      removeChip(chips.length - 1);
+      removeChip(chipsRef.current.length - 1);
     }
   }
 
@@ -167,8 +185,18 @@ export default function RecipientField({
               <button
                 type="button"
                 aria-label={`移除 ${chip}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => removeChip(index)}
+                onMouseDown={(event) => {
+                  // This button lives inside a label. Prevent the label's
+                  // default activation so the input value and focus stay
+                  // stable while removing exactly one chip.
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  removeChip(index);
+                }}
               >
                 <X size={11} />
               </button>

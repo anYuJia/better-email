@@ -1562,6 +1562,24 @@
   font-size: 9px;
 }
 
+/* Delivery controls use a compact variant with stronger light-mode rules.
+ * Rejoin the shared semantic control scale in dark mode instead of exposing
+ * white select triggers inside the composer. */
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary small {
+  color: var(--ui-text-tertiary);
+}
+
 .composer .composer-template-controls {
   min-width: 0;
   display: grid;
@@ -1748,4 +1766,367 @@
   background: #edf4fb;
   outline: 1.5px solid rgba(18, 95, 157, 0.35);
   outline-offset: -1.5px;
+}
+
+/*
+ * Composer dark mode
+ *
+ * The composer is loaded lazily, after the global dark-mode pass. Its compact
+ * light-mode refinements above therefore need their own semantic dark
+ * counterparts rather than relying on the older global selectors. Keep the
+ * message canvas quiet, retain a subtle tonal separation for controls, and
+ * reserve accent colour for focus and active/drop states.
+ */
+:root[data-theme="dark"] .composer .composer-primary-fields,
+:root[data-theme="dark"] .composer .composer-body-field,
+:root[data-theme="dark"] .composer .composer-body-attachments,
+:root[data-theme="dark"] .composer footer {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .composer .composer-field-row {
+  border-bottom-color: var(--ui-border);
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .composer-field-row:focus-within,
+:root[data-theme="dark"] .composer-recipient-field .composer-field-row:focus-within {
+  border-bottom-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .composer .composer-field-row input,
+:root[data-theme="dark"] .composer .composer-field-row input:hover,
+:root[data-theme="dark"] .composer .composer-field-row input:focus {
+  color: var(--ui-text);
+  background: transparent;
+  caret-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-field-row input::placeholder,
+:root[data-theme="dark"] .composer .composer-body-field textarea::placeholder,
+:root[data-theme="dark"] .composer .composer-body-field .composer-richtext-body:empty::before {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions > span,
+:root[data-theme="dark"] .composer .recipient-suggestions button small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions button {
+  color: var(--ui-text);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions button:hover,
+:root[data-theme="dark"] .composer .recipient-suggestions button.is-active,
+:root[data-theme="dark"] .composer .recipient-suggestions button.is-active:hover {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions button.is-active,
+:root[data-theme="dark"] .composer .recipient-suggestions button.is-active:hover {
+  outline-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-recipient-chip {
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-recipient-chip button {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-recipient-chip button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field textarea,
+:root[data-theme="dark"] .composer .composer-body-field textarea:hover,
+:root[data-theme="dark"] .composer .composer-body-field textarea:focus,
+:root[data-theme="dark"] .composer .composer-body-field .composer-richtext-body {
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  caret-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field::after,
+:root[data-theme="dark"] .composer .composer-body-field.has-original-quote textarea,
+:root[data-theme="dark"] .composer .composer-body-field.has-original-quote .composer-richtext-body {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field::after {
+  background: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field.drop-active::before {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-accent);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+:root[data-theme="dark"] .composer .composer-original-quote {
+  border-color: var(--ui-border);
+  border-left-color: var(--ui-border-strong);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-original-quote header span,
+:root[data-theme="dark"] .composer .composer-original-quote dd,
+:root[data-theme="dark"] .composer .composer-original-quote pre {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .composer .composer-original-quote header small,
+:root[data-theme="dark"] .composer .composer-original-quote dt {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-original-quote dl {
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile-copy small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-filemark,
+:root[data-theme="dark"] .composer .composer-attachment-filemark-fold {
+  border-color: var(--ui-border);
+  color: var(--ui-accent);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-filemark::after {
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-image .composer-attachment-filemark,
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
+  border-color: var(--ui-success);
+  color: var(--ui-success);
+  background: var(--ui-success-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-image .composer-attachment-filemark::after,
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
+  background: var(--ui-success-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-archive .composer-attachment-filemark {
+  border-color: var(--ui-warning-border);
+  color: var(--ui-warning);
+  background: var(--ui-warning-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
+  background: var(--ui-warning-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-filemark-label {
+  color: currentColor;
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile button {
+  color: var(--ui-danger);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile button:hover {
+  color: var(--ui-danger-hover);
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .composer .composer-body-attachment-empty {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-quick-tools,
+:root[data-theme="dark"] .composer .composer-advanced,
+:root[data-theme="dark"] .composer .composer-advanced-panel {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .rich-toolbar {
+  border-right-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer .rich-toolbar button {
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .rich-toolbar button:hover,
+:root[data-theme="dark"] .composer .rich-toolbar button:focus-visible {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-signature button,
+:root[data-theme="dark"] .composer .composer-attachment-button,
+:root[data-theme="dark"] .composer .composer-quick-tools .checkbox-row {
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-signature button:hover,
+:root[data-theme="dark"] .composer .composer-attachment-button:hover,
+:root[data-theme="dark"] .composer .composer-quick-tools .checkbox-row:hover {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-quick-tools .checkbox-row input {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-quick-tools .checkbox-row input:checked {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-signature small,
+:root[data-theme="dark"] .composer .composer-attachment-controls > span,
+:root[data-theme="dark"] .composer .composer-advanced summary > span,
+:root[data-theme="dark"] .composer .composer-advanced-chevron {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-attachments.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-advanced summary {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .composer .composer-advanced summary:hover,
+:root[data-theme="dark"] .composer .composer-advanced[open] summary {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .composer-inline-select,
+:root[data-theme="dark"] .composer .composer-delivery-controls .composer-inline-input,
+:root[data-theme="dark"] .composer .composer-delivery-controls .composer-schedule,
+:root[data-theme="dark"] .composer .composer-delivery-controls .composer-schedule > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls input,
+:root[data-theme="dark"] .composer .composer-delivery-controls input:hover,
+:root[data-theme="dark"] .composer .composer-delivery-controls input:focus,
+:root[data-theme="dark"] .composer .composer-template-save input {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls input:focus,
+:root[data-theme="dark"] .composer .composer-template-save input:focus {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-template-controls {
+  border-top-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer .composer-template-list > small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-template-row button {
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-template-row button:last-child {
+  color: var(--ui-danger);
+}
+
+:root[data-theme="dark"] .composer .composer-template-row button:hover {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-template-save button {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .composer .composer-template-save button:hover {
+  border-color: var(--ui-accent-hover);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
+}
+
+:root[data-theme="dark"] .composer footer {
+  border-top-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer footer > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer-minimized {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text);
 }

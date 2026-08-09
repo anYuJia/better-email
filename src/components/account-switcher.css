@@ -213,7 +213,7 @@
 
 .account-switcher-menu .context-menu button:hover,
 .account-switcher-menu .context-menu button:focus-visible {
-  background: #f5f6f7;
+  background: var(--quiet-row-hover);
 }
 
 .account-switcher-menu .context-menu-icon {

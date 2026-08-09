@@ -173,7 +173,7 @@ export default function AccountLoginDialog({
     <div className="account-login-gate" ref={overlayRef}>
       <section className="account-login-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="account-login-title">
         <header className="account-login-header">
-          <img src="/brand-mark.png" alt="Better Email" />
+          <img src="/brand/v4/brand-mark.png" alt="Better Email" />
           <span>
             <strong id="account-login-title">登录邮箱</strong>
             <small>连接你的收件箱</small>

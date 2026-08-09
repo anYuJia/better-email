@@ -69,3 +69,29 @@
   background: var(--quiet-row-selected);
   box-shadow: none;
 }
+
+/* Virtualized date headers are direct children of the list, so a modifier
+   carries the group separator without relying on a light-only inline style. */
+.message-date-header.message-date-header--separated {
+  border-top: 1px solid var(--ui-border);
+}
+
+.message-list-footer {
+  color: var(--ui-text-tertiary);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-list);
+}
+
+/* Older refinement passes make the final empty-state action a translucent
+ * white button. Keep both empty-state actions on the semantic control scale
+ * when the workspace is dark. */
+:root[data-theme="dark"] .message-list .empty-state button {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .message-list .empty-state button:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+}

@@ -291,11 +291,13 @@ export default function MessageListView({
         >
           {visibleItems.map(({ index, item, style }) => {
             if (item.type === 'header') {
-              const borderTop = index > 0 ? '1px solid #edf0f3' : 'none';
               return (
                 <header
-                  className="message-date-header"
-                  style={{ ...style, borderTop }}
+                  className={[
+                    'message-date-header',
+                    index > 0 ? 'message-date-header--separated' : '',
+                  ].filter(Boolean).join(' ')}
+                  style={style}
                   key={`header-${item.id}`}
                 >
                   <span>{item.label}</span>
@@ -337,9 +339,6 @@ export default function MessageListView({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '11px',
-              color: '#64748b',
-              borderTop: '1px solid #e7ebf0',
-              background: '#fafbfc',
             }}
           >
             <span>

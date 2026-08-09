@@ -754,10 +754,10 @@
   z-index: 110;
   min-width: 176px;
   padding: 6px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--ui-border-strong);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.16);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
   backdrop-filter: blur(14px);
 }
 
@@ -776,7 +776,7 @@
 }
 
 .reader-image-context-menu button:hover {
-  background: #edf4fb;
+  background: var(--quiet-row-hover);
 }
 
 .empty-reader-compose {

@@ -37,13 +37,22 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico",
-      "icons/icon.png"
+      "icons/v3/32x32.png",
+      "icons/v3/128x128.png",
+      "icons/v3/128x128@2x.png",
+      "icons/v3/icon.icns",
+      "icons/v3/icon.ico",
+      "icons/v3/icon.png"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0MjdCMzM3QTQwMDY0QgpSV1JMQmtCNk0zdENBMmNNb3NpV2pLeGF3LzFzSzJkQUtpT3l4QUhXSU43UmM4L2x1U1dyZERCYwo=",
+      "endpoints": [
+        "https://github.com/anYuJia/better-email/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

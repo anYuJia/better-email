@@ -308,3 +308,91 @@
     margin-block: 14px;
   }
 }
+
+/* Account login is shown before the mailbox shell is ready, so its local
+ * fields cannot rely on the workspace's surface overrides. */
+:root[data-theme="dark"] .account-login-gate {
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
+}
+
+:root[data-theme="dark"] .account-login-field > input,
+:root[data-theme="dark"] .account-login-field > select,
+:root[data-theme="dark"] .account-login-input-wrap {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .account-login-input-wrap {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .account-login-input-wrap:focus-within,
+:root[data-theme="dark"] .account-login-field > input:focus,
+:root[data-theme="dark"] .account-login-field > select:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .account-login-field input::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .account-login-icon-button {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .account-login-icon-button:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .account-login-provider {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .account-login-provider.ready {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .account-login-provider strong {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .account-login-provider small {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .account-login-disclosure {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .account-login-disclosure:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+:root[data-theme="dark"] .account-login-error {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+:root[data-theme="dark"] .account-login-submit {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .account-login-submit:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+:root[data-theme="dark"] .account-login-dialog footer {
+  border-top-color: var(--ui-border);
+  color: var(--ui-text-tertiary);
+  background: var(--ui-surface-muted);
+}

@@ -13,12 +13,10 @@
   display: grid;
   gap: 0;
   padding: 3px;
-  border: 1px solid #d9dee5;
+  border: 1px solid var(--ui-border-strong);
   border-radius: 8px;
-  background: #fff;
-  box-shadow:
-    0 10px 24px rgba(20, 26, 34, 0.12),
-    0 1px 3px rgba(20, 26, 34, 0.08);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .search-suggestion-panel button {
@@ -44,12 +42,12 @@
 }
 
 .search-suggestion-panel button.active {
-  background: #eef1f7;
+  background: var(--quiet-row-selected);
 }
 
 .search-suggestion-panel button:hover,
 .search-suggestion-panel button:focus-visible {
-  background: #f5f6f8;
+  background: var(--quiet-row-hover);
   outline: none;
 }
 

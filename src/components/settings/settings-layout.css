@@ -164,7 +164,7 @@
   border: 1px solid var(--st-header-border);
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
-  background: #ffffff;
+  background: var(--st-surface);
   box-shadow: none;
 }
 
@@ -318,7 +318,7 @@
   padding: 10px 18px;
   border-radius: 999px;
   border: 1px solid var(--st-border-strong);
-  background: #ffffff;
+  background: var(--st-surface);
   color: var(--st-text);
   box-shadow: var(--st-shadow-float);
   animation: settings-floating-bar-slide 240ms cubic-bezier(0.16, 1, 0.3, 1) both;

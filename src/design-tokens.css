@@ -9,10 +9,12 @@
 :root {
   color-scheme: light;
 
-  /* Primitive palette: cool neutral workspace, gently warm reading paper. */
+  /* Primitive palette: cool neutral workspace, gently warm reading paper.
+     The blue is intentionally familiar and dependable rather than decorative:
+     it is reserved for primary actions, selection and keyboard focus. */
   --primitive-hue-neutral: 255;
   --primitive-hue-paper: 90;
-  --primitive-hue-accent: 250;
+  --primitive-hue-accent: 255;
   --primitive-hue-success: 152;
   --primitive-hue-warning: 78;
   --primitive-hue-danger: 29;
@@ -24,8 +26,8 @@
   --color-surface-reader: oklch(0.992 0.004 var(--primitive-hue-paper));
   --color-surface-raised: oklch(0.996 0.003 var(--primitive-hue-paper));
   --color-surface-muted: oklch(0.955 0.006 var(--primitive-hue-neutral));
-  --color-surface-hover: oklch(0.935 0.012 var(--primitive-hue-accent));
-  --color-surface-selected: oklch(0.916 0.022 var(--primitive-hue-accent));
+  --color-surface-hover: oklch(0.938 0.012 var(--primitive-hue-accent));
+  --color-surface-selected: oklch(0.920 0.026 var(--primitive-hue-accent));
 
   --color-text-primary: oklch(0.235 0.017 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.445 0.015 var(--primitive-hue-neutral));
@@ -34,14 +36,18 @@
 
   --color-border-subtle: oklch(0.885 0.007 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.8 0.011 var(--primitive-hue-neutral));
+  /* The default blue (#0068d5-equivalent) keeps white labels above AA
+     contrast while avoiding a noisy, overly saturated workspace. */
   --color-focus: oklch(0.55 0.18 var(--primitive-hue-accent));
-  --color-accent: oklch(0.55 0.18 var(--primitive-hue-accent));
-  --color-accent-hover: oklch(0.59 0.18 var(--primitive-hue-accent));
-  --color-accent-soft: oklch(0.945 0.028 var(--primitive-hue-accent));
+  --color-accent: oklch(0.53 0.19 var(--primitive-hue-accent));
+  --color-accent-hover: oklch(0.55 0.18 var(--primitive-hue-accent));
+  --color-accent-pressed: oklch(0.50 0.17 var(--primitive-hue-accent));
+  --color-accent-soft: oklch(0.948 0.024 var(--primitive-hue-accent));
   --color-success: oklch(0.5 0.13 var(--primitive-hue-success));
   --color-success-soft: oklch(0.95 0.035 var(--primitive-hue-success));
   --color-warning: oklch(0.52 0.12 var(--primitive-hue-warning));
   --color-warning-soft: oklch(0.97 0.04 var(--primitive-hue-warning));
+  --color-warning-border: oklch(0.88 0.055 var(--primitive-hue-warning));
   --color-danger: oklch(0.52 0.18 var(--primitive-hue-danger));
   --color-danger-hover: oklch(0.46 0.17 var(--primitive-hue-danger));
   --color-danger-soft: oklch(0.96 0.035 var(--primitive-hue-danger));
@@ -64,21 +70,28 @@
   --ui-space-7: 32px;
   --ui-space-8: 40px;
 
+  /* Compact desktop density: dense metadata still has a 30px option, while
+     primary controls remain comfortably targetable at 34px. */
+  --ui-control-height-dense: 30px;
   --ui-control-height: 34px;
   --ui-control-height-comfortable: 40px;
   --ui-control-height-touch: 44px;
-  --ui-radius-sm: 8px;
-  --ui-radius-control: 9px;
+  --ui-control-padding-inline: 10px;
+  --ui-radius-xs: 6px;
+  --ui-radius-sm: 6px;
+  --ui-radius-control: 8px;
   --ui-radius-panel: 12px;
   --ui-radius-modal: 16px;
+  --ui-radius-pill: 999px;
 
-  /* Elevation belongs to transient layers only. Panes stay visually quiet. */
-  --ui-shadow-popover: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.05), 0 10px 28px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.1), 0 24px 56px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.06);
-  --ui-shadow-float: 0 1px 3px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.06), 0 14px 36px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.1), 0 30px 72px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.05);
-  --ui-shadow-tooltip: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.1), 0 6px 16px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.13);
+  /* Elevation belongs to transient layers only. The short first shadow makes
+     menus feel attached; the second gives dialogs depth without a haze. */
+  --ui-shadow-popover: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.06), 0 8px 24px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.10);
+  --ui-shadow-float: 0 2px 4px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.07), 0 18px 44px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.12);
+  --ui-shadow-tooltip: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.10), 0 5px 14px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.14);
 
-  --ui-focus-outline: 2px solid #6b7280;
-  --ui-focus-ring: none;
+  --ui-focus-outline: 2px solid var(--color-focus);
+  --ui-focus-ring: 0 0 0 3px oklch(0.55 0.18 var(--primitive-hue-accent) / 0.18);
   --ui-scrollbar-thumb: oklch(0.78 0.012 var(--primitive-hue-neutral));
   --ui-scrollbar-thumb-hover: oklch(0.67 0.014 var(--primitive-hue-neutral));
 
@@ -103,6 +116,7 @@
   --ui-border-strong: var(--color-border-strong);
   --ui-accent: var(--color-accent);
   --ui-accent-hover: var(--color-accent-hover);
+  --ui-accent-pressed: var(--color-accent-pressed);
   --ui-accent-soft: var(--color-accent-soft);
   --ui-success: var(--color-success);
   --ui-success-bg: var(--color-success-soft);
@@ -111,6 +125,7 @@
   --ui-danger-bg: var(--color-danger-soft);
   --ui-warning: var(--color-warning);
   --ui-warning-bg: var(--color-warning-soft);
+  --ui-warning-border: var(--color-warning-border);
 
   /* Quiet list states use luminance before colour. */
   --quiet-row-hover: var(--color-surface-hover);
@@ -172,43 +187,50 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-    --color-canvas: oklch(0.205 0.014 var(--primitive-hue-neutral));
-    --color-surface-sidebar: oklch(0.232 0.016 var(--primitive-hue-neutral));
-    --color-surface-list: oklch(0.238 0.014 var(--primitive-hue-neutral));
-    --color-surface-reader: oklch(0.225 0.012 var(--primitive-hue-paper));
-    --color-surface-raised: oklch(0.262 0.016 var(--primitive-hue-neutral));
-    --color-surface-muted: oklch(0.28 0.016 var(--primitive-hue-neutral));
-    --color-surface-hover: oklch(0.32 0.024 var(--primitive-hue-accent));
-    --color-surface-selected: oklch(0.365 0.05 var(--primitive-hue-accent));
+  /* Keep the persistent panes clearly ordered without making the reading
+     canvas look elevated. The subtle warm cast preserves its paper role. */
+  --color-canvas: oklch(0.192 0.012 var(--primitive-hue-neutral));
+  --color-surface-sidebar: oklch(0.216 0.014 var(--primitive-hue-neutral));
+  --color-surface-list: oklch(0.238 0.012 var(--primitive-hue-neutral));
+  --color-surface-reader: oklch(0.260 0.010 var(--primitive-hue-paper));
+  --color-surface-raised: oklch(0.282 0.014 var(--primitive-hue-neutral));
+  --color-surface-muted: oklch(0.304 0.014 var(--primitive-hue-neutral));
+  --color-surface-hover: oklch(0.326 0.024 var(--primitive-hue-accent));
+  --color-surface-selected: oklch(0.372 0.050 var(--primitive-hue-accent));
 
-    --color-text-primary: oklch(0.92 0.012 var(--primitive-hue-neutral));
-    --color-text-secondary: oklch(0.78 0.012 var(--primitive-hue-neutral));
-    --color-text-tertiary: oklch(0.64 0.012 var(--primitive-hue-neutral));
-    --color-text-on-accent: oklch(0.99 0.008 var(--primitive-hue-accent));
+  --color-text-primary: oklch(0.92 0.012 var(--primitive-hue-neutral));
+  --color-text-secondary: oklch(0.78 0.012 var(--primitive-hue-neutral));
+  --color-text-tertiary: oklch(0.64 0.012 var(--primitive-hue-neutral));
+  --color-text-on-accent: oklch(0.99 0.008 var(--primitive-hue-accent));
 
-    --color-border-subtle: oklch(0.33 0.014 var(--primitive-hue-neutral));
-    --color-border-strong: oklch(0.43 0.016 var(--primitive-hue-neutral));
-    --color-focus: oklch(0.72 0.17 var(--primitive-hue-accent));
-    --color-accent: oklch(0.7 0.16 var(--primitive-hue-accent));
-    --color-accent-hover: oklch(0.75 0.16 var(--primitive-hue-accent));
-    --color-accent-soft: oklch(0.36 0.05 var(--primitive-hue-accent));
-    --color-success: oklch(0.74 0.13 var(--primitive-hue-success));
-    --color-success-soft: oklch(0.3 0.045 var(--primitive-hue-success));
-    --color-warning: oklch(0.76 0.12 var(--primitive-hue-warning));
-    --color-warning-soft: oklch(0.32 0.045 var(--primitive-hue-warning));
-    --color-danger: oklch(0.72 0.16 var(--primitive-hue-danger));
-    --color-danger-hover: oklch(0.77 0.15 var(--primitive-hue-danger));
-    --color-danger-soft: oklch(0.32 0.05 var(--primitive-hue-danger));
+  --color-border-subtle: oklch(0.33 0.014 var(--primitive-hue-neutral));
+  --color-border-strong: oklch(0.43 0.016 var(--primitive-hue-neutral));
+  /* Keep button labels white and readable in dark mode. Focus is brighter
+     than primary actions so keyboard location is never mistaken for state. */
+  --color-focus: oklch(0.72 0.17 var(--primitive-hue-accent));
+  --color-accent: oklch(0.56 0.18 var(--primitive-hue-accent));
+  --color-accent-hover: oklch(0.57 0.18 var(--primitive-hue-accent));
+  --color-accent-pressed: oklch(0.53 0.17 var(--primitive-hue-accent));
+  --color-accent-soft: oklch(0.36 0.05 var(--primitive-hue-accent));
+  --color-success: oklch(0.74 0.13 var(--primitive-hue-success));
+  --color-success-soft: oklch(0.3 0.045 var(--primitive-hue-success));
+  --color-warning: oklch(0.76 0.12 var(--primitive-hue-warning));
+  --color-warning-soft: oklch(0.275 0.035 var(--primitive-hue-warning));
+  --color-warning-border: oklch(0.54 0.075 var(--primitive-hue-warning));
+  --color-danger: oklch(0.72 0.16 var(--primitive-hue-danger));
+  --color-danger-hover: oklch(0.77 0.15 var(--primitive-hue-danger));
+  --color-danger-soft: oklch(0.32 0.05 var(--primitive-hue-danger));
 
-    --ui-focus-outline: 2px solid oklch(0.72 0.17 var(--primitive-hue-accent));
-    --ui-scrollbar-thumb: oklch(0.45 0.014 var(--primitive-hue-neutral));
-    --ui-scrollbar-thumb-hover: oklch(0.54 0.016 var(--primitive-hue-neutral));
+  --ui-focus-outline: 2px solid var(--color-focus);
+  --ui-focus-ring: 0 0 0 3px oklch(0.72 0.17 var(--primitive-hue-accent) / 0.28);
+  --ui-scrollbar-thumb: oklch(0.45 0.014 var(--primitive-hue-neutral));
+  --ui-scrollbar-thumb-hover: oklch(0.54 0.016 var(--primitive-hue-neutral));
 
-    --ui-shadow-popover: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.5), 0 10px 28px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.55), 0 24px 56px oklch(0.03 0.01 var(--primitive-hue-neutral) / 0.6);
-    --ui-shadow-float: 0 1px 3px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.45), 0 14px 36px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.5), 0 30px 72px oklch(0.03 0.01 var(--primitive-hue-neutral) / 0.55);
-    --ui-shadow-tooltip: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.5), 0 6px 16px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.55);
+  --ui-shadow-popover: 0 1px 3px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.50), 0 12px 30px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.54);
+  --ui-shadow-float: 0 3px 8px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.46), 0 22px 52px oklch(0.03 0.01 var(--primitive-hue-neutral) / 0.56);
+  --ui-shadow-tooltip: 0 1px 2px oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.52), 0 5px 14px oklch(0.04 0.01 var(--primitive-hue-neutral) / 0.58);
 
-    --quiet-row-shadow: inset 0 1px 0 oklch(0.35 0.012 var(--primitive-hue-paper) / 0.4);
-    --glass: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.82);
-    --glass-strong: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.94);
+  --quiet-row-shadow: inset 0 1px 0 oklch(0.35 0.012 var(--primitive-hue-paper) / 0.4);
+  --glass: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.82);
+  --glass-strong: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.94);
 }

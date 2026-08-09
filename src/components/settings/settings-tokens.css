@@ -90,39 +90,39 @@
  * token layer does.
  */
 :root[data-theme="dark"] .settings-backdrop {
-  --st-canvas: #12161c;
-  --st-surface: #1a2028;
-  --st-surface-subtle: #1e2530;
-  --st-surface-muted: #252d39;
-  --st-sidebar: #161b22;
+  --st-canvas: var(--ui-bg);
+  --st-surface: var(--ui-surface);
+  --st-surface-subtle: var(--ui-surface-muted);
+  --st-surface-muted: var(--ui-surface-muted);
+  --st-sidebar: var(--ui-sidebar);
 
-  --st-border: #2a3340;
-  --st-border-strong: #3a4656;
-  --st-border-subtle: #2a3340;
-  --st-header-border: #2a3340;
-  --st-text: #e6eaf0;
-  --st-text-secondary: #9aa5b3;
-  --st-text-tertiary: #66707f;
+  --st-border: var(--ui-border);
+  --st-border-strong: var(--ui-border-strong);
+  --st-border-subtle: var(--ui-border);
+  --st-header-border: var(--ui-border);
+  --st-text: var(--ui-text);
+  --st-text-secondary: var(--ui-text-secondary);
+  --st-text-tertiary: var(--ui-text-tertiary);
 
-  --st-accent: #3b82f6;
-  --st-accent-hover: #4f92ff;
-  --st-accent-soft: rgba(59, 130, 246, 0.15);
-  --st-on-accent: #ffffff;
-  --st-danger: #f87171;
-  --st-danger-hover: #fca5a5;
-  --st-danger-soft: rgba(248, 113, 113, 0.14);
-  --st-success: #34d399;
-  --st-success-soft: rgba(52, 211, 153, 0.13);
-  --st-warning: #fbbf24;
-  --st-warning-soft: rgba(251, 191, 36, 0.14);
-  --st-info: #60a5fa;
-  --st-info-soft: rgba(96, 165, 250, 0.14);
+  --st-accent: var(--ui-accent);
+  --st-accent-hover: var(--ui-accent-hover);
+  --st-accent-soft: var(--ui-accent-soft);
+  --st-on-accent: var(--color-text-on-accent);
+  --st-danger: var(--ui-danger);
+  --st-danger-hover: var(--ui-danger-hover);
+  --st-danger-soft: var(--ui-danger-bg);
+  --st-success: var(--ui-success);
+  --st-success-soft: var(--ui-success-bg);
+  --st-warning: var(--ui-warning);
+  --st-warning-soft: var(--ui-warning-bg);
+  --st-info: var(--ui-accent);
+  --st-info-soft: var(--ui-accent-soft);
 
-  --st-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px -1px rgba(0, 0, 0, 0.4);
-  --st-shadow-float: 0 4px 16px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
-  --st-shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.65), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+  --st-shadow-card: none;
+  --st-shadow-float: var(--ui-shadow-popover);
+  --st-shadow-modal: var(--ui-shadow-float);
 
-  --st-focus-border: #7c8ba0;
+  --st-focus-border: var(--ui-accent);
 }
 
 :root[data-theme="dark"] .settings-backdrop {
@@ -146,20 +146,20 @@
 
 /* Hard-coded light surfaces inside settings that the token layer cannot reach. */
 :root[data-theme="dark"] .settings-modal .settings-close-button {
-  background: #1a2028;
+  background: var(--st-surface);
 }
 
 :root[data-theme="dark"] .settings-modal .settings-floating-unsaved-bar {
-  background: #1d242d;
+  background: var(--st-surface);
 }
 
 :root[data-theme="dark"] .settings-modal .st-switch input[type="checkbox"] {
-  background: #3a4350;
+  background: var(--st-surface-muted);
 }
 
 :root[data-theme="dark"] .settings-modal .settings-preview-result details {
-  border-color: rgba(148, 163, 184, 0.16);
-  background: #171c22;
+  border-color: var(--st-border);
+  background: var(--st-surface-muted);
 }
 
 :root[data-theme="dark"] .settings-modal .settings-oauth-result {
@@ -203,4 +203,3 @@
   --st-danger-hover: #fca5a5;
   background: rgba(0, 0, 0, 0.6);
 }
-

@@ -123,8 +123,8 @@
 }
 
 .settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
-  border-color: #9ca3af;
-  background: #f8fafc;
+  border-color: var(--st-focus-border);
+  background: var(--st-surface-subtle);
   box-shadow: none;
 }
 
@@ -139,7 +139,7 @@
 
 /* --- Focus visibility --- */
 .settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid #6b7280;
+  outline: 2px solid var(--st-focus-border);
   outline-offset: 1px;
 }
 

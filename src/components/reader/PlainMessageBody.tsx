@@ -140,7 +140,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           }}
           style={{
             wordBreak: 'break-all',
-            color: 'var(--color-primary, #2563eb)',
+            color: 'var(--ui-accent)',
             textDecoration: 'underline',
             cursor: 'pointer'
           }}

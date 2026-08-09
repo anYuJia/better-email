@@ -107,7 +107,7 @@
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: var(--ui-radius-control, 8px);
-  color: var(--ui-text-secondary, #4e5966);
+  color: var(--ui-text, #1d232b);
   background: transparent;
   box-shadow: none;
   font-size: 14px;

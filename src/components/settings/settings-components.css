@@ -36,7 +36,7 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  color: #111827;
+  color: var(--st-text);
   border-bottom: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
   border-top-color: var(--st-header-border);
   border-right-color: var(--st-header-border);
@@ -236,7 +236,7 @@
  * padding below are scoped to label.st-field. */
 .settings-modal label.st-field {
   padding: 10px 14px;
-  color: #374151;
+  color: var(--st-text);
   font-size: 12px;
   font-weight: 650;
 }
@@ -246,7 +246,7 @@
 }
 
 .settings-modal .st-field-label {
-  color: var(--st-text-secondary);
+  color: var(--st-text);
   font-size: var(--st-font-size-secondary);
   font-weight: 560;
 }
@@ -285,7 +285,7 @@
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   background: transparent;
-  color: #374151;
+  color: var(--st-text);
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
@@ -469,7 +469,7 @@
 }
 
 .settings-modal .st-btn-ghost {
-  color: var(--st-text-secondary);
+  color: var(--st-text);
   border-color: transparent;
   background: transparent;
 }

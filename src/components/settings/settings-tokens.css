@@ -25,9 +25,12 @@
   /* Header chrome border: matches the app-level border-subtle token the
    * legacy global header rules applied inside the settings modal. */
   --st-header-border: #e5e7eb;
-  --st-text: #111827;
+  /* Text hierarchy: primary for titles/labels/values/actions, secondary for
+   * auxiliary copy (descriptions, hints, timestamps), tertiary for the weakest
+   * tier (placeholders, nav group labels, disabled). */
+  --st-text: #1f2937;
   --st-text-secondary: #6b7280;
-  --st-text-tertiary: #6b7280;
+  --st-text-tertiary: #9ca3af;
 
   /* Interaction and Accent Gradient Colors */
   --st-accent: #2563eb;

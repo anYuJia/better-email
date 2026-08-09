@@ -65,7 +65,7 @@
   z-index: 3;
   border-bottom: 1px solid var(--st-header-border);
   background: var(--st-canvas);
-  color: #111827;
+  color: var(--st-text);
 }
 
 .settings-title {
@@ -163,7 +163,7 @@
   padding: 0;
   border: 1px solid var(--st-header-border);
   border-radius: var(--st-radius-sm);
-  color: #374151;
+  color: var(--st-text);
   background: #ffffff;
   box-shadow: none;
 }
@@ -398,7 +398,7 @@
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
-  color: var(--st-text-secondary);
+  color: var(--st-text);
   background: transparent;
   box-shadow: none;
   font-size: 13.5px;
@@ -432,7 +432,7 @@
 
 .settings-modal .settings-nav-section > button.active {
   border-color: transparent !important;
-  color: var(--st-accent);
+  color: var(--st-text);
   background: var(--st-accent-soft);
   font-weight: 620;
 }
@@ -553,7 +553,7 @@
   z-index: 3;
   border-bottom: 1px solid var(--st-header-border);
   background: var(--st-canvas);
-  color: #111827;
+  color: var(--st-text);
 }
 
 .settings-page-heading {
@@ -766,7 +766,7 @@
     padding: 6px 8px;
     border: 1px solid transparent;
     border-radius: var(--st-radius-sm);
-    color: var(--st-text-secondary);
+    color: var(--st-text);
     background: transparent;
     box-shadow: none;
     text-align: left;
@@ -799,7 +799,7 @@
   .settings-mobile-menu-group > button:hover,
   .settings-mobile-menu-group > button.active {
     border-color: var(--st-border);
-    color: var(--st-accent);
+    color: var(--st-text);
     background: var(--st-accent-soft);
   }
 }

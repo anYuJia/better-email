@@ -215,8 +215,6 @@ export default function App() {
     setContactForm,
     contactFormAliases,
     setContactFormAliases,
-    mergeSourceContactId,
-    setMergeSourceContactId,
     contactTransferBusy,
     managedContacts,
     filteredContacts,
@@ -227,7 +225,6 @@ export default function App() {
     saveContactOverride,
     toggleContactVip,
     deleteManagedContact,
-    mergeManagedContact,
     exportContactsVcard,
     refreshManagedContacts,
     confirmDeleteContact: contactToDeleteFromHook,
@@ -720,7 +717,6 @@ export default function App() {
     handleComposerAttachmentDragEnter,
     handleComposerAttachmentDragLeave,
     removeDraftAttachment,
-    addContactToDraft,
     composeFromMessage,
     editDraftMessage,
     saveDraft,
@@ -1477,7 +1473,6 @@ export default function App() {
           onRestore={() => setComposerMinimized(false)}
           onClose={closeComposer}
           onDraftChange={setDraft}
-          onAddContact={addContactToDraft}
           onApplyTemplate={applyComposeTemplate}
           onDeleteTemplate={deleteComposeTemplate}
           onTemplateNameChange={setTemplateName}
@@ -1572,7 +1567,6 @@ export default function App() {
           editingContactId={editingContactId}
           contactEditName={contactEditName}
           contactEditAliases={contactEditAliases}
-          mergeSourceContactId={mergeSourceContactId}
           contactTransferBusy={contactTransferBusy}
           providerWriteValidationStatus={providerWriteValidationStatus}
           providerWriteValidationLoading={providerWriteValidationLoading}
@@ -1702,14 +1696,19 @@ export default function App() {
           onCreateContact={createManagedContact}
           onEditNameChange={setContactEditName}
           onEditAliasesChange={setContactEditAliases}
-          onSaveContactOverride={(contact) => { saveContactOverride(contact).catch((error) => setStatus(String(error))); }}
+          onSaveContactOverride={async (contact) => {
+            try {
+              await saveContactOverride(contact);
+            } catch (error) {
+              setStatus(String(error));
+              throw error;
+            }
+          }}
           onCancelEdit={() => setEditingContactId(null)}
           onComposeToContact={composeToContact}
           onStartEditContact={startEditContact}
           onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
-          onMergeContact={(contact) => { mergeManagedContact(contact).catch((error) => setStatus(String(error))); }}
           onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
-          onMergeSourceChange={setMergeSourceContactId}
           onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
           onRefreshContacts={refreshManagedContacts}
           onStatus={setStatus}

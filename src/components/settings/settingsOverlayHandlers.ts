@@ -87,9 +87,7 @@ export type SettingsHandlers = {
   onComposeToContact: SettingsOverlayProps['onComposeToContact'];
   onStartEditContact: SettingsOverlayProps['onStartEditContact'];
   onToggleContactVip: SettingsOverlayProps['onToggleContactVip'];
-  onMergeContact: SettingsOverlayProps['onMergeContact'];
   onDeleteContact: SettingsOverlayProps['onDeleteContact'];
-  onMergeSourceChange: SettingsOverlayProps['onMergeSourceChange'];
   onExportContacts: () => void;
   onRefreshContacts: SettingsOverlayProps['onRefreshContacts'];
   onStatus: SettingsOverlayProps['onStatus'];
@@ -180,9 +178,7 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onComposeToContact: (contact: Contact) => latest().onComposeToContact(contact),
     onStartEditContact: (contact: Contact) => latest().onStartEditContact(contact),
     onToggleContactVip: (contact: Contact) => latest().onToggleContactVip(contact),
-    onMergeContact: (contact: Contact) => latest().onMergeContact(contact),
     onDeleteContact: (contact: Contact) => latest().onDeleteContact(contact),
-    onMergeSourceChange: (contactId: SetStateAction<number | null>) => latest().onMergeSourceChange(contactId),
     onExportContacts: () => latest().onExportContacts(),
     onRefreshContacts: () => latest().onRefreshContacts(),
     onStatus: (status: SetStateAction<string>) => latest().onStatus(status),

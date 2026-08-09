@@ -1350,6 +1350,43 @@
   margin-top: 20px;
 }
 
+/* Confirmation dialogs need a deliberate safe exit and a clearly destructive
+ * commit action. This also covers the inline template/contact confirmations. */
+.settings-cache-confirm :is(footer, .st-actions) .st-btn {
+  min-width: 56px;
+  min-height: 38px;
+}
+
+.settings-cache-confirm :is(footer, .st-actions) .st-btn-secondary {
+  color: var(--st-text, #1d232b);
+  border-color: var(--st-border-strong, #c3ccd5);
+  background: var(--st-surface, #ffffff);
+}
+
+.settings-cache-confirm :is(footer, .st-actions) .st-btn-secondary:hover:not(:disabled) {
+  color: var(--st-text, #1d232b);
+  border-color: #aeb9c5;
+  background: var(--st-surface-muted, #f1f3f5);
+}
+
+.settings-cache-confirm :is(footer, .st-actions) .st-btn-danger {
+  color: #ffffff;
+  border-color: var(--st-danger, #b3261e);
+  background: var(--st-danger, #b3261e);
+}
+
+.settings-cache-confirm :is(footer, .st-actions) .st-btn-danger:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: var(--st-danger-hover, #941d16);
+  background: var(--st-danger-hover, #941d16);
+}
+
+.settings-cache-confirm :is(footer, .st-actions) .st-btn:focus-visible,
+.contact-import-dialog .st-btn:focus-visible {
+  outline: 2px solid var(--st-accent, #0a63c4);
+  outline-offset: 2px;
+}
+
 .settings-modal .settings-cache-confirm-backdrop,
 .settings-modal .settings-confirm-overlay {
   position: fixed;
@@ -2213,7 +2250,7 @@
 
 .settings-modal .settings-contact-list-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.68fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 0 0 10px;
   border: 0;
@@ -2369,6 +2406,137 @@
 .settings-modal .contact-merge-picker select {
   width: 100%;
 }
+
+/* Contact management keeps the list deliberately scan-friendly; editing lives
+ * in dialogs so an address book with many people does not turn into a card wall. */
+.settings-modal .settings-contact-list .contact-tool-row {
+  min-height: 48px;
+  align-items: center;
+  padding: 4px 10px 4px 14px;
+}
+
+.settings-modal .settings-contact-main {
+  align-items: center;
+  min-height: 38px;
+  cursor: pointer;
+}
+
+.settings-modal .settings-contact-main > span {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.settings-modal .settings-contact-main strong {
+  flex: 0 1 auto;
+  max-width: 46%;
+}
+
+.settings-modal .settings-contact-main em {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .contact-tool-actions {
+  align-self: center;
+  padding-left: 8px;
+}
+
+.settings-modal .settings-contact-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-contact-pagination > div,
+.settings-modal .settings-contact-dialog footer,
+.settings-modal .settings-contact-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.settings-modal .settings-contact-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 410;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.settings-modal .settings-contact-dialog {
+  width: min(500px, 100%);
+  max-height: min(calc(100dvh - 32px), 680px);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+  border: 1px solid var(--st-border-strong);
+  border-radius: var(--st-radius-lg);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-modal);
+}
+
+.settings-modal .settings-contact-dialog > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-modal .settings-contact-dialog > header > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-contact-dialog > header strong { color: var(--st-text); font-size: var(--st-font-size-card-title); }
+.settings-modal .settings-contact-dialog > header small { color: var(--st-text-secondary); font-size: var(--st-font-size-secondary); }
+
+.settings-modal .settings-contact-dialog-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-contact-dialog-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-modal .settings-contact-dialog-close:hover { color: var(--st-text); background: var(--st-surface-muted); }
+.settings-modal .settings-contact-dialog .st-field { padding: 0; }
+.settings-modal .settings-contact-dialog textarea { min-height: 72px; resize: vertical; }
+.settings-modal .settings-contact-dialog .st-switch { padding: 4px 0; }
+
+.settings-modal .settings-contact-details { display: grid; gap: 10px; margin: 0; }
+.settings-modal .settings-contact-details > div { display: grid; gap: 3px; padding: 10px 12px; border-radius: var(--st-radius-md); background: var(--st-surface-subtle); }
+.settings-modal .settings-contact-details dt { color: var(--st-text-tertiary); font-size: var(--st-font-size-secondary); }
+.settings-modal .settings-contact-details dd { margin: 0; overflow-wrap: anywhere; color: var(--st-text); font-size: var(--st-font-size-body); }
+.settings-modal .settings-contact-detail-actions { flex-wrap: wrap; }
 
 .settings-modal .settings-rule-editor {
   display: grid;
@@ -2791,14 +2959,14 @@
 
 .contact-import-dialog .st-btn-secondary {
   color: var(--st-text);
-  border-color: transparent;
+  border-color: var(--st-border-strong);
   background: var(--st-surface);
 }
 
 .contact-import-dialog .st-btn-secondary:hover:not(:disabled) {
-  color: var(--st-accent);
-  border-color: transparent;
-  background: var(--st-accent-soft);
+  color: var(--st-text);
+  border-color: #aeb9c5;
+  background: var(--st-surface-muted);
 }
 
 .contact-import-dialog .st-btn-danger {
@@ -4295,6 +4463,20 @@
 @media (max-width: 640px) {
   .settings-modal .contact-tool-actions .contact-action-label {
     display: none;
+  }
+
+  .settings-modal .settings-contact-dialog footer.settings-contact-detail-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-modal .settings-contact-detail-actions .st-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-modal .settings-contact-detail-actions .st-btn:last-child {
+    grid-column: 1 / -1;
   }
 
   .settings-modal .settings-account-form-grid,

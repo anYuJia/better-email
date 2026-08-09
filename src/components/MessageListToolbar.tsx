@@ -122,7 +122,10 @@ export default function MessageListToolbar({
             <input
               ref={searchInputRef}
               value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
+              onChange={(event) => {
+                setSearchFocused(true);
+                onQueryChange(event.target.value);
+              }}
               onFocus={() => {
                 clearSearchBlurTimer();
                 setSearchFocused(true);

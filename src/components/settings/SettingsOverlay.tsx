@@ -123,7 +123,6 @@ export type SettingsOverlayProps = {
   editingContactId: number | null;
   contactEditName: string;
   contactEditAliases: string;
-  mergeSourceContactId: number | null;
   contactTransferBusy: boolean;
   providerWriteValidationStatus: ProviderWriteValidationStatus | null;
   providerWriteValidationLoading: boolean;
@@ -198,14 +197,12 @@ export type SettingsOverlayProps = {
   onCreateContact: () => Promise<void>;
   onEditNameChange: Dispatch<SetStateAction<string>>;
   onEditAliasesChange: Dispatch<SetStateAction<string>>;
-  onSaveContactOverride: (contact: Contact) => void;
+  onSaveContactOverride: (contact: Contact) => void | Promise<void>;
   onCancelEdit: () => void;
   onComposeToContact: (contact: Contact) => void;
   onStartEditContact: (contact: Contact) => void;
   onToggleContactVip: (contact: Contact) => void;
-  onMergeContact: (contact: Contact) => void;
   onDeleteContact: (contact: Contact) => void;
-  onMergeSourceChange: Dispatch<SetStateAction<number | null>>;
   onExportContacts: () => void;
   onRefreshContacts: () => Promise<Contact[]>;
   onStatus: Dispatch<SetStateAction<string>>;
@@ -360,7 +357,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     editingContactId: props.editingContactId,
     editName: props.contactEditName,
     editAliases: props.contactEditAliases,
-    mergeSourceContactId: props.mergeSourceContactId,
     transferBusy: props.contactTransferBusy,
   }), [
     props.contactForm,
@@ -371,7 +367,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.editingContactId,
     props.contactEditName,
     props.contactEditAliases,
-    props.mergeSourceContactId,
     props.contactTransferBusy,
   ]);
 

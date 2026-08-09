@@ -20,18 +20,17 @@ const contact: Contact = {
   last_seen_at: '2026-08-08T00:00:00Z',
 };
 
-function renderSettings(editingContactId: number | null = null) {
+function renderSettings(editingContactId: number | null = null, allContacts: Contact[] = [contact]) {
   return render(
     <ContactAutomationSettings
       contactForm={contactForm}
       contactFormAliases=""
-      contacts={[contact]}
-      filteredContacts={[contact]}
+      contacts={allContacts}
+      filteredContacts={allContacts}
       contactQuery=""
       editingContactId={editingContactId}
       editName={contact.name}
       editAliases={contact.aliases.join(', ')}
-      mergeSourceContactId={null}
       transferBusy={false}
       onContactFormChange={() => undefined}
       onContactFormAliasesChange={() => undefined}
@@ -44,9 +43,7 @@ function renderSettings(editingContactId: number | null = null) {
       onComposeToContact={() => undefined}
       onStartEditContact={() => undefined}
       onToggleContactVip={() => undefined}
-      onMergeContact={() => undefined}
       onDeleteContact={() => undefined}
-      onMergeSourceChange={() => undefined}
       onExportContacts={() => undefined}
       onRefreshContacts={async () => [contact]}
       onStatus={() => undefined}
@@ -59,23 +56,43 @@ describe('ContactAutomationSettings', () => {
     cleanup();
   });
 
-  it('groups contact creation, search, and merge controls into their respective workflows', () => {
+  it('keeps the address book compact and opens creation in a dialog', () => {
     renderSettings();
 
-    expect(screen.getByText('添加联系人')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '添加联系人' })).not.toBeNull();
+    expect(screen.queryByRole('textbox', { name: '联系人名称' })).toBeNull();
+    expect(screen.queryByText('合并联系人')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '添加联系人' }));
+    expect(screen.getByRole('dialog', { name: '添加联系人' })).not.toBeNull();
     expect(screen.getByRole('textbox', { name: '联系人名称' })).not.toBeNull();
-    expect(screen.getByRole('textbox', { name: /别名邮箱/ })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '合并来源' })).not.toBeNull();
-    expect(screen.getByText('选择来源后，再点目标联系人的合并按钮。')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '确认添加' })).not.toBeNull();
   });
 
-  it('keeps inline editing labeled and exposes stable alias input', () => {
-    renderSettings(contact.id);
+  it('opens details from a row and editing in its own dialog', () => {
+    const startEdit = () => undefined;
+    render(
+      <ContactAutomationSettings
+        contactForm={contactForm} contactFormAliases="" contacts={[contact]} filteredContacts={[contact]} contactQuery=""
+        editingContactId={contact.id} editName={contact.name} editAliases={contact.aliases.join(', ')} transferBusy={false}
+        onContactFormChange={() => undefined} onContactFormAliasesChange={() => undefined} onContactQueryChange={() => undefined} onCreateContact={async () => undefined}
+        onEditNameChange={() => undefined} onEditAliasesChange={() => undefined} onSaveContactOverride={() => undefined} onCancelEdit={() => undefined}
+        onComposeToContact={() => undefined} onStartEditContact={startEdit} onToggleContactVip={() => undefined} onDeleteContact={() => undefined}
+        onExportContacts={() => undefined} onRefreshContacts={async () => [contact]} onStatus={() => undefined}
+      />,
+    );
 
-    expect(screen.getAllByText('联系人名称')).toHaveLength(2);
-    expect(screen.getAllByText('别名邮箱')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: '保存' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '取消' })).not.toBeNull();
+    fireEvent.click(screen.getByText('Ada Lovelace'));
+    expect(screen.getByRole('dialog', { name: 'Ada Lovelace' })).not.toBeNull();
+    expect(screen.getByText('ada@work.example')).not.toBeNull();
+    expect(screen.queryByText('合并联系人')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }));
+    expect(screen.getByRole('dialog', { name: '编辑联系人' })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: '联系人名称' })).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: /别名邮箱/ })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '确认保存' })).not.toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('shows an inline error when a contact cannot be created', () => {
@@ -90,7 +107,6 @@ describe('ContactAutomationSettings', () => {
         editingContactId={null}
         editName=""
         editAliases=""
-        mergeSourceContactId={null}
         transferBusy={false}
         onContactFormChange={() => undefined}
         onContactFormAliasesChange={() => undefined}
@@ -103,16 +119,24 @@ describe('ContactAutomationSettings', () => {
         onComposeToContact={() => undefined}
         onStartEditContact={() => undefined}
         onToggleContactVip={() => undefined}
-        onMergeContact={() => undefined}
         onDeleteContact={() => undefined}
-        onMergeSourceChange={() => undefined}
         onExportContacts={() => undefined}
         onRefreshContacts={async () => []}
         onStatus={() => undefined}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '新增联系人' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加联系人' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }));
     expect(screen.getByRole('alert').textContent).toContain('有效的联系人邮箱');
+  });
+
+  it('paginates a long contact list', () => {
+    const contacts = Array.from({ length: 9 }, (_, index) => ({ ...contact, id: index + 1, name: `Contact ${index + 1}`, email: `contact${index + 1}@example.com` }));
+    renderSettings(null, contacts);
+    expect(screen.getByText('Contact 1')).not.toBeNull();
+    expect(screen.queryByText('Contact 9')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(screen.getByText('Contact 9')).not.toBeNull();
   });
 });

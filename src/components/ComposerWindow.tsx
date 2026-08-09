@@ -55,7 +55,6 @@ export type ComposerWindowProps = {
   onRestore: () => void;
   onClose: () => void;
   onDraftChange: React.Dispatch<React.SetStateAction<DraftInput>>;
-  onAddContact: (contact: Contact) => void;
   onApplyTemplate: (template: ComposeTemplate) => void;
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
@@ -96,7 +95,6 @@ export default function ComposerWindow({
   onRestore,
   onClose,
   onDraftChange,
-  onAddContact,
   onApplyTemplate,
   onDeleteTemplate,
   onTemplateNameChange,
@@ -258,7 +256,6 @@ export default function ComposerWindow({
           richComposer={richComposer}
           dropActive={dropActive}
           onPatchDraft={patchDraft}
-          onAddContact={onAddContact}
           onPickAttachments={onPickAttachments}
           onRemoveAttachment={onRemoveAttachment}
           onAttachmentDrop={onAttachmentDrop}

@@ -20,6 +20,16 @@ const ada: Contact = {
   last_seen_at: '',
 };
 
+const adaWu: Contact = {
+  id: 2,
+  name: 'Ada Wu',
+  email: 'ada.wu@example.com',
+  aliases: [],
+  vip: false,
+  message_count: 0,
+  last_seen_at: '',
+};
+
 function draft(overrides: Partial<DraftInput> = {}): DraftInput {
   return {
     draft_id: 0,
@@ -41,15 +51,15 @@ function renderFields(
   input: DraftInput,
   richComposer = true,
   onPatchDraft = vi.fn(),
+  contacts: Contact[] = [ada],
 ) {
   const result = render(
     <ComposerPrimaryFields
       draft={input}
-      contacts={[ada]}
+      contacts={contacts}
       richComposer={richComposer}
       dropActive={false}
       onPatchDraft={onPatchDraft}
-      onAddContact={vi.fn()}
       onPickAttachments={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onAttachmentDrop={vi.fn()}
@@ -62,6 +72,11 @@ function renderFields(
     />,
   );
   return { ...result, onPatchDraft };
+}
+
+function recipientInput(container: HTMLElement, index = 0) {
+  const inputs = Array.from(container.querySelectorAll<HTMLInputElement>('.composer-recipient-editor input'));
+  return inputs[index];
 }
 
 describe('ComposerPrimaryFields', () => {
@@ -79,28 +94,110 @@ describe('ComposerPrimaryFields', () => {
     expect(container.querySelector('datalist')).toBeNull();
 
     fireEvent.focus(recipient);
-    expect(screen.getByText('常用联系人')).not.toBeNull();
+    expect(container.querySelector('.recipient-suggestions')).toBeNull();
+
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    expect(screen.getByText('匹配联系人')).not.toBeNull();
     expect(screen.getByRole('button', { name: /Ada Lovelace/ })).not.toBeNull();
   });
 
-  it('keeps common contacts available for an unmatched fragment and replaces that fragment on selection', () => {
-    const { onPatchDraft } = renderFields(draft({ to: '22' }));
+  it('only suggests contacts once the query matches, and commits on Enter', () => {
+    const { onPatchDraft } = renderFields(draft());
     const recipient = screen.getByPlaceholderText('收件人');
 
     fireEvent.focus(recipient);
-    expect(screen.getByText('常用联系人')).not.toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Ada Lovelace/ }));
+    fireEvent.change(recipient, { target: { value: '225' } });
+    expect(screen.queryByText('匹配联系人')).toBeNull();
 
-    expect(onPatchDraft).toHaveBeenCalledWith({ to: 'ada@example.com' });
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada@example.com' });
+  });
+
+  it('navigates suggestions with arrow keys before committing', () => {
+    const { onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    fireEvent.keyDown(recipient, { key: 'ArrowDown' });
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada.wu@example.com' });
+  });
+
+  it('turns a committed recipient into a chip removable as a whole', () => {
+    const { container, onPatchDraft } = renderFields(draft());
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+
+    const chip = container.querySelector('.composer-recipient-chip');
+    expect(chip?.textContent).toContain('Ada Lovelace');
+    expect(screen.getByLabelText('移除 ada@example.com')).not.toBeNull();
+
+    fireEvent.click(screen.getByLabelText('移除 ada@example.com'));
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: '' });
+  });
+
+  it('removes the last chip with Backspace on an empty input', () => {
+    const { container, onPatchDraft } = renderFields(draft());
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+
+    fireEvent.keyDown(recipientInput(container), { key: 'Backspace' });
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: '' });
+  });
+
+  it('supports multiple recipients as separate chips', () => {
+    const { container, onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.change(recipient, { target: { value: 'ada' } });
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+
+    const editorInput = recipientInput(container);
+    fireEvent.change(editorInput, { target: { value: 'ada.wu' } });
+    fireEvent.keyDown(editorInput, { key: 'Enter' });
+
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada@example.com, ada.wu@example.com' });
+    expect(container.querySelectorAll('.composer-recipient-chip')).toHaveLength(2);
+  });
+
+  it('commits a fully typed address as a chip on blur', () => {
+    const { container, onPatchDraft } = renderFields(draft());
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.change(recipient, { target: { value: 'new@example.com' } });
+    fireEvent.blur(recipient);
+
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'new@example.com' });
+    expect(container.querySelectorAll('.composer-recipient-chip')).toHaveLength(1);
+  });
+
+  it('offers contact suggestions in the cc field', () => {
+    const { onPatchDraft } = renderFields(draft());
+    const cc = screen.getByPlaceholderText('抄送（可选）');
+
+    fireEvent.focus(cc);
+    expect(screen.queryByText('匹配联系人')).toBeNull();
+
+    fireEvent.change(cc, { target: { value: 'ada' } });
+    fireEvent.keyDown(cc, { key: 'Enter' });
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ cc: 'ada@example.com' });
   });
 
   it('renders the cc field between recipients and subject', () => {
     const { container, onPatchDraft } = renderFields(draft({ cc: 'team@example.com' }));
-    const cc = screen.getByPlaceholderText('抄送（可选）');
 
-    expect((cc as HTMLInputElement).value).toBe('team@example.com');
+    expect(container.querySelectorAll('.composer-recipient-chip')[0]?.textContent).toContain('team@example.com');
+    const cc = recipientInput(container, 1);
+    expect(cc.value).toBe('');
     fireEvent.change(cc, { target: { value: 'design@example.com' } });
-    expect(onPatchDraft).toHaveBeenCalledWith({ cc: 'design@example.com' });
+    expect(onPatchDraft).toHaveBeenCalledWith({ cc: 'team@example.com, design@example.com' });
 
     const rows = Array.from(container.querySelectorAll('.composer-field-row'));
     expect(rows.map((row) => row.querySelector('span')?.textContent)).toEqual(['收件人', '抄送', '主题']);

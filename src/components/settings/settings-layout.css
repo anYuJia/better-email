@@ -252,6 +252,13 @@
   font-size: 13px;
 }
 
+/* The search shell carries the focus state; avoid a second outline around the
+ * input itself when it receives keyboard focus. */
+.settings-modal .settings-nav-search input:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 .settings-nav-search input::-webkit-search-cancel-button {
   display: none;
 }

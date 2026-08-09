@@ -432,6 +432,19 @@
   background: var(--st-accent-soft);
 }
 
+/* Dialog actions need a visible secondary boundary so the safe exit remains
+ * distinct from the surrounding surface. */
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface);
+}
+
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary:hover:not(:disabled) {
+  color: var(--st-text);
+  border-color: #aeb9c5;
+  background: var(--st-surface-muted);
+}
+
 .settings-modal .st-btn-danger {
   color: var(--st-on-accent);
   border-color: var(--st-danger);

@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type React from 'react';
 import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput, OutboundAttachmentInput } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
-import {
-  buildContactSearchEntries,
-  matchingContacts,
-  recommendedContacts,
-} from './contactSuggestions';
+import { buildContactSearchEntries } from './contactSuggestions';
+import RecipientField from './RecipientField';
 import {
   joinEditableBody,
   parseOriginalQuote,
@@ -23,7 +20,6 @@ type ComposerPrimaryFieldsProps = {
   richComposer: boolean;
   dropActive: boolean;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
-  onAddContact: (contact: Contact) => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
   onAttachmentDrop: React.DragEventHandler<HTMLElement>;
@@ -34,8 +30,6 @@ type ComposerPrimaryFieldsProps = {
   buildInlineImageAttachments: (files: File[]) => Promise<OutboundAttachmentInput[]>;
   onInlineImagesAdded: (attachments: OutboundAttachmentInput[]) => void;
 };
-
-const inlineSuggestionLimit = 5;
 
 function ComposerOriginalQuote({ originalQuote }: { originalQuote: string }) {
   const quote = useMemo(() => parseOriginalQuote(originalQuote), [originalQuote]);
@@ -89,7 +83,6 @@ export default function ComposerPrimaryFields({
   richComposer,
   dropActive,
   onPatchDraft,
-  onAddContact,
   onPickAttachments,
   onRemoveAttachment,
   onAttachmentDrop,
@@ -100,29 +93,12 @@ export default function ComposerPrimaryFields({
   buildInlineImageAttachments,
   onInlineImagesAdded,
 }: ComposerPrimaryFieldsProps) {
-  const [recipientFocused, setRecipientFocused] = useState(false);
-  const recipientBlurTimerRef = useRef<number | null>(null);
   const richBodyRef = useRef<HTMLDivElement>(null);
   const hydratedInlineSrcRef = useRef<Map<string, string>>(new Map());
-  const recipientQuery = draft.to.split(/[;,]/).pop()?.trim().toLowerCase() ?? '';
   const contactSearchEntries = useMemo(
     () => buildContactSearchEntries(contacts),
     [contacts],
   );
-  const matchedContacts = useMemo(
-    () => matchingContacts(contactSearchEntries, recipientQuery, inlineSuggestionLimit),
-    [contactSearchEntries, recipientQuery],
-  );
-  const suggestedContacts = useMemo(
-    () => matchedContacts.length > 0
-      ? matchedContacts
-      : recommendedContacts(contactSearchEntries, inlineSuggestionLimit),
-    [contactSearchEntries, matchedContacts],
-  );
-  const showRecipientSuggestions = suggestedContacts.length > 0 && recipientFocused;
-  const recipientSuggestionLabel = recipientQuery && matchedContacts.length > 0
-    ? '匹配联系人'
-    : '常用联系人';
   const { editableBody, originalQuote } = useMemo(
     () => splitEditableBody(draft.body),
     [draft.body],
@@ -171,16 +147,6 @@ export default function ComposerPrimaryFields({
       cancelled = true;
     };
   }, [richComposer, draft.html_body, draft.attachments]);
-
-  const clearRecipientBlurTimer = () => {
-    if (recipientBlurTimerRef.current === null) return;
-    window.clearTimeout(recipientBlurTimerRef.current);
-    recipientBlurTimerRef.current = null;
-  };
-
-  useEffect(() => () => {
-    clearRecipientBlurTimer();
-  }, []);
 
   function syncRichBodyFromEditor() {
     const editor = richBodyRef.current;
@@ -271,77 +237,23 @@ export default function ComposerPrimaryFields({
     syncRichBodyFromEditor();
   }
 
-  function selectRecipientSuggestion(contact: Contact) {
-    if (!recipientQuery) {
-      onAddContact(contact);
-      return;
-    }
-
-    const separatorIndex = Math.max(draft.to.lastIndexOf(','), draft.to.lastIndexOf(';'));
-    const existingRecipients = (separatorIndex < 0 ? '' : draft.to.slice(0, separatorIndex))
-      .split(/[;,]/)
-      .map((recipient) => recipient.trim())
-      .filter(Boolean);
-    const contactAddresses = [contact.email, ...(contact.aliases ?? [])]
-      .map((address) => address.trim().toLowerCase())
-      .filter(Boolean);
-    const alreadyIncluded = existingRecipients.some((recipient) =>
-      contactAddresses.includes(recipient.toLowerCase()),
-    );
-
-    onPatchDraft({
-      to: alreadyIncluded
-        ? existingRecipients.join(', ')
-        : [...existingRecipients, contact.email].join(', '),
-    });
-  }
-
   return (
     <div className="composer-primary-fields">
-      <div className="composer-recipient-field">
-        <label className="composer-field-row">
-          <span>收件人</span>
-          <input
-            autoComplete="off"
-            value={draft.to}
-            onChange={(event) => onPatchDraft({ to: event.target.value })}
-            onFocus={() => {
-              clearRecipientBlurTimer();
-              setRecipientFocused(true);
-            }}
-            onBlur={() => {
-              clearRecipientBlurTimer();
-              recipientBlurTimerRef.current = window.setTimeout(() => {
-                recipientBlurTimerRef.current = null;
-                setRecipientFocused(false);
-              }, 120);
-            }}
-            placeholder="收件人"
-          />
-        </label>
+      <RecipientField
+        label="收件人"
+        placeholder="收件人"
+        value={draft.to}
+        contactSearchEntries={contactSearchEntries}
+        onChange={(value) => onPatchDraft({ to: value })}
+      />
 
-        {showRecipientSuggestions && (
-          <div className="recipient-suggestions">
-            <span>{recipientSuggestionLabel}</span>
-            {suggestedContacts.map((contact) => (
-              <button type="button" key={contact.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectRecipientSuggestion(contact)}>
-                <strong>{contact.name || contact.email}</strong>
-                <small>{contact.email}</small>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <label className="composer-field-row">
-        <span>抄送</span>
-        <input
-          autoComplete="off"
-          value={draft.cc}
-          onChange={(event) => onPatchDraft({ cc: event.target.value })}
-          placeholder="抄送（可选）"
-        />
-      </label>
+      <RecipientField
+        label="抄送"
+        placeholder="抄送（可选）"
+        value={draft.cc}
+        contactSearchEntries={contactSearchEntries}
+        onChange={(value) => onPatchDraft({ cc: value })}
+      />
 
       <label className="composer-field-row">
         <span>主题</span>

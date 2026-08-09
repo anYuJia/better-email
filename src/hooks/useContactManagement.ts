@@ -27,7 +27,6 @@ export default function useContactManagement({
   const [contactEditAliases, setContactEditAliases] = useState('');
   const [contactForm, setContactForm] = useState<ContactCreateInput>(emptyContactForm);
   const [contactFormAliases, setContactFormAliases] = useState('');
-  const [mergeSourceContactId, setMergeSourceContactId] = useState<number | null>(null);
   const [contactQuery, setContactQuery] = useState('');
   const [contactTransferBusy, setContactTransferBusy] = useState(false);
   const [confirmDeleteContact, setConfirmDeleteContact] = useState<Contact | null>(null);
@@ -39,12 +38,11 @@ export default function useContactManagement({
       if (byCount !== 0) return byCount;
       return right.last_seen_at.localeCompare(left.last_seen_at);
     });
-    if (!term) return sortedContacts.slice(0, 6);
+    if (!term) return sortedContacts;
     return sortedContacts
       .filter((contact) =>
         [contact.name, contact.email, contact.aliases.join(' ')].join(' ').toLowerCase().includes(term),
-      )
-      .slice(0, 8);
+      );
   }, [contactQuery, contacts]);
 
   function startEditContact(contact: Contact) {
@@ -141,28 +139,7 @@ export default function useContactManagement({
     if (editingContactId === contact.id) {
       setEditingContactId(null);
     }
-    if (mergeSourceContactId === contact.id) {
-      setMergeSourceContactId(null);
-    }
     setStatus(`联系人已删除：${contact.name || contact.email}`);
-  }
-
-  async function mergeManagedContact(target: Contact) {
-    if (!mergeSourceContactId || mergeSourceContactId === target.id) {
-      setStatus('请选择要合并进来的联系人');
-      return;
-    }
-    const source = contacts.find((contact) => contact.id === mergeSourceContactId);
-    const merged = await invoke<Contact>(IPC.MergeContacts, {
-      targetContactId: target.id,
-      sourceContactId: mergeSourceContactId,
-    });
-    setContacts((current) => [
-      merged,
-      ...current.filter((item) => item.id !== target.id && item.id !== mergeSourceContactId),
-    ]);
-    setMergeSourceContactId(null);
-    setStatus(`已合并联系人：${source?.name || source?.email || '来源联系人'} → ${merged.name || merged.email}`);
   }
 
   return {
@@ -178,8 +155,6 @@ export default function useContactManagement({
     setContactForm,
     contactFormAliases,
     setContactFormAliases,
-    mergeSourceContactId,
-    setMergeSourceContactId,
     contactQuery,
     setContactQuery,
     contactTransferBusy,
@@ -190,7 +165,6 @@ export default function useContactManagement({
     saveContactOverride,
     toggleContactVip,
     deleteManagedContact,
-    mergeManagedContact,
     exportContactsVcard,
     refreshManagedContacts,
     confirmDeleteContact,

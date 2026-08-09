@@ -2,16 +2,16 @@ import {
   FileDown,
   FileUp,
   History,
-  Merge,
   Pencil,
   Search,
   Send,
   Star,
   Trash2,
   UserPlus,
+  Users,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   Contact,
   ContactCreateInput,
@@ -23,7 +23,6 @@ import {
   validateContactAliases,
 } from '../../app/uiConfig';
 import useContactImportManager from '../../hooks/useContactImportManager';
-import { CustomSelect } from './accounts/CustomSelect';
 import ContactImportDialog from './ContactImportDialog';
 import ContactImportHistoryDialog from './ContactImportHistoryDialog';
 import {
@@ -44,7 +43,6 @@ type ContactAutomationSettingsProps = {
   editingContactId: number | null;
   editName: string;
   editAliases: string;
-  mergeSourceContactId: number | null;
   transferBusy: boolean;
   onContactFormChange: (contact: ContactCreateInput) => void;
   onContactFormAliasesChange: (value: string) => void;
@@ -52,14 +50,12 @@ type ContactAutomationSettingsProps = {
   onCreateContact: () => Promise<void>;
   onEditNameChange: (value: string) => void;
   onEditAliasesChange: (value: string) => void;
-  onSaveContactOverride: (contact: Contact) => void;
+  onSaveContactOverride: (contact: Contact) => void | Promise<void>;
   onCancelEdit: () => void;
   onComposeToContact: (contact: Contact) => void;
   onStartEditContact: (contact: Contact) => void;
   onToggleContactVip: (contact: Contact) => void;
-  onMergeContact: (contact: Contact) => void;
   onDeleteContact: (contact: Contact) => void;
-  onMergeSourceChange: (contactId: number | null) => void;
   onExportContacts: () => void;
   onRefreshContacts: () => Promise<Contact[]>;
   onStatus: Dispatch<SetStateAction<string>>;
@@ -74,7 +70,6 @@ export default function ContactAutomationSettings({
   editingContactId,
   editName,
   editAliases,
-  mergeSourceContactId,
   transferBusy,
   onContactFormChange,
   onContactFormAliasesChange,
@@ -87,9 +82,7 @@ export default function ContactAutomationSettings({
   onComposeToContact,
   onStartEditContact,
   onToggleContactVip,
-  onMergeContact,
   onDeleteContact,
-  onMergeSourceChange,
   onExportContacts,
   onRefreshContacts,
   onStatus,
@@ -117,10 +110,42 @@ export default function ContactAutomationSettings({
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [dialog, setDialog] = useState<'create' | 'details' | 'edit' | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [page, setPage] = useState(1);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const pageSize = 8;
 
   useEffect(() => {
     void refreshBatches();
   }, [refreshBatches]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [contactQuery]);
+
+  useEffect(() => {
+    if (!dialog) return undefined;
+    const focusSelector = dialog === 'details'
+      ? '.settings-contact-dialog-close'
+      : 'input, textarea, button:not(.settings-contact-dialog-close)';
+    const focusTarget = dialogRef.current?.querySelector<HTMLElement>(focusSelector);
+    focusTarget?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeContactDialog();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [dialog]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredContacts.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleContacts = filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   async function handleCommitImport() {
     await commitImport();
@@ -165,29 +190,62 @@ export default function ContactAutomationSettings({
     const email = contactForm.email.trim();
     if (!email) {
       setCreateError('请输入联系人邮箱。');
-      return;
+      return false;
     }
     if (!isValidEmailAddress(email)) {
       setCreateError('请输入有效的联系人邮箱地址。');
-      return;
+      return false;
     }
     if (contactAliasIssues.invalid.length > 0 || contactAliasIssues.duplicatesWithin.length > 0 || contactAliasIssues.takenByOther.length > 0) {
       setCreateError(`请先修正别名：${aliasIssueText}`);
-      return;
+      return false;
     }
     setCreateError('');
     try {
       await onCreateContact();
+      closeContactDialog();
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message.replace(/^Error:\s*/i, '') : String(error);
       setCreateError(message || '无法新增联系人，请稍后重试。');
+      return false;
     }
+  }
+
+  function openDetails(contact: Contact) {
+    triggerRef.current = document.activeElement as HTMLElement;
+    setCreateError('');
+    setSelectedContact(contact);
+    setDialog('details');
+  }
+
+  function openEdit(contact: Contact) {
+    if (dialog === null) {
+      triggerRef.current = document.activeElement as HTMLElement;
+    }
+    setCreateError('');
+    onStartEditContact(contact);
+    setSelectedContact(contact);
+    setDialog('edit');
+  }
+
+  function closeContactDialog() {
+    setDialog(null);
+    setSelectedContact(null);
+    setCreateError('');
+    onCancelEdit();
+    triggerRef.current?.focus();
+  }
+
+  function toggleDetailVip(contact: Contact) {
+    onToggleContactVip(contact);
+    setSelectedContact({ ...contact, vip: !contact.vip });
   }
 
   return (
     <SettingsSection
       title="联系人管理"
-      description="别名、VIP、重复合并和快捷写信"
+      description="别名、VIP和快捷写信"
       actions={
         <div className="contact-transfer-actions">
           <SettingsBadge tone="neutral">{contacts.length} 位联系人</SettingsBadge>
@@ -212,76 +270,17 @@ export default function ContactAutomationSettings({
             icon={<History size={14} />}
             onClick={() => setHistoryDialogOpen(true)}
           />
+          <SettingsButton size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => { triggerRef.current = document.activeElement as HTMLElement; setDialog('create'); }}>
+            添加联系人
+          </SettingsButton>
         </div>
       }
       dataSection="contacts"
     >
 
-      <div className="contact-create-form settings-contact-create">
-        <header className="settings-contact-create-header">
-          <span>
-            <strong>添加联系人</strong>
-            <small>填写常用邮箱和别名，后续可从联系人列表继续维护。</small>
-          </span>
-        </header>
-        <div className="settings-contact-create-fields">
-          <SettingsField label="联系人名称">
-            <input
-              value={contactForm.name}
-              onChange={(event) => {
-                setCreateError('');
-                onContactFormChange({ ...contactForm, name: event.target.value });
-              }}
-              placeholder="联系人名称"
-            />
-          </SettingsField>
-          <SettingsField label="邮箱地址">
-            <input
-              value={contactForm.email}
-              onChange={(event) => {
-                setCreateError('');
-                onContactFormChange({ ...contactForm, email: event.target.value });
-              }}
-              placeholder="name@example.com"
-            />
-          </SettingsField>
-        </div>
-        <SettingsField
-          className="settings-contact-aliases"
-          label="别名邮箱"
-          error={contactAliasIssues.invalid.length > 0 || contactAliasIssues.duplicatesWithin.length > 0 || contactAliasIssues.takenByOther.length > 0 ? aliasIssueText : undefined}
-          hint={contactAliasIssues.invalid.length === 0 && contactAliasIssues.duplicatesWithin.length === 0 && contactAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}
-        >
-          <textarea
-            rows={2}
-            value={contactFormAliases}
-            onChange={(event) => {
-              setCreateError('');
-              onContactFormAliasesChange(event.target.value);
-            }}
-            placeholder="alias@example.com"
-          />
-        </SettingsField>
-        <footer className="settings-contact-create-footer">
-          <SettingsSwitch
-            label="设为 VIP"
-            description="可配合通知策略只提醒重要联系人"
-            checked={contactForm.vip}
-            onChange={(checked) => {
-              setCreateError('');
-              onContactFormChange({ ...contactForm, vip: checked });
-            }}
-          />
-          <SettingsButton variant="primary" icon={<UserPlus size={14} />} onClick={() => { void handleCreateContact(); }}>
-            新增联系人
-          </SettingsButton>
-        </footer>
-        {createError && <p className="settings-contact-save-error" role="alert">{createError}</p>}
-      </div>
-
       {contacts.length === 0 ? (
         <SettingsEmptyState>
-           还没有联系人。可以手动新增，或从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件导入。
+           还没有联系人。点击右上角“添加联系人”，或从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件导入。
         </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">
@@ -307,123 +306,87 @@ export default function ContactAutomationSettings({
                 )}
               </div>
             </SettingsField>
-            <SettingsField
-              className="settings-contact-merge-field"
-              label="合并来源"
-              hint="选择来源后，再点目标联系人的合并按钮。"
-            >
-              <CustomSelect
-                ariaLabel="合并来源"
-                value={mergeSourceContactId !== null ? String(mergeSourceContactId) : ''}
-                options={[
-                  { value: '', label: '选择一个联系人' },
-                  ...contacts.map((contact) => ({
-                    value: String(contact.id),
-                    label: `${contact.name || contact.email} · ${contact.email}`,
-                  })),
-                ]}
-                onChange={(nextValue) => onMergeSourceChange(nextValue ? Number(nextValue) : null)}
-              />
-            </SettingsField>
           </div>
-          {filteredContacts.map((contact) => (
+          {visibleContacts.map((contact) => (
             <div className="st-data-row contact-tool-row" key={contact.id}>
-              {editingContactId === contact.id ? (
-                <div className="contact-edit-form">
-                  <SettingsField className="contact-edit-name" label="联系人名称">
-                    <input
-                      value={editName}
-                      onChange={(event) => onEditNameChange(event.target.value)}
-                      placeholder="联系人名称"
-                    />
-                  </SettingsField>
-                  <SettingsField
-                    className="contact-edit-aliases"
-                    label="别名邮箱"
-                    error={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0 ? editAliasIssueText : undefined}
-                    hint={editAliasIssues.invalid.length === 0 && editAliasIssues.duplicatesWithin.length === 0 && editAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}
-                  >
-                    <textarea
-                      rows={2}
-                      value={editAliases}
-                      onChange={(event) => onEditAliasesChange(event.target.value)}
-                      placeholder="alias@example.com"
-                    />
-                  </SettingsField>
-                  <div className="st-actions contact-edit-actions">
-                    <SettingsButton size="sm" variant="primary" onClick={() => onSaveContactOverride(contact)}>保存</SettingsButton>
-                    <SettingsButton size="sm" onClick={onCancelEdit}>取消</SettingsButton>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button type="button" className="settings-contact-main" onClick={() => onComposeToContact(contact)}>
-                    <Send size={14} />
-                    <span>
-                      <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                      <em>{contact.email}</em>
-                      {contact.aliases.length > 0 && (
-                        <span className="contact-alias-chips">
-                          {contact.aliases.slice(0, 4).map((alias) => (
-                            <span key={alias}>{alias}</span>
-                          ))}
-                          {contact.aliases.length > 4 && (
-                            <span>+{contact.aliases.length - 4}</span>
-                          )}
-                        </span>
-                      )}
-                      <small>{contact.message_count} 封往来</small>
-                    </span>
-                  </button>
-                  <div className="contact-tool-actions">
-                    <SettingsButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`编辑 ${contact.name || contact.email}`}
-                      title="编辑联系人"
-                      icon={<Pencil size={13} />}
-                      onClick={() => onStartEditContact(contact)}
-                    >
-                      <span className="contact-action-label">编辑</span>
-                    </SettingsButton>
-                    <SettingsButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`${contact.vip ? '取消 VIP' : '设为 VIP'} ${contact.name || contact.email}`}
-                      title={contact.vip ? '取消 VIP' : '设为 VIP'}
-                      icon={<Star size={13} />}
-                      onClick={() => onToggleContactVip(contact)}
-                    >
-                      <span className="contact-action-label">{contact.vip ? '取消 VIP' : '设为 VIP'}</span>
-                    </SettingsButton>
-                    <SettingsButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`合并 ${contact.name || contact.email}`}
-                      title="合并联系人"
-                      icon={<Merge size={13} />}
-                      onClick={() => onMergeContact(contact)}
-                    >
-                      <span className="contact-action-label">合并</span>
-                    </SettingsButton>
-                    <SettingsButton
-                      size="sm"
-                      variant="danger-secondary"
-                      aria-label={`删除 ${contact.name || contact.email}`}
-                      title="删除联系人"
-                      icon={<Trash2 size={13} />}
-                      onClick={() => onDeleteContact(contact)}
-                    >
-                      <span className="contact-action-label">删除</span>
-                    </SettingsButton>
-                  </div>
-                </>
-              )}
+              <button type="button" className="settings-contact-main" onClick={() => openDetails(contact)}>
+                <span>
+                  <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
+                  <em>{contact.email}</em>
+                </span>
+              </button>
+              <div className="contact-tool-actions">
+                <SettingsButton size="sm" variant="ghost" aria-label={`编辑 ${contact.name || contact.email}`} title="编辑联系人" icon={<Pencil size={13} />} onClick={() => openEdit(contact)}>
+                  <span className="contact-action-label">编辑</span>
+                </SettingsButton>
+              </div>
             </div>
           ))}
           {filteredContacts.length === 0 && contactQuery && (
             <p className="settings-empty-hint">没有匹配「{contactQuery}」的联系人。</p>
           )}
+          {filteredContacts.length > pageSize && (
+            <nav className="settings-contact-pagination" aria-label="联系人分页">
+              <span>第 {currentPage} / {pageCount} 页，共 {filteredContacts.length} 位</span>
+              <div>
+                <SettingsButton size="sm" variant="ghost" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>上一页</SettingsButton>
+                <SettingsButton size="sm" variant="ghost" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>下一页</SettingsButton>
+              </div>
+            </nav>
+          )}
+        </div>
+      )}
+
+      {dialog === 'create' && (
+        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-create-form" role="dialog" aria-modal="true" aria-labelledby="contact-create-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <span className="settings-contact-dialog-mark"><UserPlus size={18} /></span>
+              <span><strong id="contact-create-title">添加联系人</strong><small>填写姓名、邮箱和可选别名。</small></span>
+              <button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button>
+            </header>
+            <div className="settings-contact-create-fields">
+              <SettingsField label="联系人名称"><input value={contactForm.name} onChange={(event) => { setCreateError(''); onContactFormChange({ ...contactForm, name: event.target.value }); }} placeholder="联系人名称" /></SettingsField>
+              <SettingsField label="邮箱地址"><input value={contactForm.email} onChange={(event) => { setCreateError(''); onContactFormChange({ ...contactForm, email: event.target.value }); }} placeholder="name@example.com" /></SettingsField>
+            </div>
+            <SettingsField className="settings-contact-aliases" label="别名邮箱" error={contactAliasIssues.invalid.length > 0 || contactAliasIssues.duplicatesWithin.length > 0 || contactAliasIssues.takenByOther.length > 0 ? aliasIssueText : undefined} hint={contactAliasIssues.invalid.length === 0 && contactAliasIssues.duplicatesWithin.length === 0 && contactAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}>
+              <textarea rows={2} value={contactFormAliases} onChange={(event) => { setCreateError(''); onContactFormAliasesChange(event.target.value); }} placeholder="alias@example.com" />
+            </SettingsField>
+            <SettingsSwitch label="设为 VIP" description="可配合通知策略只提醒重要联系人" checked={contactForm.vip} onChange={(vip) => { setCreateError(''); onContactFormChange({ ...contactForm, vip }); }} />
+            {createError && <p className="settings-contact-save-error" role="alert">{createError}</p>}
+            <footer><SettingsButton onClick={closeContactDialog}>取消</SettingsButton><SettingsButton variant="primary" icon={<UserPlus size={14} />} onClick={() => { void handleCreateContact(); }}>确认添加</SettingsButton></footer>
+          </section>
+        </div>
+      )}
+
+      {dialog === 'details' && selectedContact && (
+        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog" role="dialog" aria-modal="true" aria-labelledby="contact-details-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <span className="settings-contact-dialog-mark"><Users size={18} /></span>
+              <span><strong id="contact-details-title">{selectedContact.name || selectedContact.email}</strong><small>{selectedContact.vip ? 'VIP 联系人' : '联系人详情'}</small></span>
+              <button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button>
+            </header>
+            <dl className="settings-contact-details"><div><dt>邮箱地址</dt><dd>{selectedContact.email}</dd></div><div><dt>别名邮箱</dt><dd>{selectedContact.aliases.length ? selectedContact.aliases.join('、') : '未设置'}</dd></div><div><dt>往来邮件</dt><dd>{selectedContact.message_count} 封</dd></div></dl>
+            <footer className="settings-contact-detail-actions">
+              <SettingsButton size="sm" variant="ghost" icon={<Send size={14} />} onClick={() => onComposeToContact(selectedContact)}>写信</SettingsButton>
+              <SettingsButton size="sm" variant="ghost" icon={<Star size={14} />} onClick={() => toggleDetailVip(selectedContact)}>{selectedContact.vip ? '取消 VIP' : '设为 VIP'}</SettingsButton>
+              <SettingsButton size="sm" variant="danger-secondary" icon={<Trash2 size={14} />} onClick={() => { onDeleteContact(selectedContact); closeContactDialog(); }}>删除</SettingsButton>
+              <SettingsButton size="sm" variant="primary" icon={<Pencil size={14} />} onClick={() => openEdit(selectedContact)}>编辑</SettingsButton>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {dialog === 'edit' && selectedContact && (
+        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-edit-form" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header><span className="settings-contact-dialog-mark"><Pencil size={18} /></span><span><strong id="contact-edit-title">编辑联系人</strong><small>{selectedContact.email}</small></span><button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button></header>
+            <SettingsField label="联系人名称"><input value={editName} onChange={(event) => onEditNameChange(event.target.value)} placeholder="联系人名称" /></SettingsField>
+            <SettingsField label="别名邮箱" error={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0 ? editAliasIssueText : undefined} hint={editAliasIssues.invalid.length === 0 && editAliasIssues.duplicatesWithin.length === 0 && editAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}><textarea rows={2} value={editAliases} onChange={(event) => onEditAliasesChange(event.target.value)} placeholder="alias@example.com" /></SettingsField>
+            {createError && <p className="settings-contact-save-error" role="alert">{createError}</p>}
+            <footer><SettingsButton onClick={closeContactDialog}>取消</SettingsButton><SettingsButton variant="primary" disabled={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0} onClick={async () => { try { await onSaveContactOverride(selectedContact); closeContactDialog(); } catch (error) { setCreateError(error instanceof Error ? error.message : String(error)); } }}>确认保存</SettingsButton></footer>
+          </section>
         </div>
       )}
 

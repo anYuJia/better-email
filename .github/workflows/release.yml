@@ -41,7 +41,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            chromium
+            google-chrome-stable
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

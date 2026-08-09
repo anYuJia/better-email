@@ -10,6 +10,7 @@ import { calculateVisibleRange } from './messageListLayout';
 const SCROLL_SAVE_DEBOUNCE_MS = 220;
 const NEW_MESSAGE_ANIMATION_LIMIT = 5;
 const NEW_MESSAGE_ABSORB_DELAY_MS = 800;
+const MESSAGE_ROW_HEIGHT = 68;
 
 type MessageGroup = {
   id: string;
@@ -125,7 +126,7 @@ export default function MessageListView({
     for (const item of flatItems) {
       let height = 34;
       if (item.type === 'message') {
-        height = 62;
+        height = MESSAGE_ROW_HEIGHT;
       }
       layout.push({ top: currentTop, height });
       currentTop += height;
@@ -304,7 +305,7 @@ export default function MessageListView({
             } else {
               const message = item.message;
               return (
-                <div style={style} key={`msg-wrapper-${message.id}`}>
+                <div className="message-list-item" style={style} key={`msg-wrapper-${message.id}`}>
                   <MessageListCard
                     message={message}
                     isCurrentMessage={message.id === selectedId}

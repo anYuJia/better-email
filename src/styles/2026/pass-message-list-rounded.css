@@ -1,0 +1,71 @@
+/* Rounded rows keep the inbox approachable without turning it into a sparse
+   card grid. The virtual row includes the gap; the card itself stays 62px. */
+.message-list-item {
+  box-sizing: border-box;
+  padding: 0 6px 6px;
+}
+
+.message-card {
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+.message-card:hover,
+.message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+.message-card.selected,
+.message-card.selected:hover,
+.message-card.is-unread.selected,
+.message-card.is-unread.selected:hover {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: none;
+}
+
+.message-card.dragging {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.message-card .message-unread-dot {
+  border-color: var(--ui-surface);
+}
+
+.message-card:hover .message-unread-dot {
+  border-color: var(--quiet-row-hover);
+}
+
+.message-card.selected .message-unread-dot {
+  border-color: var(--quiet-row-selected);
+}
+
+.message-date-header {
+  padding-inline: 14px;
+}
+
+:root[data-theme="dark"] .message-card {
+  border-color: transparent;
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .message-card:hover,
+:root[data-theme="dark"] .message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .message-card.selected,
+:root[data-theme="dark"] .message-card.selected:hover,
+:root[data-theme="dark"] .message-card.is-unread.selected,
+:root[data-theme="dark"] .message-card.is-unread.selected:hover {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: none;
+}

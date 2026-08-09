@@ -44,7 +44,7 @@ export type AiSettingsReport = {
   mcp_api_key: string;
 };
 
-/** 从后端读取 AI 设置（API Key 存放于系统凭据库，不落 localStorage）。 */
+/** 从后端读取 AI 设置（密钥只保存在应用本地数据库，不落 localStorage）。 */
 export async function loadAiSettingsFromBackend(): Promise<AiSettingsReport | null> {
   try {
     const report = await invoke<AiSettingsReport>(IPC.LoadAiSettings);
@@ -54,7 +54,7 @@ export async function loadAiSettingsFromBackend(): Promise<AiSettingsReport | nu
   }
 }
 
-/** 保存 AI 设置到后端（API Key 优先系统凭据库，失败回退本地数据库）。 */
+/** 保存 AI 设置到后端（密钥只写入应用本地数据库）。 */
 export async function saveAiSettingsToBackend(config: AiServiceConfig): Promise<string> {
   const input: AiSettingsInput = {
     enabled: config.enabled,
@@ -109,7 +109,7 @@ export function loadAiServiceConfig(): AiServiceConfig {
   }
 }
 
-/** localStorage 只保留非密钥字段；API Key 由后端系统凭据库管理。 */
+/** localStorage 只保留非密钥字段；API Key 由后端应用本地数据库管理。 */
 export function saveAiServiceConfig(config: AiServiceConfig): void {
   window.localStorage.setItem(aiServiceStorageKey, JSON.stringify(stripSecrets(config)));
 }

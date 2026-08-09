@@ -25,7 +25,8 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
     saveAiServiceConfig(config);
   }, [config]);
 
-  // 从后端系统凭据库恢复 API Key，不回写 localStorage。
+  // 从后端本地数据库恢复设置，不回写 localStorage。
+  // 后端刻意不把 AI 密钥放入系统凭据库，打开设置页不会触发任何 Keychain 访问。
   useEffect(() => {
     let cancelled = false;
     loadAiSettingsFromBackend().then((report) => {

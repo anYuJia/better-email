@@ -99,19 +99,11 @@ pub fn save_ai_settings(
         mcp_endpoint: input.mcp_endpoint,
         mcp_api_key: input.mcp_api_key,
     };
-    let keychain_ok = record.api_key.trim().is_empty()
-        || crate::credentials::keychain_set_secret("ai:http", &record.api_key).is_ok();
-    let mcp_keychain_ok = record.mcp_api_key.trim().is_empty()
-        || crate::credentials::keychain_set_secret("ai:mcp", &record.mcp_api_key).is_ok();
+    // AI 密钥只写入应用自己的本地数据库，不触碰系统凭据库，
+    // 保证打开设置页时不会触发任何 Keychain 访问或授权提示。
     store
         .save_ai_settings(&record)
         .map_err(|error| error.to_string())?;
-    if !keychain_ok && !record.api_key.trim().is_empty() {
-        return Err("系统凭据库不可用，AI API Key 已回退保存到本地数据库（未加密）。".to_string());
-    }
-    if !mcp_keychain_ok && !record.mcp_api_key.trim().is_empty() {
-        return Err("系统凭据库不可用，MCP API Key 已回退保存到本地数据库（未加密）。".to_string());
-    }
     Ok("AI 服务设置已保存。".to_string())
 }
 

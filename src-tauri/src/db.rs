@@ -211,8 +211,10 @@ impl MailStore {
             data_dir,
             database_path: path,
         };
+        // 启动路径绝不访问系统凭据库（Keychain / Credential Manager）：
+        // 凭据只在用户明确操作（同步、发送、验证、保存）时按需读取或写入，
+        // 避免干净安装后启动弹出 Keychain 授权提示。
         store.migrate()?;
-        store.migrate_legacy_secrets_to_keychain()?;
         if !seed_demo_data {
             store.remove_demo_seed_data()?;
         }
@@ -227,43 +229,6 @@ impl MailStore {
             .lock()
             .map_err(|_| MailError::DatabaseLockPoisoned)?;
         f(&conn)
-    }
-
-    /// 把旧版本保存在 SQLite `account_credentials` 中的明文凭据迁移到系统凭据库，
-    /// 迁移成功后擦除明文行。系统凭据库不可用时保留原样（运行时回退路径仍可用）。
-    fn migrate_legacy_secrets_to_keychain(&self) -> MailResult<()> {
-        let pending: Vec<(String, String)> = self.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "SELECT account_email, secret FROM account_credentials WHERE length(secret) > 0",
-            )?;
-            let rows = stmt
-                .query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(rows)
-        })?;
-        if pending.is_empty() {
-            return Ok(());
-        }
-        let mut migrated = 0_usize;
-        for (email, secret) in &pending {
-            if crate::credentials::keychain_set_secret(email, secret).is_ok() {
-                let _ = self.with_conn(|conn| {
-                    Ok(conn.execute(
-                        "DELETE FROM account_credentials WHERE account_email = ?1",
-                        params![email],
-                    )?)
-                });
-                migrated += 1;
-            }
-        }
-        db_info(format!(
-            "[better-email][db] keychain migration migrated={} pending={}",
-            migrated,
-            pending.len()
-        ));
-        Ok(())
     }
 
     fn seed_if_empty(&self, should_seed_demo_data: bool) -> MailResult<()> {
@@ -585,6 +550,59 @@ mod tests {
             b"legacy wal"
         );
         fs::remove_dir_all(data_dir).expect("migration dir removed");
+    }
+
+    #[test]
+    fn fresh_install_open_never_touches_keychain() {
+        // 回归测试：干净安装后，应用启动（打开数据库）绝不能访问系统凭据库，
+        // 否则 macOS 会弹出 Keychain 授权提示。这里验证全新数据库可以直接
+        // 打开、没有账号、并且可以安全地再次打开（模拟重启）。
+        let db_path = test_database_path("better-email-clean-install");
+        let store = MailStore::open_at(db_path.clone()).expect("fresh store opens");
+        assert!(store.list_accounts().expect("accounts load").is_empty());
+
+        let reopened = MailStore::open_at(db_path).expect("store reopens");
+        assert!(reopened.list_accounts().expect("accounts load").is_empty());
+    }
+
+    #[test]
+    fn opening_store_does_not_move_legacy_secrets_to_keychain() {
+        // 回归测试：旧版本保存在 SQLite account_credentials 中的明文凭据，
+        // 在启动路径上必须原样保留，不得被迁移进系统凭据库（那会触发
+        // Keychain 写入/授权提示）。迁移只允许在用户执行邮件操作时惰性发生。
+        let db_path = test_database_path("better-email-no-startup-migration");
+        let store = MailStore::open_at(db_path.clone()).expect("store opens");
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "INSERT INTO accounts(id, email, display_name, provider, created_at)
+                     VALUES (900, 'legacy@example.com', 'Legacy', 'gmail', '2026-07-15')",
+                    [],
+                )?;
+                conn.execute(
+                    "INSERT INTO account_credentials(account_email, secret, updated_at)
+                     VALUES ('legacy@example.com', 'LEGACY_PLAINTEXT_SECRET', '2026-07-15')",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("legacy secret seeded");
+
+        let reopened = MailStore::open_at(db_path).expect("store reopens");
+        let remaining: i64 = reopened
+            .with_conn(|conn| {
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM account_credentials
+                     WHERE account_email = 'legacy@example.com' AND secret = 'LEGACY_PLAINTEXT_SECRET'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )?)
+            })
+            .expect("legacy row still queryable");
+        assert_eq!(
+            remaining, 1,
+            "startup must not migrate or erase SQLite secrets"
+        );
     }
 
     #[test]

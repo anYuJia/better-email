@@ -1,8 +1,5 @@
 use super::*;
 
-const AI_KEYCHAIN_KIND_HTTP: &str = "ai:http";
-const AI_KEYCHAIN_KIND_MCP: &str = "ai:mcp";
-
 impl MailStore {
     pub fn save_ai_settings(&self, record: &AiSettingsRecord) -> MailResult<()> {
         self.with_conn(|conn| store_ai_settings_for_conn(conn, record))
@@ -27,11 +24,9 @@ pub struct AiSettingsRecord {
     pub mcp_api_key: String,
 }
 
+/// AI 设置只保存在应用自己的 SQLite 数据库（app 数据目录，0600 权限）。
+/// 刻意不使用系统凭据库：打开设置页时绝不触发 Keychain 访问或授权提示。
 pub fn store_ai_settings_for_conn(conn: &Connection, record: &AiSettingsRecord) -> MailResult<()> {
-    let keychain_ok =
-        crate::credentials::keychain_set_secret(AI_KEYCHAIN_KIND_HTTP, &record.api_key).is_ok();
-    let mcp_keychain_ok =
-        crate::credentials::keychain_set_secret(AI_KEYCHAIN_KIND_MCP, &record.mcp_api_key).is_ok();
     conn.execute(
         "
         INSERT INTO ai_settings(id, enabled, service_type, endpoint, api_key, model,
@@ -55,21 +50,13 @@ pub fn store_ai_settings_for_conn(conn: &Connection, record: &AiSettingsRecord) 
             record.enabled,
             record.service_type,
             record.endpoint,
-            if keychain_ok {
-                ""
-            } else {
-                record.api_key.as_str()
-            },
+            record.api_key,
             record.model,
             record.timeout_seconds as i64,
             record.privacy_acknowledged,
             record.mcp_enabled,
             record.mcp_endpoint,
-            if mcp_keychain_ok {
-                ""
-            } else {
-                record.mcp_api_key.as_str()
-            },
+            record.mcp_api_key,
             Utc::now().to_rfc3339()
         ],
     )?;
@@ -129,19 +116,12 @@ pub fn load_ai_settings_for_conn(conn: &Connection) -> MailResult<AiSettingsReco
         enabled: enabled != 0,
         service_type,
         endpoint,
-        api_key: load_ai_secret(AI_KEYCHAIN_KIND_HTTP, &api_key),
+        api_key,
         model,
         timeout_seconds: timeout_seconds as u64,
         privacy_acknowledged: privacy_acknowledged != 0,
         mcp_enabled: mcp_enabled != 0,
         mcp_endpoint,
-        mcp_api_key: load_ai_secret(AI_KEYCHAIN_KIND_MCP, &mcp_api_key),
+        mcp_api_key,
     })
-}
-
-fn load_ai_secret(kind: &str, fallback: &str) -> String {
-    match crate::credentials::keychain_get_secret(kind) {
-        Ok(Some(secret)) if !secret.trim().is_empty() => secret,
-        _ => fallback.to_string(),
-    }
 }

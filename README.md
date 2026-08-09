@@ -36,7 +36,7 @@
 
 ### 1. 🔒 本地优先与系统级安全 (Local-First & OS Security)
 * **SQLite 本地索引**：所有邮件正文、联系人、标签与元数据全量保存在本地 SQLite 数据库中，秒级全文搜索，离线随时查阅。
-* **系统凭据安全 (Keychain / Credential Manager)**：账号密码、App 授权码与 OAuth Token 优先存储于系统 OS 级凭据管理器中（macOS Keychain / Windows Credential Vault / Linux secret-service），并在启动与读取时自动迁移存量明文凭据；系统凭据库不可用时回退本地数据库并明确提示。凭据绝不上传第三方服务器。
+* **系统凭据安全 (Keychain / Credential Manager)**：账号密码、App 授权码与 OAuth Token 按需存储于系统 OS 级凭据管理器中（macOS Keychain / Windows Credential Vault / Linux secret-service），仅在用户执行邮件操作（同步、发送、验证、保存、删除）时访问，应用启动、检查更新与打开设置页绝不触碰系统凭据库，也不会弹出 Keychain 授权提示；系统凭据库不可用时回退本地数据库并明确提示。凭据绝不上传第三方服务器。
 * **隐私追踪拦截 (Tracker Blocking)**：默认拦截邮件中的像素追踪图片与第三方跨站 Link，邮件浏览更无痕。
 
 ### 2. 🚀 极致性能与低资源占用 (Rust Core Engine)
@@ -102,9 +102,10 @@ npm run tauri:build
 
 您可以前往 [GitHub Releases](https://github.com/anYuJia/better-email/releases) 获取最新的二进制安装包：
 
-* **macOS**：Universal `.dmg` / `.app` (支持 Intel 与 Apple Silicon)
-* **Windows**：`.msi` / `.exe` (x64)
-* **Linux**：`.AppImage` / `.deb`
+* **macOS (Apple Silicon)**：`Better_Email_<VERSION>_mac_arm.dmg`
+* **Windows (x64)**：`Better_Email_<VERSION>_windows_x64.msi`
+
+Release 中另附 Tauri 自动更新必需的签名更新载荷（macOS 为 `.app.tar.gz` + `.sig`，Windows 为 `.msi.sig`）与 `latest.json` 更新清单，它们不是安装包。
 
 ---
 

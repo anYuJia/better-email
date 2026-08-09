@@ -36,7 +36,6 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/v3/32x32.png",

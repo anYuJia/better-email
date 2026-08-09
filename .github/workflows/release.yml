@@ -105,8 +105,8 @@ jobs:
             }
           "
 
-  publish:
-    name: Build and publish installers
+  build:
+    name: Build installers (${{ matrix.platform }})
     needs: validate
     if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch')
     strategy:
@@ -114,26 +114,15 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: ''
           - platform: windows-latest
-            args: ''
-          - platform: ubuntu-22.04
-            args: '--bundles appimage,deb'
     runs-on: ${{ matrix.platform }}
+    env:
+      # 更新包签名密钥只存在于 CI Secrets 中，绝不写入仓库。
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -152,29 +141,108 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and upload release assets
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tauri updater artifacts are signed before they are attached to the
-          # GitHub Release. Configure this repository secret with the private
-          # key that matches plugins.updater.pubkey in tauri.conf.json.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Add Apple or Windows code-signing variables here only after the
-          # corresponding certificate secrets have been configured. Leaving
-          # empty certificate variables unset keeps ad-hoc builds valid.
-        with:
-          args: ${{ matrix.args }}
-          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseName: Better Email ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          releaseBody: |
-            Better Email desktop release for ${{ matrix.platform }}.
+      - name: Require updater signing key
+        # latest.json 必须携带与 plugins.updater.pubkey 匹配的签名，
+        # 缺少私钥时不允许产出未签名更新载荷。
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY secret is required to build signed updater artifacts. Configure it in the repository settings, then re-run the release."
+            exit 1
+          fi
 
-            Installers built on this job:
-            - macOS: .dmg / .app (notarized when signing secrets are configured)
-            - Windows: .msi / .exe
-            - Linux: .AppImage / .deb
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
+      - name: Build installers
+        run: npm run tauri:build
+
+      - name: Prepare and rename release assets
+        id: assets
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/ci-prepare-assets.mjs --version="$VERSION" --bundle="src-tauri/target/release/bundle" > asset-plan.json
+          cat asset-plan.json
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/**/Better_Email_*.dmg
+            src-tauri/target/release/bundle/**/Better_Email_*.app.tar.gz
+            src-tauri/target/release/bundle/**/Better_Email_*.msi
+            src-tauri/target/release/bundle/**/*.sig
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+          echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate updater manifest (latest.json)
+        # Tauri updater 不支持 DMG 作为 macOS 更新载荷，macOS 的更新载荷必须是
+        # 签名的 .app.tar.gz 归档；DMG 只是用户安装包。Windows 的 MSI 同时充当
+        # 安装包与更新载荷。latest.json 中的 URL 全部指向重命名后的正式文件名。
+        run: |
+          node scripts/update-manifest.mjs \
+            --version="${{ steps.meta.outputs.version }}" \
+            --tag="${{ steps.meta.outputs.tag }}" \
+            --repo="${{ steps.meta.outputs.repo }}" \
+            --payload-darwin-aarch64="dist/installers-macos-latest/Better_Email_${{ steps.meta.outputs.version }}_mac_arm.app.tar.gz" \
+            --payload-windows-x86_64="dist/installers-windows-latest/Better_Email_${{ steps.meta.outputs.version }}_windows_x64.msi" \
+            --out="dist/latest.json"
+
+      - name: Create and populate GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          BODY=$(cat <<EOF
+          ## Better Email $TAG
+
+          ### 安装包（Installers）
+          - macOS (Apple Silicon)：\`Better_Email_${VERSION}_mac_arm.dmg\`
+          - Windows (x64)：\`Better_Email_${VERSION}_windows_x64.msi\`
+
+          ### 更新载荷（Updater payloads，签名文件与文件一一对应）
+          - macOS：\`Better_Email_${VERSION}_mac_arm.app.tar.gz\` + \`.sig\` — Tauri updater 不支持 DMG 作为 macOS 更新载荷，此归档是自动更新必需的有效载荷，请勿当作安装包使用。
+          - Windows：\`Better_Email_${VERSION}_windows_x64.msi\` + \`.sig\`
+          - \`latest.json\`：更新清单，URL 全部指向上方重命名后的正式文件。
+          EOF
+          )
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Better Email $TAG" --notes "$BODY"
+          else
+            gh release create "$TAG" --title "Better Email $TAG" --notes "$BODY"
+          fi
+          gh release upload "$TAG" \
+            "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.dmg" \
+            "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.app.tar.gz" \
+            "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.app.tar.gz.sig" \
+            "dist/installers-windows-latest/Better_Email_${VERSION}_windows_x64.msi" \
+            "dist/installers-windows-latest/Better_Email_${VERSION}_windows_x64.msi.sig" \
+            "dist/latest.json" \
+            --clobber

@@ -364,8 +364,8 @@ if (activeThread && threadMessages.length > 0) {
   const isTrash = selected.folder_role === 'trash';
 
   return (
-    <section className="reader-panel">
-      <article className="reader" ref={readerRef} onScroll={maybeCompleteReading}>
+    <section className="reader-panel" ref={readerRef} onScroll={maybeCompleteReading}>
+      <article className="reader">
         <ReaderToolbar
           selected={selected}
           folders={folders}
@@ -382,6 +382,7 @@ if (activeThread && threadMessages.length > 0) {
           onToggleTranslation={toggleTranslation}
           onToggleStar={onToggleStar}
           onEditDraft={onEditDraft}
+          onComposeNew={onComposeNew}
           onComposeFromMessage={onComposeFromMessage}
           onRestoreFromTrash={onRestoreFromTrash}
           onMoveArchive={onMoveArchive}

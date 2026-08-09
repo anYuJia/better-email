@@ -1,0 +1,97 @@
+/* Final interaction pass: keep popovers above the reading surface and make
+ * the persistent workspace quieter without changing its layout. */
+
+/* Details-based menus used by labels, reader actions and list controls should
+ * not be painted below the body or another pane. The list/context menus that
+ * already use portals retain their own higher layer. */
+.app-shell .compact-menu[open] {
+  position: relative;
+  z-index: 2400;
+}
+
+.app-shell .compact-menu[open] > div {
+  z-index: 2500;
+}
+
+.app-shell .reader-more-menu[open] > div,
+.app-shell .label-menu[open] > .label-menu-container {
+  z-index: 2500;
+}
+
+/* The outer panel owns scrolling; allowing the article to paint overflow
+ * keeps a label/action menu from being clipped by the article scroll box. */
+.app-shell .reader-panel {
+  overflow: auto;
+}
+
+.app-shell .reader {
+  overflow: visible;
+}
+
+/* Selected folders use a quiet fill only; the old inset blue rail was too
+ * visually loud and looked like a resize affordance. */
+.app-shell .folder.active,
+.app-shell .folder.active:hover,
+.app-shell .sidebar-disclosure[open] summary,
+.app-shell .sidebar-disclosure[open] summary:hover {
+  box-shadow: none;
+}
+
+/* Sender addresses are actionable without looking like a browser link. */
+.app-shell .reader-sender-email {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-shell .reader-sender-email:hover,
+.app-shell .reader-sender-email:focus-visible {
+  color: var(--ui-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Remove the extra rules above the list controls; pane boundaries already
+ * provide enough structure. */
+.app-shell .toolbar,
+.app-shell .list-control-strip {
+  border-top: 0;
+  border-bottom-color: transparent;
+}
+
+/* All scrollable surfaces use a narrow, low-contrast thumb. It becomes
+ * slightly stronger only while the user is actually hovering the surface. */
+.app-shell * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-text-tertiary) 28%, transparent) transparent;
+}
+
+.app-shell *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-shell *::-webkit-scrollbar-thumb {
+  min-height: 30px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text-tertiary) 24%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-thumb:hover,
+.app-shell :is(.sidebar, .message-list, .thread-list, .reader-panel, .reader, .label-menu-list):hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-text-tertiary) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -36,6 +36,7 @@ type ReaderToolbarProps = {
   onToggleTranslation: () => void;
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
+  onComposeNew?: (fields: { to: string }) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onRestoreFromTrash: () => void;
   onMoveArchive: () => void;
@@ -68,6 +69,7 @@ export default function ReaderToolbar({
   onToggleTranslation,
   onToggleStar,
   onEditDraft,
+  onComposeNew,
   onComposeFromMessage,
   onRestoreFromTrash,
   onMoveArchive,
@@ -90,7 +92,7 @@ export default function ReaderToolbar({
     <header className="reader-header">
       <div className="reader-title-block">
         <h1>{selected.subject || '(无主题)'}</h1>
-        <SenderIdentity message={selected} />
+        <SenderIdentity message={selected} onComposeNew={onComposeNew} />
       </div>
       <div className="reader-actions" aria-label="邮件操作">
         {isDraft ? (

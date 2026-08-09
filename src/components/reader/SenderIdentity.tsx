@@ -4,9 +4,12 @@ import Avatar from '../Avatar';
 
 type SenderIdentityProps = {
   message: MessageSummary;
+  onComposeNew?: (fields: { to: string }) => void;
 };
 
-export default function SenderIdentity({ message }: SenderIdentityProps) {
+export default function SenderIdentity({ message, onComposeNew }: SenderIdentityProps) {
+  const senderEmail = message.sender_email.trim();
+
   return (
     <div className="reader-sender">
       <Avatar
@@ -17,7 +20,21 @@ export default function SenderIdentity({ message }: SenderIdentityProps) {
       <span className="reader-sender-copy">
         <strong>{message.sender_name || message.sender_email}</strong>
         <span>
-          {message.sender_email}
+          {senderEmail && onComposeNew ? (
+            <button
+              type="button"
+              className="reader-sender-email"
+              title={`写信给 ${senderEmail}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onComposeNew({ to: senderEmail });
+              }}
+            >
+              {senderEmail}
+            </button>
+          ) : (
+            message.sender_email
+          )}
           {message.recipients ? ` 发给 ${message.recipients}` : ''}
         </span>
       </span>

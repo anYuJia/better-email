@@ -5,3 +5,25 @@ release-assets/
 src-tauri/target/
 *.log
 .DS_Store
+
+# Local AI tooling and design workspaces
+.agent/
+.gemini/
+design-system/
+
+# Browser, test, and visual QA output
+.playwright-cli/
+output/
+coverage/
+playwright-report/
+test-results/
+
+# Internal reports belong outside the product repository
+docs/
+
+# Local secrets and interpreter caches
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]

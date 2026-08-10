@@ -1,115 +1,107 @@
 # Better Email
 
 <p align="center">
-  <img src="public/favicon.svg" alt="Better Email Logo" width="100" height="100" style="border-radius: 22px; box-shadow: 0 10px 40px rgba(79, 70, 229, 0.15);" />
-</p>
-
-<h3 align="center">Better Email</h3>
-
-<p align="center">
-  <strong>本地优先 • 隐私至上 • 极致流畅的下一代桌面邮箱客户端</strong>
+  <img src="./public/brand/v4/brand-mark.png" alt="Better Email" width="88" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/anYuJia/better-email/releases">
-    <img src="https://img.shields.io/github/v/release/anYuJia/better-email?style=flat-square&label=Release&color=2563eb" alt="GitHub release" />
-  </a>
-  <img src="https://img.shields.io/badge/Tauri-v2.0-blueviolet?style=flat-square" alt="Tauri" />
-  <img src="https://img.shields.io/badge/Rust-1.75%2B-orange?style=flat-square" alt="Rust" />
-  <img src="https://img.shields.io/badge/React-18-61dafb?style=flat-square" alt="React" />
-  <a href="https://github.com/anYuJia/better-email/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/anYuJia/better-email?style=flat-square&label=License&color=475569" alt="License" />
-  </a>
+  本地优先的多账户桌面邮箱客户端
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/anYuJia/better-email/releases">下载最新版本</a>
+  &nbsp;|&nbsp;
+  <a href="./CHANGELOG.md">更新日志</a>
+  &nbsp;|&nbsp;
+  <a href="./LICENSE">MIT License</a>
+</p>
 
-## ⚡ 什么是 Better Email？
+Better Email 面向需要长期处理多个邮箱的个人、独立从业者和小团队。它把收件箱、搜索、写信、同步和邮件整理放在一个桌面工作台中，并尽量将邮件数据留在本机。
 
-**Better Email** 是一款专为高效处理邮件打造的下一代桌面客户端。
+## 下载
 
-我们拒绝臃肿的 Web 套壳与信息流干扰，结合 **Tauri v2 + Rust 后端** 与 **React 极简 UI**，重塑了日常邮件处理工作流。不管是个人多邮箱归档、商务高效回复，还是本地隐私备份，Better Email 都能提供媲美原生应用的速度与安全保障。
+前往 [GitHub Releases](https://github.com/anYuJia/better-email/releases) 下载正式安装包：
 
----
+| 平台 | 安装包 |
+| --- | --- |
+| macOS（Apple Silicon） | `Better_Email_<VERSION>_mac_arm.dmg` |
+| Windows（x64） | `Better_Email_<VERSION>_windows_x64.msi` |
 
-## ✨ 核心亮点
+Release 中的 `.app.tar.gz`、`.sig` 和 `latest.json` 用于应用自动更新，不是常规安装包。
 
-### 1. 🔒 本地优先与系统级安全 (Local-First & OS Security)
-* **SQLite 本地索引**：所有邮件正文、联系人、标签与元数据全量保存在本地 SQLite 数据库中，秒级全文搜索，离线随时查阅。
-* **凭据本地存储 (Local Credentials)**：账号密码、App 授权码与 OAuth Token 只保存在应用自己的本地 SQLite 数据库（app 数据目录，文件权限 0600），应用启动、检查更新、打开设置页与查看邮件等任何操作都不会访问 macOS Keychain，也不会弹出系统授权提示；凭据绝不上传第三方服务器。
-* **隐私追踪拦截 (Tracker Blocking)**：默认拦截邮件中的像素追踪图片与第三方跨站 Link，邮件浏览更无痕。
+## 核心能力
 
-### 2. 🚀 极致性能与低资源占用 (Rust Core Engine)
-* **Tauri v2 + Rust**：底层基于 Rust 的 IMAP/POP3/SMTP 网络库与 SQLite 引擎构建，常驻内存占用极低（仅数十 MB），远优于传统 Electron 应用。
-* **增量并发拉取**：支持离线与背景增量同步，附件按需拉取，大容量邮箱依旧流畅。
+- 多账号与统一收件箱：在聚合视图和单账号视图之间切换，管理文件夹、会话、标签和已保存搜索。
+- 收信与发信：支持 IMAP / POP3 收信与 SMTP 发信，提供 Gmail、Outlook、QQ 邮箱和网易 163 的账号预设，也可手动填写服务器设置。
+- 高效处理：搜索、星标、已读状态、归档、删除、稍后处理、批量操作和撤销都可在邮件列表中完成。
+- 写信工作流：富文本编辑、附件和内嵌图片、草稿、模板、定时发送、身份/别名、联系人及规则。
+- 本地工作流：邮件数据、账户配置和搜索索引保存在本机 SQLite 数据库，支持后台同步、通知、备份恢复和联系人导入导出。
+- 可选 AI：提供翻译、摘要和模板生成；可使用本地演示模式，或连接 OpenAI 兼容的外部服务。
 
-### 3. 🎨 现代三栏极简设计 (Modern 3-Pane Experience)
-* **清晰视效与高度自定义**：三栏流式布局（文件夹导航 → 邮件列表 → 阅读与沉浸编辑），界面跟随系统暗黑/白天模式自动切换。
-* **富文本/Markdown 编辑器**：支持内联图片、语法高亮、快速模板与快捷键流式回复。
-* **多账号无缝统一**：聚合收件箱 (Unified Inbox) 与单账号独立视角的快速切换。
+## 服务商与认证
 
----
+内置预设仅用于加快配置，不代表所有账号和企业租户都已验证可用。请以服务商当前的 IMAP、POP3、SMTP 和 OAuth2 政策为准。
 
-## 🌐 邮件服务商兼容矩阵 (Supported Providers)
+| 服务商 | 预设认证方式 | 说明 |
+| --- | --- | --- |
+| Gmail | OAuth2 或应用专用密码 | POP3 需要应用专用密码。 |
+| Outlook / Microsoft 365 | OAuth2 或租户允许的认证方式 | 企业租户可能需要管理员开放相关协议。 |
+| QQ 邮箱 | 客户端授权码 | 需在邮箱设置中开启服务。 |
+| 网易 163 / 126 / Yeah | 客户端授权码 | 收信和发信服务可能需要分别开启。 |
+| 自定义邮箱 | 手动配置 | 填写 IMAP 或 POP3 与 SMTP 服务器参数。 |
 
-Better Email 内置多款常用邮件服务商预设，支持 **IMAP / POP3 / SMTP** 协议自动识别：
+## 隐私与数据边界
 
-| 服务商 | 协议 | 认证方式 | 快速配置指南 |
-| :--- | :--- | :--- | :--- |
-| **Gmail** | IMAP / POP3 / SMTP | OAuth2 / 应用专用密码 | 开启 Google IMAP/POP3，推荐 OAuth2 或应用专用密码登录。 |
-| **Outlook / Office365** | IMAP / POP3 / SMTP | OAuth2 / 账号密码 | 支持 Microsoft 个人与企业账号。 |
-| **QQ 邮箱 / Foxmail** | IMAP / POP3 / SMTP | 客户端授权码 | 设置页面开启 IMAP/SMTP 服务，使用 16 位授权码登录。 |
-| **网易 163 / 126 / Yeah** | IMAP / POP3 / SMTP | 客户端授权码 | 开启 IMAP/POP3/SMTP 服务，使用网易客户端授权码。 |
-| **自定义 IMAP/POP3** | IMAP / POP3 / SMTP | Password / TLS | 支持自建 Postfix/Dovecot、iRedMail、ProtonMail Bridge 等。 |
+- 邮件数据和账号配置保存在本机应用数据目录中的 SQLite 数据库。
+- 账号密码、授权码、OAuth Token 和已保存的 AI 服务密钥也保存在本地应用数据库；当前版本不提供数据库静态加密。Unix 系统上应用会尝试将数据库文件权限设为 `0600`。
+- 本地备份不会包含已保存的账号凭据。
+- 远程图片默认不加载；HTTPS 链接默认隐藏，需要用户明确查看或打开。
+- 启用外部 AI 服务后，翻译、摘要或模板生成所需的邮件正文和提示词可能发送到你配置的服务端。请先确认该服务的数据处理政策。
 
----
+## 常用快捷键
 
-## ⌨️ 高效快捷键
+| 快捷键 | 操作 |
+| --- | --- |
+| `/` | 聚焦邮件搜索 |
+| `C` | 新建邮件 |
+| `J` / `K` 或方向键 | 选择下一封 / 上一封邮件 |
+| `R` / `Shift` + `R` | 回复 / 回复全部 |
+| `F` | 转发 |
+| `S` / `M` | 星标 / 切换已读状态 |
+| `E` | 归档 |
+| `Delete` / `Backspace` | 移至废纸篓 |
+| `Cmd` / `Ctrl` + `Z` | 撤销最近操作 |
 
-| 快捷键 | 功能 |
-| :--- | :--- |
-| <kbd>Cmd / Ctrl</kbd> + <kbd>N</kbd> | 新建/撰写邮件 |
-| <kbd>Cmd / Ctrl</kbd> + <kbd>R</kbd> | 回复当前邮件 |
-| <kbd>Cmd / Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> | 回复全部 |
-| <kbd>Cmd / Ctrl</kbd> + <kbd>F</kbd> | 聚焦搜索框 / 聚焦邮件全文 |
-| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | 移至垃圾桶/归档 |
-> 主题跟随系统外观自动切换（macOS/Windows 系统设置中切换深色/浅色外观）。
+按 `?` 或 `Cmd` / `Ctrl` + `/` 可打开完整快捷键列表。
 
----
+## 本地开发
 
-## 🛠️ 本地开发与构建
-
-构建 Better Email 需准备 [Node.js](https://nodejs.org/) (>= 18) 以及 [Rust](https://www.rust-lang.org/) 工具链。
+需要 Node.js 20 LTS、Rust stable，以及 [Tauri 的平台依赖](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
-# 1. 克隆项目仓库
 git clone https://github.com/anYuJia/better-email.git
 cd better-email
-
-# 2. 安装前端依赖
-npm install
-
-# 3. 启动本地 Tauri 桌面端开发调试环境
+npm ci
 npm run tauri:dev
+```
 
-# 4. 构建生产打包版本
+构建安装包：
+
+```bash
 npm run tauri:build
 ```
 
----
+常用验证命令：
 
-## 📥 下载与支持平台
+```bash
+npm run lint
+npm test
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+```
 
-您可以前往 [GitHub Releases](https://github.com/anYuJia/better-email/releases) 获取最新的二进制安装包：
+## 反馈与许可
 
-* **macOS (Apple Silicon)**：`Better_Email_<VERSION>_mac_arm.dmg`
-* **Windows (x64)**：`Better_Email_<VERSION>_windows_x64.msi`
-
-Release 中另附 Tauri 自动更新必需的签名更新载荷（macOS 为 `.app.tar.gz` + `.sig`，Windows 为 `.msi.sig`）与 `latest.json` 更新清单，它们不是安装包。
-
----
-
-<p align="center">
-  Made with ❤️ by the Better Email Team. Licensed under the <a href="./LICENSE">MIT License</a>.
-</p>
-
+问题和功能建议请提交到 [GitHub Issues](https://github.com/anYuJia/better-email/issues)。项目采用 [MIT License](./LICENSE)，版本变更见 [CHANGELOG.md](./CHANGELOG.md)。

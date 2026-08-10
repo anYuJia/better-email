@@ -140,6 +140,18 @@ pub fn update_account_settings(
 }
 
 #[tauri::command]
+pub fn set_account_onboarding_completed(
+    store: State<'_, MailStore>,
+    account_id: i64,
+    completed: bool,
+) -> MailResult<Account> {
+    command_info(format!(
+        "[better-email][account] onboarding complete account_id={account_id} completed={completed}"
+    ));
+    store.set_account_onboarding_completed(account_id, completed)
+}
+
+#[tauri::command]
 pub fn list_folders(
     store: State<'_, MailStore>,
     account_id: Option<i64>,

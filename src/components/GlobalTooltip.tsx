@@ -173,7 +173,8 @@ export default function GlobalTooltip() {
 
     setCoords({ left, top });
     if (placement !== tooltip.placement) {
-      // Keep the state in sync so the arrow points at the right edge.
+      // Keep the state in sync with the chosen placement for later bounds
+      // calculations. The tooltip intentionally has no decorative arrow.
       setTooltip({ ...tooltip, placement });
     }
   }, [tooltip]);

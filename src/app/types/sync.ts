@@ -1,7 +1,8 @@
 import type { Account } from './account';
 
 export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
-export type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed';
+/** done 即成功（succeeded）语义，与历史状态保持一致。 */
+export type BackgroundTaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
 
 export type LocalBackupSummary = {
@@ -64,11 +65,17 @@ export type BackgroundTask = {
   id: number;
   kind: BackgroundTaskKind;
   title: string;
-  source: 'manual' | 'timer';
+  source: 'manual' | 'timer' | 'initial';
   status: BackgroundTaskStatus;
   message: string;
   created_at: string;
   started_at: string;
   finished_at: string;
+  /** 绑定明确账号的任务（首次登录后台同步）；null 表示全局任务。 */
+  account_id: number | null;
+  /** 运行中任务被请求取消：执行方在安全检查点消费后落为 cancelled。 */
+  cancel_requested: boolean;
+  /** 文件夹/批次级进度（0-100），由 Rust 同步流程在安全检查点写入。 */
+  progress: number;
 };
 

@@ -26,6 +26,8 @@ function makeAccount(overrides: Partial<Account> = {}): Account {
     block_external_mailboxes: false,
     intercept_https_links: true,
     auto_download_attachments: false,
+    warn_external_senders: false,
+    onboarding_completed: true,
     is_default: true,
     ...overrides,
   };
@@ -67,6 +69,7 @@ function renderRemovalHook(account: Account, accounts: Account[]) {
 function renderCreationHook(
   newAccountForm: AccountCreateInput,
   loadMeta = vi.fn().mockResolvedValue({ folderId: 9, folders: [{ id: 9 }] }),
+  onAccountCreated?: (account: Account) => void,
 ) {
   const setters = {
     setAccount: vi.fn(),
@@ -82,7 +85,6 @@ function renderCreationHook(
     setSettingsOpen: vi.fn(),
     setCredentialStatus: vi.fn(),
     setCredentialVerification: vi.fn(),
-    setSyncRuns: vi.fn(),
     setStatus: vi.fn(),
   };
   const loadMessages = vi.fn().mockResolvedValue([]);
@@ -93,6 +95,7 @@ function renderCreationHook(
     query: '',
     filter: 'all' as FilterMode,
     ...setters,
+    onAccountCreated,
     loadMeta,
     loadMessages,
   }));
@@ -232,6 +235,46 @@ describe('useAccountProvisioning removeCurrentAccount', () => {
 });
 
 describe('useAccountProvisioning createNewAccount', () => {
+  const created = makeAccount({ id: 7, email: 'ada@qq.com' });
+
+  function newForm() {
+    return {
+      ...emptyAccountCreateForm,
+      email: 'ada@qq.com',
+      display_name: 'Ada',
+      provider: 'qq',
+      imap_host: 'imap.qq.com:993',
+      smtp_host: 'smtp.qq.com:587',
+    };
+  }
+
+  function verifyInvoke(overrides: Record<string, unknown> = {}) {
+    vi.mocked(invoke).mockImplementation(((command: string) => {
+      const handler = overrides[command];
+      if (handler) return (handler as () => unknown)();
+      switch (command) {
+        case 'create_account':
+          return Promise.resolve(created);
+        case 'store_account_secret':
+          return Promise.resolve({ exists: true, status: 'stored', message: 'saved' });
+        case 'verify_account_credentials_with_secret':
+          return Promise.resolve({ authenticated: true, status: 'ok', message: 'verified' });
+        default:
+          return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+      }
+    }) as never);
+  }
+
+  async function runCreate(utils: { result: { current: { createNewAccount: (secret?: string) => Promise<Account | void> } } }, secret?: string) {
+    let result: Account | void = undefined;
+    await act(async () => {
+      const pending = utils.result.current.createNewAccount(secret);
+      await vi.runAllTimersAsync();
+      result = await pending;
+    });
+    return result;
+  }
+
   beforeEach(() => {
     vi.mocked(invoke).mockReset();
   });
@@ -241,51 +284,83 @@ describe('useAccountProvisioning createNewAccount', () => {
     cleanup();
   });
 
-  it('keeps a successfully verified account when the initial mailbox load fails', async () => {
+  it('resolves immediately after credential verification, without waiting for SyncImapHeaders', async () => {
     vi.useFakeTimers();
-    const created = makeAccount({ id: 7, email: 'ada@qq.com' });
-    const newAccountForm: AccountCreateInput = {
-      ...emptyAccountCreateForm,
-      email: created.email,
-      display_name: 'Ada',
-      provider: 'qq',
-      imap_host: 'imap.qq.com:993',
-      smtp_host: 'smtp.qq.com:587',
-      incoming_protocol: 'imap',
-      auth_type: 'password',
-    };
-    vi.mocked(invoke).mockImplementation(((command: string) => {
-      switch (command) {
-        case 'create_account':
-          return Promise.resolve(created);
-        case 'store_account_secret':
-          return Promise.resolve({ exists: true, status: 'stored', message: 'saved' });
-        case 'verify_account_credentials_with_secret':
-          return Promise.resolve({ authenticated: true, status: 'ok', message: 'verified' });
-        case 'sync_imap_headers':
-          return Promise.resolve({ status: 'ok', scanned_folders: 1, imported_messages: 0 });
-        default:
-          return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
-      }
-    }) as never);
-    const { utils, setters, loadMessages } = renderCreationHook(
-      newAccountForm,
-      vi.fn().mockRejectedValue(new Error('metadata unavailable')),
-    );
-
-    let result: Account | void = undefined;
-    await act(async () => {
-      const pending = utils.result.current.createNewAccount('mail-code');
-      await vi.runAllTimersAsync();
-      result = await pending;
+    // SyncImapHeaders 永不返回：createNewAccount 不应被它阻塞。
+    verifyInvoke({
+      sync_imap_headers: () => new Promise(() => undefined),
     });
+    const { utils } = renderCreationHook(newForm());
+
+    const result = await runCreate(utils, 'mail-code');
 
     expect(result).toEqual(created);
+    expect(invoke).not.toHaveBeenCalledWith('sync_imap_headers', expect.anything());
+    expect(invoke).not.toHaveBeenCalledWith('list_folders', expect.anything());
+  });
+
+  it('hands the verified account to onAccountCreated so the login gate closes and sync moves to background', async () => {
+    vi.useFakeTimers();
+    verifyInvoke();
+    const onAccountCreated = vi.fn();
+    const { utils } = renderCreationHook(newForm(), undefined, onAccountCreated);
+
+    const result = await runCreate(utils, 'mail-code');
+
+    expect(result).toEqual(created);
+    expect(onAccountCreated).toHaveBeenCalledWith(created);
+  });
+
+  it('keeps a successfully verified account even when the initial background sync fails (no rollback)', async () => {
+    vi.useFakeTimers();
+    verifyInvoke();
+    const { utils, setters } = renderCreationHook(newForm(), vi.fn().mockRejectedValue(new Error('metadata unavailable')));
+
+    const result = await runCreate(utils, 'mail-code');
+
+    expect(result).toEqual(created);
+    expect(invoke).not.toHaveBeenCalledWith('delete_account', expect.anything());
     expect(setters.setAccount).toHaveBeenCalledWith(created);
-    expect(setters.setAccounts).toHaveBeenCalledWith(expect.any(Function));
-    expect(loadMessages).not.toHaveBeenCalled();
-    expect(setters.setStatus).toHaveBeenCalledWith(
-      '邮箱账号已创建并完成登录验证，但初始数据加载失败：metadata unavailable',
-    );
+  });
+
+  it('rolls back the account when credential verification fails', async () => {
+    vi.useFakeTimers();
+    verifyInvoke({
+      verify_account_credentials_with_secret: () => Promise.resolve({
+        authenticated: false,
+        status: 'credential_error',
+        message: '授权码无效',
+      }),
+      delete_account: () => Promise.resolve(null),
+    });
+    const { utils, setters } = renderCreationHook(newForm());
+
+    const pending = utils.result.current.createNewAccount('bad-code');
+    const assertion = expect(pending).rejects.toThrow('授权码无效');
+    await act(async () => {
+      await vi.runAllTimersAsync();
+      await assertion;
+    });
+    expect(invoke).toHaveBeenCalledWith('delete_account', { accountId: 7 });
+    expect(setters.setAccount).not.toHaveBeenCalled();
+    expect(setters.setAccounts).not.toHaveBeenCalled();
+  });
+
+  it('rolls back the account when the credential store fails', async () => {
+    vi.useFakeTimers();
+    verifyInvoke({
+      store_account_secret: () => Promise.resolve({ exists: false, status: 'failed', message: '本地写入失败' }),
+      delete_account: () => Promise.resolve(null),
+    });
+    const { utils, setters } = renderCreationHook(newForm());
+
+    const pending = utils.result.current.createNewAccount('mail-code');
+    const assertion = expect(pending).rejects.toThrow('本地写入失败');
+    await act(async () => {
+      await vi.runAllTimersAsync();
+      await assertion;
+    });
+    expect(invoke).toHaveBeenCalledWith('delete_account', { accountId: 7 });
+    expect(setters.setAccount).not.toHaveBeenCalled();
   });
 });

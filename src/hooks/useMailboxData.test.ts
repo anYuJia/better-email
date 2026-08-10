@@ -1,5 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
 import { buildMailboxRequests } from './mailboxDataRequests';
+import useMailboxData from './useMailboxData';
+import { invoke } from '../tauriBridge';
+import type { MessageSummary } from '../app/types';
+
+vi.mock('../tauriBridge', () => ({
+  invoke: vi.fn(),
+}));
+
+const mockInvoke = vi.mocked(invoke);
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
+
+beforeEach(() => {
+  mockInvoke.mockReset();
+});
 
 describe('buildMailboxRequests', () => {
   it('keeps message and thread queries in the same scoped mailbox view', () => {
@@ -126,5 +150,70 @@ describe('buildMailboxRequests', () => {
         limit: 80,
       },
     });
+  });
+});
+
+describe('useMailboxData request guard', () => {
+  it('does not commit an A message response after the mailbox has switched to B', async () => {
+    const messagesResponse = deferred<MessageSummary[]>();
+    mockInvoke.mockImplementation((() => messagesResponse.promise) as never);
+    const mailboxRefreshRef = { current: 4 };
+    const setters = {
+      setMessages: vi.fn(),
+      setThreads: vi.fn(),
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    };
+    const { result, rerender } = renderHook(
+      ({ activeAccountScope }: { activeAccountScope: number | 'all' }) => useMailboxData({
+        accountScope: activeAccountScope,
+        currentAccountId: activeAccountScope === 'all' ? null : activeAccountScope,
+        folderId: 101,
+        searchScope: 'folder',
+        query: '',
+        filter: 'all',
+        listMode: 'messages',
+        listSort: 'newest',
+        folders: [],
+        imapMailboxes: [],
+        mailboxRefreshRef,
+        loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+        maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+        ...setters,
+      }),
+      { initialProps: { activeAccountScope: 1 } },
+    );
+
+    let loading!: Promise<MessageSummary[]>;
+    await act(async () => {
+      loading = result.current.loadMessages(
+        101,
+        '',
+        'all',
+        1,
+        4,
+        undefined,
+        'folder',
+        false,
+        { id: 4, scope: 1 },
+      );
+      await Promise.resolve();
+    });
+
+    mailboxRefreshRef.current += 1;
+    rerender({ activeAccountScope: 2 });
+    await act(async () => {
+      messagesResponse.resolve([]);
+      await loading;
+    });
+
+    expect(setters.setMessages).not.toHaveBeenCalled();
+    expect(setters.setThreads).not.toHaveBeenCalled();
+    expect(setters.setSelectedId).not.toHaveBeenCalled();
+    expect(setters.setSelectedMessageIds).not.toHaveBeenCalled();
   });
 });

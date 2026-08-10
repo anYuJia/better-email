@@ -183,6 +183,7 @@ export default function WindowChrome() {
   return (
     <div
       className={`window-chrome window-chrome-${platform}`}
+      data-window-chrome
       role="presentation"
     >
       <div

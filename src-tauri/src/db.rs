@@ -61,6 +61,9 @@ pub enum MailError {
     Smtp(String),
     #[error("{0}")]
     Imap(String),
+    /// 系统对话框被用户取消（另存为/选择文件等）：不是失败，调用方应保持现状。
+    #[error("操作已取消。")]
+    Cancelled,
 }
 
 impl serde::Serialize for MailError {
@@ -1706,6 +1709,7 @@ mod tests {
                     block_external_mailboxes: false,
                     intercept_https_links: true,
                     auto_download_attachments: false,
+                    warn_external_senders: false,
                 },
             )
             .unwrap();
@@ -1730,6 +1734,7 @@ mod tests {
                     block_external_mailboxes: false,
                     intercept_https_links: true,
                     auto_download_attachments: true,
+                    warn_external_senders: true,
                 },
             )
             .unwrap();
@@ -1811,6 +1816,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
 
@@ -1890,6 +1896,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
         let first_folders = store
@@ -2117,6 +2124,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
         let first_inbox = store
@@ -2239,6 +2247,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
 
@@ -2284,6 +2293,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
         store.set_default_account(second_account.id).unwrap();
@@ -2404,6 +2414,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap()
     }
@@ -2566,6 +2577,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
 
@@ -2640,6 +2652,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
         let third_account = store
@@ -2658,6 +2671,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                warn_external_senders: false,
             })
             .unwrap();
 
@@ -4394,12 +4408,14 @@ mod tests {
             .enqueue_background_task(BackgroundTaskInput {
                 kind: "sync".to_string(),
                 source: "manual".to_string(),
+                account_id: None,
             })
             .unwrap();
         let duplicate_sync = store
             .enqueue_background_task(BackgroundTaskInput {
                 kind: "sync".to_string(),
                 source: "timer".to_string(),
+                account_id: None,
             })
             .unwrap();
         assert_eq!(first_sync.id, duplicate_sync.id);
@@ -4409,6 +4425,7 @@ mod tests {
             .enqueue_background_task(BackgroundTaskInput {
                 kind: "outbox-smtp".to_string(),
                 source: "manual".to_string(),
+                account_id: None,
             })
             .unwrap();
         assert_ne!(first_sync.id, outbox_task.id);
@@ -4416,6 +4433,7 @@ mod tests {
             .enqueue_background_task(BackgroundTaskInput {
                 kind: "outbox-smtp".to_string(),
                 source: "timer".to_string(),
+                account_id: None,
             })
             .unwrap();
         assert_eq!(outbox_task.id, duplicate_outbox.id);
@@ -4434,7 +4452,8 @@ mod tests {
         assert!(!completed.finished_at.is_empty());
 
         let failed = store
-            .fail_background_task(outbox_task.id, "SMTP 失败")
+            .mark_background_task_running(outbox_task.id)
+            .and_then(|task| store.fail_background_task(task.id, "SMTP 失败"))
             .unwrap();
         assert_eq!(failed.status, "failed");
         assert_eq!(failed.message, "SMTP 失败");
@@ -4442,6 +4461,287 @@ mod tests {
         let tasks = store.list_background_tasks().unwrap();
         assert!(tasks.iter().any(|task| task.id == completed.id));
         assert!(tasks.iter().any(|task| task.id == failed.id));
+    }
+
+    #[test]
+    fn background_tasks_are_account_bound_cancellable_and_retryable() {
+        let store = test_store();
+        let account_a = store
+            .create_account(AccountCreateInput {
+                email: "a@example.com".to_string(),
+                display_name: "A".to_string(),
+                provider: "custom".to_string(),
+                imap_host: "imap.example.com:993".to_string(),
+                smtp_host: "smtp.example.com:587".to_string(),
+                incoming_protocol: "imap".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap();
+        let account_b = store
+            .create_account(AccountCreateInput {
+                email: "b@example.com".to_string(),
+                display_name: "B".to_string(),
+                provider: "custom".to_string(),
+                imap_host: "imap.example.com:993".to_string(),
+                smtp_host: "smtp.example.com:587".to_string(),
+                incoming_protocol: "imap".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap();
+
+        // 同账号去重，不同账号各自独立排队
+        let task_a1 = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "initial".to_string(),
+                account_id: Some(account_a.id),
+            })
+            .unwrap();
+        let task_a2 = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "manual".to_string(),
+                account_id: Some(account_a.id),
+            })
+            .unwrap();
+        assert_eq!(task_a1.id, task_a2.id);
+        assert_eq!(task_a1.account_id, Some(account_a.id));
+        assert_eq!(task_a1.title, "首次同步邮件头");
+        let task_b = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "initial".to_string(),
+                account_id: Some(account_b.id),
+            })
+            .unwrap();
+        assert_ne!(task_a1.id, task_b.id);
+
+        // 排队中取消
+        let cancelled = store.cancel_background_task(task_b.id).unwrap();
+        assert_eq!(cancelled.status, "cancelled");
+        assert_eq!(cancelled.message, "已取消");
+
+        // 重试后回到排队
+        let retried = store.retry_background_task(cancelled.id).unwrap();
+        assert_eq!(retried.status, "queued");
+        assert_eq!(retried.message, "等待执行");
+
+        // 运行中取消：请求标记 + 安全检查点消费
+        let running = store.mark_background_task_running(retried.id).unwrap();
+        let cancel_requested = store.cancel_background_task(running.id).unwrap();
+        assert!(cancel_requested.cancel_requested);
+        assert_eq!(cancel_requested.status, "running");
+        assert!(store.consume_background_task_cancel(retried.id).unwrap());
+        let consumed = store.get_background_task_by_id(retried.id).unwrap();
+        assert_eq!(consumed.status, "cancelled");
+        assert!(!consumed.cancel_requested);
+
+        // 已取消任务重试后取消请求被清除
+        let retried_again = store.retry_background_task(retried.id).unwrap();
+        assert_eq!(retried_again.status, "queued");
+        assert!(!retried_again.cancel_requested);
+    }
+
+    #[test]
+    fn background_task_transitions_are_atomic_against_cancellation() {
+        let store = test_store();
+        let queued = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "manual".to_string(),
+                account_id: None,
+            })
+            .unwrap();
+
+        // 竞态 1：queued 任务已被取消后，worker 不能再把它标记为 running。
+        let cancelled = store.cancel_background_task(queued.id).unwrap();
+        assert_eq!(cancelled.status, "cancelled");
+        let mark_result = store.mark_background_task_running(queued.id);
+        assert!(
+            mark_result.is_err(),
+            "已取消的 queued 任务不能被 worker 领取"
+        );
+        let still = store.get_background_task_by_id(queued.id).unwrap();
+        assert_eq!(still.status, "cancelled");
+
+        // 竞态 2：running 任务被请求取消后，不能把完整同步误标为 done。
+        let running = store
+            .mark_background_task_running(
+                store
+                    .enqueue_background_task(BackgroundTaskInput {
+                        kind: "sync".to_string(),
+                        source: "timer".to_string(),
+                        account_id: None,
+                    })
+                    .unwrap()
+                    .id,
+            )
+            .unwrap();
+        let cancel_requested = store.cancel_background_task(running.id).unwrap();
+        assert!(cancel_requested.cancel_requested);
+        assert_eq!(cancel_requested.status, "running");
+        assert!(store.background_task_cancel_requested(running.id).unwrap());
+        assert!(store
+            .complete_background_task(running.id, "同步完成")
+            .is_err());
+        assert!(store.fail_background_task(running.id, "同步失败").is_err());
+        let unchanged = store.get_background_task_by_id(running.id).unwrap();
+        assert_eq!(unchanged.status, "running");
+        assert!(unchanged.cancel_requested);
+        assert!(store.consume_background_task_cancel(running.id).unwrap());
+        let consumed = store.get_background_task_by_id(running.id).unwrap();
+        assert_eq!(consumed.status, "cancelled");
+        assert!(!consumed.cancel_requested);
+        assert!(!store.background_task_cancel_requested(running.id).unwrap());
+
+        // 竞态 3：正常完成的 running 任务不受影响。
+        let normal = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "manual".to_string(),
+                account_id: None,
+            })
+            .unwrap();
+        store.mark_background_task_running(normal.id).unwrap();
+        let done = store
+            .complete_background_task(normal.id, "同步完成")
+            .unwrap();
+        assert_eq!(done.status, "done");
+
+        // 进度只对 running 任务生效，完成后不再更新。
+        let progress = store
+            .enqueue_background_task(BackgroundTaskInput {
+                kind: "sync".to_string(),
+                source: "initial".to_string(),
+                account_id: None,
+            })
+            .unwrap();
+        store.mark_background_task_running(progress.id).unwrap();
+        let progressed = store
+            .update_background_task_progress(progress.id, 40, "正在同步文件夹 2/5")
+            .unwrap();
+        assert_eq!(progressed.progress, 40);
+        assert_eq!(progressed.message, "正在同步文件夹 2/5");
+        store
+            .complete_background_task(progress.id, "同步完成")
+            .unwrap();
+        let after_done = store
+            .update_background_task_progress(progress.id, 100, "不应更新")
+            .unwrap();
+        assert_eq!(after_done.progress, 40, "已完成任务不得再写入进度");
+        assert_eq!(after_done.status, "done");
+    }
+
+    #[test]
+    fn restart_recovery_marks_running_tasks_failed_and_keeps_queued() {
+        let path = test_database_path("better-email-restart");
+        let running_task = {
+            let store = MailStore::open_at_with_seed(path.clone(), false).unwrap();
+            let queued = store
+                .enqueue_background_task(BackgroundTaskInput {
+                    kind: "sync".to_string(),
+                    source: "initial".to_string(),
+                    account_id: None,
+                })
+                .unwrap();
+            store
+                .enqueue_background_task(BackgroundTaskInput {
+                    kind: "outbox-dry-run".to_string(),
+                    source: "manual".to_string(),
+                    account_id: None,
+                })
+                .unwrap();
+            store.mark_background_task_running(queued.id).unwrap()
+        };
+
+        // 模拟应用重启：重新打开数据库，运行中的任务转失败可重试，排队任务保留。
+        let reopened = MailStore::open_at_with_seed(path.clone(), false).unwrap();
+        let tasks = reopened.list_background_tasks().unwrap();
+        let recovered = tasks
+            .iter()
+            .find(|task| task.id == running_task.id)
+            .unwrap();
+        assert_eq!(recovered.status, "failed");
+        assert_eq!(recovered.message, "应用重启时中断，可重试");
+        let queued_after = tasks
+            .iter()
+            .filter(|task| task.id != running_task.id)
+            .find(|task| task.status == "queued");
+        assert!(queued_after.is_some(), "排队任务在重启后保留并可恢复");
+        let retried = reopened.retry_background_task(recovered.id).unwrap();
+        assert_eq!(retried.status, "queued");
+        assert!(!retried.cancel_requested);
+    }
+
+    #[test]
+    fn onboarding_completed_marks_only_new_accounts() {
+        let store = test_store();
+        let created = store
+            .create_account(AccountCreateInput {
+                email: "new@example.com".to_string(),
+                display_name: "New".to_string(),
+                provider: "custom".to_string(),
+                imap_host: "imap.example.com:993".to_string(),
+                smtp_host: "smtp.example.com:587".to_string(),
+                incoming_protocol: "imap".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap();
+        assert!(!created.onboarding_completed);
+        assert!(!created.warn_external_senders);
+
+        let updated = store
+            .update_account_settings_for(
+                Some(created.id),
+                AccountSettingsInput {
+                    display_name: "New".to_string(),
+                    provider: "custom".to_string(),
+                    imap_host: "imap.example.com:993".to_string(),
+                    smtp_host: "smtp.example.com:587".to_string(),
+                    incoming_protocol: "imap".to_string(),
+                    auth_type: "password".to_string(),
+                    sync_mode: "manual".to_string(),
+                    remote_images_allowed: false,
+                    signature: String::new(),
+                    cross_account_risk_warning: true,
+                    block_external_mailboxes: false,
+                    intercept_https_links: true,
+                    auto_download_attachments: false,
+                    warn_external_senders: true,
+                },
+            )
+            .unwrap();
+        assert!(updated.warn_external_senders);
+        assert!(!updated.onboarding_completed);
+
+        let marked = store
+            .set_account_onboarding_completed(created.id, true)
+            .unwrap();
+        assert!(marked.onboarding_completed);
     }
 
     #[test]

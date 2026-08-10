@@ -12,8 +12,8 @@ type AttachmentListProps = {
   errors: Record<number, string>;
   isDownloadingAll: boolean;
   onDownloadAll: () => void;
-  onDownload: (attachment: Attachment) => Promise<boolean>;
-  onPreview: (attachment: Attachment) => Promise<void>;
+  onDownload: (attachment: Attachment) => Promise<Attachment | null>;
+  onPreview: (attachment: Attachment, trigger?: HTMLElement | null) => Promise<void>;
   onOpen: (attachment: Attachment) => void;
   onContextMenu: (context: AttachmentContextMenu) => void;
 };
@@ -89,7 +89,7 @@ export default function AttachmentList({
                     title={attachment.local_path || attachment.filename}
                     disabled={downloading}
                     aria-busy={downloading}
-                    onClick={() => onPreview(attachment).catch(() => undefined)}
+                    onClick={(event) => onPreview(attachment, event.currentTarget).catch(() => undefined)}
                   >
                     预览
                   </button>

@@ -269,6 +269,15 @@ pub fn run() {
         .setup(|app| {
             let store = MailStore::open(app.handle())?;
             app.manage(store);
+            // 主窗口图标与 bundle.icon 使用同一份 v4 源资源：
+            // 无边框/透明窗口在 Windows 任务栏、Alt+Tab 需要显式设置图标。
+            if let Some(window) = app.get_webview_window("main") {
+                if let Ok(icon) =
+                    tauri::image::Image::from_bytes(include_bytes!("../icons/v4/icon.png"))
+                {
+                    let _ = window.set_icon(icon);
+                }
+            }
             if let Err(e) = setup_tray(app) {
                 eprintln!("Failed to setup tray: {:?}", e);
             }
@@ -295,6 +304,7 @@ pub fn run() {
             commands::delete_account,
             commands::remove_account,
             commands::update_account_settings,
+            commands::set_account_onboarding_completed,
             commands::list_folders,
             commands::create_custom_folder,
             commands::rename_custom_folder,
@@ -403,7 +413,12 @@ pub fn run() {
             commands::list_threads,
             commands::list_outbox,
             commands::enqueue_background_task,
+            commands::enqueue_account_background_task,
+            commands::retry_background_task,
+            commands::cancel_background_task,
+            commands::consume_background_task_cancel,
             commands::list_background_tasks,
+            commands::get_background_task,
             commands::next_background_task,
             commands::mark_background_task_running,
             commands::complete_background_task,

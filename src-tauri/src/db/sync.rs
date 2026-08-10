@@ -155,7 +155,8 @@ impl MailStore {
                 SELECT a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
                        a.signature, a.cross_account_risk_warning,
-                       a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments, a.is_default
+                       a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments,
+                       a.warn_external_senders, a.onboarding_completed, a.is_default
                 FROM accounts a
                 LEFT JOIN imap_mailboxes m ON m.account_id = a.id
                 GROUP BY a.id, a.email, a.display_name, a.provider, a.imap_host, a.smtp_host,

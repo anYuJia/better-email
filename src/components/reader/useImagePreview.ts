@@ -25,23 +25,69 @@ export default function useImagePreview(
   const [imagePreviewFit, setImagePreviewFit] = useState(true);
   const [imagePreviewPan, setImagePreviewPan] = useState({ x: 0, y: 0 });
   const [isImagePreviewPanning, setIsImagePreviewPanning] = useState(false);
+  const [imagePreviewLoading, setImagePreviewLoading] = useState(false);
+  const [imagePreviewError, setImagePreviewError] = useState<string | null>(null);
 
   const imagePreviewDragRef = useRef<{ x: number; y: number } | null>(null);
   const imagePreviewStageRef = useRef<HTMLDivElement | null>(null);
   const imagePreviewImageRef = useRef<HTMLImageElement | null>(null);
+  // 关闭后焦点恢复到打开前的图片元素（正文点击的 img）。
+  const imagePreviewFocusReturnRef = useRef<HTMLElement | null>(null);
+  const imagePreviewCloseRequestedRef = useRef(false);
+  // 右键菜单会在打开预览前卸载，不能把菜单项本身当作焦点恢复目标。
+  const imageContextMenuFocusReturnRef = useRef<HTMLElement | null>(null);
 
   const resetImagePreview = useCallback(() => {
     setImagePreviewZoom(1);
     setImagePreviewFit(true);
     setImagePreviewPan({ x: 0, y: 0 });
     setIsImagePreviewPanning(false);
+    setImagePreviewLoading(false);
+    setImagePreviewError(null);
     imagePreviewDragRef.current = null;
   }, []);
 
-  const openImagePreview = useCallback((image: PreviewImage) => {
-    setImagePreview(image);
+  const restoreImagePreviewFocus = useCallback(() => {
+    // React StrictMode 会对 effect 做一次开发期清理，只有真实关闭请求才恢复焦点。
+    if (!imagePreviewCloseRequestedRef.current) return;
+    imagePreviewCloseRequestedRef.current = false;
+    const focusReturn = imagePreviewFocusReturnRef.current;
+    imagePreviewFocusReturnRef.current = null;
+    if (!focusReturn?.isConnected) return;
+
+    // 邮件正文的 <img> 默认不在 Tab 顺序中。临时提供 programmatic focus，
+    // 然后恢复原 attribute，避免留下永久 tabindex="-1" 的 DOM 污染。
+    const originalTabIndex = focusReturn.getAttribute('tabindex');
+    const needsTemporaryTabIndex = originalTabIndex === null && focusReturn.tabIndex < 0;
+    if (needsTemporaryTabIndex) focusReturn.setAttribute('tabindex', '-1');
+    focusReturn.focus({ preventScroll: true });
+    if (needsTemporaryTabIndex) {
+      queueMicrotask(() => {
+        if (focusReturn.isConnected && focusReturn.getAttribute('tabindex') === '-1') {
+          focusReturn.removeAttribute('tabindex');
+        }
+      });
+    }
+  }, []);
+
+  const closeImagePreview = useCallback(() => {
+    imagePreviewCloseRequestedRef.current = true;
+    setImagePreview(null);
     resetImagePreview();
   }, [resetImagePreview]);
+
+  const openImagePreview = useCallback((image: PreviewImage, focusReturn?: Element | null) => {
+    imagePreviewCloseRequestedRef.current = false;
+    imagePreviewFocusReturnRef.current = focusReturn instanceof HTMLElement ? focusReturn : null;
+    setImagePreview(image);
+    resetImagePreview();
+    setImagePreviewLoading(true);
+  }, [resetImagePreview]);
+
+  const handleImagePreviewError = useCallback(() => {
+    setImagePreviewLoading(false);
+    setImagePreviewError('图片加载失败：地址无效或附件已不存在，请关闭后重试。');
+  }, []);
 
   const clampImagePreviewPan = useCallback((
     pan: { x: number; y: number },
@@ -83,11 +129,30 @@ export default function useImagePreview(
   }, [clampImagePreviewPan]);
 
   useEffect(() => {
+    // 模态期间底层不可交互：全局快捷键（写邮件等）不得穿透。
+    if (!imagePreview) return undefined;
+    const previousModal = document.body.dataset.imagePreviewModal;
+    document.body.dataset.imagePreviewModal = '1';
+    return () => {
+      if (previousModal === undefined) {
+        delete document.body.dataset.imagePreviewModal;
+      } else {
+        document.body.dataset.imagePreviewModal = previousModal;
+      }
+    };
+  }, [imagePreview]);
+
+  useEffect(() => {
     if (!imagePreview && !imageContextMenu && !attachmentContextMenu) return undefined;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setImagePreview(null);
+        // 预览/上下文菜单是当前的模态交互。先在捕获阶段消费 Escape，
+        // 避免 Settings、ContextMenu 等窗口级监听器同时关闭底层界面。
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        closeImagePreview();
         setImageContextMenu(null);
         setAttachmentContextMenu(null);
       }
@@ -126,8 +191,8 @@ export default function useImagePreview(
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [
     imagePreview,
     imageContextMenu,
@@ -135,6 +200,7 @@ export default function useImagePreview(
     zoomImagePreview,
     resetImagePreview,
     updateImagePreviewPan,
+    closeImagePreview,
     setImageContextMenu,
     setAttachmentContextMenu,
   ]);
@@ -210,12 +276,21 @@ export default function useImagePreview(
   }, [imageContextMenu, downloadImage, setImageContextMenu]);
 
   const saveImageAs = useCallback(async (image: PreviewImage) => {
-    if (image.attachmentId) {
-      await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: image.attachmentId });
-      return;
+    try {
+      if (image.attachmentId) {
+        await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: image.attachmentId });
+        return;
+      }
+      downloadImage(image);
+    } catch (error) {
+      const message = (error instanceof Error ? error.message : String(error))
+        .replace(/^Error:\s*/i, '')
+        .trim();
+      // 用户取消系统「另存为」对话框不是失败：保持当前预览不变，不进入错误态。
+      if (/已取消|cancelled|canceled/i.test(message)) return;
+      setImagePreviewError(message || '图片另存为失败，请重试。');
     }
-    downloadImage(image);
-  }, [downloadImage]);
+  }, [downloadImage, setImagePreviewError]);
 
   const savePreviewImageAs = useCallback(async () => {
     if (!imageContextMenu) return;
@@ -277,27 +352,36 @@ export default function useImagePreview(
 
   const handleReaderHtmlClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.nativeEvent.composedPath ? event.nativeEvent.composedPath()[0] : event.target;
+    const imageElement = target instanceof Element ? target.closest('img') : null;
     const image = imageFromEventTarget(target);
     if (!image) return;
 
     event.preventDefault();
     setImageContextMenu(null);
-    openImagePreview(image);
+    openImagePreview(image, imageElement);
   }, [imageFromEventTarget, openImagePreview, setImageContextMenu]);
 
   const handleReaderHtmlContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.nativeEvent.composedPath ? event.nativeEvent.composedPath()[0] : event.target;
+    const imageElement = target instanceof Element ? target.closest('img') : null;
     const image = imageFromEventTarget(target);
     if (!image) return;
 
     event.preventDefault();
     event.stopPropagation();
+    imageContextMenuFocusReturnRef.current = imageElement instanceof HTMLElement ? imageElement : null;
     setImageContextMenu({
       ...image,
       x: Math.min(event.clientX, window.innerWidth - 188),
       y: Math.min(event.clientY, window.innerHeight - 132),
     });
   }, [imageFromEventTarget, setImageContextMenu]);
+
+  const openImagePreviewFromContextMenu = useCallback((image: PreviewImage) => {
+    const trigger = imageContextMenuFocusReturnRef.current;
+    imageContextMenuFocusReturnRef.current = null;
+    openImagePreview(image, trigger);
+  }, [openImagePreview]);
 
   const zoomIn = useCallback(() => {
     zoomImagePreview(IMAGE_PREVIEW_BUTTON_ZOOM_STEP);
@@ -314,6 +398,8 @@ export default function useImagePreview(
   }, []);
 
   const handleImageLoad = useCallback(() => {
+    setImagePreviewLoading(false);
+    setImagePreviewError(null);
     setImagePreviewPan((pan) => clampImagePreviewPan(pan));
   }, [clampImagePreviewPan]);
 
@@ -324,15 +410,21 @@ export default function useImagePreview(
     imagePreviewFit,
     imagePreviewPan,
     isImagePreviewPanning,
+    imagePreviewLoading,
+    imagePreviewError,
     imagePreviewStageRef,
     imagePreviewImageRef,
     openImagePreview,
+    openImagePreviewFromContextMenu,
+    closeImagePreview,
+    restoreImagePreviewFocus,
     resetImagePreview,
     zoomImagePreview,
     zoomIn,
     zoomOut,
     showOriginalSize,
     handleImageLoad,
+    handleImagePreviewError,
     handleImagePreviewWheel,
     handleImagePreviewPointerDown,
     handleImagePreviewPointerMove,

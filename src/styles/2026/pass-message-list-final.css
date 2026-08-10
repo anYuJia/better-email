@@ -242,53 +242,6 @@
   text-rendering: geometricPrecision;
 }
 
-.global-tooltip.is-top::after,
-.global-tooltip.is-bottom::after {
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.global-tooltip.is-left::after,
-.global-tooltip.is-right::after {
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  transform: translateY(-50%) rotate(45deg);
-}
-
-.global-tooltip::after {
-  position: absolute;
-  border: inherit;
-  background: inherit;
-  content: "";
-}
-
-.global-tooltip.is-top::after {
-  bottom: -5px;
-  border-top: 0;
-  border-left: 0;
-}
-
-.global-tooltip.is-bottom::after {
-  top: -5px;
-  border-right: 0;
-  border-bottom: 0;
-}
-
-.global-tooltip.is-left::after {
-  right: -5px;
-  border-top: 0;
-  border-right: 0;
-}
-
-.global-tooltip.is-right::after {
-  left: -5px;
-  border-bottom: 0;
-  border-left: 0;
-}
-
 @keyframes global-tooltip-in {
   from {
     opacity: 0;

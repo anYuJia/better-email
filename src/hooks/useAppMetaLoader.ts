@@ -1,4 +1,4 @@
-import { useRef, type Dispatch, type SetStateAction } from 'react';
+import { useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import {
   invoke,
   getCurrentWindow,
@@ -23,8 +23,23 @@ import type {
 import { flowInfo, flowWarn } from '../app/logger';
 import { IPC } from '../ipc/commands';
 
+/**
+ * A mailbox view generation captured before an asynchronous refresh starts.
+ *
+ * `id` comes from the app-wide mailboxRefreshRef.  Keeping the scope beside it
+ * matters because a new account view may be rendered before an older request
+ * resolves; the old request must then be allowed to finish without committing
+ * its result into the new view.
+ */
+export type MailboxRefreshRequest = {
+  id: number;
+  scope: AccountScope;
+};
+
 export type LoadMetaOptions = {
   mode?: 'full' | 'mailbox';
+  /** Only commit mailbox state while this request still matches the active view. */
+  mailboxRequest?: MailboxRefreshRequest;
 };
 
 export type LoadMetaResult = {
@@ -35,6 +50,7 @@ export type LoadMetaResult = {
 type UseAppMetaLoaderOptions = {
   folderId: number | null;
   accountScope: AccountScope;
+  mailboxRefreshRef?: MutableRefObject<number>;
   setAccounts: Dispatch<SetStateAction<Account[]>>;
   setAccount: Dispatch<SetStateAction<Account | null>>;
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
@@ -72,6 +88,7 @@ function accountIdForScope(scope: AccountScope): number | null {
 export default function useAppMetaLoader({
   folderId,
   accountScope,
+  mailboxRefreshRef,
   setAccounts,
   setAccount,
   setAccountForm,
@@ -94,6 +111,19 @@ export default function useAppMetaLoader({
   onAccountListLoaded,
 }: UseAppMetaLoaderOptions) {
   const benchmarkSyncRef = useRef(false);
+  // State setters below intentionally run only after all metadata queries
+  // settle.  This ref lets those delayed commits compare themselves with the
+  // newest rendered mailbox scope rather than the closure that started them.
+  const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
+  activeMailboxScopeRef.current = accountScope;
+
+  function isMailboxRefreshCurrent(mailboxRequest?: MailboxRefreshRequest): boolean {
+    if (!mailboxRequest) return true;
+    return (
+      mailboxRequest.scope === activeMailboxScopeRef.current
+      && (!mailboxRefreshRef || mailboxRequest.id === mailboxRefreshRef.current)
+    );
+  }
 
   async function releaseDueSnoozedMessages() {
     const result = await invoke<{ released_count: number }>(IPC.ReleaseDueSnoozedMessages, { now: new Date().toISOString() });
@@ -108,11 +138,20 @@ export default function useAppMetaLoader({
     const startedAt = performance.now();
     const nextAccountId = accountIdForScope(nextScope);
     const mode = options.mode ?? 'full';
+    const mailboxRequest = options.mailboxRequest;
+    const shouldCommitMailboxResult = () => (
+      !mailboxRequest
+      || (
+        mailboxRequest.scope === nextScope
+        && isMailboxRefreshCurrent(mailboxRequest)
+      )
+    );
     appFlowLog('loadMeta start', {
       requestedFolderId: nextFolderId,
       scope: nextScope,
       accountId: nextAccountId,
       mode,
+      mailboxRefreshId: mailboxRequest?.id ?? null,
     });
     try {
       const nextAccountsPromise = invoke<Account[]>(IPC.ListAccounts).then((nextAccounts) => {
@@ -151,6 +190,21 @@ export default function useAppMetaLoader({
           invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: nextAccountId }),
           invoke<ImapMailboxState[]>(IPC.ListImapMailboxes),
         ]);
+        const resolvedFolderId =
+          nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
+            ? nextFolderId
+            : nextFolders[0]?.id ?? null;
+        if (!shouldCommitMailboxResult()) {
+          appFlowLog('loadMeta ignored stale mailbox result', {
+            requestedFolderId: nextFolderId,
+            requestedScope: nextScope,
+            currentScope: activeMailboxScopeRef.current,
+            mailboxRefreshId: mailboxRequest?.id ?? null,
+            currentMailboxRefreshId: mailboxRefreshRef?.current ?? null,
+            mode,
+          });
+          return { folderId: resolvedFolderId, folders: nextFolders };
+        }
         if (released.released_count > 0) {
           setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
         }
@@ -166,11 +220,7 @@ export default function useAppMetaLoader({
         setSyncSchedulePlan(nextSyncSchedulePlan);
         setRemoteImageTrusts(nextRemoteImageTrusts);
         setImapMailboxes(nextImapMailboxes);
-        void updateAppUnreadBadge(nextStats.unread_messages);
-        const resolvedFolderId =
-          nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
-            ? nextFolderId
-            : nextFolders[0]?.id ?? null;
+        void updateAppUnreadBadge(nextStats.unread_messages, mailboxRequest);
         setFolderId(resolvedFolderId);
         appFlowLog('loadMeta done', {
           accountCount: nextAccounts.length,
@@ -218,6 +268,21 @@ export default function useAppMetaLoader({
         invoke<ImapMailboxState[]>(IPC.ListImapMailboxes),
         invoke<OAuthSession[]>(IPC.ListOauthSessions),
       ]);
+      const resolvedFolderId =
+        nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
+          ? nextFolderId
+          : nextFolders[0]?.id ?? null;
+      if (!shouldCommitMailboxResult()) {
+        appFlowLog('loadMeta ignored stale mailbox result', {
+          requestedFolderId: nextFolderId,
+          requestedScope: nextScope,
+          currentScope: activeMailboxScopeRef.current,
+          mailboxRefreshId: mailboxRequest?.id ?? null,
+          currentMailboxRefreshId: mailboxRefreshRef?.current ?? null,
+          mode,
+        });
+        return { folderId: resolvedFolderId, folders: nextFolders };
+      }
       if (released.released_count > 0) {
         setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
       }
@@ -236,11 +301,7 @@ export default function useAppMetaLoader({
       setRemoteImageTrusts(nextRemoteImageTrusts);
       setImapMailboxes(nextImapMailboxes);
       setOauthSessions(nextOauthSessions);
-      void updateAppUnreadBadge(nextStats.unread_messages);
-      const resolvedFolderId =
-        nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)
-          ? nextFolderId
-          : nextFolders[0]?.id ?? null;
+      void updateAppUnreadBadge(nextStats.unread_messages, mailboxRequest);
       setFolderId(resolvedFolderId);
       appFlowLog('loadMeta done', {
         accountCount: nextAccounts.length,
@@ -263,15 +324,23 @@ export default function useAppMetaLoader({
     }
   }
 
-  async function updateAppUnreadBadge(unreadCount: number) {
+  async function updateAppUnreadBadge(
+    unreadCount: number,
+    mailboxRequest?: MailboxRefreshRequest,
+  ) {
+    if (!isMailboxRefreshCurrent(mailboxRequest)) return;
     try {
       await getCurrentWindow().setBadgeCount(unreadCount > 0 ? unreadCount : undefined);
+      if (!isMailboxRefreshCurrent(mailboxRequest)) return;
       setAppBadgeStatus(unreadCount > 0 ? `应用角标 ${unreadCount}` : '应用角标已清除');
     } catch {
-      setAppBadgeStatus('当前平台不支持应用角标');
+      if (isMailboxRefreshCurrent(mailboxRequest)) {
+        setAppBadgeStatus('当前平台不支持应用角标');
+      }
     }
 
     try {
+      if (!isMailboxRefreshCurrent(mailboxRequest)) return;
       await invoke(IPC.SetTrayUnreadCount, { unreadCount });
     } catch (error) {
       console.warn('Failed to update tray unread count:', error);

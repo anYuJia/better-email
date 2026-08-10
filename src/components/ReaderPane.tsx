@@ -60,6 +60,7 @@ export type ReaderPaneProps = {
   selectedHasRemoteImageWarning: boolean;
   selectedSenderIsExternal: boolean;
   selectedExternalBlocked: boolean;
+  selectedWarnExternalSender: boolean;
   selectedInterceptsHttps: boolean;
   onOpenHttpsLink: (href: string) => void;
   quickReplyBody: string;
@@ -95,7 +96,7 @@ export type ReaderPaneProps = {
   onUpdateLabel?: (id: number, name: string, color: string) => Promise<void>;
   onDeleteLabel?: (id: number) => Promise<void>;
   onOpenAttachment: (attachment: Attachment) => void;
-  onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
+  onDownloadAttachment: (attachment: Attachment) => void | Promise<Attachment | null | undefined>;
   onSaveAttachmentAs: (attachment: Attachment) => void;
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
@@ -119,6 +120,7 @@ function ReaderPane({
   selectedHasRemoteImageWarning,
   selectedSenderIsExternal,
   selectedExternalBlocked,
+  selectedWarnExternalSender,
   selectedInterceptsHttps,
   onOpenHttpsLink,
   quickReplyBody,
@@ -185,19 +187,24 @@ function ReaderPane({
 
   const {
     imagePreview,
-    setImagePreview,
     imagePreviewZoom,
     imagePreviewFit,
     imagePreviewPan,
     isImagePreviewPanning,
+    imagePreviewLoading,
+    imagePreviewError,
     imagePreviewStageRef,
     imagePreviewImageRef,
     openImagePreview,
+    openImagePreviewFromContextMenu,
+    closeImagePreview,
+    restoreImagePreviewFocus,
     resetImagePreview,
     zoomIn,
     zoomOut,
     showOriginalSize,
     handleImageLoad,
+    handleImagePreviewError,
     handleImagePreviewWheel,
     handleImagePreviewPointerDown,
     handleImagePreviewPointerMove,
@@ -450,6 +457,7 @@ if (activeThread && threadMessages.length > 0) {
           selectedSenderDomain={selectedSenderDomain}
           selectedSenderIsExternal={selectedSenderIsExternal}
           selectedExternalBlocked={selectedExternalBlocked}
+          selectedWarnExternalSender={selectedWarnExternalSender}
           showLinkAction={Boolean(selectedInterceptsHttps && selectedHasLinks)}
           linkActionLabel={linksRevealed ? '隐藏链接' : '查看链接'}
           onLinkAction={() => setLinksRevealed((current) => !current)}
@@ -498,6 +506,8 @@ if (activeThread && threadMessages.length > 0) {
           imagePreviewFit={imagePreviewFit}
           imagePreviewZoom={imagePreviewZoom}
           imagePreviewPan={imagePreviewPan}
+          imagePreviewLoading={imagePreviewLoading}
+          imagePreviewError={imagePreviewError}
           imagePreviewStageRef={imagePreviewStageRef}
           imagePreviewImageRef={imagePreviewImageRef}
           zoomIn={zoomIn}
@@ -507,18 +517,20 @@ if (activeThread && threadMessages.length > 0) {
           saveImageAs={saveImageAs}
           downloadImage={downloadImage}
           handleImageLoad={handleImageLoad}
+          handleImagePreviewError={handleImagePreviewError}
           handleImagePreviewWheel={handleImagePreviewWheel}
           handleImagePreviewPointerDown={handleImagePreviewPointerDown}
           handleImagePreviewPointerMove={handleImagePreviewPointerMove}
           stopImagePreviewPanning={stopImagePreviewPanning}
           isPanning={isImagePreviewPanning}
-          onClose={() => setImagePreview(null)}
+          onClose={closeImagePreview}
+          onBackgroundRestored={restoreImagePreviewFocus}
         />
       )}
       {imageContextMenu && (
         <ImageContextMenuOverlay
           imageContextMenu={imageContextMenu}
-          openImagePreview={openImagePreview}
+          openImagePreview={openImagePreviewFromContextMenu}
           setImageContextMenu={setImageContextMenu}
           savePreviewImageAs={savePreviewImageAs}
           downloadPreviewImage={downloadPreviewImage}

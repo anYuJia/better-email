@@ -6,7 +6,7 @@ impl MailStore {
     pub fn list_accounts(&self) -> MailResult<Vec<Account>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, onboarding_completed, is_default
                  FROM accounts ORDER BY is_default DESC, id",
             )?;
             let accounts = stmt
@@ -176,8 +176,8 @@ impl MailStore {
                 conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| row.get::<_, bool>(0))?;
             let now = Utc::now().to_rfc3339();
             conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, is_default, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, is_default, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                 params![
                     email,
                     display_name,
@@ -193,6 +193,7 @@ impl MailStore {
                     bool_to_int(input.block_external_mailboxes),
                     bool_to_int(input.intercept_https_links),
                     bool_to_int(input.auto_download_attachments),
+                    bool_to_int(input.warn_external_senders),
                     bool_to_int(is_default),
                     now
                 ],
@@ -311,7 +312,7 @@ impl MailStore {
                  SET display_name = ?1, provider = ?2, imap_host = ?3, smtp_host = ?4,
                      incoming_protocol = ?5, auth_type = ?6, sync_mode = ?7, remote_images_allowed = ?8, signature = ?9,
                      cross_account_risk_warning = ?11, block_external_mailboxes = ?12, intercept_https_links = ?13,
-                     auto_download_attachments = ?14
+                     auto_download_attachments = ?14, warn_external_senders = ?15
                  WHERE id = ?10",
                 params![
                     input.display_name.trim(),
@@ -327,7 +328,8 @@ impl MailStore {
                     bool_to_int(input.cross_account_risk_warning),
                     bool_to_int(input.block_external_mailboxes),
                     bool_to_int(input.intercept_https_links),
-                    bool_to_int(input.auto_download_attachments)
+                    bool_to_int(input.auto_download_attachments),
+                    bool_to_int(input.warn_external_senders)
                 ],
             )?;
             upsert_account_default_identity_conn(
@@ -338,6 +340,21 @@ impl MailStore {
                 &input.signature,
             )?;
             account_for_conn(conn, Some(account.id))
+        })
+    }
+    /// 首次引导生命周期状态：只有用户「完成」或「跳过全部」后才标记完成。
+    pub fn set_account_onboarding_completed(
+        &self,
+        account_id: i64,
+        completed: bool,
+    ) -> MailResult<Account> {
+        self.with_conn(|conn| {
+            account_for_conn(conn, Some(account_id))?;
+            conn.execute(
+                "UPDATE accounts SET onboarding_completed = ?1 WHERE id = ?2",
+                params![bool_to_int(completed), account_id],
+            )?;
+            account_for_conn(conn, Some(account_id))
         })
     }
     pub fn list_identities_for_account(
@@ -437,7 +454,9 @@ pub(super) fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> 
         block_external_mailboxes: row.get::<_, i64>(12)? != 0,
         intercept_https_links: row.get::<_, i64>(13)? != 0,
         auto_download_attachments: row.get::<_, i64>(14)? != 0,
-        is_default: row.get::<_, i64>(15)? != 0,
+        warn_external_senders: row.get::<_, i64>(15)? != 0,
+        onboarding_completed: row.get::<_, i64>(16)? != 0,
+        is_default: row.get::<_, i64>(17)? != 0,
     })
 }
 pub(super) fn normalize_identity_email(value: &str) -> MailResult<String> {
@@ -688,7 +707,7 @@ pub(super) fn account_for_conn_optional(
     if let Some(account_id) = account_id {
         return conn
             .query_row(
-                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, is_default
+                "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, onboarding_completed, is_default
                  FROM accounts WHERE id = ?1",
                 params![account_id],
                 map_account,
@@ -698,7 +717,7 @@ pub(super) fn account_for_conn_optional(
     }
 
     conn.query_row(
-        "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, is_default
+        "SELECT id, email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, onboarding_completed, is_default
          FROM accounts ORDER BY is_default DESC, id LIMIT 1",
         [],
         map_account,

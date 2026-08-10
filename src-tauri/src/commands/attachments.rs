@@ -85,7 +85,7 @@ pub async fn save_image_data_url_as(
 
     let Some(target_path) = prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename))?
     else {
-        return Err(crate::db::MailError::Imap("已取消图片另存为。".to_string()));
+        return Err(crate::db::MailError::Cancelled);
     };
 
     if let Some(parent) = target_path.parent() {
@@ -504,7 +504,7 @@ pub async fn save_attachment_as(
     let Some(target_path) =
         prompt_save_file_path(&app, "另存附件", sanitize_filename(&attachment.filename))?
     else {
-        return Err(crate::db::MailError::Imap("已取消附件另存为。".to_string()));
+        return Err(crate::db::MailError::Cancelled);
     };
 
     if let Some(parent) = target_path.parent() {

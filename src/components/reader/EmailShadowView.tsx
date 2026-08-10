@@ -9,17 +9,30 @@ function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean) 
   contentDiv.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
     const href = anchor.getAttribute('href') ?? '';
     if (!isWebLink(href)) return;
+    const hasImageContent = Boolean(anchor.querySelector('img'));
     if (linksHidden) {
       if (anchor.dataset.betterEmailHref) return;
       anchor.dataset.betterEmailHref = href;
       anchor.removeAttribute('href');
-      anchor.textContent = '已隐藏链接';
       anchor.setAttribute('data-better-email-hidden-link', 'true');
+      if (hasImageContent) {
+        // 链接目标需要隐藏，但绝不能通过 textContent 覆盖掉图片本身。
+        // 无 href 的图片容器不再导航，点击会冒泡给宿主的图片预览逻辑。
+        anchor.setAttribute('data-better-email-hidden-image-link', 'true');
+        anchor.setAttribute('aria-label', '已隐藏链接中的图片');
+      } else {
+        anchor.textContent = '已隐藏链接';
+      }
     } else {
       const originalHref = anchor.dataset.betterEmailHref;
       if (!originalHref) return;
       anchor.setAttribute('href', originalHref);
-      anchor.textContent = originalHref;
+      if (!hasImageContent) {
+        anchor.textContent = originalHref;
+      } else {
+        anchor.removeAttribute('data-better-email-hidden-image-link');
+        anchor.removeAttribute('aria-label');
+      }
       delete anchor.dataset.betterEmailHref;
       anchor.removeAttribute('data-better-email-hidden-link');
     }
@@ -127,6 +140,13 @@ export default function EmailShadowView({
 
     const handleLinkClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      // 点击链接内的图片时，目标是图片本身：必须把事件放行到宿主层，
+      // 由 useImagePreview 优先进入图片预览。只阻止 a 的原生导航，不停止
+      // 冒泡，否则图片会在预览打开后仍意外跳转到远程链接。
+      if (target instanceof Element && target.closest('img')) {
+        event.preventDefault();
+        return;
+      }
       const anchor = target.closest('a');
       if (anchor) {
         const href = anchor.getAttribute('href');

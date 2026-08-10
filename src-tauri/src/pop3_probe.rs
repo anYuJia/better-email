@@ -242,6 +242,8 @@ mod tests {
             block_external_mailboxes: false,
             intercept_https_links: true,
             auto_download_attachments: false,
+            warn_external_senders: false,
+            onboarding_completed: false,
             is_default: true,
         };
         let result = Pop3Client::connect(&account);

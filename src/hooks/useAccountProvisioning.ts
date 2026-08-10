@@ -4,7 +4,6 @@ import {
   formatInvokeError,
   handleAccountDeleteFlow,
   maskEmailForLog,
-  shouldRunInitialMailboxSync,
 } from '../app/accountConnectionFlows';
 import type {
   Account,
@@ -17,7 +16,6 @@ import type {
   Folder,
   MessageSummary,
   SearchScope,
-  SyncRun,
 } from '../app/types';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
@@ -42,8 +40,9 @@ type AccountProvisioningOptions = {
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   setCredentialStatus: Dispatch<SetStateAction<CredentialStatus | null>>;
   setCredentialVerification: Dispatch<SetStateAction<CredentialVerificationReport | null>>;
-  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  /** 凭据验证成功后立即回调（登录遮罩随即关闭，同步转入后台任务）。 */
+  onAccountCreated?: (account: Account) => void;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -85,8 +84,8 @@ export default function useAccountProvisioning({
   setSettingsOpen,
   setCredentialStatus,
   setCredentialVerification,
-  setSyncRuns,
   setStatus,
+  onAccountCreated,
   loadMeta,
   loadMessages,
 }: AccountProvisioningOptions) {
@@ -105,7 +104,6 @@ export default function useAccountProvisioning({
     });
     try {
       onProgress?.('正在创建本地邮箱账号...');
-      await new Promise((resolve) => setTimeout(resolve, 600));
       const created = await invoke<Account>(IPC.CreateAccount, { input: newAccountForm });
       accountFlowLog('create account stored', {
         accountId: created.id,
@@ -115,7 +113,6 @@ export default function useAccountProvisioning({
       let verification: CredentialVerificationReport | null = null;
       if (trimmedSecret) {
         onProgress?.('正在保存本机本地凭据...');
-        await new Promise((resolve) => setTimeout(resolve, 600));
         const credentialResult = await invoke<CredentialStatus>(IPC.StoreAccountSecret, {
           input: { account_email: created.email, secret: trimmedSecret },
         });
@@ -144,7 +141,6 @@ export default function useAccountProvisioning({
           throw new Error(credentialResult.message);
         }
         onProgress?.('正在连接服务器验证登录凭据...');
-        await new Promise((resolve) => setTimeout(resolve, 600));
         verification = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentialsWithSecret, {
           input: {
             account_id: created.id,
@@ -185,53 +181,16 @@ export default function useAccountProvisioning({
       setMessages([]);
       setSelectedId(null);
       setAttachments([]);
-      if (shouldRunInitialMailboxSync(created.incoming_protocol, Boolean(trimmedSecret), Boolean(verification?.authenticated))) {
-        accountFlowLog('initial mailbox sync start', {
-          accountId: created.id,
-          email: maskEmailForLog(created.email),
-          protocol: created.incoming_protocol,
-        });
-        try {
-          onProgress?.('已成功登录！正在同步服务器邮件列表...');
-          await new Promise((resolve) => setTimeout(resolve, 600));
-          const syncRun = await invoke<SyncRun>(IPC.SyncImapHeaders, {
-            accountId: created.id,
-          });
-          setSyncRuns?.((current) => [syncRun, ...current].slice(0, 10));
-          accountFlowLog('initial mailbox sync done', {
-            accountId: created.id,
-            status: syncRun.status,
-            scannedFolders: syncRun.scanned_folders,
-            importedMessages: syncRun.imported_messages,
-          });
-        } catch (syncError) {
-          accountFlowWarn('initial mailbox sync failed', {
-            accountId: created.id,
-            email: maskEmailForLog(created.email),
-            error: syncError instanceof Error ? syncError.message : String(syncError),
-          });
-        }
-      }
-      onProgress?.('已完成邮件同步，正在加载界面数据...');
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      try {
-        const { folderId: nextFolderId, folders: nextFolders } = await loadMeta(null, created.id);
-        accountFlowLog('metadata loaded after create', {
-          accountId: created.id,
-          folderId: nextFolderId,
-          folderCount: nextFolders.length,
-        });
-        await loadMessages(nextFolderId, '', 'all', created.id, undefined, undefined, 'account');
-        setStatus(`已创建邮箱账号：${created.email}${trimmedSecret ? '，并完成登录验证' : ''}`);
-      } catch (initialLoadError) {
-        const message = formatInvokeError(initialLoadError);
-        accountFlowWarn('initial mailbox data load failed after create', {
-          accountId: created.id,
-          email: maskEmailForLog(created.email),
-          error: message,
-        });
-        setStatus(`邮箱账号已创建${trimmedSecret ? '并完成登录验证' : ''}，但初始数据加载失败：${message}`);
-      }
+      // 凭据验证已通过：登录遮罩立即结束。
+      // 文件夹发现 / 邮件头同步 / 正文预取 / 元数据与列表刷新全部转入
+      // 绑定该 account_id 的后台任务渐进执行，不再阻塞首次进入应用。
+      accountFlowLog('credential verified, initial sync delegated to background task', {
+        accountId: created.id,
+        email: maskEmailForLog(created.email),
+        protocol: created.incoming_protocol,
+      });
+      onAccountCreated?.(created);
+      onProgress?.('登录验证通过，正在进入应用...');
       return created;
     } catch (error) {
       accountFlowWarn('create failed', {
@@ -242,6 +201,7 @@ export default function useAccountProvisioning({
     }
   }, [
     newAccountForm,
+    onAccountCreated,
     setAccount,
     setAccountForm,
     setAccountScope,
@@ -254,9 +214,6 @@ export default function useAccountProvisioning({
     setNewAccountForm,
     setSelectedId,
     setStatus,
-    setSyncRuns,
-    loadMeta,
-    loadMessages,
   ]);
 
   const removeCurrentAccount = useCallback(async (deleteSecret: boolean) => {

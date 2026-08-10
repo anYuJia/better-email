@@ -47,11 +47,13 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function backgroundTaskTitle(kind: BackgroundTaskKind, source: 'manual' | 'timer' = 'manual'): string {
-  const manual = source === 'manual';
-  if (kind === 'sync') return manual ? '手动同步全部邮箱' : '定时同步全部邮箱';
-  if (kind === 'outbox-dry-run') return manual ? '手动演练发件箱发送' : '定时演练发件箱发送';
-  return manual ? '手动发送发件箱邮件' : '定时发送发件箱邮件';
+export function backgroundTaskTitle(kind: BackgroundTaskKind, source: 'manual' | 'timer' | 'initial' = 'manual'): string {
+  if (kind === 'sync') {
+    if (source === 'initial') return '首次同步邮件头';
+    return source === 'manual' ? '手动同步全部邮箱' : '定时同步全部邮箱';
+  }
+  if (kind === 'outbox-dry-run') return source === 'manual' ? '手动演练发件箱发送' : '定时演练发件箱发送';
+  return source === 'manual' ? '手动发送发件箱邮件' : '定时发送发件箱邮件';
 }
 
 export function readAppStorage(key: string): string | null {

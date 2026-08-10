@@ -84,6 +84,24 @@ describe('AccountLoginDialog', () => {
     expect(background.hasAttribute('inert')).toBe(false);
   });
 
+  it('keeps the Windows window chrome close button visible and clickable above the login gate', () => {
+    const closeHandler = vi.fn();
+    render(
+      <>
+        <div data-window-chrome>
+          <button type="button" onClick={closeHandler}>关闭窗口</button>
+        </div>
+        <LoginHarness />
+      </>,
+    );
+    const closeButton = screen.getByRole('button', { name: '关闭窗口' });
+
+    expect(closeButton.hasAttribute('inert')).toBe(false);
+    expect(closeButton.getAttribute('aria-hidden')).toBeNull();
+    fireEvent.click(closeButton);
+    expect(closeHandler).toHaveBeenCalledTimes(1);
+  });
+
   it('finishes submitting under React StrictMode', async () => {
     const onSubmit = vi.fn(async () => undefined);
     render(

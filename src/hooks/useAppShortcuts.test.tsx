@@ -84,4 +84,30 @@ describe('useAppShortcuts text selection boundary', () => {
     expect(options.composeNew).not.toHaveBeenCalled();
     expect(options.openShortcuts).not.toHaveBeenCalled();
   });
+
+  it('ignores app shortcuts while the first-run onboarding gate is active', () => {
+    // App 层把「首次引导进行中」并入 isAccountLoginRequired（门禁状态），
+    // 写邮件、快捷键帮助、批量选择、回复等都不能穿透引导。
+    const options = makeOptions();
+    options.isAccountLoginRequired = true;
+    options.isSettingsOpen = true;
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'c' });
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(options.composeNew).not.toHaveBeenCalled();
+    expect(options.closeOverlays).not.toHaveBeenCalled();
+  });
+
+  it('ignores app shortcuts while the image preview modal is open', () => {
+    const options = makeOptions();
+    render(<ShortcutHarness options={options} />);
+    document.body.dataset.imagePreviewModal = '1';
+
+    fireEvent.keyDown(window, { key: 'c' });
+
+    expect(options.composeNew).not.toHaveBeenCalled();
+    delete document.body.dataset.imagePreviewModal;
+  });
 });

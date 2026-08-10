@@ -7,7 +7,7 @@ import {
   Pencil,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type {
   ContactImportCommitSummary,
   ContactImportEntryEdit,
@@ -25,7 +25,10 @@ import {
   type ImportEntryEditMap,
   type ImportSelectionMap,
 } from '../../hooks/useContactImportManager';
-import { CustomSelect } from './accounts/CustomSelect';
+import {
+  CustomSelect,
+  customSelectPortalLayers,
+} from './accounts/CustomSelect';
 import SettingsButton from './shared/SettingsButton';
 import { SettingsSwitch } from './shared';
 
@@ -37,6 +40,7 @@ type ContactImportDialogProps = {
   entryEdits: ImportEntryEditMap;
   previewing: boolean;
   importing: boolean;
+  importError: string | null;
   onSetSelection: (key: string, action: 'create' | 'merge' | 'skip') => void;
   onSetAllSelection: (action: 'create' | 'merge' | 'skip') => void;
   onSetEntryEdit: (key: string, edit: ContactImportEntryEdit) => void;
@@ -89,6 +93,7 @@ export default function ContactImportDialog({
   entryEdits,
   previewing,
   importing,
+  importError,
   onSetSelection,
   onSetAllSelection,
   onSetEntryEdit,
@@ -99,6 +104,121 @@ export default function ContactImportDialog({
 }: ContactImportDialogProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftEdit | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  /**
+   * CustomSelect menus render into document.body. This stable owner lets the
+   * modal's focus trap treat those menus as part of this dialog's focus scope.
+   */
+  const portalOwnerId = useId();
+  /** 打开时记录触发元素，关闭后恢复焦点（导入联系人按钮等）。 */
+  const focusRestoreRef = useRef<HTMLElement | null>(null);
+  /** importing 在 keydown 监听里通过 ref 读取，避免反复重建监听。 */
+  const importingRef = useRef(importing);
+  importingRef.current = importing;
+
+  // 初始焦点进入弹窗（预览态优先关闭按钮）；关闭时恢复焦点到触发元素。
+  useEffect(() => {
+    if (!open) return undefined;
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLElement
+      && !activeElement.closest('.contact-import-dialog')
+    ) {
+      focusRestoreRef.current = activeElement;
+    }
+    const dialog = dialogRef.current;
+    if (dialog) {
+      const closeButton = dialog.querySelector<HTMLElement>('.contact-import-close');
+      const firstFocusable = dialog.querySelector<HTMLElement>(
+        'button:not([disabled]), input, select, textarea',
+      );
+      (closeButton ?? firstFocusable)?.focus();
+    }
+    return () => {
+      focusRestoreRef.current?.focus();
+      focusRestoreRef.current = null;
+    };
+  }, [open]);
+
+  // Native file picking and import completion replace controls in-place. If
+  // the focused button disappeared or became disabled, move focus back to a
+  // valid element in the currently visible dialog state.
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const active = document.activeElement as HTMLElement | null;
+    const activeIsUsable = Boolean(
+      active
+      && active.isConnected
+      && dialog.contains(active)
+      && !active.hasAttribute('disabled'),
+    );
+    if (activeIsUsable) return;
+    const focusTarget = dialog.querySelector<HTMLElement>(
+      '.contact-import-close:not([disabled]), button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
+    );
+    focusTarget?.focus();
+  }, [open, preview, commitResult, previewing, importing]);
+
+  // Tab / Shift+Tab 焦点循环；Escape 关闭（导入提交期间不得误关闭）。
+  // CustomSelect menus are body portals, so include only the portals owned by
+  // this dialog in the focusable set and in the contains check below.
+  useEffect(() => {
+    if (!open) return undefined;
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+    const focusableSelector = 'button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const ownedPortals = () => Array.from(
+      document.querySelectorAll<HTMLElement>('[data-portal-owner]'),
+    ).filter((element) => element.getAttribute('data-portal-owner') === portalOwnerId);
+    const focusables = () => {
+      const insideDialog = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+      const insideOwnedPortals = ownedPortals().flatMap((portal) => (
+        Array.from(portal.querySelectorAll<HTMLElement>(focusableSelector))
+      ));
+      return [...insideDialog, ...insideOwnedPortals].filter((element) => (
+        !element.hasAttribute('disabled')
+        && !element.hidden
+        && element.getAttribute('aria-hidden') !== 'true'
+      ));
+    };
+    const isInFocusScope = (active: HTMLElement | null) => (
+      Boolean(active)
+      && (
+        dialog.contains(active)
+        || ownedPortals().some((portal) => portal.contains(active))
+      )
+    );
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!importingRef.current) onCancel();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = focusables();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!isInFocusScope(active)) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onCancel, portalOwnerId]);
 
   if (!open) return null;
 
@@ -151,10 +271,13 @@ export default function ContactImportDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="contact-import-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-import-title"
+        aria-busy={previewing || importing || undefined}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         {preview ? (
           <div className="contact-import-step">
@@ -188,9 +311,9 @@ export default function ContactImportDialog({
 
             <div className="contact-import-selection-toolbar">
               <span>批量选择：</span>
-              <SettingsButton size="sm" onClick={() => onSetAllSelection('create')}>全部新增</SettingsButton>
-              <SettingsButton size="sm" onClick={() => onSetAllSelection('merge')}>全部合并</SettingsButton>
-              <SettingsButton size="sm" onClick={() => onSetAllSelection('skip')}>全部跳过</SettingsButton>
+              <SettingsButton size="sm" disabled={importing} onClick={() => onSetAllSelection('create')}>全部新增</SettingsButton>
+              <SettingsButton size="sm" disabled={importing} onClick={() => onSetAllSelection('merge')}>全部合并</SettingsButton>
+              <SettingsButton size="sm" disabled={importing} onClick={() => onSetAllSelection('skip')}>全部跳过</SettingsButton>
               <span className="contact-import-edit-hint">点击行内铅笔图标可修改名称、邮箱、别名</span>
             </div>
 
@@ -208,6 +331,7 @@ export default function ContactImportDialog({
                           <span className="st-field-label">联系人名称</span>
                           <input
                             value={draft?.name ?? ''}
+                            disabled={importing}
                             onChange={(event) => setDraft((current) => current ? { ...current, name: event.target.value } : current)}
                             placeholder="联系人名称"
                           />
@@ -216,6 +340,7 @@ export default function ContactImportDialog({
                           <span className="st-field-label">邮箱地址</span>
                           <input
                             value={draft?.email ?? ''}
+                            disabled={importing}
                             onChange={(event) => setDraft((current) => current ? { ...current, email: event.target.value } : current)}
                             placeholder="邮箱地址"
                           />
@@ -227,6 +352,7 @@ export default function ContactImportDialog({
                           <span className="st-field-label">别名邮箱</span>
                           <textarea
                             value={draft?.aliasesText ?? ''}
+                            disabled={importing}
                             onChange={(event) => setDraft((current) => current ? { ...current, aliasesText: event.target.value } : current)}
                             placeholder="别名邮箱，逗号、分号或换行分隔"
                           />
@@ -236,16 +362,17 @@ export default function ContactImportDialog({
                           label="设为 VIP"
                           description="可配合通知策略只提醒重要联系人"
                           checked={draft?.vip ?? false}
+                          disabled={importing}
                           onChange={(checked) => setDraft((current) => current ? { ...current, vip: checked } : current)}
                         />
                         <div className="st-actions">
-                          <SettingsButton size="sm" onClick={() => { setEditingKey(null); setDraft(null); }}>
+                          <SettingsButton size="sm" disabled={importing} onClick={() => { setEditingKey(null); setDraft(null); }}>
                             取消
                           </SettingsButton>
                           <SettingsButton
                             size="sm"
                             variant="primary"
-                            disabled={!draft || !isValidEmailAddress(draft.email)}
+                            disabled={importing || !draft || !isValidEmailAddress(draft.email)}
                             onClick={() => saveDraft(key, entry)}
                           >
                             保存修改
@@ -281,7 +408,9 @@ export default function ContactImportDialog({
                           dense
                           ariaLabel={`${entry.name || entry.email} 导入操作`}
                           value={selectionMap[key] ?? defaultActionFor(entry.status)}
-                          disabled={entry.status === 'invalid' && !editFixedEmail}
+                          portalZIndex={customSelectPortalLayers.contactImport}
+                          portalOwnerId={portalOwnerId}
+                          disabled={importing || (entry.status === 'invalid' && !editFixedEmail)}
                           disabledValues={entry.status === 'new' ? ['merge'] : []}
                           options={[
                             { value: 'create', label: '新增' },
@@ -323,6 +452,13 @@ export default function ContactImportDialog({
                 {importing ? '正在导入…' : `确认导入（${selectedCount} 条）`}
               </SettingsButton>
             </footer>
+            {importError && (
+              <div className="contact-import-error" role="alert">
+                <strong>导入失败</strong>
+                <p>{importError}</p>
+                <small>可以重试确认导入，或取消后重新选择文件。</small>
+              </div>
+            )}
           </div>
         ) : commitResult ? (
           <div className="contact-import-step contact-import-result">
@@ -354,6 +490,13 @@ export default function ContactImportDialog({
               支持 vCard（.vcf / .vcard）、CSV（.csv）和 Excel（.xlsx / .xlsm）文件，单个文件最大 5 MB。
             </p>
             <p>CSV / Excel 请使用 name、email 表头；vCard 中的多个邮箱会按 PREF 标记选择主邮箱。</p>
+            {importError && (
+              <div className="contact-import-error" role="alert">
+                <strong>无法导入该文件</strong>
+                <p>{importError}</p>
+                <small>可重新选择文件重试，或取消本次导入。</small>
+              </div>
+            )}
             <div className="contact-import-dialog-actions">
               <SettingsButton icon={<X size={14} />} onClick={onCancel}>
                 取消
@@ -364,7 +507,7 @@ export default function ContactImportDialog({
                 onClick={onPickFile}
                 disabled={previewing}
               >
-                选择文件
+                {previewing ? '正在读取文件…' : importError ? '重新选择文件' : '选择文件'}
               </SettingsButton>
             </div>
           </div>

@@ -18,7 +18,7 @@ type UseInlineImagesOptions = {
   attachmentErrors: Record<number, string>;
   setAttachmentErrors: Dispatch<SetStateAction<Record<number, string>>>;
   onFetchBody: () => void | Promise<void>;
-  handleAttachmentDownload: (attachment: Attachment) => Promise<boolean>;
+  handleAttachmentDownload: (attachment: Attachment) => Promise<Attachment | null>;
 };
 
 export default function useInlineImages({
@@ -36,12 +36,20 @@ export default function useInlineImages({
   const [isRefreshingInlineImages, setIsRefreshingInlineImages] = useState(false);
 
   const inlineImageRefreshAttemptsRef = useRef<Set<number>>(new Set());
+  // 递增 token 与 selected.id 绑定，令旧邮件的正文请求不能回写当前邮件的状态。
+  const inlineImageRefreshGenerationRef = useRef(0);
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   /** Attachments already attempted via Data URL fallback (success or failure) — avoid re-trigger. */
   const inlineImageDataUrlAttemptsRef = useRef<Set<number>>(new Set());
+  const onFetchBodyRef = useRef(onFetchBody);
+
+  useEffect(() => {
+    onFetchBodyRef.current = onFetchBody;
+  }, [onFetchBody]);
 
   // Reset states on selection change
   useEffect(() => {
+    inlineImageRefreshGenerationRef.current += 1;
     setInlineImageRefreshError('');
     setInlineImageDataUrls({});
     setInlineImageAssetUrls({});
@@ -50,6 +58,13 @@ export default function useInlineImages({
     inlineImageRefreshAttemptsRef.current = new Set();
     inlineImageDownloadAttemptsRef.current = new Set();
     inlineImageDataUrlAttemptsRef.current = new Set();
+
+    return () => {
+      // Also invalidate requests when the hook unmounts. For a normal rerender
+      // with the same message this cleanup does not run, so the in-flight
+      // request remains authoritative for that message.
+      inlineImageRefreshGenerationRef.current += 1;
+    };
   }, [selected?.id]);
 
   const inlineImageResolution = useMemo(
@@ -139,29 +154,43 @@ export default function useInlineImages({
 
   // Effect: Auto-refresh body if inline images have missing content IDs
   useEffect(() => {
-    if (!selected) return;
-    if (inlineImageResolution.missingContentIds.length === 0) return;
-    if (inlineImageResolution.pendingAttachments.length > 0) return;
-    if (selected.remote_uid <= 0) return;
-    if (selected.body.trim() || selected.sanitized_html.trim()) return;
-    if (inlineImageRefreshAttemptsRef.current.has(selected.id)) return;
+    if (!selected
+      || inlineImageResolution.missingContentIds.length === 0
+      || inlineImageResolution.pendingAttachments.length > 0
+      || selected.remote_uid <= 0
+      || selected.body.trim()
+      || selected.sanitized_html.trim()) {
+      // A response can make the missing-CID condition disappear while its
+      // request effect is being replaced. Do not leave the old spinner stuck.
+      setIsRefreshingInlineImages(false);
+      return undefined;
+    }
+    if (inlineImageRefreshAttemptsRef.current.has(selected.id)) return undefined;
 
     inlineImageRefreshAttemptsRef.current.add(selected.id);
     setInlineImageRefreshError('');
     setIsRefreshingInlineImages(true);
-    Promise.resolve(onFetchBody())
+    const requestGeneration = inlineImageRefreshGenerationRef.current;
+    const requestMessageId = selected.id;
+    const isCurrentRequest = () => (
+      inlineImageRefreshGenerationRef.current === requestGeneration
+      && selected?.id === requestMessageId
+    );
+
+    Promise.resolve(onFetchBodyRef.current())
       .catch((error) => {
+        if (!isCurrentRequest()) return;
         setInlineImageRefreshError(attachmentErrorMessage(error));
       })
       .finally(() => {
+        if (!isCurrentRequest()) return;
         setIsRefreshingInlineImages(false);
       });
+    return undefined;
   }, [
     inlineImageResolution.missingContentIds.length,
     inlineImageResolution.pendingAttachments.length,
-    onFetchBody,
-    selected?.id,
-    selected?.remote_uid,
+    selected,
   ]);
 
   const handleLoadInlineImages = useCallback(async () => {

@@ -198,7 +198,7 @@ export default function useReaderActions({
     setStatus(`已阻止发件人：${sender}，后续邮件将移入垃圾邮件`);
   }
 
-  async function downloadAttachment(attachment: Attachment) {
+  async function downloadAttachment(attachment: Attachment): Promise<Attachment> {
     try {
       const result = await invoke<AttachmentDownload>(IPC.DownloadAttachment, { attachmentId: attachment.id });
       setAttachments((current) =>
@@ -207,6 +207,8 @@ export default function useReaderActions({
       if (!attachment.is_inline) {
         setStatus(result.message);
       }
+      // 返回下载接口写入的新附件：local_path 等字段以服务端结果为准。
+      return result.attachment;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!attachment.is_inline) {

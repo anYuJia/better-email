@@ -11,10 +11,10 @@ import { IPC } from '../ipc/commands';
 type ReaderAttachmentsOptions = {
   attachments: Attachment[];
   selectedId: number | null;
-  onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
+  onDownloadAttachment: (attachment: Attachment) => void | Promise<Attachment | null | undefined>;
   onOpenAttachment: (attachment: Attachment) => void;
   onSaveAttachmentAs: (attachment: Attachment) => void;
-  openImagePreview: (image: PreviewImage) => void;
+  openImagePreview: (image: PreviewImage, trigger?: Element | null) => void;
 };
 
 export default function useReaderAttachments({
@@ -30,35 +30,39 @@ export default function useReaderAttachments({
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
   const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
 
-  const handleAttachmentDownload = useCallback(async (attachment: Attachment): Promise<boolean> => {
-    if (downloadingAttachmentIds.has(attachment.id)) return false;
-    setAttachmentErrors((current) => {
-      const next = { ...current };
-      delete next[attachment.id];
-      return next;
-    });
-    setDownloadingAttachmentIds((current) => {
-      const next = new Set(current);
-      next.add(attachment.id);
-      return next;
-    });
-    try {
-      await onDownloadAttachment(attachment);
-      return true;
-    } catch (error) {
-      setAttachmentErrors((current) => ({
-        ...current,
-        [attachment.id]: attachmentErrorMessage(error),
-      }));
-      return false;
-    } finally {
-      setDownloadingAttachmentIds((current) => {
-        const next = new Set(current);
-        next.delete(attachment.id);
+  const handleAttachmentDownload = useCallback(
+    async (attachment: Attachment): Promise<Attachment | null> => {
+      if (downloadingAttachmentIds.has(attachment.id)) return null;
+      setAttachmentErrors((current) => {
+        const next = { ...current };
+        delete next[attachment.id];
         return next;
       });
-    }
-  }, [downloadingAttachmentIds, onDownloadAttachment]);
+      setDownloadingAttachmentIds((current) => {
+        const next = new Set(current);
+        next.add(attachment.id);
+        return next;
+      });
+      try {
+        // 下载接口返回持久化后的新附件（local_path 等字段已经更新）。
+        const fresh = await onDownloadAttachment(attachment);
+        return fresh instanceof Object && fresh !== null ? fresh : null;
+      } catch (error) {
+        setAttachmentErrors((current) => ({
+          ...current,
+          [attachment.id]: attachmentErrorMessage(error),
+        }));
+        return null;
+      } finally {
+        setDownloadingAttachmentIds((current) => {
+          const next = new Set(current);
+          next.delete(attachment.id);
+          return next;
+        });
+      }
+    },
+    [downloadingAttachmentIds, onDownloadAttachment],
+  );
 
   const regularAttachments = useMemo(
     () => attachments.filter((attachment) => !attachment.is_inline),
@@ -87,21 +91,39 @@ export default function useReaderAttachments({
     }
   }, [isDownloadingAllAttachments, regularAttachments, handleAttachmentDownload]);
 
-  const previewAttachment = useCallback(async (attachment: Attachment) => {
-    if (!attachment.is_downloaded) {
-      const downloaded = await handleAttachmentDownload(attachment);
+  const previewAttachment = useCallback(async (
+    attachment: Attachment,
+    trigger?: HTMLElement | null,
+  ) => {
+    // 未下载的图片附件：先下载，再用下载接口返回的新附件生成资源地址，
+    // 绝不使用下载前为空（或过期）的 local_path。
+    let current = attachment;
+    if (!current.is_downloaded) {
+      const downloaded = await handleAttachmentDownload(current);
       if (!downloaded) return;
+      current = downloaded;
     }
-    if (attachmentKind(attachment) === 'image') {
-      const assetUrl = await localFileAssetUrl(attachment.local_path);
-      openImagePreview({
-        src: assetUrl,
-        alt: attachment.filename,
-        attachmentId: attachment.id,
-      });
+    if (attachmentKind(current) === 'image') {
+      try {
+        const assetUrl = await localFileAssetUrl(current.local_path);
+        if (!assetUrl.trim()) {
+          throw new Error('附件本地文件不可用，请重新下载后再试。');
+        }
+        openImagePreview({
+          src: assetUrl,
+          alt: current.filename,
+          attachmentId: current.id,
+        }, trigger ?? null);
+      } catch (error) {
+        // 预览按钮会吞掉 rejected Promise，错误必须写入附件行，不能静默失败。
+        setAttachmentErrors((currentErrors) => ({
+          ...currentErrors,
+          [current.id]: attachmentErrorMessage(error) || '无法生成附件预览地址，请重新下载后再试。',
+        }));
+      }
       return;
     }
-    onOpenAttachment(attachment);
+    onOpenAttachment(current);
   }, [handleAttachmentDownload, onOpenAttachment, openImagePreview]);
 
   const revealAttachmentInFinder = useCallback(async (attachment: Attachment) => {

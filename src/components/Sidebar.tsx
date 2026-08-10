@@ -30,6 +30,8 @@ export type SidebarProps = {
   onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
   onSyncNow: () => void;
+  onRetryBackgroundTask: (taskId: number) => void;
+  onCancelBackgroundTask: (taskId: number) => void;
   onResetAppLayout: () => void;
   onSavedSearchNameChange: (value: string) => void;
   onSaveCurrentSearch: () => void;
@@ -67,6 +69,8 @@ function Sidebar({
   onSetDefaultAccount,
   onCompose,
   onSyncNow,
+  onRetryBackgroundTask,
+  onCancelBackgroundTask,
   onResetAppLayout,
   onSavedSearchNameChange,
   onSaveCurrentSearch,
@@ -142,7 +146,31 @@ function Sidebar({
           {backgroundTasks.length > 0 && (
             <div className="task-stack">
               {backgroundTasks.slice(0, 3).map((task) => (
-                <small key={task.id}>{task.title} · {task.status}</small>
+                <div className="task-stack-row" key={task.id}>
+                  <small>{task.title} · {task.status}</small>
+                  {task.kind === 'sync' && (task.status === 'failed' || task.status === 'cancelled') && (
+                    <button
+                      type="button"
+                      className="task-stack-action"
+                      aria-label={`重试${task.title}`}
+                      title="重试"
+                      onClick={() => onRetryBackgroundTask(task.id)}
+                    >
+                      重试
+                    </button>
+                  )}
+                  {(task.status === 'queued' || task.status === 'running') && (
+                    <button
+                      type="button"
+                      className="task-stack-action"
+                      aria-label={`取消${task.title}`}
+                      title="取消"
+                      onClick={() => onCancelBackgroundTask(task.id)}
+                    >
+                      取消
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -205,10 +233,18 @@ function Sidebar({
 
       <div className="sidebar-footer">
         <div className="sidebar-footer-actions">
-          <button className="settings-button" title="设置" onClick={onOpenSettings}>
+          <button
+            className="settings-button"
+            data-no-tooltip
+            onClick={onOpenSettings}
+          >
             <Settings size={17} /> <span>设置</span>
           </button>
-          <button className="settings-button shortcut-help-button" title="快捷键" onClick={onOpenShortcuts}>
+          <button
+            className="settings-button shortcut-help-button"
+            data-no-tooltip
+            onClick={onOpenShortcuts}
+          >
             <Keyboard size={17} /> <span>快捷键</span>
           </button>
         </div>

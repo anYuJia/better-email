@@ -77,6 +77,9 @@ export type MockBackgroundTask = {
   created_at: string;
   started_at: string;
   finished_at: string;
+  account_id: number | null;
+  cancel_requested: boolean;
+  progress: number;
 };
 
 export type MockSyncRun = {

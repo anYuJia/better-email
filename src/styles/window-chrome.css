@@ -29,10 +29,20 @@ body {
   -webkit-user-select: none;
 }
 
+/* 登录遮罩（z 2000）与首次引导（z 2500）期间，窗口控制栏必须保持可见：
+ * Windows/Linux 的关闭按钮始终可点，且 Escape 无法绕过必须登录状态。 */
+body:has(.account-login-gate) .window-chrome,
+body:has(.first-run-onboarding-backdrop) .window-chrome,
+body[data-image-preview-modal='1'] .window-chrome {
+  z-index: 3000;
+}
+
 .window-drag-region {
   position: absolute;
   inset: 0;
-  cursor: grab;
+  /* macOS 的原生标题栏在可拖动区域保持普通箭头。grab 手势会让整条
+   * 标题栏像可拖拽内容，既突兀也会干扰用户判断控件状态。 */
+  cursor: default;
 }
 
 .window-drag-region:active {
@@ -54,7 +64,7 @@ body {
   left: 0;
   width: var(--app-sidebar-width, 240px);
   height: 40px;
-  cursor: grab;
+  cursor: default;
 }
 
 .window-drag-region-side:active {

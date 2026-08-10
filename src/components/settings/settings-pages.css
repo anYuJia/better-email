@@ -3048,12 +3048,42 @@
 
 /* --- Contact import preview/history --- */
 /* --- Contact import / history dialogs (portaled to document.body) --- */
+/* 层级契约见 styles/2026/workspace-hierarchy.css：
+ * 联系人导入 portal 必须显示在设置（200）与首次引导（2500）之上。 */
 .contact-import-backdrop {
-  z-index: 410;
+  z-index: 2600;
 }
 
 .contact-import-backdrop .spinning {
   animation: settings-action-spin 0.8s linear infinite;
+}
+
+/* 导入失败/解析失败/空文件/格式错误/超过大小限制等错误的可见反馈与重试入口。 */
+.contact-import-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e3b7b2;
+  border-radius: 8px;
+  color: #8f2f24;
+  background: #fdf1ef;
+}
+
+.contact-import-error strong {
+  font-size: 12.5px;
+}
+
+.contact-import-error p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.contact-import-error small {
+  font-size: 12px;
+  color: #a05449;
 }
 
 /* The dialogs are portaled outside .settings-modal, so the st-* component

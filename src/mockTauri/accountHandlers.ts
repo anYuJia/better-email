@@ -14,6 +14,7 @@ import {
   deleteMockAccount,
   mockSavedSecretEmails,
   updateMockAccountSettings,
+  setMockAccountOnboardingCompleted,
   createMockCustomFolder,
   renameMockCustomFolder,
   deleteMockCustomFolder,
@@ -138,6 +139,7 @@ export const handlers: Record<string, MockCommandHandler> = {
   'remove_account': removeMockAccount,
   'delete_account': deleteMockAccount,
   'update_account_settings': updateMockAccountSettings,
+  'set_account_onboarding_completed': setMockAccountOnboardingCompleted,
   'list_folders': (args) => folders.filter((folder) => {
     const accountId = Number(args?.accountId ?? 0);
     if (accountId <= 0) return folder.is_virtual || String(folder.role).startsWith('custom:');

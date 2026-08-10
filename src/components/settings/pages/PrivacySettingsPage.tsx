@@ -33,6 +33,7 @@ export default function PrivacySettingsPage({
   const accountTrusts = remoteImageTrusts.filter((trust) => trust.account_id === accountForm.id);
   const remoteImagesAllowed = accountForm.remote_images_allowed;
   const externalBlocked = accountForm.block_external_mailboxes === true;
+  const warnExternalSenders = accountForm.warn_external_senders === true;
   const interceptsHttps = accountForm.intercept_https_links !== false;
 
   return (
@@ -85,6 +86,20 @@ export default function PrivacySettingsPage({
         onChange={(checked) => onAccountFormChange({
           ...accountForm,
           block_external_mailboxes: checked,
+        })}
+      />
+
+      <SettingsSwitch
+        label="提示来自其他邮箱 / 外部发件人的邮件"
+        description={
+          warnExternalSenders
+            ? '发件人域名与本账号不同的邮件会显示「外部发件人」提示，便于核对身份。'
+            : '关闭后，外部发件人的邮件不额外提示（仍按普通策略处理）。'
+        }
+        checked={warnExternalSenders}
+        onChange={(checked) => onAccountFormChange({
+          ...accountForm,
+          warn_external_senders: checked,
         })}
       />
 

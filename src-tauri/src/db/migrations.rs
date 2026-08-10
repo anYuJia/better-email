@@ -173,7 +173,6 @@ impl MailStore {
                     started_at TEXT NOT NULL DEFAULT '',
                     finished_at TEXT NOT NULL DEFAULT ''
                 );
-
                 CREATE TABLE IF NOT EXISTS imap_mailboxes (
                     id INTEGER PRIMARY KEY,
                     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -325,6 +324,32 @@ impl MailStore {
             add_column_if_missing(
                 conn,
                 "accounts",
+                "warn_external_senders",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            {
+                // 首次登录引导只面向「新完成登录」的账号：
+                // 存量账号在升级后视为已完成引导，避免老用户被强制引导。
+                let mut stmt = conn.prepare("PRAGMA table_info(accounts)")?;
+                let existed = stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .collect::<Result<Vec<_>, _>>()?
+                    .iter()
+                    .any(|name| name == "onboarding_completed");
+                drop(stmt);
+                add_column_if_missing(
+                    conn,
+                    "accounts",
+                    "onboarding_completed",
+                    "INTEGER NOT NULL DEFAULT 0",
+                )?;
+                if !existed {
+                    conn.execute("UPDATE accounts SET onboarding_completed = 1", [])?;
+                }
+            }
+            add_column_if_missing(
+                conn,
+                "accounts",
                 "is_default",
                 "INTEGER NOT NULL DEFAULT 0",
             )?;
@@ -333,6 +358,34 @@ impl MailStore {
                 "account_credentials",
                 "updated_at",
                 "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "background_tasks",
+                "account_id",
+                "INTEGER REFERENCES accounts(id) ON DELETE CASCADE",
+            )?;
+            add_column_if_missing(
+                conn,
+                "background_tasks",
+                "cancel_requested",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "background_tasks",
+                "progress",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            // 应用重启恢复：运行中的任务不可能继续，标记为失败以便重试；
+            // 排队中的任务保留，由前端启动时重新 drain。
+            conn.execute(
+                "
+                UPDATE background_tasks
+                SET status = 'failed', message = '应用重启时中断，可重试'
+                WHERE status = 'running'
+                ",
+                [],
             )?;
             ensure_default_account_for_conn(conn)?;
             conn.execute_batch(

@@ -816,12 +816,12 @@
  * cards. This block is deliberately light-only; dark continues to resolve
  * from the repaired semantic palette above. */
 :root:not([data-theme="dark"]) .app-shell {
-  --workspace-sidebar: oklch(1 0 0 / 0.72);
-  --workspace-list: oklch(1 0 0 / 0.78);
-  --workspace-reader: oklch(1 0 0 / 0.84);
-  --workspace-toolbar: oklch(1 0 0 / 0.68);
-  --workspace-control: oklch(0.985 0.004 var(--primitive-hue-neutral) / 0.78);
-  --workspace-control-active: oklch(1 0 0 / 0.84);
+  --workspace-sidebar: oklch(0.945 0.008 var(--primitive-hue-neutral) / 0.78);
+  --workspace-list: oklch(0.979 0.004 var(--primitive-hue-neutral) / 0.82);
+  --workspace-reader: oklch(0.992 0.004 var(--primitive-hue-paper) / 0.86);
+  --workspace-toolbar: oklch(0.979 0.004 var(--primitive-hue-neutral) / 0.68);
+  --workspace-control: oklch(0.955 0.006 var(--primitive-hue-neutral) / 0.78);
+  --workspace-control-active: oklch(0.996 0.003 var(--primitive-hue-paper) / 0.84);
 
   /* The white app material is intentionally translucent: macOS's already
      transparent webview can softly carry the desktop through the workspace

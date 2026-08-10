@@ -83,6 +83,8 @@
 }
 
 .custom-select-dropdown {
+  /* Most settings menus sit above regular content. Modal callers override
+   * this through CustomSelect's explicit inline z-index. */
   z-index: 1000;
   display: grid;
   gap: 2px;

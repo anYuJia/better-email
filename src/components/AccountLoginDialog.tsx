@@ -66,7 +66,9 @@ export default function AccountLoginDialog({
     const overlay = overlayRef.current;
     const parent = overlay?.parentElement;
     if (!overlay || !parent) return undefined;
-    const siblings = Array.from(parent.children).filter((element) => element !== overlay);
+    const siblings = Array.from(parent.children).filter(
+      (element) => element !== overlay && !element.hasAttribute('data-window-chrome'),
+    );
     const previousAccessibilityState = new Map<Element, {
       inert: boolean;
       ariaHidden: string | null;

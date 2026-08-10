@@ -14,6 +14,7 @@ import MessageListPane, { type MessageContextAction, type BulkMessageAction } fr
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
 import AccountLoginDialog from './components/AccountLoginDialog';
+import FirstRunOnboarding from './components/FirstRunOnboarding';
 import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
 import ConfirmationDialogs from './components/ConfirmationDialogs';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
@@ -149,6 +150,14 @@ export default function App() {
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
   const isAccountLoginActive = needsAccountLogin || isAccountLoginProvisioning;
+  // 仅对「新完成登录且尚未完成首次引导」的账号展示引导。
+  const pendingOnboardingAccount = useMemo(
+    () => (account && !account.onboarding_completed ? account : null),
+    [account],
+  );
+  // 登录遮罩或首次引导期间，应用整体进入门禁状态：
+  // 快捷键、托盘命令、写邮件、切换账号、设置都不能穿透。
+  const isModalGateActive = isAccountLoginActive || Boolean(pendingOnboardingAccount);
   const mailboxRefreshRef = useRef(0);
   const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
   const {
@@ -289,6 +298,7 @@ export default function App() {
   } = useAppMetaLoader({
     folderId,
     accountScope,
+    mailboxRefreshRef,
     setAccounts,
     setAccount,
     setAccountForm,
@@ -398,9 +408,10 @@ export default function App() {
     mailboxListStateKey,
     messageLimit,
   });
-  const { enqueueBackgroundTask } = useBackgroundTaskCoordinator({
+  const { enqueueBackgroundTask, enqueueAccountInitialSync, retryBackgroundTask, cancelBackgroundTask } = useBackgroundTaskCoordinator({
     account,
     accountScope,
+    mailboxRefreshRef,
     folderId,
     query,
     filter,
@@ -475,6 +486,13 @@ export default function App() {
     setImapProbe,
     setImapMailboxes,
     setStatus,
+    onAccountCreated: (created) => {
+      // 凭据验证通过：登录遮罩立即关闭；首次同步转入绑定该账号的后台任务，
+      // 与首次引导并行执行，失败可重试，且不会写入其他账号的界面。
+      enqueueAccountInitialSync(created.id).catch((error) => {
+        setStatus(`首次同步入队失败：${String(error)}，可在侧边栏手动同步`);
+      });
+    },
     loadMeta,
     loadMessages,
   });
@@ -625,6 +643,9 @@ export default function App() {
   const selectedExternalBlocked = Boolean(
     selectedAccount?.block_external_mailboxes && selectedSenderIsExternal,
   );
+  const selectedWarnExternalSender = Boolean(
+    selectedAccount?.warn_external_senders && selectedSenderIsExternal && !selectedExternalBlocked,
+  );
   const selectedInterceptsHttps = selectedAccount?.intercept_https_links !== false;
 
   const {
@@ -756,7 +777,7 @@ export default function App() {
     async function registerTrayListeners() {
       try {
         const unlistenCompose = await listen('tray://compose', () => {
-          if (!active || isAccountLoginActive) return;
+          if (!active || isModalGateActive) return;
           setRichComposer(true);
           openComposer(emptyDraft);
           setStatus('已打开新邮件');
@@ -764,13 +785,13 @@ export default function App() {
         unlisteners.push(unlistenCompose);
 
         const unlistenSync = await listen('tray://sync', () => {
-          if (!active || isAccountLoginActive) return;
+          if (!active || isModalGateActive) return;
           syncAndRefresh().catch((error) => setStatus(String(error)));
         });
         unlisteners.push(unlistenSync);
 
         const unlistenUnread = await listen('tray://open-unread', () => {
-          if (!active || isAccountLoginActive) return;
+          if (!active || isModalGateActive) return;
           const inboxFolder = folders.find((f) => f.role === 'inbox');
           if (inboxFolder) {
             setFolderId(inboxFolder.id);
@@ -783,7 +804,7 @@ export default function App() {
         unlisteners.push(unlistenUnread);
 
         const unlistenSettings = await listen('tray://settings', () => {
-          if (!active || isAccountLoginActive) return;
+          if (!active || isModalGateActive) return;
           setSettingsOpen(true);
         });
         unlisteners.push(unlistenSettings);
@@ -798,7 +819,7 @@ export default function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isAccountLoginActive]);
+  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive]);
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
@@ -1106,7 +1127,7 @@ export default function App() {
     isComposerMinimized,
     isSettingsOpen,
     isShortcutsOpen,
-    isAccountLoginRequired: isAccountLoginActive,
+    isAccountLoginRequired: isModalGateActive,
     closeOverlays: () => {
       closeComposer();
       setSettingsOpen(false);
@@ -1134,6 +1155,29 @@ export default function App() {
   const handleRefresh = useCallback(() => {
     syncAndRefresh().catch((error) => setStatus(String(error)));
   }, [syncAndRefresh, setStatus]);
+
+  // 首次引导的所有保存回调显式绑定引导账号 ID：
+  // 即使后台状态切换，也不能把设置误写到另一个账号。
+  const handleOnboardingAccountPatch = useCallback(async (accountId: number, patch: Partial<Account>) => {
+    const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
+      accountId,
+      input: { ...accounts.find((item) => item.id === accountId) ?? account, ...patch },
+    });
+    setAccount(updated);
+    setAccountForm(updated);
+    setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }, [account, accounts, setAccount, setAccountForm, setAccounts]);
+
+  const completeOnboarding = useCallback(async (accountId: number) => {
+    const updated = await invoke<Account>(IPC.SetAccountOnboardingCompleted, {
+      accountId,
+      completed: true,
+    });
+    setAccount(updated);
+    setAccountForm(updated);
+    setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    setStatus('首次引导已完成，可随时在设置页调整');
+  }, [setAccount, setAccountForm, setAccounts, setStatus]);
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));
@@ -1289,6 +1333,12 @@ export default function App() {
         onSyncNow={() => {
           syncAndRefresh().catch((error) => setStatus(String(error)));
         }}
+        onRetryBackgroundTask={(taskId) => {
+          retryBackgroundTask(taskId).catch((error) => setStatus(String(error)));
+        }}
+        onCancelBackgroundTask={(taskId) => {
+          cancelBackgroundTask(taskId).catch((error) => setStatus(String(error)));
+        }}
         onResetAppLayout={() => {
           resetAppLayout();
           setStatus('已重置布局');
@@ -1416,6 +1466,7 @@ export default function App() {
         selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
         selectedSenderIsExternal={selectedSenderIsExternal}
         selectedExternalBlocked={selectedExternalBlocked}
+        selectedWarnExternalSender={selectedWarnExternalSender}
         selectedInterceptsHttps={selectedInterceptsHttps}
         onOpenHttpsLink={handleOpenHttpsLink}
         quickReplyBody={quickReplyBody}
@@ -1801,6 +1852,18 @@ export default function App() {
               setAccountLoginProvisioning(false);
             }
           }}
+        />
+      )}
+      {!isAccountLoginActive && pendingOnboardingAccount && (
+        <FirstRunOnboarding
+          accountId={pendingOnboardingAccount.id}
+          account={pendingOnboardingAccount}
+          sendUndoDelaySeconds={sendUndoDelaySeconds}
+          onAccountSettingsChange={(patch) => handleOnboardingAccountPatch(pendingOnboardingAccount.id, patch)}
+          onSendUndoDelayChange={setSendUndoDelaySeconds}
+          onComplete={() => completeOnboarding(pendingOnboardingAccount.id)}
+          onSkipAll={() => completeOnboarding(pendingOnboardingAccount.id)}
+          onStatus={setStatus}
         />
       )}
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>

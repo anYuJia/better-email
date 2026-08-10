@@ -13,16 +13,12 @@ import type {
 import { invoke } from '../tauriBridge';
 import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../app/mailboxListState';
 import { buildMailboxRequests, checkHistoryIncomplete, mailboxFlowLog, mailboxFlowWarn } from './mailboxDataRequests';
+import type {
+  LoadMetaOptions,
+  LoadMetaResult,
+  MailboxRefreshRequest,
+} from './useAppMetaLoader';
 import { IPC } from '../ipc/commands';
-
-type LoadMetaResult = {
-  folderId: number | null;
-  folders: Folder[];
-};
-
-type LoadMetaOptions = {
-  mode?: 'full' | 'mailbox';
-};
 
 type UseMailboxDataOptions = {
   accountScope: AccountScope;
@@ -63,6 +59,7 @@ export type MailboxDataController = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
+    mailboxRequest?: MailboxRefreshRequest,
   ) => Promise<MessageSummary[]>;
   loadMessagesWithVisibleFallback: (
     nextFolderId?: number | null,
@@ -74,6 +71,7 @@ export type MailboxDataController = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
+    mailboxRequest?: MailboxRefreshRequest,
   ) => Promise<MessageSummary[]>;
   refreshMailbox: (
     nextScope?: AccountScope,
@@ -108,6 +106,22 @@ export default function useMailboxData({
 }: UseMailboxDataOptions): MailboxDataController {
   const frontendReadyRef = useRef(false);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
+  const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
+  activeMailboxScopeRef.current = accountScope;
+
+  function isMailboxRequestCurrent(
+    nextScope: AccountScope,
+    refreshId: number,
+    mailboxRequest?: MailboxRefreshRequest,
+  ): boolean {
+    if (refreshId !== mailboxRefreshRef.current) return false;
+    if (!mailboxRequest) return true;
+    return (
+      mailboxRequest.id === refreshId
+      && mailboxRequest.scope === nextScope
+      && activeMailboxScopeRef.current === nextScope
+    );
+  }
 
   async function loadMessages(
     nextFolderId = folderId,
@@ -118,19 +132,22 @@ export default function useMailboxData({
     nextLimit?: number,
     nextSearchScope = searchScope,
     nextIncludeThreads = listMode === 'threads',
+    mailboxRequest?: MailboxRefreshRequest,
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
         searchScope: nextSearchScope,
         scope: nextScope,
       });
-      startTransition(() => {
-        setMessages([]);
-        setThreads([]);
-        setHasMoreMessages(false);
-        setSelectedId(null);
-        setSelectedMessageIds([]);
-      });
+      if (isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+        startTransition(() => {
+          setMessages([]);
+          setThreads([]);
+          setHasMoreMessages(false);
+          setSelectedId(null);
+          setSelectedMessageIds([]);
+        });
+      }
       return [];
     }
     const startedAt = performance.now();
@@ -185,7 +202,16 @@ export default function useMailboxData({
       });
       throw error;
     }
-    if (refreshId !== mailboxRefreshRef.current) return nextMessages;
+    if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+      mailboxFlowLog('loadMessages ignored stale mailbox result', {
+        scope: nextScope,
+        currentScope: activeMailboxScopeRef.current,
+        folderId: nextFolderId ?? 0,
+        refreshId,
+        currentRefreshId: mailboxRefreshRef.current,
+      });
+      return nextMessages;
+    }
     const visibleMessages = nextMessages.slice(0, effectiveLimit);
     const hasMoreRemote = checkHistoryIncomplete(
       nextFolderId,
@@ -239,6 +265,7 @@ export default function useMailboxData({
     nextLimit?: number,
     nextSearchScope = searchScope,
     nextIncludeThreads = listMode === 'threads',
+    mailboxRequest?: MailboxRefreshRequest,
   ) {
     const nextMessages = await loadMessages(
       nextFolderId,
@@ -249,14 +276,18 @@ export default function useMailboxData({
       nextLimit,
       nextSearchScope,
       nextIncludeThreads,
+      mailboxRequest,
     );
+    if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+      return nextMessages;
+    }
     if (
       nextMessages.length > 0
       || nextSearchScope !== 'folder'
       || !nextFolderId
       || nextQuery.trim()
       || nextFilter !== 'all'
-      || refreshId !== mailboxRefreshRef.current
+      || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
     ) {
       return nextMessages;
     }
@@ -272,8 +303,12 @@ export default function useMailboxData({
       nextLimit,
       nextSearchScope,
       nextIncludeThreads,
+      mailboxRequest,
     );
-    if (unreadMessages.length === 0 || refreshId !== mailboxRefreshRef.current) {
+    if (
+      unreadMessages.length === 0
+      || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
+    ) {
       return nextMessages;
     }
     setFilter('unread');
@@ -289,14 +324,18 @@ export default function useMailboxData({
   ) {
     const refreshId = mailboxRefreshRef.current + 1;
     mailboxRefreshRef.current = refreshId;
+    const mailboxRequest: MailboxRefreshRequest = { id: refreshId, scope: nextScope };
     setHasMoreMessages(false);
     setMessages([]);
     setThreads([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
-    const meta = await loadMeta(preferredFolderId, nextScope, { mode: 'mailbox' });
+    const meta = await loadMeta(preferredFolderId, nextScope, {
+      mode: 'mailbox',
+      mailboxRequest,
+    });
     const nextFolderId = meta.folderId;
-    if (refreshId !== mailboxRefreshRef.current) return nextFolderId;
+    if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) return nextFolderId;
     await loadMessagesWithVisibleFallback(
       nextFolderId,
       nextQuery,
@@ -306,6 +345,8 @@ export default function useMailboxData({
       meta.folders,
       undefined,
       searchScope,
+      undefined,
+      mailboxRequest,
     );
     return nextFolderId;
   }

@@ -8,6 +8,9 @@ import {
   markMockBackgroundTaskRunning,
   completeMockBackgroundTask,
   failMockBackgroundTask,
+  cancelMockBackgroundTask,
+  consumeMockBackgroundTaskCancel,
+  retryMockBackgroundTask,
 } from './state';
 
 export const handlers: Record<string, MockCommandHandler> = {
@@ -20,7 +23,17 @@ export const handlers: Record<string, MockCommandHandler> = {
   'mark_benchmark_sync_complete': () => undefined,
   'benchmark_sync_requested': () => false,
   'list_background_tasks': () => backgroundTasks,
+  'get_background_task': (args) => {
+    const taskId = Number(args?.taskId);
+    const task = backgroundTasks.find((item) => item.id === taskId);
+    if (!task) throw new Error('background task not found');
+    return task;
+  },
   'enqueue_background_task': enqueueMockBackgroundTask,
+  'enqueue_account_background_task': enqueueMockBackgroundTask,
+  'retry_background_task': retryMockBackgroundTask,
+  'cancel_background_task': cancelMockBackgroundTask,
+  'consume_background_task_cancel': consumeMockBackgroundTaskCancel,
   'next_background_task': () => (backgroundTasks
     .filter((task) => task.status === 'queued')
     .sort((left, right) => left.created_at.localeCompare(right.created_at))[0] ?? null),

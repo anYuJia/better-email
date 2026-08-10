@@ -100,6 +100,7 @@ export default function ContactAutomationSettings({
     startImport,
     commitImport,
     cancelImport,
+    importError,
     batches,
     refreshBatches,
     undoBatch,
@@ -420,6 +421,7 @@ export default function ContactAutomationSettings({
         entryEdits={entryEdits}
         previewing={previewing}
         importing={importing}
+        importError={importError}
         onSetSelection={setSelection}
         onSetAllSelection={setAllSelection}
         onSetEntryEdit={setEntryEdit}
@@ -427,6 +429,7 @@ export default function ContactAutomationSettings({
         onConfirm={() => { void handleCommitImport(); }}
         onCancel={handleCloseImport}
         onOpenHistory={() => {
+          cancelImport();
           setImportDialogOpen(false);
           setHistoryDialogOpen(true);
           void refreshBatches();

@@ -14,7 +14,7 @@ vi.mock('../tauriBridge', () => ({
   invoke: vi.fn(),
 }));
 
-import { invoke } from '../tauriBridge';
+import { invoke, type InvokeArgs } from '../tauriBridge';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -34,6 +34,8 @@ const account: Account = {
   block_external_mailboxes: false,
   intercept_https_links: true,
   auto_download_attachments: false,
+    warn_external_senders: false,
+    onboarding_completed: true,
   is_default: true,
 };
 
@@ -49,6 +51,16 @@ const stats: MailStats = {
   draft_messages: 0,
   attachment_messages: 1,
 };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
 
 function setupInvokeMocks() {
   mockInvoke.mockImplementation(((command: string) => {
@@ -99,8 +111,12 @@ function setupInvokeMocks() {
 
 function renderMetaLoader({
   onAccountListLoaded,
+  mailboxRefreshRef = { current: 0 },
+  accountScope = 1,
 }: {
   onAccountListLoaded?: () => void;
+  mailboxRefreshRef?: { current: number };
+  accountScope?: number | 'all';
 } = {}) {
   const setters = {
     setAccounts: vi.fn(),
@@ -123,13 +139,18 @@ function renderMetaLoader({
     setStatus: vi.fn(),
     setAppBadgeStatus: vi.fn(),
   };
-  const hook = renderHook(() => useAppMetaLoader({
-    folderId: 101,
-    accountScope: 1,
-    ...setters,
-    onAccountListLoaded,
-  }));
-  return { ...hook, setters };
+  const hook = renderHook(({ activeAccountScope }: { activeAccountScope: number | 'all' }) => (
+    useAppMetaLoader({
+      folderId: 101,
+      accountScope: activeAccountScope,
+      mailboxRefreshRef,
+      ...setters,
+      onAccountListLoaded,
+    })
+  ), {
+    initialProps: { activeAccountScope: accountScope },
+  });
+  return { ...hook, setters, mailboxRefreshRef };
 }
 
 describe('useAppMetaLoader', () => {
@@ -165,6 +186,41 @@ describe('useAppMetaLoader', () => {
     });
 
     expect(setters.setFolderId).toHaveBeenCalledWith(101);
+  });
+
+  it('does not commit an in-flight A mailbox result after the view switches to B', async () => {
+    setupInvokeMocks();
+    const folderResponse = deferred<Folder[]>();
+    const defaultImplementation = mockInvoke.getMockImplementation();
+    mockInvoke.mockImplementation(((command: string, args?: InvokeArgs) => {
+      if (command === 'list_folders' && (args as { accountId?: number } | undefined)?.accountId === 1) {
+        return folderResponse.promise;
+      }
+      return defaultImplementation?.(command, args);
+    }) as never);
+    const mailboxRefreshRef = { current: 7 };
+    const { result, rerender, setters } = renderMetaLoader({ mailboxRefreshRef });
+
+    let loading!: Promise<unknown>;
+    await act(async () => {
+      loading = result.current.loadMeta(101, 1, {
+        mode: 'mailbox',
+        mailboxRequest: { id: 7, scope: 1 },
+      });
+      await Promise.resolve();
+    });
+
+    mailboxRefreshRef.current += 1;
+    rerender({ activeAccountScope: 2 });
+    await act(async () => {
+      folderResponse.resolve(folders);
+      await loading;
+    });
+
+    expect(setters.setAccount).not.toHaveBeenCalled();
+    expect(setters.setAccountForm).not.toHaveBeenCalled();
+    expect(setters.setFolders).not.toHaveBeenCalled();
+    expect(setters.setFolderId).not.toHaveBeenCalled();
   });
 
   it('reports account availability even when unrelated mailbox metadata fails', async () => {

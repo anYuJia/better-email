@@ -152,7 +152,10 @@
   margin-top: 2px;
   color: var(--ui-text-tertiary);
   line-height: 1.3;
-  text-wrap: pretty;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-attachment,
@@ -481,4 +484,26 @@
   .reader-message-actions {
     margin-inline-start: 2px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * 统一 modal/layer 层级契约
+ *
+ * 所有全屏遮罩弹层以固定层级从低到高：
+ *   200   settings-backdrop（设置、登录后各设置弹窗）
+ *   2500  first-run-onboarding-backdrop（首次引导，门禁期唯一主遮罩）
+ *   2550  CustomSelect 菜单（首次引导内，portal 到 body）
+ *   2600  contact-import-backdrop（联系人导入，portal 到 body；
+ *        在设置或首次引导之上，可操作、可关闭）
+ *   2650  CustomSelect 菜单（联系人导入内，portal 到 body）
+ *   2700  reader-image-preview-backdrop（正文图片预览，portal 到 body）
+ *   3000  window-chrome（真实 WindowChrome 关闭按钮，登录/引导期间可见可点）
+ * 新增遮罩必须复用上述值，禁止把弹层写进阅读区等局部 stacking context。
+ * ------------------------------------------------------------------------- */
+.contact-import-backdrop {
+  z-index: 2600;
+}
+
+.reader-image-preview-backdrop {
+  z-index: 2700;
 }

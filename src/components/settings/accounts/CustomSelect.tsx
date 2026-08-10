@@ -17,7 +17,26 @@ type CustomSelectProps = {
   disabled?: boolean;
   disabledValues?: readonly string[];
   dense?: boolean;
+  /**
+   * Menus are rendered in document.body. Consumers inside a modal must opt
+   * into a layer above that modal instead of inheriting the ordinary settings
+   * dropdown layer.
+   */
+  portalZIndex?: number;
+  /**
+   * Optional focus-scope owner for a body-portal menu. A modal that owns the
+   * select can use this marker to include the menu in its focus trap even
+   * though the menu is not a DOM descendant of the modal.
+   */
+  portalOwnerId?: string;
 };
+
+/** Shared portal layers used by CustomSelect consumers that live in modals. */
+export const customSelectPortalLayers = {
+  default: 1000,
+  onboarding: 2550,
+  contactImport: 2650,
+} as const;
 
 type MenuPlacement = {
   top: number;
@@ -39,6 +58,8 @@ export function CustomSelect({
   disabled = false,
   disabledValues = [],
   dense = false,
+  portalZIndex = customSelectPortalLayers.default,
+  portalOwnerId,
 }: CustomSelectProps) {
   const activeOption = options.find((o) => o.value === value) || options[0];
   const [open, setOpen] = useState(false);
@@ -82,15 +103,18 @@ export function CustomSelect({
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        // A select opened inside a portal modal owns the first Escape. Without
+        // this, the parent SettingsFrame / import dialog may close as well.
+        event.stopPropagation();
         setOpen(false);
         triggerRef.current?.focus();
       }
     }
     document.addEventListener('pointerdown', closeOnOutsidePointer, true);
-    window.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('keydown', closeOnEscape, true);
     return () => {
       document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
-      window.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('keydown', closeOnEscape, true);
     };
   }, [open]);
 
@@ -101,11 +125,14 @@ export function CustomSelect({
           className={`custom-select-dropdown ${dense ? 'dense' : ''}`.trim()}
           role="listbox"
           aria-label={ariaLabel}
+          data-portal-layer={portalZIndex}
+          data-portal-owner={portalOwnerId}
           style={{
             position: 'fixed',
             top: placement.top,
             left: placement.left,
             width: placement.width,
+            zIndex: portalZIndex,
           }}
         >
           {options.map((option) => {

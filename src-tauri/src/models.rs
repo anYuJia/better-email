@@ -21,6 +21,10 @@ pub struct Account {
     pub intercept_https_links: bool,
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
+    #[serde(default = "default_false")]
+    pub warn_external_senders: bool,
+    #[serde(default = "default_false")]
+    pub onboarding_completed: bool,
     pub is_default: bool,
 }
 
@@ -209,6 +213,8 @@ pub struct AccountSettingsInput {
     pub intercept_https_links: bool,
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
+    #[serde(default = "default_false")]
+    pub warn_external_senders: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -231,6 +237,8 @@ pub struct AccountCreateInput {
     pub intercept_https_links: bool,
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
+    #[serde(default = "default_false")]
+    pub warn_external_senders: bool,
 }
 
 fn default_false() -> bool {
@@ -777,12 +785,20 @@ pub struct BackgroundTask {
     pub created_at: String,
     pub started_at: String,
     pub finished_at: String,
+    #[serde(default)]
+    pub account_id: Option<i64>,
+    #[serde(default)]
+    pub cancel_requested: bool,
+    #[serde(default)]
+    pub progress: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BackgroundTaskInput {
     pub kind: String,
     pub source: String,
+    #[serde(default)]
+    pub account_id: Option<i64>,
 }
 
 #[derive(Debug, Clone)]

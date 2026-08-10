@@ -45,7 +45,7 @@ describe('PrivacySettingsPage', () => {
   it('renders the remote image policy toggle with risk-aware copy', () => {
     renderPage(makeAccount({ remote_images_allowed: false }), []);
     const toggles = screen.getAllByRole('checkbox');
-    expect(toggles.length).toBe(3);
+    expect(toggles.length).toBe(4);
     expect(screen.getByText('默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
     expect((toggles[0] as HTMLInputElement).checked).toBe(false);
   });
@@ -60,6 +60,7 @@ describe('PrivacySettingsPage', () => {
     renderPage(makeAccount(), []);
     expect(screen.getByText('拦截外部邮箱邮件')).not.toBeNull();
     expect(screen.getByText('隐藏邮件中的链接')).not.toBeNull();
+    expect(screen.getByText('提示来自其他邮箱 / 外部发件人的邮件')).not.toBeNull();
   });
 
   it('shows an explicit empty state for the trust list', () => {

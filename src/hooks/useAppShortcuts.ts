@@ -93,6 +93,8 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const commandModifier = event.metaKey || event.ctrlKey;
 
       if (isAccountLoginRequired) return;
+      // 图片预览模态期间快捷键不穿透。
+      if (document.body.dataset.imagePreviewModal === '1') return;
 
       if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen)) {
         event.preventDefault();

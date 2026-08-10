@@ -36,9 +36,25 @@ describe('CustomSelect', () => {
     const trigger = screen.getByRole('button', { expanded: false });
     fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).not.toBeNull();
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(trigger, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('lets a modal elevate its body-portal menu above the modal backdrop', () => {
+    render(
+      <CustomSelect
+        value="5"
+        options={options}
+        portalZIndex={2650}
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    const listbox = screen.getByRole('listbox');
+    expect(listbox.getAttribute('data-portal-layer')).toBe('2650');
+    expect((listbox as HTMLElement).style.zIndex).toBe('2650');
   });
 
   it('marks the active option as selected', () => {

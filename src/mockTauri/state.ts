@@ -35,6 +35,8 @@ export let account = {
   block_external_mailboxes: false,
   intercept_https_links: true,
   auto_download_attachments: false,
+  warn_external_senders: false,
+  onboarding_completed: true,
   is_default: true,
 };
 
@@ -787,6 +789,8 @@ export function createMockAccount(args?: InvokeArgs) {
     block_external_mailboxes: Boolean(input.block_external_mailboxes),
     intercept_https_links: input.intercept_https_links !== false,
     auto_download_attachments: Boolean(input.auto_download_attachments),
+    warn_external_senders: Boolean(input.warn_external_senders),
+    onboarding_completed: false,
     is_default: isFirstAccount,
   };
   mockAccounts = [...mockAccounts, created];
@@ -870,6 +874,17 @@ export function updateMockAccountSettings(args?: InvokeArgs) {
     ...input,
     id: accountId,
   };
+  mockAccounts = mockAccounts.map((item) => (item.id === accountId ? updated : item));
+  if (account.id === accountId) account = updated;
+  return updated;
+}
+
+export function setMockAccountOnboardingCompleted(args?: InvokeArgs) {
+  const accountId = Number(args?.accountId ?? 0);
+  const completed = Boolean(args?.completed);
+  const existing = mockAccounts.find((item) => item.id === accountId);
+  if (!existing) throw new Error('邮箱账号不存在或已被移除。');
+  const updated = { ...existing, onboarding_completed: completed };
   mockAccounts = mockAccounts.map((item) => (item.id === accountId ? updated : item));
   if (account.id === accountId) account = updated;
   return updated;
@@ -1632,14 +1647,18 @@ export function renderMockMessageWithRemoteImagesOnce(args?: InvokeArgs) {
 }
 
 export function enqueueMockBackgroundTask(args?: InvokeArgs) {
-  const input = args?.input as { kind?: string; source?: string } | undefined;
+  const input = args?.input as { kind?: string; source?: string; account_id?: number } | undefined;
   const kind = String(input?.kind ?? 'sync');
   const source = String(input?.source ?? 'manual');
+  const accountId = Number(input?.account_id ?? 0) > 0 ? Number(input?.account_id) : null;
   const active = backgroundTasks.find(
-    (task) => task.kind === kind && ['queued', 'running'].includes(task.status),
+    (task) =>
+      task.kind === kind
+      && ['queued', 'running'].includes(task.status)
+      && (task.account_id ?? null) === accountId,
   );
   if (active) return active;
-  const task = {
+  const task: MockBackgroundTask = {
     id: Math.max(0, ...backgroundTasks.map((item) => item.id)) + 1,
     kind,
     title:
@@ -1649,13 +1668,18 @@ export function enqueueMockBackgroundTask(args?: InvokeArgs) {
           ? '发件箱发送演练'
           : source === 'timer'
             ? '定时同步邮件头'
-            : '同步邮件头',
+            : source === 'initial'
+              ? '首次同步邮件头'
+              : '同步邮件头',
     source,
     status: 'queued',
     message: '等待执行',
     created_at: now,
     started_at: '',
     finished_at: '',
+    account_id: accountId,
+    cancel_requested: false,
+    progress: 0,
   };
   backgroundTasks = [task, ...backgroundTasks];
   return task;
@@ -1665,7 +1689,11 @@ export function markMockBackgroundTaskRunning(args?: InvokeArgs) {
   const taskId = Number(args?.taskId);
   const task = backgroundTasks.find((item) => item.id === taskId);
   if (!task) throw new Error('background task not found');
-  const updated = { ...task, status: 'running', message: '执行中', started_at: now };
+  // 原子领取：只有 queued 且未被请求取消的任务才能转 running。
+  if (task.status !== 'queued' || task.cancel_requested) {
+    throw new Error('任务已不在排队状态（可能已取消），无法开始执行。');
+  }
+  const updated = { ...task, status: 'running', message: '执行中', started_at: now, cancel_requested: false };
   backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
   return updated;
 }
@@ -1674,11 +1702,16 @@ export function completeMockBackgroundTask(args?: InvokeArgs) {
   const taskId = Number(args?.taskId);
   const task = backgroundTasks.find((item) => item.id === taskId);
   if (!task) throw new Error('background task not found');
+  // 原子完成：仅 running 且未被请求取消的任务可完成。
+  if (task.status !== 'running' || task.cancel_requested) {
+    throw new Error('任务已完成、被取消或不在执行状态，本次完成结果未提交。');
+  }
   const updated = {
     ...task,
     status: 'done',
     message: String(args?.message ?? '完成'),
     finished_at: now,
+    cancel_requested: false,
   };
   backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
   return updated;
@@ -1688,11 +1721,61 @@ export function failMockBackgroundTask(args?: InvokeArgs) {
   const taskId = Number(args?.taskId);
   const task = backgroundTasks.find((item) => item.id === taskId);
   if (!task) throw new Error('background task not found');
+  // 原子失败：仅 running 任务可失败；已取消的任务保持 cancelled。
+  if (task.status !== 'running' || task.cancel_requested) {
+    throw new Error('任务已取消或不在执行状态，失败结果未提交。');
+  }
   const updated = {
     ...task,
     status: 'failed',
     message: String(args?.message ?? '失败'),
     finished_at: now,
+    cancel_requested: false,
+  };
+  backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+  return updated;
+}
+
+export function cancelMockBackgroundTask(args?: InvokeArgs) {
+  const taskId = Number(args?.taskId);
+  const task = backgroundTasks.find((item) => item.id === taskId);
+  if (!task) throw new Error('background task not found');
+  const updated = task.status === 'queued'
+    ? { ...task, status: 'cancelled', message: '已取消', finished_at: now }
+    : task.status === 'running'
+      ? { ...task, cancel_requested: true, message: '正在取消…' }
+      : task;
+  backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+  return updated;
+}
+
+export function consumeMockBackgroundTaskCancel(args?: InvokeArgs) {
+  const taskId = Number(args?.taskId);
+  const task = backgroundTasks.find((item) => item.id === taskId);
+  if (!task || task.status !== 'running' || !task.cancel_requested) return false;
+  const updated = {
+    ...task,
+    status: 'cancelled',
+    message: '已取消',
+    cancel_requested: false,
+    finished_at: now,
+  };
+  backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+  return true;
+}
+
+export function retryMockBackgroundTask(args?: InvokeArgs) {
+  const taskId = Number(args?.taskId);
+  const task = backgroundTasks.find((item) => item.id === taskId);
+  if (!task) throw new Error('background task not found');
+  if (!['failed', 'cancelled'].includes(task.status)) return task;
+  const updated = {
+    ...task,
+    status: 'queued',
+    message: '等待执行',
+    cancel_requested: false,
+    started_at: '',
+    finished_at: '',
   };
   backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
   return updated;

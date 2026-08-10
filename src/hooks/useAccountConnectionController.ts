@@ -22,7 +22,6 @@ import type {
   MessageSummary,
   ProviderVerificationRecord,
   SearchScope,
-  SyncRun,
 } from '../app/types';
 import {
   incomingHostForProtocol,
@@ -65,7 +64,6 @@ type UseAccountConnectionControllerOptions = {
   setCredentialStatus: Dispatch<SetStateAction<CredentialStatus | null>>;
   setImapProbe: Dispatch<SetStateAction<ImapProbeReport | null>>;
   setImapMailboxes: Dispatch<SetStateAction<ImapMailboxState[]>>;
-  setSyncRuns?: Dispatch<SetStateAction<SyncRun[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
   loadMeta: (nextFolderId?: number | null, nextScope?: AccountScope) => Promise<LoadMetaResult>;
   loadMessages: (
@@ -77,6 +75,8 @@ type UseAccountConnectionControllerOptions = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
   ) => Promise<MessageSummary[]>;
+  /** 凭据验证成功后回调（登录遮罩关闭，同步转入绑定账号的后台任务）。 */
+  onAccountCreated?: (account: Account) => void;
 };
 
 export default function useAccountConnectionController({
@@ -105,10 +105,10 @@ export default function useAccountConnectionController({
   setCredentialStatus,
   setImapProbe,
   setImapMailboxes,
-  setSyncRuns,
   setStatus,
   loadMeta,
   loadMessages,
+  onAccountCreated,
 }: UseAccountConnectionControllerOptions) {
   const persistedAccountForm = useMemo(
     () => accounts.find((item) => item.id === accountForm?.id) ?? null,
@@ -197,8 +197,8 @@ export default function useAccountConnectionController({
     setSettingsOpen,
     setCredentialStatus,
     setCredentialVerification,
-    setSyncRuns,
     setStatus,
+    onAccountCreated,
     loadMeta,
     loadMessages,
   });
@@ -220,7 +220,6 @@ export default function useAccountConnectionController({
     setCredentialVerification,
     setImapProbe,
     setImapMailboxes,
-    setSyncRuns,
     setStatus,
     updateProviderVerification,
     loadMeta,

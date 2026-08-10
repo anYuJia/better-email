@@ -70,6 +70,16 @@ describe('GlobalTooltip helpers', () => {
     expect(shouldShowGlobalTooltip(button)).toBe(true);
   });
 
+  it('lets visibly labelled controls opt out of a redundant hover tooltip', () => {
+    const button = fakeElement({
+      textContent: '设置',
+      attributes: { title: '设置', 'data-no-tooltip': '' },
+      hasSvg: true,
+    });
+
+    expect(shouldShowGlobalTooltip(button)).toBe(false);
+  });
+
   it('keeps icon-only and disabled controls on the expected paths', () => {
     const iconButton = fakeElement({
       attributes: { 'aria-label': '搜索' },

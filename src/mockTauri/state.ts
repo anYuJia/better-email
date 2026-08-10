@@ -348,7 +348,7 @@ export let nextAttachmentId = 3;
 export let nextOutboxId = 1;
 export let nextRuleId = 4;
 export let nextIdentityId = 3;
-export let nextContactId = 4;
+export let nextContactId = 1;
 export let nextAccountId = Math.max(...mockAccounts.map((item) => item.id)) + 1;
 
 export let labels = [
@@ -1994,7 +1994,7 @@ export function mockCommitContactImport(args?: InvokeArgs) {
 }
 
 export function mockCommitContactImportEntries(args?: InvokeArgs) {
-  const file_name = String(args?.file_name ?? 'import-contacts.vcf');
+  const file_name = String(args?.fileName ?? 'import-contacts.vcf');
   const rawEntries = Array.isArray(args?.entries)
     ? (args.entries as Array<{
         email: string;

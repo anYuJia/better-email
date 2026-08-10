@@ -18,6 +18,20 @@ export function importSelectionKey(email: string, status: string): string {
   return `${email}|${status}`;
 }
 
+export function formatContactImportError(
+  error: unknown,
+  fallback = '无法读取联系人文件，请检查文件格式和编码后重试。',
+): string {
+  const message = (error instanceof Error ? error.message : String(error ?? ''))
+    .replace(/^Error(?:\([^)]*\))?:\s*/i, '')
+    .replace(/^error:\s*/i, '')
+    .trim();
+  if (/不是有效的\s*UTF-?8|invalid\s+UTF-?8/i.test(message)) {
+    return '文件编码无法识别。请确认选择的是 vCard 或 CSV，并使用 UTF-8（推荐）或 GB18030 编码保存后再导入。';
+  }
+  return message || fallback;
+}
+
 type ContactImportManagerOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
 };
@@ -80,11 +94,9 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
       if (importGenerationRef.current !== generation) return;
       // 解析失败、空文件、格式错误、超过大小限制等都在当前可见对话框内
       // 显示明确错误，并提供重试（重新选择文件）入口。
-      const message = (error instanceof Error ? error.message : String(error))
-        .replace(/^Error:\s*/i, '')
-        .trim();
-      setImportError(message || '无法读取联系人文件，请检查文件格式后重试。');
-      setStatus(message || '联系人文件解析失败，请在导入对话框内重试。');
+      const message = formatContactImportError(error, '联系人文件解析失败，请在导入对话框内重试。');
+      setImportError(message);
+      setStatus(message);
     } finally {
       if (importGenerationRef.current === generation) {
         setPreviewing(false);
@@ -135,7 +147,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
         };
       });
       const summary = await invoke<ContactImportCommitSummary>(IPC.CommitContactImportEntries, {
-        file_name: preview.file_name,
+        fileName: preview.file_name,
         entries,
         scope: 'global',
       });
@@ -145,11 +157,9 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
       await refreshBatches();
       setStatus(`联系人导入完成：新增 ${summary.created}、合并 ${summary.merged}、跳过 ${summary.skipped}`);
     } catch (error) {
-      const message = (error instanceof Error ? error.message : String(error))
-        .replace(/^Error:\s*/i, '')
-        .trim();
-      setImportError(message || '联系人导入失败，请重试。');
-      setStatus(message || '联系人导入失败，请在导入对话框内重试。');
+      const message = formatContactImportError(error, '联系人导入失败，请在导入对话框内重试。');
+      setImportError(message);
+      setStatus(message);
     } finally {
       setImporting(false);
     }

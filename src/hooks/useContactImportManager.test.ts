@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import useContactImportManager from './useContactImportManager';
+import useContactImportManager, { formatContactImportError } from './useContactImportManager';
 import { invoke } from '../tauriBridge';
 import type { ContactImportPreview } from '../app/types/contact';
 
@@ -45,6 +45,11 @@ describe('useContactImportManager import generation', () => {
   });
 
   afterEach(() => cleanup());
+
+  it('turns legacy UTF-8 errors into an actionable encoding message', () => {
+    expect(formatContactImportError(new Error('联系人文件不是有效的 UTF-8 文本。')))
+      .toBe('文件编码无法识别。请确认选择的是 vCard 或 CSV，并使用 UTF-8（推荐）或 GB18030 编码保存后再导入。');
+  });
 
   it('previews a picked file and populates selection defaults', async () => {
     const { utils, setStatus } = renderManager();
@@ -154,7 +159,8 @@ describe('useContactImportManager import generation', () => {
   it('clears a completed session so the next open can select another file', async () => {
     const { utils } = renderManager();
     let pickCount = 0;
-    vi.mocked(invoke).mockImplementation((async (command: string) => {
+    let commitArgs: Record<string, unknown> | undefined;
+    vi.mocked(invoke).mockImplementation((async (command: string, args?: Record<string, unknown>) => {
       if (command === 'pick_contact_import_file') {
         pickCount += 1;
         return pickCount === 1 ? '/mock/first.vcf' : '/mock/second.vcf';
@@ -163,6 +169,7 @@ describe('useContactImportManager import generation', () => {
         return previewFor(pickCount === 1 ? 'first.vcf' : 'second.vcf', pickCount === 1 ? 'first@example.com' : 'second@example.com');
       }
       if (command === 'commit_contact_import_entries') {
+        commitArgs = args;
         return { batch_id: 1, created: 1, merged: 0, skipped: 0 };
       }
       if (command === 'list_contact_import_batches') return [];
@@ -176,6 +183,8 @@ describe('useContactImportManager import generation', () => {
       await utils.result.current.commitImport();
     });
     expect(utils.result.current.commitResult?.created).toBe(1);
+    expect(commitArgs?.fileName).toBe('first.vcf');
+    expect(commitArgs?.file_name).toBeUndefined();
 
     act(() => utils.result.current.cancelImport());
     expect(utils.result.current.commitResult).toBeNull();

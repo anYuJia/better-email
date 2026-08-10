@@ -3064,10 +3064,10 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid #e3b7b2;
+  border: 1px solid var(--st-danger);
   border-radius: 8px;
-  color: #8f2f24;
-  background: #fdf1ef;
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
 }
 
 .contact-import-error strong {
@@ -3083,7 +3083,7 @@
 
 .contact-import-error small {
   font-size: 12px;
-  color: #a05449;
+  color: var(--st-text-secondary);
 }
 
 /* The dialogs are portaled outside .settings-modal, so the st-* component

@@ -470,6 +470,7 @@ export default function ContactImportDialog({
               新增 {commitResult.created} 位联系人，合并 {commitResult.merged} 位，
               跳过 {commitResult.skipped} 位。
             </p>
+            <p>标记为“重复”的条目已跳过，原有联系人不会重复创建；联系人列表按最近导入/使用时间排序，不按文件原始顺序显示。</p>
             <p>新增的联系人可在「最近导入记录」中一键撤销。</p>
             <div className="contact-import-dialog-actions">
               <SettingsButton icon={<History size={14} />} onClick={onOpenHistory}>
@@ -489,7 +490,7 @@ export default function ContactImportDialog({
             <p>
               支持 vCard（.vcf / .vcard）、CSV（.csv）和 Excel（.xlsx / .xlsm）文件，单个文件最大 5 MB。
             </p>
-            <p>CSV / Excel 请使用 name、email 表头；vCard 中的多个邮箱会按 PREF 标记选择主邮箱。</p>
+            <p>CSV / Excel 会按表头识别姓名和邮箱列（支持 name / 姓名、email / 邮箱）；没有姓名时使用邮箱作为名称。vCard 中的多个邮箱会按 PREF 标记选择主邮箱。</p>
             {importError && (
               <div className="contact-import-error" role="alert">
                 <strong>无法导入该文件</strong>

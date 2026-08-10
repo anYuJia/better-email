@@ -85,6 +85,15 @@ describe('ContactImportDialog error handling', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it('explains skipped duplicates and the post-import list ordering', () => {
+    renderDialog({
+      commitResult: { batch_id: 1, created: 2, merged: 0, skipped: 3 },
+    });
+
+    expect(screen.getByText(/重复.*跳过/)).toBeTruthy();
+    expect(screen.getByText(/不按文件原始顺序显示/)).toBeTruthy();
+  });
+
   it('gives initial focus inside the dialog and restores it on close', () => {
     const outside = document.createElement('button');
     outside.textContent = '外部按钮';

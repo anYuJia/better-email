@@ -40,6 +40,7 @@ mod search;
 mod sync;
 
 use self::accounts::{ensure_default_account_for_conn, ensure_default_identity_for_account_conn};
+#[cfg(test)]
 use self::contacts_rules::upsert_contact;
 use self::folders::{create_default_folders_for_account, folder_id_for_role};
 use self::messages::thread_key_for_message;
@@ -412,6 +413,7 @@ impl MailStore {
                         params![message_id],
                     )?;
                 }
+                #[cfg(test)]
                 upsert_contact(conn, sender_name, sender_email, &received_at.to_rfc3339())?;
             }
             db_info(format!(
@@ -486,14 +488,17 @@ fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
     conn.execute(
         "
         DELETE FROM contacts
-        WHERE aliases = ''
-          AND vip = 0
-          AND (
-            (email = 'ada@example.com' AND name = 'Ada Chen')
-            OR (email = 'updates@example.com' AND name = 'Product Robot')
-            OR (email = 'security@example.com' AND name = 'Security Team')
-            OR (email = 'demo@better-email.local' AND name = 'Better Email Demo')
-          )
+        WHERE
+          (lower(email) = 'ada@example.com'
+            AND lower(name) IN ('ada', 'ada chen', 'ada@example.com'))
+          OR (lower(email) = 'updates@example.com'
+            AND lower(name) IN ('product robot', 'updates@example.com'))
+          OR (lower(email) = 'security@example.com'
+            AND lower(name) IN ('security team', 'security@example.com'))
+          OR (lower(email) = 'demo@better-email.local'
+            AND lower(name) IN ('better email demo', 'demo@better-email.local'))
+          OR (lower(email) = 'demo@swiftmail.local'
+            AND lower(name) = lower(email))
         ",
         [],
     )?;
@@ -715,6 +720,21 @@ mod tests {
                 .iter()
                 .any(|account| account.email == "demo@better-email.local"));
             assert!(seeded.get_stats_for_account(None).unwrap().total_messages > 0);
+            seeded
+                .with_conn(|conn| {
+                    conn.execute(
+                        "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
+                         VALUES (?1, ?2, ?3, 0, 0, ?4)",
+                        params![
+                            "demo@swiftmail.local",
+                            "demo@swiftmail.local",
+                            "demo@swiftmail.local, ada@example.com, security@example.com",
+                            Utc::now().to_rfc3339(),
+                        ],
+                    )?;
+                    Ok(())
+                })
+                .expect("legacy mock contact inserted");
         }
 
         let cleaned = MailStore::open_at(path).expect("cleaned store opens");
@@ -3743,6 +3763,25 @@ mod tests {
         assert_eq!(item.status, "queued");
         let flushed = store.flush_outbox_dry_run().unwrap();
         assert!(flushed.iter().any(|item| item.status == "sent_dry_run"));
+    }
+
+    #[test]
+    fn contact_list_is_not_truncated_after_large_imports() {
+        let store =
+            MailStore::open_at_with_seed(test_database_path("better-email-contact-list"), false)
+                .expect("empty contact store opens");
+        for index in 0..125 {
+            store
+                .create_contact(ContactCreateInput {
+                    name: format!("Contact {index}"),
+                    email: format!("contact-{index}@example.com"),
+                    aliases: Vec::new(),
+                    vip: false,
+                })
+                .expect("contact creates");
+        }
+
+        assert_eq!(store.list_contacts().unwrap().len(), 125);
     }
 
     #[test]

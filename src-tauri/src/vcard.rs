@@ -1,5 +1,6 @@
 use crate::models::{Contact, ContactCreateInput};
 use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
+use encoding_rs::GB18030;
 
 #[derive(Debug, Clone)]
 pub struct ParsedVcards {
@@ -51,9 +52,74 @@ pub fn parse_contact_import_bytes(
             format: "xlsx".to_string(),
         });
     }
-    let raw = std::str::from_utf8(payload)
-        .map_err(|_| "联系人文件不是有效的 UTF-8 文本。".to_string())?;
-    Ok(parse_contact_import(raw, file_name))
+    let raw = decode_contact_text(payload, file_name)?;
+    Ok(parse_contact_import(&raw, file_name))
+}
+
+fn contact_text_format(file_name: &str) -> Option<&'static str> {
+    let extension = file_name
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())?;
+    match extension.as_str() {
+        "csv" => Some("CSV"),
+        "vcf" | "vcard" => Some("vCard"),
+        _ => None,
+    }
+}
+
+fn encoding_error(format: &str) -> String {
+    format!("{format} 文件编码无法识别。请将文件另存为 UTF-8（推荐）或 GB18030 编码后再导入。")
+}
+
+fn strip_utf8_bom(value: &str) -> String {
+    value.strip_prefix('\u{feff}').unwrap_or(value).to_string()
+}
+
+fn decode_utf16_with_bom(payload: &[u8]) -> Result<Option<String>, String> {
+    if payload.len() < 2 {
+        return Ok(None);
+    }
+    let (little_endian, bytes) = match payload[..2] {
+        [0xff, 0xfe] => (true, &payload[2..]),
+        [0xfe, 0xff] => (false, &payload[2..]),
+        _ => return Ok(None),
+    };
+    if bytes.len() % 2 != 0 {
+        return Err("文件编码无法识别。请将 CSV 或 vCard 另存为 UTF-8 编码后再导入。".to_string());
+    }
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|chunk| {
+            if little_endian {
+                u16::from_le_bytes([chunk[0], chunk[1]])
+            } else {
+                u16::from_be_bytes([chunk[0], chunk[1]])
+            }
+        })
+        .collect();
+    String::from_utf16(&units)
+        .map(Some)
+        .map_err(|_| "文件编码无法识别。请将 CSV 或 vCard 另存为 UTF-8 编码后再导入。".to_string())
+}
+
+fn decode_contact_text(payload: &[u8], file_name: &str) -> Result<String, String> {
+    let Some(format) = contact_text_format(file_name) else {
+        return Err(
+            "不支持的联系人文件格式。请选择 vCard（.vcf/.vcard）、CSV（.csv）或 Excel（.xlsx/.xlsm）文件。"
+                .to_string(),
+        );
+    };
+    if let Ok(value) = std::str::from_utf8(payload) {
+        return Ok(strip_utf8_bom(value));
+    }
+    if let Some(value) = decode_utf16_with_bom(payload)? {
+        return Ok(strip_utf8_bom(&value));
+    }
+    let (decoded, _, had_errors) = GB18030.decode(payload);
+    if !had_errors {
+        return Ok(strip_utf8_bom(&decoded));
+    }
+    Err(encoding_error(format))
 }
 
 pub fn parse_contacts_xlsx(payload: &[u8]) -> Result<ParsedVcards, String> {
@@ -86,75 +152,149 @@ pub fn parse_contacts_csv(raw: &str) -> ParsedVcards {
     parse_contact_rows(parse_csv_rows(raw))
 }
 
+#[derive(Debug, Clone)]
+struct ContactColumnMap {
+    name: Option<usize>,
+    emails: Vec<usize>,
+}
+
+fn normalized_header(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|character| !character.is_whitespace() && !matches!(character, '_' | '-' | ':'))
+        .collect()
+}
+
+fn is_email_header(value: &str) -> bool {
+    let normalized = normalized_header(value);
+    normalized.contains("email")
+        || normalized.contains("邮箱")
+        || normalized.contains("电子邮件")
+        || normalized.contains("邮件地址")
+        || normalized == "mail"
+}
+
+fn is_name_header(value: &str) -> bool {
+    let normalized = normalized_header(value);
+    normalized == "name"
+        || normalized == "fullname"
+        || normalized == "displayname"
+        || normalized == "contactname"
+        || normalized.contains("姓名")
+        || normalized.contains("联系人")
+        || normalized == "名字"
+        || normalized == "昵称"
+        || normalized == "名称"
+}
+
+fn contact_column_map(row: &[String]) -> Option<ContactColumnMap> {
+    let emails: Vec<usize> = row
+        .iter()
+        .enumerate()
+        .filter_map(|(index, cell)| is_email_header(cell).then_some(index))
+        .collect();
+    if emails.is_empty() {
+        return None;
+    }
+    let name = row
+        .iter()
+        .enumerate()
+        .find_map(|(index, cell)| is_name_header(cell).then_some(index));
+    Some(ContactColumnMap { name, emails })
+}
+
+fn is_numeric_identifier(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty()
+        && value.chars().any(|character| character.is_ascii_digit())
+        && value
+            .chars()
+            .all(|character| character.is_ascii_digit() || matches!(character, '+' | '-' | ' '))
+}
+
+fn extract_emails(value: &str) -> Vec<String> {
+    value
+        .split([',', ';', ' '])
+        .filter_map(|part| {
+            let candidate = part.trim().trim_matches('"').trim().to_ascii_lowercase();
+            is_valid_email(&candidate).then_some(candidate)
+        })
+        .collect()
+}
+
 fn parse_contact_rows(rows: Vec<Vec<String>>) -> ParsedVcards {
     let mut contacts: Vec<ContactCreateInput> = Vec::new();
     let mut skipped = 0_i64;
-    let mut header_seen = false;
+    let mut column_map: Option<ContactColumnMap> = None;
     for row in rows {
-        let mut cells = row;
+        let cells = row;
         if cells.len() == 1 && cells[0].trim().is_empty() {
             skipped += 1;
             continue;
         }
-        let header_indicators = [
-            "name",
-            "姓名",
-            "名字",
-            "email",
-            "邮箱",
-            "邮件",
-            "地址",
-            "联系人",
-        ];
-        if !header_seen
-            && cells.iter().any(|cell| {
-                let value = cell.trim().to_ascii_lowercase();
-                header_indicators
-                    .iter()
-                    .any(|indicator| value == *indicator)
-            })
-        {
-            header_seen = true;
-            continue;
+        if column_map.is_none() {
+            if let Some(map) = contact_column_map(&cells) {
+                column_map = Some(map);
+                continue;
+            }
         }
-        let mut name = String::new();
+
+        let mut name_candidates: Vec<String> = Vec::new();
         let mut email_cells: Vec<String> = Vec::new();
-        for cell in cells.iter_mut() {
-            let value = cell.trim().to_string();
+        if let Some(map) = &column_map {
+            if let Some(index) = map.name {
+                if let Some(value) = cells
+                    .get(index)
+                    .map(|cell| cell.trim())
+                    .filter(|value| !value.is_empty())
+                {
+                    name_candidates.push(value.to_string());
+                }
+            }
+            for index in &map.emails {
+                if let Some(value) = cells.get(*index) {
+                    email_cells.push(value.clone());
+                }
+            }
+        } else {
+            name_candidates.extend(
+                cells
+                    .iter()
+                    .filter(|cell| !cell.trim().is_empty() && extract_emails(cell).is_empty())
+                    .cloned(),
+            );
+            email_cells.extend(cells.iter().cloned());
+        }
+
+        let mut name = name_candidates
+            .iter()
+            .find(|candidate| !is_numeric_identifier(candidate))
+            .cloned()
+            .unwrap_or_default();
+        let mut parsed_email_cells: Vec<String> = Vec::new();
+        for cell in &email_cells {
+            let value = cell.trim();
             if value.is_empty() {
                 continue;
             }
-            let emails: Vec<String> = value
-                .split([',', ';', ' '])
-                .filter_map(|part| {
-                    let candidate = part.trim().trim_matches('"').trim().to_ascii_lowercase();
-                    if is_valid_email(&candidate) {
-                        Some(candidate)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            if !emails.is_empty() {
-                email_cells.extend(emails);
-            } else if name.is_empty() {
-                name = value;
-            }
+            parsed_email_cells.extend(extract_emails(value));
         }
-        if email_cells.is_empty() {
+        if parsed_email_cells.is_empty() {
             skipped += 1;
             continue;
         }
-        email_cells.sort();
-        email_cells.dedup();
-        let primary = email_cells.remove(0);
+        parsed_email_cells.sort();
+        parsed_email_cells.dedup();
+        let primary = parsed_email_cells.remove(0);
         if name.is_empty() {
             name = primary.clone();
         }
         contacts.push(ContactCreateInput {
             name,
             email: primary,
-            aliases: email_cells,
+            aliases: parsed_email_cells,
             vip: false,
         });
     }
@@ -533,6 +673,23 @@ mod tests {
     }
 
     #[test]
+    fn maps_csv_name_and_email_columns_instead_of_using_numeric_ids() {
+        let parsed = parse_contacts_csv(concat!(
+            "编号,手机号,姓名,邮箱地址\n",
+            "-9000000000000000001,13800000000,测试联系人,person.one@example.com\n",
+            "006973,13800000001,,person.two@example.com\n",
+        ));
+
+        assert_eq!(parsed.contacts.len(), 2);
+        assert_eq!(parsed.contacts[0].name, "测试联系人");
+        assert_eq!(parsed.contacts[0].email, "person.one@example.com");
+        assert_eq!(parsed.contacts[1].name, "person.two@example.com");
+
+        let no_header = parse_contacts_csv("12345,张三,zhangsan@example.com\n");
+        assert_eq!(no_header.contacts[0].name, "张三");
+    }
+
+    #[test]
     fn csv_parser_handles_escaped_quotes_and_detects_header() {
         let parsed = parse_contacts_csv("name,email\n\"\"\"Dr.\"\" Grace\",grace@example.com\n");
         assert_eq!(parsed.contacts.len(), 1);
@@ -549,6 +706,27 @@ mod tests {
         );
         assert_eq!(vcard_parsed.format, "vcard");
         assert_eq!(vcard_parsed.contacts.len(), 1);
+    }
+
+    #[test]
+    fn decodes_gb18030_csv_and_utf8_bom() {
+        let (gb18030, _, had_errors) = GB18030.encode("姓名,邮箱\n张三,zhang@example.com\n");
+        assert!(!had_errors);
+        let parsed = parse_contact_import_bytes(&gb18030, "contacts.csv").unwrap();
+        assert_eq!(parsed.contacts[0].name, "张三");
+
+        let utf8_bom = b"\xef\xbb\xbfname,email\nAda,ada@example.com\n";
+        let parsed = parse_contact_import_bytes(utf8_bom, "contacts.csv").unwrap();
+        assert_eq!(parsed.contacts[0].email, "ada@example.com");
+    }
+
+    #[test]
+    fn reports_actionable_errors_for_unsupported_and_invalid_text_files() {
+        let unsupported = parse_contact_import_bytes(b"not a contact", "video.mp4").unwrap_err();
+        assert!(unsupported.contains("不支持的联系人文件格式"));
+
+        let invalid = parse_contact_import_bytes(&[0xff, 0xff, 0xff], "contacts.csv").unwrap_err();
+        assert!(invalid.contains("CSV 文件编码无法识别"));
     }
 
     fn build_minimal_xlsx() -> Vec<u8> {

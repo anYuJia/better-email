@@ -8,7 +8,7 @@ impl MailStore {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-                 FROM contacts ORDER BY last_seen_at DESC, name LIMIT 100",
+                 FROM contacts ORDER BY last_seen_at DESC, name",
             )?;
             let contacts = stmt
                 .query_map([], |row| {

@@ -19,6 +19,7 @@ pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<Strin
         .file()
         .set_title("导入联系人（vCard / CSV / Excel）")
         .add_filter("联系人文件", &["vcf", "vcard", "csv", "xlsx", "xlsm"])
+        .set_can_create_directories(false)
         .blocking_pick_file()
     else {
         return Ok(None);
@@ -241,6 +242,8 @@ async fn read_contact_import_file(
         .dialog()
         .file()
         .set_title("导入联系人 vCard 或 CSV")
+        .add_filter("联系人文件", &["vcf", "vcard", "csv"])
+        .set_can_create_directories(false)
         .blocking_pick_file()
     else {
         return Ok(None);

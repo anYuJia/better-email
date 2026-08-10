@@ -845,7 +845,7 @@
 .thread-message.active {
   border-color: var(--ui-border);
   background: var(--ui-accent-soft);
-  box-shadow: inset 3px 0 0 var(--ui-accent);
+  box-shadow: none;
 }
 
 .thread-message header {

@@ -54,7 +54,7 @@ textarea:focus-visible {
 /* Thread view active states share the 2026 theme accent. */
 .thread-message.active {
   background: var(--ui-accent-soft);
-  box-shadow: inset 3px 0 0 var(--ui-accent);
+  box-shadow: none;
 }
 
 .message-chips {

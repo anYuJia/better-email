@@ -503,7 +503,7 @@
 .app-shell .message-card.is-unread.selected:hover {
   border-color: transparent;
   background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--ui-accent);
+  box-shadow: none;
 }
 
 :root[data-theme="dark"] .app-shell .message-card.selected,
@@ -512,7 +512,7 @@
 :root[data-theme="dark"] .app-shell .message-card.is-unread.selected:hover {
   border-color: transparent;
   background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--ui-accent);
+  box-shadow: none;
 }
 
 .app-shell .message-card .message-unread-dot {
@@ -571,7 +571,7 @@
 .app-shell .thread-card.selected:hover {
   border-color: transparent !important;
   background: var(--quiet-row-selected) !important;
-  box-shadow: inset 2px 0 0 var(--ui-accent) !important;
+  box-shadow: none !important;
 }
 
 /* Dark mode has a local !important fallback for the previous card layout;
@@ -594,7 +594,7 @@
 :root[data-theme="dark"] .app-shell .thread-card.selected:hover {
   border-color: transparent !important;
   background: var(--quiet-row-selected) !important;
-  box-shadow: inset 2px 0 0 var(--ui-accent) !important;
+  box-shadow: none !important;
 }
 
 .app-shell .bulk-toolbar {

@@ -211,9 +211,9 @@ impl MailStore {
             data_dir,
             database_path: path,
         };
-        // 启动路径绝不访问系统凭据库（Keychain / Credential Manager）：
-        // 凭据只在用户明确操作（同步、发送、验证、保存）时按需读取或写入，
-        // 避免干净安装后启动弹出 Keychain 授权提示。
+        // 账号凭据只保存在应用自己的 SQLite 数据库，任何路径都不访问
+        // 系统凭据库（Keychain / Credential Manager），因此启动、更新检查、
+        // 打开设置页乃至查看邮件都不会触发 macOS Keychain 授权提示。
         store.migrate()?;
         if !seed_demo_data {
             store.remove_demo_seed_data()?;
@@ -603,6 +603,51 @@ mod tests {
             remaining, 1,
             "startup must not migrate or erase SQLite secrets"
         );
+    }
+
+    #[test]
+    fn account_secret_round_trip_stays_in_local_database() {
+        // 回归测试：账号凭据只保存在应用自己的 SQLite 数据库。
+        // 存储→读取→检查→删除全程不依赖任何系统凭据服务，
+        // 在任何平台（含 macOS）都不会触发 Keychain 授权提示。
+        let db_path = test_database_path("better-email-sqlite-credentials");
+        let store = MailStore::open_at(db_path.clone()).expect("store opens");
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "INSERT INTO accounts(id, email, display_name, provider, created_at)
+                     VALUES (901, 'sqlite-creds@example.com', 'Sqlite', 'gmail', '2026-07-15')",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("account seeded");
+
+        let account = store.get_account_by_id(Some(901)).expect("account loaded");
+        let stored = store
+            .store_account_secret("sqlite-creds@example.com", "round-trip-secret")
+            .expect("secret stored");
+        assert!(stored.exists);
+
+        let secret = store
+            .get_account_secret_raw(&account)
+            .expect("secret read back");
+        assert_eq!(secret, "round-trip-secret");
+
+        let checked = store
+            .check_account_secret("sqlite-creds@example.com")
+            .expect("secret checked");
+        assert!(checked.exists);
+
+        let deleted = store
+            .delete_account_secret("sqlite-creds@example.com")
+            .expect("secret deleted");
+        assert!(!deleted.exists);
+
+        let after_delete = store
+            .get_account_secret_raw(&account)
+            .expect_err("secret must be gone after delete");
+        assert!(after_delete.to_string().contains("未保存"));
     }
 
     #[test]

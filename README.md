@@ -36,7 +36,7 @@
 
 ### 1. 🔒 本地优先与系统级安全 (Local-First & OS Security)
 * **SQLite 本地索引**：所有邮件正文、联系人、标签与元数据全量保存在本地 SQLite 数据库中，秒级全文搜索，离线随时查阅。
-* **系统凭据安全 (Keychain / Credential Manager)**：账号密码、App 授权码与 OAuth Token 按需存储于系统 OS 级凭据管理器中（macOS Keychain / Windows Credential Vault / Linux secret-service），仅在用户执行邮件操作（同步、发送、验证、保存、删除）时访问，应用启动、检查更新与打开设置页绝不触碰系统凭据库，也不会弹出 Keychain 授权提示；系统凭据库不可用时回退本地数据库并明确提示。凭据绝不上传第三方服务器。
+* **凭据本地存储 (Local Credentials)**：账号密码、App 授权码与 OAuth Token 只保存在应用自己的本地 SQLite 数据库（app 数据目录，文件权限 0600），应用启动、检查更新、打开设置页与查看邮件等任何操作都不会访问 macOS Keychain，也不会弹出系统授权提示；凭据绝不上传第三方服务器。
 * **隐私追踪拦截 (Tracker Blocking)**：默认拦截邮件中的像素追踪图片与第三方跨站 Link，邮件浏览更无痕。
 
 ### 2. 🚀 极致性能与低资源占用 (Rust Core Engine)

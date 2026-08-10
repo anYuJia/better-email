@@ -23,79 +23,10 @@ fn oauth_bundle_from_raw(raw: &str) -> Result<OAuthTokenBundle, String> {
     Ok(bundle)
 }
 
-/// 系统凭据服务名（macOS Keychain / Windows Credential Manager / Linux secret-service）。
-///
-/// 仅账号邮件凭据使用系统凭据库，并且只在用户明确操作时访问：
-/// 同步/发送/验证/保存/删除。应用启动、更新检查和打开设置页都不会触碰这里。
-pub const KEYCHAIN_SERVICE: &str = "app.betteremail.client";
-
-/// 只做精确匹配（service + account），绝不使用泛匹配查询，
-/// 也不会读取其他应用或旧应用写入的凭据项目。
-fn keychain_entry_for(service: &str, account_email: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(service, account_email.trim())
-        .map_err(|error| format!("系统凭据库初始化失败：{error}"))
-}
-
-/// 将账号凭据写入系统凭据库。失败时返回错误信息，由调用方决定是否回退。
-pub fn keychain_set_secret(account_email: &str, secret: &str) -> Result<(), String> {
-    let entry = keychain_entry_for(KEYCHAIN_SERVICE, account_email)?;
-    entry
-        .set_password(secret)
-        .map_err(|error| format!("系统凭据库写入失败：{error}"))
-}
-
-/// 从系统凭据库读取账号凭据。不存在时返回 Ok(None)。
-pub fn keychain_get_secret(account_email: &str) -> Result<Option<String>, String> {
-    let entry = keychain_entry_for(KEYCHAIN_SERVICE, account_email)?;
-    match entry.get_password() {
-        Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(format!("系统凭据库读取失败：{error}")),
-    }
-}
-
-/// 从系统凭据库删除账号凭据。不存在时视为已删除。
-pub fn keychain_delete_secret(account_email: &str) -> Result<(), String> {
-    let entry = keychain_entry_for(KEYCHAIN_SERVICE, account_email)?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(format!("系统凭据库删除失败：{error}")),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::CredentialStatus;
-
-    /// 测试专用服务名，与生产服务名 `app.betteremail.client` 完全隔离，
-    /// 确保单元测试永远不会触碰真实应用的 Keychain 项目。
-    const TEST_KEYCHAIN_SERVICE: &str = "dev.test.betteremail.keyring";
-
-    fn test_keychain_set_secret(account_email: &str, secret: &str) -> Result<(), String> {
-        keychain_entry_for(TEST_KEYCHAIN_SERVICE, account_email)?
-            .set_password(secret)
-            .map_err(|error| format!("测试凭据库写入失败：{error}"))
-    }
-
-    fn test_keychain_get_secret(account_email: &str) -> Result<Option<String>, String> {
-        let entry = keychain_entry_for(TEST_KEYCHAIN_SERVICE, account_email)?;
-        match entry.get_password() {
-            Ok(secret) => Ok(Some(secret)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(error) => Err(format!("测试凭据库读取失败：{error}")),
-        }
-    }
-
-    fn test_keychain_delete_secret(account_email: &str) -> Result<(), String> {
-        let entry = keychain_entry_for(TEST_KEYCHAIN_SERVICE, account_email)?;
-        match entry.delete_credential() {
-            Ok(()) => Ok(()),
-            Err(keyring::Error::NoEntry) => Ok(()),
-            Err(error) => Err(format!("测试凭据库删除失败：{error}")),
-        }
-    }
 
     #[test]
     fn status_shape_does_not_expose_secret() {
@@ -126,40 +57,5 @@ mod tests {
             AccountSecret::OAuth2(bundle) => assert_eq!(bundle.access_token, "access-123"),
             AccountSecret::Password(_) => panic!("oauth2 auth should parse token bundle"),
         }
-    }
-
-    #[test]
-    fn keychain_missing_entry_reads_as_none_without_error() {
-        let email = "keychain-test-none@example.com";
-        let _ = test_keychain_delete_secret(email);
-        match test_keychain_get_secret(email) {
-            Ok(option) => assert!(option.is_none()),
-            Err(error) => {
-                // 无可用系统凭据库（如 headless Linux）时跳过，不视为失败。
-                assert!(error.contains("系统凭据库"));
-            }
-        }
-    }
-
-    #[test]
-    fn keychain_round_trip_uses_exact_service_and_account_scope() {
-        let email = "round-trip@example.com";
-        let _ = test_keychain_delete_secret(email);
-        let read_missing = test_keychain_get_secret(email);
-        match read_missing {
-            Ok(option) => assert!(option.is_none()),
-            Err(error) => {
-                assert!(error.contains("系统凭据库"));
-                return;
-            }
-        }
-        test_keychain_set_secret(email, "exact-secret-value").expect("secret stored");
-        let read_back = test_keychain_get_secret(email).expect("secret read");
-        assert_eq!(read_back.as_deref(), Some("exact-secret-value"));
-        let other_account = test_keychain_get_secret("other-account@example.com").unwrap_or(None);
-        assert!(other_account.is_none());
-        test_keychain_delete_secret(email).expect("secret deleted");
-        let read_after_delete = test_keychain_get_secret(email).unwrap_or(None);
-        assert!(read_after_delete.is_none());
     }
 }

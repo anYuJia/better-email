@@ -179,7 +179,7 @@ impl MailStore {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
             let now = Utc::now().to_rfc3339();
-            let message = "OAuth2 token 已交换并保存到系统凭据库。";
+            let message = "OAuth2 token 已交换并保存到本地应用数据库。";
             conn.execute(
                 "
                 UPDATE oauth_sessions

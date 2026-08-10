@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### 安全
+- 账号密码、App 授权码与 OAuth Token 改为只保存在应用本地 SQLite 数据库（app 数据目录，0600 权限），完全移除对系统凭据库（macOS Keychain / Windows Credential Manager）的读写；查看邮件、同步、发送、标记已读等任何操作都不会再触发 macOS Keychain 授权提示。用户已有的 Keychain 数据不会被删除，只是不再读取（需重新录入一次凭据）。
+
 ## [1.0.12] - 2026-08
 
 ### 安全

@@ -34,6 +34,8 @@ import {
   SettingsSwitch,
 } from './shared';
 
+const FOCUSABLE_SELECTOR = 'button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 type ContactAutomationSettingsProps = {
   contactForm: ContactCreateInput;
   contactFormAliases: string;
@@ -130,7 +132,9 @@ export default function ContactAutomationSettings({
     if (!dialog) return undefined;
     const focusSelector = dialog === 'details'
       ? '.settings-contact-dialog-close'
-      : 'input, textarea, button:not(.settings-contact-dialog-close)';
+      : dialog === 'edit'
+        ? '#contact-edit-name'
+        : 'input:not([readonly]), textarea, button:not(.settings-contact-dialog-close)';
     const focusTarget = dialogRef.current?.querySelector<HTMLElement>(focusSelector);
     focusTarget?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -138,6 +142,30 @@ export default function ContactAutomationSettings({
         event.preventDefault();
         event.stopPropagation();
         closeContactDialog();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusable = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+        .filter((element) => !element.hasAttribute('disabled'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!root.contains(active)) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+      if (event.shiftKey) {
+        if (active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onKeyDown);
@@ -368,12 +396,31 @@ export default function ContactAutomationSettings({
               <span><strong id="contact-details-title">{selectedContact.name || selectedContact.email}</strong><small>{selectedContact.vip ? 'VIP 联系人' : '联系人详情'}</small></span>
               <button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button>
             </header>
-            <dl className="settings-contact-details"><div><dt>邮箱地址</dt><dd>{selectedContact.email}</dd></div><div><dt>别名邮箱</dt><dd>{selectedContact.aliases.length ? selectedContact.aliases.join('、') : '未设置'}</dd></div><div><dt>往来邮件</dt><dd>{selectedContact.message_count} 封</dd></div></dl>
+            <dl className="settings-contact-details">
+              <div className="settings-contact-detail-primary">
+                <dt>邮箱地址</dt>
+                <dd>{selectedContact.email}</dd>
+              </div>
+              <div>
+                <dt>别名邮箱</dt>
+                <dd className={selectedContact.aliases.length === 0 ? 'settings-contact-detail-empty' : undefined}>
+                  {selectedContact.aliases.length ? selectedContact.aliases.join('、') : '未设置'}
+                </dd>
+              </div>
+              <div>
+                <dt>往来邮件</dt>
+                <dd>{selectedContact.message_count} 封</dd>
+              </div>
+            </dl>
             <footer className="settings-contact-detail-actions">
-              <SettingsButton size="sm" variant="ghost" icon={<Send size={14} />} onClick={() => onComposeToContact(selectedContact)}>写信</SettingsButton>
-              <SettingsButton size="sm" variant="ghost" icon={<Star size={14} />} onClick={() => toggleDetailVip(selectedContact)}>{selectedContact.vip ? '取消 VIP' : '设为 VIP'}</SettingsButton>
-              <SettingsButton size="sm" variant="danger-secondary" icon={<Trash2 size={14} />} onClick={() => { onDeleteContact(selectedContact); closeContactDialog(); }}>删除</SettingsButton>
-              <SettingsButton size="sm" variant="primary" icon={<Pencil size={14} />} onClick={() => openEdit(selectedContact)}>编辑</SettingsButton>
+              <span className="settings-contact-detail-actions-danger">
+                <SettingsButton size="sm" variant="danger-secondary" icon={<Trash2 size={14} />} onClick={() => { onDeleteContact(selectedContact); closeContactDialog(); }}>删除</SettingsButton>
+              </span>
+              <span className="settings-contact-detail-actions-primary">
+                <SettingsButton variant="primary" icon={<Send size={14} />} onClick={() => onComposeToContact(selectedContact)}>写信</SettingsButton>
+                <SettingsButton size="sm" variant="secondary" icon={<Star size={14} />} onClick={() => toggleDetailVip(selectedContact)}>{selectedContact.vip ? '取消 VIP' : '设为 VIP'}</SettingsButton>
+                <SettingsButton size="sm" variant="secondary" icon={<Pencil size={14} />} onClick={() => openEdit(selectedContact)}>编辑</SettingsButton>
+              </span>
             </footer>
           </section>
         </div>
@@ -382,11 +429,19 @@ export default function ContactAutomationSettings({
       {dialog === 'edit' && selectedContact && (
         <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
           <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-edit-form" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title" onMouseDown={(event) => event.stopPropagation()}>
-            <header><span className="settings-contact-dialog-mark"><Pencil size={18} /></span><span><strong id="contact-edit-title">编辑联系人</strong><small>{selectedContact.email}</small></span><button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button></header>
-            <SettingsField label="联系人名称"><input value={editName} onChange={(event) => onEditNameChange(event.target.value)} placeholder="联系人名称" /></SettingsField>
-            <SettingsField label="别名邮箱" error={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0 ? editAliasIssueText : undefined} hint={editAliasIssues.invalid.length === 0 && editAliasIssues.duplicatesWithin.length === 0 && editAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}><textarea rows={2} value={editAliases} onChange={(event) => onEditAliasesChange(event.target.value)} placeholder="alias@example.com" /></SettingsField>
+            <header><span className="settings-contact-dialog-mark"><Pencil size={18} /></span><span><strong id="contact-edit-title">编辑联系人</strong><small>修改显示名称与别名邮箱</small></span><button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button></header>
+            <div className="settings-contact-edit-email" role="group" aria-label="主邮箱">
+              <span className="settings-contact-edit-email-label">主邮箱</span>
+              <strong className="settings-contact-edit-email-value">{selectedContact.email}</strong>
+            </div>
+            <SettingsField label="显示名称" htmlFor="contact-edit-name">
+              <input id="contact-edit-name" value={editName} onChange={(event) => onEditNameChange(event.target.value)} placeholder="显示名称" />
+            </SettingsField>
+            <SettingsField label="别名邮箱" error={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0 ? editAliasIssueText : undefined} hint={editAliasIssues.invalid.length === 0 && editAliasIssues.duplicatesWithin.length === 0 && editAliasIssues.takenByOther.length === 0 ? '可用逗号、分号或换行分隔多个别名。' : undefined}>
+              <textarea rows={2} value={editAliases} onChange={(event) => onEditAliasesChange(event.target.value)} placeholder="alias@example.com" />
+            </SettingsField>
             {createError && <p className="settings-contact-save-error" role="alert">{createError}</p>}
-            <footer><SettingsButton onClick={closeContactDialog}>取消</SettingsButton><SettingsButton variant="primary" disabled={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0} onClick={async () => { try { await onSaveContactOverride(selectedContact); closeContactDialog(); } catch (error) { setCreateError(error instanceof Error ? error.message : String(error)); } }}>确认保存</SettingsButton></footer>
+            <footer><SettingsButton onClick={closeContactDialog}>取消</SettingsButton><SettingsButton variant="primary" disabled={editAliasIssues.invalid.length > 0 || editAliasIssues.duplicatesWithin.length > 0 || editAliasIssues.takenByOther.length > 0} onClick={async () => { try { await onSaveContactOverride(selectedContact); closeContactDialog(); } catch (error) { setCreateError(error instanceof Error ? error.message : String(error)); } }}>保存</SettingsButton></footer>
           </section>
         </div>
       )}

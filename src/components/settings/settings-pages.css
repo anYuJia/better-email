@@ -2467,26 +2467,41 @@
 }
 
 .settings-modal .contact-edit-form {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
-  gap: 10px;
+  align-content: start;
 }
 
 .settings-modal .contact-edit-form .st-field {
   padding: 0;
 }
 
-.settings-modal .contact-edit-form textarea {
+.settings-modal .settings-contact-edit-email {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-contact-edit-email-label {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 560;
+}
+
+.settings-modal .settings-contact-edit-email-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 560;
+  line-height: 1.45;
+}
+
+.settings-modal .settings-contact-dialog.contact-edit-form textarea {
   height: 84px;
   min-height: 84px;
   resize: none;
-}
-
-.settings-modal .contact-edit-form .contact-edit-actions {
-  grid-column: 1 / -1;
-  justify-content: flex-end;
-  padding-top: 2px;
 }
 
 .settings-modal .settings-contact-search {
@@ -2612,6 +2627,7 @@
   place-items: center;
   padding: 16px;
   background: rgba(15, 23, 42, 0.5);
+  overscroll-behavior: contain;
 }
 
 .settings-modal .settings-contact-dialog {
@@ -2622,9 +2638,9 @@
   padding: 18px;
   overflow-y: auto;
   border: 1px solid var(--st-border-strong);
-  border-radius: var(--st-radius-lg);
+  border-radius: var(--st-radius-sm);
   background: var(--st-surface);
-  box-shadow: var(--st-shadow-modal);
+  box-shadow: var(--st-shadow-float);
 }
 
 .settings-modal .settings-contact-dialog > header {
@@ -2671,11 +2687,25 @@
 .settings-modal .settings-contact-dialog textarea { min-height: 72px; resize: vertical; }
 .settings-modal .settings-contact-dialog .st-switch { padding: 4px 0; }
 
-.settings-modal .settings-contact-details { display: grid; gap: 10px; margin: 0; }
-.settings-modal .settings-contact-details > div { display: grid; gap: 3px; padding: 10px 12px; border-radius: var(--st-radius-md); background: var(--st-surface-subtle); }
-.settings-modal .settings-contact-details dt { color: var(--st-text-secondary); font-size: var(--st-font-size-secondary); }
-.settings-modal .settings-contact-details dd { margin: 0; overflow-wrap: anywhere; color: var(--st-text); font-size: var(--st-font-size-body); }
+.settings-modal .settings-contact-details { display: grid; margin: 0; border-top: 1px solid var(--st-border); }
+.settings-modal .settings-contact-details > div { min-width: 0; display: grid; gap: 3px; padding: 10px 2px; border-bottom: 1px solid var(--st-border); }
+.settings-modal .settings-contact-details dt { color: var(--st-text-secondary); font-size: var(--st-font-size-secondary); font-weight: 560; }
+.settings-modal .settings-contact-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--st-text); font-size: var(--st-font-size-body); line-height: 1.45; }
+.settings-modal .settings-contact-details .settings-contact-detail-primary dd { font-size: var(--st-font-size-card-title); font-weight: 620; }
+.settings-modal .settings-contact-details dd.settings-contact-detail-empty { color: var(--st-text-tertiary); }
 .settings-modal .settings-contact-detail-actions { flex-wrap: wrap; }
+.settings-modal .settings-contact-detail-actions-danger {
+  margin-inline-end: auto;
+  padding-inline-end: 10px;
+  border-inline-end: 1px solid var(--st-border);
+}
+.settings-modal .settings-contact-detail-actions-primary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 .settings-modal .settings-rule-editor {
   display: grid;
@@ -4639,17 +4669,34 @@
     display: none;
   }
 
-  .settings-modal .settings-contact-dialog footer.settings-contact-detail-actions {
+  .settings-modal footer.settings-contact-detail-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
-  .settings-modal .settings-contact-detail-actions .st-btn {
+  .settings-modal .settings-contact-detail-actions-danger {
+    grid-column: 1 / -1;
+    margin-inline-end: 0;
+    padding-inline-end: 0;
+    padding-bottom: 8px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--st-border);
+  }
+
+  .settings-modal .settings-contact-detail-actions-primary {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .settings-modal .settings-contact-detail-actions-primary .st-btn {
     width: 100%;
     justify-content: center;
   }
 
-  .settings-modal .settings-contact-detail-actions .st-btn:last-child {
+  .settings-modal footer.settings-contact-detail-actions .st-btn:first-child {
     grid-column: 1 / -1;
   }
 
@@ -4657,8 +4704,7 @@
   .settings-modal .settings-oauth-grid,
   .settings-modal .settings-account-protocol-grid,
   .settings-modal .settings-contact-create-fields,
-  .settings-modal .settings-contact-list-toolbar,
-  .settings-modal .contact-edit-form {
+  .settings-modal .settings-contact-list-toolbar {
     grid-template-columns: 1fr;
   }
 

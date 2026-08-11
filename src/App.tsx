@@ -205,7 +205,7 @@ export default function App() {
     setStatus,
   });
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
-  const [backgroundSyncStatus, setBackgroundSyncStatus] = useState('后台同步待机');
+  const [, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
   const [remoteImageTrusts, setRemoteImageTrusts] = useState<RemoteImageTrust[]>([]);
@@ -272,7 +272,6 @@ export default function App() {
     moveLayoutMouseResize,
     endLayoutResize,
     endLayoutMouseResize,
-    resetAppLayout,
   } = useAppLayout();
   const {
     undoAction,
@@ -408,7 +407,11 @@ export default function App() {
     mailboxListStateKey,
     messageLimit,
   });
-  const { enqueueBackgroundTask, enqueueAccountInitialSync, retryBackgroundTask, cancelBackgroundTask } = useBackgroundTaskCoordinator({
+  const {
+    enqueueBackgroundTask,
+    enqueueManualSync,
+    enqueueAccountInitialSync,
+  } = useBackgroundTaskCoordinator({
     account,
     accountScope,
     mailboxRefreshRef,
@@ -689,7 +692,6 @@ export default function App() {
     isRefreshing,
     refreshNotice,
     refreshAll,
-    syncAndRefresh,
   } = useMailboxSync({
     folderId,
     accountScope,
@@ -705,6 +707,10 @@ export default function App() {
     openThread,
     setStatus,
   });
+
+  const isBackgroundSyncRunning = backgroundTasks.some((task) => (
+    task.kind === 'sync' && (task.status === 'queued' || task.status === 'running')
+  ));
 
   const {
     draft,
@@ -786,7 +792,7 @@ export default function App() {
 
         const unlistenSync = await listen('tray://sync', () => {
           if (!active || isModalGateActive) return;
-          syncAndRefresh().catch((error) => setStatus(String(error)));
+          enqueueManualSync().catch((error) => setStatus(String(error)));
         });
         unlisteners.push(unlistenSync);
 
@@ -819,7 +825,7 @@ export default function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, syncAndRefresh, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive]);
+  }, [openComposer, enqueueManualSync, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive]);
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
@@ -1153,8 +1159,8 @@ export default function App() {
   });
 
   const handleRefresh = useCallback(() => {
-    syncAndRefresh().catch((error) => setStatus(String(error)));
-  }, [syncAndRefresh, setStatus]);
+    enqueueManualSync().catch((error) => setStatus(String(error)));
+  }, [enqueueManualSync, setStatus]);
 
   // 首次引导的所有保存回调显式绑定引导账号 ID：
   // 即使后台状态切换，也不能把设置误写到另一个账号。
@@ -1312,7 +1318,6 @@ export default function App() {
         folderId={folderId}
         renamingFolderId={renamingFolderId}
         renamingFolderName={renamingFolderName}
-        backgroundSyncStatus={backgroundSyncStatus}
         backgroundTasks={backgroundTasks}
         savedSearchName={savedSearchName}
         savedSearches={savedSearches}
@@ -1329,19 +1334,6 @@ export default function App() {
             openComposer(emptyDraft);
             setStatus('已打开新邮件');
           }
-        }}
-        onSyncNow={() => {
-          syncAndRefresh().catch((error) => setStatus(String(error)));
-        }}
-        onRetryBackgroundTask={(taskId) => {
-          retryBackgroundTask(taskId).catch((error) => setStatus(String(error)));
-        }}
-        onCancelBackgroundTask={(taskId) => {
-          cancelBackgroundTask(taskId).catch((error) => setStatus(String(error)));
-        }}
-        onResetAppLayout={() => {
-          resetAppLayout();
-          setStatus('已重置布局');
         }}
         onSavedSearchNameChange={setSavedSearchName}
         onSaveCurrentSearch={() => saveCurrentSearch(query, filter, searchScope)}
@@ -1390,7 +1382,7 @@ export default function App() {
         searchInputRef={searchInputRef}
         query={query}
         searchScope={searchScope}
-        isRefreshing={isRefreshing}
+        isRefreshing={isRefreshing || isBackgroundSyncRunning}
         refreshNotice={refreshNotice}
         filter={filter}
         listMode={listMode}

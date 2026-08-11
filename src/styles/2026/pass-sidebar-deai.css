@@ -120,12 +120,64 @@
   background: var(--quiet-row-hover);
 }
 
-.background-sync-card {
-  display: none !important;
+.sidebar-sync-status {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 8px 7px;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
-.background-sync-card summary {
-  min-height: 28px;
-  padding-inline: 8px;
-  font-weight: 520;
+.sidebar-sync-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-sync-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ui-border);
+}
+
+.sidebar-sync-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ui-accent);
+  transition: width 180ms ease-out;
+}
+
+.app-shell .sidebar-footer.has-sync-status {
+  gap: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.app-shell .sidebar-footer.has-sync-status .sidebar-footer-actions {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.app-shell .attachments {
+  gap: 8px;
+  border-bottom: 0;
+}
+
+.app-shell .attachments .attachment-item {
+  width: min(100%, 620px);
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+
+.app-shell .attachments .attachment-item:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+  box-shadow: none;
 }

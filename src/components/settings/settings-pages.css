@@ -779,6 +779,81 @@
   background: var(--st-surface-subtle);
 }
 
+.settings-modal .settings-account-history-attachments {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text);
+  background: var(--st-surface-subtle);
+  cursor: pointer;
+}
+
+.settings-modal .settings-account-history-attachments > input {
+  appearance: none;
+  inline-size: 18px;
+  block-size: 18px;
+  flex: 0 0 18px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px solid var(--st-border-strong);
+  border-radius: 50%;
+  background: var(--st-surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.1);
+  cursor: pointer;
+}
+
+.settings-modal .settings-account-history-attachments > input::before {
+  width: 7px;
+  height: 4px;
+  border: solid var(--st-surface);
+  border-width: 0 0 2px 2px;
+  content: '';
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+
+.settings-modal .settings-account-history-attachments > input:checked {
+  border-color: var(--st-accent);
+  background: var(--st-accent);
+  box-shadow: none;
+}
+
+.settings-modal .settings-account-history-attachments > input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.settings-modal .settings-account-history-attachments > input:focus-visible {
+  outline: var(--st-focus-outline);
+  outline-offset: 2px;
+}
+
+.settings-modal .settings-account-history-attachments > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-account-history-attachments strong {
+  font-size: var(--st-font-size-secondary);
+  font-weight: 580;
+}
+
+.settings-modal .settings-account-history-attachments small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-account-history-attachments:hover {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface-muted);
+}
+
 .settings-modal .settings-account-auto-match[data-ready="true"] {
   border-color: #c2e2cd;
   background: var(--st-success-soft);

@@ -148,6 +148,21 @@ export default function AddAccountDialog({
           </label>
         </div>
 
+        <label className="settings-account-history-attachments">
+          <input
+            type="checkbox"
+            checked={form.fetch_history_attachments === true}
+            onChange={(event) => onFormChange({
+              ...form,
+              fetch_history_attachments: event.target.checked,
+            })}
+          />
+          <span>
+            <strong>读取历史邮件附件信息</strong>
+            <small>正文照常同步；附件内容仅在点击下载时获取。</small>
+          </span>
+        </label>
+
         <div className="settings-account-auto-match" data-ready={serverReady}>
           <span>
             <strong>{matchedProviderLabel}</strong>

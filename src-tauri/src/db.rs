@@ -1729,6 +1729,7 @@ mod tests {
                     block_external_mailboxes: false,
                     intercept_https_links: true,
                     auto_download_attachments: false,
+                    fetch_history_attachments: false,
                     warn_external_senders: false,
                 },
             )
@@ -1754,11 +1755,13 @@ mod tests {
                     block_external_mailboxes: false,
                     intercept_https_links: true,
                     auto_download_attachments: true,
+                    fetch_history_attachments: true,
                     warn_external_senders: true,
                 },
             )
             .unwrap();
         assert!(updated.auto_download_attachments);
+        assert!(updated.fetch_history_attachments);
     }
 
     #[test]
@@ -1836,6 +1839,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -1916,6 +1920,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2144,6 +2149,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2267,6 +2273,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2313,6 +2320,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2434,6 +2442,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap()
@@ -2597,6 +2606,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2672,6 +2682,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -2691,6 +2702,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -4521,6 +4533,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -4540,6 +4553,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -4747,6 +4761,7 @@ mod tests {
                 block_external_mailboxes: false,
                 intercept_https_links: true,
                 auto_download_attachments: false,
+                fetch_history_attachments: false,
                 warn_external_senders: false,
             })
             .unwrap();
@@ -4770,6 +4785,7 @@ mod tests {
                     block_external_mailboxes: false,
                     intercept_https_links: true,
                     auto_download_attachments: false,
+                    fetch_history_attachments: false,
                     warn_external_senders: true,
                 },
             )

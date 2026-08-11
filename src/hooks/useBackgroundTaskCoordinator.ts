@@ -220,7 +220,10 @@ export default function useBackgroundTaskCoordinator({
     return tasks;
   }, [setBackgroundTasks]);
 
-  const runBackgroundSync = useCallback(async (reason: 'manual' | 'timer'): Promise<string> => {
+  const runBackgroundSync = useCallback(async (
+    reason: 'manual' | 'timer',
+    taskId?: number,
+  ): Promise<string> => {
     if (backgroundSyncRef.current) {
       fetchTimerLog('sync skipped: already running', { reason });
       return '同步任务已在运行';
@@ -230,6 +233,28 @@ export default function useBackgroundTaskCoordinator({
     const mailboxRequest = createMailboxRefreshRequest();
     const syncAccountId = current.accountScope === 'all' ? null : current.accountScope;
     const startedAt = performance.now();
+    let pollTimer: number | undefined;
+    if (taskId) {
+      pollTimer = window.setInterval(async () => {
+        try {
+          const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
+          setBackgroundTasks((currentTasks) => (
+            currentTasks.some((item) => item.id === latest.id)
+              ? currentTasks.map((item) => (item.id === latest.id ? latest : item))
+              : currentTasks
+          ));
+          if (latest.status !== 'running') {
+            window.clearInterval(pollTimer);
+            return;
+          }
+          if (latest.message) {
+            setBackgroundSyncStatus(`${latest.message}…`);
+          }
+        } catch {
+          window.clearInterval(pollTimer);
+        }
+      }, PROGRESS_POLL_INTERVAL_MS)
+    }
     fetchTimerLog('sync start', {
       reason,
       accountId: syncAccountId,
@@ -258,7 +283,10 @@ export default function useBackgroundTaskCoordinator({
               : '手动同步中...',
         );
       }
-      const run = await invoke<SyncRun>(IPC.SyncImapHeaders, { accountId: syncAccountId });
+      const run = await invoke<SyncRun>(IPC.SyncImapHeaders, {
+        accountId: syncAccountId,
+        ...(taskId ? { taskId } : {}),
+      });
       const released = await current.releaseDueSnoozedMessages();
       setSyncRuns?.((existing) => [run, ...existing].slice(0, 10));
       const summary =
@@ -349,6 +377,7 @@ export default function useBackgroundTaskCoordinator({
       }
       throw error;
     } finally {
+      if (pollTimer !== undefined) window.clearInterval(pollTimer);
       backgroundSyncRef.current = false;
     }
   }, [
@@ -356,6 +385,7 @@ export default function useBackgroundTaskCoordinator({
     isMailboxRefreshCurrent,
     mailboxRefreshRef,
     notifyNewMail,
+    setBackgroundTasks,
     setBackgroundSyncStatus,
     setStatus,
     setSyncRuns,
@@ -440,7 +470,7 @@ export default function useBackgroundTaskCoordinator({
    */
   const runAccountSyncTask = useCallback(async (task: BackgroundTask): Promise<string> => {
     const accountId = task.account_id;
-    if (!accountId) return runBackgroundSync('manual');
+    if (!accountId) return runBackgroundSync('manual', task.id);
     const startedAt = performance.now();
     fetchTimerLog('account sync start', {
       taskId: task.id,
@@ -516,7 +546,7 @@ export default function useBackgroundTaskCoordinator({
       if (task.account_id != null) {
         return runAccountSyncTask(task);
       }
-      return runBackgroundSync(task.source === 'timer' ? 'timer' : 'manual');
+      return runBackgroundSync(task.source === 'timer' ? 'timer' : 'manual', task.id);
     }
     if (task.kind === 'outbox-smtp' && task.source === 'timer') return (await sendDueOutboxItems()).message;
     if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
@@ -625,10 +655,42 @@ export default function useBackgroundTaskCoordinator({
       taskStatus: task.status,
       queuedTasks: tasks.filter((item) => item.status === 'queued').length,
     });
-    setBackgroundSyncStatus(isReusedActiveTask ? '同步任务已在队列中' : `${task.title} 已入队`);
+    setBackgroundSyncStatus(
+      isReusedActiveTask
+        ? '同步任务已在队列中'
+        : `${task.title} 已入队，将在后台分批同步`,
+    );
     if (!tasks.some((item) => item.status === 'queued')) return;
     void drainBackgroundTaskQueue();
   }, [drainBackgroundTaskQueue, refreshBackgroundTasks, setBackgroundSyncStatus]);
+
+  const enqueueAccountSyncTask = useCallback(async (
+    accountId: number,
+    source: 'manual' | 'initial',
+  ) => {
+    const task = await invoke<BackgroundTask>(IPC.EnqueueAccountBackgroundTask, {
+      input: { kind: 'sync', source, account_id: accountId },
+    });
+    const tasks = await refreshBackgroundTasks();
+    setBackgroundSyncStatus(
+      task.status === 'queued'
+        ? `${task.title}已入队，将在后台分批同步`
+        : `${task.title}正在后台分批同步`,
+    );
+    if (tasks.some((item) => item.status === 'queued')) {
+      void drainBackgroundTaskQueue();
+    }
+    return task;
+  }, [drainBackgroundTaskQueue, refreshBackgroundTasks, setBackgroundSyncStatus]);
+
+  const enqueueManualSync = useCallback(async () => {
+    const selectedScope = currentRef.current.accountScope;
+    if (selectedScope === 'all') {
+      await enqueueBackgroundTask('sync', 'manual');
+      return;
+    }
+    await enqueueAccountSyncTask(selectedScope, 'manual');
+  }, [enqueueAccountSyncTask, enqueueBackgroundTask]);
 
   /**
    * 登录完成后的首次同步入口：绑定明确 account_id，
@@ -636,18 +698,8 @@ export default function useBackgroundTaskCoordinator({
    */
   const enqueueAccountInitialSync = useCallback(async (accountId: number) => {
     fetchTimerLog('enqueue account initial sync start', { accountId });
-    const task = await invoke<BackgroundTask>(IPC.EnqueueAccountBackgroundTask, {
-      input: { kind: 'sync', source: 'initial', account_id: accountId },
-    });
-    await refreshBackgroundTasks();
-    setBackgroundSyncStatus(
-      task.status === 'queued'
-        ? `${task.title}已入队，正在后台同步`
-        : `${task.title}执行中`,
-    );
-    void drainBackgroundTaskQueue();
-    return task;
-  }, [drainBackgroundTaskQueue, refreshBackgroundTasks, setBackgroundSyncStatus]);
+    return enqueueAccountSyncTask(accountId, 'initial');
+  }, [enqueueAccountSyncTask]);
 
   const retryBackgroundTask = useCallback(async (taskId: number) => {
     const task = await invoke<BackgroundTask>(IPC.RetryBackgroundTask, { taskId });
@@ -687,6 +739,7 @@ export default function useBackgroundTaskCoordinator({
 
   return {
     enqueueBackgroundTask,
+    enqueueManualSync,
     enqueueAccountInitialSync,
     retryBackgroundTask,
     cancelBackgroundTask,

@@ -161,6 +161,7 @@ export const emptyAccountCreateForm: AccountCreateInput = {
   block_external_mailboxes: false,
   intercept_https_links: true,
   auto_download_attachments: false,
+  fetch_history_attachments: false,
   warn_external_senders: false,
   signature: '',
 };
@@ -198,4 +199,3 @@ export function outboxTimingLabel(item: OutboxItem): string {
 export function canCancelOutboxItem(status: string): boolean {
   return ['queued', 'scheduled', 'retry', 'failed'].includes(status);
 }
-

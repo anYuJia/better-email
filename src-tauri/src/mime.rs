@@ -542,6 +542,7 @@ pub fn content_type_charset(fields: &[(String, Vec<u8>)]) -> Option<String> {
 }
 
 /// Case-insensitive ASCII substring search on raw bytes.
+#[cfg(test)]
 pub fn contains_ascii_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
     if needle.is_empty() || haystack.len() < needle.len() {
         return false;

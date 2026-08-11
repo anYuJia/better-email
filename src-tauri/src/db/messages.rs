@@ -255,7 +255,7 @@ impl MailStore {
                        a.incoming_protocol, a.auth_type, a.sync_mode, a.remote_images_allowed,
                        a.signature, a.cross_account_risk_warning,
                        a.block_external_mailboxes, a.intercept_https_links, a.auto_download_attachments,
-                       a.warn_external_senders, a.onboarding_completed, a.is_default
+                       a.fetch_history_attachments, a.warn_external_senders, a.onboarding_completed, a.is_default
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 WHERE m.id = ?1

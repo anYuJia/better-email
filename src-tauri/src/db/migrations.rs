@@ -27,6 +27,7 @@ impl MailStore {
                     signature TEXT NOT NULL DEFAULT '',
                     is_default INTEGER NOT NULL DEFAULT 0,
                     auto_download_attachments INTEGER NOT NULL DEFAULT 0,
+                    fetch_history_attachments INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
 
@@ -319,6 +320,12 @@ impl MailStore {
                 conn,
                 "accounts",
                 "auto_download_attachments",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "accounts",
+                "fetch_history_attachments",
                 "INTEGER NOT NULL DEFAULT 0",
             )?;
             add_column_if_missing(

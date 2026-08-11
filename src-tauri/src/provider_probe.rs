@@ -48,7 +48,7 @@ pub fn list_provider_probe_accounts(
         .prepare(
             "SELECT id, email, display_name, provider, imap_host, smtp_host,
                     incoming_protocol, auth_type, sync_mode, remote_images_allowed,
-                    signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, onboarding_completed, is_default
+                    signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, fetch_history_attachments, warn_external_senders, onboarding_completed, is_default
              FROM accounts ORDER BY is_default DESC, id",
         )
         .map_err(|error| format!("读取账号列表失败：{error}"))?;
@@ -262,7 +262,7 @@ fn load_account(database_path: &Path, account_id: i64) -> Result<Account, String
         .query_row(
             "SELECT id, email, display_name, provider, imap_host, smtp_host,
                     incoming_protocol, auth_type, sync_mode, remote_images_allowed,
-                    signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, warn_external_senders, onboarding_completed, is_default
+                    signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, fetch_history_attachments, warn_external_senders, onboarding_completed, is_default
              FROM accounts WHERE id = ?1",
             [account_id],
             map_account,
@@ -289,9 +289,10 @@ fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         block_external_mailboxes: row.get::<_, i64>(12)? != 0,
         intercept_https_links: row.get::<_, i64>(13)? != 0,
         auto_download_attachments: row.get::<_, i64>(14)? != 0,
-        warn_external_senders: row.get::<_, i64>(15)? != 0,
-        onboarding_completed: row.get::<_, i64>(16)? != 0,
-        is_default: row.get::<_, i64>(17)? != 0,
+        fetch_history_attachments: row.get::<_, i64>(15)? != 0,
+        warn_external_senders: row.get::<_, i64>(16)? != 0,
+        onboarding_completed: row.get::<_, i64>(17)? != 0,
+        is_default: row.get::<_, i64>(18)? != 0,
     })
 }
 
@@ -384,6 +385,7 @@ mod tests {
                     block_external_mailboxes INTEGER NOT NULL DEFAULT 0,
                     intercept_https_links INTEGER NOT NULL DEFAULT 1,
                     auto_download_attachments INTEGER NOT NULL DEFAULT 0,
+                    fetch_history_attachments INTEGER NOT NULL DEFAULT 0,
                     warn_external_senders INTEGER NOT NULL DEFAULT 0,
                     onboarding_completed INTEGER NOT NULL DEFAULT 0,
                     is_default INTEGER NOT NULL
@@ -391,7 +393,7 @@ mod tests {
                 INSERT INTO accounts VALUES(
                     7, 'reader@example.com', 'Reader', 'custom',
                     'imap.example.com:993', 'smtp.example.com:465',
-                    'imap', 'password', 'manual', 0, '', 1, 0, 1, 0, 0, 0, 1
+                    'imap', 'password', 'manual', 0, '', 1, 0, 1, 0, 0, 0, 0, 1
                 );",
             )
             .unwrap();

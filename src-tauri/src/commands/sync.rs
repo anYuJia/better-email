@@ -269,7 +269,8 @@ pub async fn sync_imap_headers(
         // 明确绑定账号的同步：直接按该账号执行，绝不依赖计划批次里的「第一个账号」，
         // 保证任务始终同步任务自身的 account_id。
         let account = store.get_account_by_id(Some(account_id))?;
-        let result = sync_headers_for_account(&store, &account, false, task_id);
+        let task_progress = SyncTaskProgress::for_account(task_id, 0, 1);
+        let result = sync_headers_for_account(&store, &account, false, task_progress);
         match &result {
             Ok(run) => command_info(format!(
                 "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} duration_ms={}",
@@ -294,10 +295,11 @@ pub async fn sync_imap_headers(
     let mut warnings = Vec::new();
 
     for (index, account) in accounts.iter().enumerate() {
-        if let Some(task_id) = task_id {
-            store.update_background_task_progress(
-                task_id,
-                progress_percent(index, accounts.len()),
+        let task_progress = SyncTaskProgress::for_account(task_id, index, accounts.len());
+        if let Some(task_progress) = task_progress {
+            task_progress.update(
+                &store,
+                0,
                 &format!(
                     "正在同步第 {} / {} 个账号：{}",
                     index + 1,
@@ -306,7 +308,7 @@ pub async fn sync_imap_headers(
                 ),
             )?;
         }
-        match sync_headers_for_account(&store, account, false, task_id) {
+        match sync_headers_for_account(&store, account, false, task_progress) {
             Ok(run) => {
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
@@ -420,16 +422,16 @@ fn sync_headers_for_account(
     store: &MailStore,
     account: &Account,
     history_only: bool,
-    task_id: Option<i64>,
+    task_progress: Option<SyncTaskProgress>,
 ) -> MailResult<SyncRun> {
     if account
         .incoming_protocol
         .trim()
         .eq_ignore_ascii_case("pop3")
     {
-        sync_pop3_headers_for_account(store, account, history_only, task_id)
+        sync_pop3_headers_for_account(store, account, history_only, task_progress)
     } else {
-        sync_imap_headers_for_account(store, account, history_only, task_id)
+        sync_imap_headers_for_account(store, account, history_only, task_progress)
     }
 }
 
@@ -437,7 +439,7 @@ fn sync_pop3_headers_for_account(
     store: &MailStore,
     account: &Account,
     history_only: bool,
-    task_id: Option<i64>,
+    task_progress: Option<SyncTaskProgress>,
 ) -> MailResult<SyncRun> {
     let started_at = Utc::now().to_rfc3339();
     if history_only {
@@ -458,8 +460,8 @@ fn sync_pop3_headers_for_account(
 
     // POP3 路径同样尊重任务取消语义：拉取前、导入前都是安全检查点。
     let ensure_not_cancelled = |store: &MailStore| -> MailResult<()> {
-        if let Some(task_id) = task_id {
-            if task_id > 0 && store.background_task_cancel_requested(task_id)? {
+        if let Some(task_progress) = task_progress {
+            if store.background_task_cancel_requested(task_progress.task_id)? {
                 return Err(crate::db::MailError::Imap(
                     "同步任务已取消，已停止继续同步。".to_string(),
                 ));
@@ -468,11 +470,17 @@ fn sync_pop3_headers_for_account(
         Ok(())
     };
     let secret = store.get_account_secret(account)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.update(store, 0, &format!("{}：正在获取 POP3 邮件…", account.email))?;
+    }
     ensure_not_cancelled(store)?;
     let messages = pop3_probe::fetch_recent_messages(account, &secret)?;
     ensure_not_cancelled(store)?;
     let fetched_messages = messages.len() as i64;
     let imported_messages = store.import_pop3_messages(account.id, &messages)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.update(store, 100, &format!("{}：POP3 邮件已获取", account.email))?;
+    }
     let finished_at = Utc::now().to_rfc3339();
     let message = format!(
         "{} POP3 同步完成：检查 {} 封最近邮件，新增 {} 封到收件箱。",
@@ -492,12 +500,12 @@ fn sync_imap_headers_for_account(
     store: &MailStore,
     account: &Account,
     history_only: bool,
-    task_id: Option<i64>,
+    task_progress: Option<SyncTaskProgress>,
 ) -> MailResult<SyncRun> {
     // 取消令牌安全点：文件夹发现、每个文件夹、UID/正文批次、附件批次之间检查。
     let ensure_not_cancelled = |store: &MailStore| -> MailResult<()> {
-        if let Some(task_id) = task_id {
-            if task_id > 0 && store.background_task_cancel_requested(task_id)? {
+        if let Some(task_progress) = task_progress {
+            if store.background_task_cancel_requested(task_progress.task_id)? {
                 return Err(crate::db::MailError::Imap(
                     "同步任务已取消，已停止继续同步。".to_string(),
                 ));
@@ -510,14 +518,8 @@ fn sync_imap_headers_for_account(
     let mut mailboxes = store.list_imap_mailboxes_for_account(Some(account.id))?;
     if mailboxes.is_empty() {
         ensure_not_cancelled(store)?;
-        if let Some(task_id) = task_id {
-            if task_id > 0 {
-                store.update_background_task_progress(
-                    task_id,
-                    2,
-                    &format!("{}：正在发现文件夹…", account.email),
-                )?;
-            }
+        if let Some(task_progress) = task_progress {
+            task_progress.update(store, 2, &format!("{}：正在发现文件夹…", account.email))?;
         }
         let report = imap_probe::discover_folders(account, &secret)?;
         mailboxes = store.save_imap_mailboxes_for_account(Some(account.id), &report.folders)?;
@@ -546,20 +548,18 @@ fn sync_imap_headers_for_account(
             completed_history_folders += 1;
             continue;
         }
-        if let Some(task_id) = task_id {
-            if task_id > 0 {
-                store.update_background_task_progress(
-                    task_id,
-                    progress_percent(folder_index, mailboxes.len()),
-                    &format!(
-                        "{}：正在同步文件夹 {}/{}（{}）",
-                        account.email,
-                        folder_index + 1,
-                        mailboxes.len(),
-                        mailbox.remote_name
-                    ),
-                )?;
-            }
+        if let Some(task_progress) = task_progress {
+            task_progress.update(
+                store,
+                progress_percent(folder_index, mailboxes.len()),
+                &format!(
+                    "{}：正在同步文件夹 {}/{}（{}）",
+                    account.email,
+                    folder_index + 1,
+                    mailboxes.len(),
+                    mailbox.remote_name
+                ),
+            )?;
         }
         match imap_probe::fetch_header_page(
             account,
@@ -601,7 +601,11 @@ fn sync_imap_headers_for_account(
                             &secret,
                             &mailbox.remote_name,
                             &pre_existing_uids,
-                            task_id,
+                            mailbox.highest_uid,
+                            account.fetch_history_attachments,
+                            task_progress,
+                            folder_index,
+                            mailboxes.len(),
                             &ensure_not_cancelled,
                         ) {
                             Ok(stats) => {
@@ -618,6 +622,18 @@ fn sync_imap_headers_for_account(
                                 );
                                 body_failures += 1;
                             }
+                        }
+                        if let Some(task_progress) = task_progress {
+                            task_progress.update(
+                                store,
+                                progress_percent(folder_index + 1, mailboxes.len()),
+                                &format!(
+                                    "{}：文件夹 {}/{} 已完成",
+                                    account.email,
+                                    folder_index + 1,
+                                    mailboxes.len()
+                                ),
+                            )?;
                         }
                     }
                     (Err(error), _) | (_, Err(error)) => {
@@ -801,6 +817,47 @@ fn syncable_mailboxes(mailboxes: Vec<ImapMailboxState>) -> (Vec<ImapMailboxState
 }
 
 const BODY_SYNC_LIMIT_PER_MAILBOX: i64 = 50;
+const BODY_SYNC_BATCH_SIZE: usize = 5;
+
+/// Maps one account's local 0-100 progress into its range in a queued task.
+/// A unified mailbox task assigns each account a disjoint range so progress
+/// remains monotonic while accounts are synchronized one after another.
+#[derive(Clone, Copy)]
+struct SyncTaskProgress {
+    task_id: i64,
+    start_percent: i64,
+    end_percent: i64,
+}
+
+impl SyncTaskProgress {
+    fn for_account(
+        task_id: Option<i64>,
+        account_index: usize,
+        total_accounts: usize,
+    ) -> Option<Self> {
+        let task_id = task_id.filter(|id| *id > 0)?;
+        Some(Self {
+            task_id,
+            start_percent: progress_percent(account_index, total_accounts),
+            end_percent: progress_percent(account_index + 1, total_accounts),
+        })
+    }
+
+    fn scaled_percent(&self, local_percent: i64) -> i64 {
+        let span = self.end_percent.saturating_sub(self.start_percent);
+        (self.start_percent + span * local_percent.clamp(0, 100) / 100)
+            .clamp(self.start_percent, self.end_percent)
+    }
+
+    fn update(&self, store: &MailStore, local_percent: i64, message: &str) -> MailResult<()> {
+        store.update_background_task_progress(
+            self.task_id,
+            self.scaled_percent(local_percent),
+            message,
+        )?;
+        Ok(())
+    }
+}
 
 struct MailboxBodySyncStats {
     fetched: usize,
@@ -809,13 +866,25 @@ struct MailboxBodySyncStats {
     auto_download_failures: usize,
 }
 
+fn should_fetch_attachment_metadata(
+    remote_uid: i64,
+    previous_highest_uid: i64,
+    fetch_history_attachments: bool,
+) -> bool {
+    fetch_history_attachments || (previous_highest_uid > 0 && remote_uid > previous_highest_uid)
+}
+
 fn sync_mailbox_bodies(
     store: &MailStore,
     account: &Account,
     secret: &AccountSecret,
     remote_name: &str,
     pre_existing_uids: &BTreeSet<i64>,
-    task_id: Option<i64>,
+    previous_highest_uid: i64,
+    fetch_history_attachments: bool,
+    task_progress: Option<SyncTaskProgress>,
+    folder_index: usize,
+    total_folders: usize,
     ensure_not_cancelled: &dyn Fn(&MailStore) -> MailResult<()>,
 ) -> MailResult<MailboxBodySyncStats> {
     let mut stats = MailboxBodySyncStats {
@@ -829,75 +898,173 @@ fn sync_mailbox_bodies(
     if pending.is_empty() {
         return Ok(stats);
     }
+    let attachment_metadata_uids = pending
+        .iter()
+        .filter_map(|(_, uid)| {
+            should_fetch_attachment_metadata(*uid, previous_highest_uid, fetch_history_attachments)
+                .then_some(*uid)
+        })
+        .collect::<BTreeSet<_>>();
     let uid_to_message_id = pending
         .into_iter()
         .map(|(message_id, uid)| (uid, message_id))
         .collect::<BTreeMap<i64, i64>>();
     let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
-    ensure_not_cancelled(store)?;
-    let bodies = match imap_probe::fetch_message_bodies(account, secret, remote_name, &uids) {
-        Ok(bodies) => bodies,
-        Err(error) => {
-            eprintln!(
-                "[better-email][sync] body batch fetch failed account_id={} mailbox={} pending={} error={error}",
-                account.id,
-                remote_name,
-                uid_to_message_id.len()
-            );
-            stats.failures = uid_to_message_id.len();
-            return Ok(stats);
-        }
-    };
-    let mut fetched_message_ids = Vec::new();
-    for (uid, body) in bodies {
+    let total_messages = uids.len();
+    let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
+    for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
         ensure_not_cancelled(store)?;
-        let Some(&message_id) = uid_to_message_id.get(&uid) else {
-            continue;
-        };
-        match store.update_message_body(message_id, &body) {
-            Ok(_) => {
-                stats.fetched += 1;
-                fetched_message_ids.push(message_id);
-            }
+        let batch_uid_to_message_id = batch_uids
+            .iter()
+            .filter_map(|uid| {
+                uid_to_message_id
+                    .get(uid)
+                    .map(|message_id| (*uid, *message_id))
+            })
+            .collect::<BTreeMap<i64, i64>>();
+        let bodies = match imap_probe::fetch_message_bodies(
+            account,
+            secret,
+            remote_name,
+            batch_uids,
+            &attachment_metadata_uids,
+        ) {
+            Ok(bodies) => bodies,
             Err(error) => {
                 eprintln!(
-                    "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
+                    "[better-email][sync] body batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
                     account.id,
                     remote_name,
-                    uid,
-                    message_id
+                    batch_index + 1,
+                    total_batches,
+                    batch_uids.len()
                 );
-                stats.failures += 1;
-            }
-        }
-    }
-    ensure_not_cancelled(store)?;
-    if account.auto_download_attachments {
-        for (uid, message_id) in &uid_to_message_id {
-            ensure_not_cancelled(store)?;
-            if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid) {
+                stats.failures += batch_uids.len();
+                update_body_sync_progress(
+                    store,
+                    task_progress,
+                    account,
+                    remote_name,
+                    folder_index,
+                    total_folders,
+                    stats.fetched + stats.failures,
+                    total_messages,
+                    batch_index + 1,
+                    total_batches,
+                )?;
                 continue;
             }
-            let outcome = auto_download_attachments_for_message(store, *message_id);
-            stats.auto_downloaded += outcome.downloaded;
-            stats.auto_download_failures += outcome.failures;
+        };
+        let mut fetched_message_ids = Vec::new();
+        let mut received_uids = BTreeSet::new();
+        for (uid, body) in bodies {
+            ensure_not_cancelled(store)?;
+            received_uids.insert(uid);
+            let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
+                continue;
+            };
+            match store.update_message_body(message_id, &body) {
+                Ok(_) => {
+                    stats.fetched += 1;
+                    fetched_message_ids.push(message_id);
+                }
+                Err(error) => {
+                    eprintln!(
+                        "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
+                        account.id,
+                        remote_name,
+                        uid,
+                        message_id
+                    );
+                    stats.failures += 1;
+                }
+            }
         }
-    }
-    if let Some(task_id) = task_id {
-        if task_id > 0 {
-            store.update_background_task_progress(
-                task_id,
-                progress_percent(stats.fetched, uid_to_message_id.len().max(1)),
-                &format!(
-                    "正在获取正文 {}/{}：{}",
-                    stats.fetched,
-                    uid_to_message_id.len(),
-                    remote_name
-                ),
-            )?;
+        stats.failures += batch_uids
+            .iter()
+            .filter(|uid| !received_uids.contains(uid))
+            .count();
+        ensure_not_cancelled(store)?;
+        if account.auto_download_attachments {
+            for (uid, message_id) in &batch_uid_to_message_id {
+                ensure_not_cancelled(store)?;
+                if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid) {
+                    continue;
+                }
+                let outcome = auto_download_attachments_for_message(store, *message_id);
+                stats.auto_downloaded += outcome.downloaded;
+                stats.auto_download_failures += outcome.failures;
+            }
         }
+        update_body_sync_progress(
+            store,
+            task_progress,
+            account,
+            remote_name,
+            folder_index,
+            total_folders,
+            stats.fetched + stats.failures,
+            total_messages,
+            batch_index + 1,
+            total_batches,
+        )?;
     }
     Ok(stats)
+}
+
+fn update_body_sync_progress(
+    store: &MailStore,
+    task_progress: Option<SyncTaskProgress>,
+    account: &Account,
+    remote_name: &str,
+    folder_index: usize,
+    total_folders: usize,
+    processed_messages: usize,
+    total_messages: usize,
+    batch_index: usize,
+    total_batches: usize,
+) -> MailResult<()> {
+    let Some(task_progress) = task_progress else {
+        return Ok(());
+    };
+    task_progress.update(
+        store,
+        folder_progress_percent(
+            folder_index,
+            total_folders,
+            processed_messages,
+            total_messages,
+        ),
+        &format!(
+            "{}：正在获取 {} 正文，已处理 {}/{}（第 {}/{} 批）",
+            account.email,
+            remote_name,
+            processed_messages.min(total_messages),
+            total_messages,
+            batch_index,
+            total_batches
+        ),
+    )
+}
+
+fn folder_progress_percent(
+    folder_index: usize,
+    total_folders: usize,
+    processed_messages: usize,
+    total_messages: usize,
+) -> i64 {
+    if total_folders == 0 {
+        return 0;
+    }
+    let start = (folder_index * 100) / total_folders;
+    let end = ((folder_index + 1) * 100) / total_folders;
+    let folder_span = end.saturating_sub(start);
+    let body_progress = if total_messages == 0 {
+        folder_span
+    } else {
+        folder_span * processed_messages.min(total_messages) / total_messages
+    };
+    (start + body_progress).min(100) as i64
 }
 
 fn progress_percent(current: usize, total: usize) -> i64 {
@@ -957,7 +1124,10 @@ pub fn list_sync_runs(store: State<'_, MailStore>) -> MailResult<Vec<SyncRun>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{credential_error_report, credential_verification_report, syncable_mailboxes};
+    use super::{
+        credential_error_report, credential_verification_report, folder_progress_percent,
+        should_fetch_attachment_metadata, syncable_mailboxes, SyncTaskProgress,
+    };
     use crate::models::{Account, ImapMailboxState};
 
     fn sample_account() -> Account {
@@ -977,6 +1147,7 @@ mod tests {
             block_external_mailboxes: false,
             intercept_https_links: true,
             auto_download_attachments: false,
+            fetch_history_attachments: false,
             warn_external_senders: false,
             onboarding_completed: false,
             is_default: true,
@@ -1057,5 +1228,32 @@ mod tests {
         assert!(mapped
             .iter()
             .any(|mailbox| mailbox.local_folder_name == "项目 Alpha"));
+    }
+
+    #[test]
+    fn body_progress_tracks_each_batch_within_its_folder_range() {
+        assert_eq!(folder_progress_percent(0, 4, 0, 20), 0);
+        assert_eq!(folder_progress_percent(0, 4, 5, 20), 6);
+        assert_eq!(folder_progress_percent(0, 4, 20, 20), 25);
+        assert_eq!(folder_progress_percent(3, 4, 20, 20), 100);
+    }
+
+    #[test]
+    fn history_attachment_metadata_requires_explicit_opt_in() {
+        assert!(!should_fetch_attachment_metadata(44, 0, false));
+        assert!(!should_fetch_attachment_metadata(44, 100, false));
+        assert!(should_fetch_attachment_metadata(101, 100, false));
+        assert!(should_fetch_attachment_metadata(44, 100, true));
+    }
+
+    #[test]
+    fn unified_task_scales_each_account_into_a_non_overlapping_range() {
+        let first = SyncTaskProgress::for_account(Some(8), 0, 3).unwrap();
+        let second = SyncTaskProgress::for_account(Some(8), 1, 3).unwrap();
+        let third = SyncTaskProgress::for_account(Some(8), 2, 3).unwrap();
+
+        assert_eq!(first.scaled_percent(100), second.scaled_percent(0));
+        assert_eq!(second.scaled_percent(100), third.scaled_percent(0));
+        assert_eq!(third.scaled_percent(100), 100);
     }
 }

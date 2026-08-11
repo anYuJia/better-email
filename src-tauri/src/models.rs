@@ -22,6 +22,8 @@ pub struct Account {
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
     #[serde(default = "default_false")]
+    pub fetch_history_attachments: bool,
+    #[serde(default = "default_false")]
     pub warn_external_senders: bool,
     #[serde(default = "default_false")]
     pub onboarding_completed: bool,
@@ -214,6 +216,8 @@ pub struct AccountSettingsInput {
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
     #[serde(default = "default_false")]
+    pub fetch_history_attachments: bool,
+    #[serde(default = "default_false")]
     pub warn_external_senders: bool,
 }
 
@@ -237,6 +241,8 @@ pub struct AccountCreateInput {
     pub intercept_https_links: bool,
     #[serde(default = "default_false")]
     pub auto_download_attachments: bool,
+    #[serde(default = "default_false")]
+    pub fetch_history_attachments: bool,
     #[serde(default = "default_false")]
     pub warn_external_senders: bool,
 }

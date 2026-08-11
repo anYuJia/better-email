@@ -21,7 +21,6 @@ export type SidebarProps = {
   folderId: number | null;
   renamingFolderId: number | null;
   renamingFolderName: string;
-  backgroundSyncStatus: string;
   backgroundTasks: BackgroundTask[];
   savedSearchName: string;
   savedSearches: SavedSearch[];
@@ -29,10 +28,6 @@ export type SidebarProps = {
   onAccountScopeChange: (value: string) => void;
   onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
-  onSyncNow: () => void;
-  onRetryBackgroundTask: (taskId: number) => void;
-  onCancelBackgroundTask: (taskId: number) => void;
-  onResetAppLayout: () => void;
   onSavedSearchNameChange: (value: string) => void;
   onSaveCurrentSearch: () => void;
   onRunSavedSearch: (savedSearch: SavedSearch) => void;
@@ -53,6 +48,35 @@ export type SidebarProps = {
   onOpenShortcuts: () => void;
 };
 
+function syncTaskLabel(task: BackgroundTask): string {
+  if (task.status === 'queued') return '正在等待同步';
+
+  const message = task.message;
+  const bodyFolder = message.match(/正在获取\s+(.+?)\s+正文/)?.[1];
+  const folderName = bodyFolder
+    ?? message.match(/正在同步文件夹\s+\d+\/\d+（(.+?)）/)?.[1];
+  const messageProgress = message.match(/已处理\s+(\d+)\s*\/\s*(\d+)/);
+  const folderProgress = message.match(/文件夹\s+(\d+)\s*\/\s*(\d+)/)
+    ?? message.match(/正在同步第\s+(\d+)\s*\/\s*(\d+)\s*个账号/);
+  const progress = messageProgress ?? folderProgress;
+  const count = progress ? ` ${progress[1]}/${progress[2]}` : '';
+
+  if (folderName) return `正在同步${syncFolderDisplayName(folderName)}${count}`;
+  if (message.includes('正在发现文件夹')) return '正在准备同步';
+  return `正在同步邮件${count}`;
+}
+
+function syncFolderDisplayName(folderName: string): string {
+  const normalized = folderName.trim().toLowerCase();
+  if (normalized === 'inbox') return '收件箱';
+  if (normalized.includes('sent')) return '已发送';
+  if (normalized.includes('draft')) return '草稿箱';
+  if (normalized.includes('archive') || normalized.includes('all mail')) return '归档';
+  if (normalized.includes('trash') || normalized.includes('deleted')) return '废纸篓';
+  if (normalized.includes('junk') || normalized.includes('spam')) return '垃圾邮件';
+  return /[\u4e00-\u9fff]/.test(folderName) ? folderName.trim() : '邮件';
+}
+
 function Sidebar({
   accountScope,
   accounts,
@@ -60,7 +84,6 @@ function Sidebar({
   folderId,
   renamingFolderId,
   renamingFolderName,
-  backgroundSyncStatus,
   backgroundTasks,
   savedSearchName,
   savedSearches,
@@ -68,10 +91,6 @@ function Sidebar({
   onAccountScopeChange,
   onSetDefaultAccount,
   onCompose,
-  onSyncNow,
-  onRetryBackgroundTask,
-  onCancelBackgroundTask,
-  onResetAppLayout,
   onSavedSearchNameChange,
   onSaveCurrentSearch,
   onRunSavedSearch,
@@ -91,6 +110,11 @@ function Sidebar({
   onOpenSettings,
   onOpenShortcuts,
 }: SidebarProps) {
+  const syncTask = backgroundTasks.find((task) => task.kind === 'sync' && task.status === 'running')
+    ?? backgroundTasks.find((task) => task.kind === 'sync' && task.status === 'queued');
+  const syncProgress = syncTask ? Math.min(100, Math.max(0, syncTask.progress)) : 0;
+  const syncLabel = syncTask ? syncTaskLabel(syncTask) : '';
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -132,54 +156,6 @@ function Sidebar({
         onEmptyTrash={onEmptyTrash}
         onFavoriteChange={onFolderFavoriteChange}
       >
-        <details className="background-sync-card">
-          <summary>
-            <span>同步与布局</span>
-            <small>{backgroundSyncStatus}</small>
-          </summary>
-          <span>后台任务</span>
-          <em>
-            {backgroundTasks.length > 0
-              ? `${backgroundTasks.filter((task) => task.status === 'queued').length} 个排队`
-              : '暂无后台任务'}
-          </em>
-          {backgroundTasks.length > 0 && (
-            <div className="task-stack">
-              {backgroundTasks.slice(0, 3).map((task) => (
-                <div className="task-stack-row" key={task.id}>
-                  <small>{task.title} · {task.status}</small>
-                  {task.kind === 'sync' && (task.status === 'failed' || task.status === 'cancelled') && (
-                    <button
-                      type="button"
-                      className="task-stack-action"
-                      aria-label={`重试${task.title}`}
-                      title="重试"
-                      onClick={() => onRetryBackgroundTask(task.id)}
-                    >
-                      重试
-                    </button>
-                  )}
-                  {(task.status === 'queued' || task.status === 'running') && (
-                    <button
-                      type="button"
-                      className="task-stack-action"
-                      aria-label={`取消${task.title}`}
-                      title="取消"
-                      onClick={() => onCancelBackgroundTask(task.id)}
-                    >
-                      取消
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="sidebar-utility-actions">
-            <button type="button" onClick={onSyncNow}>同步</button>
-            <button type="button" onClick={onResetAppLayout}>重置布局</button>
-          </div>
-        </details>
-
         {import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1' && (
           <details className="sidebar-tools">
             <summary>工具</summary>
@@ -231,7 +207,22 @@ function Sidebar({
         )}
       </SidebarFolderNavigation>
 
-      <div className="sidebar-footer">
+      <div className={`sidebar-footer${syncTask ? ' has-sync-status' : ''}`}>
+        {syncTask && (
+          <div className="sidebar-sync-status" role="status" aria-live="polite">
+            <span>{syncLabel}</span>
+            <div
+              className="sidebar-sync-progress"
+              role="progressbar"
+              aria-label={`${syncLabel}进度`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={syncProgress}
+            >
+              <span style={{ width: `${syncProgress}%` }} />
+            </div>
+          </div>
+        )}
         <div className="sidebar-footer-actions">
           <button
             className="settings-button"

@@ -433,6 +433,22 @@ describe('useBackgroundTaskCoordinator account-bound sync', () => {
     expect(loadMetaCalls).toBeGreaterThan(0);
   });
 
+  it('queues a manual sync for the currently selected account so it can report batch progress', async () => {
+    const { utils, scenario } = renderCoordinator(accountB.id);
+
+    await act(async () => {
+      await utils.result.current.enqueueManualSync();
+    });
+
+    await waitFor(() => {
+      expect(scenario.tasks[0]?.status).toBe('done');
+    });
+    expect(invoke).toHaveBeenCalledWith('enqueue_account_background_task', {
+      input: { kind: 'sync', source: 'manual', account_id: accountB.id },
+    });
+    expect(scenario.syncCommand).toBe(String(accountB.id));
+  });
+
   it('consumes folder/batch progress from the running task and shows progressive status', async () => {
     const { utils, scenario, setBackgroundSyncStatus } = renderCoordinator(accountA.id);
     // 同步期间暂停，让进度轮询消费到 Rust 写入的文件夹级进度。

@@ -18,6 +18,8 @@ export type Account = {
   block_external_mailboxes: boolean;
   intercept_https_links: boolean;
   auto_download_attachments: boolean;
+  /** 历史同步时是否保存附件名称、类型和大小；附件内容始终按需下载。 */
+  fetch_history_attachments?: boolean;
   /** 提示「来自其他邮箱 / 外部发件人」的邮件（区别于跨账号发件风险提示）。 */
   warn_external_senders: boolean;
   /** 首次登录引导是否已完成（仅新完成登录的账号展示引导）。 */
@@ -195,4 +197,3 @@ export type ProviderVerificationRecord = {
   checked_at: string;
   notes: string;
 };
-

@@ -39,20 +39,31 @@ fn imap_info(message: impl AsRef<str>) {
     }
 }
 
-fn retry_attachment_fetch<T>(
-    operation: impl FnMut() -> Result<T, MailError>,
+fn retry_attachment_session<T>(
+    mut operation: impl FnMut() -> Result<T, MailError>,
 ) -> Result<T, MailError> {
-    retry_attachment_fetch_with_sleeper(operation, thread::sleep)
+    retry_attachment_session_with_sleeper(&mut operation, thread::sleep)
 }
 
-fn retry_attachment_fetch_with_sleeper<T>(
+fn retry_attachment_session_with_sleeper<T>(
     mut operation: impl FnMut() -> Result<T, MailError>,
     mut sleeper: impl FnMut(Duration),
+) -> Result<T, MailError> {
+    retry_attachment_operation_with_sleeper(&mut operation, &mut sleeper, |error| {
+        matches!(error, MailError::Imap(_))
+    })
+}
+
+fn retry_attachment_operation_with_sleeper<T>(
+    operation: &mut impl FnMut() -> Result<T, MailError>,
+    sleeper: &mut impl FnMut(Duration),
+    should_retry: impl Fn(&MailError) -> bool,
 ) -> Result<T, MailError> {
     let mut last_error = String::new();
     for attempt in 0..ATTACHMENT_FETCH_ATTEMPTS {
         match operation() {
             Ok(value) => return Ok(value),
+            Err(error) if !should_retry(&error) => return Err(error),
             Err(error) => last_error = error.to_string(),
         }
         if attempt + 1 < ATTACHMENT_FETCH_ATTEMPTS {
@@ -62,6 +73,32 @@ fn retry_attachment_fetch_with_sleeper<T>(
     Err(MailError::Imap(format!(
         "附件 IMAP 请求在 {ATTACHMENT_FETCH_ATTEMPTS} 次尝试后仍失败：{last_error}"
     )))
+}
+
+struct CountingWriter<'a, W> {
+    inner: &'a mut W,
+    written: usize,
+}
+
+impl<'a, W> CountingWriter<'a, W> {
+    fn new(inner: &'a mut W) -> Self {
+        Self { inner, written: 0 }
+    }
+}
+
+impl<W: Write> Write for CountingWriter<'_, W> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(buffer)?;
+        self.written = self
+            .written
+            .checked_add(written)
+            .ok_or_else(|| std::io::Error::other("附件写入字节数溢出。"))?;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
 }
 
 fn attachment_retry_delay(attempt: usize) -> Duration {
@@ -364,32 +401,18 @@ pub fn fetch_message_body(
         "[better-email][imap] body fetch start account_id={} mailbox={} uid={} peek=true seen_unchanged=true",
         account.id, remote_name, remote_uid
     ));
-    let (host, port) = parse_imap_endpoint(&account.imap_host)?;
-    let client = imap::ClientBuilder::new(host.as_str(), port)
-        .connect()
-        .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
-    let mut session = login_imap(client, account, secret)?;
-    session
-        .select(remote_name)
-        .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
-    let fetches = session
-        .uid_fetch(remote_uid.to_string(), BODY_FETCH_QUERY_PRESERVE_SEEN)
-        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
-    let raw = fetches
-        .iter()
-        .find_map(|fetch| fetch.body())
-        .map(|bytes| bytes.to_vec())
-        .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
-    let _ = session.logout();
-
-    imap_info(format!(
-        "[better-email][imap] body fetch ok account_id={} mailbox={} uid={} bytes={} seen_unchanged=true",
-        account.id,
+    let attachment_metadata_uids = BTreeSet::from([remote_uid]);
+    let mut bodies = fetch_message_bodies(
+        account,
+        secret,
         remote_name,
-        remote_uid,
-        raw.len()
-    ));
-    Ok(parse_body_from_raw(&raw))
+        &[remote_uid],
+        &attachment_metadata_uids,
+    )?;
+    let Some((_, body)) = bodies.pop() else {
+        return Err(MailError::Imap("IMAP 未返回邮件正文。".to_string()));
+    };
+    Ok(body)
 }
 
 pub fn fetch_message_bodies(
@@ -397,6 +420,7 @@ pub fn fetch_message_bodies(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uids: &[i64],
+    attachment_metadata_uids: &BTreeSet<i64>,
 ) -> Result<Vec<(i64, RemoteMessageBody)>, MailError> {
     if remote_uids.is_empty() {
         return Ok(Vec::new());
@@ -407,47 +431,268 @@ pub fn fetch_message_bodies(
         remote_name,
         remote_uids.len()
     ));
-    let (host, port) = parse_imap_endpoint(&account.imap_host)?;
-    let client = imap::ClientBuilder::new(host.as_str(), port)
-        .connect()
-        .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
-    let mut session = login_imap(client, account, secret)?;
-    session
-        .select(remote_name)
-        .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
+    with_selected_mailbox(account, secret, remote_name, |session| {
+        fetch_message_bodies_from_selected(
+            session,
+            remote_uids,
+            attachment_metadata_uids,
+            account,
+            remote_name,
+        )
+    })
+}
+
+fn fetch_message_bodies_from_selected(
+    session: &mut imap::Session<imap::Connection>,
+    remote_uids: &[i64],
+    attachment_metadata_uids: &BTreeSet<i64>,
+    account: &Account,
+    remote_name: &str,
+) -> Result<Vec<(i64, RemoteMessageBody)>, MailError> {
     let uid_set = remote_uids
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(",");
     let fetches = session
-        .uid_fetch(uid_set, "(UID BODY.PEEK[])")
-        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
-    let mut bodies_by_uid = std::collections::BTreeMap::new();
+        .uid_fetch(uid_set, "(UID BODYSTRUCTURE)")
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取邮件结构失败：{error}")))?;
+    let mut metadata_by_uid = std::collections::BTreeMap::new();
     for fetch in fetches.iter() {
-        let (Some(uid), Some(raw)) = (fetch.uid, fetch.body()) else {
+        let (Some(uid), Some(bodystructure)) = (fetch.uid, fetch.bodystructure()) else {
             continue;
         };
-        bodies_by_uid.insert(i64::from(uid), raw.to_vec());
+        metadata_by_uid.insert(i64::from(uid), message_structure_metadata(bodystructure));
     }
-    let _ = session.logout();
+
     let mut results = Vec::with_capacity(remote_uids.len());
     for remote_uid in remote_uids {
-        let Some(raw) = bodies_by_uid.remove(remote_uid) else {
+        let Some(metadata) = metadata_by_uid.remove(remote_uid) else {
             continue;
         };
-        let body = parse_body_from_raw(&raw);
+        let (body, body_bytes) = fetch_structured_message_body(
+            session,
+            *remote_uid,
+            metadata,
+            attachment_metadata_uids.contains(remote_uid),
+        )?;
         imap_info(format!(
-            "[better-email][imap] body batch fetch ok account_id={} mailbox={} uid={} bytes={} attachments={}",
+            "[better-email][imap] body batch fetch ok account_id={} mailbox={} uid={} body_bytes={} attachments={} attachment_bytes=0",
             account.id,
             remote_name,
             remote_uid,
-            raw.len(),
+            body_bytes,
             body.attachments.len()
         ));
         results.push((*remote_uid, body));
     }
     Ok(results)
+}
+
+struct MessageStructureMetadata {
+    text_parts: Vec<TextPartMetadata>,
+    attachments: Vec<RemoteAttachmentMetadata>,
+}
+
+struct TextPartMetadata {
+    path: Vec<u32>,
+    is_html: bool,
+    transfer_encoding: Option<String>,
+    charset: Option<String>,
+}
+
+fn message_structure_metadata(bodystructure: &BodyStructure<'_>) -> MessageStructureMetadata {
+    let mut metadata = MessageStructureMetadata {
+        text_parts: Vec::new(),
+        attachments: Vec::new(),
+    };
+    collect_message_structure_metadata(bodystructure, &[], &mut metadata);
+    metadata
+}
+
+fn collect_message_structure_metadata(
+    bodystructure: &BodyStructure<'_>,
+    path: &[u32],
+    metadata: &mut MessageStructureMetadata,
+) {
+    match bodystructure {
+        BodyStructure::Multipart { bodies, .. } => {
+            for (index, body) in bodies.iter().enumerate() {
+                let mut child_path = path.to_vec();
+                child_path.push((index + 1) as u32);
+                collect_message_structure_metadata(body, &child_path, metadata);
+            }
+        }
+        BodyStructure::Text { common, other, .. } => {
+            let type_name = common.ty.ty.to_ascii_lowercase();
+            let subtype = common.ty.subtype.to_ascii_lowercase();
+            let filename =
+                attachment_filename_from_bodystructure(bodystructure).unwrap_or_default();
+            let content_id = protocol::normalize_content_id(other.id.as_deref());
+            let is_text_body = type_name == "text" && filename.is_empty() && content_id.is_empty();
+            if is_text_body {
+                metadata.text_parts.push(TextPartMetadata {
+                    path: path.to_vec(),
+                    is_html: subtype == "html",
+                    transfer_encoding: imap_content_transfer_encoding(&other.transfer_encoding),
+                    charset: bodystructure_charset(common.ty.params.as_deref()),
+                });
+            } else if !filename.is_empty() || !content_id.is_empty() {
+                metadata.attachments.push(RemoteAttachmentMetadata {
+                    filename: if filename.is_empty() {
+                        protocol::inline_attachment_filename(
+                            format!("{type_name}/{subtype}").as_str(),
+                            &content_id,
+                            metadata.attachments.len(),
+                        )
+                    } else {
+                        filename
+                    },
+                    mime_type: format!("{type_name}/{subtype}"),
+                    size_bytes: i64::from(other.octets),
+                    content_id: content_id.clone(),
+                    is_inline: !content_id.is_empty(),
+                });
+            }
+        }
+        BodyStructure::Basic { common, other, .. }
+        | BodyStructure::Message { common, other, .. } => {
+            let filename =
+                attachment_filename_from_bodystructure(bodystructure).unwrap_or_default();
+            let content_id = protocol::normalize_content_id(other.id.as_deref());
+            if filename.is_empty() && content_id.is_empty() {
+                return;
+            }
+            let mime_type = format!("{}/{}", common.ty.ty, common.ty.subtype).to_ascii_lowercase();
+            metadata.attachments.push(RemoteAttachmentMetadata {
+                filename: if filename.is_empty() {
+                    protocol::inline_attachment_filename(
+                        &mime_type,
+                        &content_id,
+                        metadata.attachments.len(),
+                    )
+                } else {
+                    filename
+                },
+                mime_type,
+                size_bytes: i64::from(other.octets),
+                content_id: content_id.clone(),
+                is_inline: !content_id.is_empty(),
+            });
+        }
+    }
+}
+
+fn imap_content_transfer_encoding(encoding: &ContentEncoding<'_>) -> Option<String> {
+    let value = match encoding {
+        ContentEncoding::SevenBit => "7bit",
+        ContentEncoding::EightBit => "8bit",
+        ContentEncoding::Binary => "binary",
+        ContentEncoding::Base64 => "base64",
+        ContentEncoding::QuotedPrintable => "quoted-printable",
+        ContentEncoding::Other(value) => value.as_ref(),
+    };
+    Some(value.to_string())
+}
+
+fn bodystructure_charset(
+    params: Option<&[(std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>)]>,
+) -> Option<String> {
+    params?.iter().find_map(|(name, value)| {
+        name.eq_ignore_ascii_case("charset")
+            .then(|| value.to_string())
+    })
+}
+
+fn fetch_structured_message_body(
+    session: &mut imap::Session<imap::Connection>,
+    remote_uid: i64,
+    mut metadata: MessageStructureMetadata,
+    include_attachment_metadata: bool,
+) -> Result<(RemoteMessageBody, usize), MailError> {
+    let mut text_parts = Vec::new();
+    let mut html_parts = Vec::new();
+    let mut body_bytes = 0_usize;
+    for part in metadata.text_parts {
+        let bytes = fetch_message_text_part(session, remote_uid, &part.path)?;
+        body_bytes = body_bytes.saturating_add(bytes.len());
+        let decoded = crate::mime::decode_body_text(
+            &bytes,
+            part.transfer_encoding.as_deref(),
+            part.charset.as_deref(),
+        );
+        if part.is_html {
+            html_parts.push(decoded);
+        } else {
+            text_parts.push(decoded);
+        }
+    }
+
+    let text_body = text_parts.join("\n");
+    let html_body = html_parts.join("\n");
+    let has_renderable_html = looks_like_html(&html_body);
+    let fallback_body = if !text_body.trim().is_empty() {
+        text_body.clone()
+    } else {
+        html_body.clone()
+    };
+    let body = if has_renderable_html {
+        html_body.clone()
+    } else {
+        fallback_body.clone()
+    };
+    let sanitized_html = has_renderable_html
+        .then(|| protocol::sanitize_html(&html_body))
+        .unwrap_or_default();
+    let security_warnings = reader_security_warnings(&html_body, &html_body);
+    let snippet = protocol::message_body_snippet(&text_body, &html_body, &fallback_body);
+    if !include_attachment_metadata {
+        metadata.attachments.clear();
+    }
+
+    Ok((
+        RemoteMessageBody {
+            body,
+            sanitized_html,
+            security_warnings,
+            snippet,
+            has_attachments: !metadata.attachments.is_empty(),
+            attachments: metadata.attachments,
+        },
+        body_bytes,
+    ))
+}
+
+fn fetch_message_text_part(
+    session: &mut imap::Session<imap::Connection>,
+    remote_uid: i64,
+    path: &[u32],
+) -> Result<Vec<u8>, MailError> {
+    if path.is_empty() {
+        let fetches = session
+            .uid_fetch(remote_uid.to_string(), BODY_FETCH_QUERY_PRESERVE_SEEN)
+            .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
+        return fetches
+            .iter()
+            .find_map(|fetch| fetch.body())
+            .map(|bytes| bytes.to_vec())
+            .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()));
+    }
+
+    let section = path
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(".");
+    let section_path = SectionPath::Part(path.to_vec(), None);
+    let fetches = session
+        .uid_fetch(remote_uid.to_string(), format!("BODY.PEEK[{section}]"))
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文分段失败：{error}")))?;
+    fetches
+        .iter()
+        .find_map(|fetch| fetch.section(&section_path))
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| MailError::Imap("IMAP 未返回正文分段。".to_string()))
 }
 
 pub struct RemoteAttachmentWrite {
@@ -623,40 +868,54 @@ pub fn download_attachment_to_writer(
             options.max_bytes.saturating_mul(4) / 1024 / 1024
         )));
     }
-    let (host, port) = parse_imap_endpoint(&account.imap_host)?;
-    let client = imap::ClientBuilder::new(host.as_str(), port)
-        .connect()
-        .map_err(|error| MailError::Imap(format!("IMAP 连接失败：{error}")))?;
-    let mut session = login_imap(client, account, secret)?;
-    session
-        .select(options.remote_name)
-        .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
+    let mut next_offset = options.start_offset;
+    retry_attachment_session(|| {
+        let start_offset = next_offset;
+        let mut counted_writer = CountingWriter::new(&mut *writer);
+        let result = with_selected_mailbox(account, secret, options.remote_name, |session| {
+            download_attachment_from_selected(session, options, start_offset, &mut counted_writer)
+        });
+        next_offset = next_offset
+            .checked_add(counted_writer.written)
+            .ok_or_else(|| MailError::Imap("附件下载进度超出可用范围。".to_string()))?;
+        result
+    })
+}
 
-    let result = match retry_attachment_fetch(|| {
-        find_attachment_part_metadata(
-            &mut session,
-            options.remote_uid,
-            options.filename,
-            options.content_id,
-        )
-    }) {
+fn download_attachment_from_selected(
+    session: &mut imap::Session<imap::Connection>,
+    options: AttachmentDownloadOptions<'_>,
+    start_offset: usize,
+    writer: &mut impl Write,
+) -> Result<RemoteAttachmentWrite, MailError> {
+    match find_attachment_part_metadata(
+        session,
+        options.remote_uid,
+        options.filename,
+        options.content_id,
+    ) {
         Ok(part) => download_attachment_part_to_writer(
-            &mut session,
+            session,
             options.remote_uid,
             options.filename,
             options.max_bytes,
-            options.start_offset,
+            start_offset,
             writer,
             part,
         ),
         Err(part_error) => {
-            if options.start_offset > 0 {
+            // A tagged-response mismatch means the session is no longer trustworthy. Let the
+            // outer retry discard it and establish a fresh IMAP connection before continuing.
+            if imap_session_is_desynchronized(&part_error) {
+                return Err(part_error);
+            }
+            if start_offset > 0 {
                 return Err(MailError::Imap(format!(
                     "服务器本次未提供可续传的附件分段信息：{part_error}"
                 )));
             }
             let payload = fetch_attachment_payload_from_selected(
-                &mut session,
+                session,
                 options.remote_uid,
                 options.filename,
                 options.content_id,
@@ -675,9 +934,15 @@ pub fn download_attachment_to_writer(
                 })
             }
         }
+    }
+}
+
+fn imap_session_is_desynchronized(error: &MailError) -> bool {
+    let MailError::Imap(message) = error else {
+        return false;
     };
-    let _ = session.logout();
-    result
+    let message = message.to_ascii_lowercase();
+    message.contains("tagmismatch") || message.contains("mismatched tag")
 }
 
 pub fn set_remote_seen(
@@ -951,16 +1216,14 @@ fn fetch_attachment_payload_from_selected(
     filename: &str,
     content_id: &str,
 ) -> Result<RemoteAttachmentPayload, MailError> {
-    let raw = retry_attachment_fetch(|| {
-        let fetches = session
-            .uid_fetch(remote_uid.to_string(), "RFC822")
-            .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
-        fetches
-            .iter()
-            .find_map(|fetch| fetch.body())
-            .map(|bytes| bytes.to_vec())
-            .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))
-    })?;
+    let fetches = session
+        .uid_fetch(remote_uid.to_string(), "RFC822")
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
+    let raw = fetches
+        .iter()
+        .find_map(|fetch| fetch.body())
+        .map(|bytes| bytes.to_vec())
+        .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
     parse_attachment_payload_from_raw(&raw, filename, content_id).ok_or_else(|| {
         MailError::Imap(format!(
             "IMAP 正文中未找到附件：{}",
@@ -1030,16 +1293,14 @@ fn download_attachment_part_to_writer(
             "BODY.PEEK[{section}]<{}.{}>",
             offset, ATTACHMENT_CHUNK_BYTES
         );
-        let chunk = retry_attachment_fetch(|| {
-            let fetches = session
-                .uid_fetch(remote_uid.to_string(), query.as_str())
-                .map_err(|error| MailError::Imap(format!("IMAP 分段拉取附件失败：{error}")))?;
-            fetches
-                .iter()
-                .find_map(|fetch| fetch.section(&section_path))
-                .map(ToOwned::to_owned)
-                .ok_or_else(|| MailError::Imap("IMAP 未返回附件分段数据。".to_string()))
-        })?;
+        let fetches = session
+            .uid_fetch(remote_uid.to_string(), query.as_str())
+            .map_err(|error| MailError::Imap(format!("IMAP 分段拉取附件失败：{error}")))?;
+        let chunk = fetches
+            .iter()
+            .find_map(|fetch| fetch.section(&section_path))
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| MailError::Imap("IMAP 未返回附件分段数据。".to_string()))?;
         if chunk.is_empty() {
             break;
         }
@@ -1596,6 +1857,7 @@ fn email_from_address(address: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
     let parsed = MessageParser::default().parse(raw);
     let raw_lossy = String::from_utf8_lossy(raw);
@@ -1656,6 +1918,7 @@ fn attachment_display_name(part: &MessagePart<'_>) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(test)]
 fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteAttachmentMetadata> {
     let mut attachments = Vec::new();
     let mut seen_inline_content_ids = BTreeSet::new();
@@ -1702,6 +1965,7 @@ fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteA
     attachments
 }
 
+#[cfg(test)]
 fn remote_attachment_metadata_from_part(
     part: &MessagePart<'_>,
     index: usize,
@@ -1899,21 +2163,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn attachment_fetch_retries_transient_failures() {
+    fn attachment_session_retries_after_protocol_desync() {
         let mut attempts = 0;
         let mut delays = Vec::new();
-        let value = retry_attachment_fetch_with_sleeper(
+        let value = retry_attachment_session_with_sleeper(
             || {
                 attempts += 1;
                 if attempts < ATTACHMENT_FETCH_ATTEMPTS {
-                    Err(MailError::Imap("temporary failure".to_string()))
+                    Err(MailError::Imap(
+                        "IMAP 拉取正文失败：Mismatched Tag: TagMismatch".to_string(),
+                    ))
                 } else {
                     Ok(42)
                 }
             },
             |delay| delays.push(delay),
         )
-        .expect("third attachment fetch attempt should succeed");
+        .expect("third attachment session attempt should succeed");
 
         assert_eq!(value, 42);
         assert_eq!(attempts, ATTACHMENT_FETCH_ATTEMPTS);
@@ -1924,10 +2190,10 @@ mod tests {
     }
 
     #[test]
-    fn attachment_fetch_reports_exhausted_retries() {
+    fn attachment_session_reports_exhausted_retries() {
         let mut attempts = 0;
         let mut delays = Vec::new();
-        let error = retry_attachment_fetch_with_sleeper::<()>(
+        let error = retry_attachment_session_with_sleeper::<()>(
             || {
                 attempts += 1;
                 Err(MailError::Imap("connection reset".to_string()))
@@ -1943,6 +2209,33 @@ mod tests {
         );
         assert!(error.to_string().contains("3 次尝试"));
         assert!(error.to_string().contains("connection reset"));
+    }
+
+    #[test]
+    fn attachment_session_does_not_retry_local_write_errors() {
+        let mut attempts = 0;
+        let error = retry_attachment_session_with_sleeper::<()>(
+            || {
+                attempts += 1;
+                Err(MailError::Io(std::io::Error::other("disk full")))
+            },
+            |_| panic!("local write errors must not be retried"),
+        )
+        .expect_err("local write error should be returned directly");
+
+        assert_eq!(attempts, 1);
+        assert_eq!(error.to_string(), "file system error: disk full");
+    }
+
+    #[test]
+    fn detects_imap_tag_mismatch_as_session_desync() {
+        assert!(imap_session_is_desynchronized(&MailError::Imap(
+            "IMAP 拉取正文失败：Mismatched Tag: TagMismatch { expect: 8, actual: Ok(5) }"
+                .to_string(),
+        )));
+        assert!(!imap_session_is_desynchronized(&MailError::Imap(
+            "IMAP 未返回邮件正文。".to_string(),
+        )));
     }
 
     #[test]
@@ -2039,6 +2332,7 @@ mod tests {
             block_external_mailboxes: false,
             intercept_https_links: true,
             auto_download_attachments: false,
+            fetch_history_attachments: false,
             warn_external_senders: false,
             onboarding_completed: false,
             is_default: true,
@@ -2357,6 +2651,36 @@ mod tests {
             "37053ddf@48e10a4e.2a20536a00000000.png"
         );
         assert!(body.attachments[0].is_inline);
+    }
+
+    #[test]
+    fn bodystructure_separates_text_parts_from_attachment_metadata() {
+        let response = b"* 1569 FETCH (BODYSTRUCTURE (((\"TEXT\" \"PLAIN\" (\"CHARSET\" \"UTF-8\") NIL NIL \"QUOTED-PRINTABLE\" 833 30 NIL NIL NIL)(\"TEXT\" \"HTML\" (\"CHARSET\" \"UTF-8\") NIL NIL \"QUOTED-PRINTABLE\" 3412 62 NIL (\"INLINE\" NIL) NIL) \"ALTERNATIVE\" (\"BOUNDARY\" \"alt\") NIL NIL)(\"APPLICATION\" \"PDF\" (\"NAME\" \"title.pdf\") \"<part-2>\" NIL \"BASE64\" 333980 NIL (\"ATTACHMENT\" (\"FILENAME\" \"title.pdf\")) NIL) \"MIXED\" (\"BOUNDARY\" \"mixed\") NIL NIL))\r\n";
+        let (_, parsed) = imap_proto::parser::parse_response(response).unwrap();
+        let imap_proto::types::Response::Fetch(_, attributes) = parsed else {
+            panic!("expected FETCH response");
+        };
+        let bodystructure = attributes
+            .iter()
+            .find_map(|attribute| match attribute {
+                imap_proto::types::AttributeValue::BodyStructure(bodystructure) => {
+                    Some(bodystructure)
+                }
+                _ => None,
+            })
+            .expect("BODYSTRUCTURE should be present");
+
+        let metadata = message_structure_metadata(bodystructure);
+
+        assert_eq!(metadata.text_parts.len(), 2);
+        assert_eq!(metadata.text_parts[0].path, vec![1, 1]);
+        assert!(!metadata.text_parts[0].is_html);
+        assert_eq!(metadata.text_parts[1].path, vec![1, 2]);
+        assert!(metadata.text_parts[1].is_html);
+        assert_eq!(metadata.attachments.len(), 1);
+        assert_eq!(metadata.attachments[0].filename, "title.pdf");
+        assert_eq!(metadata.attachments[0].mime_type, "application/pdf");
+        assert_eq!(metadata.attachments[0].size_bytes, 333_980);
     }
 
     #[test]

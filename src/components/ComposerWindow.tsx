@@ -175,7 +175,7 @@ export default function ComposerWindow({
 
   if (minimized) {
     return (
-      <div className="composer-backdrop composer-backdrop-minimized">
+      <aside className="composer-minimized-layer" aria-label="已最小化的新邮件">
         <section className="composer-minimized" aria-label="已最小化的新邮件">
           <button className="composer-mini-main" type="button" onClick={onRestore}>
             <Mail size={17} />
@@ -195,7 +195,7 @@ export default function ComposerWindow({
             </button>
           </div>
         </section>
-      </div>
+      </aside>
     );
   }
 

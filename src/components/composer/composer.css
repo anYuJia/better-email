@@ -681,6 +681,10 @@
   z-index: 4;
 }
 
+.composer-recipient-field.has-suggestions {
+  z-index: 80;
+}
+
 .composer .recipient-suggestions {
   position: absolute;
   left: 68px;
@@ -873,6 +877,7 @@
 }
 
 .composer-minimized {
+  pointer-events: auto;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
   background: #fff;
@@ -910,7 +915,7 @@
   padding: 6px;
   border-color: rgba(31, 35, 40, 0.12);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.98);
+  background: #ffffff;
   box-shadow:
     0 14px 30px rgba(31, 35, 40, 0.13),
     0 1px 4px rgba(31, 35, 40, 0.07);
@@ -1305,9 +1310,12 @@
   background: #fff;
 }
 
-.composer-backdrop-minimized {
-  align-items: flex-end;
-  justify-content: flex-end;
+.composer-minimized-layer {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1000;
+  width: min(440px, calc(100vw - 44px));
   pointer-events: none;
 }
 
@@ -2129,4 +2137,27 @@
   border-color: var(--ui-border-strong);
   background: var(--ui-surface);
   color: var(--ui-text);
+}
+
+/* Recipient search is a solid, four-row menu. It must not inherit any of
+ * the workspace glass effects or allow the compose fields to show through. */
+.composer .recipient-suggestions {
+  max-height: 218px;
+  z-index: 80;
+  isolation: isolate;
+  background: #ffffff !important;
+  opacity: 1 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.composer-minimized {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-theme="dark"] .composer .recipient-suggestions,
+:root[data-theme="dark"] .composer-minimized {
+  background: var(--ui-surface) !important;
 }

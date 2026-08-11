@@ -33,7 +33,6 @@ describe('SettingsFrame dialog behavior', () => {
           onNavigate={() => undefined}
           onTestConnection={() => undefined}
           onSave={() => undefined}
-          onSaveAndVerify={() => undefined}
           onClose={onClose}
         >
           <input placeholder="设置内输入框" />

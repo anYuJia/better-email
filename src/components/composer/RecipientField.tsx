@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { X } from 'lucide-react';
 import type { ContactSearchEntry } from './contactSuggestions';
@@ -12,7 +12,7 @@ type RecipientFieldProps = {
   onChange: (value: string) => void;
 };
 
-const suggestionLimit = 5;
+const suggestionLimit = 4;
 const emailPattern = /^[^\s@;,:]+@[^\s@;,:]+\.[^\s@;,:]+$/;
 
 function parseParts(value: string) {
@@ -47,6 +47,7 @@ export default function RecipientField({
   const [query, setQuery] = useState<string>(() => initialParse(value).query);
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const suggestionListId = useId();
   const lastValueRef = useRef(value);
   // Chip actions can run between controlled parent updates. Keep the latest
   // local state in refs so a click always removes exactly one chip.
@@ -61,6 +62,11 @@ export default function RecipientField({
     () => (query.trim() ? matchingContacts(contactSearchEntries, query, suggestionLimit) : []),
     [contactSearchEntries, query],
   );
+  const menuOpen = focused && matches.length > 0;
+  const activeMatch = matches[highlight] ?? matches[0];
+  const activeSuggestionId = menuOpen && activeMatch
+    ? `${suggestionListId}-option-${activeMatch.id}`
+    : undefined;
 
   useEffect(() => {
     if (value === lastValueRef.current) return;
@@ -124,6 +130,12 @@ export default function RecipientField({
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matches.length > 0) {
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        const direction = event.shiftKey ? -1 : 1;
+        setHighlight((current) => (current + direction + matches.length) % matches.length);
+        return;
+      }
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setHighlight((current) => (current + 1) % matches.length);
@@ -136,7 +148,7 @@ export default function RecipientField({
       }
       if (event.key === 'Enter') {
         event.preventDefault();
-        commitEmail(matches[highlight].email);
+        commitEmail(activeMatch.email);
         return;
       }
       if (event.key === 'Escape') {
@@ -175,7 +187,7 @@ export default function RecipientField({
   }
 
   return (
-    <div className="composer-recipient-field">
+    <div className={`composer-recipient-field${menuOpen ? ' has-suggestions' : ''}`}>
       <label className="composer-field-row">
         <span>{label}</span>
         <div className="composer-recipient-editor">
@@ -205,6 +217,10 @@ export default function RecipientField({
           <input
             ref={inputRef}
             autoComplete="off"
+            aria-autocomplete="list"
+            aria-controls={menuOpen ? suggestionListId : undefined}
+            aria-expanded={menuOpen}
+            aria-activedescendant={activeSuggestionId}
             value={query}
             placeholder={chips.length === 0 ? placeholder : ''}
             onChange={handleInputChange}
@@ -218,14 +234,17 @@ export default function RecipientField({
         </div>
       </label>
 
-      {focused && matches.length > 0 && (
-        <div className="recipient-suggestions">
-          <span>匹配联系人</span>
+      {menuOpen && (
+        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}匹配联系人`}>
+          <span aria-hidden="true">匹配联系人</span>
           {matches.map((contact, index) => (
             <button
               type="button"
+              role="option"
+              id={`${suggestionListId}-option-${contact.id}`}
               key={contact.id}
               className={index === highlight ? 'is-active' : ''}
+              aria-selected={index === highlight}
               onMouseDown={(event) => event.preventDefault()}
               onMouseEnter={() => setHighlight(index)}
               onClick={() => commitEmail(contact.email)}

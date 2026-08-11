@@ -641,12 +641,19 @@
   background: #1d242d;
 }
 
-:root[data-theme="dark"] .recipient-suggestions,
 :root[data-theme="dark"] .composer-rich-toggle,
 :root[data-theme="dark"] .composer-signature,
 :root[data-theme="dark"] .composer-attachments,
 :root[data-theme="dark"] .composer-schedule {
   background: rgba(15, 19, 24, 0.8);
+}
+
+/* Recipient autocomplete must stay fully opaque above the compose fields. */
+:root[data-theme="dark"] .composer .recipient-suggestions {
+  background: var(--ui-surface) !important;
+  opacity: 1;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 :root[data-theme="dark"] .recipient-suggestions button,

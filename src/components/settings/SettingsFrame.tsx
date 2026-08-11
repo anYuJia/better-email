@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type React from 'react';
 import {
-  BadgeCheck,
   FlaskConical,
   LoaderCircle,
   Save,
@@ -34,7 +33,6 @@ type SettingsFrameProps = {
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
   onSave: () => void;
-  onSaveAndVerify: () => void;
   canSaveAndVerify?: boolean;
   isDirty?: boolean;
   isBusy?: boolean;
@@ -56,7 +54,6 @@ export default function SettingsFrame({
   onNavigate,
   onTestConnection,
   onSave,
-  onSaveAndVerify,
   canSaveAndVerify = false,
   isDirty = false,
   isBusy = false,
@@ -190,30 +187,19 @@ export default function SettingsFrame({
           </div>
           <div className="settings-header-actions">
             {hasConnectionActions ? (
-              <>
-                <button
-                  type="button"
-                  className="settings-header-button secondary"
-                  aria-label="仅保存设置"
-                  title={isDirty ? '保存当前账号设置，不执行连接验证' : '当前没有未保存修改'}
-                  disabled={!isDirty || isBusy}
-                  onClick={onSave}
-                >
-                  <Save size={15} />
-                  <span>仅保存</span>
-                </button>
+              isDirty ? (
                 <button
                   type="button"
                   className="settings-header-button primary"
-                  aria-label="保存并验证设置"
-                  title="先保存当前账号设置，再检查服务器和登录认证"
+                  aria-label="保存账号设置"
+                  title="保存当前账号设置"
                   disabled={isBusy}
-                  onClick={onSaveAndVerify}
+                  onClick={onSave}
                 >
-                  {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <BadgeCheck size={15} />}
-                  <span>{isBusy ? '验证中' : '保存并验证'}</span>
+                  {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <Save size={15} />}
+                  <span>{isBusy ? '保存中' : '保存修改'}</span>
                 </button>
-              </>
+              ) : null
             ) : connectionSettingsSections.has(activeSection) ? (
               <button
                 type="button"
@@ -284,20 +270,12 @@ export default function SettingsFrame({
             <div className="settings-floating-unsaved-actions">
               <button
                 type="button"
-                className="st-btn st-btn-secondary st-btn-sm"
+                className="st-btn st-btn-primary st-btn-sm"
                 disabled={isBusy}
                 onClick={onSave}
               >
-                仅保存
-              </button>
-              <button
-                type="button"
-                className="st-btn st-btn-primary st-btn-sm"
-                disabled={isBusy}
-                onClick={hasConnectionActions ? onSaveAndVerify : onSave}
-              >
                 {isBusy ? <LoaderCircle className="settings-action-spinner" size={13} /> : <Save size={13} />}
-                <span>{isBusy ? '保存中...' : hasConnectionActions ? '保存并验证' : '保存修改'}</span>
+                <span>{isBusy ? '保存中...' : '保存修改'}</span>
               </button>
             </div>
           </div>

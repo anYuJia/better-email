@@ -121,7 +121,7 @@ describe('ComposerPrimaryFields', () => {
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     expect(screen.getByText('匹配联系人')).not.toBeNull();
-    expect(screen.getByRole('button', { name: /Ada Lovelace/ })).not.toBeNull();
+    expect(screen.getByRole('option', { name: /Ada Lovelace/ })).not.toBeNull();
   });
 
   it('only suggests contacts once the query matches, and commits on Enter', () => {
@@ -147,6 +147,37 @@ describe('ComposerPrimaryFields', () => {
     fireEvent.keyDown(recipient, { key: 'Enter' });
 
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada.wu@example.com' });
+  });
+
+  it('shows four matches and cycles the active contact with Tab and arrow keys', () => {
+    const contacts = Array.from({ length: 5 }, (_, index) => ({
+      ...ada,
+      id: index + 10,
+      name: `Wang ${index + 1}`,
+      email: `wang${index + 1}@example.com`,
+    }));
+    const onPatchDraft = vi.fn();
+    renderFields(draft(), true, onPatchDraft, contacts);
+    const recipient = screen.getByPlaceholderText('收件人');
+
+    fireEvent.focus(recipient);
+    fireEvent.change(recipient, { target: { value: 'wang' } });
+
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(4);
+    expect(options[0].getAttribute('aria-selected')).toBe('true');
+
+    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(false);
+    expect(options[1].getAttribute('aria-selected')).toBe('true');
+
+    fireEvent.keyDown(recipient, { key: 'ArrowDown' });
+    expect(options[2].getAttribute('aria-selected')).toBe('true');
+
+    expect(fireEvent.keyDown(recipient, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(options[1].getAttribute('aria-selected')).toBe('true');
+
+    fireEvent.keyDown(recipient, { key: 'Enter' });
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'wang2@example.com' });
   });
 
   it('turns a committed recipient into a chip removable as a whole', () => {

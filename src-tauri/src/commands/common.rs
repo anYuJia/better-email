@@ -56,15 +56,16 @@ pub(super) fn prompt_save_file_path(
     app: &AppHandle,
     title: &str,
     filename: String,
+    directory: Option<&Path>,
 ) -> MailResult<Option<PathBuf>> {
     let (sender, receiver) = mpsc::channel();
-    app.dialog()
-        .file()
-        .set_title(title)
-        .set_file_name(filename)
-        .save_file(move |path| {
-            let _ = sender.send(path);
-        });
+    let mut builder = app.dialog().file().set_title(title).set_file_name(filename);
+    if let Some(directory) = directory {
+        builder = builder.set_directory(directory);
+    }
+    builder.save_file(move |path| {
+        let _ = sender.send(path);
+    });
 
     let Some(path) = receiver
         .recv()

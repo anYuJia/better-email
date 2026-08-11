@@ -1404,6 +1404,83 @@
   line-height: 1.5;
 }
 
+/* --- Default download location --- */
+.settings-modal .settings-download-location {
+  min-width: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-download-path-wrap {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-modal .settings-download-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: var(--st-font-size-secondary);
+  color: var(--st-text);
+}
+
+.settings-modal .settings-download-path-wrap .icon-only-action {
+  flex: 0 0 auto;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: transparent;
+}
+
+.settings-modal .settings-download-path-wrap .icon-only-action:hover:not(:disabled) {
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-download-path-wrap .icon-only-action:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 1px;
+}
+
+.settings-modal .settings-download-path-wrap .icon-only-action:disabled {
+  opacity: 0.55;
+}
+
+.settings-modal .settings-download-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.settings-modal .settings-download-hint {
+  margin-top: 8px;
+}
+
+.settings-modal .settings-download-error {
+  margin-top: 8px;
+  color: var(--st-danger);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+@media (max-width: 680px) {
+  .settings-modal .settings-download-actions {
+    margin-top: 8px;
+  }
+}
+
 /* --- Data list rows (sync runs, outbox, endpoints, folders) --- */
 .settings-modal .st-list {
   display: grid;

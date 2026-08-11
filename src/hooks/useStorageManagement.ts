@@ -3,6 +3,8 @@ import type {
   LocalBackupSummary,
   StorageUsage,
   CacheClearResult,
+  AppSettingsReport,
+  DownloadDirSetResult,
   Attachment,
   MessageSummary,
 } from '../app/types';
@@ -32,6 +34,9 @@ export default function useStorageManagement({
   const [localBackupSummary, setLocalBackupSummary] = useState<LocalBackupSummary | null>(null);
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
   const [storageBusy, setStorageBusy] = useState(false);
+  const [appSettings, setAppSettings] = useState<AppSettingsReport | null>(null);
+  const [downloadDirBusy, setDownloadDirBusy] = useState(false);
+  const [downloadDirError, setDownloadDirError] = useState<string | null>(null);
 
   async function exportDiagnostics() {
     const payload = await invoke<string>(IPC.ExportDiagnostics);
@@ -112,16 +117,76 @@ export default function useStorageManagement({
     }
   }
 
+  /** 读取应用全局「默认附件下载位置」设置（含回退后的实际生效目录）。 */
+  async function refreshAppSettings() {
+    try {
+      const report = await invoke<AppSettingsReport>(IPC.GetAppSettings);
+      setAppSettings(report);
+      setDownloadDirError(null);
+    } catch (error) {
+      setStatus(`读取默认下载位置失败：${String(error).replace(/^Error:\s*/i, '')}`);
+      throw error;
+    }
+  }
+
+  /** 弹出原生目录选择器设置默认下载位置；用户取消时不修改原设置。 */
+  async function pickDownloadDir() {
+    setDownloadDirBusy(true);
+    try {
+      const result = await invoke<DownloadDirSetResult>(IPC.SetDownloadDir);
+      setDownloadDirError(null);
+      if (result.cancelled) {
+        setStatus('已取消选择下载位置，设置保持不变');
+        return result;
+      }
+      setAppSettings(result.settings);
+      setStatus('默认附件下载位置已更新');
+      return result;
+    } catch (error) {
+      const message = String(error).replace(/^Error:\s*/i, '');
+      setDownloadDirError(message);
+      setStatus(`设置默认下载位置失败：${message}`);
+      throw error;
+    } finally {
+      setDownloadDirBusy(false);
+    }
+  }
+
+  /** 恢复系统默认 Downloads/better-email。 */
+  async function resetDownloadDir() {
+    setDownloadDirBusy(true);
+    try {
+      const report = await invoke<AppSettingsReport>(IPC.ResetDownloadDir);
+      setAppSettings(report);
+      setDownloadDirError(null);
+      setStatus('已恢复默认下载位置');
+      return report;
+    } catch (error) {
+      const message = String(error).replace(/^Error:\s*/i, '');
+      setDownloadDirError(message);
+      setStatus(`恢复默认下载位置失败：${message}`);
+      throw error;
+    } finally {
+      setDownloadDirBusy(false);
+    }
+  }
+
   return {
     diagnosticExport,
     localBackupSummary,
     storageUsage,
     storageBusy,
+    appSettings,
+    downloadDirBusy,
+    downloadDirError,
     exportDiagnostics,
     exportLocalBackup,
     previewLocalBackup,
     importLocalBackup,
     refreshStorageUsage,
     clearAttachmentCache,
+    refreshAppSettings,
+    pickDownloadDir,
+    resetDownloadDir,
   };
 }

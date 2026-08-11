@@ -10,6 +10,7 @@ import {
 import type {
   Account,
   AccountCreateInput,
+  AppSettingsReport,
   BackgroundTaskKind,
   Contact,
   ContactCreateInput,
@@ -109,6 +110,9 @@ export type SettingsOverlayProps = {
   localBackupSummary: LocalBackupSummary | null;
   storageUsage: StorageUsage | null;
   storageBusy: boolean;
+  appSettings: AppSettingsReport | null;
+  downloadDirBusy: boolean;
+  downloadDirError: string | null;
   imapProbe: ImapProbeReport | null;
   syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
@@ -182,6 +186,8 @@ export type SettingsOverlayProps = {
   onExportBackup: () => void;
   onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
+  onPickDownloadDir: () => void;
+  onResetDownloadDir: () => void;
   onDiscoverImapFolders: () => void;
   onPrepareWriteValidation: () => void;
   onRefreshWriteValidation: () => void;
@@ -327,12 +333,18 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     connectionReport: props.connectionReport,
     storageUsage: props.storageUsage,
     storageBusy: props.storageBusy,
+    appSettings: props.appSettings,
+    downloadDirBusy: props.downloadDirBusy,
+    downloadDirError: props.downloadDirError,
   }), [
     props.diagnosticExport,
     props.localBackupSummary,
     props.connectionReport,
     props.storageUsage,
     props.storageBusy,
+    props.appSettings,
+    props.downloadDirBusy,
+    props.downloadDirError,
   ]);
 
   const syncProps = useMemo(() => ({

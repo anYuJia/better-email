@@ -14,6 +14,21 @@ const mockAiSettingsState = {
   mcp_api_key: '',
 };
 
+// 应用全局「默认附件下载位置」：空字符串表示未自定义（使用系统默认）。
+const mockAppSettingsState = {
+  default_download_dir: '',
+};
+
+function mockAppSettingsReport() {
+  const configured = mockAppSettingsState.default_download_dir;
+  const effective = configured || '/tmp/better-email';
+  return {
+    configured_dir: configured,
+    effective_dir: effective,
+    using_default: configured === '',
+  };
+}
+
 export const handlers: Record<string, MockCommandHandler> = {
   'open_url': (args) => {
     console.log('Mock opening URL:', args?.url);
@@ -39,6 +54,22 @@ export const handlers: Record<string, MockCommandHandler> = {
     return 'AI 服务设置已保存。';
   },
   'load_ai_settings': () => ({ ...mockAiSettingsState }),
+  'get_app_settings': () => mockAppSettingsReport(),
+  'set_download_dir': (args) => {
+    if (args?.cancel === true) {
+      return { settings: mockAppSettingsReport(), cancelled: true };
+    }
+    // 模拟原生文件夹选择器：默认选中一个可写的目录，测试可通过 path 指定。
+    const selected = typeof args?.path === 'string' && args.path.trim()
+      ? args.path.trim()
+      : '/mock/downloads/better-email';
+    mockAppSettingsState.default_download_dir = selected;
+    return { settings: mockAppSettingsReport(), cancelled: false };
+  },
+  'reset_download_dir': () => {
+    mockAppSettingsState.default_download_dir = '';
+    return mockAppSettingsReport();
+  },
   'export_diagnostics': () => JSON.stringify({ app_version: '0.1.0', accounts: [{ email_masked: 'd***@better-email.local' }] }, null, 2),
   'parse_raw_message': () => ({
     subject: '安全预览样例',

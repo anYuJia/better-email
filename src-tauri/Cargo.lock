@@ -293,6 +293,7 @@ dependencies = [
  "base64 0.22.1",
  "calamine",
  "chrono",
+ "dirs",
  "encoding_rs",
  "imap",
  "imap-proto",

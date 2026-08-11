@@ -1,8 +1,9 @@
 use super::common::{mask_email, mask_recipient_list, read_backup_from_dialog};
-use crate::db::{MailResult, MailStore};
+use crate::db::{MailError, MailResult, MailStore};
 use crate::models::{
-    CacheClearResult, DiagnosticAccount, DiagnosticExport, DiagnosticOAuthSession,
-    DiagnosticOutboxItem, LocalBackupSummary, MailStats, StorageUsage,
+    AppSettingsReport, CacheClearResult, DiagnosticAccount, DiagnosticExport,
+    DiagnosticOAuthSession, DiagnosticOutboxItem, DownloadDirSetResult, LocalBackupSummary,
+    MailStats, StorageUsage,
 };
 use chrono::Utc;
 use std::fs;
@@ -140,4 +141,56 @@ pub fn get_storage_usage(store: State<'_, MailStore>) -> MailResult<StorageUsage
 #[tauri::command]
 pub async fn clear_attachment_cache(store: State<'_, MailStore>) -> MailResult<CacheClearResult> {
     store.clear_reclaimable_attachment_cache()
+}
+
+#[tauri::command]
+pub fn get_app_settings(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
+    app_settings_report(&store)
+}
+
+/// 弹出原生文件夹选择器，让用户设置「默认附件下载位置」。
+/// 取消选择时不修改设置；选择不可写或危险位置时不保存并返回可操作错误。
+#[tauri::command]
+pub async fn set_download_dir(
+    app: AppHandle,
+    store: State<'_, MailStore>,
+) -> MailResult<DownloadDirSetResult> {
+    let Some(path) = app
+        .dialog()
+        .file()
+        .set_title("选择默认附件下载位置的文件夹")
+        .blocking_pick_folder()
+    else {
+        // 用户取消：保持原设置不变。
+        return Ok(DownloadDirSetResult {
+            settings: app_settings_report(&store)?,
+            cancelled: true,
+        });
+    };
+    let path = path
+        .into_path()
+        .map_err(|error| MailError::Imap(format!("无法解析所选文件夹路径：{error}")))?;
+    let selected = path.to_string_lossy().into_owned();
+    store.validate_and_save_download_dir(&selected)?;
+    Ok(DownloadDirSetResult {
+        settings: app_settings_report(&store)?,
+        cancelled: false,
+    })
+}
+
+#[tauri::command]
+pub fn reset_download_dir(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
+    store.reset_download_dir()?;
+    app_settings_report(&store)
+}
+
+fn app_settings_report(store: &MailStore) -> MailResult<AppSettingsReport> {
+    let settings = store.load_app_settings()?;
+    let effective = store.resolve_download_dir()?;
+    let using_default = settings.default_download_dir.trim().is_empty();
+    Ok(AppSettingsReport {
+        configured_dir: settings.default_download_dir,
+        effective_dir: effective.to_string_lossy().into_owned(),
+        using_default,
+    })
 }

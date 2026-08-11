@@ -362,6 +362,26 @@ pub struct ReleasedSnoozedCount {
     pub released_count: i64,
 }
 
+/// 应用全局「默认附件下载位置」设置回显。
+#[derive(Debug, Clone, Serialize)]
+pub struct AppSettingsReport {
+    /// 用户显式配置的绝对路径；未自定义时为空字符串。
+    pub configured_dir: String,
+    /// 实际生效的下载目录（用户配置或系统默认 Downloads/better-email）。
+    pub effective_dir: String,
+    /// 是否正在使用系统默认目录（即用户尚未自定义）。
+    pub using_default: bool,
+}
+
+/// 设置默认下载目录的结果。
+#[derive(Debug, Clone, Serialize)]
+pub struct DownloadDirSetResult {
+    /// 更新后的全局设置回显。
+    pub settings: AppSettingsReport,
+    /// 用户取消目录选择时为空消息。
+    pub cancelled: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DiagnosticAccount {
     pub id: i64,

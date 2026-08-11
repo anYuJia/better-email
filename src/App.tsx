@@ -685,6 +685,7 @@ export default function App() {
   useEffect(() => {
     if (!isSettingsOpen || activeSettingsSection !== 'backup') return;
     refreshStorageUsage(false).catch((error) => setStatus(String(error)));
+    refreshAppSettings().catch((error) => setStatus(String(error)));
   }, [isSettingsOpen, activeSettingsSection]);
 
 
@@ -1057,12 +1058,18 @@ export default function App() {
     localBackupSummary,
     storageUsage,
     storageBusy,
+    appSettings,
+    downloadDirBusy,
+    downloadDirError,
     exportDiagnostics,
     exportLocalBackup,
     previewLocalBackup,
     importLocalBackup,
     refreshStorageUsage,
     clearAttachmentCache,
+    refreshAppSettings,
+    pickDownloadDir,
+    resetDownloadDir,
   } = useStorageManagement({
     selected,
     diagnosticExport,
@@ -1595,6 +1602,9 @@ export default function App() {
           localBackupSummary={localBackupSummary}
           storageUsage={storageUsage}
           storageBusy={storageBusy}
+          appSettings={appSettings}
+          downloadDirBusy={downloadDirBusy}
+          downloadDirError={downloadDirError}
           imapProbe={imapProbe}
           syncSchedulePlan={syncSchedulePlan}
           imapMailboxes={imapMailboxes}
@@ -1713,6 +1723,8 @@ export default function App() {
           onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
           onRefreshStorage={() => refreshStorageUsage()}
           onClearAttachmentCache={() => clearAttachmentCache()}
+          onPickDownloadDir={() => pickDownloadDir()}
+          onResetDownloadDir={() => resetDownloadDir()}
           onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
           onPrepareWriteValidation={prepareProviderWriteValidation}
           onRefreshWriteValidation={() => {

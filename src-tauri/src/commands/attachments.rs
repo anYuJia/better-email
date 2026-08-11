@@ -11,7 +11,7 @@ use crate::models::{Attachment, AttachmentDownload, Message, OutboundAttachmentI
 use base64::Engine as _;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufReader, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -83,7 +83,8 @@ pub async fn save_image_data_url_as(
         .map_err(|error| crate::db::MailError::Imap(format!("图片数据解析失败：{error}")))?;
     validate_attachment_download_size(payload.len().min(i64::MAX as usize) as i64)?;
 
-    let Some(target_path) = prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename))?
+    let Some(target_path) =
+        prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename), None)?
     else {
         return Err(crate::db::MailError::Cancelled);
     };
@@ -184,9 +185,13 @@ pub fn download_attachment_file(
     }
     validate_attachment_download_size(attachment.size_bytes)?;
 
-    let dir = store.attachment_dir(attachment.message_id);
-    fs::create_dir_all(&dir)?;
-    let temp_path = dir.join(format!("{}.download", attachment.id));
+    // 用户配置的下载目录只存放最终完成的附件文件；断点续传与解码临时文件
+    // 放回应用受管理的缓存目录，避免在用户目录中写 .download/.decoded。
+    let final_dir = store.resolve_download_dir()?;
+    fs::create_dir_all(&final_dir)?;
+    let temp_dir = store.attachment_dir(attachment.message_id);
+    fs::create_dir_all(&temp_dir)?;
+    let temp_path = temp_dir.join(format!("{}.download", attachment.id));
     let resume_offset = fs::metadata(&temp_path)
         .ok()
         .and_then(|metadata| attachment_resume_offset(metadata.len()))
@@ -229,19 +234,17 @@ pub fn download_attachment_file(
     } else {
         &downloaded.filename
     });
-    let local_path = dir.join(format!("{}-{filename}", attachment.id));
-    let decoded_path = dir.join(format!("{}.decoded", attachment.id));
-    let decoded_size = match downloaded.transfer_encoding {
+    let decoded_path = temp_dir.join(format!("{}.decoded", attachment.id));
+    let (local_path, decoded_size) = match downloaded.transfer_encoding {
         imap_probe::AttachmentTransferEncoding::Identity => {
             if let Err(error) = validate_attachment_download_size(downloaded.size_bytes) {
                 let _ = fs::remove_file(&temp_path);
                 return Err(error);
             }
-            if local_path.exists() {
-                fs::remove_file(&local_path)?;
-            }
-            fs::rename(&temp_path, &local_path)?;
-            downloaded.size_bytes
+            let local_path = copy_download_to_user_dir(&temp_path, &final_dir, &filename)?;
+            // 已成功落盘到用户目录，清理断点临时文件。
+            let _ = fs::remove_file(&temp_path);
+            (local_path, downloaded.size_bytes)
         }
         transfer_encoding => {
             let decode_result = (|| -> MailResult<i64> {
@@ -266,12 +269,10 @@ pub fn download_attachment_file(
                     return Err(error);
                 }
             };
-            if local_path.exists() {
-                fs::remove_file(&local_path)?;
-            }
-            fs::rename(&decoded_path, &local_path)?;
+            let local_path = copy_download_to_user_dir(&decoded_path, &final_dir, &filename)?;
             let _ = fs::remove_file(&temp_path);
-            decoded_size
+            let _ = fs::remove_file(&decoded_path);
+            (local_path, decoded_size)
         }
     };
     let local_path_string = local_path.to_string_lossy().into_owned();
@@ -501,8 +502,14 @@ pub async fn save_attachment_as(
         )));
     }
 
-    let Some(target_path) =
-        prompt_save_file_path(&app, "另存附件", sanitize_filename(&attachment.filename))?
+    // 另存为对话框初始目录为配置的默认附件下载位置；用户显式更改则以用户选择为准。
+    let initial_dir = store.resolve_download_dir().ok();
+    let Some(target_path) = prompt_save_file_path(
+        &app,
+        "另存附件",
+        sanitize_filename(&attachment.filename),
+        initial_dir.as_deref(),
+    )?
     else {
         return Err(crate::db::MailError::Cancelled);
     };
@@ -674,10 +681,95 @@ pub fn save_temp_attachment(
     Ok(file_path.to_string_lossy().into_owned())
 }
 
+/// 按「文件名、文件名 (1).ext、文件名 (2).ext…」返回第 index 个候选文件名。
+fn candidate_name(filename: &str, index: u64) -> String {
+    if index == 0 {
+        return filename.to_string();
+    }
+    let (stem, extension) = split_extension(filename);
+    if extension.is_empty() {
+        format!("{stem} ({index})")
+    } else {
+        format!("{stem} ({index}).{extension}")
+    }
+}
+
+/// 在同名文件已存在时不覆盖，而是按「文件名、文件名 (1).ext、文件名 (2).ext…」
+/// 追加序号返回一个当前尚未占用的目标路径。
+#[cfg(test)]
+pub(crate) fn unique_download_path(dir: &Path, filename: &str) -> PathBuf {
+    let mut index = 0_u64;
+    loop {
+        let candidate = dir.join(candidate_name(filename, index));
+        if !candidate.exists() {
+            return candidate;
+        }
+        index += 1;
+    }
+}
+
+/// 把已完成的下载结果安全落到用户配置目录：
+/// - 用 create_new(true) 原子占用最终文件名，绝不对已存在的用户文件做截断或覆盖；
+/// - 与已有文件冲突时按「文件名 (1).ext」追加序号重试，消除「先检查再落盘」的并发窗口；
+/// - 失败时只清理本次调用创建的目标文件。
+fn copy_download_to_user_dir(source: &Path, dir: &Path, filename: &str) -> MailResult<PathBuf> {
+    use std::io::ErrorKind;
+    fs::create_dir_all(dir)?;
+    let mut index = 0_u64;
+    loop {
+        let candidate = dir.join(candidate_name(filename, index));
+        let mut dest = match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(dest) => dest,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                index += 1;
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let copy_result = (|| -> std::io::Result<()> {
+            let mut src = File::open(source)?;
+            std::io::copy(&mut src, &mut dest)?;
+            dest.sync_all()
+        })();
+        if let Err(error) = copy_result {
+            let _ = fs::remove_file(&candidate);
+            return Err(error.into());
+        }
+        return Ok(candidate);
+    }
+}
+
+fn split_extension(filename: &str) -> (String, String) {
+    match filename.rsplit_once('.') {
+        Some((stem, extension)) if !extension.is_empty() && !stem.is_empty() => {
+            (stem.to_string(), extension.to_string())
+        }
+        _ => (filename.to_string(), String::new()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::render_eml_message;
+    use super::{render_eml_message, split_extension, unique_download_path};
     use crate::models::{Attachment, Message};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DATABASE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn unique_test_database_path() -> std::path::PathBuf {
+        let unique = TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-download-dir-test-{}-{}",
+            std::process::id(),
+            unique
+        ));
+        std::fs::create_dir_all(&dir).expect("test data dir created");
+        dir.join("better-email.sqlite3")
+    }
 
     #[test]
     fn renders_plain_eml_with_attachment_metadata() {
@@ -729,5 +821,131 @@ mod tests {
         assert!(eml.contains("Cc: team@example.com"));
         assert!(eml.contains("Hello\r\nworld"));
         assert!(eml.contains("brief.txt; text/plain; 12 bytes; not downloaded"));
+    }
+
+    #[test]
+    fn unique_path_avoids_clobbering_existing_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+
+        // 不存在时直接使用原名。
+        let first = unique_download_path(root, "report.pdf");
+        assert_eq!(first, root.join("report.pdf"));
+
+        // 创建后应追加序号 (1)。
+        std::fs::write(&first, b"a").expect("write first");
+        let second = unique_download_path(root, "report.pdf");
+        assert_eq!(second, root.join("report (1).pdf"));
+
+        // 连续同名应继续递增 (2)、(3)。
+        std::fs::write(&second, b"b").expect("write second");
+        let third = unique_download_path(root, "report.pdf");
+        assert_eq!(third, root.join("report (2).pdf"));
+
+        // 无扩展名文件同样追加序号。
+        std::fs::write(root.join("LICENSE"), b"x").expect("write LICENSE");
+        assert_eq!(
+            unique_download_path(root, "LICENSE"),
+            root.join("LICENSE (1)")
+        );
+    }
+
+    #[test]
+    fn split_extension_handles_dotted_and_bare_names() {
+        assert_eq!(
+            split_extension("report.pdf"),
+            ("report".to_string(), "pdf".to_string())
+        );
+        assert_eq!(
+            split_extension("archive.tar.gz"),
+            ("archive.tar".to_string(), "gz".to_string())
+        );
+        assert_eq!(
+            split_extension(".gitignore"),
+            (".gitignore".to_string(), String::new())
+        );
+        assert_eq!(
+            split_extension("LICENSE"),
+            ("LICENSE".to_string(), String::new())
+        );
+    }
+
+    #[test]
+    fn download_resolution_and_unique_path_drive_configured_directory() {
+        // 手动/自动下载都会先 resolve_download_dir 再经 unique_download_path 落盘：
+        // 这里直接验证两者组合会落在用户配置目录，而非数据库缓存目录。
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let custom_dir = std::env::temp_dir().join("better-email-download-uses-config");
+        store
+            .validate_and_save_download_dir(&custom_dir.to_string_lossy())
+            .expect("save custom download dir");
+        let dir = store.resolve_download_dir().expect("resolve");
+        let target = unique_download_path(&dir, "报告.pdf");
+        assert_eq!(target, custom_dir.join("报告.pdf"), "下载应落在配置目录");
+        let _ = std::fs::remove_dir_all(&custom_dir);
+    }
+
+    #[test]
+    fn final_download_copy_never_overwrites_or_touches_user_files() {
+        // 用户目录中预置哨兵：同名最终文件、旧式 {id}.download / {id}.decoded。
+        let temp = tempfile::tempdir().expect("tempdir");
+        let user_dir = temp.path().join("downloads");
+        std::fs::create_dir_all(&user_dir).expect("user dir created");
+
+        let source = temp.path().join("source.bin");
+        std::fs::write(&source, b"downloaded-content").expect("source written");
+
+        let final_sentinel = user_dir.join("report.pdf");
+        let download_sentinel = user_dir.join("7.download");
+        let decoded_sentinel = user_dir.join("7.decoded");
+        std::fs::write(&final_sentinel, b"final-sentinel").expect("final sentinel");
+        std::fs::write(&download_sentinel, b"download-sentinel").expect("download sentinel");
+        std::fs::write(&decoded_sentinel, b"decoded-sentinel").expect("decoded sentinel");
+
+        let target = super::copy_download_to_user_dir(&source, &user_dir, "report.pdf")
+            .expect("copy succeeds");
+        assert_eq!(
+            target.file_name().and_then(|name| name.to_str()),
+            Some("report (1).pdf"),
+            "同名最终文件应追加序号而非覆盖"
+        );
+        // 预置的哨兵文件必须原样保留。
+        assert_eq!(std::fs::read(&final_sentinel).unwrap(), b"final-sentinel");
+        assert_eq!(
+            std::fs::read(&download_sentinel).unwrap(),
+            b"download-sentinel"
+        );
+        assert_eq!(
+            std::fs::read(&decoded_sentinel).unwrap(),
+            b"decoded-sentinel"
+        );
+        // 新落盘内容正确。
+        assert_eq!(std::fs::read(&target).unwrap(), b"downloaded-content");
+    }
+
+    #[test]
+    fn download_temp_files_live_in_managed_cache_not_user_dir() {
+        // 断点续传与解码临时文件必须留在应用受管理缓存目录，而不是用户下载目录。
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let user_dir = std::env::temp_dir().join("better-email-user-downloads");
+        store
+            .validate_and_save_download_dir(&user_dir.to_string_lossy())
+            .expect("save custom download dir");
+        let resolved = store.resolve_download_dir().expect("resolve");
+        assert_eq!(resolved, user_dir);
+
+        let temp_download = store.attachment_dir(1234).join("56.download");
+        let temp_decoded = store.attachment_dir(1234).join("56.decoded");
+        assert!(
+            !temp_download.starts_with(&user_dir),
+            "断点文件不得写入用户下载目录"
+        );
+        assert!(
+            !temp_decoded.starts_with(&user_dir),
+            "解码文件不得写入用户下载目录"
+        );
+        let _ = std::fs::remove_dir_all(&user_dir);
     }
 }

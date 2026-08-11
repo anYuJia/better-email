@@ -54,6 +54,8 @@ export type { BackgroundTask } from './types/sync';
 export type { LocalBackupSummary } from './types/sync';
 export type { StorageUsage } from './types/sync';
 export type { CacheClearResult } from './types/sync';
+export type { AppSettingsReport } from './types/sync';
+export type { DownloadDirSetResult } from './types/sync';
 export type { DraftInput } from './types/composer';
 export type { DraftSaveReport } from './types/composer';
 export type { ComposeTemplate } from './types/composer';

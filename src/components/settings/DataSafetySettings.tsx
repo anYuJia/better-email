@@ -1,26 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Check,
+  Copy,
   Database,
   Download,
   FileInput,
+  FolderOpen,
   HardDrive,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
 import type {
+  AppSettingsReport,
   ConnectionReport,
   LocalBackupSummary,
   StorageUsage,
 } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
+import { copyTextToClipboard } from '../../app/clipboard';
 import {
   SettingsBadge,
   SettingsButton,
   SettingsNotice,
+  SettingsRow,
   SettingsSection,
 } from './shared';
 
@@ -30,6 +37,9 @@ type DataSafetySettingsProps = {
   connectionReport: ConnectionReport | null;
   storageUsage: StorageUsage | null;
   storageBusy: boolean;
+  appSettings: AppSettingsReport | null;
+  downloadDirBusy: boolean;
+  downloadDirError: string | null;
   onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
@@ -37,6 +47,8 @@ type DataSafetySettingsProps = {
   onExportBackup: () => void;
   onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
+  onPickDownloadDir: () => void;
+  onResetDownloadDir: () => void;
 };
 
 export default function DataSafetySettings({
@@ -45,14 +57,27 @@ export default function DataSafetySettings({
   connectionReport,
   storageUsage,
   storageBusy,
+  appSettings,
+  downloadDirBusy,
+  downloadDirError,
   onImportEml,
   onPreviewBackup,
   onImportBackup,
   onExportBackup,
   onRefreshStorage,
   onClearAttachmentCache,
+  onPickDownloadDir,
+  onResetDownloadDir,
 }: DataSafetySettingsProps) {
   const [cacheConfirmationOpen, setCacheConfirmationOpen] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
+
+  const effectiveDir = appSettings?.effective_dir ?? '';
 
   async function confirmClearAttachmentCache() {
     try {
@@ -61,6 +86,18 @@ export default function DataSafetySettings({
     } catch {
       // The parent status surface reports the failure without dismissing this confirmation.
     }
+  }
+
+  async function copyDownloadDirPath() {
+    if (!effectiveDir) return;
+    try {
+      await copyTextToClipboard(effectiveDir);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopyState('idle'), 1600);
   }
 
   return (
@@ -141,6 +178,62 @@ export default function DataSafetySettings({
           >
             清理缓存
           </SettingsButton>
+        </div>
+
+        <div className="settings-download-location" data-testid="download-location">
+          <SettingsRow
+            title="默认下载位置"
+            description={(
+              <span className="settings-download-path-wrap">
+                <span
+                  className="settings-download-path"
+                  title={effectiveDir}
+                  data-testid="download-dir-path"
+                >
+                  {effectiveDir || '正在读取…'}
+                </span>
+                <button
+                  type="button"
+                  className="icon-only-action"
+                  aria-label={copyState === 'copied' ? '已复制' : '复制完整路径'}
+                  title={copyState === 'copied' ? '已复制' : '复制完整路径'}
+                  disabled={!effectiveDir || copyState === 'copied'}
+                  onClick={() => { copyDownloadDirPath().catch(() => undefined); }}
+                >
+                  {copyState === 'copied' ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              </span>
+            )}
+            control={(
+              <span className="st-actions settings-download-actions">
+                <SettingsButton
+                  icon={<FolderOpen size={14} />}
+                  disabled={downloadDirBusy}
+                  aria-busy={downloadDirBusy}
+                  onClick={onPickDownloadDir}
+                >
+                  {downloadDirBusy ? '正在选择…' : '选择文件夹'}
+                </SettingsButton>
+                <SettingsButton
+                  icon={<RotateCcw size={14} />}
+                  disabled={downloadDirBusy || appSettings?.using_default === true}
+                  onClick={onResetDownloadDir}
+                >
+                  恢复默认位置
+                </SettingsButton>
+              </span>
+            )}
+          />
+          <p className="st-field-hint settings-download-hint">
+            {appSettings?.using_default
+              ? '当前使用系统默认目录；手动下载与自动下载的新附件都会保存到这里。'
+              : '手动下载与自动下载的新附件都会保存到该文件夹。'}
+          </p>
+          {downloadDirError && (
+            <p className="settings-download-error" role="alert">
+              {downloadDirError}
+            </p>
+          )}
         </div>
       </SettingsSection>
 

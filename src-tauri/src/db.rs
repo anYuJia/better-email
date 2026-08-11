@@ -26,6 +26,7 @@ use thiserror::Error;
 
 mod accounts;
 pub(crate) mod ai_settings;
+mod app_settings;
 mod attachments;
 mod background_tasks;
 mod backup;
@@ -986,6 +987,42 @@ mod tests {
             message.received_at.as_str() >= "2026-07-01T00:00:00"
                 && message.received_at.as_str() <= "2026-07-20T23:59:59"
         }));
+    }
+
+    #[test]
+    fn changing_download_dir_does_not_rewrite_existing_attachment_paths() {
+        // 已有已下载附件的 local_path 是历史落盘位置，设置新下载目录时不得被迁移或改写。
+        let store = test_store();
+        let inbox = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let message = store
+            .list_messages_for_scope(None, inbox.id, None, None, 50)
+            .unwrap()
+            .into_iter()
+            .find(|message| message.has_attachments)
+            .expect("seeded message with attachment exists");
+        let attachment = store.list_attachments(message.id).unwrap().remove(0);
+        let legacy_path = "/Users/demo/Downloads/better-email/legacy.pdf";
+        store
+            .mark_attachment_downloaded(attachment.id, legacy_path, attachment.size_bytes)
+            .unwrap();
+
+        let custom_dir =
+            std::env::temp_dir().join("better-email-download-location-should-not-migrate");
+        store
+            .validate_and_save_download_dir(&custom_dir.to_string_lossy())
+            .expect("save custom download dir");
+
+        let reloaded = store.get_attachment(attachment.id).unwrap();
+        assert_eq!(
+            reloaded.local_path, legacy_path,
+            "已有附件的落盘路径不能被改写"
+        );
+        let _ = fs::remove_dir_all(&custom_dir);
     }
 
     #[test]

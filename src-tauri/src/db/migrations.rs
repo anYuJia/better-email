@@ -203,6 +203,11 @@ impl MailStore {
                     privacy_acknowledged INTEGER NOT NULL DEFAULT 0,
                     updated_at TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    default_download_dir TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL DEFAULT ''
+                );
                 CREATE TABLE IF NOT EXISTS contact_import_batches (
                     id INTEGER PRIMARY KEY,
                     file_name TEXT NOT NULL,

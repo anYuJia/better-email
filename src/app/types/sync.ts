@@ -40,6 +40,17 @@ export type CacheClearResult = {
   storage: StorageUsage;
 };
 
+export type AppSettingsReport = {
+  configured_dir: string;
+  effective_dir: string;
+  using_default: boolean;
+};
+
+export type DownloadDirSetResult = {
+  settings: AppSettingsReport;
+  cancelled: boolean;
+};
+
 
 export type SyncRun = {
   id: number;

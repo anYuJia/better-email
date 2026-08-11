@@ -64,6 +64,8 @@ export type SettingsHandlers = {
   onExportBackup: () => void;
   onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
+  onPickDownloadDir: () => void;
+  onResetDownloadDir: () => void;
   onDiscoverImapFolders: () => void;
   onPrepareWriteValidation: SettingsOverlayProps['onPrepareWriteValidation'];
   onRefreshWriteValidation: () => void;
@@ -155,6 +157,8 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onExportBackup: () => latest().onExportBackup(),
     onRefreshStorage: () => latest().onRefreshStorage(),
     onClearAttachmentCache: () => latest().onClearAttachmentCache(),
+    onPickDownloadDir: () => latest().onPickDownloadDir(),
+    onResetDownloadDir: () => latest().onResetDownloadDir(),
     onDiscoverImapFolders: () => latest().onDiscoverImapFolders(),
     onPrepareWriteValidation: () => latest().onPrepareWriteValidation(),
     onRefreshWriteValidation: () => latest().onRefreshWriteValidation(),

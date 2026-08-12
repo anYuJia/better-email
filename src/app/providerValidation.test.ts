@@ -50,6 +50,7 @@ const sync: SyncRun = {
   status: 'imap_headers_account',
   scanned_folders: 4,
   imported_messages: 2,
+  new_messages: 2,
   message: 'sync complete',
 };
 

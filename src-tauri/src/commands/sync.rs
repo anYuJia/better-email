@@ -290,6 +290,7 @@ pub async fn sync_imap_headers(
     let started_at = Utc::now().to_rfc3339();
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
+    let mut new_messages = 0;
     let mut synced_accounts = 0;
     let mut failures = Vec::new();
     let mut warnings = Vec::new();
@@ -312,6 +313,7 @@ pub async fn sync_imap_headers(
             Ok(run) => {
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
+                new_messages += run.new_messages;
                 synced_accounts += 1;
                 if run.status.ends_with("_account_partial") {
                     warnings.push(format!("{}: {}", account.email, run.message));
@@ -387,6 +389,7 @@ pub async fn sync_imap_headers(
         status,
         scanned_folders,
         imported_messages,
+        new_messages,
         &message,
     );
     match &result {
@@ -454,6 +457,7 @@ fn sync_pop3_headers_for_account(
             "pop3_history_complete",
             0,
             0,
+            0,
             &message,
         );
     }
@@ -491,6 +495,7 @@ fn sync_pop3_headers_for_account(
         &finished_at,
         "pop3_headers_account",
         1,
+        imported_messages,
         imported_messages,
         &message,
     )
@@ -534,6 +539,7 @@ fn sync_imap_headers_for_account(
     let total_mapped_folders = mailboxes.len();
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
+    let mut new_messages = 0;
     let mut updated_remote_states = 0;
     let mut removed_remote_messages = 0;
     let mut failures = Vec::new();
@@ -590,9 +596,10 @@ fn sync_imap_headers_for_account(
                 let reconcile = store.reconcile_imap_flag_snapshot(mailbox.id, &fetch.flags);
                 let imported = store.import_imap_headers_batch(mailbox.id, &fetch.headers);
                 match (reconcile, imported) {
-                    (Ok(reconciled), Ok(imported)) => {
+                    (Ok(reconciled), Ok((imported, batch_new_messages))) => {
                         scanned_folders += 1;
                         imported_messages += imported;
+                        new_messages += batch_new_messages;
                         updated_remote_states += reconciled.updated_messages;
                         removed_remote_messages += reconciled.removed_messages;
                         match sync_mailbox_bodies(
@@ -666,6 +673,7 @@ fn sync_imap_headers_for_account(
             "imap_history_complete",
             0,
             0,
+            0,
             &message,
         );
     }
@@ -690,6 +698,7 @@ fn sync_imap_headers_for_account(
             } else {
                 "imap_headers_account_failed"
             },
+            0,
             0,
             0,
             &message,
@@ -797,6 +806,7 @@ fn sync_imap_headers_for_account(
         status,
         scanned_folders,
         imported_messages,
+        new_messages,
         &message,
     )
 }

@@ -29,13 +29,14 @@ impl MailStore {
                 account.email
             );
             conn.execute(
-                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, message)
-                 VALUES (?1, ?2, 'dry_run', ?3, ?4, ?5)",
+                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, new_messages, message)
+                 VALUES (?1, ?2, 'dry_run', ?3, ?4, ?5, ?6)",
                 params![
                     started_at,
                     finished_at,
                     scanned_folders,
                     imported_messages,
+                    0,
                     message
                 ],
             )?;
@@ -47,6 +48,7 @@ impl MailStore {
                 status: "dry_run".to_string(),
                 scanned_folders,
                 imported_messages,
+                new_messages: 0,
                 message,
             })
         })
@@ -218,7 +220,7 @@ impl MailStore {
     ) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
             let started_at = Utc::now().to_rfc3339();
-            let imported_messages = import_imap_headers_for_conn(conn, mailbox_id, batch)?;
+            let (imported_messages, new_messages) = import_imap_headers_for_conn(conn, mailbox_id, batch)?;
             let finished_at = Utc::now().to_rfc3339();
             let message = format!(
                 "IMAP 邮件头同步完成：{} 扫描 {} 封，新增 {} 封。",
@@ -227,9 +229,9 @@ impl MailStore {
                 imported_messages
             );
             conn.execute(
-                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, message)
-                 VALUES (?1, ?2, 'imap_headers', 1, ?3, ?4)",
-                params![started_at, finished_at, imported_messages, message],
+                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, new_messages, message)
+                 VALUES (?1, ?2, 'imap_headers', 1, ?3, ?4, ?5)",
+                params![started_at, finished_at, imported_messages, new_messages, message],
             )?;
             let id = conn.last_insert_rowid();
             Ok(SyncRun {
@@ -239,6 +241,7 @@ impl MailStore {
                 status: "imap_headers".to_string(),
                 scanned_folders: 1,
                 imported_messages,
+                new_messages,
                 message,
             })
         })
@@ -247,7 +250,7 @@ impl MailStore {
         &self,
         mailbox_id: i64,
         batch: &ImapHeaderBatch,
-    ) -> MailResult<i64> {
+    ) -> MailResult<(i64, i64)> {
         self.with_conn(|conn| import_imap_headers_for_conn(conn, mailbox_id, batch))
     }
     pub fn reconcile_imap_flag_snapshot(
@@ -260,7 +263,7 @@ impl MailStore {
     pub fn list_sync_runs(&self) -> MailResult<Vec<SyncRun>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, started_at, finished_at, status, scanned_folders, imported_messages, message
+                "SELECT id, started_at, finished_at, status, scanned_folders, imported_messages, new_messages, message
                  FROM sync_runs ORDER BY started_at DESC LIMIT 10",
             )?;
             let runs = stmt
@@ -272,7 +275,8 @@ impl MailStore {
                         status: row.get(3)?,
                         scanned_folders: row.get(4)?,
                         imported_messages: row.get(5)?,
-                        message: row.get(6)?,
+                        new_messages: row.get(6)?,
+                        message: row.get(7)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -286,18 +290,20 @@ impl MailStore {
         status: &str,
         scanned_folders: i64,
         imported_messages: i64,
+        new_messages: i64,
         message: &str,
     ) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, message)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO sync_runs(started_at, finished_at, status, scanned_folders, imported_messages, new_messages, message)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
                     started_at,
                     finished_at,
                     status,
                     scanned_folders,
                     imported_messages,
+                    new_messages,
                     message
                 ],
             )?;
@@ -309,6 +315,7 @@ impl MailStore {
                 status: status.to_string(),
                 scanned_folders,
                 imported_messages,
+                new_messages,
                 message: message.to_string(),
             })
         })
@@ -383,7 +390,7 @@ pub(super) fn import_imap_headers_for_conn(
     conn: &Connection,
     mailbox_id: i64,
     batch: &ImapHeaderBatch,
-) -> MailResult<i64> {
+) -> MailResult<(i64, i64)> {
     let transaction = conn.unchecked_transaction()?;
     let (account_id, local_role, local_folder_id): (i64, String, Option<i64>) = conn.query_row(
         "SELECT account_id, local_role, local_folder_id FROM imap_mailboxes WHERE id = ?1",
@@ -407,6 +414,18 @@ pub(super) fn import_imap_headers_for_conn(
         folder_id_for_account_role(conn, account_id, &local_role)?
     };
     let mut imported_messages = 0;
+    // 同步前的最高 UID：只有超过它的新插入才计入「新邮件」，历史补同步不计入。
+    let mut new_messages = 0;
+    let previous_highest_uid: i64 = if batch.cursor_reset {
+        0
+    } else {
+        conn.query_row(
+            "SELECT COALESCE(highest_uid, 0) FROM imap_mailboxes WHERE id = ?1",
+            params![mailbox_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+    };
 
     if batch.cursor_reset {
         conn.execute(
@@ -532,6 +551,9 @@ pub(super) fn import_imap_headers_for_conn(
         if changed > 0 {
             let message_id = conn.last_insert_rowid();
             apply_enabled_rules_for_message(conn, message_id)?;
+            if previous_highest_uid > 0 && header.remote_uid > previous_highest_uid {
+                new_messages += 1;
+            }
         }
         imported_messages += changed as i64;
     }
@@ -570,7 +592,7 @@ pub(super) fn import_imap_headers_for_conn(
         ],
     )?;
     transaction.commit()?;
-    Ok(imported_messages)
+    Ok((imported_messages, new_messages))
 }
 pub(super) fn reconcile_imap_flag_snapshot_for_conn(
     conn: &Connection,

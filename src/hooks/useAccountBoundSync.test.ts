@@ -40,6 +40,7 @@ const syncRun: SyncRun = {
   status: 'ok',
   scanned_folders: 4,
   imported_messages: 3,
+  new_messages: 3,
   message: '同步完成',
 };
 

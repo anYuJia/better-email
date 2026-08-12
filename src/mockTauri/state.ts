@@ -2218,6 +2218,7 @@ export function runMockSyncCommand(command: string, args?: InvokeArgs) {
       : plan.delayed_accounts.length > 0 ? 'imap_headers_limited' : 'ok',
     scanned_folders: scannedFolderCount,
     imported_messages: 1,
+    new_messages: command === 'sync_imap_history' ? 0 : 1,
     message: command === 'sync_imap_history'
       ? `UI smoke mock 历史回填完成（${targetAccount.email}）：扫描 ${scannedFolderCount} 个文件夹，补充 1 封。`
       : args?.accountId

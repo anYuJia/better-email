@@ -212,6 +212,8 @@ export function syncIntervalMs(syncMode: string): number | null {
 
 export type SyncRunSummary = {
   imported_messages: number;
+  /** 真正新增的邮件数（不含历史补同步）；旧数据可能缺省。 */
+  new_messages?: number;
   finished_at: string;
   message: string;
 };
@@ -259,8 +261,9 @@ export function syncStatusLabel(run: SyncRunSummary): string {
 }
 
 export function newMailNotificationBody(run: SyncRunSummary): string | null {
-  if (run.imported_messages <= 0) return null;
-  return `已同步 ${run.imported_messages} 封新邮件`;
+  const count = run.new_messages ?? run.imported_messages;
+  if (count <= 0) return null;
+  return `已同步 ${count} 封新邮件`;
 }
 
 export function newMailNotificationDecision(
@@ -282,7 +285,8 @@ export function newMailNotificationDecision(
     };
   }
 
-  const candidates = messages.slice(0, Math.max(0, run.imported_messages));
+  const mailCount = run.new_messages ?? run.imported_messages;
+  const candidates = messages.slice(0, Math.max(0, mailCount));
   const mutedScopeSet = new Set(mutedThreadScopes);
   const accountActiveMessages = candidates.filter((message) => !isAccountListed(message, policy.mutedAccounts));
   const mutedMatches = candidates.length - accountActiveMessages.length;
@@ -360,6 +364,20 @@ export function newMailNotificationDecision(
       reason: 'send',
       vipMatches: 0,
       priorityMatches: priorityMessages.length,
+      mutedMatches,
+      threadMutedMatches,
+    };
+  }
+
+  if (activeMessages.length === 1) {
+    const first = activeMessages[0];
+    const subject = first.subject.trim() || '(无主题)';
+    const sender = first.sender_name.trim() || first.sender_email;
+    return {
+      body: `${sender} · ${subject}`,
+      reason: 'send',
+      vipMatches: 0,
+      priorityMatches: 0,
       mutedMatches,
       threadMutedMatches,
     };

@@ -132,6 +132,7 @@ impl MailStore {
                     status TEXT NOT NULL,
                     scanned_folders INTEGER NOT NULL,
                     imported_messages INTEGER NOT NULL,
+                    new_messages INTEGER NOT NULL DEFAULT 0,
                     message TEXT NOT NULL
                 );
 
@@ -549,6 +550,12 @@ impl MailStore {
             migrate_thread_keys_if_needed(conn)?;
             migrate_fts_update_trigger_if_needed(conn)?;
             ensure_default_identities_for_conn(conn)?;
+            add_column_if_missing(
+                conn,
+                "sync_runs",
+                "new_messages",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
             Ok(())
         })
     }

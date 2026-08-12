@@ -80,6 +80,7 @@ function createLoaders() {
     status: 'ok',
     scanned_folders: 1,
     imported_messages: 2,
+    new_messages: 2,
     message: '同步完成',
   }));
   const loadersRef: { current: MailboxSearchLoaders | null } = {

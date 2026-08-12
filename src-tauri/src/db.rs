@@ -2928,6 +2928,68 @@ mod tests {
     }
 
     #[test]
+    fn new_messages_exclude_history_backfill() {
+        let store = test_store();
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let header = |remote_uid: i64, message_id: &str| crate::models::RemoteMessageHeader {
+            remote_uid,
+            message_id: message_id.to_string(),
+            in_reply_to: String::new(),
+            references: String::new(),
+            subject: format!("Subject {remote_uid}"),
+            sender_name: "Remote".to_string(),
+            sender_email: "remote@example.com".to_string(),
+            recipients: "demo@better-email.local".to_string(),
+            snippet: "header only".to_string(),
+            received_at: Utc::now().to_rfc3339(),
+            is_read: false,
+            is_starred: false,
+        };
+        // 首次同步（游标为空）：整批按历史填充，不产生「新邮件」。
+        let first = store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "42".to_string(),
+                    highest_uid: 10,
+                    lowest_uid: 10,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(10, "<m10@example.com>")],
+                },
+            )
+            .unwrap();
+        assert_eq!(first, (1, 0));
+
+        // 增量同步：UID 高于游标的才算新邮件，历史补同步不计入。
+        let second = store
+            .import_imap_headers_batch(
+                mailbox.id,
+                &ImapHeaderBatch {
+                    remote_name: "INBOX".to_string(),
+                    uid_validity: "42".to_string(),
+                    highest_uid: 12,
+                    lowest_uid: 5,
+                    history_complete: false,
+                    history_scanned: true,
+                    cursor_reset: false,
+                    headers: vec![header(12, "<m12@example.com>"), header(5, "<m5@example.com>")],
+                },
+            )
+            .unwrap();
+        assert_eq!(second, (2, 1));
+    }
+
+    #[test]
     fn imap_replies_with_different_subjects_share_reference_thread() {
         let store = test_store();
         let mailbox = store
@@ -2980,7 +3042,7 @@ mod tests {
         };
 
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
             2
         );
 
@@ -3275,7 +3337,7 @@ mod tests {
             }],
         };
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
             1
         );
         let archive = store
@@ -3305,7 +3367,7 @@ mod tests {
         assert_eq!(
             store
                 .import_imap_headers_batch(mailbox.id, &rebound_batch)
-                .unwrap(),
+                .unwrap().0,
             0
         );
         let rebound = store.get_message(message.id).unwrap();
@@ -3352,7 +3414,7 @@ mod tests {
         let initial_sync_runs = store.list_sync_runs().unwrap().len();
 
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap(),
+            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
             1
         );
         assert_eq!(store.list_sync_runs().unwrap().len(), initial_sync_runs);
@@ -3488,7 +3550,7 @@ mod tests {
         assert_eq!(
             store
                 .import_imap_headers_batch(remote_custom.id, &batch)
-                .unwrap(),
+                .unwrap().0,
             1
         );
         let imported = store

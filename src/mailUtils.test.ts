@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  defaultNotificationPolicy,
   formatBytes,
   formatDate,
   messageDateGroup,
@@ -168,6 +169,40 @@ describe('mail UI utilities', () => {
     expect(syncStatusLabel(run)).toBe('not-a-date · IMAP 邮件头同步完成：INBOX 扫描 10 封，新增 3 封。');
     expect(newMailNotificationBody(run)).toBe('已同步 3 封新邮件');
     expect(newMailNotificationBody({ ...run, imported_messages: 0 })).toBeNull();
+    // 历史补同步（有导入但无新邮件）不应触发新邮件提醒。
+    expect(newMailNotificationBody({ ...run, new_messages: 0 })).toBeNull();
+  });
+
+  it('shows sender and subject when only one new message arrives', () => {
+    const run = {
+      imported_messages: 5,
+      new_messages: 1,
+      finished_at: 'not-a-date',
+      message: '同步完成',
+    };
+    const messages = [
+      { sender_name: 'Ada', sender_email: 'ada@example.com', subject: 'Review' },
+    ];
+
+    expect(newMailNotificationDecision(run, defaultNotificationPolicy, messages))
+      .toMatchObject({ reason: 'send', body: 'Ada · Review' });
+  });
+
+  it('does not notify when only history backfill is imported', () => {
+    const run = {
+      imported_messages: 25,
+      new_messages: 0,
+      finished_at: 'not-a-date',
+      message: '同步完成',
+    };
+    const messages = Array.from({ length: 25 }, (_, index) => ({
+      sender_name: `Sender ${index}`,
+      sender_email: `sender${index}@example.com`,
+      subject: `Message ${index}`,
+    }));
+
+    expect(newMailNotificationDecision(run, defaultNotificationPolicy, messages))
+      .toMatchObject({ body: null, reason: 'no-new-mail' });
   });
 
   it('applies quiet hours and VIP notification policy', () => {
@@ -314,7 +349,7 @@ describe('mail UI utilities', () => {
         [mutedScope],
       ),
     ).toMatchObject({
-      body: '已同步 1 封新邮件',
+      body: 'Personal Robot · Visible personal digest',
       reason: 'send',
       threadMutedMatches: 1,
     });

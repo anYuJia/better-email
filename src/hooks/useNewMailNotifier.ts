@@ -29,7 +29,7 @@ export default function useNewMailNotifier({
   const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: MessageSummary[]) => {
     const currentMessages = getCurrentMessages();
     const candidates = (latestMessages ?? currentMessages)
-      .slice(0, Math.max(0, run.imported_messages));
+      .slice(0, Math.max(0, run.new_messages ?? run.imported_messages));
     const accountIds = [...new Set(
       candidates
         .map((message) => message.account_id)

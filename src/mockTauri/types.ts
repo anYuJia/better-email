@@ -89,6 +89,7 @@ export type MockSyncRun = {
   status: string;
   scanned_folders: number;
   imported_messages: number;
+  new_messages: number;
   message: string;
 };
 

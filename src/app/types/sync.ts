@@ -59,6 +59,8 @@ export type SyncRun = {
   status: string;
   scanned_folders: number;
   imported_messages: number;
+  /** 真正新增的邮件数（不含历史补同步）。 */
+  new_messages: number;
   message: string;
 };
 

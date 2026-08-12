@@ -637,6 +637,8 @@ pub struct SyncRun {
     pub status: String,
     pub scanned_folders: i64,
     pub imported_messages: i64,
+    /// 本次同步真正新增的邮件数（UID 高于同步前游标），不含历史补同步。
+    pub new_messages: i64,
     pub message: String,
 }
 

@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-08-12
+
+### 质量
+- 所有运行日志（Rust 后端与 TypeScript/React 前端）统一在**输出时**增加本机时区时间戳，格式固定为 `YYYY-MM-DD HH:mm:ss.SSS ±HH:MM`；日志正文、分类、级别与敏感信息脱敏均保持不变。
+- 日志输出收口到单一入口（Rust `logging.rs` 的 `log_line`、前端 `logger.ts` 的 `logInfo/logWarn/logError` 等），不再有绕过统一入口的散落 `println!` / `console.*` 调用，避免重复时间戳。
+- 新增时间戳格式、正文保留、错误日志带时间戳以及 Rust / 前端格式一致的回归测试（Rust 229 项、前端 544 项全绿）。
+
 ## [1.0.14] - 2026-08-11
 
 ### 修复

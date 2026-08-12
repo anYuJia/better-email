@@ -119,6 +119,12 @@ export default function AccountSwitcher({
         aria-haspopup="menu"
         aria-expanded={Boolean(menu)}
         onPointerDown={(event) => {
+          // 只阻止默认行为(聚焦/选中文本),开关交给 onClick 统一处理,
+          // 避免 pointerdown 与 click 两个事件都切换导致“关掉又展开”。
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           if (menu) {
@@ -126,11 +132,6 @@ export default function AccountSwitcher({
             return;
           }
           openMenuFromTrigger();
-        }}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (!menu) openMenuFromTrigger();
         }}
         onContextMenu={(event) => {
           event.preventDefault();

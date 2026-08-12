@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
 import MessageListView from './MessageListView';
+import {
+  GROUP_HEADER_HEIGHT,
+  LIST_FOOTER_HEIGHT,
+  MESSAGE_ROW_HEIGHT,
+} from './messageListLayout';
 
 const message: MessageSummary = {
   id: 1,
@@ -103,5 +108,57 @@ describe('MessageListView theme-safe separators', () => {
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);
     expect(onToggleMessageSelection).toHaveBeenCalledWith(message.id, true);
+  });
+
+  it('虚拟布局行高与单一事实来源常量完全一致', () => {
+    const messages = [message, { ...message, id: 2, remote_uid: 2 }];
+    const { container } = render(
+      <MessageListView
+        groups={[
+          { id: 'today', label: '今天', messages: [messages[0]] },
+          { id: 'earlier', label: '更早', messages: [messages[1]] },
+        ]}
+        messages={messages}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages={false}
+        listStateKey="layout-consistency"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const wrapper = container.querySelector('.message-list-viewport-wrapper') as HTMLElement;
+    const headers = container.querySelectorAll<HTMLElement>('.message-date-header');
+    const rows = container.querySelectorAll<HTMLElement>('.message-list-item');
+
+    // 外层总高度 = 所有 header/行高度之和 + 底部 footer 高度。
+    const expectedTotal = 2 * (GROUP_HEADER_HEIGHT + MESSAGE_ROW_HEIGHT) + LIST_FOOTER_HEIGHT;
+    expect(wrapper.style.height).toBe(`${expectedTotal}px`);
+
+    // header 0 顶部 y=0，行 0 紧跟其后；header 1 在“header0 + 行0”之后。
+    expect(headers[0].style.transform).toBe('translateY(0px)');
+    expect(headers[0].style.height).toBe(`${GROUP_HEADER_HEIGHT}px`);
+    expect(rows[0].style.transform).toBe(`translateY(${GROUP_HEADER_HEIGHT}px)`);
+    expect(rows[0].style.height).toBe(`${MESSAGE_ROW_HEIGHT}px`);
+    expect(headers[1].style.transform).toBe(
+      `translateY(${GROUP_HEADER_HEIGHT + MESSAGE_ROW_HEIGHT}px)`,
+    );
+    expect(rows[1].style.transform).toBe(
+      `translateY(${2 * GROUP_HEADER_HEIGHT + MESSAGE_ROW_HEIGHT}px)`,
+    );
+    expect(rows[1].style.height).toBe(`${MESSAGE_ROW_HEIGHT}px`);
   });
 });

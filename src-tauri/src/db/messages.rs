@@ -898,6 +898,28 @@ impl MailStore {
             message_for_conn(conn, message_id)
         })
     }
+    /// 批量稍后处理：在单个数据库事务内处理全部目标邮件，保证全成或全不成。
+    /// 中途任一目标失败（例如邮件不存在）会整体回滚，不会留下部分已稍后处理的中间状态。
+    pub fn snooze_messages(
+        &self,
+        message_ids: &[i64],
+        snoozed_until: &str,
+    ) -> MailResult<Vec<Message>> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let mut messages = Vec::with_capacity(message_ids.len());
+            for message_id in message_ids {
+                let folder_id = folder_id_for_message_role(&transaction, *message_id, "snoozed")?;
+                transaction.execute(
+                    "UPDATE messages SET folder_id = ?1, snoozed_until = ?2, is_read = 1 WHERE id = ?3",
+                    params![folder_id, snoozed_until.trim(), message_id],
+                )?;
+                messages.push(message_for_conn(&transaction, *message_id)?);
+            }
+            transaction.commit()?;
+            Ok(messages)
+        })
+    }
     pub fn unsnooze_message(&self, message_id: i64) -> MailResult<Message> {
         self.with_conn(|conn| {
             let folder_id = folder_id_for_message_role(conn, message_id, "inbox")?;

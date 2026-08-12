@@ -1,4 +1,4 @@
-import { useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import {
   invoke,
   getCurrentWindow,
@@ -32,6 +32,19 @@ import { IPC } from '../ipc/commands';
  * its result into the new view.
  */
 export type MailboxRefreshRequest = {
+  id: number;
+  scope: AccountScope;
+};
+
+/**
+ * 未读角标/托盘刷新的独立请求标记。
+ *
+ * 与 mailboxRefreshRef 分开维护：未读刷新是轻量的 get_stats 路径，账号切换时
+ * 旧账号的慢响应不能覆盖新账号的 Dock 角标和托盘未读数。`id` 来自独立的
+ * unreadRefreshSeqRef 递增计数，`scope` 记录发起时的账号 scope。
+ */
+export type UnreadRefreshRequest = {
+  kind: 'unread';
   id: number;
   scope: AccountScope;
 };
@@ -116,14 +129,37 @@ export default function useAppMetaLoader({
   // newest rendered mailbox scope rather than the closure that started them.
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
   activeMailboxScopeRef.current = accountScope;
+  // 未读刷新的独立请求序号与当前活跃请求：账号切换竞态只认这个 token，
+  // 不复用 mailboxRefreshRef（那是邮件视图刷新，语义不同）。
+  const unreadRefreshSeqRef = useRef(0);
+  const activeUnreadRefreshRef = useRef<UnreadRefreshRequest | null>(null);
 
-  function isMailboxRefreshCurrent(mailboxRequest?: MailboxRefreshRequest): boolean {
-    if (!mailboxRequest) return true;
-    return (
-      mailboxRequest.scope === activeMailboxScopeRef.current
-      && (!mailboxRefreshRef || mailboxRequest.id === mailboxRefreshRef.current)
-    );
-  }
+  const isMailboxRefreshCurrent = useCallback(
+    (mailboxRequest?: MailboxRefreshRequest): boolean => {
+      if (!mailboxRequest) return true;
+      return (
+        mailboxRequest.scope === activeMailboxScopeRef.current
+        && (!mailboxRefreshRef || mailboxRequest.id === mailboxRefreshRef.current)
+      );
+    },
+    [mailboxRefreshRef],
+  );
+
+  // 未读刷新新鲜度：请求仍是最新一次发起，且 scope 仍匹配当前渲染的账号范围。
+  // 账号从 A 切到 B 后，A 的慢响应在 scope 校验处被丢弃。
+  const isUnreadRefreshCurrent = useCallback(
+    (request?: MailboxRefreshRequest | UnreadRefreshRequest): boolean => {
+      if (!request) return true;
+      if ('kind' in request) {
+        const active = activeUnreadRefreshRef.current;
+        return Boolean(
+          active && active.id === request.id && request.scope === activeMailboxScopeRef.current,
+        );
+      }
+      return isMailboxRefreshCurrent(request);
+    },
+    [isMailboxRefreshCurrent],
+  );
 
   async function releaseDueSnoozedMessages() {
     const result = await invoke<{ released_count: number }>(IPC.ReleaseDueSnoozedMessages, { now: new Date().toISOString() });
@@ -139,6 +175,16 @@ export default function useAppMetaLoader({
     const nextAccountId = accountIdForScope(nextScope);
     const mode = options.mode ?? 'full';
     const mailboxRequest = options.mailboxRequest;
+    // 未携带 mailboxRequest 的调用（邮件操作、部分刷新路径）也要给角标/托盘
+    // 写入一个 scope 快照 token：慢 loadMeta 在账号切换后不得把旧账号的未读数
+    // 覆盖到新账号。带 mailboxRequest 的路径沿用原有 freshness 校验。
+    // 关键：只有当前 scope 的请求才登记为活跃 token，旧账号的 loadMeta 恢复时
+    // 绝不能顶掉 B 账号正在途的焦点刷新请求。
+    const unreadRequest: MailboxRefreshRequest | UnreadRefreshRequest =
+      mailboxRequest ?? { kind: 'unread', id: ++unreadRefreshSeqRef.current, scope: nextScope };
+    if ('kind' in unreadRequest && unreadRequest.scope === activeMailboxScopeRef.current) {
+      activeUnreadRefreshRef.current = unreadRequest;
+    }
     const shouldCommitMailboxResult = () => (
       !mailboxRequest
       || (
@@ -220,7 +266,7 @@ export default function useAppMetaLoader({
         setSyncSchedulePlan(nextSyncSchedulePlan);
         setRemoteImageTrusts(nextRemoteImageTrusts);
         setImapMailboxes(nextImapMailboxes);
-        void updateAppUnreadBadge(nextStats.unread_messages, mailboxRequest);
+        void updateAppUnreadBadge(nextStats.unread_messages, unreadRequest);
         setFolderId(resolvedFolderId);
         appFlowLog('loadMeta done', {
           accountCount: nextAccounts.length,
@@ -301,7 +347,7 @@ export default function useAppMetaLoader({
       setRemoteImageTrusts(nextRemoteImageTrusts);
       setImapMailboxes(nextImapMailboxes);
       setOauthSessions(nextOauthSessions);
-      void updateAppUnreadBadge(nextStats.unread_messages, mailboxRequest);
+      void updateAppUnreadBadge(nextStats.unread_messages, unreadRequest);
       setFolderId(resolvedFolderId);
       appFlowLog('loadMeta done', {
         accountCount: nextAccounts.length,
@@ -324,43 +370,63 @@ export default function useAppMetaLoader({
     }
   }
 
-  async function updateAppUnreadBadge(
-    unreadCount: number,
-    mailboxRequest?: MailboxRefreshRequest,
-  ) {
-    if (!isMailboxRefreshCurrent(mailboxRequest)) return;
-    try {
-      await getCurrentWindow().setBadgeCount(unreadCount > 0 ? unreadCount : undefined);
-      if (!isMailboxRefreshCurrent(mailboxRequest)) return;
-      setAppBadgeStatus(unreadCount > 0 ? `应用角标 ${unreadCount}` : '应用角标已清除');
-    } catch {
-      if (isMailboxRefreshCurrent(mailboxRequest)) {
-        setAppBadgeStatus('当前平台不支持应用角标');
+  const updateAppUnreadBadge = useCallback(
+    async function updateAppUnreadBadge(
+      unreadCount: number,
+      request?: MailboxRefreshRequest | UnreadRefreshRequest,
+    ) {
+      if (!isUnreadRefreshCurrent(request)) return;
+      try {
+        await getCurrentWindow().setBadgeCount(unreadCount > 0 ? unreadCount : undefined);
+        if (!isUnreadRefreshCurrent(request)) return;
+        setAppBadgeStatus(unreadCount > 0 ? `应用角标 ${unreadCount}` : '应用角标已清除');
+      } catch {
+        if (isUnreadRefreshCurrent(request)) {
+          setAppBadgeStatus('当前平台不支持应用角标');
+        }
       }
-    }
 
-    try {
-      if (!isMailboxRefreshCurrent(mailboxRequest)) return;
-      await invoke(IPC.SetTrayUnreadCount, { unreadCount });
-    } catch (error) {
-      console.warn('Failed to update tray unread count:', error);
-    }
-  }
+      try {
+        if (!isUnreadRefreshCurrent(request)) return;
+        await invoke(IPC.SetTrayUnreadCount, { unreadCount });
+      } catch (error) {
+        console.warn('Failed to update tray unread count:', error);
+      }
+    },
+    [isUnreadRefreshCurrent, setAppBadgeStatus],
+  );
 
   /**
    * 独立于 loadMeta 的角标/托盘未读同步：即使邮件加载失败，
    * 也能用一次轻量 get_stats 把 Dock 角标和托盘未读数刷新到真实状态。
+   *
+   * 每次发起都记录独立的 request id 与 scope。get_stats 返回后、setBadgeCount
+   * 返回后、写托盘前，updateAppUnreadBadge 都会校验该请求仍是最新且 scope 仍
+   * 匹配，因此账号从 A 切到 B 后，A 的慢响应不会覆盖 B 的角标/托盘。
    */
-  async function refreshUnreadIndicators(scope: AccountScope = 'all') {
-    try {
-      const nextStats = await invoke<MailStats>(IPC.GetStats, {
-        accountId: accountIdForScope(scope),
-      });
-      await updateAppUnreadBadge(nextStats.unread_messages);
-    } catch (error) {
-      console.warn('Failed to refresh unread indicators:', error);
-    }
-  }
+  const refreshUnreadIndicators = useCallback(
+    async function refreshUnreadIndicators(scope: AccountScope = 'all') {
+      const request: UnreadRefreshRequest = {
+        kind: 'unread',
+        id: ++unreadRefreshSeqRef.current,
+        scope,
+      };
+      // 只有当前账号 scope 的请求才配作为“活跃未读请求”；非当前 scope 的
+      // 旧调用若覆盖 token，会让真正在途的 B 请求被 id 校验误丢弃。
+      if (scope === activeMailboxScopeRef.current) {
+        activeUnreadRefreshRef.current = request;
+      }
+      try {
+        const nextStats = await invoke<MailStats>(IPC.GetStats, {
+          accountId: accountIdForScope(scope),
+        });
+        await updateAppUnreadBadge(nextStats.unread_messages, request);
+      } catch (error) {
+        console.warn('Failed to refresh unread indicators:', error);
+      }
+    },
+    [updateAppUnreadBadge],
+  );
 
   async function maybeRunBenchmarkSync(runSyncDryRun: () => Promise<SyncRun>) {
     if (benchmarkSyncRef.current) return;

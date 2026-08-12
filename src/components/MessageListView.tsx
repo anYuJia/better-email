@@ -5,12 +5,16 @@ import type {
   MessageSummary,
 } from '../app/types';
 import MessageListCard from './MessageListCard';
-import { calculateVisibleRange } from './messageListLayout';
+import {
+  GROUP_HEADER_HEIGHT,
+  LIST_FOOTER_HEIGHT,
+  MESSAGE_ROW_HEIGHT,
+  calculateVisibleRange,
+} from './messageListLayout';
 
 const SCROLL_SAVE_DEBOUNCE_MS = 220;
 const NEW_MESSAGE_ANIMATION_LIMIT = 5;
 const NEW_MESSAGE_ABSORB_DELAY_MS = 800;
-const MESSAGE_ROW_HEIGHT = 68;
 
 type MessageGroup = {
   id: string;
@@ -124,10 +128,7 @@ export default function MessageListView({
     const layout: { top: number; height: number }[] = [];
     let currentTop = 0;
     for (const item of flatItems) {
-      let height = 34;
-      if (item.type === 'message') {
-        height = MESSAGE_ROW_HEIGHT;
-      }
+      const height = item.type === 'message' ? MESSAGE_ROW_HEIGHT : GROUP_HEADER_HEIGHT;
       layout.push({ top: currentTop, height });
       currentTop += height;
     }
@@ -285,7 +286,7 @@ export default function MessageListView({
           className="message-list-viewport-wrapper"
           style={{
             position: 'relative',
-            height: totalHeight + 40,
+            height: totalHeight + LIST_FOOTER_HEIGHT,
             width: '100%',
           }}
         >
@@ -334,7 +335,7 @@ export default function MessageListView({
               bottom: 0,
               left: 0,
               right: 0,
-              height: 40,
+              height: LIST_FOOTER_HEIGHT,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

@@ -285,14 +285,13 @@ impl MailStore {
                 params![batch_id],
             )?;
             transaction.commit()?;
-            let remaining_created = self.with_conn(|conn| {
-                let count = conn.query_row(
-                    "SELECT COUNT(*) FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
-                    params![batch_id],
-                    |row| row.get::<_, i64>(0),
-                )?;
-                Ok(count)
-            })?;
+            // 事务已提交，复用外层 with_conn 的连接查询剩余条数；
+            // 不能再嵌套调用 self.with_conn，否则非重入 Mutex 会永久阻塞。
+            let remaining_created = conn.query_row(
+                "SELECT COUNT(*) FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
+                params![batch_id],
+                |row| row.get::<_, i64>(0),
+            )?;
             Ok(ContactImportUndoReport {
                 removed,
                 remaining_created,

@@ -1,5 +1,18 @@
 export type LayoutItem = { top: number; height: number };
 
+/**
+ * 邮件列表虚拟布局的行高常量 —— 单一事实来源。
+ *
+ * 与 `styles/2026/pass-message-list-rounded.css` 中 `.message-list-item`
+ * 的 `height: 68px`、`.message-date-header` 的 `height: 34px` 保持一致：
+ * 每封邮件卡片 62px + 底部留白组成 68px 行距；日期分组标题固定 34px。
+ * 虚拟计算高度必须与实际渲染高度一致，否则滚动、选中、悬停会错位。
+ */
+export const MESSAGE_ROW_HEIGHT = 68;
+export const GROUP_HEADER_HEIGHT = 34;
+/** 列表底部“已显示 N 封 / 加载更多”区域的高度，计入外层包裹总高度。 */
+export const LIST_FOOTER_HEIGHT = 40;
+
 export function calculateVisibleRange(
   layout: LayoutItem[],
   scrollTop: number,

@@ -53,9 +53,11 @@ export function prodGetCurrentWindow() {
       const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
       return getTauriCurrentWindow().onDragDropEvent((event) => handler(event.payload as unknown as DesktopFileDropEvent));
     },
-    onFocusChanged: async (handler: () => void) => {
+    onFocusChanged: async (handler: (focused: boolean) => void) => {
       const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
-      return getTauriCurrentWindow().onFocusChanged(handler);
+      // Tauri 的 onFocusChanged 回调携带 Event<boolean>；透传 payload，
+      // 让调用方只在窗口真正获得焦点时刷新未读数，失焦不再触发 IPC。
+      return getTauriCurrentWindow().onFocusChanged((event) => handler(event.payload));
     },
   };
 }

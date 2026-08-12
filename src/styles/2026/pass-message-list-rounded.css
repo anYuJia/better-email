@@ -1,7 +1,10 @@
 /* Rounded rows keep the inbox approachable without turning it into a sparse
-   card grid. The virtual row includes the gap; the card itself stays 62px. */
+   card grid. The virtual row includes the gap; the card itself stays 62px.
+   Height 68px is the single source of truth shared with
+   MessageListView's MESSAGE_ROW_HEIGHT in messageListLayout.ts. */
 .message-list-item {
   box-sizing: border-box;
+  height: 68px;
   padding: 0 6px 6px;
 }
 
@@ -77,6 +80,8 @@
 }
 
 .message-list-footer {
+  box-sizing: border-box;
+  height: 40px;
   color: var(--ui-text-tertiary);
   border-top: 1px solid var(--ui-border);
   background: var(--ui-list);

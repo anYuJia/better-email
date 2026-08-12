@@ -588,11 +588,27 @@ pub async fn import_eml_file(
     store.import_eml_message(account_id, &payload).map(Some)
 }
 
+/// 清洗将要写入 RFC 822 header 的动态字段：移除 `\r` 与 `\n`。
+///
+/// subject、sender、recipients、cc、bcc、date、account_email 都来自数据库或
+/// 远端邮件头，可能是不可信内容；任何残留的换行都可能被解析成额外 header 行，
+/// 从而伪造 `Bcc:`、`X-Injected:` 等。清洗后再 trim，确保一个字段永远不会
+/// 产生多于一行 header。
+fn sanitize_eml_header_value(value: &str) -> String {
+    let mut sanitized = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch != '\r' && ch != '\n' {
+            sanitized.push(ch);
+        }
+    }
+    sanitized.trim().to_string()
+}
+
 fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {
     let subject = if message.subject.trim().is_empty() {
-        "(无主题)"
+        "(无主题)".to_string()
     } else {
-        message.subject.trim()
+        sanitize_eml_header_value(&message.subject)
     };
     let body = if message.body.trim().is_empty() {
         message.snippet.as_str()
@@ -621,26 +637,28 @@ fn render_eml_message(message: &Message, attachments: &[Attachment]) -> String {
                 .join("\r\n")
         )
     };
+    // 附件元信息属于正文，不经过 header 清洗；正文换行保持原样。
     format!(
         "From: {} <{}>\r\nTo: {}\r\n{}{}Subject: {}\r\nDate: {}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nX-Better Email-Account: {}\r\n\r\n{}{}",
-        message.sender_name.trim(),
-        message.sender_email.trim(),
-        message.recipients.trim(),
+        sanitize_eml_header_value(&message.sender_name),
+        sanitize_eml_header_value(&message.sender_email),
+        sanitize_eml_header_value(&message.recipients),
         optional_header("Cc", &message.cc),
         optional_header("Bcc", &message.bcc),
         subject,
-        message.received_at.trim(),
-        message.account_email.trim(),
+        sanitize_eml_header_value(&message.received_at),
+        sanitize_eml_header_value(&message.account_email),
         body.replace('\n', "\r\n"),
         attachment_note
     )
 }
 
 fn optional_header(name: &str, value: &str) -> String {
-    if value.trim().is_empty() {
+    let sanitized = sanitize_eml_header_value(value);
+    if sanitized.is_empty() {
         String::new()
     } else {
-        format!("{name}: {}\r\n", value.trim())
+        format!("{name}: {sanitized}\r\n")
     }
 }
 
@@ -821,6 +839,69 @@ mod tests {
         assert!(eml.contains("Cc: team@example.com"));
         assert!(eml.contains("Hello\r\nworld"));
         assert!(eml.contains("brief.txt; text/plain; 12 bytes; not downloaded"));
+    }
+
+    #[test]
+    fn eml_export_strips_crlf_from_header_fields_to_block_injection() {
+        // 所有写入 RFC822 header 的动态字段都必须移除 \r \n，
+        // 否则构造出的 EML 会被解析出伪造的 Bcc: / X-Injected: 等 header。
+        let message = Message {
+            id: 1,
+            account_id: 1,
+            account_email: "me@example.com\r\nX-Better Email-Account: forged".to_string(),
+            folder_id: 1,
+            folder_role: "inbox".to_string(),
+            sender_name: "Ada\r\nX-Injected: sender".to_string(),
+            sender_email: "ada@example.com".to_string(),
+            recipients: "me@example.com\r\nBcc: victim@example.com".to_string(),
+            cc: "team@example.com".to_string(),
+            bcc: "secret@example.com\r\nX-Bcc-Injected: true".to_string(),
+            subject: "Hi\r\nBcc: forged@example.com".to_string(),
+            snippet: "Snippet".to_string(),
+            body: "第一行\n第二行\nX-Injected: body-only".to_string(),
+            sanitized_html: String::new(),
+            security_warnings: Vec::new(),
+            received_at: "2026-07-09T10:00:00+08:00".to_string(),
+            is_read: true,
+            is_starred: false,
+            has_attachments: false,
+            snoozed_until: String::new(),
+            labels: Vec::new(),
+            attachment_count: 0,
+            remote_mailbox: "INBOX".to_string(),
+            remote_uid: 1,
+            message_id_header: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+        };
+        let eml = render_eml_message(&message, &[]);
+
+        // 不得出现任何伪造的 header 行。
+        assert!(!eml.contains("\r\nBcc: forged@example.com"));
+        assert!(!eml.contains("\r\nBcc: victim@example.com"));
+        assert!(!eml.contains("\r\nX-Injected: sender"));
+        assert!(!eml.contains("\r\nX-Injected: forged"));
+        assert!(!eml.contains("\r\nX-Better Email-Account: forged"));
+        assert!(!eml.contains("\r\nX-Bcc-Injected: true"));
+
+        // 动态值被清洗（移除换行后保留内容），合法 header 仍然完整。
+        assert!(eml.contains("From: AdaX-Injected: sender <ada@example.com>"));
+        assert!(eml.contains("To: me@example.comBcc: victim@example.com"));
+        assert!(eml.contains("Bcc: secret@example.comX-Bcc-Injected: true"));
+        assert!(eml.contains("Subject: HiBcc: forged@example.com"));
+        assert!(
+            eml.contains("X-Better Email-Account: me@example.comX-Better Email-Account: forged")
+        );
+
+        // 正文换行保持不变；正文中的“注入”内容只是正文，不属于 header。
+        assert!(eml.contains("第一行\r\n第二行\r\nX-Injected: body-only"));
+        let body_section = eml
+            .split_once("\r\n\r\n")
+            .expect("body follows the header block");
+        assert!(
+            body_section.1.contains("X-Injected: body-only"),
+            "正文中的注入内容原样保留在正文区"
+        );
     }
 
     #[test]

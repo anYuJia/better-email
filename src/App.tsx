@@ -33,6 +33,7 @@ import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import useAppGlobalEffects from './hooks/useAppGlobalEffects';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
+import useUnreadFocusSync from './hooks/useUnreadFocusSync';
 import useComposerController from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
 import useFolderManagement from './hooks/useFolderManagement';
@@ -53,8 +54,7 @@ import useThemeMode from './hooks/useThemeMode';
 import {
   type NotificationPolicy,
 } from './mailUtils';
-import { getCurrentWindow, invoke, listen } from './tauriBridge';
-
+import { invoke, listen } from './tauriBridge';
 import type {
   AccountScope,
   Account,
@@ -588,19 +588,9 @@ export default function App() {
     window.localStorage.setItem(accountScopeStorageKey, String(accountScope));
   }, [accountScope]);
 
-  useEffect(() => {
-    const scopeRef: { current: AccountScope } = { current: accountScope };
-    const syncIndicators = () => {
-      void refreshUnreadIndicators(scopeRef.current);
-    };
-    syncIndicators();
-    const unlistenPromise = Promise.resolve(
-      getCurrentWindow().onFocusChanged?.(syncIndicators),
-    ).catch(() => () => undefined);
-    return () => {
-      void unlistenPromise.then((unlisten) => unlisten?.());
-    };
-  }, [refreshUnreadIndicators]);
+  // 焦点监听：只在挂载与账号 scope 切换时订阅，聚焦时刷新未读角标/托盘。
+  // refreshUnreadIndicators 是稳定 useCallback，任何无关渲染都不会重新订阅或触发 GetStats。
+  useUnreadFocusSync(refreshUnreadIndicators, accountScope);
 
   useEffect(() => {
     if (!folderId) return;

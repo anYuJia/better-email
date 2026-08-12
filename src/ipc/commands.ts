@@ -108,6 +108,7 @@ export const IPC = {
   SetThreadsMuted: 'set_threads_muted',
   SetTrayUnreadCount: 'set_tray_unread_count',
   SnoozeMessage: 'snooze_message',
+  SnoozeMessages: 'snooze_messages',
   StartOauth2Pkce: 'start_oauth2_pkce',
   StoreAccountSecret: 'store_account_secret',
   SyncImapHeaders: 'sync_imap_headers',

@@ -142,10 +142,10 @@ impl Pop3Client {
         let mut lines = Vec::new();
         loop {
             let line = self.read_line()?;
-            if line == "." {
-                break;
+            match process_multiline_line(&line) {
+                Some(content) => lines.push(content),
+                None => break,
             }
-            lines.push(line.strip_prefix("..").unwrap_or(&line).to_string());
         }
         Ok(lines)
     }
@@ -179,6 +179,18 @@ impl Pop3Client {
         }
         Ok(line.trim_end_matches(['\r', '\n']).to_string())
     }
+}
+
+/// 处理一行 POP3 多行响应内容。
+///
+/// RFC 1939：`.` 单独一行是多行响应的终止符，不进入正文；正文行首的
+/// stuffed 点（服务器会在以 `.` 开头的行前再补一个 `.`）只需移除一个 leading
+/// dot，因此 `..foo` 还原为 `.foo`，`...foo` 还原为 `..foo`。
+fn process_multiline_line(line: &str) -> Option<String> {
+    if line == "." {
+        return None;
+    }
+    Some(line.strip_prefix('.').unwrap_or(line).to_string())
 }
 
 fn parse_pop3_endpoint(configured: &str) -> Result<(String, u16), MailError> {
@@ -259,5 +271,23 @@ mod tests {
     fn uidl_hash_is_stable_positive_number() {
         assert_eq!(remote_uid_from_uidl("abc"), remote_uid_from_uidl("abc"));
         assert!(remote_uid_from_uidl("abc") > 0);
+    }
+
+    #[test]
+    fn multiline_dot_unstuffing_follows_rfc_1939() {
+        assert_eq!(process_multiline_line("..foo"), Some(".foo".to_string()));
+        assert_eq!(process_multiline_line("...foo"), Some("..foo".to_string()));
+        assert_eq!(
+            process_multiline_line("plain line"),
+            Some("plain line".to_string())
+        );
+        assert_eq!(process_multiline_line(""), Some(String::new()));
+        // 被 stuffed 的单个点正文还原为一个点；它不会与终止行混淆。
+        assert_eq!(process_multiline_line(".."), Some(".".to_string()));
+    }
+
+    #[test]
+    fn multiline_terminator_dot_is_not_part_of_body() {
+        assert_eq!(process_multiline_line("."), None);
     }
 }

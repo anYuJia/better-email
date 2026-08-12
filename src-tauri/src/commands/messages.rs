@@ -342,6 +342,15 @@ pub fn snooze_message(
 }
 
 #[tauri::command]
+pub fn snooze_messages(
+    store: State<'_, MailStore>,
+    message_ids: Vec<i64>,
+    snoozed_until: String,
+) -> MailResult<Vec<Message>> {
+    store.snooze_messages(&message_ids, &snoozed_until)
+}
+
+#[tauri::command]
 pub fn unsnooze_message(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
     store.unsnooze_message(message_id)
 }

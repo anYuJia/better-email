@@ -294,7 +294,7 @@ describe('useAppMetaLoader', () => {
       }
       return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
     }) as never);
-    const { result } = renderMetaLoader();
+    const { result } = renderMetaLoader({ accountScope: 'all' });
 
     await act(async () => {
       await result.current.refreshUnreadIndicators('all');
@@ -330,7 +330,7 @@ describe('useAppMetaLoader', () => {
   it('keeps refreshUnreadIndicators resilient when get_stats fails', async () => {
     setupInvokeMocks();
     mockInvoke.mockRejectedValue(new Error('stats unavailable'));
-    const { result } = renderMetaLoader();
+    const { result } = renderMetaLoader({ accountScope: 'all' });
 
     await expect(
       act(async () => {
@@ -338,5 +338,182 @@ describe('useAppMetaLoader', () => {
       }),
     ).resolves.toBeUndefined();
     expect(mockSetBadgeCount).not.toHaveBeenCalled();
+  });
+
+  it('keeps indicator callbacks stable across unrelated re-renders', () => {
+    setupInvokeMocks();
+    const { result, rerender } = renderMetaLoader();
+    const firstUpdate = result.current.updateAppUnreadBadge;
+    const firstRefresh = result.current.refreshUnreadIndicators;
+
+    rerender({ activeAccountScope: 1 });
+    expect(result.current.updateAppUnreadBadge).toBe(firstUpdate);
+    expect(result.current.refreshUnreadIndicators).toBe(firstRefresh);
+  });
+
+  it('keeps indicator callbacks stable even when accountScope changes', () => {
+    // 稳定回调 + App 焦点 effect 的 accountScope 依赖，才能保证 scope 切换时
+    // 重新订阅只由 scope 变化驱动，而不是回调身份每次渲染都变化造成 IPC 风暴。
+    setupInvokeMocks();
+    const { result, rerender } = renderMetaLoader({ accountScope: 1 });
+    const firstUpdate = result.current.updateAppUnreadBadge;
+    const firstRefresh = result.current.refreshUnreadIndicators;
+
+    rerender({ activeAccountScope: 2 });
+    expect(result.current.updateAppUnreadBadge).toBe(firstUpdate);
+    expect(result.current.refreshUnreadIndicators).toBe(firstRefresh);
+  });
+
+  it('reads the requested scope when refreshUnreadIndicators is called', async () => {
+    setupInvokeMocks();
+    const { result } = renderMetaLoader({ accountScope: 2 });
+
+    await act(async () => {
+      await result.current.refreshUnreadIndicators(2);
+    });
+    expect(mockInvoke).toHaveBeenCalledWith('get_stats', { accountId: 2 });
+  });
+
+  it('账号从 A 切到 B 后，A 的慢响应不得覆盖 B 的角标/托盘', async () => {
+    setupInvokeMocks();
+    const accountAResponse = deferred<MailStats>();
+    const accountBResponse = deferred<MailStats>();
+    mockInvoke.mockImplementation(((command: string, args?: InvokeArgs) => {
+      if (command === 'get_stats') {
+        const accountId = (args as { accountId?: number | null } | undefined)?.accountId;
+        if (accountId === 1) return accountAResponse.promise;
+        if (accountId === 2) return accountBResponse.promise;
+      }
+      if (command === 'set_tray_unread_count') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
+    }) as never);
+
+    const { result, rerender } = renderMetaLoader({ accountScope: 1 });
+
+    // A 请求（scope 1）在途未返回。
+    let refreshA!: Promise<void>;
+    act(() => {
+      refreshA = result.current.refreshUnreadIndicators(1);
+    });
+
+    // 切换到 B 并发起 B 请求（scope 2）。
+    rerender({ activeAccountScope: 2 });
+    let refreshB!: Promise<void>;
+    act(() => {
+      refreshB = result.current.refreshUnreadIndicators(2);
+    });
+
+    // B 先完成：B 的数值写入角标与托盘。
+    await act(async () => {
+      accountBResponse.resolve({ ...stats, unread_messages: 5 });
+      await refreshB;
+    });
+    expect(mockSetBadgeCount).toHaveBeenLastCalledWith(5);
+    expect(mockSetBadgeCount).toHaveBeenCalledTimes(1);
+
+    // A 后完成：必须被丢弃，不能覆盖 B 的数值。
+    await act(async () => {
+      accountAResponse.resolve({ ...stats, unread_messages: 99 });
+      await refreshA;
+    });
+    expect(mockSetBadgeCount).toHaveBeenLastCalledWith(5);
+    expect(mockSetBadgeCount).not.toHaveBeenCalledWith(99);
+
+    // 托盘只写入 B 的值一次。
+    const trayCalls = mockInvoke.mock.calls.filter(
+      ([command]) => command === 'set_tray_unread_count',
+    );
+    expect(trayCalls.length).toBe(1);
+    expect(trayCalls[0][1]).toEqual({ unreadCount: 5 });
+  });
+
+  it('无 mailboxRequest 的 A 慢 loadMeta 不得覆盖 B 的角标/托盘', async () => {
+    // 邮件操作（移动/标记等）调用的 loadMeta 通常不带 mailboxRequest；
+    // 账号切换后 A 的慢响应也不能把 A 的未读数写进 B 的角标/托盘。
+    setupInvokeMocks();
+    const accountAResponse = deferred<MailStats>();
+    const defaultImplementation = mockInvoke.getMockImplementation();
+    mockInvoke.mockImplementation(((command: string, args?: InvokeArgs) => {
+      if (command === 'get_stats') {
+        const accountId = (args as { accountId?: number | null } | undefined)?.accountId;
+        if (accountId === 1) return accountAResponse.promise;
+      }
+      return defaultImplementation?.(command, args);
+    }) as never);
+
+    const { result, rerender } = renderMetaLoader({ accountScope: 1 });
+
+    // A 账号的无 mailboxRequest loadMeta 在途。
+    let loadingA!: Promise<unknown>;
+    act(() => {
+      loadingA = result.current.loadMeta(101, 1, { mode: 'mailbox' });
+    });
+
+    // 切换到 B 账号。
+    rerender({ activeAccountScope: 2 });
+
+    // A 后返回：不得把 A 的未读数写入角标或托盘。
+    await act(async () => {
+      accountAResponse.resolve({ ...stats, unread_messages: 99 });
+      await loadingA;
+    });
+    expect(mockSetBadgeCount).not.toHaveBeenCalled();
+    expect(mockSetBadgeCount).not.toHaveBeenCalledWith(99);
+    const trayCalls = mockInvoke.mock.calls.filter(
+      ([command]) => command === 'set_tray_unread_count',
+    );
+    expect(trayCalls.length).toBe(0);
+  });
+
+  it('切换 B 后旧 A 的 loadMeta 恢复，不得顶掉 B 的活跃 token、B 未读数仍写入一次', async () => {
+    // 反向时序：先切到 B、B 的焦点刷新已在途；A 的旧异步操作随后恢复并调用
+    // loadMeta(A)。旧 A 请求绝不能覆盖 B 的活跃 token，否则 B 的返回值会因
+    // id 不匹配被丢弃，B 的角标/托盘永远不更新。
+    setupInvokeMocks();
+    const accountBResponse = deferred<MailStats>();
+    const defaultImplementation = mockInvoke.getMockImplementation();
+    mockInvoke.mockImplementation(((command: string, args?: InvokeArgs) => {
+      if (command === 'get_stats') {
+        const accountId = (args as { accountId?: number | null } | undefined)?.accountId;
+        if (accountId === 2) return accountBResponse.promise;
+      }
+      return defaultImplementation?.(command, args);
+    }) as never);
+
+    const { result, rerender } = renderMetaLoader({ accountScope: 1 });
+    // 切换到 B 账号。
+    rerender({ activeAccountScope: 2 });
+
+    // B 的焦点刷新在途。
+    let refreshB!: Promise<void>;
+    act(() => {
+      refreshB = result.current.refreshUnreadIndicators(2);
+    });
+
+    // A 的旧异步操作恢复，调用 loadMeta(A)（无 mailboxRequest）。
+    let loadingA!: Promise<unknown>;
+    act(() => {
+      loadingA = result.current.loadMeta(101, 1, { mode: 'mailbox' });
+    });
+    // A 的 loadMeta 立即完成：会提交本地状态，但不得覆盖 B 的活跃 token。
+    await act(async () => {
+      await loadingA;
+    });
+    expect(mockSetBadgeCount).not.toHaveBeenCalled();
+
+    // B 后返回：B 的未读数必须写入角标与托盘一次。
+    await act(async () => {
+      accountBResponse.resolve({ ...stats, unread_messages: 5 });
+      await refreshB;
+    });
+    expect(mockSetBadgeCount).toHaveBeenCalledTimes(1);
+    expect(mockSetBadgeCount).toHaveBeenLastCalledWith(5);
+    const trayCalls = mockInvoke.mock.calls.filter(
+      ([command]) => command === 'set_tray_unread_count',
+    );
+    expect(trayCalls.length).toBe(1);
+    expect(trayCalls[0][1]).toEqual({ unreadCount: 5 });
   });
 });

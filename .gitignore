@@ -20,6 +20,7 @@ test-results/
 
 # Internal reports belong outside the product repository
 docs/
+/论文/
 
 # Local secrets and interpreter caches
 .env

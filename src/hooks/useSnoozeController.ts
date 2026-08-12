@@ -79,10 +79,18 @@ export default function useSnoozeController({
     }
 
     const undoSnapshots = snapshotMessages(target.messages);
-    for (const message of target.messages) {
-      await invoke<Message>(IPC.SnoozeMessage, { messageId: message.id, snoozedUntil });
+    const messageIds = target.messages.map((message) => message.id);
+    // 批量命令在单个数据库事务内处理全部目标：要么全部稍后处理，要么全部不生效。
+    // 失败时不做任何选择清除、不登记撤销，也不显示“全部已稍后处理”。
+    try {
+      await invoke<Message[]>(IPC.SnoozeMessages, { messageIds, snoozedUntil });
+    } catch (error) {
+      setStatus(`稍后处理失败，未做任何更改：${String(error)}`);
+      return;
     }
 
+    // 后端已成功：立即登记撤销并清空选择，绝不因本地刷新失败而丢失撤销入口。
+    const count = target.messages.length;
     const targetIds = new Set(target.messages.map((message) => message.id));
     setSnoozeTarget(null);
     setSelectedMessageIds((current) => current.filter((messageId) => !targetIds.has(messageId)));
@@ -97,15 +105,20 @@ export default function useSnoozeController({
       setActiveThread(null);
       setThreadMessages([]);
     }
-    await refreshAll();
-
-    const count = target.messages.length;
-    setStatus(
-      count === 1
-        ? `已稍后处理到 ${formatDate(snoozedUntil)}`
-        : `已将 ${count} 封邮件稍后处理到 ${formatDate(snoozedUntil)}`,
-    );
     queueUndoAction('稍后处理', undoSnapshots, count > 1 ? `${count} 封邮件` : undefined);
+
+    // 本地视图刷新失败不能把已成功的稍后处理说成“未做任何更改”，也不能产生
+    // 未处理的 Promise rejection；撤销保持可操作。
+    try {
+      await refreshAll();
+      setStatus(
+        count === 1
+          ? `已稍后处理到 ${formatDate(snoozedUntil)}`
+          : `已将 ${count} 封邮件稍后处理到 ${formatDate(snoozedUntil)}`,
+      );
+    } catch (error) {
+      setStatus(`已稍后处理，但本地列表刷新失败：${String(error)}`);
+    }
   }
 
   function snoozeSelected() {

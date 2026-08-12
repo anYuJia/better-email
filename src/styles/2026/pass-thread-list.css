@@ -8,6 +8,7 @@
 .thread-card {
   position: relative;
   width: 100%;
+  height: 88px;
   border: 1px solid transparent !important;
   border-radius: var(--ui-radius-sm) !important;
   background: var(--ui-surface) !important;

@@ -136,6 +136,8 @@ pub struct MessageRemoteRef {
 
 const LOCAL_BACKUP_SCHEMA_VERSION: i64 = 1;
 const THREAD_KEY_SCHEMA_VERSION: i64 = 1;
+/// messages_au 触发器改为仅在 FTS 索引字段变化时重建的版本号。
+const FTS_UPDATE_TRIGGER_SCHEMA_VERSION: i64 = 2;
 const DATABASE_FILENAME: &str = "better-email.sqlite3";
 const LEGACY_DATABASE_FILENAME: &str = "swiftmail.sqlite3";
 const LEGACY_APP_IDENTIFIER: &str = "app.swiftmail.client";
@@ -5197,5 +5199,357 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn undo_contact_import_batch_returns_within_timeout_and_removes_only_created_contacts() {
+        // 回归测试：undo_contact_import_batch 之前在外层 with_conn 闭包尚未返回时
+        // 又调用了一次 self.with_conn。MailStore 使用不可重入 Mutex，这会导致永久阻塞。
+        // 这里在独立线程执行撤销，主线程用 recv_timeout 断言它必须在合理时间内返回。
+        let db_path = test_database_path("better-email-undo-import");
+        let store = MailStore::open_at(db_path.clone()).expect("store opens");
+        store
+            .create_contact(ContactCreateInput {
+                name: "Existing".into(),
+                email: "existing@example.com".into(),
+                aliases: vec!["old@example.com".into()],
+                vip: false,
+            })
+            .expect("pre-existing contact created");
+        let summary = store
+            .commit_contact_import_entries(
+                vec![
+                    (
+                        ContactCreateInput {
+                            name: "Alice".into(),
+                            email: "alice@example.com".into(),
+                            aliases: Vec::new(),
+                            vip: false,
+                        },
+                        "create".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "Existing Import".into(),
+                            email: "existing@example.com".into(),
+                            aliases: vec!["import@example.com".into()],
+                            vip: false,
+                        },
+                        "merge".to_string(),
+                    ),
+                    (
+                        ContactCreateInput {
+                            name: "Bob".into(),
+                            email: "bob@example.com".into(),
+                            aliases: Vec::new(),
+                            vip: false,
+                        },
+                        "create".to_string(),
+                    ),
+                ],
+                "contacts.vcf",
+                "global",
+            )
+            .expect("import batch commits");
+        assert_eq!(summary.created, 2, "batch should create two new contacts");
+        assert_eq!(summary.merged, 1, "batch should merge one existing contact");
+        drop(store);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let undo_path = db_path.clone();
+        std::thread::spawn(move || {
+            let store = MailStore::open_at(undo_path).expect("reopen store for undo");
+            let result = store.undo_contact_import_batch(summary.batch_id);
+            let _ = tx.send(result);
+        });
+        let report = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect(
+                "undo_contact_import_batch must return within timeout (nested with_conn deadlock)",
+            )
+            .expect("undo succeeds");
+
+        assert_eq!(
+            report.removed, 2,
+            "only the two created contacts are removed"
+        );
+        assert_eq!(
+            report.remaining_created, 0,
+            "no create entries remain for the batch"
+        );
+
+        let store = MailStore::open_at(db_path).expect("reopen store for verification");
+        let contacts = store.list_contacts().expect("contacts load");
+        assert!(
+            !contacts
+                .iter()
+                .any(|contact| contact.email == "alice@example.com"),
+            "created contact Alice must be deleted"
+        );
+        assert!(
+            !contacts
+                .iter()
+                .any(|contact| contact.email == "bob@example.com"),
+            "created contact Bob must be deleted"
+        );
+        let existing = contacts
+            .iter()
+            .find(|contact| contact.email == "existing@example.com")
+            .expect("merged contact survives undo");
+        assert_eq!(
+            existing.name, "Existing Import",
+            "merge/update changes must not be rolled back"
+        );
+    }
+
+    #[test]
+    fn snooze_messages_moves_every_target_in_one_transaction() {
+        let store = test_store();
+        let account = store.get_account().expect("seeded account loads");
+        let inbox = store
+            .list_folders_for_account(Some(account.id))
+            .expect("folders load")
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .expect("inbox folder exists");
+        let seeded = store
+            .list_messages_for_scope_sorted(Some(account.id), inbox.id, None, None, None, 10)
+            .expect("seeded messages load");
+        assert!(
+            seeded.len() >= 2,
+            "seed data must provide at least two inbox messages"
+        );
+        let ids: Vec<i64> = seeded.iter().take(3).map(|message| message.id).collect();
+        let until = "2027-01-01T09:00:00+08:00";
+
+        let snoozed = store
+            .snooze_messages(&ids, until)
+            .expect("batch snooze commits");
+        assert_eq!(snoozed.len(), 3);
+        for message in &snoozed {
+            assert_eq!(message.folder_role, "snoozed");
+            assert_eq!(message.snoozed_until, until);
+            assert!(message.is_read, "snoozed messages are marked read");
+        }
+
+        let snoozed_folder = store
+            .list_folders_for_account(Some(account.id))
+            .expect("folders load")
+            .into_iter()
+            .find(|folder| folder.role == "snoozed")
+            .expect("snoozed folder exists");
+        let after = store
+            .list_messages_for_scope_sorted(
+                Some(account.id),
+                snoozed_folder.id,
+                None,
+                None,
+                None,
+                20,
+            )
+            .expect("snoozed messages load");
+        assert_eq!(
+            after.len(),
+            3,
+            "all three targets land in the snoozed folder"
+        );
+    }
+
+    #[test]
+    fn snooze_messages_rolls_back_all_targets_when_any_fails() {
+        let store = test_store();
+        let account = store.get_account().expect("seeded account loads");
+        let inbox = store
+            .list_folders_for_account(Some(account.id))
+            .expect("folders load")
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .expect("inbox folder exists");
+        let valid_id = store
+            .list_messages_for_scope_sorted(Some(account.id), inbox.id, None, None, None, 1)
+            .expect("seeded messages load")
+            .first()
+            .expect("seeded message exists")
+            .id;
+
+        let result = store.snooze_messages(&[valid_id, 999_999_999], "2027-01-01T09:00:00+08:00");
+        assert!(
+            result.is_err(),
+            "a missing target must fail the whole batch"
+        );
+
+        let untouched = store.get_message(valid_id).expect("message still loads");
+        assert_ne!(
+            untouched.folder_role, "snoozed",
+            "transaction rollback must keep the valid message in its original folder"
+        );
+        assert_eq!(
+            untouched.snoozed_until, "",
+            "transaction rollback must leave snoozed_until untouched"
+        );
+    }
+
+    #[test]
+    fn fts_update_trigger_is_gated_to_searchable_columns() {
+        // 核心断言：messages_au 触发器必须带 WHEN 门控，标记已读/星标等非
+        // FTS 列不会触发重建；同时验证更新正文仍会同步索引。
+        let store = test_store();
+        let account = store.get_account().expect("seeded account loads");
+        let inbox = store
+            .list_folders_for_account(Some(account.id))
+            .expect("folders load")
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .expect("inbox folder exists");
+        let message_id = store
+            .list_messages_for_scope_sorted(Some(account.id), inbox.id, None, None, None, 1)
+            .expect("seeded messages load")
+            .first()
+            .expect("seeded message exists")
+            .id;
+
+        // 触发器定义包含 WHEN，且覆盖全部 FTS 索引列。
+        store
+            .with_conn(|conn| {
+                let sql: String = conn.query_row(
+                    "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='messages_au'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(sql.contains("WHEN"), "messages_au 必须带 WHEN 门控");
+                for column in [
+                    "subject",
+                    "sender_name",
+                    "sender_email",
+                    "recipients",
+                    "snippet",
+                    "body",
+                ] {
+                    assert!(
+                        sql.contains(&format!("old.{column} IS NOT new.{column}")),
+                        "messages_au 必须覆盖 FTS 列 {column}"
+                    );
+                }
+                Ok(())
+            })
+            .expect("trigger definition inspected");
+
+        // 更新正文到唯一 token：FTS 应同步（新 token 可搜索）。
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET body = ?1 WHERE id = ?2",
+                    params!["zebraquarkalpha", message_id],
+                )?;
+                Ok(())
+            })
+            .expect("body update");
+        store
+            .with_conn(|conn| {
+                let count: i64 = conn.query_row(
+                    "SELECT count(*) FROM message_search WHERE message_search MATCH ?1",
+                    params!["zebraquarkalpha"],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(count, 1, "更新正文必须同步到 FTS 索引");
+                Ok(())
+            })
+            .expect("fts synced after body update");
+
+        // 只更新 is_read / is_starred（非搜索列）：索引保持可搜索，无数据丢失。
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET is_read = 1, is_starred = 1 WHERE id = ?1",
+                    params![message_id],
+                )?;
+                Ok(())
+            })
+            .expect("read/star update");
+        store
+            .with_conn(|conn| {
+                let count: i64 = conn.query_row(
+                    "SELECT count(*) FROM message_search WHERE message_search MATCH ?1",
+                    params!["zebraquarkalpha"],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(count, 1, "标记已读/星标不得破坏 FTS 索引");
+                Ok(())
+            })
+            .expect("fts intact after read/star update");
+
+        // 再次更新正文：新内容进入索引（重建确实发生）。
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET body = ?1 WHERE id = ?2",
+                    params!["zebraquarkbeta", message_id],
+                )?;
+                Ok(())
+            })
+            .expect("second body update");
+        store
+            .with_conn(|conn| {
+                let count: i64 = conn.query_row(
+                    "SELECT count(*) FROM message_search WHERE message_search MATCH ?1",
+                    params!["zebraquarkbeta"],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(count, 1, "再次更新正文后新 token 必须可搜索");
+                Ok(())
+            })
+            .expect("fts synced after second body update");
+    }
+
+    #[test]
+    fn fts_trigger_migration_replaces_unconditional_trigger_on_upgrade() {
+        // 已有用户数据库里是旧的无条件触发器，只改 IF NOT EXISTS 文本不会生效；
+        // 版本化迁移必须先 DROP 再 CREATE，并推进 user_version。
+        let db_path = test_database_path("better-email-fts-trigger-upgrade");
+        let store = MailStore::open_at(db_path.clone()).expect("store opens");
+        store
+            .with_conn(|conn| {
+                conn.execute_batch(
+                    "
+                    DROP TRIGGER IF EXISTS messages_au;
+                    CREATE TRIGGER messages_au AFTER UPDATE ON messages BEGIN
+                        INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                        VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
+                        INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                        VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
+                    END;
+                    PRAGMA user_version = 1;
+                    ",
+                )?;
+                Ok(())
+            })
+            .expect("simulate legacy unconditional trigger");
+        drop(store);
+
+        // 重新打开触发 migrate：IF NOT EXISTS 保留旧触发器，随后版本化迁移替换之。
+        let store = MailStore::open_at(db_path).expect("store reopens after migration");
+        store
+            .with_conn(|conn| {
+                let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+                assert!(
+                    version >= FTS_UPDATE_TRIGGER_SCHEMA_VERSION,
+                    "FTS 触发器迁移必须推进 user_version"
+                );
+                let sql: String = conn.query_row(
+                    "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='messages_au'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert!(
+                    sql.contains("WHEN"),
+                    "迁移后 messages_au 必须带上 WHEN 门控"
+                );
+                assert!(
+                    sql.contains("old.body IS NOT new.body"),
+                    "迁移后触发器必须门控到 FTS 列"
+                );
+                Ok(())
+            })
+            .expect("migrated trigger inspected");
     }
 }

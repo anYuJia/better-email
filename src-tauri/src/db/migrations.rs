@@ -277,7 +277,14 @@ impl MailStore {
                     INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
                     VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
                 END;
-                CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+                CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages
+                WHEN old.subject IS NOT new.subject
+                  OR old.sender_name IS NOT new.sender_name
+                  OR old.sender_email IS NOT new.sender_email
+                  OR old.recipients IS NOT new.recipients
+                  OR old.snippet IS NOT new.snippet
+                  OR old.body IS NOT new.body
+                BEGIN
                     INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
                     VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
                     INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
@@ -540,6 +547,7 @@ impl MailStore {
                 [],
             )?;
             migrate_thread_keys_if_needed(conn)?;
+            migrate_fts_update_trigger_if_needed(conn)?;
             ensure_default_identities_for_conn(conn)?;
             Ok(())
         })
@@ -609,6 +617,39 @@ pub(super) fn migrate_thread_keys_if_needed(conn: &Connection) -> MailResult<()>
     }
     rebuild_thread_keys_for_conn(conn)?;
     conn.pragma_update(None, "user_version", THREAD_KEY_SCHEMA_VERSION)?;
+    Ok(())
+}
+
+/// 把 messages_au 触发器升级为「仅在 FTS 索引字段变化时重建」的版本。
+///
+/// 旧版本对任何 UPDATE（标记已读、星标、移动文件夹等）都会完整删除并重建
+/// FTS 索引。只改 `CREATE TRIGGER IF NOT EXISTS` 的文本对已有数据库不生效
+/// （触发器已存在会跳过），因此必须先 DROP 再重建，并依赖 user_version 让
+/// 迁移只执行一次，确保升级后真实生效。
+pub(super) fn migrate_fts_update_trigger_if_needed(conn: &Connection) -> MailResult<()> {
+    let current_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if current_version >= FTS_UPDATE_TRIGGER_SCHEMA_VERSION {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "
+        DROP TRIGGER IF EXISTS messages_au;
+        CREATE TRIGGER messages_au AFTER UPDATE ON messages
+        WHEN old.subject IS NOT new.subject
+          OR old.sender_name IS NOT new.sender_name
+          OR old.sender_email IS NOT new.sender_email
+          OR old.recipients IS NOT new.recipients
+          OR old.snippet IS NOT new.snippet
+          OR old.body IS NOT new.body
+        BEGIN
+            INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
+            VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
+            INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
+            VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
+        END;
+        ",
+    )?;
+    conn.pragma_update(None, "user_version", FTS_UPDATE_TRIGGER_SCHEMA_VERSION)?;
     Ok(())
 }
 pub(super) fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> {

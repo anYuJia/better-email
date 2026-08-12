@@ -342,6 +342,15 @@ messages = [
 
 export const mutedThreadScopes = new Set<string>();
 
+// 初始种子快照：mock 测试恢复用。后续测试对 messages 的修改只替换对象、
+// 不做原地变更，因此这里做一层浅拷贝即可在 resetMockMessages 时重建完整状态。
+const initialMessages: MockMessage[] = messages.map((message) => ({ ...message }));
+
+/** 仅供 mock 测试使用：把 messages 恢复到模块加载时的初始种子。 */
+export function resetMockMessages() {
+  messages = initialMessages.map((message) => ({ ...message }));
+}
+
 export const mockSavedSecretEmails = new Set<string>();
 
 export let nextMessageId = Math.max(...messages.map((message) => message.id)) + 1;
@@ -1286,6 +1295,33 @@ export function snoozeMockMessage(args?: InvokeArgs) {
   });
   if (!updated) throw new Error('message not found');
   return updated;
+}
+
+export function snoozeMessagesMockMessage(args?: InvokeArgs) {
+  const rawIds = Array.isArray(args?.messageIds) ? args.messageIds : [];
+  const snoozedUntil = String(args?.snoozedUntil ?? args?.snoozed_until ?? '').trim();
+  const ids = rawIds.map(Number);
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  // 与 Rust 单事务保持一致：先校验全部目标有效，再一次性写回 messages。
+  // 任一 ID 不存在就抛错，且不留下任何已移动的中间状态（全成或全不成）。
+  for (const messageId of ids) {
+    if (!byId.has(messageId)) throw new Error('message not found');
+  }
+  const updatedById = new Map<number, MockMessage>();
+  messages = messages.map((message) => {
+    if (!ids.includes(message.id)) return message;
+    const next: MockMessage = {
+      ...message,
+      folder_role: 'snoozed',
+      folder_id: folderIdForRole('snoozed', message.account_id),
+      snoozed_until: snoozedUntil,
+      is_read: true,
+    };
+    updatedById.set(message.id, next);
+    return next;
+  });
+  // 结果按请求顺序返回，与后端返回顺序一致；重复 ID 只返回同一封的多个副本。
+  return ids.map((messageId) => updatedById.get(messageId) as MockMessage);
 }
 
 export function unsnoozeMockMessage(args?: InvokeArgs) {

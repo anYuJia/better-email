@@ -348,6 +348,7 @@ pub fn run() {
             commands::delete_message_permanently,
             commands::empty_trash,
             commands::snooze_message,
+            commands::snooze_messages,
             commands::unsnooze_message,
             commands::release_due_snoozed_messages,
             commands::apply_label_to_message,

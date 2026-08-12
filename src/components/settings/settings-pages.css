@@ -796,10 +796,15 @@
   appearance: none;
   inline-size: 18px;
   block-size: 18px;
+  /* 覆盖 .settings-page-content 通用 input 样式(min-height/padding)，
+     否则会被撑成 18px × 38px 的垂直椭圆。 */
+  min-width: 18px;
+  min-height: 18px;
   flex: 0 0 18px;
   display: grid;
   place-items: center;
   margin: 0;
+  padding: 0;
   border: 1px solid var(--st-border-strong);
   border-radius: 50%;
   background: var(--st-surface);

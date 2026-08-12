@@ -1,4 +1,5 @@
 use super::common::{command_info, mask_email, mask_recipient_list};
+use crate::commands::attachments::validate_outbound_attachment;
 use crate::credentials;
 use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
@@ -7,6 +8,18 @@ use crate::models::{
 };
 use crate::smtp;
 use tauri::State;
+
+/// 发送前校验邮件全部附件：未授权路径、symlink/文件替换、大小变化都会被拒绝。
+fn validate_outbound_message_attachments(
+    store: &MailStore,
+    message: &OutboundMessage,
+) -> MailResult<()> {
+    for attachment in &message.attachments {
+        validate_outbound_attachment(store, attachment)?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn save_draft(
     store: State<'_, MailStore>,
@@ -193,6 +206,7 @@ pub async fn send_message(
             return Err(crate::db::MailError::Smtp(blocked_error));
         }
     };
+    validate_outbound_message_attachments(&store, &message)?;
     let raw_message = match smtp::send_outbound(&account, &message, &secret) {
         Ok(raw_message) => raw_message,
         Err(error) => {
@@ -216,7 +230,6 @@ pub async fn send_message(
     ));
     Ok(message_id)
 }
-
 #[tauri::command]
 pub fn queue_outbox_message(
     store: State<'_, MailStore>,
@@ -364,6 +377,19 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                 continue;
             }
         };
+        match validate_outbound_message_attachments(store.inner(), &message) {
+            Ok(()) => {}
+            Err(error) => {
+                crate::logging::log_line(format!(
+                    "[better-email][send] smtp item attachment rejected message_id={} account_id={} error={}",
+                    message.id,
+                    message.account_id,
+                    error,
+                ));
+                store.mark_outbox_failed(message.id, &error.to_string())?;
+                continue;
+            }
+        }
         match smtp::send_outbound(&account, &message, &secret) {
             Ok(raw_message) => {
                 let message_id_header = smtp::outbound_message_id(&message);

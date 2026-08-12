@@ -79,6 +79,16 @@ function listProviderWriteValidationMessages(args?: InvokeArgs) {
 
 export const handlers: Record<string, MockCommandHandler> = {
   'list_messages': (args) => listMessages(args),
+  'list_messages_by_ids': (args) => {
+    const ids = Array.isArray(args?.messageIds ?? args?.message_ids)
+      ? (args?.messageIds ?? args?.message_ids) as number[]
+      : [];
+    const idSet = new Set(ids);
+    return messages
+      .filter((message) => idSet.has(message.id))
+      .map((message) => renderMessageWithPolicy(message.id, false))
+      .sort((left, right) => right.received_at.localeCompare(left.received_at) || right.id - left.id);
+  },
   'list_thread_messages': (args) => listThreadMessages(args),
   'list_threads': (args) => listThreads(args),
   'list_provider_write_validation_messages': listProviderWriteValidationMessages,

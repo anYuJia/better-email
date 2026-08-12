@@ -41,18 +41,92 @@ export default function SnoozePicker({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<Element | null>(null);
+
+  // 打开时保存旧焦点并聚焦第一个选项；关闭时恢复旧焦点（触发元素可能已卸载）。
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement;
+    firstOptionRef.current?.focus();
+    return () => {
+      const previouslyFocused = previouslyFocusedRef.current;
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        try {
+          previouslyFocused.focus();
+        } catch {
+          // 忽略不可聚焦的恢复目标。
+        }
+      }
+    };
+  }, []);
+
+  // 背景 inert：把除本对话框外的 body 子元素设为 inert/aria-hidden，键盘与
+  // 读屏焦点无法逃逸。用 previouslyInert 记录原状态，只恢复本层设置的 inert，
+  // 不错误解除父层 modal 的 inert（支持嵌套 modal）。
+  useEffect(() => {
+    const modal = modalRef.current;
+    const container = modal?.parentElement;
+    if (!modal || !container) return undefined;
+    const siblings = Array.from(container.children).filter((element) => element !== modal);
+    const previouslyInert = new Map<Element, boolean>();
+    for (const sibling of siblings) {
+      previouslyInert.set(sibling, sibling.hasAttribute('inert'));
+      sibling.setAttribute('inert', '');
+      sibling.setAttribute('aria-hidden', 'true');
+    }
+    return () => {
+      for (const sibling of siblings) {
+        if (previouslyInert.get(sibling)) continue;
+        sibling.removeAttribute('inert');
+        sibling.removeAttribute('aria-hidden');
+      }
+    };
+  }, []);
+
+  // 焦点循环：Tab/Shift+Tab 在对话框内循环，不逃逸到背景。
+  useEffect(() => {
+    const modalNode = modalRef.current;
+    if (!modalNode) return;
+    const modal: HTMLElement = modalNode;
+    const focusableSelector =
+      'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(modal.querySelectorAll<HTMLElement>(focusableSelector))
+        .filter((element) => !element.hasAttribute('disabled'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!modal.contains(active)) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+      if (event.shiftKey) {
+        if (active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    modal.addEventListener('keydown', handleKeyDown);
+    return () => modal.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
-    firstOptionRef.current?.focus();
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !submitting) {
         event.preventDefault();
         onClose();
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, submitting]);
 
   async function confirm(date: Date) {
     setSubmitting(true);
@@ -76,6 +150,7 @@ export default function SnoozePicker({
   return createPortal(
     <div
       className="snooze-backdrop"
+      ref={modalRef}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !submitting) onClose();
       }}

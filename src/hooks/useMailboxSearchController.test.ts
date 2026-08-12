@@ -81,6 +81,7 @@ function createLoaders() {
     scanned_folders: 1,
     imported_messages: 2,
     new_messages: 2,
+    new_message_ids: [],
     message: '同步完成',
   }));
   const loadersRef: { current: MailboxSearchLoaders | null } = {
@@ -106,6 +107,9 @@ function renderController({
   const setStatus = vi.fn();
   const setActiveThread = vi.fn();
   const setThreadMessages = vi.fn();
+  // 稳定引用：搜索控制器会自增 mailboxRefreshRef，若在 render 回调内联创建，
+  // 每次重渲染都会重置为初值，掩盖刷新 token 语义。
+  const mailboxRefreshRef: { current: number } = { current: mailboxRefreshRefValue };
   const utils = renderHook(() => useMailboxSearchController({
     account,
     accountScope,
@@ -113,7 +117,7 @@ function renderController({
     folders,
     imapMailboxes,
     messages,
-    mailboxRefreshRef: { current: mailboxRefreshRefValue },
+    mailboxRefreshRef,
     loadersRef: loaders.loadersRef,
     setActiveThread,
     setThreadMessages,
@@ -189,7 +193,7 @@ describe('useMailboxSearchController', () => {
       '',
       'all',
       'all',
-      1,
+      2,
       folders,
       messagePageSize,
       'folder',
@@ -202,7 +206,7 @@ describe('useMailboxSearchController', () => {
       await result.current.runSearch(event);
     });
     expect(loadMessagesWithVisibleFallback).toHaveBeenLastCalledWith(
-      101, 'invoice', 'all', 'all', 1, folders, messagePageSize, 'folder', false,
+      101, 'invoice', 'all', 'all', 3, folders, messagePageSize, 'folder', false,
     );
     expect(setStatus).toHaveBeenLastCalledWith('已搜索：invoice');
   });
@@ -217,7 +221,7 @@ describe('useMailboxSearchController', () => {
     expect(setActiveThread).toHaveBeenCalledWith(null);
     expect(setThreadMessages).toHaveBeenCalledWith([]);
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize, 'account', false,
+      101, '', 'all', 'all', 2, folders, messagePageSize, 'account', false,
     );
     expect(setStatus).toHaveBeenCalledWith('搜索范围已切换为：当前账号');
   });
@@ -234,7 +238,7 @@ describe('useMailboxSearchController', () => {
     });
     expect(result.current.query).toBe('安全 from:');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '安全 from:', 'all', 'all', 1, folders, messagePageSize, 'folder', false,
+      101, '安全 from:', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
     expect(fakeInput.focus).toHaveBeenCalled();
     expect(fakeInput.setSelectionRange).toHaveBeenCalledWith('安全 from:'.length, '安全 from:'.length);
@@ -248,7 +252,7 @@ describe('useMailboxSearchController', () => {
     });
     expect(result.current.query).toBe('invoice');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, 'invoice', 'all', 'all', 1, folders, messagePageSize, 'folder', false,
+      101, 'invoice', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
     expect(setStatus).toHaveBeenCalledWith('已搜索：invoice');
   });
@@ -269,7 +273,7 @@ describe('useMailboxSearchController', () => {
     expect(result.current.searchScope).toBe('folder');
     expect(result.current.listMode).toBe('threads');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize, 'folder', true,
+      101, '', 'all', 'all', 3, folders, messagePageSize, 'folder', true,
     );
     expect(setStatus).toHaveBeenCalledWith('已清空搜索和筛选');
   });
@@ -337,7 +341,7 @@ describe('useMailboxSearchController', () => {
     expect(result.current.searchScope).toBe('all');
     expect(result.current.listMode).toBe('messages');
     expect(loadMessages).toHaveBeenCalledWith(
-      101, 'invoice', 'starred', 'all', 1, messagePageSize, 'all', false,
+      101, 'invoice', 'starred', 'all', 2, messagePageSize, 'all', false,
     );
     expect(setStatus).toHaveBeenCalledWith('已运行保存搜索：发票');
   });
@@ -399,7 +403,7 @@ describe('useMailboxSearchController', () => {
       vi.advanceTimersByTime(100);
     });
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize, 'folder', false,
+      101, '', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
     expect(setStatus).not.toHaveBeenCalled();
     vi.useRealTimers();
@@ -436,7 +440,7 @@ describe('useMailboxSearchController', () => {
     });
     expect(result.current.listMode).toBe('threads');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize, 'folder', true,
+      101, '', 'all', 'all', 2, folders, messagePageSize, 'folder', true,
     );
   });
 

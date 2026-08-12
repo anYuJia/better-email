@@ -61,6 +61,8 @@ export type SyncRun = {
   imported_messages: number;
   /** 真正新增的邮件数（不含历史补同步）。 */
   new_messages: number;
+  /** 本次同步真正新增邮件的本地 message id（通知候选来源，不依赖当前 UI 列表）。 */
+  new_message_ids: number[];
   message: string;
 };
 

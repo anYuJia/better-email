@@ -1,6 +1,7 @@
 import {
   MoreHorizontal,
 } from 'lucide-react';
+import { useRef } from 'react';
 import { movableFoldersForBulk } from '../app/appConfig';
 import { canSnoozeRole } from '../app/snooze';
 import type {
@@ -9,6 +10,7 @@ import type {
   MessageSummary,
 } from '../app/types';
 import type { BulkMessageAction } from './messageContextMenu';
+import { useDetailsMenu } from '../hooks/useDetailsMenu';
 
 type MessageBulkToolbarProps = {
   visibleMessageCount: number;
@@ -35,6 +37,8 @@ export default function MessageBulkToolbar({
   onMoveBulkToFolder,
   onToggleBulkLabel,
 }: MessageBulkToolbarProps) {
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const moreMenu = useDetailsMenu(moreMenuRef);
   if (selectedMessageIds.length === 0) return null;
 
   const allVisibleSelected = visibleMessageCount > 0 && selectedMessageIds.length === visibleMessageCount;
@@ -51,20 +55,20 @@ export default function MessageBulkToolbar({
         <span>已选 {selectedMessageIds.length}</span>
       </label>
       <button type="button" className="bulk-primary-action" onClick={() => onRunBulkAction('archive')}>归档</button>
-      <details className="compact-menu bulk-more-menu">
+      <details className="compact-menu bulk-more-menu" ref={moreMenuRef}>
         <summary>
           <MoreHorizontal size={15} />
           操作
         </summary>
         <div>
-          <button type="button" onClick={() => onRunBulkAction('star')}>星标</button>
-          <button type="button" onClick={() => onRunBulkAction('trash')}>删除</button>
-          <button type="button" onClick={() => onRunBulkAction('read')}>标为已读</button>
-          <button type="button" onClick={() => onRunBulkAction('unread')}>标为未读</button>
+          <button type="button" onClick={() => { onRunBulkAction('star'); moreMenu.closeMenu(); }}>星标</button>
+          <button type="button" onClick={() => { onRunBulkAction('trash'); moreMenu.closeMenu(); }}>删除</button>
+          <button type="button" onClick={() => { onRunBulkAction('read'); moreMenu.closeMenu(); }}>标为已读</button>
+          <button type="button" onClick={() => { onRunBulkAction('unread'); moreMenu.closeMenu(); }}>标为未读</button>
           <button
             type="button"
             disabled={snoozableSelectedMessages.length === 0}
-            onClick={() => onRequestSnooze(snoozableSelectedMessages)}
+            onClick={() => { onRequestSnooze(snoozableSelectedMessages); moreMenu.closeMenu(); }}
           >
             稍后处理
           </button>
@@ -74,14 +78,14 @@ export default function MessageBulkToolbar({
               type="button"
               key={folder.id}
               disabled={selectedMessages.length === 0}
-              onClick={() => onMoveBulkToFolder(folder)}
+              onClick={() => { onMoveBulkToFolder(folder); moreMenu.closeMenu(); }}
             >
               {folder.name}
             </button>
           ))}
           <span className="menu-section-title">打标签</span>
           {labels.map((label) => (
-            <button type="button" key={label.id} onClick={() => onToggleBulkLabel(label)}>
+            <button type="button" key={label.id} onClick={() => { onToggleBulkLabel(label); moreMenu.closeMenu(); }}>
               <span className="label-dot" style={{ background: label.color }} />
               {label.name}
             </button>

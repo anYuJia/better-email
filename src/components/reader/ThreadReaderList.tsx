@@ -17,6 +17,8 @@ import type { Folder, Label, Message, MessageSummary, ThreadSummary } from '../.
 import { formatDate } from '../../mailUtils';
 import type { BulkMessageAction } from '../messageContextMenu';
 import SenderIdentity from './SenderIdentity';
+import { useDetailsMenu } from '../../hooks/useDetailsMenu';
+import { useRef } from 'react';
 
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
@@ -61,6 +63,8 @@ export default function ThreadReaderList({
     (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
   ).length;
   const threadMoveFolders = movableFoldersForBulk(folders, threadMovableMessages);
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const moreMenu = useDetailsMenu(moreMenuRef);
 
   return (
     <>
@@ -132,11 +136,11 @@ export default function ThreadReaderList({
               <Trash2 size={16} />
             </button>
           </div>
-          <details className="reader-more-menu compact-menu">
+          <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
             <summary className="icon-only-summary" title="更多会话操作" aria-label="更多会话操作">
               <MoreHorizontal size={17} />
             </summary>
-            <div>
+            <div onClick={() => moreMenu.closeMenu()}>
               <span className="menu-section-title">会话</span>
               <button type="button" onClick={onToggleThreadMute}>
                 {activeThread.is_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}

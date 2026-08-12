@@ -77,6 +77,25 @@ export default function DataSafetySettings({
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
   }, []);
 
+  // 嵌套缓存确认对话框拥有 Escape：在 document 冒泡阶段 stopPropagation，
+  // SettingsFrame 的 window 级 Escape 不会把整个设置页一起关闭。
+  useEffect(() => {
+    if (!cacheConfirmationOpen) return undefined;
+    const previouslyFocused = document.activeElement;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !storageBusy) {
+        event.stopPropagation();
+        event.preventDefault();
+        setCacheConfirmationOpen(false);
+        if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+          previouslyFocused.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [cacheConfirmationOpen, storageBusy]);
+
   const effectiveDir = appSettings?.effective_dir ?? '';
 
   async function confirmClearAttachmentCache() {

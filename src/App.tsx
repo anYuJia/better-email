@@ -96,6 +96,7 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { buildMailboxContextKey } from './app/mailboxContext';
+import { openUnreadInbox } from './app/trayActions';
 import './ui-2026.css';
 
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
@@ -140,6 +141,10 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const skipNextFolderEffectLoadRef = useRef(false);
+  // 导航动作（focusMailboxRole/locateProviderWriteValidation）主动切换账号 scope
+  // 时，由导航动作自己驱动加载；accountScope effect 读到这个标记就跳过 refreshMailbox，
+  // 避免两个异步流程并发写 folderId/messages 造成「先导航后刷新覆盖」竞态。
+  const navigationScopeClaimRef = useRef<number | 'all' | null>(null);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -559,6 +564,7 @@ export default function App() {
     setSettingsOpen,
     setStatus,
     setThreadMessages,
+    navigationScopeClaimRef,
   });
   function prepareProviderWriteValidation() {
     const validationDraft = createValidationDraft();
@@ -570,6 +576,8 @@ export default function App() {
   }
 
   useEffect(() => {
+    // 导航动作已认领该 scope 时跳过：由导航动作自己驱动加载，避免双重驱动竞态。
+    if (navigationScopeClaimRef.current === accountScope) return;
     skipNextFolderEffectLoadRef.current = true;
     refreshMailbox(accountScope, null)
       .catch((error) => {
@@ -790,14 +798,18 @@ export default function App() {
 
         const unlistenUnread = await listen('tray://open-unread', () => {
           if (!active || isModalGateActive) return;
-          const inboxFolder = folders.find((f) => f.role === 'inbox');
-          if (inboxFolder) {
-            setFolderId(inboxFolder.id);
-          }
-          setActiveThread(null);
-          setThreadMessages([]);
-          setListMode('messages');
-          setFilter('unread');
+          // 统一导航入口：清空搜索词、恢复 folder 范围、清空线程/选择状态，
+          // 再切到收件箱未读视图，确保真正加载收件箱未读结果而非残留搜索。
+          openUnreadInbox({
+            folders,
+            resetSearch,
+            setFilter,
+            setFolderId,
+            setActiveThread,
+            setThreadMessages,
+            setSelectedId,
+            setSelectedMessageIds,
+          });
         });
         unlisteners.push(unlistenUnread);
 
@@ -817,7 +829,7 @@ export default function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, enqueueManualSync, folders, setFilter, setListMode, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive]);
+  }, [openComposer, enqueueManualSync, folders, setFilter, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive, resetSearch, setSelectedId, setSelectedMessageIds]);
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {

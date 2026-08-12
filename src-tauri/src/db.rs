@@ -5,9 +5,9 @@ use crate::models::{
     CredentialStatus, DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch,
     ImapMailboxState, ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
     MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageSummary,
-    MessageThreadingInput, OAuthCallbackReport, OAuthSession, OAuthStartReport,
+    MessageThreadingInput, MailboxSyncTransactionResult, OAuthCallbackReport, OAuthSession, OAuthStartReport,
     OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage,
+    PendingRemoteWrite, ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage,
     SyncRun, SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
@@ -519,6 +519,7 @@ mod tests {
     use super::migrations::{migrate_legacy_database, path_with_suffix};
     use super::search::{message_order_clause, normalized_list_sort, thread_order_clause};
     use super::*;
+    use crate::models::ImapFlagState;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -631,6 +632,142 @@ mod tests {
             remaining, 1,
             "startup must not migrate or erase SQLite secrets"
         );
+    }
+
+    #[test]
+    fn legacy_messages_missing_columns_upgrade_in_place() {
+        // 回归测试：旧版本 messages 表缺少 remote_uid/remote_mailbox 等列时，
+        // 打开数据库必须先补齐兼容列、再创建依赖这些列的索引/触发器/FTS，
+        // 否则启动会永久失败。这里构造真实旧库并验证迁移成功、列与索引存在、
+        // 重复打开（模拟重启）依然成功。
+        let data_dir = std::env::temp_dir().join(format!(
+            "better-email-legacy-messages-{}-{}",
+            std::process::id(),
+            TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&data_dir).expect("legacy dir created");
+        let db_path = data_dir.join(DATABASE_FILENAME);
+
+        {
+            // 构造「旧版本」数据库：messages 表只有历史列，没有 remote_uid、
+            // remote_mailbox、message_id_header、in_reply_to_header、
+            // references_header、cc、bcc、sanitized_html、security_warnings、snoozed_until。
+            let legacy = rusqlite::Connection::open(&db_path).expect("legacy db opened");
+            legacy
+                .execute_batch(
+                    "
+                    CREATE TABLE accounts (
+                        id INTEGER PRIMARY KEY,
+                        email TEXT NOT NULL UNIQUE,
+                        display_name TEXT NOT NULL,
+                        provider TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE TABLE folders (
+                        id INTEGER PRIMARY KEY,
+                        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                        name TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        sort_order INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(account_id, role)
+                    );
+                    CREATE TABLE messages (
+                        id INTEGER PRIMARY KEY,
+                        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                        folder_id INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+                        sender_name TEXT NOT NULL,
+                        sender_email TEXT NOT NULL,
+                        recipients TEXT NOT NULL,
+                        subject TEXT NOT NULL,
+                        snippet TEXT NOT NULL,
+                        body TEXT NOT NULL,
+                        received_at TEXT NOT NULL,
+                        is_read INTEGER NOT NULL DEFAULT 0,
+                        is_starred INTEGER NOT NULL DEFAULT 0,
+                        has_attachments INTEGER NOT NULL DEFAULT 0,
+                        thread_key TEXT NOT NULL DEFAULT ''
+                    );
+                    INSERT INTO accounts(id, email, display_name, provider, created_at)
+                    VALUES (1, 'legacy@example.com', 'Legacy', 'gmail', '2025-01-01T00:00:00Z');
+                    INSERT INTO folders(id, account_id, name, role, sort_order)
+                    VALUES (1, 1, 'Inbox', 'inbox', 0);
+                    INSERT INTO messages(
+                        id, account_id, folder_id, sender_name, sender_email, recipients,
+                        subject, snippet, body, received_at, is_read, is_starred, has_attachments
+                    )
+                    VALUES (10, 1, 1, 'Old Sender', 'old@example.com', 'me@example.com',
+                            'Old subject', 'old snippet', '', '2025-01-02T00:00:00Z', 0, 0, 0);
+                    ",
+                )
+                .expect("legacy schema created");
+        }
+
+        let store = MailStore::open_at(db_path.clone()).expect("legacy database migrates");
+        let (has_remote_uid, has_remote_mailbox, has_message_id_header) = store
+            .with_conn(|conn| {
+                let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
+                let names = stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((
+                    names.contains(&"remote_uid".to_string()),
+                    names.contains(&"remote_mailbox".to_string()),
+                    names.contains(&"message_id_header".to_string()),
+                ))
+            })
+            .expect("messages columns inspected");
+        assert!(has_remote_uid, "remote_uid 列应已补齐");
+        assert!(has_remote_mailbox, "remote_mailbox 列应已补齐");
+        assert!(has_message_id_header, "message_id_header 列应已补齐");
+
+        let index_exists = store
+            .with_conn(|conn| {
+                let count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM sqlite_master
+                     WHERE type = 'index' AND name = 'idx_messages_remote_uid'",
+                    [],
+                    |row| row.get(0),
+                )?;
+                Ok(count > 0)
+            })
+            .expect("index lookup");
+        assert!(index_exists, "idx_messages_remote_uid 索引应已创建");
+
+        // 迁移后旧消息仍可读，且新列有默认值。
+        let legacy_message = store
+            .with_conn(|conn| {
+                let subject = conn.query_row(
+                    "SELECT subject, remote_uid, remote_mailbox FROM messages WHERE id = 10",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, String>(2)?,
+                        ))
+                    },
+                )?;
+                Ok(subject)
+            })
+            .expect("legacy message read");
+        assert_eq!(legacy_message.0, "Old subject");
+        assert_eq!(legacy_message.1, 0);
+        assert_eq!(legacy_message.2, "");
+
+        // 重复打开（模拟重启）必须依然成功。
+        let reopened = MailStore::open_at(db_path).expect("legacy database reopens");
+        let reopened_ok = reopened
+            .with_conn(|conn| {
+                let count: i64 = conn.query_row(
+                    "SELECT COUNT(*) FROM messages WHERE id = 10",
+                    [],
+                    |row| row.get(0),
+                )?;
+                Ok(count)
+            })
+            .expect("reopened messages query");
+        assert_eq!(reopened_ok, 1);
+        fs::remove_dir_all(data_dir).expect("legacy dir removed");
     }
 
     #[test]
@@ -2968,7 +3105,7 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(first, (1, 0));
+        assert_eq!(first, (1, 0, vec![]));
 
         // 增量同步：UID 高于游标的才算新邮件，历史补同步不计入。
         let second = store
@@ -2986,7 +3123,9 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(second, (2, 1));
+        assert_eq!(second.0, 2);
+        assert_eq!(second.1, 1);
+        assert_eq!(second.2.len(), 1, "新增邮件应记录其 message id");
     }
 
     #[test]
@@ -3861,6 +4000,974 @@ mod tests {
         assert_eq!(downloaded.size_bytes, 84);
         assert_eq!(downloaded.content_id, "remote-image@example.com");
         assert!(downloaded.is_inline);
+    }
+
+    fn seed_remote_message(store: &MailStore, subject: &str, uid: i64) -> i64 {
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let batch = ImapHeaderBatch {
+            remote_name: "INBOX".to_string(),
+            uid_validity: "1".to_string(),
+            highest_uid: uid,
+            lowest_uid: uid,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: uid,
+                message_id: format!("<{subject}@example.com>"),
+                in_reply_to: String::new(),
+                references: String::new(),
+                subject: subject.to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: "demo@better-email.local".to_string(),
+                snippet: "header only".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+                is_starred: false,
+            }],
+        };
+        store.import_imap_headers(mailbox.id, &batch).unwrap();
+        let inbox = store
+            .list_folders_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        store
+            .list_messages_for_scope(
+                None,
+                inbox.id,
+                Some(subject.to_string()),
+                None,
+                10,
+            )
+            .unwrap()
+            .remove(0)
+            .id
+    }
+
+    fn remote_attachment(
+        filename: &str,
+        mime_type: &str,
+        size_bytes: i64,
+        content_id: &str,
+        is_inline: bool,
+    ) -> crate::models::RemoteAttachmentMetadata {
+        crate::models::RemoteAttachmentMetadata {
+            filename: filename.to_string(),
+            mime_type: mime_type.to_string(),
+            size_bytes,
+            content_id: content_id.to_string(),
+            is_inline,
+        }
+    }
+
+    #[test]
+    fn update_message_body_preserves_downloaded_attachment_state() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Preserve download", 21);
+        let first = store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first body".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first body".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("report.pdf", "application/pdf", 100, "", false)],
+                },
+            )
+            .unwrap();
+        assert_eq!(first.attachment_count, 1);
+        let attachment = store.list_attachments(message_id).unwrap().remove(0);
+
+        // 真实写盘并标记下载，模拟用户已下载附件。
+        let dir = store.attachment_dir(message_id);
+        fs::create_dir_all(&dir).unwrap();
+        let file_path = dir.join(format!("{}-report.pdf", attachment.id));
+        fs::write(&file_path, b"verified attachment bytes").unwrap();
+        store
+            .mark_attachment_downloaded(attachment.id, &file_path.to_string_lossy(), 8)
+            .unwrap();
+
+        // 正文重拉（附件不变）：已下载状态、local_path 与磁盘实际大小必须保留。
+        let updated = store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second body".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second body".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("report.pdf", "application/pdf", 100, "", false)],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap().remove(0);
+        assert_eq!(updated.attachment_count, 1);
+        assert!(refreshed.is_downloaded, "附件不变时应保留已下载状态");
+        assert_eq!(refreshed.local_path, file_path.to_string_lossy());
+        assert_eq!(
+            refreshed.size_bytes,
+            fs::metadata(&file_path).unwrap().len().min(i64::MAX as u64) as i64,
+            "size_bytes 应更新为磁盘实际大小"
+        );
+        assert_eq!(refreshed.filename, "report.pdf");
+    }
+
+    #[test]
+    fn update_message_body_clears_download_state_when_file_missing() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Missing file", 22);
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("gone.pdf", "application/pdf", 10, "", false)],
+                },
+            )
+            .unwrap();
+        let attachment = store.list_attachments(message_id).unwrap().remove(0);
+        // 标记下载但文件并不存在（如外部盘未挂载）。
+        store
+            .mark_attachment_downloaded(attachment.id, "/tmp/nonexistent-gone.pdf", 10)
+            .unwrap();
+
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("gone.pdf", "application/pdf", 10, "", false)],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap().remove(0);
+        assert!(!refreshed.is_downloaded, "文件缺失时不应保留伪下载状态");
+        assert!(refreshed.local_path.is_empty());
+    }
+
+    #[test]
+    fn update_message_body_removed_attachment_is_cleared_from_database() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Removed attachment", 23);
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("keep.pdf", "application/pdf", 10, "", false),
+                        remote_attachment("drop.txt", "text/plain", 5, "", false),
+                    ],
+                },
+            )
+            .unwrap();
+        let attachments = store.list_attachments(message_id).unwrap();
+        assert_eq!(attachments.len(), 2);
+        let keep = attachments.iter().find(|a| a.filename == "keep.pdf").unwrap();
+        let dir = store.attachment_dir(message_id);
+        fs::create_dir_all(&dir).unwrap();
+        let keep_path = dir.join(format!("{}-keep.pdf", keep.id));
+        fs::write(&keep_path, b"keep bytes").unwrap();
+        store
+            .mark_attachment_downloaded(keep.id, &keep_path.to_string_lossy(), 10)
+            .unwrap();
+
+        // 远端已删除 drop.txt：数据库附件状态应清理，保留 keep.pdf 的下载状态。
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("keep.pdf", "application/pdf", 10, "", false)],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap();
+        assert_eq!(refreshed.len(), 1, "已删除远端附件应从数据库清理");
+        assert_eq!(refreshed[0].filename, "keep.pdf");
+        assert!(refreshed[0].is_downloaded);
+        assert_eq!(refreshed[0].local_path, keep_path.to_string_lossy());
+    }
+
+    #[test]
+    fn update_message_body_matches_same_name_attachments_in_order() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Same name attachments", 24);
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("photo.jpg", "image/jpeg", 100, "", false),
+                        remote_attachment("photo.jpg", "image/jpeg", 200, "", false),
+                    ],
+                },
+            )
+            .unwrap();
+        let dir = store.attachment_dir(message_id);
+        fs::create_dir_all(&dir).unwrap();
+        let attachments = store.list_attachments(message_id).unwrap();
+        assert_eq!(attachments.len(), 2);
+        let first_path = dir.join(format!("{}-photo.jpg", attachments[0].id));
+        let second_path = dir.join(format!("{}-photo.jpg", attachments[1].id));
+        fs::write(&first_path, b"first photo bytes").unwrap();
+        fs::write(&second_path, b"second photo bytes").unwrap();
+        store
+            .mark_attachment_downloaded(attachments[0].id, &first_path.to_string_lossy(), 20)
+            .unwrap();
+        store
+            .mark_attachment_downloaded(attachments[1].id, &second_path.to_string_lossy(), 22)
+            .unwrap();
+
+        // 同名附件重拉后仍应按顺序配对，两个都已下载状态都被保留。
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("photo.jpg", "image/jpeg", 100, "", false),
+                        remote_attachment("photo.jpg", "image/jpeg", 200, "", false),
+                    ],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap();
+        assert_eq!(refreshed.len(), 2);
+        let mut downloaded_paths = refreshed
+            .iter()
+            .filter(|a| a.is_downloaded)
+            .map(|a| a.local_path.clone())
+            .collect::<Vec<_>>();
+        downloaded_paths.sort();
+        let mut expected = vec![first_path.to_string_lossy().into_owned(), second_path.to_string_lossy().into_owned()];
+        expected.sort();
+        assert_eq!(downloaded_paths, expected, "两个同名附件的下载状态都应保留");
+    }
+
+    #[test]
+    fn update_message_body_matches_inline_by_content_id_across_reorder() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Inline reorder", 25);
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("a.png", "image/png", 10, "cid:a@example.com", true),
+                        remote_attachment("b.png", "image/png", 20, "cid:b@example.com", true),
+                    ],
+                },
+            )
+            .unwrap();
+        let dir = store.attachment_dir(message_id);
+        fs::create_dir_all(&dir).unwrap();
+        let attachments = store.list_attachments(message_id).unwrap();
+        let a = attachments.iter().find(|a| a.content_id == "cid:a@example.com").unwrap();
+        let b = attachments.iter().find(|a| a.content_id == "cid:b@example.com").unwrap();
+        let a_path = dir.join(format!("{}-a.png", a.id));
+        let b_path = dir.join(format!("{}-b.png", b.id));
+        fs::write(&a_path, b"aaa").unwrap();
+        fs::write(&b_path, b"bbbb").unwrap();
+        store
+            .mark_attachment_downloaded(a.id, &a_path.to_string_lossy(), 3)
+            .unwrap();
+        store
+            .mark_attachment_downloaded(b.id, &b_path.to_string_lossy(), 4)
+            .unwrap();
+
+        // 重排 + 其中一个同名：content_id 是稳定身份，状态必须跟随内容而非顺序。
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("b.png", "image/png", 20, "cid:b@example.com", true),
+                        remote_attachment("a.png", "image/png", 10, "cid:a@example.com", true),
+                    ],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap();
+        let a = refreshed.iter().find(|a| a.content_id == "cid:a@example.com").unwrap();
+        let b = refreshed.iter().find(|a| a.content_id == "cid:b@example.com").unwrap();
+        assert!(a.is_downloaded);
+        assert_eq!(a.local_path, a_path.to_string_lossy());
+        assert_eq!(a.size_bytes, 3);
+        assert!(b.is_downloaded);
+        assert_eq!(b.local_path, b_path.to_string_lossy());
+        assert_eq!(b.size_bytes, 4);
+    }
+
+    #[test]
+    fn update_message_body_new_attachment_starts_undownloaded() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "New attachment", 26);
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "first".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "first".to_string(),
+                    has_attachments: true,
+                    attachments: vec![remote_attachment("old.pdf", "application/pdf", 10, "", false)],
+                },
+            )
+            .unwrap();
+        let old = store.list_attachments(message_id).unwrap().remove(0);
+        let dir = store.attachment_dir(message_id);
+        fs::create_dir_all(&dir).unwrap();
+        let old_path = dir.join(format!("{}-old.pdf", old.id));
+        fs::write(&old_path, b"old bytes").unwrap();
+        store
+            .mark_attachment_downloaded(old.id, &old_path.to_string_lossy(), 9)
+            .unwrap();
+
+        // 新增附件：旧附件保留下载状态，新附件从未下载开始。
+        store
+            .update_message_body(
+                message_id,
+                &RemoteMessageBody {
+                    body: "second".to_string(),
+                    sanitized_html: String::new(),
+                    security_warnings: Vec::new(),
+                    snippet: "second".to_string(),
+                    has_attachments: true,
+                    attachments: vec![
+                        remote_attachment("old.pdf", "application/pdf", 10, "", false),
+                        remote_attachment("new.pdf", "application/pdf", 77, "", false),
+                    ],
+                },
+            )
+            .unwrap();
+        let refreshed = store.list_attachments(message_id).unwrap();
+        let old = refreshed.iter().find(|a| a.filename == "old.pdf").unwrap();
+        let new = refreshed.iter().find(|a| a.filename == "new.pdf").unwrap();
+        assert!(old.is_downloaded);
+        assert_eq!(old.local_path, old_path.to_string_lossy());
+        assert!(!new.is_downloaded);
+        assert!(new.local_path.is_empty());
+        assert_eq!(new.size_bytes, 77);
+    }
+
+    fn pop3_eml(subject: &str, message_id: &str, body: &str) -> String {
+        format!(
+            "Subject: {subject}\r\n\
+             From: \"Pop Sender\" <pop@example.com>\r\n\
+             To: demo@better-email.local\r\n\
+             Date: Thu, 09 Jul 2026 10:00:00 +0800\r\n\
+             Message-ID: <{message_id}>\r\n\
+             Content-Type: text/plain; charset=utf-8\r\n\
+             \r\n\
+             {body}"
+        )
+    }
+
+    fn import_pop3(store: &MailStore, account_id: i64, uid: i64, eml: &str) -> i64 {
+        store
+            .import_pop3_messages(
+                account_id,
+                &[crate::pop3_probe::Pop3Message {
+                    remote_uid: uid,
+                    raw: eml.to_string(),
+                }],
+            )
+            .unwrap()
+    }
+
+    fn pop3_message_id(store: &MailStore, account_id: i64, subject: &str) -> i64 {
+        let inbox = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        store
+            .list_messages_for_scope(
+                Some(account_id),
+                inbox.id,
+                Some(subject.to_string()),
+                None,
+                10,
+            )
+            .unwrap()
+            .remove(0)
+            .id
+    }
+
+    #[test]
+    fn pop3_resync_preserves_local_folder_organization() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+
+        // 首次导入进入收件箱。
+        assert_eq!(
+            import_pop3(
+                &store,
+                account_id,
+                101,
+                &pop3_eml("Pop organize", "pop-organize@example.com", "v1 body"),
+            ),
+            1
+        );
+        let message_id = pop3_message_id(&store, account_id, "Pop organize");
+        assert_eq!(store.get_message(message_id).unwrap().folder_role, "inbox");
+
+        // 用户把邮件移到废纸篓并加星标。
+        store.move_message_to_role(message_id, "trash").unwrap();
+        store.set_message_starred(message_id, true).unwrap();
+
+        // 再同步同一 UIDL：内容更新，但本地文件夹整理与星标必须保留。
+        assert_eq!(
+            import_pop3(
+                &store,
+                account_id,
+                101,
+                &pop3_eml("Pop organize", "pop-organize@example.com", "v2 body"),
+            ),
+            0,
+            "同一 UIDL 再同步不应计入新增"
+        );
+        let after = store.get_message(message_id).unwrap();
+        assert_eq!(after.folder_role, "trash", "归档/整理不应被拉回收件箱");
+        assert!(after.is_starred, "本地星标不应被覆盖");
+        assert!(
+            after.body.contains("v2 body"),
+            "远端内容应更新，实际正文：{}",
+            after.body
+        );
+    }
+
+    #[test]
+    fn pop3_resync_preserves_custom_folder_and_snooze_state() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+        import_pop3(
+            &store,
+            account_id,
+            102,
+            &pop3_eml("Pop custom", "pop-custom@example.com", "v1"),
+        );
+        let message_id = pop3_message_id(&store, account_id, "Pop custom");
+
+        // 移到自定义文件夹 + 稍后处理。
+        store.create_custom_folder(Some(account_id), "项目 Alpha".to_string()).unwrap();
+        let custom = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role.starts_with("custom:") && folder.name == "项目 Alpha")
+            .unwrap();
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET folder_id = ?1, snoozed_until = ?2 WHERE id = ?3",
+                    params![custom.id, "2099-01-01T00:00:00Z", message_id],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        import_pop3(
+            &store,
+            account_id,
+            102,
+            &pop3_eml("Pop custom", "pop-custom@example.com", "v2"),
+        );
+        let after = store.get_message(message_id).unwrap();
+        assert_eq!(after.folder_id, custom.id, "自定义文件夹应保留");
+        assert_eq!(after.snoozed_until, "2099-01-01T00:00:00Z", "稍后状态应保留");
+    }
+
+    #[test]
+    fn pop3_new_uidl_lands_in_inbox() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+        import_pop3(
+            &store,
+            account_id,
+            201,
+            &pop3_eml("Pop new", "pop-new@example.com", "first"),
+        );
+        assert_eq!(
+            import_pop3(
+                &store,
+                account_id,
+                202,
+                &pop3_eml("Pop new", "pop-new@example.com", "second"),
+            ),
+            1,
+            "新 UIDL 应作为新邮件导入收件箱"
+        );
+        let inbox = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let messages = store
+            .list_messages_for_scope(
+                Some(account_id),
+                inbox.id,
+                Some("Pop new".to_string()),
+                None,
+                10,
+            )
+            .unwrap();
+        assert_eq!(messages.len(), 2);
+        assert!(messages.iter().all(|message| message.folder_role == "inbox"));
+    }
+
+    fn seed_custom_mailbox_message(
+        store: &MailStore,
+        remote_name: &str,
+        uid: i64,
+        subject: &str,
+    ) -> (i64, i64) {
+        let mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: remote_name.to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Custom".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let account_id = store.get_account().unwrap().id;
+        let inbox = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+        let message_id = store
+            .with_conn(|conn| {
+                conn.execute(
+                    "INSERT INTO messages(
+                        account_id, folder_id, sender_name, sender_email, recipients, subject,
+                        snippet, body, received_at, is_read, is_starred, has_attachments,
+                        thread_key, remote_mailbox, remote_uid
+                     ) VALUES (?1, ?2, 'x', 'x@example.com', 'me@example.com', ?3, '', '',
+                               '2026-01-01T00:00:00Z', 0, 0, 0, '', ?4, ?5)",
+                    params![account_id, inbox.id, subject, remote_name, uid],
+                )?;
+                Ok(conn.last_insert_rowid())
+            })
+            .unwrap();
+        (mailbox.id, message_id)
+    }
+
+    #[test]
+    fn sync_mailbox_import_failure_rolls_back_reconcile_flag_updates() {
+        let store = test_store();
+        let (mailbox_id, message_id) =
+            seed_custom_mailbox_message(&store, "Projects/Alpha", 1, "Rollback flags");
+        // 自定义目录未映射本地文件夹：reconcile 成功更新 flags 后 import 必然失败。
+        let snapshot = ImapFlagSnapshot {
+            floor_uid: 0,
+            complete: false,
+            states: vec![ImapFlagState {
+                remote_uid: 1,
+                is_read: true,
+                is_starred: false,
+            }],
+        };
+        let batch = ImapHeaderBatch {
+            remote_name: "Projects/Alpha".to_string(),
+            uid_validity: "1".to_string(),
+            highest_uid: 1,
+            lowest_uid: 1,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: Vec::new(),
+        };
+        let result = store.sync_imap_mailbox_into_db(mailbox_id, &snapshot, &batch);
+        assert!(result.is_err(), "import 应失败并使整个事务回滚");
+
+        let after = store.get_message(message_id).unwrap();
+        assert!(!after.is_read, "reconcile 的 flags 更新不应在 import 失败后残留");
+    }
+
+    #[test]
+    fn sync_mailbox_import_failure_rolls_back_reconcile_deletes() {
+        let store = test_store();
+        let (mailbox_id, message_id) =
+            seed_custom_mailbox_message(&store, "Projects/Beta", 1, "Rollback deletes");
+        // complete=true、states 为空：reconcile 会把本地消息当作远端已删除而 DELETE。
+        let snapshot = ImapFlagSnapshot {
+            floor_uid: 0,
+            complete: true,
+            states: Vec::new(),
+        };
+        let batch = ImapHeaderBatch {
+            remote_name: "Projects/Beta".to_string(),
+            uid_validity: "1".to_string(),
+            highest_uid: 1,
+            lowest_uid: 1,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: Vec::new(),
+        };
+        let result = store.sync_imap_mailbox_into_db(mailbox_id, &snapshot, &batch);
+        assert!(result.is_err(), "import 应失败并使整个事务回滚");
+
+        let count: i64 = store
+            .with_conn(|conn| {
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM messages WHERE id = ?1",
+                    params![message_id],
+                    |row| row.get(0),
+                )?)
+            })
+            .unwrap();
+        assert_eq!(count, 1, "reconcile 的删除不应在 import 失败后残留");
+    }
+
+    #[test]
+    fn sync_mailbox_into_db_commits_flags_import_and_cursor_atomically() {
+        let store = test_store();
+        let (mailbox_id, message_id) =
+            seed_custom_mailbox_message(&store, "Projects/Gamma", 7, "Atomic commit");
+        // 先建立自定义文件夹并映射，让 import 走通。
+        let custom_folder = store
+            .create_custom_folder(Some(store.get_account().unwrap().id), "项目 Gamma".to_string())
+            .unwrap();
+        store.map_imap_mailbox(mailbox_id, Some(custom_folder.id)).unwrap();
+
+        let snapshot = ImapFlagSnapshot {
+            floor_uid: 0,
+            complete: false,
+            states: vec![ImapFlagState {
+                remote_uid: 7,
+                is_read: true,
+                is_starred: false,
+            }],
+        };
+        let batch = ImapHeaderBatch {
+            remote_name: "Projects/Gamma".to_string(),
+            uid_validity: "42".to_string(),
+            highest_uid: 9,
+            lowest_uid: 9,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 8,
+                message_id: "<gamma-8@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
+                subject: "New gamma".to_string(),
+                sender_name: "G".to_string(),
+                sender_email: "g@example.com".to_string(),
+                recipients: "me@example.com".to_string(),
+                snippet: "gamma".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+                is_starred: false,
+            }],
+        };
+        let result = store
+            .sync_imap_mailbox_into_db(mailbox_id, &snapshot, &batch)
+            .unwrap();
+        assert!(result.reconcile.updated_messages >= 1);
+        assert_eq!(result.imported_messages, 1);
+        assert!(store.get_message(message_id).unwrap().is_read);
+        let mailbox = store
+            .list_imap_mailboxes_for_account(Some(store.get_account().unwrap().id))
+            .unwrap()
+            .into_iter()
+            .find(|mailbox| mailbox.id == mailbox_id)
+            .unwrap();
+        assert_eq!(mailbox.uid_validity, "42");
+        assert_eq!(mailbox.highest_uid, 9);
+    }
+
+    fn inbox_mailbox_id(store: &MailStore) -> i64 {
+        store
+            .list_imap_mailboxes()
+            .unwrap()
+            .into_iter()
+            .find(|mailbox| mailbox.remote_name == "INBOX")
+            .map(|mailbox| mailbox.id)
+            .unwrap()
+    }
+
+    fn flag_snapshot(states: Vec<(i64, bool, bool)>) -> ImapFlagSnapshot {
+        ImapFlagSnapshot {
+            floor_uid: 0,
+            complete: false,
+            states: states
+                .into_iter()
+                .map(|(remote_uid, is_read, is_starred)| ImapFlagState {
+                    remote_uid,
+                    is_read,
+                    is_starred,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn pending_remote_write_blocks_flag_overwrite_until_successful_writeback() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Pending flags", 31);
+        assert!(!store.get_message(message_id).unwrap().is_read);
+
+        // 本地标记已读（is_read=1），远端写回失败：记录待处理意图。
+        store.set_message_read(message_id, true).unwrap();
+        store.record_pending_remote_write(message_id, "seen", "1").unwrap();
+        // 远端快照说未读：待处理意图存在，不应被覆盖。
+        store
+            .reconcile_imap_flag_snapshot(
+                inbox_mailbox_id(&store),
+                &flag_snapshot(vec![(31, false, false)]),
+            )
+            .unwrap();
+        assert!(
+            store.get_message(message_id).unwrap().is_read,
+            "写回失败后本地已读状态不应被远端快照静默撤销"
+        );
+
+        // 写回成功：清除待处理意图，远端恢复权威。
+        store.clear_pending_remote_write(message_id, "seen").unwrap();
+        store
+            .reconcile_imap_flag_snapshot(
+                inbox_mailbox_id(&store),
+                &flag_snapshot(vec![(31, false, false)]),
+            )
+            .unwrap();
+        assert!(
+            !store.get_message(message_id).unwrap().is_read,
+            "写回成功后应以远端状态为准"
+        );
+        assert!(store.list_pending_remote_writes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn pending_move_blocks_remote_folder_overwrite_until_writeback() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Pending move", 32);
+        // 用户本地移到废纸篓，远端移动写回失败。
+        store.move_message_to_role(message_id, "trash").unwrap();
+        assert_eq!(store.get_message(message_id).unwrap().folder_role, "trash");
+        store.record_pending_remote_write(message_id, "move", "trash").unwrap();
+
+        // 下一次头同步（INBOX 仍返回该 UID）：待处理移动意图阻止拉回收件箱。
+        let batch = ImapHeaderBatch {
+            remote_name: "INBOX".to_string(),
+            uid_validity: "1".to_string(),
+            highest_uid: 32,
+            lowest_uid: 32,
+            history_complete: false,
+            history_scanned: true,
+            cursor_reset: false,
+            headers: vec![crate::models::RemoteMessageHeader {
+                remote_uid: 32,
+                message_id: "<Pending move@example.com>".to_string(),
+                in_reply_to: String::new(),
+                references: String::new(),
+                subject: "Pending move".to_string(),
+                sender_name: "Remote".to_string(),
+                sender_email: "remote@example.com".to_string(),
+                recipients: "demo@better-email.local".to_string(),
+                snippet: "header".to_string(),
+                received_at: Utc::now().to_rfc3339(),
+                is_read: false,
+                is_starred: false,
+            }],
+        };
+        store
+            .import_imap_headers_batch(inbox_mailbox_id(&store), &batch)
+            .unwrap();
+        assert_eq!(
+            store.get_message(message_id).unwrap().folder_role,
+            "trash",
+            "写回失败后本地文件夹整理不应被下次同步拉回收件箱"
+        );
+
+        // 写回成功：清除待处理意图，远端成为权威（INBOX 不再包含该邮件时，
+        // 下次 reconcile 才会删除；这里验证待处理清除即可）。
+        store.clear_pending_remote_write(message_id, "move").unwrap();
+        assert!(store.list_pending_remote_writes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn remote_flag_changes_apply_when_no_pending_intent() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Remote changes", 33);
+        assert!(!store.get_message(message_id).unwrap().is_read);
+        assert!(!store.get_message(message_id).unwrap().is_starred);
+
+        // 无本地待处理意图：其他客户端在服务器上的修改照常应用。
+        store
+            .reconcile_imap_flag_snapshot(
+                inbox_mailbox_id(&store),
+                &flag_snapshot(vec![(33, true, true)]),
+            )
+            .unwrap();
+        let after = store.get_message(message_id).unwrap();
+        assert!(after.is_read, "远端已读修改应被应用");
+        assert!(after.is_starred, "远端星标修改应被应用");
+        assert!(store.list_pending_remote_writes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn pending_remote_write_list_and_clear_round_trip() {
+        let store = test_store();
+        let message_id = seed_remote_message(&store, "Pending list", 34);
+        store.record_pending_remote_write(message_id, "flagged", "1").unwrap();
+        store.record_pending_remote_write(message_id, "move", "trash").unwrap();
+        let writes = store.list_pending_remote_writes().unwrap();
+        assert_eq!(writes.len(), 2);
+        assert!(writes.iter().any(|w| w.kind == "flagged" && w.value == "1"));
+        assert!(writes.iter().any(|w| w.kind == "move" && w.value == "trash"));
+
+        store.clear_pending_remote_write(message_id, "flagged").unwrap();
+        let writes = store.list_pending_remote_writes().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert_eq!(writes[0].kind, "move");
+    }
+
+    #[test]
+    fn missing_body_backfill_fairly_reaches_oldest_messages() {
+        let store = test_store();
+        let account_id = store.get_account().unwrap().id;
+        let _mailbox = store
+            .save_imap_mailboxes(&[ImapFolderProbe {
+                name: "INBOX".to_string(),
+                delimiter: "/".to_string(),
+                attributes: vec!["Inbox".to_string()],
+            }])
+            .unwrap()
+            .remove(0);
+        let inbox = store
+            .list_folders_for_account(Some(account_id))
+            .unwrap()
+            .into_iter()
+            .find(|folder| folder.role == "inbox")
+            .unwrap();
+
+        // 大量历史积压：uid 1..20 都缺正文。
+        store
+            .with_conn(|conn| {
+                for uid in 1..=20_i64 {
+                    conn.execute(
+                        "INSERT INTO messages(
+                            account_id, folder_id, sender_name, sender_email, recipients, subject,
+                            snippet, body, received_at, is_read, is_starred, has_attachments,
+                            thread_key, remote_mailbox, remote_uid
+                         ) VALUES (?1, ?2, 'x', 'x@example.com', 'me@example.com', 'Subject ' || ?3,
+                                   '', '', '2026-01-01T00:00:00Z', 0, 0, 0, '', 'INBOX', ?3)",
+                        params![account_id, inbox.id, uid],
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        // 持续新增缺正文邮件，且每轮只回填 limit 条（模拟真实同步批次）。
+        let mut fetched_oldest_uid_1 = false;
+        let mut next_uid = 100_i64;
+        for round in 0..6 {
+            let pending =
+                store.list_messages_missing_body(account_id, "INBOX", 4).unwrap();
+            assert!(!pending.is_empty(), "round {round} 不应为空");
+            if pending.iter().any(|(_, uid)| *uid == 1) {
+                fetched_oldest_uid_1 = true;
+            }
+            // 处理本批：补上正文，模拟同步把缺正文邮件标记为已处理。
+            for (message_id, _) in &pending {
+                store
+                    .with_conn(|conn| {
+                        conn.execute(
+                            "UPDATE messages SET body = 'fetched' WHERE id = ?1",
+                            params![message_id],
+                        )?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+            // 每轮新增若干新缺正文邮件，模拟持续到达。
+            store
+                .with_conn(|conn| {
+                    for _ in 0..3 {
+                        conn.execute(
+                            "INSERT INTO messages(
+                                account_id, folder_id, sender_name, sender_email, recipients, subject,
+                                snippet, body, received_at, is_read, is_starred, has_attachments,
+                                thread_key, remote_mailbox, remote_uid
+                             ) VALUES (?1, ?2, 'x', 'x@example.com', 'me@example.com', 'Fresh ' || ?3,
+                                       '', '', '2026-01-01T00:00:00Z', 0, 0, 0, '', 'INBOX', ?3)",
+                            params![account_id, inbox.id, next_uid],
+                        )?;
+                        next_uid += 1;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+        }
+        assert!(
+            fetched_oldest_uid_1,
+            "持续新增时，最老积压邮件必须最终进入回填批次"
+        );
+
+        // 新邮件不应长期饥饿：最新缺正文邮件也应很快出现在批次中。
+        let pending = store.list_messages_missing_body(account_id, "INBOX", 4).unwrap();
+        assert!(
+            !pending.is_empty(),
+            "仍有新增缺正文邮件时批次不应为空"
+        );
     }
 
     #[test]
@@ -5231,6 +6338,164 @@ mod tests {
         assert!(refreshed.local_path.is_empty());
         assert_eq!(cleared.storage.reclaimable_cache_bytes, 0);
         assert!(cleared.storage.local_attachment_bytes > 0);
+    }
+
+    #[test]
+    fn malicious_backup_html_and_attachment_paths_are_sanitized_on_import() {
+        // 备份 JSON 是不可信输入：导入 messages 时必须在 Rust 端重新生成
+        // sanitized_html/security_warnings；attachments 的 local_path 必须清空，
+        // 防止恶意备份注入脚本或借附件 id 读取任意文件。
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test-malicious-backup.sqlite3");
+        let store = MailStore::open_at(db_path).unwrap();
+
+        let mut messages = LocalBackupRow::new();
+        messages.insert("id".into(), serde_json::json!(1));
+        messages.insert("account_id".into(), serde_json::json!(1));
+        messages.insert("folder_id".into(), serde_json::json!(1));
+        messages.insert("sender_name".into(), serde_json::json!("Attacker"));
+        messages.insert("sender_email".into(), serde_json::json!("attacker@example.com"));
+        messages.insert("recipients".into(), serde_json::json!("me@example.com"));
+        messages.insert("subject".into(), serde_json::json!("Malicious"));
+        messages.insert("snippet".into(), serde_json::json!("snippet"));
+        messages.insert("body".into(), serde_json::json!(
+            "<p>Hello</p><script>alert(1)</script><img src=\"http://tracker.example/open.png\">"
+        ));
+        messages.insert("received_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        // 备份携带的 sanitized_html 是恶意注入内容，导入时必须被当前 sanitizer 重写。
+        messages.insert("sanitized_html".into(), serde_json::json!(
+            "<script>alert(1)</script><img src=\"http://tracker.example/open.png\" onerror=\"bad()\">"
+        ));
+        messages.insert("security_warnings".into(), serde_json::json!(""));
+
+        let mut attachments = LocalBackupRow::new();
+        attachments.insert("id".into(), serde_json::json!(1));
+        attachments.insert("message_id".into(), serde_json::json!(1));
+        attachments.insert("filename".into(), serde_json::json!("leak.txt"));
+        attachments.insert("mime_type".into(), serde_json::json!("text/plain"));
+        attachments.insert("size_bytes".into(), serde_json::json!(123));
+        // 恶意备份伪造已下载状态与任意路径（如 /etc/passwd）。
+        attachments.insert("is_downloaded".into(), serde_json::json!(1));
+        attachments.insert("local_path".into(), serde_json::json!("/etc/passwd"));
+        attachments.insert("content_id".into(), serde_json::json!(""));
+        attachments.insert("is_inline".into(), serde_json::json!(0));
+
+        let mut tables = BTreeMap::new();
+        let mut accounts = LocalBackupRow::new();
+        accounts.insert("id".into(), serde_json::json!(1));
+        accounts.insert("email".into(), serde_json::json!("restored@example.com"));
+        accounts.insert("display_name".into(), serde_json::json!("Restored"));
+        accounts.insert("provider".into(), serde_json::json!("gmail"));
+        accounts.insert("created_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        tables.insert("accounts".to_string(), vec![accounts]);
+        let mut folders = LocalBackupRow::new();
+        folders.insert("id".into(), serde_json::json!(1));
+        folders.insert("account_id".into(), serde_json::json!(1));
+        folders.insert("name".into(), serde_json::json!("收件箱"));
+        folders.insert("role".into(), serde_json::json!("inbox"));
+        folders.insert("sort_order".into(), serde_json::json!(10));
+        tables.insert("folders".to_string(), vec![folders]);
+        tables.insert("messages".to_string(), vec![messages]);
+        tables.insert("attachments".to_string(), vec![attachments]);
+
+        let backup = LocalBackup {
+            schema_version: LOCAL_BACKUP_SCHEMA_VERSION,
+            app_version: "test".to_string(),
+            exported_at: Utc::now().to_rfc3339(),
+            tables,
+        };
+        store.import_local_backup(&backup).unwrap();
+
+        let restored_message = store
+            .with_conn(|conn| {
+                let row = conn.query_row(
+                    "SELECT body, sanitized_html, security_warnings FROM messages WHERE id = 1",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                        ))
+                    },
+                )?;
+                Ok(row)
+            })
+            .unwrap();
+        assert!(
+            !restored_message.1.contains("<script"),
+            "导入后的 sanitized_html 不得包含 script：{}",
+            restored_message.1
+        );
+        assert!(
+            !restored_message.1.contains("onerror"),
+            "导入后的 sanitized_html 不得包含事件属性：{}",
+            restored_message.1
+        );
+        assert!(
+            !restored_message.1.contains("http://tracker"),
+            "导入后的 sanitized_html 不得包含远程图片 src：{}",
+            restored_message.1
+        );
+        assert!(
+            restored_message.2.contains("远程图片"),
+            "重新生成的 security_warnings 应包含远程图片警告：{}",
+            restored_message.2
+        );
+
+        let restored_attachment = store
+            .with_conn(|conn| {
+                let row = conn.query_row(
+                    "SELECT is_downloaded, local_path FROM attachments WHERE id = 1",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, String>(1)?,
+                        ))
+                    },
+                )?;
+                Ok(row)
+            })
+            .unwrap();
+        assert_eq!(
+            restored_attachment.0, 0,
+            "导入后附件必须是未下载状态"
+        );
+        assert!(
+            restored_attachment.1.is_empty(),
+            "导入后附件 local_path 必须清空（不能指向 /etc/passwd）：{}",
+            restored_attachment.1
+        );
+    }
+
+    #[test]
+    fn validate_local_backup_rejects_oversized_tables() {
+        use super::backup::validate_local_backup;
+        let mut tables = BTreeMap::new();
+        let mut accounts = LocalBackupRow::new();
+        accounts.insert("id".into(), serde_json::json!(1));
+        accounts.insert("email".into(), serde_json::json!("a@example.com"));
+        accounts.insert("display_name".into(), serde_json::json!("A"));
+        accounts.insert("provider".into(), serde_json::json!("gmail"));
+        accounts.insert("created_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        tables.insert("accounts".to_string(), vec![accounts]);
+        // 超过行数上限。
+        let many = (0..300_000)
+            .map(|_| LocalBackupRow::new())
+            .collect::<Vec<_>>();
+        tables.insert("contacts".to_string(), many);
+        let oversized = LocalBackup {
+            schema_version: LOCAL_BACKUP_SCHEMA_VERSION,
+            app_version: "test".to_string(),
+            exported_at: "2026-01-01T00:00:00Z".to_string(),
+            tables,
+        };
+        let err = validate_local_backup(&oversized).unwrap_err();
+        assert!(
+            err.to_string().contains("超过上限"),
+            "超行数表应被拒绝：{err}"
+        );
     }
 
     #[test]

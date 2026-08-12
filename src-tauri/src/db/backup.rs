@@ -113,10 +113,26 @@ pub(super) fn import_backup_table(
 ) -> MailResult<()> {
     let columns = table_columns(conn, table)?;
     for row in rows {
+        // 不可信备份的安全化：messages 的 sanitized_html/security_warnings 必须
+        // 从原始正文重新生成，绝不信任备份提供的安全派生字段；attachments 的
+        // local_path/is_downloaded 一律清空，防止借附件路径读取任意文件。
+        let mut normalized = row.clone();
+        if table == "messages" {
+            let body = row.get("body").and_then(|value| value.as_str()).unwrap_or_default();
+            let (sanitized_html, security_warnings) = recompute_message_security(body);
+            normalized.insert("sanitized_html".into(), serde_json::Value::String(sanitized_html));
+            normalized.insert(
+                "security_warnings".into(),
+                serde_json::Value::String(security_warnings),
+            );
+        } else if table == "attachments" {
+            normalized.insert("local_path".into(), serde_json::Value::String(String::new()));
+            normalized.insert("is_downloaded".into(), serde_json::Value::Number(0.into()));
+        }
         let mut insert_columns = Vec::new();
         let mut values = Vec::new();
         for column in &columns {
-            if let Some(value) = row.get(column) {
+            if let Some(value) = normalized.get(column) {
                 insert_columns.push(column.clone());
                 values.push(json_to_sql_value(value));
             }
@@ -139,6 +155,21 @@ pub(super) fn import_backup_table(
         conn.execute(&sql, params_from_iter(values))?;
     }
     Ok(())
+}
+
+/// 从可信原始正文重新生成 messages 的安全字段：
+/// sanitized_html 用当前 sanitizer 清洗，security_warnings 重新检测。
+fn recompute_message_security(body: &str) -> (String, String) {
+    let sanitized_html = crate::protocol::sanitize_html(body);
+    let mut warnings = Vec::new();
+    if body.to_ascii_lowercase().contains("<script") {
+        warnings.push("HTML 正文包含 script 标签，渲染前必须清洗。".to_string());
+    }
+    if crate::protocol::html_has_remote_images(body) {
+        warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
+    }
+    warnings.extend(crate::protocol::link_risk_warnings(body));
+    (sanitized_html, super::messages::warning_lines_to_text(&warnings))
 }
 pub(super) fn table_columns(conn: &Connection, table: &str) -> MailResult<Vec<String>> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", quote_identifier(table)))?;
@@ -177,12 +208,43 @@ pub(super) fn json_to_sql_value(value: &serde_json::Value) -> Value {
 pub(super) fn quote_identifier(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
 }
+/// 备份行数与字符串长度上限，防止不可信备份导致资源耗尽。
+const MAX_BACKUP_ROWS_PER_TABLE: usize = 200_000;
+const MAX_BACKUP_STRING_CHARS: usize = 1_000_000;
+
 pub(super) fn validate_local_backup(backup: &LocalBackup) -> MailResult<()> {
     if backup.schema_version != LOCAL_BACKUP_SCHEMA_VERSION {
         return Err(MailError::Imap(format!(
             "备份版本 {} 与当前版本 {} 不兼容。",
             backup.schema_version, LOCAL_BACKUP_SCHEMA_VERSION
         )));
+    }
+    if backup.tables.len() > LOCAL_BACKUP_TABLES.len() {
+        return Err(MailError::Imap(format!(
+            "备份包含 {} 张表，超过支持的表数量（{}）。",
+            backup.tables.len(),
+            LOCAL_BACKUP_TABLES.len()
+        )));
+    }
+    for (table, rows) in &backup.tables {
+        if rows.len() > MAX_BACKUP_ROWS_PER_TABLE {
+            return Err(MailError::Imap(format!(
+                "备份表 {table} 包含 {} 行，超过上限 {MAX_BACKUP_ROWS_PER_TABLE} 行，已取消恢复。",
+                rows.len()
+            )));
+        }
+        for row in rows {
+            for value in row.values() {
+                if let serde_json::Value::String(text) = value {
+                    if text.chars().count() > MAX_BACKUP_STRING_CHARS {
+                        return Err(MailError::Imap(format!(
+                            "备份表 {table} 中存在超长字符串（{} 字符 > {MAX_BACKUP_STRING_CHARS}），已取消恢复。",
+                            text.chars().count()
+                        )));
+                    }
+                }
+            }
+        }
     }
     if backup_table_count(backup, "accounts") == 0 {
         return Err(MailError::Imap(

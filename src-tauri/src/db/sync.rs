@@ -2,7 +2,7 @@ use super::accounts::account_for_conn;
 use super::accounts::map_account;
 use super::contacts_rules::apply_enabled_rules_for_message;
 use super::folders::{folder_for_conn, folder_id_for_account_role, is_custom_folder_role};
-use super::messages::{bool_to_int, thread_key_for_message};
+use super::messages::{bool_to_int, has_pending_remote_write_for_conn, thread_key_for_message};
 use super::*;
 
 impl MailStore {
@@ -49,6 +49,7 @@ impl MailStore {
                 scanned_folders,
                 imported_messages,
                 new_messages: 0,
+                new_message_ids: Vec::new(),
                 message,
             })
         })
@@ -220,7 +221,8 @@ impl MailStore {
     ) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
             let started_at = Utc::now().to_rfc3339();
-            let (imported_messages, new_messages) = import_imap_headers_for_conn(conn, mailbox_id, batch)?;
+            let (imported_messages, new_messages, new_message_ids) =
+                import_imap_headers_for_conn(conn, mailbox_id, batch)?;
             let finished_at = Utc::now().to_rfc3339();
             let message = format!(
                 "IMAP 邮件头同步完成：{} 扫描 {} 封，新增 {} 封。",
@@ -242,23 +244,62 @@ impl MailStore {
                 scanned_folders: 1,
                 imported_messages,
                 new_messages,
+                new_message_ids,
                 message,
             })
         })
     }
+    #[cfg(test)]
     pub fn import_imap_headers_batch(
         &self,
         mailbox_id: i64,
         batch: &ImapHeaderBatch,
-    ) -> MailResult<(i64, i64)> {
-        self.with_conn(|conn| import_imap_headers_for_conn(conn, mailbox_id, batch))
+    ) -> MailResult<(i64, i64, Vec<i64>)> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let result = import_imap_headers_for_conn(&transaction, mailbox_id, batch)?;
+            transaction.commit()?;
+            Ok(result)
+        })
     }
+    #[cfg(test)]
     pub fn reconcile_imap_flag_snapshot(
         &self,
         mailbox_id: i64,
         snapshot: &ImapFlagSnapshot,
     ) -> MailResult<ImapReconcileResult> {
-        self.with_conn(|conn| reconcile_imap_flag_snapshot_for_conn(conn, mailbox_id, snapshot))
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let result = reconcile_imap_flag_snapshot_for_conn(&transaction, mailbox_id, snapshot)?;
+            transaction.commit()?;
+            Ok(result)
+        })
+    }
+    /// 在同一数据库事务内完成「远端 flag 快照调和 + 邮件头导入」。
+    ///
+    /// reconcile 与 import 各自独立提交时，import 失败会导致已提交的
+    /// 删除/状态变更无法回滚。这里为同一个 mailbox 的两次本地数据库变更
+    /// 提供单一事务入口：网络读取仍发生在事务外，事务只覆盖本地数据库
+    /// 变更；任一步失败则删除、flags、游标、headers 全部回滚。
+    pub fn sync_imap_mailbox_into_db(
+        &self,
+        mailbox_id: i64,
+        snapshot: &ImapFlagSnapshot,
+        batch: &ImapHeaderBatch,
+    ) -> MailResult<MailboxSyncTransactionResult> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let reconcile = reconcile_imap_flag_snapshot_for_conn(&transaction, mailbox_id, snapshot)?;
+            let (imported_messages, new_messages, new_message_ids) =
+                import_imap_headers_for_conn(&transaction, mailbox_id, batch)?;
+            transaction.commit()?;
+            Ok(MailboxSyncTransactionResult {
+                reconcile,
+                imported_messages,
+                new_messages,
+                new_message_ids,
+            })
+        })
     }
     pub fn list_sync_runs(&self) -> MailResult<Vec<SyncRun>> {
         self.with_conn(|conn| {
@@ -276,6 +317,7 @@ impl MailStore {
                         scanned_folders: row.get(4)?,
                         imported_messages: row.get(5)?,
                         new_messages: row.get(6)?,
+                        new_message_ids: Vec::new(),
                         message: row.get(7)?,
                     })
                 })?
@@ -283,6 +325,7 @@ impl MailStore {
             Ok(runs)
         })
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn record_sync_run(
         &self,
         started_at: &str,
@@ -291,6 +334,7 @@ impl MailStore {
         scanned_folders: i64,
         imported_messages: i64,
         new_messages: i64,
+        new_message_ids: &[i64],
         message: &str,
     ) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
@@ -316,6 +360,7 @@ impl MailStore {
                 scanned_folders,
                 imported_messages,
                 new_messages,
+                new_message_ids: new_message_ids.to_vec(),
                 message: message.to_string(),
             })
         })
@@ -390,8 +435,7 @@ pub(super) fn import_imap_headers_for_conn(
     conn: &Connection,
     mailbox_id: i64,
     batch: &ImapHeaderBatch,
-) -> MailResult<(i64, i64)> {
-    let transaction = conn.unchecked_transaction()?;
+) -> MailResult<(i64, i64, Vec<i64>)> {
     let (account_id, local_role, local_folder_id): (i64, String, Option<i64>) = conn.query_row(
         "SELECT account_id, local_role, local_folder_id FROM imap_mailboxes WHERE id = ?1",
         params![mailbox_id],
@@ -416,6 +460,7 @@ pub(super) fn import_imap_headers_for_conn(
     let mut imported_messages = 0;
     // 同步前的最高 UID：只有超过它的新插入才计入「新邮件」，历史补同步不计入。
     let mut new_messages = 0;
+    let mut new_message_ids = Vec::new();
     let previous_highest_uid: i64 = if batch.cursor_reset {
         0
     } else {
@@ -446,76 +491,86 @@ pub(super) fn import_imap_headers_for_conn(
             &header.in_reply_to,
             &header.references,
         );
+        let mut message_id: Option<i64> = None;
         if !header.message_id.trim().is_empty() {
-            let rebound = conn.execute(
-                "
-                UPDATE messages
-                SET folder_id = ?1,
-                    remote_mailbox = ?2,
-                    remote_uid = ?3,
-                    message_id_header = ?5,
-                    in_reply_to_header = ?8,
-                    references_header = ?9,
-                    thread_key = ?10,
-                    is_read = ?6,
-                    is_starred = ?7
-                WHERE id = (
+            // 本地已有同 Message-ID 但尚未绑定远端 UID 的消息：补绑远端引用。
+            message_id = conn
+                .query_row(
+                    "
                     SELECT id
                     FROM messages
-                    WHERE account_id = ?4
+                    WHERE account_id = ?1
                       AND remote_mailbox = ?2
                       AND remote_uid = 0
-                      AND message_id_header = ?5
+                      AND message_id_header = ?3
                     ORDER BY id ASC
                     LIMIT 1
+                    ",
+                    params![account_id, batch.remote_name, header.message_id],
+                    |row| row.get(0),
                 )
-                ",
-                params![
-                    folder_id,
-                    batch.remote_name,
-                    header.remote_uid,
-                    account_id,
-                    header.message_id,
-                    bool_to_int(header.is_read),
-                    bool_to_int(header.is_starred),
-                    header.in_reply_to,
-                    header.references,
-                    thread_key
-                ],
-            )?;
-            if rebound > 0 {
-                continue;
+                .optional()?;
+            if let Some(message_id) = message_id {
+                conn.execute(
+                    "UPDATE messages SET remote_mailbox = ?1, remote_uid = ?2 WHERE id = ?3",
+                    params![batch.remote_name, header.remote_uid, message_id],
+                )?;
             }
         }
-
-        let updated = conn.execute(
-            "
-            UPDATE messages
-            SET folder_id = ?1,
-                is_read = ?2,
-                is_starred = ?3,
-                message_id_header = ?7,
-                in_reply_to_header = ?8,
-                references_header = ?9,
-                thread_key = ?10
-            WHERE account_id = ?4
-              AND remote_mailbox = ?5
-              AND remote_uid = ?6
-            ",
-            params![
-                folder_id,
-                bool_to_int(header.is_read),
-                bool_to_int(header.is_starred),
-                account_id,
-                batch.remote_name,
-                header.remote_uid,
-                header.message_id,
-                header.in_reply_to,
-                header.references,
-                thread_key
-            ],
-        )?;
-        if updated > 0 {
+        if message_id.is_none() {
+            message_id = conn
+                .query_row(
+                    "
+                    SELECT id
+                    FROM messages
+                    WHERE account_id = ?1
+                      AND remote_mailbox = ?2
+                      AND remote_uid = ?3
+                    ",
+                    params![account_id, batch.remote_name, header.remote_uid],
+                    |row| row.get(0),
+                )
+                .optional()?;
+        }
+        if let Some(message_id) = message_id {
+            // 本地乐观修改写回远端失败时存在待处理意图：该字段保持本地值，
+            // 直到写回成功（待处理记录清除）才恢复远端权威。其他客户端在
+            // 服务器上的真实修改在没有本地待处理意图时照常应用。
+            if !has_pending_remote_write_for_conn(conn, message_id, "move")? {
+                conn.execute(
+                    "UPDATE messages SET folder_id = ?1 WHERE id = ?2 AND folder_id <> ?1",
+                    params![folder_id, message_id],
+                )?;
+            }
+            if !has_pending_remote_write_for_conn(conn, message_id, "seen")? {
+                conn.execute(
+                    "UPDATE messages SET is_read = ?1 WHERE id = ?2 AND is_read <> ?1",
+                    params![bool_to_int(header.is_read), message_id],
+                )?;
+            }
+            if !has_pending_remote_write_for_conn(conn, message_id, "flagged")? {
+                conn.execute(
+                    "UPDATE messages SET is_starred = ?1 WHERE id = ?2 AND is_starred <> ?1",
+                    params![bool_to_int(header.is_starred), message_id],
+                )?;
+            }
+            conn.execute(
+                "
+                UPDATE messages
+                SET message_id_header = ?1,
+                    in_reply_to_header = ?2,
+                    references_header = ?3,
+                    thread_key = ?4
+                WHERE id = ?5
+                ",
+                params![
+                    header.message_id,
+                    header.in_reply_to,
+                    header.references,
+                    thread_key,
+                    message_id
+                ],
+            )?;
             continue;
         }
 
@@ -553,6 +608,7 @@ pub(super) fn import_imap_headers_for_conn(
             apply_enabled_rules_for_message(conn, message_id)?;
             if previous_highest_uid > 0 && header.remote_uid > previous_highest_uid {
                 new_messages += 1;
+                new_message_ids.push(message_id);
             }
         }
         imported_messages += changed as i64;
@@ -591,15 +647,13 @@ pub(super) fn import_imap_headers_for_conn(
             Utc::now().to_rfc3339()
         ],
     )?;
-    transaction.commit()?;
-    Ok((imported_messages, new_messages))
+    Ok((imported_messages, new_messages, new_message_ids))
 }
 pub(super) fn reconcile_imap_flag_snapshot_for_conn(
     conn: &Connection,
     mailbox_id: i64,
     snapshot: &ImapFlagSnapshot,
 ) -> MailResult<ImapReconcileResult> {
-    let transaction = conn.unchecked_transaction()?;
     let (account_id, remote_name): (i64, String) = conn.query_row(
         "SELECT account_id, remote_name FROM imap_mailboxes WHERE id = ?1",
         params![mailbox_id],
@@ -614,24 +668,51 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
         .collect::<BTreeSet<_>>();
 
     for state in &snapshot.states {
-        updated_messages += conn.execute(
-            "
-            UPDATE messages
-            SET is_read = ?1,
-                is_starred = ?2
-            WHERE account_id = ?3
-              AND remote_mailbox = ?4
-              AND remote_uid = ?5
-              AND (is_read <> ?1 OR is_starred <> ?2)
-            ",
-            params![
-                bool_to_int(state.is_read),
-                bool_to_int(state.is_starred),
-                account_id,
-                remote_name,
-                state.remote_uid
-            ],
-        )? as i64;
+        let message_id: Option<i64> = conn
+            .query_row(
+                "
+                SELECT id
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid = ?3
+                ",
+                params![account_id, remote_name, state.remote_uid],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(message_id) = message_id else {
+            continue;
+        };
+        // 远端写回失败后存在待处理意图时，不覆盖本地 flags，避免静默撤销
+        // 用户操作；写回成功后待处理记录清除，远端恢复权威。每封邮件无论
+        // is_read/is_starred 各更新多少字段，只计一次「已更新」。
+        let mut changed = false;
+        if !has_pending_remote_write_for_conn(conn, message_id, "seen")? {
+            changed |= conn.execute(
+                "
+                UPDATE messages
+                SET is_read = ?1
+                WHERE id = ?2
+                  AND is_read <> ?1
+                ",
+                params![bool_to_int(state.is_read), message_id],
+            )? > 0;
+        }
+        if !has_pending_remote_write_for_conn(conn, message_id, "flagged")? {
+            changed |= conn.execute(
+                "
+                UPDATE messages
+                SET is_starred = ?1
+                WHERE id = ?2
+                  AND is_starred <> ?1
+                ",
+                params![bool_to_int(state.is_starred), message_id],
+            )? > 0;
+        }
+        if changed {
+            updated_messages += 1;
+        }
     }
 
     let should_scan_local = snapshot.complete || snapshot.floor_uid > 0;
@@ -678,7 +759,6 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
         }
     }
 
-    transaction.commit()?;
     Ok(ImapReconcileResult {
         updated_messages,
         removed_messages,

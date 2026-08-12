@@ -2,9 +2,9 @@ use super::common::is_pop3_account;
 use crate::db::{MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
-    FolderReadReport, Message, MessageSummary, ParsedMessagePreview, RawMessageInput,
-    ReleasedSnoozedCount, RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput,
-    RestoreMessageReport, ThreadSummary, TrashActionReport,
+    FolderReadReport, Message, MessageSummary, ParsedMessagePreview, PendingRemoteWrite,
+    RawMessageInput, ReleasedSnoozedCount, RemoteActionReport, RemoteImageTrust,
+    RemoteImageTrustInput, RestoreMessageReport, ThreadSummary, TrashActionReport,
 };
 use crate::protocol;
 use std::collections::BTreeMap;
@@ -68,6 +68,21 @@ pub fn list_muted_thread_keys(
     account_id: i64,
 ) -> MailResult<Vec<String>> {
     store.list_muted_thread_keys(account_id)
+}
+
+#[tauri::command]
+pub fn list_pending_remote_writes(
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<PendingRemoteWrite>> {
+    store.list_pending_remote_writes()
+}
+
+#[tauri::command]
+pub fn list_messages_by_ids(
+    store: State<'_, MailStore>,
+    message_ids: Vec<i64>,
+) -> MailResult<Vec<Message>> {
+    store.list_messages_by_ids(&message_ids)
 }
 
 #[tauri::command]
@@ -412,14 +427,25 @@ fn sync_remote_seen(
         }
     };
     match imap_probe::set_remote_seen(&account, &secret, &remote_mailbox, remote_uid, is_read) {
-        Ok(()) => Ok(remote_ok_report(if is_read {
-            "本地已标为已读，远端 \\Seen 状态已同步。"
-        } else {
-            "本地已标为未读，远端 \\Seen 状态已同步。"
-        })),
-        Err(error) => Ok(remote_failed_report(format!(
-            "本地已更新；远端已读状态回写失败：{error}"
-        ))),
+        Ok(()) => {
+            let _ = store.clear_pending_remote_write(message_id, "seen");
+            Ok(remote_ok_report(if is_read {
+                "本地已标为已读，远端 \\Seen 状态已同步。"
+            } else {
+                "本地已标为未读，远端 \\Seen 状态已同步。"
+            }))
+        }
+        Err(error) => {
+            // 写回失败：记录待处理意图，避免下次同步静默撤销本地已读状态。
+            let _ = store.record_pending_remote_write(
+                message_id,
+                "seen",
+                if is_read { "1" } else { "0" },
+            );
+            Ok(remote_failed_report(format!(
+                "本地已更新；远端已读状态回写失败：{error}"
+            )))
+        }
     }
 }
 
@@ -450,14 +476,25 @@ fn sync_remote_flagged(
     };
     match imap_probe::set_remote_flagged(&account, &secret, &remote_mailbox, remote_uid, is_starred)
     {
-        Ok(()) => Ok(remote_ok_report(if is_starred {
-            "本地已添加星标，远端 \\Flagged 状态已同步。"
-        } else {
-            "本地已取消星标，远端 \\Flagged 状态已同步。"
-        })),
-        Err(error) => Ok(remote_failed_report(format!(
-            "本地星标已更新；远端星标状态回写失败：{error}"
-        ))),
+        Ok(()) => {
+            let _ = store.clear_pending_remote_write(message_id, "flagged");
+            Ok(remote_ok_report(if is_starred {
+                "本地已添加星标，远端 \\Flagged 状态已同步。"
+            } else {
+                "本地已取消星标，远端 \\Flagged 状态已同步。"
+            }))
+        }
+        Err(error) => {
+            // 写回失败：记录待处理意图，避免下次同步静默撤销本地星标。
+            let _ = store.record_pending_remote_write(
+                message_id,
+                "flagged",
+                if is_starred { "1" } else { "0" },
+            );
+            Ok(remote_failed_report(format!(
+                "本地星标已更新；远端星标状态回写失败：{error}"
+            )))
+        }
     }
 }
 
@@ -499,6 +536,7 @@ fn sync_remote_move(
             &reference.message_id_header,
         ) {
             Ok(target_uid) => {
+                let _ = store.clear_pending_remote_write(message_id, "move");
                 store.set_message_remote_ref(
                     message_id,
                     &target_mailbox,
@@ -512,9 +550,13 @@ fn sync_remote_move(
                     )
                 }))
             }
-            Err(error) => Ok(remote_failed_report(format!(
-                "本地已移动；远端移动失败：{error}"
-            ))),
+            Err(error) => {
+                // 写回失败：记录待处理移动意图，避免下次同步把本地文件夹拉回原目录。
+                let _ = store.record_pending_remote_write(message_id, "move", role);
+                Ok(remote_failed_report(format!(
+                    "本地已移动；远端移动失败：{error}"
+                )))
+            }
         },
         None if role == "trash" => {
             let candidates = [imap_probe::RemoteDeleteCandidate {

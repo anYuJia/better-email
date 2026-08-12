@@ -2,11 +2,28 @@ use super::*;
 
 impl MailStore {
     pub fn save_ai_settings(&self, record: &AiSettingsRecord) -> MailResult<()> {
-        self.with_conn(|conn| store_ai_settings_for_conn(conn, record))
+        let mut record = record.clone();
+        // 应用层加密 API key / MCP key，数据库文件单独被读取时是密文。
+        record.api_key =
+            crate::secret_crypto::encrypt_secret(&self.data_dir, &record.api_key).map_err(MailError::Io)?;
+        record.mcp_api_key =
+            crate::secret_crypto::encrypt_secret(&self.data_dir, &record.mcp_api_key).map_err(MailError::Io)?;
+        self.with_conn(|conn| store_ai_settings_for_conn(conn, &record))
     }
 
     pub fn load_ai_settings(&self) -> MailResult<AiSettingsRecord> {
-        self.with_conn(load_ai_settings_for_conn)
+        let record = self.with_conn(load_ai_settings_for_conn)?;
+        // 解密读取；升级前纯文本遗留值原样返回（惰性迁移）。
+        let api_key = crate::secret_crypto::decrypt_secret(&self.data_dir, &record.api_key)
+            .map_err(MailError::Io)?;
+        let mcp_api_key =
+            crate::secret_crypto::decrypt_secret(&self.data_dir, &record.mcp_api_key)
+                .map_err(MailError::Io)?;
+        Ok(AiSettingsRecord {
+            api_key,
+            mcp_api_key,
+            ..record
+        })
     }
 }
 

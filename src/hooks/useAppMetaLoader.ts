@@ -185,12 +185,15 @@ export default function useAppMetaLoader({
     if ('kind' in unreadRequest && unreadRequest.scope === activeMailboxScopeRef.current) {
       activeUnreadRefreshRef.current = unreadRequest;
     }
+    // 未携带 mailboxRequest 的调用同样绑定当前 mailbox 世代：导航动作（selectFolder /
+    // changeAccountScope / refreshMailbox）会递增 mailboxRefreshRef，因此这里捕获
+    // 发起时的 id，慢响应恢复时若用户已导航到别的视图，提交将被拒绝，避免旧请求
+    // 覆盖 setFolderId/setFolders/setStatus 等导航状态。
+    const commitRequest: MailboxRefreshRequest =
+      mailboxRequest ?? { id: mailboxRefreshRef?.current ?? 0, scope: nextScope };
     const shouldCommitMailboxResult = () => (
-      !mailboxRequest
-      || (
-        mailboxRequest.scope === nextScope
-        && isMailboxRefreshCurrent(mailboxRequest)
-      )
+      commitRequest.scope === nextScope
+      && isMailboxRefreshCurrent(commitRequest)
     );
     appFlowLog('loadMeta start', {
       requestedFolderId: nextFolderId,

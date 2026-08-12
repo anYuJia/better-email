@@ -107,6 +107,62 @@ describe('mail UI utilities', () => {
     })).toBe('');
   });
 
+  it('does not cache the header-only empty preview and refreshes once the body arrives', () => {
+    const headerOnly = mailboxListPreview({
+      id: 6001,
+      body: '',
+      sanitized_html: '',
+      snippet: '远端邮件头已同步，打开邮件后自动获取正文。',
+    });
+    expect(headerOnly).toBe('');
+    // 正文到达后同一 id 必须立即返回正文预览，而不是旧空预览。
+    const withBody = mailboxListPreview({
+      id: 6001,
+      body: '<p>完整正文</p>',
+      sanitized_html: '',
+      snippet: '远端邮件头已同步，打开邮件后自动获取正文。',
+    });
+    expect(withBody).toBe('完整正文');
+  });
+
+  it('invalidates the cached preview when snippet or body changes', () => {
+    expect(mailboxListPreview({
+      id: 6002,
+      body: '',
+      sanitized_html: '',
+      snippet: '第一版摘要',
+    })).toBe('第一版摘要');
+    expect(mailboxListPreview({
+      id: 6002,
+      body: '',
+      sanitized_html: '',
+      snippet: '第二版摘要',
+    })).toBe('第二版摘要');
+    expect(mailboxListPreview({
+      id: 6002,
+      body: '<p>正文</p>',
+      sanitized_html: '',
+      snippet: '第二版摘要',
+    })).toBe('正文');
+  });
+
+  it('reuses the cached preview when the preview inputs are unchanged', () => {
+    const first = mailboxListPreview({
+      id: 6003,
+      body: '<p>正文</p>',
+      sanitized_html: '',
+      snippet: '摘要',
+    });
+    const second = mailboxListPreview({
+      id: 6003,
+      body: '<p>正文</p>',
+      sanitized_html: '',
+      snippet: '摘要',
+    });
+    expect(first).toBe('正文');
+    expect(second).toBe(first);
+  });
+
   it('quotes message bodies for reply and forward drafts', () => {
     const quoted = quoteMessage({
       sender_name: 'Ada',
@@ -426,6 +482,10 @@ describe('mail UI utilities', () => {
       // negative cases
       expect(htmlHasRemoteVisualContent('<img src="cid:local.png">')).toBe(false);
       expect(htmlHasRemoteVisualContent('<img src="/local/path.png">')).toBe(false);
+      // 协议相对远程图片也必须识别为远程视觉内容
+      expect(htmlHasRemoteVisualContent('<img src="//tracker.example/a.png">')).toBe(true);
+      expect(htmlHasRemoteVisualContent('<td background="//cdn.example.com/bg.png"></td>')).toBe(true);
+      expect(htmlHasRemoteVisualContent('<div style="background: url(\'//cdn.example.com/bg.png\')"></div>')).toBe(true);
     });
   });
 

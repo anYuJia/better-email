@@ -495,11 +495,20 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
         .attribute_filter(move |element, attribute, value| {
             if element.eq_ignore_ascii_case("img") && attribute.eq_ignore_ascii_case("src") {
                 let normalized = value.trim().to_ascii_lowercase();
+                let protocol_relative = normalized.starts_with("//");
                 if normalized.starts_with("http://")
                     || (normalized.starts_with("https://")
                         && (!allow_remote_images || is_tracking_image_source(&normalized)))
+                    || (protocol_relative
+                        && (!allow_remote_images || is_tracking_image_source(&normalized)))
                 {
                     return None;
+                }
+                if protocol_relative && allow_remote_images {
+                    // 协议相对 URL（//host/path）默认阻止；允许后按 https 语义
+                    // 放行并改写为 https://，否则 ammonia 的 url_schemes 不含
+                    // relative 会把 src 剥掉。
+                    return Some(Cow::Owned(format!("https:{value}")));
                 }
             }
             Some(Cow::Borrowed(value))
@@ -527,10 +536,7 @@ pub(crate) fn html_has_remote_images(html: &str) -> bool {
         };
         let tag = &html[start..=tag_end];
         if extract_attr(tag, "src")
-            .map(|src| {
-                let normalized = src.trim().to_ascii_lowercase();
-                normalized.starts_with("http://") || normalized.starts_with("https://")
-            })
+            .map(|src| is_remote_image_source(&src))
             .unwrap_or(false)
         {
             return true;
@@ -557,7 +563,11 @@ pub(crate) fn html_has_remote_images(html: &str) -> bool {
 
 fn is_remote_image_source(value: &str) -> bool {
     let normalized = value.trim().to_ascii_lowercase();
-    normalized.starts_with("http://") || normalized.starts_with("https://")
+    // 覆盖 http(s):// 与协议相对 //host/path：后者浏览器会按页面协议解析到远端，
+    // 同样属于远程图片来源，必须纳入检测与阻止策略。
+    normalized.starts_with("http://")
+        || normalized.starts_with("https://")
+        || normalized.starts_with("//")
 }
 
 fn style_has_remote_image(style: &str) -> bool {
@@ -604,10 +614,17 @@ fn promote_https_background_images(html: &str) -> String {
         output.push_str(&html[cursor..=tag_end]);
         if let Some(source) = extract_attr(&html[start..=tag_end], "background") {
             let decoded = decode_basic_entities(&source);
-            if decoded.trim().to_ascii_lowercase().starts_with("https://")
+            let normalized = decoded.trim().to_ascii_lowercase();
+            // 只认 https 或协议相对（按 https 语义放行）的背景图；http 不提升。
+            if (normalized.starts_with("https://") || normalized.starts_with("//"))
                 && !is_tracking_image_source(&decoded)
             {
-                let escaped = decoded
+                let promoted = if normalized.starts_with("//") {
+                    format!("https:{decoded}")
+                } else {
+                    decoded.clone()
+                };
+                let escaped = promoted
                     .replace('&', "&amp;")
                     .replace('"', "&quot;")
                     .replace('<', "&lt;")
@@ -1013,6 +1030,67 @@ mod tests {
         assert!(html_has_remote_images(
             "<div style=\"background:url('https://cdn.example.com/hero.png')\"></div>"
         ));
+    }
+
+    #[test]
+    fn protocol_relative_remote_images_are_detected_in_all_forms() {
+        // 带引号 src
+        assert!(html_has_remote_images(
+            "<img src=\"//tracker.example/a.png\">"
+        ));
+        // 无引号 src
+        assert!(html_has_remote_images(
+            "<img src=//tracker.example/a.png>"
+        ));
+        // background 属性
+        assert!(html_has_remote_images(
+            "<td background=\"//tracker.example/a.png\"></td>"
+        ));
+        // style url()
+        assert!(html_has_remote_images(
+            "<div style=\"background:url('//tracker.example/a.png')\"></div>"
+        ));
+    }
+
+    #[test]
+    fn protocol_relative_images_are_blocked_by_default_and_rewritten_when_allowed() {
+        let blocked = sanitize_html("<img src=\"//tracker.example/a.png\" alt=\"x\">");
+        assert!(
+            !blocked.contains("tracker.example"),
+            "默认应阻止协议相对远程图片：{blocked}"
+        );
+        assert!(!blocked.contains("<img"), "无 src 的 img 应被移除：{blocked}");
+
+        let allowed = sanitize_html_with_remote_images(
+            "<img src=\"//cdn.example.com/photo.png\" alt=\"photo\">",
+        );
+        assert!(
+            allowed.contains("https://cdn.example.com/photo.png"),
+            "允许远程图时协议相对 URL 应按 https 语义放行并改写：{allowed}"
+        );
+        assert!(
+            !allowed.contains("src=\"//"),
+            "放行后的 src 不应保留裸协议相对形式：{allowed}"
+        );
+
+        // 协议相对跟踪像素即便允许远程图也仍被阻止。
+        let tracking = sanitize_html_with_remote_images("<img src=\"//tracker.example/p/t.gif\">");
+        assert!(
+            !tracking.contains("tracker.example"),
+            "跟踪像素不应因允许远程图而放行：{tracking}"
+        );
+    }
+
+    #[test]
+    fn protocol_relative_background_is_promoted_after_confirmation() {
+        let html = "<table><tr><td background=\"//cdn.example.com/hero.png\">x</td></tr></table>";
+        let blocked = sanitize_html(html);
+        assert!(!blocked.contains("cdn.example.com"), "默认应阻止：{blocked}");
+        let allowed = sanitize_html_with_remote_images(html);
+        assert!(
+            allowed.contains("https://cdn.example.com/hero.png"),
+            "允许后协议相对背景应按 https 提升：{allowed}"
+        );
     }
 
     #[test]

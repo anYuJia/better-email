@@ -26,7 +26,6 @@ export default function AiServiceSettings() {
   const {
     config,
     patchConfig,
-    maskedApiKey,
     testing,
     saving,
     testResult,
@@ -117,15 +116,25 @@ export default function AiServiceSettings() {
                   <input
                     className="settings-text-input"
                     type="password"
-                    placeholder={maskedApiKey || '输入 API Key'}
+                    placeholder={config.hasApiKey ? '已保存 Key，留空保持不变' : '输入 API Key'}
                     value={config.apiKey}
                     onChange={(event) => patchConfig({ apiKey: event.target.value })}
                     autoComplete="off"
                   />
-                  <span className="settings-ai-key-hint">
-                    <KeyRound size={12} aria-hidden="true" />
-                    {maskedApiKey ? '已保存 Key' : '未保存'}
-                  </span>
+                  {config.hasApiKey && !config.apiKey ? (
+                    <button
+                      type="button"
+                      className="settings-text-button"
+                      onClick={() => patchConfig({ clearApiKey: true, hasApiKey: false })}
+                    >
+                      清除已保存 Key
+                    </button>
+                  ) : (
+                    <span className="settings-ai-key-hint">
+                      <KeyRound size={12} aria-hidden="true" />
+                      {config.hasApiKey ? '已保存 Key' : '未保存'}
+                    </span>
+                  )}
                 </div>
               </SettingsField>
 
@@ -229,14 +238,30 @@ export default function AiServiceSettings() {
               </SettingsField>
 
               <SettingsField label="MCP 访问密钥 (可选)">
-                <input
-                  className="settings-text-input"
-                  type="password"
-                  placeholder="设置鉴权 Token (Bearer)"
-                  value={config.mcpApiKey || ''}
-                  onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
-                  autoComplete="off"
-                />
+                <div className="settings-ai-key-row">
+                  <input
+                    className="settings-text-input"
+                    type="password"
+                    placeholder={config.hasMcpApiKey ? '已保存 Token，留空保持不变' : '设置鉴权 Token (Bearer)'}
+                    value={config.mcpApiKey || ''}
+                    onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
+                    autoComplete="off"
+                  />
+                  {config.hasMcpApiKey && !config.mcpApiKey ? (
+                    <button
+                      type="button"
+                      className="settings-text-button"
+                      onClick={() => patchConfig({ clearMcpApiKey: true, hasMcpApiKey: false })}
+                    >
+                      清除已保存 Token
+                    </button>
+                  ) : (
+                    <span className="settings-ai-key-hint">
+                      <KeyRound size={12} aria-hidden="true" />
+                      {config.hasMcpApiKey ? '已保存 Token' : ''}
+                    </span>
+                  )}
+                </div>
               </SettingsField>
             </div>
           )}

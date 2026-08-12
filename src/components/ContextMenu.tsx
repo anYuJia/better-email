@@ -133,6 +133,9 @@ export default function ContextMenu({
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  // Tab 关闭时浏览器已把焦点移到下一个自然目标，不能再把焦点拉回触发元素。
+  const skipFocusRestoreRef = useRef(false);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -151,11 +154,28 @@ export default function ContextMenu({
   useEffect(() => {
     if (initialFocusRef.current) return;
     initialFocusRef.current = true;
+    // 记录打开菜单前的焦点（右键目标或触发按钮），关闭时按规则恢复。
+    skipFocusRestoreRef.current = false;
+    if (document.activeElement instanceof HTMLElement) {
+      previousFocusRef.current = document.activeElement;
+    }
     menuRef.current
       ?.querySelector<HTMLButtonElement>(
         '.context-menu-items > div > button:not(:disabled)',
       )
       ?.focus({ preventScroll: true });
+    return () => {
+      if (skipFocusRestoreRef.current) return;
+      const target = previousFocusRef.current;
+      // 触发元素可能已被卸载：安全降级为不恢复。
+      if (target && target.isConnected && typeof target.focus === 'function') {
+        try {
+          target.focus({ preventScroll: true });
+        } catch {
+          // 忽略不可聚焦的恢复目标。
+        }
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -173,6 +193,7 @@ export default function ContextMenu({
       }
 
       if (event.key === 'Tab') {
+        skipFocusRestoreRef.current = true;
         onClose();
         return;
       }

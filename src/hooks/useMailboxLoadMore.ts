@@ -50,6 +50,9 @@ export default function useMailboxLoadMore({
     if (!loaders) return;
     if (loadingMoreRef.current) return;
     loadingMoreRef.current = true;
+    // 捕获发起时的 mailbox 世代：加载更多期间用户导航到别的视图时，
+    // 慢响应不得把旧文件夹的追加结果写回新视图。
+    const startedRefreshId = mailboxRefreshRef.current;
     setLoadMoreStatus('正在读取本地缓存...');
     try {
       const nextLimit = messageLimit + messagePageSize;
@@ -58,7 +61,7 @@ export default function useMailboxLoadMore({
         query,
         filter,
         accountScope,
-        mailboxRefreshRef.current,
+        startedRefreshId,
         folders,
         nextLimit,
         searchScope,
@@ -85,13 +88,15 @@ export default function useMailboxLoadMore({
         setStatus('正在从服务器同步历史邮件...');
         setLoadMoreStatus('正在从服务器拉取历史邮件...');
         const run = await loaders.syncImapHistoryPage(targetMailbox.account_id);
+        if (startedRefreshId !== mailboxRefreshRef.current) return;
         const meta = await loaders.loadMeta(folderId, accountScope, { mode: 'mailbox' });
+        if (startedRefreshId !== mailboxRefreshRef.current) return;
         const refreshedMessages = await loaders.loadMessagesWithVisibleFallback(
           meta.folderId,
           query,
           filter,
           accountScope,
-          mailboxRefreshRef.current,
+          startedRefreshId,
           meta.folders,
           nextLimit,
           searchScope,

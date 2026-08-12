@@ -42,8 +42,16 @@ pub async fn wait_for_oauth2_callback(
     store: State<'_, MailStore>,
     input: OAuthLocalCallbackInput,
 ) -> MailResult<OAuthCallbackReport> {
-    let payload = oauth::wait_for_local_callback(&input.redirect_uri, input.timeout_seconds)
-        .map_err(crate::db::MailError::Imap)?;
+    // 只接受匹配当前待处理会话 state 的回调：随机探测、错误 state 不会终止监听。
+    let sessions = store.list_oauth_sessions()?;
+    let expected_states = sessions
+        .into_iter()
+        .filter(|session| session.status == "pending")
+        .map(|session| session.state)
+        .collect::<Vec<_>>();
+    let payload =
+        oauth::wait_for_local_callback(&input.redirect_uri, &expected_states, input.timeout_seconds)
+            .map_err(crate::db::MailError::Imap)?;
     store.complete_oauth_callback(&payload.state, &payload.code)
 }
 

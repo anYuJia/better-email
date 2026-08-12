@@ -27,6 +27,8 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
 
   // 从后端本地数据库恢复设置，不回写 localStorage。
   // 后端刻意不把 AI 密钥放入系统凭据库，打开设置页不会触发任何 Keychain 访问。
+  // 后端绝不回传完整密钥：只返回 has_api_key 标志，apiKey 输入框保持空值表示
+  // 「保持现有密钥」，保存时后端会保留已存密钥。
   useEffect(() => {
     let cancelled = false;
     loadAiSettingsFromBackend().then((report) => {
@@ -38,13 +40,15 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
           ? report.service_type
           : 'http',
         endpoint: report.endpoint,
-        apiKey: report.api_key,
+        apiKey: '',
+        hasApiKey: report.has_api_key,
         defaultModel: report.model || current.defaultModel,
         timeoutSeconds: report.timeout_seconds || current.timeoutSeconds,
         privacyAcknowledged: report.privacy_acknowledged,
         mcpEnabled: report.mcp_enabled,
         mcpEndpoint: report.mcp_endpoint || current.mcpEndpoint,
-        mcpApiKey: report.mcp_api_key,
+        mcpApiKey: '',
+        hasMcpApiKey: report.has_mcp_api_key,
       }));
       setSecretsLoaded(true);
     });
@@ -75,6 +79,12 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
     setSaving(true);
     try {
       const message = await saveAiSettingsToBackend(config);
+      // 清除标记只发一次；保存成功后复位，避免 localStorage/下次保存误清。
+      setConfig((current) => ({
+        ...current,
+        clearApiKey: false,
+        clearMcpApiKey: false,
+      }));
       setStatus(message);
       return message;
     } finally {

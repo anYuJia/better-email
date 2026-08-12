@@ -291,6 +291,7 @@ pub async fn sync_imap_headers(
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
     let mut new_messages = 0;
+    let mut new_message_ids = Vec::new();
     let mut synced_accounts = 0;
     let mut failures = Vec::new();
     let mut warnings = Vec::new();
@@ -314,6 +315,7 @@ pub async fn sync_imap_headers(
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
                 new_messages += run.new_messages;
+                new_message_ids.extend(run.new_message_ids);
                 synced_accounts += 1;
                 if run.status.ends_with("_account_partial") {
                     warnings.push(format!("{}: {}", account.email, run.message));
@@ -390,6 +392,7 @@ pub async fn sync_imap_headers(
         scanned_folders,
         imported_messages,
         new_messages,
+        &new_message_ids,
         &message,
     );
     match &result {
@@ -458,6 +461,7 @@ fn sync_pop3_headers_for_account(
             0,
             0,
             0,
+            &[],
             &message,
         );
     }
@@ -497,6 +501,7 @@ fn sync_pop3_headers_for_account(
         1,
         imported_messages,
         imported_messages,
+        &[],
         &message,
     )
 }
@@ -540,6 +545,7 @@ fn sync_imap_headers_for_account(
     let mut scanned_folders = 0;
     let mut imported_messages = 0;
     let mut new_messages = 0;
+    let mut new_message_ids = Vec::new();
     let mut updated_remote_states = 0;
     let mut removed_remote_messages = 0;
     let mut failures = Vec::new();
@@ -593,15 +599,18 @@ fn sync_imap_headers_for_account(
                     BTreeSet::new()
                 };
                 ensure_not_cancelled(store)?;
-                let reconcile = store.reconcile_imap_flag_snapshot(mailbox.id, &fetch.flags);
-                let imported = store.import_imap_headers_batch(mailbox.id, &fetch.headers);
-                match (reconcile, imported) {
-                    (Ok(reconciled), Ok((imported, batch_new_messages))) => {
+                // reconcile 与 import 必须在同一数据库事务内提交：import 失败时
+                // reconcile 的删除/状态变更必须一并回滚，避免部分提交。
+                let synced =
+                    store.sync_imap_mailbox_into_db(mailbox.id, &fetch.flags, &fetch.headers);
+                match synced {
+                    Ok(result) => {
                         scanned_folders += 1;
-                        imported_messages += imported;
-                        new_messages += batch_new_messages;
-                        updated_remote_states += reconciled.updated_messages;
-                        removed_remote_messages += reconciled.removed_messages;
+                        imported_messages += result.imported_messages;
+                        new_messages += result.new_messages;
+                        new_message_ids.extend(result.new_message_ids);
+                        updated_remote_states += result.reconcile.updated_messages;
+                        removed_remote_messages += result.reconcile.removed_messages;
                         match sync_mailbox_bodies(
                             store,
                             account,
@@ -643,7 +652,7 @@ fn sync_imap_headers_for_account(
                             )?;
                         }
                     }
-                    (Err(error), _) | (_, Err(error)) => {
+                    Err(error) => {
                         failures.push(format!("{}: {error}", mailbox.remote_name));
                     }
                 }
@@ -674,6 +683,7 @@ fn sync_imap_headers_for_account(
             0,
             0,
             0,
+            &[],
             &message,
         );
     }
@@ -701,6 +711,7 @@ fn sync_imap_headers_for_account(
             0,
             0,
             0,
+            &[],
             &message,
         )?;
         return Err(crate::db::MailError::Imap(message));
@@ -807,6 +818,7 @@ fn sync_imap_headers_for_account(
         scanned_folders,
         imported_messages,
         new_messages,
+        &new_message_ids,
         &message,
     )
 }

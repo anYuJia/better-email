@@ -245,52 +245,20 @@ impl MailStore {
                     message TEXT NOT NULL DEFAULT ''
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_messages_folder_time ON messages(folder_id, received_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(folder_id, is_read);
-                CREATE INDEX IF NOT EXISTS idx_messages_subject_like ON messages(subject);
-                CREATE INDEX IF NOT EXISTS idx_messages_sender_like ON messages(sender_name, sender_email);
-                CREATE INDEX IF NOT EXISTS idx_messages_recipients_like ON messages(recipients);
-                CREATE INDEX IF NOT EXISTS idx_messages_snippet_like ON messages(snippet);
-                CREATE INDEX IF NOT EXISTS idx_muted_threads_key ON muted_threads(thread_key);
-                CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
-                CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
-                CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
-                CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
-                CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);
-                CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
-                CREATE INDEX IF NOT EXISTS idx_oauth_sessions_account_status ON oauth_sessions(account_id, status, created_at DESC);
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_remote_uid
-                    ON messages(account_id, remote_mailbox, remote_uid)
-                    WHERE remote_uid > 0;
-
-                CREATE VIRTUAL TABLE IF NOT EXISTS message_search USING fts5(
-                    subject, sender_name, sender_email, recipients, snippet, body,
-                    content='messages', content_rowid='id'
+                CREATE TABLE IF NOT EXISTS pending_remote_writes (
+                    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                    kind TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (message_id, kind)
                 );
 
-                CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
-                    INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
-                    VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
-                END;
-                CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
-                    INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
-                    VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
-                END;
-                CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages
-                WHEN old.subject IS NOT new.subject
-                  OR old.sender_name IS NOT new.sender_name
-                  OR old.sender_email IS NOT new.sender_email
-                  OR old.recipients IS NOT new.recipients
-                  OR old.snippet IS NOT new.snippet
-                  OR old.body IS NOT new.body
-                BEGIN
-                    INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
-                    VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
-                    INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
-                    VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
-                END;
+                CREATE TABLE IF NOT EXISTS outbound_attachment_auths (
+                    id INTEGER PRIMARY KEY,
+                    canonical_path TEXT NOT NULL UNIQUE,
+                    size_bytes INTEGER NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 ",
             )?;
 
@@ -528,6 +496,59 @@ impl MailStore {
                 "imap_mailboxes",
                 "history_last_sync_at",
                 "TEXT NOT NULL DEFAULT ''",
+            )?;
+            // 兼容列必须在建索引、触发器与 FTS 外部内容表之前补齐：
+            // 旧库缺 remote_uid/remote_mailbox 等列时，若先建依赖这些列的
+            // 数据库对象会导致启动永久失败。此处统一在列补齐后创建。
+            conn.execute_batch(
+                "
+                CREATE INDEX IF NOT EXISTS idx_messages_folder_time ON messages(folder_id, received_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(folder_id, is_read);
+                CREATE INDEX IF NOT EXISTS idx_messages_subject_like ON messages(subject);
+                CREATE INDEX IF NOT EXISTS idx_messages_sender_like ON messages(sender_name, sender_email);
+                CREATE INDEX IF NOT EXISTS idx_messages_recipients_like ON messages(recipients);
+                CREATE INDEX IF NOT EXISTS idx_messages_snippet_like ON messages(snippet);
+                CREATE INDEX IF NOT EXISTS idx_muted_threads_key ON muted_threads(thread_key);
+                CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
+                CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
+                CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
+                CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+                CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);
+                CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
+                CREATE INDEX IF NOT EXISTS idx_oauth_sessions_account_status ON oauth_sessions(account_id, status, created_at DESC);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_remote_uid
+                    ON messages(account_id, remote_mailbox, remote_uid)
+                    WHERE remote_uid > 0;
+
+                CREATE VIRTUAL TABLE IF NOT EXISTS message_search USING fts5(
+                    subject, sender_name, sender_email, recipients, snippet, body,
+                    content='messages', content_rowid='id'
+                );
+
+                CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+                    INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                    VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
+                END;
+                CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+                    INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                    VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
+                END;
+                CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages
+                WHEN old.subject IS NOT new.subject
+                  OR old.sender_name IS NOT new.sender_name
+                  OR old.sender_email IS NOT new.sender_email
+                  OR old.recipients IS NOT new.recipients
+                  OR old.snippet IS NOT new.snippet
+                  OR old.body IS NOT new.body
+                BEGIN
+                    INSERT INTO message_search(message_search, rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                    VALUES('delete', old.id, old.subject, old.sender_name, old.sender_email, old.recipients, old.snippet, old.body);
+                    INSERT INTO message_search(rowid, subject, sender_name, sender_email, recipients, snippet, body)
+                    VALUES (new.id, new.subject, new.sender_name, new.sender_email, new.recipients, new.snippet, new.body);
+                END;
+                ",
             )?;
             conn.execute(
                 "

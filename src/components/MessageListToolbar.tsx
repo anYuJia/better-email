@@ -23,6 +23,7 @@ import {
   buildMessageSearchEntries,
   buildMessageSearchSuggestions,
 } from './messageListSearchSuggestions';
+import { useDetailsMenu } from '../hooks/useDetailsMenu';
 
 type MessageListToolbarProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -89,6 +90,12 @@ export default function MessageListToolbar({
     () => buildMessageSearchSuggestions(searchEntries, trimmedQuery),
     [searchEntries, trimmedQuery],
   );
+  const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
+  const filterMenuRef = React.useRef<HTMLDetailsElement>(null);
+  const sortMenuRef = React.useRef<HTMLDetailsElement>(null);
+  const searchScopeMenu = useDetailsMenu(searchScopeMenuRef);
+  const filterMenu = useDetailsMenu(filterMenuRef);
+  const sortMenu = useDetailsMenu(sortMenuRef);
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
 
   function clearSearchBlurTimer() {
@@ -165,7 +172,7 @@ export default function MessageListToolbar({
               </div>
             )}
           </form>
-          <details className="compact-menu search-scope-menu">
+          <details className="compact-menu search-scope-menu" ref={searchScopeMenuRef}>
             <summary
               title={`搜索范围：${activeSearchScope.label}`}
               aria-label={`搜索范围：${activeSearchScope.label}`}
@@ -182,7 +189,8 @@ export default function MessageListToolbar({
                   key={item.id}
                   onClick={(event) => {
                     onSearchScopeChange(item.id);
-                    event.currentTarget.closest('details')?.removeAttribute('open');
+                    event.preventDefault();
+                    searchScopeMenu.closeMenu();
                   }}
                 >
                   {item.label}
@@ -224,7 +232,7 @@ export default function MessageListToolbar({
           >
             会话
           </button>
-          <details className="compact-menu filter-menu">
+          <details className="compact-menu filter-menu" ref={filterMenuRef}>
             <summary className={filter !== 'all' ? 'active' : ''}>
               <SlidersHorizontal size={15} />
               <span className="filter-label">{filter === 'all' ? '筛选' : activeFilterLabel}</span>
@@ -235,14 +243,17 @@ export default function MessageListToolbar({
                   type="button"
                   key={item.id}
                   className={filter === item.id ? 'active' : ''}
-                  onClick={() => onFilterChange(item.id)}
+                  onClick={() => {
+                    onFilterChange(item.id);
+                    filterMenu.closeMenu();
+                  }}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
           </details>
-          <details className="compact-menu sort-menu">
+          <details className="compact-menu sort-menu" ref={sortMenuRef}>
             <summary className={listSort !== 'newest' ? 'active' : ''}>
               <ArrowDownUp size={15} />
               <span className="sort-label">{activeSortLabel}</span>
@@ -254,7 +265,10 @@ export default function MessageListToolbar({
                   type="button"
                   key={item.id}
                   className={listSort === item.id ? 'active' : ''}
-                  onClick={() => onSortChange(item.id)}
+                  onClick={() => {
+                    onSortChange(item.id);
+                    sortMenu.closeMenu();
+                  }}
                 >
                   {item.label}
                 </button>

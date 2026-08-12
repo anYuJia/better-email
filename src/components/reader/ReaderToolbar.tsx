@@ -17,6 +17,8 @@ import { movableFoldersForMessage } from '../../app/appConfig';
 import { canSnoozeRole } from '../../app/snooze';
 import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
+import { useDetailsMenu } from '../../hooks/useDetailsMenu';
+import { useRef } from 'react';
 
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
@@ -87,6 +89,8 @@ export default function ReaderToolbar({
 }: ReaderToolbarProps) {
   const isDraft = selected.folder_role === 'drafts';
   const isTrash = selected.folder_role === 'trash';
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const moreMenu = useDetailsMenu(moreMenuRef);
 
   return (
     <header className="reader-header">
@@ -161,11 +165,11 @@ export default function ReaderToolbar({
             </button>
           )}
         </div>
-        <details className="reader-more-menu compact-menu">
+        <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
             <MoreHorizontal size={17} />
           </summary>
-          <div>
+          <div onClick={() => moreMenu.closeMenu()}>
             <span className="menu-section-title">整理</span>
             {selected.folder_role === 'snoozed' ? (
               <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>

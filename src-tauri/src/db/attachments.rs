@@ -55,6 +55,59 @@ impl MailStore {
             .join("attachments")
             .join(message_id.to_string())
     }
+
+    /// 应用受管理的附件根目录（所有已下载附件文件的合法位置）。
+    pub fn attachment_root(&self) -> PathBuf {
+        self.data_dir.join("attachments")
+    }
+
+    /// 记录一次发件附件授权：只有经过 Rust 端校验（canonicalize + 常规文件 +
+    /// 大小限制）的路径才会登记，发送时再次按 canonical path + size 校验。
+    pub fn register_outbound_attachment_auth(
+        &self,
+        canonical_path: &str,
+        size_bytes: i64,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT OR IGNORE INTO outbound_attachment_auths(canonical_path, size_bytes, created_at)
+                 VALUES (?1, ?2, ?3)",
+                params![canonical_path, size_bytes, Utc::now().to_rfc3339()],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// 校验发件附件是否已授权且路径/大小与授权一致。
+    pub fn is_outbound_attachment_authorized(
+        &self,
+        canonical_path: &str,
+        size_bytes: i64,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            let exists: Option<i64> = conn
+                .query_row(
+                    "SELECT 1 FROM outbound_attachment_auths
+                     WHERE canonical_path = ?1 AND size_bytes = ?2 LIMIT 1",
+                    params![canonical_path, size_bytes],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            Ok(exists.is_some())
+        })
+    }
+
+    /// 清理过期的发件附件授权记录（超过 max_age_days），避免无界增长。
+    pub fn cleanup_outbound_attachment_auths(&self, max_age_days: i64) -> MailResult<usize> {
+        self.with_conn(|conn| {
+            let cutoff = (Utc::now() - chrono::Duration::days(max_age_days)).to_rfc3339();
+            let removed = conn.execute(
+                "DELETE FROM outbound_attachment_auths WHERE created_at < ?1",
+                params![cutoff],
+            )?;
+            Ok(removed)
+        })
+    }
     pub fn storage_usage(&self) -> MailResult<StorageUsage> {
         let attachment_root = self.data_dir.join("attachments");
         let (protected_paths, reclaimable_rows) = self.attachment_storage_index()?;

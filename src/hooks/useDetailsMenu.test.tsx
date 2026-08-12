@@ -1,0 +1,71 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { useRef } from 'react';
+import { useDetailsMenu } from './useDetailsMenu';
+
+afterEach(() => {
+  cleanup();
+});
+
+function MenuHarness({ onCommand }: { onCommand?: () => void }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  const menu = useDetailsMenu(ref);
+  return (
+    <div>
+      <details ref={ref}>
+        <summary>菜单</summary>
+        <div>
+          <button type="button" onClick={() => { onCommand?.(); menu.closeMenu(); }}>命令A</button>
+          <button type="button">命令B</button>
+        </div>
+      </details>
+      <button type="button">外部按钮</button>
+    </div>
+  );
+}
+
+function openDetails() {
+  const summary = document.querySelector('summary') as HTMLElement;
+  const details = document.querySelector('details') as HTMLElement;
+  fireEvent.click(summary);
+  details.setAttribute('open', '');
+  return { summary, details };
+}
+
+describe('useDetailsMenu', () => {
+  it('closes a single-command menu after the command is selected', () => {
+    const onCommand = vi.fn();
+    render(<MenuHarness onCommand={onCommand} />);
+    const { details } = openDetails();
+    expect(details.hasAttribute('open')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '命令A' }));
+    expect(onCommand).toHaveBeenCalled();
+    expect(details.hasAttribute('open')).toBe(false);
+  });
+
+  it('closes on outside pointerdown and restores summary focus', () => {
+    render(<MenuHarness />);
+    const { summary, details } = openDetails();
+    expect(details.hasAttribute('open')).toBe(true);
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: '外部按钮' }));
+    expect(details.hasAttribute('open')).toBe(false);
+    expect(document.activeElement).toBe(summary);
+  });
+
+  it('closes on Escape from within the menu', () => {
+    render(<MenuHarness />);
+    const { details } = openDetails();
+    const command = screen.getByRole('button', { name: '命令B' });
+    command.focus();
+    fireEvent.keyDown(command, { key: 'Escape' });
+    expect(details.hasAttribute('open')).toBe(false);
+  });
+
+  it('does not close when Escape fires outside the menu', () => {
+    render(<MenuHarness />);
+    const { details } = openDetails();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(details.hasAttribute('open')).toBe(true);
+  });
+});

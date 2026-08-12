@@ -169,18 +169,7 @@ fn build_body_part(message: &OutboundMessage, html_uses_cid: bool) -> Result<Mul
 }
 
 fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
-    if attachment.local_path.trim().is_empty() {
-        return Err(MailError::Smtp(format!(
-            "内嵌图片缺少本地路径，无法发送：{}",
-            attachment.filename
-        )));
-    }
-    let bytes = fs::read(&attachment.local_path).map_err(|error| {
-        MailError::Smtp(format!(
-            "读取内嵌图片失败 {}：{error}",
-            attachment.local_path
-        ))
-    })?;
+    let bytes = read_attachment_bytes(attachment)?;
     let content_type = ContentType::parse(&attachment.mime_type)
         .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
     Ok(SinglePart::builder()
@@ -193,18 +182,43 @@ fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailErr
 }
 
 fn attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
-    if attachment.local_path.trim().is_empty() {
+    let bytes = read_attachment_bytes(attachment)?;
+    let content_type = ContentType::parse(&attachment.mime_type)
+        .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
+    Ok(lettre::message::Attachment::new(attachment.filename.clone()).body(bytes, content_type))
+}
+
+/// 读取发件附件前的最终校验：canonicalize 解析符号链接，要求仍是常规文件且
+/// 大小与预期一致（拦截授权后到读取之间的 symlink/文件替换 TOCTOU）。
+fn read_attachment_bytes(attachment: &Attachment) -> Result<Vec<u8>, MailError> {
+    let path = &attachment.local_path;
+    if path.trim().is_empty() {
         return Err(MailError::Smtp(format!(
             "附件缺少本地路径，无法发送：{}",
             attachment.filename
         )));
     }
-    let bytes = fs::read(&attachment.local_path).map_err(|error| {
-        MailError::Smtp(format!("读取附件失败 {}：{error}", attachment.local_path))
+    let canonical = std::fs::canonicalize(path).map_err(|error| {
+        MailError::Smtp(format!("附件路径无法解析 {path}：{error}"))
     })?;
-    let content_type = ContentType::parse(&attachment.mime_type)
-        .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
-    Ok(lettre::message::Attachment::new(attachment.filename.clone()).body(bytes, content_type))
+    let metadata = std::fs::metadata(&canonical).map_err(|error| {
+        MailError::Smtp(format!("附件元数据读取失败 {path}：{error}"))
+    })?;
+    if !metadata.is_file() {
+        return Err(MailError::Smtp(format!(
+            "附件不再是常规文件，已拒绝发送：{path}"
+        )));
+    }
+    let size = metadata.len().min(i64::MAX as u64) as i64;
+    if attachment.size_bytes > 0 && size != attachment.size_bytes {
+        return Err(MailError::Smtp(format!(
+            "附件大小与预期不一致（{size} 字节 ≠ {} 字节），可能已被替换，已拒绝发送：{path}",
+            attachment.size_bytes
+        )));
+    }
+    fs::read(&canonical).map_err(|error| {
+        MailError::Smtp(format!("读取附件失败 {path}：{error}"))
+    })
 }
 
 fn smtp_transport(host: &str, port: u16) -> Result<SmtpTransportBuilder, MailError> {
@@ -521,7 +535,7 @@ mod tests {
                     message_id: 11,
                     filename: "inline.png".to_string(),
                     mime_type: "image/png".to_string(),
-                    size_bytes: 16,
+                    size_bytes: 14,
                     is_downloaded: true,
                     local_path: path.to_string_lossy().to_string(),
                     content_id: "inline-1@better-email.local".to_string(),
@@ -532,7 +546,7 @@ mod tests {
                     message_id: 11,
                     filename: "notes.txt".to_string(),
                     mime_type: "text/plain".to_string(),
-                    size_bytes: 15,
+                    size_bytes: 14,
                     is_downloaded: true,
                     local_path: path.to_string_lossy().to_string(),
                     content_id: String::new(),
@@ -587,7 +601,7 @@ mod tests {
                 message_id: 12,
                 filename: "unused.png".to_string(),
                 mime_type: "image/png".to_string(),
-                size_bytes: 16,
+                size_bytes: 14,
                 is_downloaded: true,
                 local_path: path.to_string_lossy().to_string(),
                 content_id: "unused@better-email.local".to_string(),

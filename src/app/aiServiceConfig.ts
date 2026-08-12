@@ -29,19 +29,22 @@ export type AiSettingsInput = {
   mcp_enabled: boolean;
   mcp_endpoint: string;
   mcp_api_key: string;
+  clear_api_key: boolean;
+  clear_mcp_api_key: boolean;
 };
 
+/** 后端返回的 AI 设置报告：绝不含完整密钥，只有「是否已配置」标志。 */
 export type AiSettingsReport = {
   enabled: boolean;
   service_type: string;
   endpoint: string;
-  api_key: string;
+  has_api_key: boolean;
   model: string;
   timeout_seconds: number;
   privacy_acknowledged: boolean;
   mcp_enabled: boolean;
   mcp_endpoint: string;
-  mcp_api_key: string;
+  has_mcp_api_key: boolean;
 };
 
 /** 从后端读取 AI 设置（密钥只保存在应用本地数据库，不落 localStorage）。 */
@@ -60,6 +63,7 @@ export async function saveAiSettingsToBackend(config: AiServiceConfig): Promise<
     enabled: config.enabled,
     service_type: config.serviceType,
     endpoint: config.endpoint.trim(),
+    // 空值表示「保持现有密钥」；只有用户显式点击清除才删除。
     api_key: config.apiKey,
     model: config.defaultModel.trim() || 'gpt-4o-mini',
     timeout_seconds: config.timeoutSeconds,
@@ -67,14 +71,18 @@ export async function saveAiSettingsToBackend(config: AiServiceConfig): Promise<
     mcp_enabled: config.mcpEnabled === true,
     mcp_endpoint: (config.mcpEndpoint ?? '').trim(),
     mcp_api_key: config.mcpApiKey ?? '',
+    clear_api_key: config.clearApiKey === true,
+    clear_mcp_api_key: config.clearMcpApiKey === true,
   };
   return invoke<string>(IPC.SaveAiSettings, { input });
 }
 
 function stripSecrets(config: AiServiceConfig): Partial<AiServiceConfig> {
-  const { apiKey, mcpApiKey, ...rest } = config;
+  const { apiKey, mcpApiKey, clearApiKey, clearMcpApiKey, ...rest } = config;
   void apiKey;
   void mcpApiKey;
+  void clearApiKey;
+  void clearMcpApiKey;
   return rest;
 }
 

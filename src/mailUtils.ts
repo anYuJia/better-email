@@ -147,12 +147,28 @@ export type PreviewableMailboxMessage = {
   snippet: string;
 };
 
-// 缓存已计算过预览的邮件 id -> preview 映射关系
-const mailboxPreviewCache = new Map<number, string>();
+// 预览缓存：键为 message id，值为「预览文本 + 输入来源指纹」。
+// 指纹覆盖所有影响预览的输入（body/sanitized_html/snippet），内容变化时
+// 旧缓存自动失效，避免 header-only 阶段缓存空预览后正文到达仍返回旧值。
+const mailboxPreviewCache = new Map<number, { preview: string; sourceKey: string }>();
+
+function previewSourceKey(message: PreviewableMailboxMessage): string {
+  const separator = String.fromCharCode(0);
+  const source = `${message.body ?? ''}${separator}${message.sanitized_html ?? ''}${separator}${message.snippet}`;
+  let hash = 5381;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash << 5) + hash + source.charCodeAt(i)) >>> 0;
+  }
+  return `${source.length}:${hash}`;
+}
 
 export function mailboxListPreview(message: PreviewableMailboxMessage): string {
-  if (message.id !== undefined && mailboxPreviewCache.has(message.id)) {
-    return mailboxPreviewCache.get(message.id)!;
+  const messageId = message.id;
+  const hasStableKey = messageId !== undefined;
+  const sourceKey = previewSourceKey(message);
+  const cached = hasStableKey ? mailboxPreviewCache.get(messageId) : undefined;
+  if (cached && cached.sourceKey === sourceKey) {
+    return cached.preview;
   }
 
   const calculatePreview = () => {
@@ -167,14 +183,20 @@ export function mailboxListPreview(message: PreviewableMailboxMessage): string {
 
   const preview = calculatePreview();
 
-  if (message.id !== undefined) {
-    if (!mailboxPreviewCache.has(message.id) && mailboxPreviewCache.size >= 1000) {
-      const firstKey = mailboxPreviewCache.keys().next().value;
-      if (firstKey !== undefined) {
-        mailboxPreviewCache.delete(firstKey);
+  // 不缓存 header-only 空结果：正文到达后会重新计算，避免旧空预览长期残留。
+  if (messageId !== undefined) {
+    if (preview) {
+      if (!mailboxPreviewCache.has(messageId) && mailboxPreviewCache.size >= 1000) {
+        const firstKey = mailboxPreviewCache.keys().next().value;
+        if (firstKey !== undefined) {
+          mailboxPreviewCache.delete(firstKey);
+        }
       }
+      mailboxPreviewCache.set(messageId, { preview, sourceKey });
+    } else if (cached) {
+      // 内容变化后重算为空（如正文仍缺）：移除不再匹配的旧缓存。
+      mailboxPreviewCache.delete(messageId);
     }
-    mailboxPreviewCache.set(message.id, preview);
   }
 
   return preview;
@@ -465,9 +487,11 @@ export function htmlHasRenderableContent(html: string): boolean {
 }
 
 export function htmlHasRemoteVisualContent(html: string): boolean {
-  return /<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?https?:\/\//i.test(html)
-    || /\bbackground\s*=\s*['"]?https?:\/\//i.test(html)
-    || /\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?https?:\/\//i.test(html);
+  // 覆盖 http(s):// 与协议相对 //host/path 远程图片来源。
+  const remoteSource = String.raw`(?:https?:)?//`;
+  return new RegExp(String.raw`<(?:img|source)\b[^>]*\bsrc\s*=\s*['"]?${remoteSource}`, 'i').test(html)
+    || new RegExp(String.raw`\bbackground\s*=\s*['"]?${remoteSource}`, 'i').test(html)
+    || new RegExp(String.raw`\bbackground(?:-image)?\s*:[^;>]*url\(\s*['"]?${remoteSource}`, 'i').test(html);
 }
 
 export type MailtoParsed = {

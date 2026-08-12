@@ -15,6 +15,18 @@ const mockAiSettingsState = {
   mcp_api_key: '',
 };
 
+// mock 模式同样不回传完整密钥：load 只返回 has_api_key/has_mcp_api_key。
+function mockAiSettingsReport() {
+  const { api_key, mcp_api_key, ...rest } = mockAiSettingsState;
+  void api_key;
+  void mcp_api_key;
+  return {
+    ...rest,
+    has_api_key: Boolean(mockAiSettingsState.api_key),
+    has_mcp_api_key: Boolean(mockAiSettingsState.mcp_api_key),
+  };
+}
+
 // 应用全局「默认附件下载位置」：空字符串表示未自定义（使用系统默认）。
 const mockAppSettingsState = {
   default_download_dir: '',
@@ -40,21 +52,30 @@ export const handlers: Record<string, MockCommandHandler> = {
   'save_ai_settings': (args) => {
     const input = args?.input as Record<string, unknown> | undefined;
     if (!input) throw new Error('缺少 AI 设置输入。');
+    // 与 Rust 后端一致：空 api_key 保持现有，clear_*_api_key 显式删除。
+    const incomingKey = String(input.api_key ?? '');
+    const incomingMcpKey = String(input.mcp_api_key ?? '');
+    const api_key = input.clear_api_key === true
+      ? ''
+      : incomingKey || mockAiSettingsState.api_key;
+    const mcp_api_key = input.clear_mcp_api_key === true
+      ? ''
+      : incomingMcpKey || mockAiSettingsState.mcp_api_key;
     Object.assign(mockAiSettingsState, {
       enabled: Boolean(input.enabled),
       service_type: String(input.service_type ?? 'http'),
       endpoint: String(input.endpoint ?? ''),
-      api_key: String(input.api_key ?? ''),
+      api_key,
       model: String(input.model ?? 'gpt-4o-mini'),
       timeout_seconds: Number(input.timeout_seconds ?? 30),
       privacy_acknowledged: Boolean(input.privacy_acknowledged),
       mcp_enabled: Boolean(input.mcp_enabled),
       mcp_endpoint: String(input.mcp_endpoint ?? ''),
-      mcp_api_key: String(input.mcp_api_key ?? ''),
+      mcp_api_key,
     });
     return 'AI 服务设置已保存。';
   },
-  'load_ai_settings': () => ({ ...mockAiSettingsState }),
+  'load_ai_settings': () => mockAiSettingsReport(),
   'get_app_settings': () => mockAppSettingsReport(),
   'set_download_dir': (args) => {
     if (args?.cancel === true) {

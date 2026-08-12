@@ -129,4 +129,33 @@ describe('AccountRemovalPanel', () => {
     expect(screen.queryByRole('button', { name: '永久移除' })).toBeNull();
     expect(screen.getByText('当前没有可移除的账号。')).not.toBeNull();
   });
+
+  it('Escape closes only the nested dialog, not a parent settings window listener', () => {
+    // 模拟 SettingsFrame 的 window 级 Escape 监听：嵌套对话框必须在 document
+    // 冒泡阶段 stopPropagation，使父设置页不被一起关闭。
+    const settingsClose = vi.fn();
+    const windowHandler = () => settingsClose();
+    window.addEventListener('keydown', windowHandler);
+    try {
+      render(
+        <AccountRemovalPanel
+          account={makeAccount()}
+          accountCount={2}
+          onRemove={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
+      const trigger = screen.getByRole('button', { name: '移除账号' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      expect(document.querySelector('[data-account-remove-dialog]')).not.toBeNull();
+
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(document.querySelector('[data-account-remove-dialog]')).toBeNull();
+      expect(settingsClose).not.toHaveBeenCalled();
+      // 焦点应回到打开嵌套框的触发按钮。
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      window.removeEventListener('keydown', windowHandler);
+    }
+  });
 });

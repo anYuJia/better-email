@@ -10,6 +10,7 @@ mod oauth;
 mod pop3_probe;
 mod protocol;
 mod provider_probe;
+mod secret_crypto;
 mod smtp;
 mod vcard;
 
@@ -320,6 +321,8 @@ pub fn run() {
             commands::list_thread_messages,
             commands::set_threads_muted,
             commands::list_muted_thread_keys,
+            commands::list_pending_remote_writes,
+            commands::list_messages_by_ids,
             commands::list_attachments,
             commands::read_attachment_data_url,
             commands::save_image_data_url_as,

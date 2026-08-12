@@ -95,6 +95,13 @@ export default function useMailboxSearchController({
   const searchClearTimerRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  // 搜索/范围/筛选/排序/清空都生成独立请求 token：自增 mailbox 世代后返回新值，
+  // 使上一轮搜索的在途慢响应因 refreshId 不再匹配而失效，避免旧结果覆盖新结果。
+  const nextSearchRefreshId = useCallback(() => {
+    mailboxRefreshRef.current += 1;
+    return mailboxRefreshRef.current;
+  }, [mailboxRefreshRef]);
+
   useEffect(() => {
     window.localStorage.setItem(listSortStorageKey, listSort);
   }, [listSort]);
@@ -139,7 +146,7 @@ export default function useMailboxSearchController({
       query,
       filter,
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       folders,
       messagePageSize,
       searchScope,
@@ -152,7 +159,7 @@ export default function useMailboxSearchController({
     query,
     filter,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     folders,
     searchScope,
     listMode,
@@ -171,7 +178,7 @@ export default function useMailboxSearchController({
       query,
       filter,
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       folders,
       messagePageSize,
       nextScope,
@@ -185,7 +192,7 @@ export default function useMailboxSearchController({
     query,
     filter,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     folders,
     setActiveThread,
     setThreadMessages,
@@ -207,7 +214,7 @@ export default function useMailboxSearchController({
       nextQuery,
       filter,
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       folders,
       messagePageSize,
       searchScope,
@@ -226,7 +233,7 @@ export default function useMailboxSearchController({
     folderId,
     filter,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     folders,
     searchScope,
     setActiveThread,
@@ -247,7 +254,7 @@ export default function useMailboxSearchController({
       '',
       'all',
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       folders,
       messagePageSize,
       'folder',
@@ -258,7 +265,7 @@ export default function useMailboxSearchController({
     loadersRef,
     folderId,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     folders,
     listMode,
     setActiveThread,
@@ -281,7 +288,7 @@ export default function useMailboxSearchController({
       savedSearch.query,
       savedSearch.filter,
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       messagePageSize,
       savedSearch.scope,
       false,
@@ -291,7 +298,7 @@ export default function useMailboxSearchController({
     loadersRef,
     folderId,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     messagePageSize,
     setActiveThread,
     setThreadMessages,
@@ -321,7 +328,7 @@ export default function useMailboxSearchController({
           '',
           filter,
           accountScope,
-          mailboxRefreshRef.current,
+          nextSearchRefreshId(),
           folders,
           messagePageSize,
           searchScope,
@@ -329,7 +336,7 @@ export default function useMailboxSearchController({
         ).catch((error) => setStatus(String(error)));
       }, 100);
     }
-  }, [loadersRef, folderId, filter, accountScope, mailboxRefreshRef, folders, searchScope, setStatus]);
+  }, [loadersRef, folderId, filter, accountScope, nextSearchRefreshId, folders, searchScope, setStatus]);
 
   const handleSearchScopeChange = useCallback((nextScope: SearchScope) => {
     changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
@@ -349,6 +356,19 @@ export default function useMailboxSearchController({
     setThreadMessages([]);
   }, [setActiveThread, setThreadMessages]);
 
+  // 排序变更也是视图刷新：先自增世代使在途旧请求失效，再应用新排序并触发加载。
+  const changeListSort = useCallback((nextSort: ListSort) => {
+    mailboxRefreshRef.current += 1;
+    setListSort(nextSort);
+  }, [mailboxRefreshRef]);
+
+  // 筛选变更同样生成独立请求 token：快速连续切换筛选时，旧筛选的在途响应
+  // 不得覆盖新筛选的结果。兼容 Dispatch 语义（接受新值或更新函数）。
+  const changeFilter = useCallback((nextFilter: SetStateAction<FilterMode>) => {
+    mailboxRefreshRef.current += 1;
+    setFilter(nextFilter);
+  }, [mailboxRefreshRef]);
+
   const handleShowThreads = useCallback(() => {
     const loaders = loadersRef.current;
     if (!loaders) return;
@@ -358,7 +378,7 @@ export default function useMailboxSearchController({
       query,
       filter,
       accountScope,
-      mailboxRefreshRef.current,
+      nextSearchRefreshId(),
       folders,
       messageLimit,
       searchScope,
@@ -370,7 +390,7 @@ export default function useMailboxSearchController({
     query,
     filter,
     accountScope,
-    mailboxRefreshRef,
+    nextSearchRefreshId,
     folders,
     messageLimit,
     searchScope,
@@ -383,11 +403,11 @@ export default function useMailboxSearchController({
     searchScope,
     setSearchScope,
     filter,
-    setFilter,
+    setFilter: changeFilter,
     listMode,
     setListMode,
     listSort,
-    setListSort,
+    setListSort: changeListSort,
     savedSearches,
     setSavedSearches,
     savedSearchName,

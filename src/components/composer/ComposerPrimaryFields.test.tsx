@@ -149,7 +149,7 @@ describe('ComposerPrimaryFields', () => {
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada.wu@example.com' });
   });
 
-  it('shows four matches and cycles the active contact with Tab and arrow keys', () => {
+  it('shows four matches and navigates with arrow keys, while Tab leaves the field', () => {
     const contacts = Array.from({ length: 5 }, (_, index) => ({
       ...ada,
       id: index + 10,
@@ -167,15 +167,19 @@ describe('ComposerPrimaryFields', () => {
     expect(options).toHaveLength(4);
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
-    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(false);
+    // Tab 不再被拦截循环建议：事件默认行为不被阻止，浏览器可正常离开字段；
+    // 高亮保持不变。
+    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(true);
+    expect(options[0].getAttribute('aria-selected')).toBe('true');
+
+    // 建议导航只由 ArrowUp/ArrowDown 驱动。
+    fireEvent.keyDown(recipient, { key: 'ArrowDown' });
     expect(options[1].getAttribute('aria-selected')).toBe('true');
+
+    fireEvent.keyDown(recipient, { key: 'ArrowUp' });
+    expect(options[0].getAttribute('aria-selected')).toBe('true');
 
     fireEvent.keyDown(recipient, { key: 'ArrowDown' });
-    expect(options[2].getAttribute('aria-selected')).toBe('true');
-
-    expect(fireEvent.keyDown(recipient, { key: 'Tab', shiftKey: true })).toBe(false);
-    expect(options[1].getAttribute('aria-selected')).toBe('true');
-
     fireEvent.keyDown(recipient, { key: 'Enter' });
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'wang2@example.com' });
   });

@@ -216,4 +216,75 @@ describe('useMailboxData request guard', () => {
     expect(setters.setSelectedId).not.toHaveBeenCalled();
     expect(setters.setSelectedMessageIds).not.toHaveBeenCalled();
   });
+
+  it('does not let an older search response overwrite a newer search result', async () => {
+    const firstSearchResponse = deferred<MessageSummary[]>();
+    const secondSearchResponse = deferred<MessageSummary[]>();
+    mockInvoke
+      .mockImplementationOnce((() => firstSearchResponse.promise) as never)
+      .mockImplementationOnce((() => secondSearchResponse.promise) as never);
+    const mailboxRefreshRef = { current: 10 };
+    const setters = {
+      setMessages: vi.fn(),
+      setThreads: vi.fn(),
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      ...setters,
+    }));
+
+    // 搜索 A（refreshId=11）慢、搜索 B（refreshId=12）快。
+    let searchA!: Promise<MessageSummary[]>;
+    let searchB!: Promise<MessageSummary[]>;
+    await act(async () => {
+      searchA = result.current.loadMessages(101, 'alpha', 'all', 1, 11, undefined, 'folder', false);
+      await Promise.resolve();
+    });
+    mailboxRefreshRef.current = 12;
+    await act(async () => {
+      searchB = result.current.loadMessages(101, 'beta', 'all', 1, 12, undefined, 'folder', false);
+      await Promise.resolve();
+    });
+
+    // B 先返回并提交。
+    await act(async () => {
+      secondSearchResponse.resolve([{ id: 2, subject: 'beta' } as MessageSummary]);
+      await searchB;
+    });
+    expect(setters.setMessages).toHaveBeenCalledWith([{ id: 2, subject: 'beta' }]);
+
+    // A 后返回：refreshId 已是 12，A 的 11 不再新鲜，不得覆盖 B。
+    setters.setMessages.mockClear();
+    setters.setHasMoreMessages.mockClear();
+    setters.setSelectedId.mockClear();
+    setters.setSelectedMessageIds.mockClear();
+    setters.setThreads.mockClear();
+    await act(async () => {
+      firstSearchResponse.resolve([{ id: 1, subject: 'alpha' } as MessageSummary]);
+      await searchA;
+    });
+    expect(setters.setMessages).not.toHaveBeenCalled();
+    expect(setters.setHasMoreMessages).not.toHaveBeenCalled();
+    expect(setters.setSelectedId).not.toHaveBeenCalled();
+    expect(setters.setSelectedMessageIds).not.toHaveBeenCalled();
+    expect(setters.setThreads).not.toHaveBeenCalled();
+  });
 });

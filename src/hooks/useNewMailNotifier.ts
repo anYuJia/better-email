@@ -27,9 +27,26 @@ export default function useNewMailNotifier({
   setNotificationStatus,
 }: NewMailNotifierOptions) {
   const notifyNewMail = useCallback(async (run: SyncRun, latestMessages?: MessageSummary[]) => {
-    const currentMessages = getCurrentMessages();
-    const candidates = (latestMessages ?? currentMessages)
-      .slice(0, Math.max(0, run.new_messages ?? run.imported_messages));
+    // 通知候选优先使用本次同步真正新增的消息 id（Rust 返回），不依赖当前 UI 列表：
+    // 用户在归档/搜索/自定义排序/非收件箱视图时，仍只通知本次真正的新邮件。
+    let candidates: MessageSummary[] = [];
+    const newIds = run.new_message_ids ?? [];
+    if (newIds.length > 0) {
+      try {
+        const newMessages = await invoke<MessageSummary[]>(IPC.ListMessagesByIds, {
+          messageIds: newIds,
+        });
+        candidates = newMessages;
+      } catch {
+        // 查询失败降级：回退到可见列表顶部（仅影响通知正文，不阻塞同步）。
+        setNotificationStatus('新邮件详情读取失败');
+      }
+    }
+    if (candidates.length === 0) {
+      const currentMessages = getCurrentMessages();
+      candidates = (latestMessages ?? currentMessages)
+        .slice(0, Math.max(0, run.new_messages ?? run.imported_messages));
+    }
     const accountIds = [...new Set(
       candidates
         .map((message) => message.account_id)
@@ -37,20 +54,26 @@ export default function useNewMailNotifier({
     )];
     const mutedThreadScopes = (
       await Promise.all(accountIds.map(async (accountId) => {
-        const threadKeys = await invoke<string[]>(IPC.ListMutedThreadKeys, { accountId });
-        return threadKeys.map((threadKey) => notificationThreadScopeKey({
-          account_id: accountId,
-          thread_key: threadKey,
-          sender_email: '',
-          sender_name: '',
-          subject: '',
-        }));
+        // 单个账号静音查询失败不得产生未处理 rejection：降级为「无静音会话」。
+        try {
+          const threadKeys = await invoke<string[]>(IPC.ListMutedThreadKeys, { accountId });
+          return threadKeys.map((threadKey) => notificationThreadScopeKey({
+            account_id: accountId,
+            thread_key: threadKey,
+            sender_email: '',
+            sender_name: '',
+            subject: '',
+          }));
+        } catch {
+          setNotificationStatus('静音会话查询失败，已按未静音处理');
+          return [];
+        }
       }))
     ).flat();
     const decision = newMailNotificationDecision(
       run,
       notificationPolicy,
-      latestMessages ?? currentMessages,
+      candidates,
       new Date(),
       mutedThreadScopes,
     );

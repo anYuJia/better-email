@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import type { Account } from '../../app/types';
 import { formatInvokeError } from '../../app/accountConnectionFlows';
@@ -22,6 +22,9 @@ export default function AccountRemovalPanel({
   const [deleteSecret, setDeleteSecret] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  // 打开嵌套框时记录触发元素，关闭后恢复焦点（比 effect 里读 document.activeElement
+  // 更可靠，不受渲染时序影响）。
+  const triggerFocusRef = useRef<Element | null>(null);
   const canRemove = accountCount > 0;
   const confirmationMatches = confirmation.trim().toLowerCase() === account.email.trim().toLowerCase();
   const confirmationMismatch = !confirmationMatches && confirmation.trim().length > 0;
@@ -38,10 +41,21 @@ export default function AccountRemovalPanel({
     if (embedded) return undefined;
     if (!dialogOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !pending) setDialogOpen(false);
+      if (event.key === 'Escape' && !pending) {
+        // document 冒泡阶段在 window 之前：stopPropagation 后 SettingsFrame 的
+        // window 级 Escape 不会把整个设置页一起关闭，本嵌套对话框拥有第一个 Escape。
+        event.stopPropagation();
+        event.preventDefault();
+        setDialogOpen(false);
+        // 关闭后焦点回到打开嵌套框的触发按钮。
+        const target = triggerFocusRef.current;
+        if (target instanceof HTMLElement && target.isConnected) {
+          target.focus();
+        }
+      }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [dialogOpen, embedded, pending]);
 
   async function handleRemove() {
@@ -149,6 +163,7 @@ export default function AccountRemovalPanel({
             disabled={!canRemove}
             data-account-remove-trigger
             onClick={() => {
+              triggerFocusRef.current = document.activeElement;
               setConfirmation('');
               setError('');
               setDialogOpen(true);

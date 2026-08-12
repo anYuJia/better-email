@@ -28,11 +28,16 @@ type UseMailboxNavigationOptions = {
   providerWriteValidationStatus: { sentMessageId: number | null; receivedMessageId: number | null } | null;
   mailboxRefreshRef: MutableRefObject<number>;
   skipNextFolderEffectLoadRef: MutableRefObject<boolean>;
+  /** 导航动作认领的账号 scope；accountScope effect 读到匹配值时跳过 refreshMailbox。 */
+  navigationScopeClaimRef: MutableRefObject<AccountScope | null>;
   resetSearch: () => void;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
-    options?: { mode?: 'mailbox' | 'full' },
+    options?: {
+      mode?: 'mailbox' | 'full';
+      mailboxRequest?: { id: number; scope: AccountScope };
+    },
   ) => Promise<{ folderId: number | null; folders: Folder[] }>;
   loadMessages: MailboxDataController['loadMessages'];
   loadMessagesWithVisibleFallback: MailboxDataController['loadMessagesWithVisibleFallback'];
@@ -71,6 +76,7 @@ export default function useMailboxNavigation({
   providerWriteValidationStatus,
   mailboxRefreshRef,
   skipNextFolderEffectLoadRef,
+  navigationScopeClaimRef,
   resetSearch,
   loadMeta,
   loadMessages,
@@ -113,6 +119,11 @@ export default function useMailboxNavigation({
   const locateProviderWriteValidation = useCallback(async (role: 'sent' | 'inbox') => {
     if (!accountForm || !activeValidationId) return;
     const targetAccountId = accountForm.id;
+    const scopeChanging = accountScope !== targetAccountId;
+    if (scopeChanging) {
+      // 认领该 scope：accountScope effect 跳过 refreshMailbox，由本导航驱动加载。
+      navigationScopeClaimRef.current = targetAccountId;
+    }
     setAccountScope(targetAccountId);
     setQuery(activeValidationId);
     setFilter('all');
@@ -120,43 +131,63 @@ export default function useMailboxNavigation({
     setActiveThread(null);
     setThreadMessages([]);
     setSettingsOpen(false);
-    const meta = await loadMeta(null, targetAccountId, { mode: 'mailbox' });
-    const targetFolder =
-      meta.folders.find((folder) => folder.account_id === targetAccountId && folder.role === role) ??
-      meta.folders.find((folder) => folder.role === role);
-    if (!targetFolder) {
-      setStatus(`当前账号没有可用的${role === 'sent' ? '已发送' : '收件箱'}目录`);
-      return;
+    // 自行递增 mailbox 世代：使在途旧刷新失效；用户进一步导航则放弃提交。
+    mailboxRefreshRef.current += 1;
+    const startedRefreshId = mailboxRefreshRef.current;
+    try {
+      const meta = await loadMeta(null, targetAccountId, {
+        mode: 'mailbox',
+        mailboxRequest: { id: startedRefreshId, scope: targetAccountId },
+      });
+      if (mailboxRefreshRef.current !== startedRefreshId) {
+        appFlowLog('locate provider validation aborted by newer navigation', {
+          refreshId: startedRefreshId,
+          currentRefreshId: mailboxRefreshRef.current,
+        });
+        return;
+      }
+      const targetFolder =
+        meta.folders.find((folder) => folder.account_id === targetAccountId && folder.role === role) ??
+        meta.folders.find((folder) => folder.role === role);
+      if (!targetFolder) {
+        setStatus(`当前账号没有可用的${role === 'sent' ? '已发送' : '收件箱'}目录`);
+        return;
+      }
+      skipNextFolderEffectLoadRef.current = true;
+      setFolderId(targetFolder.id);
+      const nextMessages = await loadMessages(
+        targetFolder.id,
+        activeValidationId,
+        'all',
+        targetAccountId,
+        startedRefreshId,
+        messagePageSize,
+        undefined,
+        false,
+      );
+      const preferredMessageId = role === 'sent'
+        ? providerWriteValidationStatus?.sentMessageId
+        : providerWriteValidationStatus?.receivedMessageId;
+      if (preferredMessageId && nextMessages.some((message) => message.id === preferredMessageId)) {
+        setSelectedId(preferredMessageId);
+      }
+      setStatus(
+        nextMessages.length
+          ? `已定位验证 ${activeValidationId} 的${role === 'sent' ? '已发送' : '收件'}邮件`
+          : `已打开${role === 'sent' ? '已发送' : '收件箱'}，暂未找到验证 ${activeValidationId}`,
+      );
+    } finally {
+      if (scopeChanging) {
+        navigationScopeClaimRef.current = null;
+      }
     }
-    skipNextFolderEffectLoadRef.current = true;
-    setFolderId(targetFolder.id);
-    const nextMessages = await loadMessages(
-      targetFolder.id,
-      activeValidationId,
-      'all',
-      targetAccountId,
-      mailboxRefreshRef.current,
-      messagePageSize,
-      undefined,
-      false,
-    );
-    const preferredMessageId = role === 'sent'
-      ? providerWriteValidationStatus?.sentMessageId
-      : providerWriteValidationStatus?.receivedMessageId;
-    if (preferredMessageId && nextMessages.some((message) => message.id === preferredMessageId)) {
-      setSelectedId(preferredMessageId);
-    }
-    setStatus(
-      nextMessages.length
-        ? `已定位验证 ${activeValidationId} 的${role === 'sent' ? '已发送' : '收件'}邮件`
-        : `已打开${role === 'sent' ? '已发送' : '收件箱'}，暂未找到验证 ${activeValidationId}`,
-    );
   }, [
     accountForm,
     activeValidationId,
     loadMessages,
     loadMeta,
     providerWriteValidationStatus,
+    navigationScopeClaimRef,
     setAccountScope,
     setActiveThread,
     setFilter,
@@ -174,58 +205,87 @@ export default function useMailboxNavigation({
   const focusMailboxRole = useCallback(async (role: FolderRole, targetAccountId: number | null, statusMessage: string) => {
     const startedAt = performance.now();
     const nextScope = accountScope === 'all' ? 'all' : targetAccountId ?? accountScope;
+    const scopeChanging = nextScope !== accountScope && nextScope !== 'all';
     appFlowLog('focus mailbox role start', {
       role,
       accountId: targetAccountId,
       scope: nextScope,
     });
+    if (scopeChanging) {
+      // 认领该 scope：accountScope effect 将跳过 refreshMailbox，由本导航
+      // 动作自己驱动加载，避免双重驱动互相覆盖 folderId/messages。
+      navigationScopeClaimRef.current = nextScope;
+    }
     if (targetAccountId && accountScope !== 'all') {
       setAccountScope(targetAccountId);
     }
     resetSearch();
-    const meta = await loadMeta(null, nextScope, { mode: 'mailbox' });
-    const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
-    const targetFolder =
-      meta.folders.find((folder) => (
-        folder.role === role
-        && (!shouldMatchTargetAccount || folder.account_id === targetAccountId)
-      )) ??
-      meta.folders.find((folder) => folder.role === role);
-    if (!targetFolder) {
-      appFlowWarn('focus mailbox role missing folder', {
+    // 自行递增 mailbox 世代：使任何在途旧刷新失效。用户在此期间的进一步
+    // 导航（selectFolder/changeAccountScope）会再次递增，本流程随即放弃提交。
+    mailboxRefreshRef.current += 1;
+    const startedRefreshId = mailboxRefreshRef.current;
+    try {
+      const meta = await loadMeta(null, nextScope, {
+        mode: 'mailbox',
+        mailboxRequest: { id: startedRefreshId, scope: nextScope },
+      });
+      if (mailboxRefreshRef.current !== startedRefreshId) {
+        appFlowLog('focus mailbox role aborted by newer navigation', {
+          role,
+          accountId: targetAccountId,
+          startedRefreshId,
+          currentRefreshId: mailboxRefreshRef.current,
+        });
+        return;
+      }
+      const shouldMatchTargetAccount = nextScope !== 'all' && Boolean(targetAccountId);
+      const targetFolder =
+        meta.folders.find((folder) => (
+          folder.role === role
+          && (!shouldMatchTargetAccount || folder.account_id === targetAccountId)
+        )) ??
+        meta.folders.find((folder) => folder.role === role);
+      if (!targetFolder) {
+        appFlowWarn('focus mailbox role missing folder', {
+          role,
+          accountId: targetAccountId,
+          folderCount: meta.folders.length,
+        });
+        await loadMessagesWithVisibleFallback(meta.folderId, '', 'all', nextScope, startedRefreshId, meta.folders, messagePageSize, 'folder', false);
+        setStatus(statusMessage);
+        return;
+      }
+      skipNextFolderEffectLoadRef.current = true;
+      setFolderId(targetFolder.id);
+      await loadMessagesWithVisibleFallback(
+        targetFolder.id,
+        '',
+        'all',
+        nextScope,
+        startedRefreshId,
+        meta.folders,
+        messagePageSize,
+        'folder',
+        false,
+      );
+      appFlowLog('focus mailbox role done', {
         role,
         accountId: targetAccountId,
-        folderCount: meta.folders.length,
+        folderId: targetFolder.id,
+        durationMs: Math.round(performance.now() - startedAt),
       });
-      await loadMessagesWithVisibleFallback(meta.folderId, '', 'all', nextScope, mailboxRefreshRef.current, meta.folders, messagePageSize, 'folder', false);
       setStatus(statusMessage);
-      return;
+    } finally {
+      if (scopeChanging) {
+        navigationScopeClaimRef.current = null;
+      }
     }
-    skipNextFolderEffectLoadRef.current = true;
-    setFolderId(targetFolder.id);
-    await loadMessagesWithVisibleFallback(
-      targetFolder.id,
-      '',
-      'all',
-      nextScope,
-      mailboxRefreshRef.current,
-      meta.folders,
-      messagePageSize,
-      'folder',
-      false,
-    );
-    appFlowLog('focus mailbox role done', {
-      role,
-      accountId: targetAccountId,
-      folderId: targetFolder.id,
-      durationMs: Math.round(performance.now() - startedAt),
-    });
-    setStatus(statusMessage);
   }, [
     accountScope,
     loadMessagesWithVisibleFallback,
     loadMeta,
     mailboxRefreshRef,
+    navigationScopeClaimRef,
     resetSearch,
     setAccountScope,
     setFolderId,

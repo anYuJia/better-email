@@ -47,6 +47,7 @@ export default function RecipientField({
   const [query, setQuery] = useState<string>(() => initialParse(value).query);
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const suggestionListId = useId();
   const lastValueRef = useRef(value);
   // Chip actions can run between controlled parent updates. Keep the latest
@@ -62,7 +63,7 @@ export default function RecipientField({
     () => (query.trim() ? matchingContacts(contactSearchEntries, query, suggestionLimit) : []),
     [contactSearchEntries, query],
   );
-  const menuOpen = focused && matches.length > 0;
+  const menuOpen = focused && matches.length > 0 && !suggestionsDismissed;
   const activeMatch = matches[highlight] ?? matches[0];
   const activeSuggestionId = menuOpen && activeMatch
     ? `${suggestionListId}-option-${activeMatch.id}`
@@ -109,6 +110,7 @@ export default function RecipientField({
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setSuggestionsDismissed(false);
     const raw = event.target.value;
     const parts = raw.split(/[;,]/);
     if (parts.length > 1) {
@@ -130,12 +132,8 @@ export default function RecipientField({
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matches.length > 0) {
-      if (event.key === 'Tab') {
-        event.preventDefault();
-        const direction = event.shiftKey ? -1 : 1;
-        setHighlight((current) => (current + direction + matches.length) % matches.length);
-        return;
-      }
+      // Tab/Shift+Tab 按正常文档顺序离开字段（blur 时会提交悬空的合法邮箱），
+      // 不得被建议循环困住。Arrow/Enter/Escape 只操作建议本身。
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setHighlight((current) => (current + 1) % matches.length);
@@ -152,8 +150,10 @@ export default function RecipientField({
         return;
       }
       if (event.key === 'Escape') {
+        // 关闭建议但保持焦点在输入框，用户可继续输入或按 Tab 离开。
         event.preventDefault();
-        inputRef.current?.blur();
+        setHighlight(0);
+        setSuggestionsDismissed(true);
         return;
       }
     }
@@ -228,6 +228,7 @@ export default function RecipientField({
             onFocus={() => {
               setFocused(true);
               setHighlight(0);
+              setSuggestionsDismissed(false);
             }}
             onBlur={handleBlur}
           />

@@ -30,7 +30,9 @@ impl MailStore {
     pub fn get_account_secret_raw(&self, account: &Account) -> MailResult<String> {
         // 凭据只保存在应用自己的 SQLite 数据库（app 数据目录，0600 权限），
         // 不再使用系统凭据库，避免 macOS 弹出 Keychain 授权提示。
-        self.with_conn(|conn| account_secret_raw_for_conn(conn, account))
+        // 存储值经每实例密钥加密，读取时解密；升级前纯文本遗留值原样返回。
+        let stored = self.with_conn(|conn| account_secret_raw_for_conn(conn, account))?;
+        crate::secret_crypto::decrypt_secret(&self.data_dir, &stored).map_err(MailError::Io)
     }
     pub fn get_account_secret(
         &self,
@@ -79,7 +81,10 @@ impl MailStore {
         }
         // 凭据只写入应用自己的 SQLite 数据库，不触碰系统凭据库，
         // 保证任何路径（启动、设置页、查看邮件、同步、发送）都不会
-        // 触发 macOS Keychain 访问或授权提示。
+        // 触发 macOS Keychain 访问或授权提示。落库前用每实例密钥做
+        // 应用层加密，数据库文件单独被读取时凭据列是密文。
+        let encrypted = crate::secret_crypto::encrypt_secret(&self.data_dir, &secret)
+            .map_err(MailError::Io)?;
         self.with_conn(|conn| {
             let now = Utc::now().to_rfc3339();
             conn.execute(
@@ -90,7 +95,7 @@ impl MailStore {
                 SET secret = excluded.secret,
                     updated_at = excluded.updated_at
                 ",
-                params![email, secret, now],
+                params![email, encrypted, now],
             )?;
             Ok(())
         })?;

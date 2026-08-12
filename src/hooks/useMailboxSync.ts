@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useRef,
   useState,
   type Dispatch,
@@ -15,11 +14,11 @@ import type {
   SyncRun,
   ThreadSummary,
 } from '../app/types';
-import { flowInfo, flowWarn, logError } from '../app/logger';
+import { flowInfo, flowWarn } from '../app/logger';
 import { loadMailboxMessageLimit } from '../app/mailboxListState';
 import type { LoadMetaResult } from './useAppMetaLoader';
 import type { MailboxDataController } from './useMailboxData';
-import { invoke, listen } from '../tauriBridge';
+import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 
 type MailboxSyncOptions = {
@@ -65,16 +64,26 @@ export default function useMailboxSync({
 
   const refreshAll = useCallback(async () => {
     const startedAt = performance.now();
+    const refreshId = mailboxRefreshRef.current;
     flowInfo('app-flow', 'refreshAll start', {
       folderId,
       scope: accountScope,
       searchScope,
       query: query.trim() || null,
       filter,
+      refreshId,
     });
     const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
+    // 刷新期间用户已导航到别的视图：旧刷新不得提交任何导航/列表状态。
+    if (refreshId !== mailboxRefreshRef.current) {
+      flowInfo('app-flow', 'refreshAll aborted by newer navigation', {
+        refreshId,
+        currentRefreshId: mailboxRefreshRef.current,
+      });
+      return;
+    }
     const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
-    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, mailboxRefreshRef.current, meta.folders, refreshLimit);
+    await loadMessagesWithVisibleFallback(meta.folderId, query, filter, accountScope, refreshId, meta.folders, refreshLimit);
     if (activeThread) {
       await openThread(activeThread, false);
     }
@@ -103,6 +112,7 @@ export default function useMailboxSync({
     if (isRefreshing) return;
     const startedAt = performance.now();
     const syncAccountId = accountScope === 'all' ? null : accountScope;
+    const refreshId = mailboxRefreshRef.current;
     flowInfo('app-flow', 'syncAndRefresh start', {
       accountId: syncAccountId,
       folderId,
@@ -110,6 +120,7 @@ export default function useMailboxSync({
       searchScope,
       query: query.trim() || null,
       filter,
+      refreshId,
     });
     setIsRefreshing(true);
     if (refreshNoticeTimeoutRef.current !== null) {
@@ -120,14 +131,28 @@ export default function useMailboxSync({
     try {
       const run = await invoke<SyncRun>(IPC.SyncImapHeaders, { accountId: syncAccountId });
       setSyncRuns?.((current) => [run, ...current].slice(0, 10));
+      if (refreshId !== mailboxRefreshRef.current) {
+        flowInfo('app-flow', 'syncAndRefresh aborted by newer navigation', {
+          refreshId,
+          currentRefreshId: mailboxRefreshRef.current,
+        });
+        return;
+      }
       const meta = await loadMeta(folderId, accountScope, { mode: 'mailbox' });
+      if (refreshId !== mailboxRefreshRef.current) {
+        flowInfo('app-flow', 'syncAndRefresh aborted by newer navigation after meta', {
+          refreshId,
+          currentRefreshId: mailboxRefreshRef.current,
+        });
+        return;
+      }
       const refreshLimit = Math.max(messageLimit, loadMailboxMessageLimit(mailboxListStateKey));
       await loadMessagesWithVisibleFallback(
         meta.folderId,
         query,
         filter,
         accountScope,
-        mailboxRefreshRef.current,
+        refreshId,
         meta.folders,
         refreshLimit,
       );
@@ -183,60 +208,8 @@ export default function useMailboxSync({
     setStatus,
   ]);
 
-  useEffect(() => {
-    let unlistenProgress: (() => void) | undefined;
-
-    let latestPayload: {
-      account_email: string;
-      folder_name: string;
-      current_folder_index: number;
-      total_folders: number;
-      scanned_folders: number;
-      imported_messages: number;
-      status_text: string;
-    } | null = null;
-    let flushTimer: ReturnType<typeof window.setTimeout> | null = null;
-    const flush = () => {
-      flushTimer = null;
-      if (!latestPayload) return;
-      const payload = latestPayload;
-      latestPayload = null;
-      setStatus(payload.status_text);
-      if (payload.folder_name) {
-        setRefreshNotice(`${payload.folder_name} (${payload.current_folder_index}/${payload.total_folders})`);
-      } else {
-        setRefreshNotice('正在连接...');
-      }
-    };
-
-    listen<{
-      account_email: string;
-      folder_name: string;
-      current_folder_index: number;
-      total_folders: number;
-      scanned_folders: number;
-      imported_messages: number;
-      status_text: string;
-    }>('sync-progress', (event) => {
-      latestPayload = event.payload;
-      if (flushTimer === null) {
-        flushTimer = window.setTimeout(flush, 250);
-      }
-    })
-      .then((nextUnlisten) => {
-        unlistenProgress = nextUnlisten;
-      })
-      .catch((error) => {
-        logError('Failed to listen to sync-progress event:', error);
-      });
-
-    return () => {
-      unlistenProgress?.();
-      if (flushTimer !== null) {
-        window.clearTimeout(flushTimer);
-      }
-    };
-  }, [setStatus]);
+  // 同步进度统一由后台任务的持久轮询提供（GetBackgroundTask + BackgroundTask.progress），
+  // 不再保留无生产者的 sync-progress 事件监听，避免死契约与冲突进度来源。
 
   return {
     isRefreshing,

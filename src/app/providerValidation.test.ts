@@ -51,6 +51,7 @@ const sync: SyncRun = {
   scanned_folders: 4,
   imported_messages: 2,
   new_messages: 2,
+  new_message_ids: [],
   message: 'sync complete',
 };
 

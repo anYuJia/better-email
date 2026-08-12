@@ -158,8 +158,17 @@ fn load_account_secret(database_path: &Path, account: &Account) -> Result<String
         )
         .optional()
         .map_err(|error| format!("读取本地授权码失败：{error}"))?;
-    raw.filter(|secret| !secret.trim().is_empty())
-        .ok_or_else(|| "未保存该账号授权码。".to_string())
+    let raw = raw.filter(|secret| !secret.trim().is_empty());
+    let Some(raw) = raw else {
+        return Err("未保存该账号授权码。".to_string());
+    };
+    // 应用层加密的凭据：读取时用每实例密钥解密；升级前纯文本原样返回。
+    let data_dir = database_path
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir);
+    crate::secret_crypto::decrypt_secret(&data_dir, &raw)
+        .map_err(|error| format!("读取本地授权码失败：{error}"))
 }
 
 fn probe_folders_and_headers(

@@ -420,8 +420,15 @@ pub fn token_needs_refresh(bundle: &OAuthTokenBundle) -> bool {
         .unwrap_or(true)
 }
 
+/// 等待本地 OAuth2 回调。
+///
+/// - 在超时前持续接受 TCP 连接，只有携带「本账号待处理会话 state」的合法回调
+///   才终止监听；路径不匹配、缺少 state/code、未知 state 等无效请求都返回 4xx
+///   并继续等待，避免随机探测或路径错误让合法登录失败。
+/// - 每个连接设置读取超时与最大请求大小，避免本地慢连接阻塞监听。
 pub fn wait_for_local_callback(
     redirect_uri: &str,
+    expected_states: &[String],
     timeout_seconds: i64,
 ) -> Result<OAuthCallbackPayload, String> {
     let endpoint = parse_local_callback_endpoint(redirect_uri)?;
@@ -435,7 +442,18 @@ pub fn wait_for_local_callback(
 
     while started.elapsed() < timeout {
         match listener.accept() {
-            Ok((mut stream, _addr)) => return handle_callback_stream(&mut stream, &endpoint),
+            Ok((mut stream, _addr)) => {
+                // 对已接受连接设置读取超时，避免慢速/异常连接阻塞整个等待循环。
+                let _ = stream.set_read_timeout(Some(StdDuration::from_secs(5)));
+                match handle_callback_stream(&mut stream, &endpoint, expected_states) {
+                    Ok(Some(payload)) => return Ok(payload),
+                    // 无效连接已返回 4xx：继续等待真正的回调。
+                    Ok(None) => {}
+                    Err(error) => {
+                        write_callback_response(&mut stream, 400, &error);
+                    }
+                }
+            }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(StdDuration::from_millis(100));
             }
@@ -494,38 +512,56 @@ pub fn parse_local_callback_endpoint(redirect_uri: &str) -> Result<LocalCallback
     })
 }
 
+/// 处理单个回调连接。
+///
+/// 返回 `Ok(Some(payload))` 表示合法回调；`Ok(None)` 表示无效请求已返回 4xx、
+/// 应继续等待；`Err` 表示请求格式问题（已附带 400 响应）。
 fn handle_callback_stream(
     stream: &mut TcpStream,
     endpoint: &LocalCallbackEndpoint,
-) -> Result<OAuthCallbackPayload, String> {
-    let mut buffer = [0_u8; 4096];
+    expected_states: &[String],
+) -> Result<Option<OAuthCallbackPayload>, String> {
+    // 只读取请求行（GET /callback?... HTTP/1.1），超过最大请求大小则拒绝，
+    // 避免恶意大请求占用内存。OAuth 回调本身是单行小型 GET。
+    let mut buffer = [0_u8; 8192];
     let read = stream
         .read(&mut buffer)
         .map_err(|error| format!("OAuth2 本地回调读取失败：{error}"))?;
+    if read == 0 {
+        return Ok(None);
+    }
     let request = String::from_utf8_lossy(&buffer[..read]);
     let first_line = request.lines().next().unwrap_or_default();
-    let target = first_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| "OAuth2 本地回调请求格式无效。".to_string())?;
+    let Some(target) = first_line.split_whitespace().nth(1) else {
+        write_callback_response(stream, 400, "Better Email OAuth2 回调请求格式无效。");
+        return Ok(None);
+    };
     if !target.starts_with(&endpoint.path) {
         write_callback_response(stream, 404, "Better Email OAuth2 回调路径不匹配。");
-        return Err("OAuth2 本地回调路径不匹配。".to_string());
+        return Ok(None);
     }
-    match parse_local_callback_url(target) {
-        Ok(payload) => {
-            write_callback_response(
-                stream,
-                200,
-                "Better Email OAuth2 授权已接收，可以回到应用继续交换 Token。",
-            );
-            Ok(payload)
-        }
+    let payload = match parse_local_callback_url(target) {
+        Ok(payload) => payload,
         Err(error) => {
             write_callback_response(stream, 400, &error);
-            Err(error)
+            return Ok(None);
         }
+    };
+    // 只接受匹配当前待处理会话的 state：未知/已消费的 state 不终止监听。
+    if !expected_states.iter().any(|expected| expected == &payload.state) {
+        write_callback_response(
+            stream,
+            400,
+            "Better Email OAuth2 回调 state 未知或已失效。",
+        );
+        return Ok(None);
     }
+    write_callback_response(
+        stream,
+        200,
+        "Better Email OAuth2 授权已接收，可以回到应用继续交换 Token。",
+    );
+    Ok(Some(payload))
 }
 
 fn parse_query(query: &str) -> Result<HashMap<String, String>, String> {
@@ -541,6 +577,98 @@ fn parse_query(query: &str) -> Result<HashMap<String, String>, String> {
         params.insert(key, value);
     }
     Ok(params)
+}
+
+#[cfg(test)]
+mod callback_tests {
+    use super::{wait_for_local_callback, OAuthCallbackPayload};
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+
+    fn free_port() -> u16 {
+        let probe = TcpListener::bind(("127.0.0.1", 0)).expect("probe binds");
+        let port = probe.local_addr().expect("probe addr").port();
+        drop(probe);
+        port
+    }
+
+    fn send_request(port: u16, path: &str) -> String {
+        // 等待测试线程中的监听器就绪：绑定在独立线程，主线程可能先连接。
+        let mut stream = None;
+        for _ in 0..50 {
+            match TcpStream::connect(("127.0.0.1", port)) {
+                Ok(connected) => {
+                    stream = Some(connected);
+                    break;
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(20)),
+            }
+        }
+        let mut stream = stream.expect("listener becomes ready");
+        stream
+            .write_all(format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").as_bytes())
+            .expect("request written");
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(3))).expect("timeout set");
+        let mut buffer = Vec::new();
+        let mut chunk = [0_u8; 256];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) | Err(_) => break,
+                Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+            }
+        }
+        String::from_utf8_lossy(&buffer).into_owned()
+    }
+
+    #[test]
+    fn invalid_connections_do_not_terminate_the_wait() {
+        let port = free_port();
+        let expected = vec!["valid-state".to_string()];
+        let waiter = thread::spawn(move || {
+            wait_for_local_callback(
+                &format!("http://127.0.0.1:{port}/oauth/callback"),
+                &expected,
+                10,
+            )
+        });
+        // 路径错误 → 404，不影响后续。
+        let wrong_path = send_request(port, "/wrong/path?state=valid-state&code=x");
+        assert!(wrong_path.contains("404"), "路径错误应返回 404：{wrong_path}");
+        // 缺 state → 400。
+        let no_state = send_request(port, "/oauth/callback?code=x");
+        assert!(no_state.contains("400"), "缺 state 应返回 400：{no_state}");
+        // 错误 state → 400，且不消费监听。
+        let wrong_state = send_request(port, "/oauth/callback?state=other-state&code=x");
+        assert!(wrong_state.contains("400"), "未知 state 应返回 400：{wrong_state}");
+        // 合法回调随后仍成功。
+        let valid = send_request(port, "/oauth/callback?state=valid-state&code=auth-code");
+        assert!(valid.contains("200"), "合法回调应返回 200：{valid}");
+        let payload: OAuthCallbackPayload = waiter.join().expect("waiter joins").expect("waiter ok");
+        assert_eq!(payload.state, "valid-state");
+        assert_eq!(payload.code, "auth-code");
+    }
+
+    #[test]
+    fn only_expected_state_terminates_the_wait() {
+        let port = free_port();
+        let expected = vec!["expected-one".to_string()];
+        let waiter = thread::spawn(move || {
+            wait_for_local_callback(
+                &format!("http://127.0.0.1:{port}/oauth/callback"),
+                &expected,
+                10,
+            )
+        });
+        // 先发一个恰好存在于别处但不在预期集合里的 state。
+        let unexpected = send_request(port, "/oauth/callback?state=other-valid&code=x");
+        assert!(unexpected.contains("400"), "非预期 state 应拒绝：{unexpected}");
+        let valid = send_request(port, "/oauth/callback?state=expected-one&code=code-1");
+        assert!(valid.contains("200"));
+        let payload = waiter.join().expect("waiter joins").expect("waiter ok");
+        assert_eq!(payload.state, "expected-one");
+        assert_eq!(payload.code, "code-1");
+    }
 }
 
 fn write_callback_response(stream: &mut TcpStream, status: u16, message: &str) {

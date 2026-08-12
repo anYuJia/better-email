@@ -95,7 +95,8 @@ pub fn call_chat_completion(
     if endpoint.trim().is_empty() {
         return Err("AI 服务地址为空，请先在设置中配置。".to_string());
     }
-    let url = normalize_endpoint(endpoint);
+    let validated = validate_ai_endpoint(endpoint)?;
+    let url = normalize_endpoint(&validated);
     let started_at = std::time::Instant::now();
     let body = OpenAiChatBody {
         model,
@@ -155,6 +156,58 @@ fn normalize_endpoint(endpoint: &str) -> String {
         trimmed.to_string()
     } else {
         format!("{}/chat/completions", trimmed.trim_end_matches('/'))
+    }
+}
+
+/// 是否为本机回环开发主机（127.0.0.1 / localhost / [::1]）。
+fn is_loopback_host(host: &str) -> bool {
+    let normalized = host.trim_matches(['[', ']']).to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "localhost" | "127.0.0.1" | "::1" | "0:0:0:0:0:0:0:1"
+    )
+}
+
+/// 校验 AI/MCP endpoint 的安全策略。
+///
+/// - 默认只允许 HTTPS。
+/// - 仅对明确的 loopback 开发端点（127.0.0.1 / localhost / [::1]）允许 HTTP，
+///   并返回清晰提示说明这是本机开发用途。
+/// - 禁止 HTTP 到局域网或公网主机。
+/// - 拒绝 userinfo（`http://user:pass@host`）与畸形 URL。
+///
+/// 返回校验通过、去掉首尾空白的 endpoint 字符串。
+pub fn validate_ai_endpoint(endpoint: &str) -> Result<String, String> {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return Err("AI 服务地址为空，请先在设置中配置。".to_string());
+    }
+    let parsed = url::Url::parse(trimmed)
+        .map_err(|_| "AI 服务地址不是合法 URL，请检查是否包含协议前缀（https:// 或 http://）。".to_string())?;
+    if parsed.host_str().unwrap_or_default().is_empty() {
+        return Err("AI 服务地址缺少主机名。".to_string());
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(
+            "AI 服务地址不允许包含用户名或密码（userinfo），请移除。".to_string(),
+        );
+    }
+    match parsed.scheme() {
+        "https" => Ok(trimmed.to_string()),
+        "http" => {
+            let host = parsed.host_str().unwrap_or_default();
+            if is_loopback_host(host) {
+                Ok(trimmed.to_string())
+            } else {
+                Err(format!(
+                    "AI 服务仅允许 HTTPS 传输邮件内容与密钥；HTTP 仅允许用于本机开发端点 \
+                     （127.0.0.1 / localhost / [::1]），当前主机 {host} 不受支持。"
+                ))
+            }
+        }
+        other => Err(format!(
+            "AI 服务地址仅支持 https:// 或 http:// 协议，当前为 {other}://。"
+        )),
     }
 }
 
@@ -251,7 +304,8 @@ fn json_rpc_call(
     params: serde_json::Value,
     timeout_seconds: u64,
 ) -> Result<serde_json::Value, String> {
-    let url = endpoint.trim().trim_end_matches('/').to_string();
+    let validated = validate_ai_endpoint(endpoint)?;
+    let url = validated.trim_end_matches('/').to_string();
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -437,5 +491,61 @@ pub fn test_ai_connection(
                 latency_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_ai_endpoint;
+
+    #[test]
+    fn https_endpoints_are_allowed() {
+        assert!(validate_ai_endpoint("https://api.openai.com/v1").is_ok());
+        assert!(validate_ai_endpoint("https://mcp.example.com/sse").is_ok());
+        assert!(validate_ai_endpoint("https://127.0.0.1:443/v1").is_ok());
+    }
+
+    #[test]
+    fn loopback_http_is_allowed_for_development() {
+        assert!(validate_ai_endpoint("http://127.0.0.1:11434/v1").is_ok());
+        assert!(validate_ai_endpoint("http://localhost:3000").is_ok());
+        assert!(validate_ai_endpoint("http://[::1]:8080").is_ok());
+    }
+
+    #[test]
+    fn public_or_lan_http_is_rejected() {
+        let public = validate_ai_endpoint("http://api.example.com/v1");
+        assert!(public.is_err());
+        assert!(public.unwrap_err().contains("HTTPS"));
+
+        let lan = validate_ai_endpoint("http://192.168.1.10:8080");
+        assert!(lan.is_err());
+        assert!(lan.unwrap_err().contains("HTTPS"));
+
+        let private = validate_ai_endpoint("http://10.0.0.5/v1");
+        assert!(private.is_err());
+    }
+
+    #[test]
+    fn userinfo_and_malformed_urls_are_rejected() {
+        let userinfo = validate_ai_endpoint("http://user:secret@api.example.com/v1");
+        assert!(userinfo.is_err());
+        assert!(userinfo.unwrap_err().contains("userinfo"));
+
+        let userinfo_https = validate_ai_endpoint("https://user@api.example.com/v1");
+        assert!(userinfo_https.is_err());
+
+        let malformed = validate_ai_endpoint("not a url");
+        assert!(malformed.is_err());
+
+        let no_scheme = validate_ai_endpoint("api.example.com/v1");
+        assert!(no_scheme.is_err());
+
+        let empty = validate_ai_endpoint("   ");
+        assert!(empty.is_err());
+
+        let ftp = validate_ai_endpoint("ftp://example.com/v1");
+        assert!(ftp.is_err());
+        assert!(ftp.unwrap_err().contains("https:// 或 http://"));
     }
 }

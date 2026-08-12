@@ -208,6 +208,14 @@ pub(super) async fn read_backup_from_dialog(
 
 pub(super) fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64)> {
     let payload = fs::read(&path)?;
+    // 备份 JSON 是不可信输入：限制文件大小，避免资源耗尽。
+    const MAX_BACKUP_FILE_BYTES: u64 = 512 * 1024 * 1024;
+    if payload.len() as u64 > MAX_BACKUP_FILE_BYTES {
+        return Err(crate::db::MailError::Imap(format!(
+            "备份文件过大（{} 字节 > {MAX_BACKUP_FILE_BYTES} 字节），已取消恢复。",
+            payload.len()
+        )));
+    }
     let backup = serde_json::from_slice::<LocalBackup>(&payload)
         .map_err(|error| crate::db::MailError::Imap(format!("备份 JSON 解析失败：{error}")))?;
     Ok((

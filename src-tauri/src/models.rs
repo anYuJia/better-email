@@ -585,6 +585,27 @@ pub struct ImapReconcileResult {
     pub removed_messages: i64,
 }
 
+/// 同一 mailbox 一次同步中 reconcile + header import 的原子事务结果。
+#[derive(Debug, Clone)]
+pub struct MailboxSyncTransactionResult {
+    pub reconcile: ImapReconcileResult,
+    pub imported_messages: i64,
+    pub new_messages: i64,
+    /// 本次同步真正新增邮件的本地 message id（通知候选来源）。
+    pub new_message_ids: Vec<i64>,
+}
+
+/// 本地乐观修改未能写回远端时的待处理意图。同步调和时对带待处理写回的
+/// 字段保持本地值，直到写回成功或用户显式放弃，避免下次同步无提示撤销
+/// 本地操作，同时不永久保留所有本地 flags（写回成功即恢复远端权威）。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PendingRemoteWrite {
+    pub message_id: i64,
+    pub kind: String,
+    pub value: String,
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct RemoteActionReport {
     pub local_applied: bool,
@@ -639,6 +660,8 @@ pub struct SyncRun {
     pub imported_messages: i64,
     /// 本次同步真正新增的邮件数（UID 高于同步前游标），不含历史补同步。
     pub new_messages: i64,
+    /// 本次同步真正新增邮件的本地 message id（通知候选的来源，避免依赖当前 UI 列表）。
+    pub new_message_ids: Vec<i64>,
     pub message: String,
 }
 

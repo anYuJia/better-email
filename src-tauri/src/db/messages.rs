@@ -12,6 +12,7 @@ use super::search::{
     build_message_filter_clause, build_message_summary_query, thread_order_clause, SearchCriteria,
 };
 use super::*;
+use std::collections::VecDeque;
 
 impl MailStore {
     #[allow(dead_code)]
@@ -244,6 +245,35 @@ impl MailStore {
     pub fn get_message(&self, message_id: i64) -> MailResult<Message> {
         self.with_conn(|conn| message_for_conn(conn, message_id))
     }
+    /// 按本地 message id 批量取消息（新邮件通知候选来源）。
+    pub fn list_messages_by_ids(&self, message_ids: &[i64]) -> MailResult<Vec<Message>> {
+        if message_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.with_conn(|conn| {
+            let placeholders = std::iter::repeat_n("?", message_ids.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
+                       m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
+                       m.received_at, m.is_read, m.is_starred, m.has_attachments,
+                       m.snoozed_until, m.remote_mailbox, m.remote_uid,
+                       m.message_id_header, m.in_reply_to_header, m.references_header
+                FROM messages m
+                JOIN accounts a ON a.id = m.account_id
+                JOIN folders f ON f.id = m.folder_id
+                WHERE m.id IN ({placeholders})
+                ORDER BY m.received_at DESC",
+            );
+            let params = message_ids.iter().map(|id| Value::Integer(*id)).collect::<Vec<_>>();
+            let mut stmt = conn.prepare(&sql)?;
+            let messages = stmt
+                .query_map(params_from_iter(params), |row| map_message_row(conn, row))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(messages)
+        })
+    }
     pub fn get_outbound_message(&self, message_id: i64) -> MailResult<OutboundMessage> {
         self.with_conn(|conn| outbound_message_for_conn(conn, message_id))
     }
@@ -398,22 +428,52 @@ impl MailStore {
                     bool_to_int(has_attachments)
                 ],
             )?;
+            // 正文重拉前先读取既有附件，以便按稳定身份匹配新旧附件并保留
+            // 已下载状态（is_downloaded/local_path），避免重拉正文把已下载
+            // 附件重置为未下载、产生孤儿文件。
+            let old_attachments = attachment_rows_for_conn(conn, message_id)?;
+            let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+            let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+            for old in old_attachments {
+                let target = if old.content_id.trim().is_empty() {
+                    &mut old_by_filename
+                } else {
+                    &mut old_by_content_id
+                };
+                target
+                    .entry(if old.content_id.trim().is_empty() {
+                        old.filename.clone()
+                    } else {
+                        old.content_id.clone()
+                    })
+                    .or_default()
+                    .push_back(old);
+            }
             conn.execute(
                 "DELETE FROM attachments WHERE message_id = ?1",
                 params![message_id],
             )?;
             for attachment in &body.attachments {
+                let matched = match_old_attachment(
+                    attachment,
+                    &mut old_by_content_id,
+                    &mut old_by_filename,
+                );
+                let (is_downloaded, local_path, size_bytes) =
+                    preserve_attachment_download_state(&matched, attachment);
                 conn.execute(
                     "INSERT INTO attachments(
                         message_id, filename, mime_type, size_bytes, is_downloaded,
                         local_path, content_id, is_inline
                      )
-                     VALUES (?1, ?2, ?3, ?4, 0, '', ?5, ?6)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     params![
                         message_id,
                         attachment.filename,
                         attachment.mime_type,
-                        attachment.size_bytes,
+                        size_bytes,
+                        bool_to_int(is_downloaded),
+                        local_path,
                         attachment.content_id,
                         bool_to_int(attachment.is_inline)
                     ],
@@ -455,24 +515,61 @@ impl MailStore {
         limit: i64,
     ) -> MailResult<Vec<(i64, i64)>> {
         self.with_conn(|conn| {
-            let mut stmt = conn.prepare(
-                "
-                SELECT id, remote_uid
-                FROM messages
-                WHERE account_id = ?1
-                  AND remote_mailbox = ?2
-                  AND remote_uid > 0
-                  AND body = ''
-                ORDER BY id DESC
-                LIMIT ?3
-                ",
-            )?;
-            let rows = stmt
-                .query_map(params![account_id, remote_mailbox, limit], |row| {
-                    Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(rows)
+            let limit = limit.max(1);
+            let oldest_limit = (limit + 1) / 2;
+            let newest_limit = limit / 2;
+            // 公平分层回填：一半最老优先，保证大量历史积压持续推进；
+            // 一半最新优先，保证新邮件正文的交互优先级不退化。
+            let mut combined = Vec::with_capacity(limit as usize);
+            let mut seen = BTreeSet::new();
+            {
+                let mut stmt = conn.prepare(
+                    "
+                    SELECT id, remote_uid
+                    FROM messages
+                    WHERE account_id = ?1
+                      AND remote_mailbox = ?2
+                      AND remote_uid > 0
+                      AND body = ''
+                    ORDER BY id ASC
+                    LIMIT ?3
+                    ",
+                )?;
+                let rows = stmt
+                    .query_map(params![account_id, remote_mailbox, oldest_limit], |row| {
+                        Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                for (id, uid) in rows {
+                    combined.push((id, uid));
+                    seen.insert(id);
+                }
+            }
+            if newest_limit > 0 {
+                let mut stmt = conn.prepare(
+                    "
+                    SELECT id, remote_uid
+                    FROM messages
+                    WHERE account_id = ?1
+                      AND remote_mailbox = ?2
+                      AND remote_uid > 0
+                      AND body = ''
+                    ORDER BY id DESC
+                    LIMIT ?3
+                    ",
+                )?;
+                let rows = stmt
+                    .query_map(params![account_id, remote_mailbox, newest_limit], |row| {
+                        Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                for (id, uid) in rows {
+                    if seen.insert(id) {
+                        combined.push((id, uid));
+                    }
+                }
+            }
+            Ok(combined)
         })
     }
     pub fn list_remote_uids_for_mailbox(
@@ -616,24 +713,22 @@ impl MailStore {
                 let updated = conn.execute(
                     "
                     UPDATE messages
-                    SET folder_id = ?1,
-                        subject = ?2,
-                        snippet = ?3,
-                        body = ?4,
-                        sanitized_html = ?5,
-                        security_warnings = ?6,
-                        received_at = ?7,
-                        has_attachments = ?8,
-                        thread_key = ?9,
-                        message_id_header = ?10,
-                        in_reply_to_header = ?11,
-                        references_header = ?12
-                    WHERE account_id = ?13
+                    SET subject = ?1,
+                        snippet = ?2,
+                        body = ?3,
+                        sanitized_html = ?4,
+                        security_warnings = ?5,
+                        received_at = ?6,
+                        has_attachments = ?7,
+                        thread_key = ?8,
+                        message_id_header = ?9,
+                        in_reply_to_header = ?10,
+                        references_header = ?11
+                    WHERE account_id = ?12
                       AND remote_mailbox = 'POP3/INBOX'
-                      AND remote_uid = ?14
+                      AND remote_uid = ?13
                     ",
                     params![
-                        folder_id,
                         subject,
                         imported.snippet,
                         imported.body,
@@ -840,6 +935,55 @@ impl MailStore {
                 params![folder_id, message_id],
             )?;
             Ok(())
+        })
+    }
+    pub fn record_pending_remote_write(
+        &self,
+        message_id: i64,
+        kind: &str,
+        value: &str,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO pending_remote_writes(message_id, kind, value, created_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(message_id, kind) DO UPDATE SET
+                     value = excluded.value,
+                     created_at = excluded.created_at",
+                params![message_id, kind, value, Utc::now().to_rfc3339()],
+            )?;
+            Ok(())
+        })
+    }
+    pub fn clear_pending_remote_write(&self, message_id: i64, kind: &str) -> MailResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "DELETE FROM pending_remote_writes WHERE message_id = ?1 AND kind = ?2",
+                params![message_id, kind],
+            )?;
+            Ok(())
+        })
+    }
+    pub fn list_pending_remote_writes(&self) -> MailResult<Vec<PendingRemoteWrite>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT message_id, kind, value, created_at
+                FROM pending_remote_writes
+                ORDER BY created_at DESC, message_id ASC
+                ",
+            )?;
+            let writes = stmt
+                .query_map([], |row| {
+                    Ok(PendingRemoteWrite {
+                        message_id: row.get(0)?,
+                        kind: row.get(1)?,
+                        value: row.get(2)?,
+                        created_at: row.get(3)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(writes)
         })
     }
     pub fn restore_message_to_inbox(&self, message_id: i64) -> MailResult<Message> {
@@ -1397,6 +1541,100 @@ pub(super) fn looks_like_html_fragment(value: &str) -> bool {
     .iter()
     .any(|tag| lower.contains(tag))
 }
+/// 附件在数据库中的行快照，用于正文重拉时按稳定身份匹配并保留下载状态。
+pub(super) struct AttachmentRow {
+    pub filename: String,
+    pub is_downloaded: bool,
+    pub local_path: String,
+    pub content_id: String,
+}
+
+pub(super) fn attachment_rows_for_conn(
+    conn: &Connection,
+    message_id: i64,
+) -> MailResult<Vec<AttachmentRow>> {
+    let mut stmt = conn.prepare(
+        "
+        SELECT filename, is_downloaded, local_path, content_id
+        FROM attachments
+        WHERE message_id = ?1
+        ",
+    )?;
+    let rows = stmt
+        .query_map(params![message_id], |row| {
+            Ok(AttachmentRow {
+                filename: row.get(0)?,
+                is_downloaded: row.get::<_, i64>(1)? != 0,
+                local_path: row.get(2)?,
+                content_id: row.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub(super) fn has_pending_remote_write_for_conn(
+    conn: &Connection,
+    message_id: i64,
+    kind: &str,
+) -> MailResult<bool> {
+    let exists: Option<i64> = conn
+        .query_row(
+            "SELECT 1 FROM pending_remote_writes WHERE message_id = ?1 AND kind = ?2 LIMIT 1",
+            params![message_id, kind],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(exists.is_some())
+}
+
+/// 为新的远端附件寻找既有附件作为下载状态来源。
+///
+/// 优先按 content_id（内联图片的稳定标识）精确匹配；无 content_id 时按
+/// filename 匹配，同名附件按稳定顺序配对，避免「先删后插」把已下载附件
+/// 重置为未下载、产生孤儿文件。
+fn match_old_attachment(
+    attachment: &crate::models::RemoteAttachmentMetadata,
+    old_by_content_id: &mut std::collections::BTreeMap<String, std::collections::VecDeque<AttachmentRow>>,
+    old_by_filename: &mut std::collections::BTreeMap<String, std::collections::VecDeque<AttachmentRow>>,
+) -> Option<AttachmentRow> {
+    if !attachment.content_id.trim().is_empty() {
+        if let Some(bucket) = old_by_content_id.get_mut(&attachment.content_id) {
+            if let Some(matched) = bucket.pop_front() {
+                return Some(matched);
+            }
+        }
+    }
+    old_by_filename
+        .get_mut(&attachment.filename)
+        .and_then(|bucket| bucket.pop_front())
+}
+
+/// 将既有附件的下载状态迁移到新的附件记录上。
+///
+/// 仅当本地文件真实存在且为普通文件时保留 is_downloaded/local_path，并把
+/// size_bytes 更新为磁盘上的实际大小（已验证）。文件缺失时视为未下载，避免
+/// 记录指向不存在文件的下载状态。用户自行复制到自定义目录的文件不会被删除。
+fn preserve_attachment_download_state(
+    matched: &Option<AttachmentRow>,
+    attachment: &crate::models::RemoteAttachmentMetadata,
+) -> (bool, String, i64) {
+    let Some(old) = matched else {
+        return (false, String::new(), attachment.size_bytes);
+    };
+    if !old.is_downloaded || old.local_path.trim().is_empty() {
+        return (false, String::new(), attachment.size_bytes);
+    }
+    match std::fs::metadata(&old.local_path) {
+        Ok(metadata) if metadata.is_file() => (
+            true,
+            old.local_path.clone(),
+            metadata.len().min(i64::MAX as u64) as i64,
+        ),
+        _ => (false, String::new(), attachment.size_bytes),
+    }
+}
+
 pub(super) fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
     conn.query_row(
         "

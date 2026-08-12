@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Tag } from 'lucide-react';
 import type { Label } from '../../app/types';
 import { logError } from '../../app/logger';
+import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 
 type ReaderLabelMenuProps = {
   selectedLabels: string[];
@@ -24,6 +25,9 @@ export default function ReaderLabelMenu({
   const [newLabelColor, setNewLabelColor] = useState('#2f7ed8');
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
   const [editingLabelName, setEditingLabelName] = useState('');
+  const labelMenuRef = useRef<HTMLDetailsElement>(null);
+  // 标签菜单支持连续选择/编辑，选中后保持打开；外部点击与 Escape 仍会关闭。
+  useDetailsMenu(labelMenuRef);
 
   async function handleCreateLabel() {
     if (!newLabelName.trim() || !onCreateLabel) return;
@@ -57,7 +61,7 @@ export default function ReaderLabelMenu({
           </span>
         );
       })}
-      <details className="compact-menu label-menu">
+      <details className="compact-menu label-menu" ref={labelMenuRef}>
         <summary><Tag size={15} /> 标签</summary>
         <div className="label-menu-container">
           <div className="label-menu-add-section">
@@ -74,12 +78,24 @@ export default function ReaderLabelMenu({
               }}
             />
             <div className="label-color-selectors">
-              {['#2f7ed8', '#2da44e', '#d97706', '#8250df', '#cf222e', '#6e7781'].map((c) => (
+              {(
+                [
+                  ['#2f7ed8', '蓝色'],
+                  ['#2da44e', '绿色'],
+                  ['#d97706', '橙色'],
+                  ['#8250df', '紫色'],
+                  ['#cf222e', '红色'],
+                  ['#6e7781', '灰色'],
+                ] as const
+              ).map(([c, colorName]) => (
                 <button
                   type="button"
                   key={c}
                   className={`color-dot-btn ${newLabelColor === c ? 'active' : ''}`}
                   style={{ background: c }}
+                  aria-label={`使用${colorName}标签颜色`}
+                  aria-pressed={newLabelColor === c}
+                  title={`${colorName}标签颜色`}
                   onClick={() => setNewLabelColor(c)}
                 />
               ))}
@@ -87,6 +103,8 @@ export default function ReaderLabelMenu({
                 type="button"
                 className="label-add-submit-btn"
                 disabled={!newLabelName.trim()}
+                aria-label="新建标签"
+                title="新建标签"
                 onClick={handleCreateLabel}
               >
                 +
@@ -136,6 +154,7 @@ export default function ReaderLabelMenu({
                           <button
                             type="button"
                             className="action-edit"
+                            aria-label="编辑名称"
                             title="编辑名称"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -148,6 +167,7 @@ export default function ReaderLabelMenu({
                           <button
                             type="button"
                             className="action-delete"
+                            aria-label="删除标签"
                             title="删除标签"
                             onClick={(e) => {
                               e.stopPropagation();

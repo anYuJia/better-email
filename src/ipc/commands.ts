@@ -59,6 +59,7 @@ export const IPC = {
   ListImapMailboxes: 'list_imap_mailboxes',
   ListLabels: 'list_labels',
   ListMessages: 'list_messages',
+  ListMessagesByIds: 'list_messages_by_ids',
   ListMutedThreadKeys: 'list_muted_thread_keys',
   ListOauthSessions: 'list_oauth_sessions',
   ListOutbox: 'list_outbox',

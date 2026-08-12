@@ -15,6 +15,184 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
+
+/// 发件附件授权与大小限制：
+/// - 单附件上限与下载侧一致（25 MB），避免一次读入超大文件。
+/// - 总大小上限：单封邮件附件总量 100 MB，防止一次外发大量数据。
+const MAX_OUTBOUND_ATTACHMENT_BYTES: i64 = 25 * 1024 * 1024;
+const MAX_OUTBOUND_TOTAL_BYTES: i64 = 100 * 1024 * 1024;
+
+/// 校验并授权一个发件附件路径。
+///
+/// - canonicalize 解析符号链接并归一化，得到真实文件路径。
+/// - 只允许常规文件（拒绝目录、设备等）。
+/// - 单附件大小上限。
+/// - 写入授权表：发送时按 canonical path + size 重新校验，未授权路径或
+///   symlink/文件替换导致的路径/大小变化都会被拒绝。
+fn authorize_outbound_path(
+    store: &MailStore,
+    path: &Path,
+    running_total: i64,
+) -> MailResult<OutboundAttachmentInput> {
+    let canonical = fs::canonicalize(path).map_err(|error| {
+        crate::db::MailError::Io(std::io::Error::new(
+            error.kind(),
+            format!("无法解析附件路径：{error}"),
+        ))
+    })?;
+    let metadata = fs::metadata(&canonical)?;
+    if !metadata.is_file() {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "附件必须是常规文件，不支持目录或特殊文件。".to_string(),
+        )));
+    }
+    let size_bytes = metadata.len().min(i64::MAX as u64) as i64;
+    if size_bytes > MAX_OUTBOUND_ATTACHMENT_BYTES {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "附件超过大小上限（{size_bytes} 字节 > {} 字节）。",
+                MAX_OUTBOUND_ATTACHMENT_BYTES
+            ),
+        )));
+    }
+    if running_total.saturating_add(size_bytes) > MAX_OUTBOUND_TOTAL_BYTES {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "一封邮件附件总大小超过上限（{} 字节）。",
+                MAX_OUTBOUND_TOTAL_BYTES
+            ),
+        )));
+    }
+    store.register_outbound_attachment_auth(
+        &canonical.to_string_lossy(),
+        size_bytes,
+    )?;
+    let filename = canonical
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "attachment".to_string());
+    Ok(OutboundAttachmentInput {
+        filename,
+        mime_type: mime_type_for_path(&canonical),
+        size_bytes,
+        local_path: canonical.to_string_lossy().into_owned(),
+        content_id: String::new(),
+        is_inline: false,
+    })
+}
+
+/// 发送前对单个附件做最终校验：canonical path 与 size 必须匹配授权记录，
+/// 且磁盘上仍是相同大小的常规文件（拦截 symlink/文件替换 TOCTOU）。
+pub fn validate_outbound_attachment(store: &MailStore, attachment: &Attachment) -> MailResult<()> {
+    if attachment.local_path.trim().is_empty() {
+        return Err(crate::db::MailError::Smtp(
+            "附件没有本地路径，无法读取。".to_string(),
+        ));
+    }
+    let canonical = fs::canonicalize(&attachment.local_path).map_err(|error| {
+        crate::db::MailError::Smtp(format!(
+            "附件路径无法解析（可能已被移动或删除）：{error}"
+        ))
+    })?;
+    let metadata = fs::metadata(&canonical)?;
+    if !metadata.is_file() {
+        return Err(crate::db::MailError::Smtp(
+            "附件不再是常规文件，已拒绝发送。".to_string(),
+        ));
+    }
+    let current_size = metadata.len().min(i64::MAX as u64) as i64;
+    if current_size != attachment.size_bytes {
+        return Err(crate::db::MailError::Smtp(format!(
+            "附件大小与授权不一致（现在 {current_size} 字节，授权 {} 字节），可能已被替换，已拒绝发送。",
+            attachment.size_bytes
+        )));
+    }
+    if !store.is_outbound_attachment_authorized(&canonical.to_string_lossy(), current_size)? {
+        return Err(crate::db::MailError::Smtp(format!(
+            "附件未经授权或已过期：{}",
+            attachment.local_path
+        )));
+    }
+    Ok(())
+}
+
+/// 创建应用受管理的附件临时目录（Unix 上收紧为 0700）。已存在时也检查并收紧。
+fn ensure_private_attachment_dir(store: &MailStore, message_id: i64) -> MailResult<PathBuf> {
+    let temp_dir = store.attachment_dir(message_id);
+    fs::create_dir_all(&temp_dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(&temp_dir) {
+            if metadata.permissions().mode() & 0o077 != 0 {
+                let _ = fs::set_permissions(&temp_dir, fs::Permissions::from_mode(0o700));
+            }
+        }
+    }
+    Ok(temp_dir)
+}
+
+/// 断点续传既有临时文件在打开前的安全检查：必须是受管目录内的常规文件；
+/// 权限过宽时直接收紧为 0600；大小超过传输上限则删除重建（从零开始）。
+fn private_resume_offset(path: &Path) -> MailResult<usize> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(_) => return Ok(0),
+    };
+    if !metadata.is_file() {
+        // 目录/设备等异常条目：删除后从零开始，绝不 append 写入。
+        let _ = fs::remove_file(path);
+        return Ok(0);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o077 != 0 {
+            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+        }
+    }
+    Ok(attachment_resume_offset(metadata.len()).unwrap_or_else(|| {
+        let _ = fs::remove_file(path);
+        0
+    }))
+}
+
+/// 打开/创建断点续传临时文件：Unix 上创建时直接使用 0600，不以宽权限创建后再 chmod。
+fn open_private_attachment_file(path: &Path) -> MailResult<File> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let mut options = OpenOptions::new();
+        options.create(true).append(true).mode(0o600);
+        if path.exists() {
+            // 既有文件打开前再次收紧权限，防止继承过宽 umask 产生的 0644。
+            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+        }
+        options.open(path).map_err(Into::into)
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(OpenOptions::new().create(true).append(true).open(path)?)
+    }
+}
+
+/// 创建解码临时文件：Unix 上直接以 0600 创建。
+fn create_private_file(path: &Path) -> MailResult<File> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        Ok(OpenOptions::new().create(true).write(true).truncate(true).mode(0o600).open(path)?)
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(File::create(path)?)
+    }
+}
+
 #[tauri::command]
 pub fn list_attachments(
     store: State<'_, MailStore>,
@@ -23,20 +201,43 @@ pub fn list_attachments(
     store.list_attachments(message_id)
 }
 
-#[tauri::command]
-pub fn read_attachment_data_url(
-    store: State<'_, MailStore>,
-    attachment_id: i64,
-) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
+/// 附件读取路径安全校验：canonicalize 解析符号链接后，必须位于应用受管理
+/// 附件目录或用户配置的下载目录内，否则拒绝（防符号链接/.. 绕过，阻止外部
+/// 备份借 attachment id 读取 /etc/passwd、SSH key 等任意文件）。
+pub(crate) fn validated_attachment_read_path(
+    store: &MailStore,
+    attachment: &Attachment,
+) -> MailResult<PathBuf> {
     if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
         return Err(crate::db::MailError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "附件尚未下载到本地。",
         )));
     }
+    let canonical = fs::canonicalize(&attachment.local_path).map_err(|error| {
+        crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("附件文件不可用：{error}"),
+        ))
+    })?;
+    let managed_root = store.attachment_root();
+    let download_dir = store.resolve_download_dir()?;
+    if !canonical.starts_with(&managed_root) && !canonical.starts_with(&download_dir) {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "附件路径不在受管目录内，已拒绝读取。".to_string(),
+        )));
+    }
+    Ok(canonical)
+}
 
-    let path = PathBuf::from(&attachment.local_path);
+#[tauri::command]
+pub fn read_attachment_data_url(
+    store: State<'_, MailStore>,
+    attachment_id: i64,
+) -> MailResult<String> {
+    let attachment = store.get_attachment(attachment_id)?;
+    let path = validated_attachment_read_path(&store, &attachment)?;
     let metadata = fs::metadata(&path)?;
     validate_attachment_download_size(metadata.len().min(i64::MAX as u64) as i64)?;
     let bytes = fs::read(&path)?;
@@ -97,7 +298,10 @@ pub async fn save_image_data_url_as(
 }
 
 #[tauri::command]
-pub async fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<OutboundAttachmentInput>> {
+pub async fn pick_outbound_attachments(
+    app: AppHandle,
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<OutboundAttachmentInput>> {
     let Some(paths) = app
         .dialog()
         .file()
@@ -107,59 +311,39 @@ pub async fn pick_outbound_attachments(app: AppHandle) -> MailResult<Vec<Outboun
         return Ok(Vec::new());
     };
 
-    paths
-        .into_iter()
-        .map(|path| {
-            let path = path.into_path().map_err(|error| {
+    let mut running_total = 0_i64;
+    let mut inputs = Vec::new();
+    for path in paths {
+        let path = path
+            .into_path()
+            .map_err(|error| {
                 crate::db::MailError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     format!("无法解析附件路径：{error}"),
                 ))
             })?;
-            let metadata = fs::metadata(&path)?;
-            let filename = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(ToOwned::to_owned)
-                .unwrap_or_else(|| "attachment".to_string());
-            Ok(OutboundAttachmentInput {
-                filename,
-                mime_type: mime_type_for_path(&path),
-                size_bytes: metadata.len().min(i64::MAX as u64) as i64,
-                local_path: path.to_string_lossy().into_owned(),
-                content_id: String::new(),
-                is_inline: false,
-            })
-        })
-        .collect()
+        let input = authorize_outbound_path(&store, &path, running_total)?;
+        running_total = running_total.saturating_add(input.size_bytes);
+        inputs.push(input);
+    }
+    Ok(inputs)
 }
 
 #[tauri::command]
 pub fn outbound_attachments_from_paths(
+    store: State<'_, MailStore>,
     paths: Vec<String>,
 ) -> MailResult<Vec<OutboundAttachmentInput>> {
-    paths
-        .into_iter()
-        .filter(|path| !path.trim().is_empty())
-        .map(|path| attachment_input_from_path(PathBuf::from(path)))
-        .collect()
-}
-
-fn attachment_input_from_path(path: PathBuf) -> MailResult<OutboundAttachmentInput> {
-    let metadata = fs::metadata(&path)?;
-    let filename = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| "attachment".to_string());
-    Ok(OutboundAttachmentInput {
-        filename,
-        mime_type: mime_type_for_path(&path),
-        size_bytes: metadata.len().min(i64::MAX as u64) as i64,
-        local_path: path.to_string_lossy().into_owned(),
-        content_id: String::new(),
-        is_inline: false,
-    })
+    let mut running_total = 0_i64;
+    let mut inputs = Vec::new();
+    // 顺手清理过期的发件附件授权记录，避免无界增长。
+    let _ = store.cleanup_outbound_attachment_auths(30);
+    for path in paths.into_iter().filter(|path| !path.trim().is_empty()) {
+        let input = authorize_outbound_path(&store, &PathBuf::from(path), running_total)?;
+        running_total = running_total.saturating_add(input.size_bytes);
+        inputs.push(input);
+    }
+    Ok(inputs)
 }
 
 #[tauri::command]
@@ -189,20 +373,12 @@ pub fn download_attachment_file(
     // 放回应用受管理的缓存目录，避免在用户目录中写 .download/.decoded。
     let final_dir = store.resolve_download_dir()?;
     fs::create_dir_all(&final_dir)?;
-    let temp_dir = store.attachment_dir(attachment.message_id);
-    fs::create_dir_all(&temp_dir)?;
+    let temp_dir = ensure_private_attachment_dir(store, attachment.message_id)?;
     let temp_path = temp_dir.join(format!("{}.download", attachment.id));
-    let resume_offset = fs::metadata(&temp_path)
-        .ok()
-        .and_then(|metadata| attachment_resume_offset(metadata.len()))
-        .unwrap_or_else(|| {
-            let _ = fs::remove_file(&temp_path);
-            0
-        });
-    let mut output = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&temp_path)?;
+    // 断点续传既有临时文件在打开前检查：受管目录内的常规文件、权限收紧、
+    // 大小未超限；异常文件删除后从零开始。
+    let resume_offset = private_resume_offset(&temp_path)?;
+    let mut output = open_private_attachment_file(&temp_path)?;
     let download_result = imap_probe::download_attachment_to_writer(
         &account,
         &secret,
@@ -249,7 +425,7 @@ pub fn download_attachment_file(
         transfer_encoding => {
             let decode_result = (|| -> MailResult<i64> {
                 let mut source = BufReader::new(File::open(&temp_path)?);
-                let decoded_file = File::create(&decoded_path)?;
+                let decoded_file = create_private_file(&decoded_path)?;
                 let mut target = BufWriter::new(decoded_file);
                 let decoded_size = imap_probe::decode_attachment_transfer(
                     &mut source,
@@ -337,18 +513,7 @@ pub fn open_attachment(
     attachment_id: i64,
 ) -> MailResult<String> {
     let attachment = store.get_attachment(attachment_id)?;
-    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
-        return Err(crate::db::MailError::Imap(
-            "附件尚未下载，请先下载后再打开。".to_string(),
-        ));
-    }
-    let path = std::path::PathBuf::from(&attachment.local_path);
-    if !path.exists() {
-        return Err(crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "已下载附件文件不存在，请重新下载。",
-        )));
-    }
+    let path = validated_attachment_read_path(&store, &attachment)?;
     app.shell()
         .open(path.to_string_lossy().into_owned(), None)
         .map_err(|error| crate::db::MailError::Imap(format!("无法打开附件：{error}")))?;
@@ -363,18 +528,7 @@ pub fn reveal_attachment_in_finder(
     attachment_id: i64,
 ) -> MailResult<String> {
     let attachment = store.get_attachment(attachment_id)?;
-    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
-        return Err(crate::db::MailError::Imap(
-            "附件尚未下载，请先下载后再定位。".to_string(),
-        ));
-    }
-    let path = std::path::PathBuf::from(&attachment.local_path);
-    if !path.exists() {
-        return Err(crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "已下载附件文件不存在，请重新下载。",
-        )));
-    }
+    let path = validated_attachment_read_path(&store, &attachment)?;
 
     #[cfg(target_os = "macos")]
     {
@@ -411,19 +565,7 @@ pub fn copy_attachment_file_to_clipboard(
     attachment_id: i64,
 ) -> MailResult<String> {
     let attachment = store.get_attachment(attachment_id)?;
-    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
-        return Err(crate::db::MailError::Imap(
-            "附件尚未下载，请先下载后再复制。".to_string(),
-        ));
-    }
-
-    let path = std::path::PathBuf::from(&attachment.local_path);
-    if !path.exists() {
-        return Err(crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "已下载附件文件不存在，请重新下载。",
-        )));
-    }
+    let path = validated_attachment_read_path(&store, &attachment)?;
 
     #[cfg(target_os = "macos")]
     {
@@ -494,13 +636,7 @@ pub async fn save_attachment_as(
         ));
     }
 
-    let source_path = std::path::PathBuf::from(&attachment.local_path);
-    if !source_path.exists() {
-        return Err(crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "已下载附件文件不存在，请重新下载。",
-        )));
-    }
+    let source_path = validated_attachment_read_path(&store, &attachment)?;
 
     // 另存为对话框初始目录为配置的默认附件下载位置；用户显式更改则以用户选择为准。
     let initial_dir = store.resolve_download_dir().ok();
@@ -665,6 +801,7 @@ fn optional_header(name: &str, value: &str) -> String {
 #[tauri::command]
 pub fn save_temp_attachment(
     app: AppHandle,
+    store: State<'_, MailStore>,
     filename: String,
     base64_data: String,
 ) -> MailResult<String> {
@@ -677,6 +814,16 @@ pub fn save_temp_attachment(
                 format!("Base64 解码失败：{error}"),
             ))
         })?;
+    if bytes.len().min(i64::MAX as usize) as i64 > MAX_OUTBOUND_ATTACHMENT_BYTES {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "附件超过大小上限（{} 字节 > {} 字节）。",
+                bytes.len(),
+                MAX_OUTBOUND_ATTACHMENT_BYTES
+            ),
+        )));
+    }
 
     let data_dir = app.path().app_data_dir().map_err(|error| {
         crate::db::MailError::Io(std::io::Error::other(format!("获取数据目录失败：{error}")))
@@ -694,9 +841,14 @@ pub fn save_temp_attachment(
         sanitize_filename(&filename)
     );
     let file_path = temp_dir.join(unique_filename);
-    std::fs::write(&file_path, bytes)?;
+    std::fs::write(&file_path, &bytes)?;
+    let canonical = fs::canonicalize(&file_path)?;
+    store.register_outbound_attachment_auth(
+        &canonical.to_string_lossy(),
+        bytes.len().min(i64::MAX as usize) as i64,
+    )?;
 
-    Ok(file_path.to_string_lossy().into_owned())
+    Ok(canonical.to_string_lossy().into_owned())
 }
 
 /// 按「文件名、文件名 (1).ext、文件名 (2).ext…」返回第 index 个候选文件名。
@@ -772,8 +924,13 @@ fn split_extension(filename: &str) -> (String, String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_eml_message, split_extension, unique_download_path};
+    use super::{
+        authorize_outbound_path, create_private_file, ensure_private_attachment_dir,
+        open_private_attachment_file, private_resume_offset, render_eml_message, split_extension,
+        unique_download_path, validate_outbound_attachment, MAX_OUTBOUND_TOTAL_BYTES,
+    };
     use crate::models::{Attachment, Message};
+    use std::fs;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DATABASE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1028,5 +1185,200 @@ mod tests {
             "解码文件不得写入用户下载目录"
         );
         let _ = std::fs::remove_dir_all(&user_dir);
+    }
+
+    fn sample_attachment(filename: &str, local_path: &str, size_bytes: i64) -> Attachment {
+        Attachment {
+            id: 1,
+            message_id: 1,
+            filename: filename.to_string(),
+            mime_type: "application/octet-stream".to_string(),
+            size_bytes,
+            is_downloaded: true,
+            local_path: local_path.to_string(),
+            content_id: String::new(),
+            is_inline: false,
+        }
+    }
+
+    #[test]
+    fn outbound_attachment_requires_prior_authorization() {
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-auth-test-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("secret.txt");
+        std::fs::write(&file, b"sensitive content").unwrap();
+
+        // 未授权路径：直接引用敏感系统文件不应通过发送前校验。
+        let attachment = sample_attachment("secret.txt", &file.to_string_lossy(), 17);
+        let err = validate_outbound_attachment(&store, &attachment).unwrap_err();
+        assert!(
+            err.to_string().contains("未经授权"),
+            "未授权路径应被拒绝：{err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn outbound_attachment_valid_authorized_path_passes() {
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-auth-ok-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("report.pdf");
+        std::fs::write(&file, b"authorized attachment content").unwrap();
+
+        // 授权后：校验通过，且能读取内容。
+        let input = authorize_outbound_path(&store, &file, 0).expect("authorized");
+        let attachment = sample_attachment("report.pdf", &input.local_path, input.size_bytes);
+        validate_outbound_attachment(&store, &attachment).expect("validated");
+        assert!(store
+            .is_outbound_attachment_authorized(&input.local_path, input.size_bytes)
+            .unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn outbound_attachment_rejects_symlink_swap_after_authorization() {
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-auth-symlink-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("original.bin");
+        std::fs::write(&original, b"benign payload").unwrap();
+        let input = authorize_outbound_path(&store, &original, 0).expect("authorized");
+
+        // 授权后把原文件替换为指向敏感文件的符号链接：canonicalize 会解析到目标，
+        // 授权记录按 canonical path 匹配，因此校验必须失败。
+        let _ = std::fs::remove_file(&original);
+        let sensitive = dir.join("passwd");
+        std::fs::write(&sensitive, b"root:x:0:0").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&sensitive, &original).unwrap();
+
+        let attachment = sample_attachment("original.bin", &input.local_path, input.size_bytes);
+        #[cfg(unix)]
+        {
+            let err = validate_outbound_attachment(&store, &attachment).unwrap_err();
+            assert!(
+                err.to_string().contains("未经授权")
+                    || err.to_string().contains("大小与授权不一致"),
+                "symlink 替换应被拒绝：{err}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn outbound_attachment_rejects_size_change_after_authorization() {
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-auth-size-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("data.bin");
+        std::fs::write(&file, b"12345").unwrap();
+        let input = authorize_outbound_path(&store, &file, 0).expect("authorized");
+
+        // 授权后文件被替换成不同大小的内容：校验必须失败。
+        std::fs::write(&file, b"1234567890").unwrap();
+        let attachment = sample_attachment("data.bin", &input.local_path, input.size_bytes);
+        let err = validate_outbound_attachment(&store, &attachment).unwrap_err();
+        assert!(
+            err.to_string().contains("大小与授权不一致"),
+            "大小变化应被拒绝：{err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn outbound_attachment_total_size_limit_is_enforced() {
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-auth-total-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        // 两个小文件足以让 total 超限（通过把 running_total 设为接近上限）。
+        let file = dir.join("a.bin");
+        std::fs::write(&file, b"a").unwrap();
+        let err = authorize_outbound_path(&store, &file, MAX_OUTBOUND_TOTAL_BYTES).unwrap_err();
+        assert!(
+            err.to_string().contains("总大小超过上限"),
+            "总大小超限应被拒绝：{err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn download_temp_files_use_private_unix_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let message_id = 777;
+        let temp_dir = ensure_private_attachment_dir(&store, message_id).expect("temp dir");
+        assert_eq!(
+            fs::metadata(&temp_dir).unwrap().permissions().mode() & 0o777,
+            0o700,
+            "附件临时目录应为 0700"
+        );
+
+        let download_path = temp_dir.join("1.download");
+        let decoded_path = temp_dir.join("1.decoded");
+        let _download = open_private_attachment_file(&download_path).expect("download file");
+        let _decoded = create_private_file(&decoded_path).expect("decoded file");
+        assert_eq!(
+            fs::metadata(&download_path).unwrap().permissions().mode() & 0o777,
+            0o600,
+            ".download 临时文件应为 0600"
+        );
+        assert_eq!(
+            fs::metadata(&decoded_path).unwrap().permissions().mode() & 0o777,
+            0o600,
+            ".decoded 临时文件应为 0600"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn existing_wide_permission_resume_file_is_tightened() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let message_id = 778;
+        let temp_dir = ensure_private_attachment_dir(&store, message_id).expect("temp dir");
+        let download_path = temp_dir.join("2.download");
+        // 模拟历史版本以宽权限（0644）创建的断点文件。
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .mode(0o644)
+            .open(&download_path)
+            .unwrap();
+        file.set_len(42).unwrap();
+        drop(file);
+
+        let offset = private_resume_offset(&download_path).expect("resume offset");
+        assert_eq!(offset, 42, "常规大小的断点文件应返回可续传偏移");
+        assert_eq!(
+            fs::metadata(&download_path).unwrap().permissions().mode() & 0o777,
+            0o600,
+            "既有断点文件打开前应收紧为 0600"
+        );
     }
 }

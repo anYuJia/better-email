@@ -4,10 +4,16 @@ export type AiServiceConfig = {
   enabled: boolean;
   serviceType: AiServiceType;
   endpoint: string;
+  /** 用户新输入的 API Key（空值表示保持后端已保存的密钥）。 */
   apiKey: string;
   defaultModel: string;
   timeoutSeconds: number;
   privacyAcknowledged: boolean;
+  /** 后端是否已保存 API Key / MCP Key。 */
+  hasApiKey?: boolean;
+  hasMcpApiKey?: boolean;
+  clearApiKey?: boolean;
+  clearMcpApiKey?: boolean;
   /* Parallel MCP Server Gateway Configuration */
   mcpEnabled?: boolean;
   mcpEndpoint?: string;

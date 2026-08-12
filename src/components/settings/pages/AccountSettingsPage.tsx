@@ -54,14 +54,22 @@ export default function AccountSettingsPage({
   useEffect(() => {
     if (!addDialogOpen && !accountDialogMode) return undefined;
 
+    const previouslyFocused = document.activeElement;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      // document 冒泡阶段在 window 之前：stopPropagation 后 SettingsFrame 的
+      // window 级 Escape 不会把整个设置页一起关闭。
+      event.stopPropagation();
+      event.preventDefault();
       setAddDialogOpen(false);
       setAccountDialogMode(null);
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [addDialogOpen, accountDialogMode]);
 
   useEffect(() => {

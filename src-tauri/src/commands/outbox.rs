@@ -182,13 +182,13 @@ pub async fn send_message(
         Err(error) => {
             let blocked_error =
                 "缺少账号授权码，请在账号设置中重新保存授权码；邮件已留在发件箱。".to_string();
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][send] direct smtp credential missing message_id={} account_id={} email={} error={}",
                 message_id,
                 message.account_id,
                 mask_email(&account.email),
                 error,
-            );
+            ));
             store.mark_outbox_blocked(message_id, &blocked_error)?;
             return Err(crate::db::MailError::Smtp(blocked_error));
         }
@@ -197,10 +197,10 @@ pub async fn send_message(
         Ok(raw_message) => raw_message,
         Err(error) => {
             let error_message = error.to_string();
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][send] direct smtp failed message_id={} account_id={} error={}",
                 message_id, message.account_id, error,
-            );
+            ));
             store.mark_outbox_failed(message_id, &error_message)?;
             return Err(error);
         }
@@ -353,13 +353,13 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
             Err(error) => {
                 let blocked_error =
                     "缺少账号授权码，请在账号设置中重新保存授权码；已暂停自动发送。".to_string();
-                eprintln!(
+                crate::logging::log_line(format!(
                     "[better-email][send] smtp item credential blocked message_id={} account_id={} email={} error={}",
                     message.id,
                     message.account_id,
                     mask_email(&account.email),
                     error,
-                );
+                ));
                 store.mark_outbox_blocked(message.id, &blocked_error)?;
                 continue;
             }
@@ -375,10 +375,10 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                 ));
             }
             Err(error) => {
-                eprintln!(
+                crate::logging::log_line(format!(
                     "[better-email][send] smtp item failed message_id={} account_id={} error={}",
                     message.id, message.account_id, error,
-                );
+                ));
                 store.mark_outbox_failed(message.id, &error.to_string())?;
             }
         }

@@ -3,6 +3,7 @@ import { Maximize2, Minus, X } from 'lucide-react';
 import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { logError } from '../app/logger';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
 
@@ -60,7 +61,7 @@ export default function WindowChrome() {
     if (platform === 'web') return undefined;
     document.body.classList.add(`platform-${platform}`);
     void invoke(IPC.WindowChromeReady).catch((error) => {
-      console.error('Failed to apply native window chrome', error);
+      logError('Failed to apply native window chrome', error);
     });
     return () => {
       document.body.classList.remove(`platform-${platform}`);

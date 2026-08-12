@@ -90,7 +90,7 @@ fn verbose_db_logs_enabled() -> bool {
 
 fn db_info(message: impl AsRef<str>) {
     if verbose_db_logs_enabled() {
-        eprintln!("{}", message.as_ref());
+        crate::logging::log_line(message);
     }
 }
 
@@ -206,11 +206,16 @@ impl MailStore {
                 if permissions.mode() & 0o777 != 0o600 {
                     permissions.set_mode(0o600); // User read & write only
                     if let Err(error) = std::fs::set_permissions(&path, permissions) {
-                        eprintln!("[better-email][db][warning] Failed to enforce 0o600 database file permissions: {}", error);
+                        crate::logging::log_line(format!(
+                            "[better-email][db][warning] Failed to enforce 0o600 database file permissions: {}",
+                            error
+                        ));
                     }
                 }
             } else {
-                eprintln!("[better-email][db][warning] Failed to read database metadata to check permissions");
+                crate::logging::log_line(
+                    "[better-email][db][warning] Failed to read database metadata to check permissions",
+                );
             }
         }
         let store = Self {
@@ -533,6 +538,18 @@ mod tests {
     fn test_store() -> MailStore {
         MailStore::open_at_with_seed(test_database_path("better-email-test"), true)
             .expect("test store opens")
+    }
+
+    #[test]
+    fn db_info_routes_through_timestamped_unified_entry() {
+        let text = crate::logging::test_util::with_capture(|| {
+            db_info("[better-email][db] open ok");
+        });
+        assert!(
+            text.lines()
+                .any(|line| line.ends_with("[better-email][db] open ok")),
+            "db_info 应经由统一日志入口输出并带时间戳，实际输出：{text}"
+        );
     }
 
     #[test]

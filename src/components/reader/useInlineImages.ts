@@ -3,6 +3,7 @@ import { resolveCidInlineImages } from '../../app/inlineImages';
 import { localFileAssetUrl, invoke } from '../../tauriBridge';
 import type { Message, Attachment } from '../../app/types';
 import { IPC } from '../../ipc/commands';
+import { logError } from '../../app/logger';
 
 /** Max attachment size allowed for Data URL fallback (2 MB). Larger files stay on asset URL path only. */
 const INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES = 2 * 1024 * 1024;
@@ -111,7 +112,7 @@ export default function useInlineImages({
           return;
         }
       } catch (e) {
-        console.error('Failed to get local asset URL, falling back to data URL if size allows', e);
+        logError('Failed to get local asset URL, falling back to data URL if size allows', e);
       }
 
       if (cancelled) return;

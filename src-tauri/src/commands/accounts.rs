@@ -42,7 +42,9 @@ pub async fn create_account(
             Ok(account)
         }
         Err(error) => {
-            eprintln!("[better-email][account] create command failed error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][account] create command failed error={error}"
+            ));
             Err(error)
         }
     }
@@ -71,10 +73,10 @@ pub async fn delete_account(
             Ok(next_account)
         }
         Err(error) => {
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][account] delete command failed account_id={} error={error}",
                 account_id,
-            );
+            ));
             Err(error)
         }
     }
@@ -100,9 +102,9 @@ pub async fn remove_account(
             Ok(next_account)
         }
         Err(error) => {
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][account] remove command failed account_id={account_id} error={error}",
-            );
+            ));
             Err(error)
         }
     }
@@ -131,9 +133,9 @@ pub fn update_account_settings(
             Ok(account)
         }
         Err(error) => {
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][account] update settings failed account_id={account_id:?} error={error}"
-            );
+            ));
             Err(error)
         }
     }

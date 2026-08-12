@@ -13,6 +13,7 @@ import {
 } from './composerBody';
 import { normalizeContentId } from '../../app/inlineImages';
 import { localFileAssetUrl } from '../../tauriBridge';
+import { logError } from '../../app/logger';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -216,7 +217,7 @@ export default function ComposerPrimaryFields({
         );
         onInlineImagesAdded(attachments);
       } catch (error) {
-        console.error(error);
+        logError(error);
       }
     }
     if (otherFiles.length > 0) {

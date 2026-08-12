@@ -20,7 +20,7 @@ import type {
   SyncRun,
   SyncSchedulePlan,
 } from '../app/types';
-import { flowInfo, flowWarn } from '../app/logger';
+import { flowInfo, flowWarn, logWarn } from '../app/logger';
 import { IPC } from '../ipc/commands';
 
 /**
@@ -390,7 +390,7 @@ export default function useAppMetaLoader({
         if (!isUnreadRefreshCurrent(request)) return;
         await invoke(IPC.SetTrayUnreadCount, { unreadCount });
       } catch (error) {
-        console.warn('Failed to update tray unread count:', error);
+        logWarn('Failed to update tray unread count:', error);
       }
     },
     [isUnreadRefreshCurrent, setAppBadgeStatus],
@@ -422,7 +422,7 @@ export default function useAppMetaLoader({
         });
         await updateAppUnreadBadge(nextStats.unread_messages, request);
       } catch (error) {
-        console.warn('Failed to refresh unread indicators:', error);
+        logWarn('Failed to refresh unread indicators:', error);
       }
     },
     [updateAppUnreadBadge],

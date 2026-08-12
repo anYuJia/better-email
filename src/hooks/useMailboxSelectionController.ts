@@ -18,6 +18,7 @@ import {
   applyMessageMetadataPatch,
   type MessageMetadataPatch,
 } from '../app/messageDetailUtils';
+import { logError } from '../app/logger';
 import type {
   Attachment,
   Folder,
@@ -147,7 +148,7 @@ export default function useMailboxSelectionController({
       })
       .catch((error) => {
         if (cancelled) return;
-        console.error('Failed to load message detail:', error);
+        logError('Failed to load message detail:', error);
       });
     return () => {
       cancelled = true;

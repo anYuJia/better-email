@@ -35,7 +35,7 @@ fn verbose_imap_logs_enabled() -> bool {
 
 fn imap_info(message: impl AsRef<str>) {
     if verbose_imap_logs_enabled() {
-        eprintln!("{}", message.as_ref());
+        crate::logging::log_line(message);
     }
 }
 
@@ -641,9 +641,11 @@ fn fetch_structured_message_body(
     } else {
         fallback_body.clone()
     };
-    let sanitized_html = has_renderable_html
-        .then(|| protocol::sanitize_html(&html_body))
-        .unwrap_or_default();
+    let sanitized_html = if has_renderable_html {
+        protocol::sanitize_html(&html_body)
+    } else {
+        Default::default()
+    };
     let security_warnings = reader_security_warnings(&html_body, &html_body);
     let snippet = protocol::message_body_snippet(&text_body, &html_body, &fallback_body);
     if !include_attachment_metadata {
@@ -1692,10 +1694,10 @@ fn send_imap_client_id_if_needed(session: &mut imap::Session<imap::Connection>, 
     let command = match imap_client_id_command() {
         Ok(command) => command,
         Err(error) => {
-            eprintln!(
+            crate::logging::log_line(format!(
                 "[better-email][imap] client id build failed email={} error={error}",
                 mask_imap_email(&account.email),
-            );
+            ));
             return;
         }
     };
@@ -1706,12 +1708,12 @@ fn send_imap_client_id_if_needed(session: &mut imap::Session<imap::Connection>, 
             account.provider,
             account.imap_host,
         )),
-        Err(error) => eprintln!(
+        Err(error) => crate::logging::log_line(format!(
             "[better-email][imap] client id failed email={} provider={} host={} error={error}",
             mask_imap_email(&account.email),
             account.provider,
             account.imap_host,
-        ),
+        )),
     }
 }
 

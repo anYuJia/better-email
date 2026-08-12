@@ -164,7 +164,7 @@ impl MailStore {
                 input.smtp_host.trim(),
             ));
             if email.is_empty() || !email.contains('@') {
-                eprintln!("[better-email][db] create_account invalid email");
+                crate::logging::log_line("[better-email][db] create_account invalid email");
                 return Err(MailError::Imap("请输入有效邮箱地址。".to_string()));
             }
             let display_name = if input.display_name.trim().is_empty() {
@@ -201,13 +201,15 @@ impl MailStore {
             )
             .map_err(|error| {
                 if is_unique_constraint_error(&error) {
-                    eprintln!(
+                    crate::logging::log_line(format!(
                         "[better-email][db] create_account duplicate email={}",
                         mask_email_for_log(&email),
-                    );
+                    ));
                     MailError::Imap("该邮箱账号已存在。".to_string())
                 } else {
-                    eprintln!("[better-email][db] create_account insert failed error={error}");
+                    crate::logging::log_line(format!(
+                        "[better-email][db] create_account insert failed error={error}"
+                    ));
                     MailError::Database(error)
                 }
             })?;
@@ -275,7 +277,9 @@ impl MailStore {
                 )
                 .optional()?;
             let Some(account_email) = account_email else {
-                eprintln!("[better-email][db] remove_account missing account_id={account_id}");
+                crate::logging::log_line(format!(
+                    "[better-email][db] remove_account missing account_id={account_id}"
+                ));
                 return Err(MailError::Imap("邮箱账号不存在或已被移除。".to_string()));
             };
 

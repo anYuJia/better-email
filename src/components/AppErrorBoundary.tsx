@@ -1,4 +1,5 @@
 import React from 'react';
+import { logError } from '../app/logger';
 
 type AppErrorBoundaryProps = {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ export default class AppErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
-    console.error('[better-email][render-error]', {
+    logError('[better-email][render-error]', {
       message: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,

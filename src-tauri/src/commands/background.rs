@@ -21,7 +21,7 @@ pub fn enqueue_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] enqueue failed error={error}");
+            crate::logging::log_line(format!("[better-email][task] enqueue failed error={error}"));
             Err(error)
         }
     }
@@ -53,7 +53,7 @@ pub fn next_background_task(store: State<'_, MailStore>) -> MailResult<Option<Ba
         }
         Ok(None) => Ok(None),
         Err(error) => {
-            eprintln!("[better-email][task] next failed error={error}");
+            crate::logging::log_line(format!("[better-email][task] next failed error={error}"));
             Err(error)
         }
     }
@@ -73,7 +73,9 @@ pub fn mark_background_task_running(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] running failed task_id={task_id} error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] running failed task_id={task_id} error={error}"
+            ));
             Err(error)
         }
     }
@@ -94,7 +96,9 @@ pub fn complete_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] complete failed task_id={task_id} error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] complete failed task_id={task_id} error={error}"
+            ));
             Err(error)
         }
     }
@@ -115,7 +119,9 @@ pub fn fail_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] fail failed task_id={task_id} error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] fail failed task_id={task_id} error={error}"
+            ));
             Err(error)
         }
     }
@@ -146,7 +152,9 @@ pub fn enqueue_account_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] enqueue account task failed error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] enqueue account task failed error={error}"
+            ));
             Err(error)
         }
     }
@@ -166,7 +174,9 @@ pub fn retry_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] retry failed task_id={task_id} error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] retry failed task_id={task_id} error={error}"
+            ));
             Err(error)
         }
     }
@@ -186,7 +196,9 @@ pub fn cancel_background_task(
             Ok(task)
         }
         Err(error) => {
-            eprintln!("[better-email][task] cancel failed task_id={task_id} error={error}");
+            crate::logging::log_line(format!(
+                "[better-email][task] cancel failed task_id={task_id} error={error}"
+            ));
             Err(error)
         }
     }

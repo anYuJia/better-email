@@ -15,7 +15,7 @@ import type {
   SyncRun,
   ThreadSummary,
 } from '../app/types';
-import { flowInfo, flowWarn } from '../app/logger';
+import { flowInfo, flowWarn, logError } from '../app/logger';
 import { loadMailboxMessageLimit } from '../app/mailboxListState';
 import type { LoadMetaResult } from './useAppMetaLoader';
 import type { MailboxDataController } from './useMailboxData';
@@ -227,7 +227,7 @@ export default function useMailboxSync({
         unlistenProgress = nextUnlisten;
       })
       .catch((error) => {
-        console.error('Failed to listen to sync-progress event:', error);
+        logError('Failed to listen to sync-progress event:', error);
       });
 
     return () => {

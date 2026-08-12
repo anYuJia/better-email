@@ -21,6 +21,7 @@ import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import MessageToastStack, { type MessageToast } from './components/MessageToastStack';
 import useAppLayout from './hooks/useAppLayout';
+import { logError } from './app/logger';
 import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
@@ -806,7 +807,7 @@ export default function App() {
         });
         unlisteners.push(unlistenSettings);
       } catch (error) {
-        console.error('Failed to register tray listeners:', error);
+        logError('Failed to register tray listeners:', error);
       }
     }
 

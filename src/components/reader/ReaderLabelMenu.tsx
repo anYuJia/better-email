@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Tag } from 'lucide-react';
 import type { Label } from '../../app/types';
+import { logError } from '../../app/logger';
 
 type ReaderLabelMenuProps = {
   selectedLabels: string[];
@@ -30,7 +31,7 @@ export default function ReaderLabelMenu({
       await onCreateLabel(newLabelName.trim(), newLabelColor);
       setNewLabelName('');
     } catch (e) {
-      console.error(e);
+      logError(e);
     }
   }
 
@@ -40,7 +41,7 @@ export default function ReaderLabelMenu({
       await onUpdateLabel(id, editingLabelName.trim(), newLabelColor);
       setEditingLabelId(null);
     } catch (e) {
-      console.error(e);
+      logError(e);
     }
   }
 

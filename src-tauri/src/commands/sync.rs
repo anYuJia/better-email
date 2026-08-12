@@ -279,10 +279,10 @@ pub async fn sync_imap_headers(
                 run.imported_messages,
                 command_started_at.elapsed().as_millis()
             )),
-            Err(error) => eprintln!(
+            Err(error) => crate::logging::log_line(format!(
                 "[better-email][sync] command failed account_id={account_id:?} error={error} duration_ms={}",
                 command_started_at.elapsed().as_millis()
-            ),
+            )),
         }
         return result;
     }
@@ -318,11 +318,11 @@ pub async fn sync_imap_headers(
                 }
             }
             Err(error) => {
-                eprintln!(
+                crate::logging::log_line(format!(
                     "[better-email][sync] account failed account_id={} email={} error={error}",
                     account.id,
                     mask_email(&account.email),
-                );
+                ));
                 failures.push(format!("{}: {error}", account.email));
             }
         }
@@ -401,10 +401,10 @@ pub async fn sync_imap_headers(
             command_started_at.elapsed().as_millis(),
             run.message,
         )),
-        Err(error) => eprintln!(
+        Err(error) => crate::logging::log_line(format!(
             "[better-email][sync] record failed account_id={account_id:?} error={error} duration_ms={}",
             command_started_at.elapsed().as_millis()
-        ),
+        )),
     }
     result
 }
@@ -615,11 +615,11 @@ fn sync_imap_headers_for_account(
                                 auto_download_failures += stats.auto_download_failures;
                             }
                             Err(error) => {
-                                eprintln!(
+                                crate::logging::log_line(format!(
                                     "[better-email][sync] body sync failed account_id={} mailbox={} error={error}",
                                     account.id,
                                     mailbox.remote_name
-                                );
+                                ));
                                 body_failures += 1;
                             }
                         }
@@ -874,6 +874,9 @@ fn should_fetch_attachment_metadata(
     fetch_history_attachments || (previous_highest_uid > 0 && remote_uid > previous_highest_uid)
 }
 
+/// 同步单个邮箱的缺失正文（按 LIMIT 分批拉取）。入参较多是同步进度与
+/// 分批上下文整体传入所致，保持平坦参数以便调用点明确可见。
+#[allow(clippy::too_many_arguments)]
 fn sync_mailbox_bodies(
     store: &MailStore,
     account: &Account,
@@ -931,14 +934,14 @@ fn sync_mailbox_bodies(
         ) {
             Ok(bodies) => bodies,
             Err(error) => {
-                eprintln!(
+                crate::logging::log_line(format!(
                     "[better-email][sync] body batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
                     account.id,
                     remote_name,
                     batch_index + 1,
                     total_batches,
                     batch_uids.len()
-                );
+                ));
                 stats.failures += batch_uids.len();
                 update_body_sync_progress(
                     store,
@@ -969,13 +972,13 @@ fn sync_mailbox_bodies(
                     fetched_message_ids.push(message_id);
                 }
                 Err(error) => {
-                    eprintln!(
+                    crate::logging::log_line(format!(
                         "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
                         account.id,
                         remote_name,
                         uid,
                         message_id
-                    );
+                    ));
                     stats.failures += 1;
                 }
             }
@@ -1012,6 +1015,8 @@ fn sync_mailbox_bodies(
     Ok(stats)
 }
 
+/// 上报正文同步进度（文件夹 / 批次 / 处理量），入参多为进度字段快照。
+#[allow(clippy::too_many_arguments)]
 fn update_body_sync_progress(
     store: &MailStore,
     task_progress: Option<SyncTaskProgress>,
@@ -1059,10 +1064,14 @@ fn folder_progress_percent(
     let start = (folder_index * 100) / total_folders;
     let end = ((folder_index + 1) * 100) / total_folders;
     let folder_span = end.saturating_sub(start);
+    // total_messages 为 0 时回退到 folder_span，避免除零。
     let body_progress = if total_messages == 0 {
         folder_span
     } else {
-        folder_span * processed_messages.min(total_messages) / total_messages
+        folder_span
+            .checked_mul(processed_messages.min(total_messages))
+            .and_then(|scaled| scaled.checked_div(total_messages))
+            .unwrap_or(folder_span)
     };
     (start + body_progress).min(100) as i64
 }

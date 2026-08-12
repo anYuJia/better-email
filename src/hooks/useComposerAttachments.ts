@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { OutboundAttachmentInput } from '../app/types';
 import { getCurrentWindow, invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { logError } from '../app/logger';
 
 type ComposerAttachmentsOptions = {
   isComposerOpen: boolean;
@@ -133,7 +134,7 @@ export default function useComposerAttachments({
 
       onAttachmentsReady(savedAttachments, statusPrefix);
     } catch (error) {
-      console.error(error);
+      logError(error);
       setStatus(`添加附件失败: ${String(error)}`);
     }
   }

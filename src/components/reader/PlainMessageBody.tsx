@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { invoke } from '../../tauriBridge';
 import { IPC } from '../../ipc/commands';
+import { logError } from '../../app/logger';
 
 export type PlainBodyBlock =
   | { type: 'text'; content: string }
@@ -135,7 +136,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           onClick={(e) => {
             e.preventDefault();
             invoke(IPC.OpenUrl, { url: part }).catch((err) =>
-              console.error('Failed to open link:', err)
+              logError('Failed to open link:', err)
             );
           }}
           style={{

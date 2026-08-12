@@ -3,6 +3,7 @@ mod commands;
 mod credentials;
 mod db;
 mod imap_probe;
+mod logging;
 mod mime;
 mod models;
 mod oauth;
@@ -279,7 +280,7 @@ pub fn run() {
                 }
             }
             if let Err(e) = setup_tray(app) {
-                eprintln!("Failed to setup tray: {:?}", e);
+                crate::logging::log_line(format!("Failed to setup tray: {:?}", e));
             }
             Ok(())
         })

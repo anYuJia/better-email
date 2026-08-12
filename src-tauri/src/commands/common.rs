@@ -23,7 +23,7 @@ pub(super) fn verbose_command_logs_enabled() -> bool {
 
 pub(super) fn command_info(message: impl AsRef<str>) {
     if verbose_command_logs_enabled() {
-        eprintln!("{}", message.as_ref());
+        crate::logging::log_line(message);
     }
 }
 

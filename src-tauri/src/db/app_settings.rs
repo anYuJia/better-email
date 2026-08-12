@@ -2,19 +2,11 @@ use super::*;
 
 /// 应用全局设置：不按邮箱账号区分。
 /// 采用与 ai_settings 相同的单例表（id = 1）模式，字段缺失时安全回退默认值。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AppSettingsRecord {
     /// 用户显式选择的「默认附件下载位置」绝对路径。
     /// 为空字符串表示未自定义，应回退到系统 Downloads/better-email 默认目录。
     pub default_download_dir: String,
-}
-
-impl Default for AppSettingsRecord {
-    fn default() -> Self {
-        Self {
-            default_download_dir: String::new(),
-        }
-    }
 }
 
 impl MailStore {
@@ -28,9 +20,9 @@ impl MailStore {
 
     /// 解析生效的附件下载目录：
     /// - 用户已显式配置且为绝对路径时使用该路径；
-    /// - 否则使用系统 Downloads/better-email 默认目录。
-    /// 数据库记录里的配置路径与数据库/应用数据目录重叠或非法时视为无效并回退默认，
-    /// 避免把附件写到数据库目录等危险位置。
+    /// - 否则使用系统 Downloads/better-email 默认目录；
+    /// - 数据库记录里的配置路径与数据库/应用数据目录重叠或非法时视为无效并回退默认，
+    ///   避免把附件写到数据库目录等危险位置。
     pub fn resolve_download_dir(&self) -> MailResult<PathBuf> {
         let settings = self.load_app_settings()?;
         let configured = settings.default_download_dir.trim();
@@ -39,8 +31,8 @@ impl MailStore {
             if is_safe_download_dir(&candidate, &self.data_dir) {
                 return Ok(candidate);
             }
-            eprintln!(
-                "[better-email][app_settings] configured download dir rejected, falling back to default"
+            crate::logging::log_line(
+                "[better-email][app_settings] configured download dir rejected, falling back to default",
             );
         }
         Ok(default_download_dir())

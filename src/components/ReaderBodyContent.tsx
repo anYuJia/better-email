@@ -2,6 +2,7 @@ import EmailReaderSkeleton from './EmailReaderSkeleton';
 import EmailShadowView from './reader/EmailShadowView';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import { parseMailtoUrl } from '../mailUtils';
+import { logWarn } from '../app/logger';
 
 type ReaderBodyContentProps = {
   isBodyRenderReady: boolean;
@@ -54,7 +55,7 @@ export default function ReaderBodyContent({
             } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
               onOpenLink(href);
             } else {
-              console.warn('Blocked navigation to unsafe/unknown protocol:', href);
+              logWarn('Blocked navigation to unsafe/unknown protocol:', href);
             }
           }}
         />

@@ -316,12 +316,12 @@ pub fn auto_download_attachments_for_message(
         match download_attachment_file(store, &attachment) {
             Ok(_) => outcome.downloaded += 1,
             Err(error) => {
-                eprintln!(
+                crate::logging::log_line(format!(
                     "[better-email][attachment] auto download failed message_id={} attachment_id={} filename={} error={error}",
                     message_id,
                     attachment.id,
                     attachment.filename
-                );
+                ));
                 outcome.failures += 1;
             }
         }

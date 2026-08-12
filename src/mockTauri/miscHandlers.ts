@@ -1,5 +1,6 @@
 import { mockSetTrayUnreadCount, mockWindowChromeReady } from './state';
 import type { MockCommandHandler } from './types';
+import { logLine } from '../app/logger';
 
 const mockAiSettingsState = {
   enabled: false,
@@ -31,7 +32,7 @@ function mockAppSettingsReport() {
 
 export const handlers: Record<string, MockCommandHandler> = {
   'open_url': (args) => {
-    console.log('Mock opening URL:', args?.url);
+    logLine('Mock opening URL:', args?.url);
     return undefined;
   },
   'set_tray_unread_count': mockSetTrayUnreadCount,

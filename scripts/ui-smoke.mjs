@@ -2,6 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { WebSocket as UndiciWebSocket } from 'undici';
+
+const CDPWebSocket = globalThis.WebSocket ?? UndiciWebSocket;
 
 const root = new URL('..', import.meta.url).pathname;
 const port = Number(
@@ -97,7 +100,7 @@ async function openCdp(debugPort, pageUrl) {
   if (!target?.webSocketDebuggerUrl) {
     throw new Error(`Chrome page target not found for ${pageUrl}`);
   }
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  const ws = new CDPWebSocket(target.webSocketDebuggerUrl);
   let seq = 0;
   const pending = new Map();
   const events = [];
@@ -129,7 +132,7 @@ async function openCdp(debugPort, pageUrl) {
   });
 
   function sendOnce(method, params = {}) {
-    if (ws.readyState !== WebSocket.OPEN) {
+    if (ws.readyState !== CDPWebSocket.OPEN) {
       return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
     }
     const id = ++seq;

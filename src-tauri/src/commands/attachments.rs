@@ -821,7 +821,7 @@ pub fn copy_attachment_file_to_clipboard(
     attachment_id: i64,
 ) -> MailResult<String> {
     let attachment = store.get_attachment(attachment_id)?;
-    let path = validated_attachment_read_path(&store, &attachment)?;
+    let _path = validated_attachment_read_path(&store, &attachment)?;
 
     #[cfg(target_os = "macos")]
     {
@@ -832,7 +832,7 @@ pub fn copy_attachment_file_to_clipboard(
             .arg("set the clipboard to (POSIX file (item 1 of argv))")
             .arg("-e")
             .arg("end run")
-            .arg(path.to_string_lossy().into_owned())
+            .arg(_path.to_string_lossy().into_owned())
             .output()
             .map_err(crate::db::MailError::Io)?;
         if !output.status.success() {

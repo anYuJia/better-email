@@ -70,22 +70,7 @@ export const handlers: Record<string, MockCommandHandler> = {
       local_path: '/tmp/better-email/smoke-brief.txt',
     },
   ],
-  'outbound_attachments_from_paths': (args) => {
-    const paths = Array.isArray(args?.paths) ? args.paths : [];
-    return paths
-      .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
-      .map((path) => {
-        const filename = path.split(/[\\/]/).pop() || 'attachment';
-        return {
-          filename,
-          mime_type: mimeTypeForMockPath(filename),
-          size_bytes: 0,
-          local_path: path,
-          content_id: '',
-          is_inline: false,
-        };
-      });
-  },
+  'cleanup_temp_attachments': () => 0,
   'save_temp_attachment': (args) => {
     const filename = String(args?.filename || 'attachment').split(/[\\/]/).pop() || 'attachment';
     return `/tmp/better-email/${filename}`;

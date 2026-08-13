@@ -289,7 +289,8 @@ impl MailStore {
     ) -> MailResult<MailboxSyncTransactionResult> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
-            let reconcile = reconcile_imap_flag_snapshot_for_conn(&transaction, mailbox_id, snapshot)?;
+            let reconcile =
+                reconcile_imap_flag_snapshot_for_conn(&transaction, mailbox_id, snapshot)?;
             let (imported_messages, new_messages, new_message_ids) =
                 import_imap_headers_for_conn(&transaction, mailbox_id, batch)?;
             transaction.commit()?;

@@ -118,15 +118,24 @@ pub(super) fn import_backup_table(
         // local_path/is_downloaded 一律清空，防止借附件路径读取任意文件。
         let mut normalized = row.clone();
         if table == "messages" {
-            let body = row.get("body").and_then(|value| value.as_str()).unwrap_or_default();
+            let body = row
+                .get("body")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default();
             let (sanitized_html, security_warnings) = recompute_message_security(body);
-            normalized.insert("sanitized_html".into(), serde_json::Value::String(sanitized_html));
+            normalized.insert(
+                "sanitized_html".into(),
+                serde_json::Value::String(sanitized_html),
+            );
             normalized.insert(
                 "security_warnings".into(),
                 serde_json::Value::String(security_warnings),
             );
         } else if table == "attachments" {
-            normalized.insert("local_path".into(), serde_json::Value::String(String::new()));
+            normalized.insert(
+                "local_path".into(),
+                serde_json::Value::String(String::new()),
+            );
             normalized.insert("is_downloaded".into(), serde_json::Value::Number(0.into()));
         }
         let mut insert_columns = Vec::new();
@@ -169,7 +178,10 @@ fn recompute_message_security(body: &str) -> (String, String) {
         warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
     }
     warnings.extend(crate::protocol::link_risk_warnings(body));
-    (sanitized_html, super::messages::warning_lines_to_text(&warnings))
+    (
+        sanitized_html,
+        super::messages::warning_lines_to_text(&warnings),
+    )
 }
 pub(super) fn table_columns(conn: &Connection, table: &str) -> MailResult<Vec<String>> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", quote_identifier(table)))?;

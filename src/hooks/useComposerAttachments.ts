@@ -56,12 +56,14 @@ export default function useComposerAttachments({
         setStatus('拖拽内容中没有文件');
         return;
       }
-      try {
-        const newAttachments = await invoke<OutboundAttachmentInput[]>(IPC.OutboundAttachmentsFromPaths, { paths });
-        onAttachmentsReady(newAttachments, '已拖入附件');
-      } catch (error) {
-        setStatus(`附件拖入失败：${String(error)}`);
-      }
+      // 操作系统拖放只暴露路径，renderer 可伪造任意路径，后端不能据此授权文件。
+      // 因此 OS 拖放不再走路径 IPC（outbound_attachments_from_paths 已移除），
+      // 回退到原生文件选择器流程（由后端登记具体文件）。
+      // HTML5 拖放 / 粘贴（File 对象）仍走 save_temp_attachment，由后端写私有临时文件。
+      setStatus('已捕获系统拖放文件，请通过「选择附件」选择要附加的文件');
+      void pickDraftAttachments().catch((error) => {
+        setStatus(`附件选择失败：${String(error)}`);
+      });
     })
       .then((nextUnlisten) => {
         unlisten = nextUnlisten;

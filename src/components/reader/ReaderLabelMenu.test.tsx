@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import ReaderLabelMenu from './ReaderLabelMenu';
 import type { Label } from '../../app/types';
 
@@ -27,6 +28,26 @@ function openLabelMenu() {
   details.setAttribute('open', '');
 }
 
+function ControlledReaderLabelMenu() {
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+
+  return (
+    <ReaderLabelMenu
+      selectedLabels={selectedLabels}
+      labels={labels}
+      onToggleLabel={(label) => {
+        setSelectedLabels((current) =>
+          current.includes(label.name)
+            ? current.filter((name) => name !== label.name)
+            : [...current, label.name],
+        );
+      }}
+      onCreateLabel={vi.fn()}
+      onDeleteLabel={vi.fn()}
+    />
+  );
+}
+
 describe('ReaderLabelMenu accessibility', () => {
   it('gives every color button a semantic name and pressed state', () => {
     openLabelMenu();
@@ -49,5 +70,32 @@ describe('ReaderLabelMenu accessibility', () => {
     openLabelMenu();
     expect(screen.getByRole('button', { name: '编辑名称' })).toBeDefined();
     expect(screen.getByRole('button', { name: '删除标签' })).toBeDefined();
+  });
+
+  it('keeps label chips and active state in sync after add, remove, and add', () => {
+    render(<ControlledReaderLabelMenu />);
+    const summary = document.querySelector('.label-menu summary') as HTMLElement;
+    fireEvent.click(summary);
+    const details = document.querySelector('.label-menu') as HTMLElement;
+    details.setAttribute('open', '');
+
+    const activeLabelCount = () => document.querySelectorAll('.active-label-chip').length;
+    const labelButton = screen.getByRole('button', { name: '工作' });
+
+    expect(labelButton.className).toContain('label-select-btn');
+    expect(labelButton.className).not.toContain('active');
+    expect(activeLabelCount()).toBe(0);
+
+    fireEvent.click(labelButton);
+    expect(labelButton.className).toContain('active');
+    expect(activeLabelCount()).toBe(1);
+
+    fireEvent.click(labelButton);
+    expect(labelButton.className).not.toContain('active');
+    expect(activeLabelCount()).toBe(0);
+
+    fireEvent.click(labelButton);
+    expect(labelButton.className).toContain('active');
+    expect(activeLabelCount()).toBe(1);
   });
 });

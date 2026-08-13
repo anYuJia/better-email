@@ -10,6 +10,9 @@ use std::net::{TcpListener, TcpStream};
 use std::time::{Duration as StdDuration, Instant};
 use uuid::Uuid;
 
+/// OAuth2 token 交换/刷新响应的读取上限：防止恶意 token 端点返回超大响应。
+const MAX_OAUTH_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
+
 struct OAuthProviderConfig {
     authorization_endpoint: &'static str,
     token_endpoint: &'static str,
@@ -221,31 +224,36 @@ pub fn build_token_exchange_request(
     })
 }
 
+/// 发送 application/x-www-form-urlencoded 表单请求，并对响应做有上限读取。
+/// 成功与失败响应都先受大小限制再返回；错误信息不含响应正文。
+fn post_form_capped(
+    endpoint: &str,
+    form: &[(String, String)],
+    max_bytes: u64,
+) -> Result<(u16, String), String> {
+    let mut response = ureq::post(endpoint)
+        .send_form(
+            form.iter()
+                .map(|(key, value)| (key.as_str(), value.as_str())),
+        )
+        .map_err(|error| format!("OAuth2 token 请求失败：{error}"))?;
+    let status = response.status();
+    let body = crate::http::read_response_capped(response.body_mut().as_reader(), max_bytes)?;
+    Ok((status.as_u16(), body))
+}
 pub fn exchange_token(
     session: &OAuthTokenExchangeSession,
     client_id: &str,
     client_secret: &str,
 ) -> Result<OAuthTokenBundle, String> {
     let request = build_token_exchange_request(session, client_id, client_secret)?;
-    let mut response = ureq::post(&request.token_endpoint)
-        .send_form(
-            request
-                .form
-                .iter()
-                .map(|(key, value)| (key.as_str(), value.as_str())),
-        )
-        .map_err(|error| format!("OAuth2 token 交换请求失败：{error}"))?;
-    let status = response.status();
-    let body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|error| format!("OAuth2 token 响应读取失败：{error}"))?;
-    if !status.is_success() {
-        return Err(format!(
-            "OAuth2 token 端点返回 HTTP {}：{}",
-            status.as_u16(),
-            truncate_for_log(&body)
-        ));
+    let (status, body) = post_form_capped(
+        &request.token_endpoint,
+        &request.form,
+        MAX_OAUTH_RESPONSE_BYTES,
+    )?;
+    if !(200..300).contains(&status) {
+        return Err(format!("OAuth2 token 端点返回 HTTP {status}，交换失败。"));
     }
     let mut bundle = token_bundle_from_response(session, &body)?;
     bundle.client_id = client_id.trim().to_string();
@@ -310,24 +318,14 @@ pub fn refresh_token(
         client_secret.trim()
     };
     let request = build_refresh_token_request(bundle, client_id, client_secret)?;
-    let mut response = ureq::post(&request.token_endpoint)
-        .send_form(
-            request
-                .form
-                .iter()
-                .map(|(key, value)| (key.as_str(), value.as_str())),
-        )
-        .map_err(|error| format!("OAuth2 token 刷新请求失败：{error}"))?;
-    let status = response.status();
-    let body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|error| format!("OAuth2 token 刷新响应读取失败：{error}"))?;
-    if !status.is_success() {
+    let (status, body) = post_form_capped(
+        &request.token_endpoint,
+        &request.form,
+        MAX_OAUTH_RESPONSE_BYTES,
+    )?;
+    if !(200..300).contains(&status) {
         return Err(format!(
-            "OAuth2 token 刷新端点返回 HTTP {}：{}",
-            status.as_u16(),
-            truncate_for_log(&body)
+            "OAuth2 token 刷新端点返回 HTTP {status}，刷新失败。"
         ));
     }
     let mut refreshed = refreshed_bundle_from_response(bundle, &body)?;
@@ -548,12 +546,11 @@ fn handle_callback_stream(
         }
     };
     // 只接受匹配当前待处理会话的 state：未知/已消费的 state 不终止监听。
-    if !expected_states.iter().any(|expected| expected == &payload.state) {
-        write_callback_response(
-            stream,
-            400,
-            "Better Email OAuth2 回调 state 未知或已失效。",
-        );
+    if !expected_states
+        .iter()
+        .any(|expected| expected == &payload.state)
+    {
+        write_callback_response(stream, 400, "Better Email OAuth2 回调 state 未知或已失效。");
         return Ok(None);
     }
     write_callback_response(
@@ -609,7 +606,9 @@ mod callback_tests {
         stream
             .write_all(format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").as_bytes())
             .expect("request written");
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(3))).expect("timeout set");
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(3)))
+            .expect("timeout set");
         let mut buffer = Vec::new();
         let mut chunk = [0_u8; 256];
         loop {
@@ -634,17 +633,24 @@ mod callback_tests {
         });
         // 路径错误 → 404，不影响后续。
         let wrong_path = send_request(port, "/wrong/path?state=valid-state&code=x");
-        assert!(wrong_path.contains("404"), "路径错误应返回 404：{wrong_path}");
+        assert!(
+            wrong_path.contains("404"),
+            "路径错误应返回 404：{wrong_path}"
+        );
         // 缺 state → 400。
         let no_state = send_request(port, "/oauth/callback?code=x");
         assert!(no_state.contains("400"), "缺 state 应返回 400：{no_state}");
         // 错误 state → 400，且不消费监听。
         let wrong_state = send_request(port, "/oauth/callback?state=other-state&code=x");
-        assert!(wrong_state.contains("400"), "未知 state 应返回 400：{wrong_state}");
+        assert!(
+            wrong_state.contains("400"),
+            "未知 state 应返回 400：{wrong_state}"
+        );
         // 合法回调随后仍成功。
         let valid = send_request(port, "/oauth/callback?state=valid-state&code=auth-code");
         assert!(valid.contains("200"), "合法回调应返回 200：{valid}");
-        let payload: OAuthCallbackPayload = waiter.join().expect("waiter joins").expect("waiter ok");
+        let payload: OAuthCallbackPayload =
+            waiter.join().expect("waiter joins").expect("waiter ok");
         assert_eq!(payload.state, "valid-state");
         assert_eq!(payload.code, "auth-code");
     }
@@ -662,7 +668,10 @@ mod callback_tests {
         });
         // 先发一个恰好存在于别处但不在预期集合里的 state。
         let unexpected = send_request(port, "/oauth/callback?state=other-valid&code=x");
-        assert!(unexpected.contains("400"), "非预期 state 应拒绝：{unexpected}");
+        assert!(
+            unexpected.contains("400"),
+            "非预期 state 应拒绝：{unexpected}"
+        );
         let valid = send_request(port, "/oauth/callback?state=expected-one&code=code-1");
         assert!(valid.contains("200"));
         let payload = waiter.join().expect("waiter joins").expect("waiter ok");
@@ -684,16 +693,6 @@ fn write_callback_response(stream: &mut TcpStream, status: u16, message: &str) {
     );
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
-}
-
-fn truncate_for_log(value: &str) -> String {
-    const LIMIT: usize = 240;
-    let value = value.trim();
-    if value.len() <= LIMIT {
-        value.to_string()
-    } else {
-        format!("{}...", &value[..LIMIT])
-    }
 }
 
 #[cfg(test)]
@@ -851,5 +850,77 @@ mod tests {
         )
         .expect_err("callback error description should be reported");
         assert_eq!(described_error, "OAuth2 授权失败：Try again");
+    }
+
+    /// 启动一个只响应一次的本地 HTTP 服务器，返回 (port, body_bytes, status)。
+    fn serve_once(status_line: &str, body: Vec<u8>) -> u16 {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().unwrap().port();
+        let status_line = status_line.to_string();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0_u8; 4096];
+            let _ = stream.read(&mut buf);
+            let response = format!(
+                "{}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+                status_line,
+                body.len()
+            );
+            let mut all = response.into_bytes();
+            all.extend_from_slice(&body);
+            let _ = stream.write_all(&all);
+            let _ = stream.flush();
+        });
+        port
+    }
+
+    #[test]
+    fn oversized_oauth_token_response_is_rejected_before_parsing() {
+        // 恶意 token 端点返回超过上限的响应：必须在读取阶段拒绝，不能无界读入。
+        let oversized = vec![b'x'; (MAX_OAUTH_RESPONSE_BYTES as usize) + 10];
+        let port = serve_once("HTTP/1.1 200 OK", oversized);
+        let err = post_form_capped(
+            &format!("http://127.0.0.1:{port}/token"),
+            &[],
+            MAX_OAUTH_RESPONSE_BYTES,
+        )
+        .expect_err("oversized token response rejected");
+        assert!(
+            err.contains("超过大小上限"),
+            "超大 token 响应应被拒绝：{err}"
+        );
+        assert!(!err.contains('x'), "错误信息不得包含响应正文：{err}");
+    }
+
+    #[test]
+    fn oauth_token_error_response_is_rejected_without_leaking_body() {
+        // 非 2xx 响应：ureq 在读取正文前即报错，超大正文不会被读入内存，
+        // 错误信息也不包含响应正文。
+        let oversized = vec![b'Z'; (MAX_OAUTH_RESPONSE_BYTES as usize) + 5];
+        let port = serve_once("HTTP/1.1 400 Bad Request", oversized);
+        let err = post_form_capped(
+            &format!("http://127.0.0.1:{port}/token"),
+            &[],
+            MAX_OAUTH_RESPONSE_BYTES,
+        )
+        .expect_err("non-2xx rejected");
+        assert!(!err.contains('Z'), "错误信息不得包含响应正文：{err}");
+    }
+
+    #[test]
+    fn oauth_token_small_response_is_returned_and_parses() {
+        // 正常大小响应可正常返回，随后由解析函数处理。
+        let body = br#"{"access_token":"at","refresh_token":"rt","token_type":"Bearer","expires_in":3600}"#.to_vec();
+        let port = serve_once("HTTP/1.1 200 OK", body);
+        let (status, body) = post_form_capped(
+            &format!("http://127.0.0.1:{port}/token"),
+            &[],
+            MAX_OAUTH_RESPONSE_BYTES,
+        )
+        .expect("small token response read");
+        assert_eq!(status, 200);
+        assert!(body.contains("\"access_token\""));
     }
 }

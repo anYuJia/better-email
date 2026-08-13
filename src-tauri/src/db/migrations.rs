@@ -112,6 +112,7 @@ impl MailStore {
                     size_bytes INTEGER NOT NULL,
                     is_downloaded INTEGER NOT NULL DEFAULT 0,
                     local_path TEXT NOT NULL DEFAULT '',
+                    content_sha256 TEXT NOT NULL DEFAULT '',
                     content_id TEXT NOT NULL DEFAULT '',
                     is_inline INTEGER NOT NULL DEFAULT 0
                 );
@@ -257,12 +258,19 @@ impl MailStore {
                     id INTEGER PRIMARY KEY,
                     canonical_path TEXT NOT NULL UNIQUE,
                     size_bytes INTEGER NOT NULL,
+                    content_sha256 TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL
                 );
                 ",
             )?;
 
             add_column_if_missing(conn, "accounts", "imap_host", "TEXT NOT NULL DEFAULT ''")?;
+            add_column_if_missing(
+                conn,
+                "outbound_attachment_auths",
+                "content_sha256",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
             add_column_if_missing(conn, "accounts", "smtp_host", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(
                 conn,
@@ -451,6 +459,12 @@ impl MailStore {
                 conn,
                 "attachments",
                 "local_path",
+                "TEXT NOT NULL DEFAULT ''",
+            )?;
+            add_column_if_missing(
+                conn,
+                "attachments",
+                "content_sha256",
                 "TEXT NOT NULL DEFAULT ''",
             )?;
             add_column_if_missing(

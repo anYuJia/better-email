@@ -1,6 +1,8 @@
 use crate::db::MailResult;
 use crate::models::{Account, LocalBackup};
 use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use tauri::AppHandle;
@@ -206,16 +208,35 @@ pub(super) async fn read_backup_from_dialog(
     read_local_backup_file(path).map(Some)
 }
 
-pub(super) fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64)> {
-    let payload = fs::read(&path)?;
-    // 备份 JSON 是不可信输入：限制文件大小，避免资源耗尽。
-    const MAX_BACKUP_FILE_BYTES: u64 = 512 * 1024 * 1024;
-    if payload.len() as u64 > MAX_BACKUP_FILE_BYTES {
+/// 先做 metadata 预检，再按上限流式读取文件；超过上限直接拒绝，
+/// 避免恶意超大文件先被整体读入内存后再被截断。
+pub(super) fn read_file_with_limit(path: &Path, max_bytes: usize) -> MailResult<Vec<u8>> {
+    let metadata = fs::metadata(path)?;
+    if metadata.len() > max_bytes as u64 {
         return Err(crate::db::MailError::Imap(format!(
-            "备份文件过大（{} 字节 > {MAX_BACKUP_FILE_BYTES} 字节），已取消恢复。",
-            payload.len()
+            "文件超过大小上限（{} 字节 > {} MB），已拒绝读取。",
+            metadata.len(),
+            max_bytes / 1024 / 1024
         )));
     }
+    let file = File::open(path)?;
+    let capacity = metadata.len().min(max_bytes as u64) as usize;
+    let mut buffer = Vec::with_capacity(capacity);
+    file.take((max_bytes + 1) as u64).read_to_end(&mut buffer)?;
+    if buffer.len() > max_bytes {
+        return Err(crate::db::MailError::Imap(format!(
+            "文件超过大小上限（{} 字节 > {} MB），已拒绝读取。",
+            buffer.len(),
+            max_bytes / 1024 / 1024
+        )));
+    }
+    Ok(buffer)
+}
+
+pub(super) fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64)> {
+    // 备份 JSON 是不可信输入：先 metadata 预检，再按上限流式读取，避免资源耗尽。
+    const MAX_BACKUP_FILE_BYTES: usize = 512 * 1024 * 1024;
+    let payload = read_file_with_limit(&path, MAX_BACKUP_FILE_BYTES)?;
     let backup = serde_json::from_slice::<LocalBackup>(&payload)
         .map_err(|error| crate::db::MailError::Imap(format!("备份 JSON 解析失败：{error}")))?;
     Ok((
@@ -279,6 +300,49 @@ mod tests {
         assert!(super::validate_external_url("https://paypal.com/login").is_ok());
         assert!(super::validate_external_url("HTTPS://google.com").is_ok());
         assert!(super::validate_external_url("hTtP://yahoo.com").is_ok());
+    }
+
+    #[test]
+    fn read_file_with_limit_prechecks_metadata_before_reading() {
+        use std::io::Write;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let small = temp.path().join("small.txt");
+        std::fs::write(&small, b"hello").unwrap();
+
+        // 正常大小：返回完整内容。
+        let bytes = super::read_file_with_limit(&small, 10).expect("small file read");
+        assert_eq!(bytes, b"hello");
+
+        // 超限文件：metadata 预检阶段即拒绝，错误信息清晰。
+        let big = temp.path().join("big.txt");
+        let mut file = std::fs::File::create(&big).unwrap();
+        file.write_all(&vec![0_u8; 4096]).unwrap();
+        file.flush().unwrap();
+        let error = super::read_file_with_limit(&big, 1024).expect_err("oversized rejected");
+        assert!(error.to_string().contains("超过大小上限"));
+
+        // 读取过程中超过上限同样拒绝（防御流式增长）。
+        let tricky = temp.path().join("tricky.txt");
+        std::fs::write(&tricky, b"12345").unwrap();
+        let error = super::read_file_with_limit(&tricky, 3).expect_err("read cap enforced");
+        assert!(error.to_string().contains("超过大小上限"));
+    }
+
+    #[test]
+    fn backup_file_read_is_bounded() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        // 合法的最小备份 JSON。
+        let backup_path = temp.path().join("backup.json");
+        std::fs::write(
+            &backup_path,
+            br#"{"schema_version":1,"app_version":"1","exported_at":"","tables":{}}"#,
+        )
+        .unwrap();
+        let (backup, path, size) =
+            super::read_local_backup_file(backup_path).expect("backup parsed");
+        assert_eq!(backup.schema_version, 1);
+        assert!(path.ends_with("backup.json"));
+        assert!(size > 0);
     }
 
     #[test]

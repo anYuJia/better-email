@@ -135,6 +135,38 @@ describe('useMailboxSelectionController', () => {
     expect(result.current.readerSelectedDetail?.subject).toBe('Subject 1');
   });
 
+  it('syncs optimistic label updates to both list and thread caches and selected detail', async () => {
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_message_detail') return Promise.resolve(message(1));
+      return Promise.resolve([]);
+    }) as never);
+    const { result, setters } = renderController();
+
+    act(() => {
+      result.current.setSelectedId(1);
+    });
+    await waitFor(() => {
+      expect(result.current.readerSelectedDetail?.id).toBe(1);
+    });
+    expect(result.current.selectedDetail?.labels).toEqual([]);
+
+    act(() => {
+      result.current.patchSelectedDetailMetadata(1, { labels: ['工作'] });
+    });
+
+    expect(result.current.selectedDetail?.labels).toEqual(['工作']);
+    expect(setters.setMessages).toHaveBeenCalledTimes(1);
+    expect(setters.setThreadMessages).toHaveBeenCalledTimes(1);
+
+    const applyMessages = setters.setMessages.mock.calls[0][0];
+    const applyThreadMessages = setters.setThreadMessages.mock.calls[0][0];
+    const fromMessages = applyMessages([summary(1), summary(2)]);
+    const fromThreads = applyThreadMessages([summary(1, { labels: ['旧标签'] })]);
+
+    expect(fromMessages[0].labels).toEqual(['工作']);
+    expect(fromThreads[0].labels).toEqual(['工作']);
+  });
+
   it('reloads the detail when the mailbox context changes even if the id is unchanged', async () => {
     const details: Record<number, () => Promise<Message>> = {
       1: () => Promise.resolve(message(1)),
@@ -258,8 +290,8 @@ describe('useMailboxSelectionController', () => {
     act(() => {
       result.current.setSelectedId(null);
     });
-    expect(result.current.readerSelectedDetail).toBeNull();
     expect(result.current.selectedDetail).toBeNull();
+    expect(result.current.readerSelectedDetail).toBeNull();
 
     act(() => {
       resolveDetail(message(1));
@@ -323,27 +355,6 @@ describe('useMailboxSelectionController', () => {
     expect(mockInvoke).not.toHaveBeenCalledWith('set_message_read', { messageId: 1, isRead: true });
   });
 
-  it('keeps the detail cleared when loading fails or returns no value', async () => {
-    mockInvoke.mockImplementation(((command: string) => {
-      if (command === 'get_message_detail') {
-        return Promise.reject(new Error('detail unavailable'));
-      }
-      return Promise.resolve([]);
-    }) as never);
-    const { result } = renderController();
-
-    act(() => {
-      result.current.setSelectedId(1);
-    });
-
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith('get_message_detail', { messageId: 1 });
-    });
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current.selectedDetail).toBeNull();
-    expect(result.current.readerSelectedDetail).toBeNull();
-  });
-
   it('loads attachments for the selected message and clears them on switch', async () => {
     const attachment: Attachment = {
       id: 1,
@@ -383,6 +394,27 @@ describe('useMailboxSelectionController', () => {
     await waitFor(() => {
       expect(setters.setAttachments).toHaveBeenCalledWith([]);
     });
+  });
+
+  it('keeps detail cleared when loading fails or returns no value', async () => {
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_message_detail') {
+        return Promise.reject(new Error('detail unavailable'));
+      }
+      return Promise.resolve([]);
+    }) as never);
+    const { result } = renderController();
+
+    act(() => {
+      result.current.setSelectedId(1);
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('get_message_detail', { messageId: 1 });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.selectedDetail).toBeNull();
+    expect(result.current.readerSelectedDetail).toBeNull();
   });
 
   it('fetches the remote body when message detail has no cached body content', async () => {

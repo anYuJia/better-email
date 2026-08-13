@@ -15,12 +15,13 @@ use lettre::{
 use std::fs;
 use std::time::Duration;
 
+#[allow(dead_code)]
 pub fn send_outbound(
     account: &Account,
     message: &OutboundMessage,
     secret: &AccountSecret,
 ) -> Result<Vec<u8>, MailError> {
-    let email = build_outbound_email(message)?;
+    let email = build_outbound_email(message, None)?;
     let raw_message = email.formatted();
     let mailer = authenticated_transport(account, secret)?;
 
@@ -30,8 +31,35 @@ pub fn send_outbound(
     Ok(raw_message)
 }
 
+/// 使用后端在同一次打开中验证并读取出的附件字节发送邮件。生产命令必须走
+/// 这个入口，避免在授权验证完成后再次按路径读取附件。
+pub fn send_outbound_with_attachment_bytes(
+    account: &Account,
+    message: &OutboundMessage,
+    secret: &AccountSecret,
+    attachment_bytes: &[Vec<u8>],
+) -> Result<Vec<u8>, MailError> {
+    let email = build_outbound_email(message, Some(attachment_bytes))?;
+    let raw_message = email.formatted();
+    let mailer = authenticated_transport(account, secret)?;
+
+    mailer
+        .send(&email)
+        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))?;
+    Ok(raw_message)
+}
+
+#[allow(dead_code)]
 pub fn render_outbound(message: &OutboundMessage) -> Result<Vec<u8>, MailError> {
-    Ok(build_outbound_email(message)?.formatted())
+    Ok(build_outbound_email(message, None)?.formatted())
+}
+
+/// 使用已验证附件字节构建 MIME，不会重新从附件路径读取。
+pub fn render_outbound_with_attachment_bytes(
+    message: &OutboundMessage,
+    attachment_bytes: &[Vec<u8>],
+) -> Result<Vec<u8>, MailError> {
+    Ok(build_outbound_email(message, Some(attachment_bytes))?.formatted())
 }
 
 pub fn outbound_message_id(message: &OutboundMessage) -> String {
@@ -41,7 +69,17 @@ pub fn outbound_message_id(message: &OutboundMessage) -> String {
     )
 }
 
-fn build_outbound_email(message: &OutboundMessage) -> Result<Message, MailError> {
+fn build_outbound_email(
+    message: &OutboundMessage,
+    attachment_bytes: Option<&[Vec<u8>]>,
+) -> Result<Message, MailError> {
+    if let Some(bytes) = attachment_bytes {
+        if bytes.len() != message.attachments.len() {
+            return Err(MailError::Smtp(
+                "附件验证结果与邮件附件数量不一致，已拒绝发送。".to_string(),
+            ));
+        }
+    }
     let mut builder = Message::builder()
         .from(mailbox(&message.sender_name, &message.sender_email)?)
         .subject(&message.subject)
@@ -67,7 +105,7 @@ fn build_outbound_email(message: &OutboundMessage) -> Result<Message, MailError>
         builder = builder.bcc(mailbox("", &recipient)?);
     }
 
-    build_email(builder, message)
+    build_email(builder, message, attachment_bytes)
 }
 
 pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(), MailError> {
@@ -109,14 +147,16 @@ fn authenticated_transport(
 fn build_email(
     builder: lettre::message::MessageBuilder,
     message: &OutboundMessage,
+    attachment_bytes: Option<&[Vec<u8>]>,
 ) -> Result<Message, MailError> {
     let html_present = !message.html_body.trim().is_empty();
     let html_uses_cid = html_present && message.html_body.to_ascii_lowercase().contains("cid:");
-    let body_part = build_body_part(message, html_uses_cid)?;
+    let body_part = build_body_part(message, html_uses_cid, attachment_bytes)?;
     let regular_attachments = message
         .attachments
         .iter()
-        .filter(|attachment| !is_inline_attachment(attachment, html_uses_cid))
+        .enumerate()
+        .filter(|(_, attachment)| !is_inline_attachment(attachment, html_uses_cid))
         .collect::<Vec<_>>();
     if regular_attachments.is_empty() {
         return if !html_present {
@@ -132,8 +172,11 @@ fn build_email(
     }
 
     let mut multipart = MultiPart::mixed().multipart(body_part);
-    for attachment in regular_attachments {
-        multipart = multipart.singlepart(attachment_part(attachment)?);
+    for (index, attachment) in regular_attachments {
+        multipart = multipart.singlepart(attachment_part(
+            attachment,
+            attachment_bytes_for(attachment, attachment_bytes, index)?,
+        )?);
     }
     builder
         .multipart(multipart)
@@ -144,7 +187,11 @@ fn is_inline_attachment(attachment: &Attachment, html_uses_cid: bool) -> bool {
     html_uses_cid && attachment.is_inline && !attachment.content_id.trim().is_empty()
 }
 
-fn build_body_part(message: &OutboundMessage, html_uses_cid: bool) -> Result<MultiPart, MailError> {
+fn build_body_part(
+    message: &OutboundMessage,
+    html_uses_cid: bool,
+    attachment_bytes: Option<&[Vec<u8>]>,
+) -> Result<MultiPart, MailError> {
     let alternative = if message.html_body.trim().is_empty() {
         MultiPart::alternative().singlepart(SinglePart::plain(message.body.clone()))
     } else {
@@ -155,21 +202,27 @@ fn build_body_part(message: &OutboundMessage, html_uses_cid: bool) -> Result<Mul
     let inline_attachments = message
         .attachments
         .iter()
-        .filter(|attachment| is_inline_attachment(attachment, html_uses_cid))
+        .enumerate()
+        .filter(|(_, attachment)| is_inline_attachment(attachment, html_uses_cid))
         .collect::<Vec<_>>();
     if inline_attachments.is_empty() {
         return Ok(alternative);
     }
 
     let mut related = MultiPart::related().multipart(alternative);
-    for attachment in inline_attachments {
-        related = related.singlepart(inline_attachment_part(attachment)?);
+    for (index, attachment) in inline_attachments {
+        related = related.singlepart(inline_attachment_part(
+            attachment,
+            attachment_bytes_for(attachment, attachment_bytes, index)?,
+        )?);
     }
     Ok(related)
 }
 
-fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
-    let bytes = read_attachment_bytes(attachment)?;
+fn inline_attachment_part(
+    attachment: &Attachment,
+    bytes: Vec<u8>,
+) -> Result<SinglePart, MailError> {
     let content_type = ContentType::parse(&attachment.mime_type)
         .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
     Ok(SinglePart::builder()
@@ -181,11 +234,23 @@ fn inline_attachment_part(attachment: &Attachment) -> Result<SinglePart, MailErr
         .body(bytes))
 }
 
-fn attachment_part(attachment: &Attachment) -> Result<SinglePart, MailError> {
-    let bytes = read_attachment_bytes(attachment)?;
+fn attachment_part(attachment: &Attachment, bytes: Vec<u8>) -> Result<SinglePart, MailError> {
     let content_type = ContentType::parse(&attachment.mime_type)
         .unwrap_or(ContentType::parse("application/octet-stream").expect("valid fallback MIME"));
     Ok(lettre::message::Attachment::new(attachment.filename.clone()).body(bytes, content_type))
+}
+
+fn attachment_bytes_for(
+    attachment: &Attachment,
+    provided: Option<&[Vec<u8>]>,
+    index: usize,
+) -> Result<Vec<u8>, MailError> {
+    match provided {
+        Some(bytes) => bytes.get(index).cloned().ok_or_else(|| {
+            MailError::Smtp("附件验证结果与邮件附件数量不一致，已拒绝发送。".to_string())
+        }),
+        None => read_attachment_bytes(attachment),
+    }
 }
 
 /// 读取发件附件前的最终校验：canonicalize 解析符号链接，要求仍是常规文件且
@@ -198,27 +263,24 @@ fn read_attachment_bytes(attachment: &Attachment) -> Result<Vec<u8>, MailError> 
             attachment.filename
         )));
     }
-    let canonical = std::fs::canonicalize(path).map_err(|error| {
-        MailError::Smtp(format!("附件路径无法解析 {path}：{error}"))
-    })?;
-    let metadata = std::fs::metadata(&canonical).map_err(|error| {
-        MailError::Smtp(format!("附件元数据读取失败 {path}：{error}"))
-    })?;
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|error| MailError::Smtp(format!("附件路径无法解析 {path}：{error}")))?;
+    let metadata = std::fs::metadata(&canonical)
+        .map_err(|error| MailError::Smtp(format!("附件元数据读取失败 {path}：{error}")))?;
     if !metadata.is_file() {
         return Err(MailError::Smtp(format!(
             "附件不再是常规文件，已拒绝发送：{path}"
         )));
     }
     let size = metadata.len().min(i64::MAX as u64) as i64;
-    if attachment.size_bytes > 0 && size != attachment.size_bytes {
+    // 无论声明大小是否为 0 都必须与实际一致：不允许用 size_bytes=0 跳过大小校验。
+    if size != attachment.size_bytes {
         return Err(MailError::Smtp(format!(
             "附件大小与预期不一致（{size} 字节 ≠ {} 字节），可能已被替换，已拒绝发送：{path}",
             attachment.size_bytes
         )));
     }
-    fs::read(&canonical).map_err(|error| {
-        MailError::Smtp(format!("读取附件失败 {path}：{error}"))
-    })
+    fs::read(&canonical).map_err(|error| MailError::Smtp(format!("读取附件失败 {path}：{error}")))
 }
 
 fn smtp_transport(host: &str, port: u16) -> Result<SmtpTransportBuilder, MailError> {
@@ -380,6 +442,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Attachment"),
             &message,
+            None,
         )
         .unwrap();
         let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
@@ -414,6 +477,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Rich text"),
             &message,
+            None,
         )
         .unwrap();
         let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
@@ -494,6 +558,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Rich attachment"),
             &message,
+            None,
         )
         .unwrap();
         let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
@@ -560,6 +625,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Inline image"),
             &message,
+            None,
         )
         .unwrap();
         let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
@@ -614,6 +680,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Inline unused"),
             &message,
+            None,
         )
         .unwrap();
         let rendered = String::from_utf8_lossy(&email.formatted()).to_string();
@@ -658,6 +725,7 @@ mod tests {
                 .to(mailbox("", "friend@example.com").unwrap())
                 .subject("Missing attachment"),
             &message,
+            None,
         )
         .unwrap_err()
         .to_string();

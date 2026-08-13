@@ -39,7 +39,9 @@ pub(crate) fn load_or_create_key(data_dir: &Path) -> std::io::Result<[u8; 32]> {
     // getrandom::Error 未实现 std::error::Error（std feature 未开启），
     // 只能用 io::Error::new 包装；clippy 的 io_other_error 建议不适用。
     #[allow(clippy::io_other_error)]
-    getrandom::getrandom(&mut key).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("安全随机源不可用：{e}")))?;
+    getrandom::getrandom(&mut key).map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("安全随机源不可用：{e}"))
+    })?;
     fs::create_dir_all(data_dir)?;
     fs::write(&path, key)?;
     #[cfg(unix)]
@@ -63,7 +65,9 @@ pub(crate) fn encrypt_secret(data_dir: &Path, plaintext: &str) -> std::io::Resul
     let cipher = ChaCha20Poly1305::new((&key).into());
     let mut nonce_bytes = [0_u8; 12];
     #[allow(clippy::io_other_error)]
-    getrandom::getrandom(&mut nonce_bytes).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("安全随机源不可用：{e}")))?;
+    getrandom::getrandom(&mut nonce_bytes).map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("安全随机源不可用：{e}"))
+    })?;
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
@@ -119,9 +123,15 @@ mod tests {
             !ciphertext.contains("SUPER_SECRET_TOKEN"),
             "密文不得包含明文"
         );
-        assert_eq!(decrypt_secret(&dir, &ciphertext).unwrap(), "SUPER_SECRET_TOKEN");
+        assert_eq!(
+            decrypt_secret(&dir, &ciphertext).unwrap(),
+            "SUPER_SECRET_TOKEN"
+        );
         // 同一实例密钥可多次解密。
-        assert_eq!(decrypt_secret(&dir, &ciphertext).unwrap(), "SUPER_SECRET_TOKEN");
+        assert_eq!(
+            decrypt_secret(&dir, &ciphertext).unwrap(),
+            "SUPER_SECRET_TOKEN"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

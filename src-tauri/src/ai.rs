@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const MAX_AI_CONTENT_CHARS: usize = 60_000;
+/// AI/MCP HTTP 响应读取上限：防止恶意服务端返回超大响应把应用内存打满。
+const MAX_AI_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 pub struct AiChatRequest {
@@ -117,10 +119,8 @@ pub fn call_chat_completion(
         .send(payload)
         .map_err(|error| format!("AI 服务请求失败：{error}"))?;
     let status = response.status();
-    let raw_body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|error| format!("AI 服务响应读取失败：{error}"))?;
+    let raw_body =
+        crate::http::read_response_capped(response.body_mut().as_reader(), MAX_AI_RESPONSE_BYTES)?;
     let payload: OpenAiChatResponse = serde_json::from_str(&raw_body).map_err(|error| {
         if status.is_success() {
             format!("AI 服务响应解析失败：{error}")
@@ -182,15 +182,14 @@ pub fn validate_ai_endpoint(endpoint: &str) -> Result<String, String> {
     if trimmed.is_empty() {
         return Err("AI 服务地址为空，请先在设置中配置。".to_string());
     }
-    let parsed = url::Url::parse(trimmed)
-        .map_err(|_| "AI 服务地址不是合法 URL，请检查是否包含协议前缀（https:// 或 http://）。".to_string())?;
+    let parsed = url::Url::parse(trimmed).map_err(|_| {
+        "AI 服务地址不是合法 URL，请检查是否包含协议前缀（https:// 或 http://）。".to_string()
+    })?;
     if parsed.host_str().unwrap_or_default().is_empty() {
         return Err("AI 服务地址缺少主机名。".to_string());
     }
     if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err(
-            "AI 服务地址不允许包含用户名或密码（userinfo），请移除。".to_string(),
-        );
+        return Err("AI 服务地址不允许包含用户名或密码（userinfo），请移除。".to_string());
     }
     match parsed.scheme() {
         "https" => Ok(trimmed.to_string()),
@@ -326,10 +325,8 @@ fn json_rpc_call(
         .send(payload)
         .map_err(|error| format!("MCP 服务请求失败：{error}"))?;
     let status = response.status();
-    let raw_body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|error| format!("MCP 服务响应读取失败：{error}"))?;
+    let raw_body =
+        crate::http::read_response_capped(response.body_mut().as_reader(), MAX_AI_RESPONSE_BYTES)?;
     let payload: serde_json::Value = serde_json::from_str(&raw_body).map_err(|error| {
         if status.is_success() {
             format!("MCP 服务响应解析失败：{error}")
@@ -497,12 +494,29 @@ pub fn test_ai_connection(
 #[cfg(test)]
 mod tests {
     use super::validate_ai_endpoint;
+    use super::MAX_AI_RESPONSE_BYTES;
+    use crate::http::read_response_capped;
 
     #[test]
     fn https_endpoints_are_allowed() {
         assert!(validate_ai_endpoint("https://api.openai.com/v1").is_ok());
         assert!(validate_ai_endpoint("https://mcp.example.com/sse").is_ok());
         assert!(validate_ai_endpoint("https://127.0.0.1:443/v1").is_ok());
+    }
+
+    #[test]
+    fn http_response_reader_caps_large_payloads_without_buffering_whole_body() {
+        let small = read_response_capped(&b"{\"ok\":true}"[..], MAX_AI_RESPONSE_BYTES)
+            .expect("small response read");
+        assert_eq!(small, "{\"ok\":true}");
+
+        let big = vec![b'x'; (MAX_AI_RESPONSE_BYTES as usize) + 10];
+        let err = read_response_capped(&big[..], MAX_AI_RESPONSE_BYTES)
+            .expect_err("oversized response rejected");
+        assert!(
+            err.contains("超过大小上限"),
+            "超大响应应在读取阶段被拒绝：{err}"
+        );
     }
 
     #[test]

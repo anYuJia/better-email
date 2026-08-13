@@ -95,12 +95,19 @@ export default function useMailboxSelectionController({
   const readerSelectedId = selectedId;
 
   const patchSelectedDetailMetadata = useCallback((messageId: number, patch: MessageMetadataPatch) => {
+    const applyMessageSummaryPatch = (nextMessages: MessageSummary[]) =>
+      nextMessages.map((message) =>
+        message.id === messageId ? { ...message, ...patch, id: message.id } : message,
+      );
+
+    setMessages(applyMessageSummaryPatch);
+    setThreadMessages(applyMessageSummaryPatch);
     messageDetailCacheRef.current.patch(messageId, patch);
     setSelectedDetail((current) => {
       if (!current || current.id !== messageId) return current;
       return applyMessageMetadataPatch(current, patch);
     });
-  }, []);
+  }, [setMessages, setThreadMessages]);
 
   const invalidateSelectedDetail = useCallback((messageId: number) => {
     messageDetailCacheRef.current.delete(messageId);

@@ -13,15 +13,21 @@ describe('AiServiceSettings', () => {
     window.localStorage.clear();
   });
 
-  it('shows friendly service type labels and MCP gateway section', () => {
+  it('shows friendly service type labels and MCP client section', () => {
     render(<AiServiceSettings />);
     expect(screen.getByText(/模型推理服务 \(LLM\)/)).not.toBeNull();
-    expect(screen.getByText(/MCP 服务端 \(Model Context Protocol\)/)).not.toBeNull();
+    expect(screen.getByText(/MCP 服务 \(Model Context Protocol\)/)).not.toBeNull();
   });
 
-  it('allows toggling MCP gateway server', () => {
+  it('configures MCP as a client endpoint rather than a local gateway', () => {
     render(<AiServiceSettings />);
-    expect(screen.getByText('开启 MCP 网关服务')).not.toBeNull();
+    // 不再宣称本地暴露 MCP HTTP 服务（无 listener）。
+    expect(screen.queryByText('开启 MCP 网关服务')).toBeNull();
+    expect(screen.queryByText(/本地暴露/)).toBeNull();
+    expect(screen.queryByText('MCP 网关地址')).toBeNull();
+    // 保留实际存在的 MCP 客户端能力配置。
+    expect(screen.getByText('启用 MCP 服务')).not.toBeNull();
+    expect(screen.getByText(/连接外部 MCP 服务器/)).not.toBeNull();
   });
 
   it('shows the status with 未启用 when the service is off', () => {

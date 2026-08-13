@@ -26,6 +26,8 @@ import type {
 } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
 import { formatDate } from '../mailUtils';
+import { invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 import useComposeFromMessage from './useComposeFromMessage';
 import useComposerSend from './useComposerSend';
 import useComposerTemplates from './useComposerTemplates';
@@ -265,12 +267,19 @@ export default function useComposerController({
     }
     setComposerOpen(false);
     setComposerMinimized(false);
+    cleanupTempAttachments();
   }
 
   function forceCloseComposer() {
     setComposerOpen(false);
     setComposerMinimized(false);
     setComposerCloseConfirmOpen(false);
+    cleanupTempAttachments();
+  }
+
+  /** 取消/丢弃/发送关闭编辑器后，立即清理不再被草稿/发件箱引用的临时附件。 */
+  function cleanupTempAttachments() {
+    Promise.resolve(invoke<number>(IPC.CleanupTempAttachments)).catch(() => undefined);
   }
 
   function clearComposerAutosave() {

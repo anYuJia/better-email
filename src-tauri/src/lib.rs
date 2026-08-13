@@ -2,6 +2,7 @@ mod ai;
 mod commands;
 mod credentials;
 mod db;
+mod http;
 mod imap_probe;
 mod logging;
 mod mime;
@@ -327,8 +328,8 @@ pub fn run() {
             commands::read_attachment_data_url,
             commands::save_image_data_url_as,
             commands::pick_outbound_attachments,
-            commands::outbound_attachments_from_paths,
             commands::save_temp_attachment,
+            commands::cleanup_temp_attachments,
             commands::mark_frontend_ready,
             commands::mark_benchmark_sync_complete,
             commands::benchmark_sync_requested,

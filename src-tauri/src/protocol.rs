@@ -1039,9 +1039,7 @@ mod tests {
             "<img src=\"//tracker.example/a.png\">"
         ));
         // 无引号 src
-        assert!(html_has_remote_images(
-            "<img src=//tracker.example/a.png>"
-        ));
+        assert!(html_has_remote_images("<img src=//tracker.example/a.png>"));
         // background 属性
         assert!(html_has_remote_images(
             "<td background=\"//tracker.example/a.png\"></td>"
@@ -1059,7 +1057,10 @@ mod tests {
             !blocked.contains("tracker.example"),
             "默认应阻止协议相对远程图片：{blocked}"
         );
-        assert!(!blocked.contains("<img"), "无 src 的 img 应被移除：{blocked}");
+        assert!(
+            !blocked.contains("<img"),
+            "无 src 的 img 应被移除：{blocked}"
+        );
 
         let allowed = sanitize_html_with_remote_images(
             "<img src=\"//cdn.example.com/photo.png\" alt=\"photo\">",
@@ -1085,7 +1086,10 @@ mod tests {
     fn protocol_relative_background_is_promoted_after_confirmation() {
         let html = "<table><tr><td background=\"//cdn.example.com/hero.png\">x</td></tr></table>";
         let blocked = sanitize_html(html);
-        assert!(!blocked.contains("cdn.example.com"), "默认应阻止：{blocked}");
+        assert!(
+            !blocked.contains("cdn.example.com"),
+            "默认应阻止：{blocked}"
+        );
         let allowed = sanitize_html_with_remote_images(html);
         assert!(
             allowed.contains("https://cdn.example.com/hero.png"),

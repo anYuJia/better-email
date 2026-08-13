@@ -19,6 +19,7 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AiTestConnectionResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [secretsLoaded, setSecretsLoaded] = useState(false);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
   const patchConfig = useCallback((patch: Partial<AiServiceConfig>) => {
     setConfig((current) => ({ ...current, ...patch }));
     setTestResult(null);
+    setSaveError(null);
   }, []);
 
   const runTestConnection = useCallback(async () => {
@@ -77,6 +79,7 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
 
   const saveConfig = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const message = await saveAiSettingsToBackend(config);
       // 清除标记只发一次；保存成功后复位，避免 localStorage/下次保存误清。
@@ -87,6 +90,10 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
       }));
       setStatus(message);
       return message;
+    } catch (error) {
+      // 后端拒绝（例如端点变化时空 key 不得沿用旧 key）必须可见，不能让用户以为已保存。
+      setSaveError(String(error));
+      throw error;
     } finally {
       setSaving(false);
     }
@@ -100,6 +107,7 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
     testResult,
     testing,
     saving,
+    saveError,
     saveConfig,
     runTestConnection,
     defaultConfig: defaultAiServiceConfig,

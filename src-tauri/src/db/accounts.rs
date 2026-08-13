@@ -83,8 +83,8 @@ impl MailStore {
         // 保证任何路径（启动、设置页、查看邮件、同步、发送）都不会
         // 触发 macOS Keychain 访问或授权提示。落库前用每实例密钥做
         // 应用层加密，数据库文件单独被读取时凭据列是密文。
-        let encrypted = crate::secret_crypto::encrypt_secret(&self.data_dir, &secret)
-            .map_err(MailError::Io)?;
+        let encrypted =
+            crate::secret_crypto::encrypt_secret(&self.data_dir, &secret).map_err(MailError::Io)?;
         self.with_conn(|conn| {
             let now = Utc::now().to_rfc3339();
             conn.execute(

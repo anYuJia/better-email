@@ -310,6 +310,7 @@ dependencies = [
  "imap",
  "imap-proto",
  "lettre",
+ "libc",
  "mail-parser",
  "native-tls",
  "once_cell",

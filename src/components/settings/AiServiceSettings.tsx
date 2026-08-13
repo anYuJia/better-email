@@ -28,6 +28,7 @@ export default function AiServiceSettings() {
     patchConfig,
     testing,
     saving,
+    saveError,
     testResult,
     saveConfig,
     runTestConnection,
@@ -190,11 +191,16 @@ export default function AiServiceSettings() {
               <PlugZap size={14} />
               {testing ? '测试中…' : '测试连接'}
             </SettingsButton>
-            <SettingsButton variant="primary" onClick={saveConfig} disabled={saving}>
+            <SettingsButton variant="primary" onClick={() => { saveConfig().catch(() => undefined); }} disabled={saving}>
               <Globe size={14} />
               {saving ? '保存中…' : '保存设置'}
             </SettingsButton>
           </div>
+          {saveError && (
+            <p className="settings-ai-save-error" role="alert">
+              {saveError}
+            </p>
+          )}
 
           {testResult && (
             <div className={`settings-ai-test-result${testResult.ok ? ' ok' : ' fail'}`}>
@@ -207,27 +213,27 @@ export default function AiServiceSettings() {
           )}
         </SettingsSection>
 
-        {/* 模块四：MCP (Model Context Protocol) 独立服务端配置 */}
+        {/* 模块四：MCP (Model Context Protocol) 客户端配置 */}
         <SettingsSection
-          title="MCP 服务端 (Model Context Protocol)"
-          description="本地暴露出 MCP 接口，供外部 AI 工具（如 Cursor、Claude Desktop、Antigravity Agent）连接访问上下文"
+          title="MCP 服务 (Model Context Protocol)"
+          description="连接外部 MCP 服务器，通过 JSON-RPC 调用翻译、摘要与模板生成工具"
           badge={
             <SettingsBadge tone={config.mcpEnabled ? 'success' : 'neutral'}>
-              {config.mcpEnabled ? 'MCP 服务已开启' : 'MCP 未开启'}
+              {config.mcpEnabled ? 'MCP 已启用' : 'MCP 未启用'}
             </SettingsBadge>
           }
           dataSection="ai-mcp-gateway"
         >
           <SettingsSwitch
-            label="开启 MCP 网关服务"
-            description="开启后允许外部 AI 客户端调用 JSON-RPC over HTTP 端点检索邮件数据与工具集。"
+            label="启用 MCP 服务"
+            description="启用后，应用可调用已配置的 MCP 服务器执行翻译、摘要与模板生成。"
             checked={Boolean(config.mcpEnabled)}
             onChange={(checked) => patchConfig({ mcpEnabled: checked })}
           />
 
           {config.mcpEnabled && (
             <div className="st-field-grid" style={{ marginTop: '12px' }}>
-              <SettingsField label="MCP 网关地址">
+              <SettingsField label="MCP 服务端点">
                 <input
                   className="settings-text-input"
                   type="url"
@@ -237,12 +243,12 @@ export default function AiServiceSettings() {
                 />
               </SettingsField>
 
-              <SettingsField label="MCP 访问密钥 (可选)">
+              <SettingsField label="Bearer 鉴权 Token (可选)">
                 <div className="settings-ai-key-row">
                   <input
                     className="settings-text-input"
                     type="password"
-                    placeholder={config.hasMcpApiKey ? '已保存 Token，留空保持不变' : '设置鉴权 Token (Bearer)'}
+                    placeholder={config.hasMcpApiKey ? '已保存 Token，留空保持不变' : '设置访问该服务的鉴权 Token (Bearer)'}
                     value={config.mcpApiKey || ''}
                     onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
                     autoComplete="off"

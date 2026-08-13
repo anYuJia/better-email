@@ -92,7 +92,7 @@ jobs:
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
       - name: Frontend dependency audit
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
       - name: Version consistency check
         run: |

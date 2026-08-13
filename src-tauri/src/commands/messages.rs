@@ -263,6 +263,8 @@ pub async fn delete_message_permanently(
     message_id: i64,
 ) -> MailResult<RemoteActionReport> {
     let reference = store.delete_message_permanently(message_id)?;
+    // 草稿/邮件被永久删除后，其临时附件不再被任何草稿/发件箱引用，立即清理。
+    let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
     sync_remote_delete_reference(&store, &reference, "本地已永久删除")
 }
 
@@ -272,6 +274,9 @@ pub async fn empty_trash(
     account_id: Option<i64>,
 ) -> MailResult<TrashActionReport> {
     let (local_deleted_count, references) = store.empty_trash_for_account(account_id)?;
+    // 数据库删除已经提交，引用关系随之消失；立即回收不再被任何草稿/发件状态
+    // 引用的临时附件。远端删除失败不影响本地生命周期状态。
+    let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
     let mut groups = BTreeMap::<(i64, String), Vec<MessageRemoteRef>>::new();
     let mut remote_skipped_count = 0_i64;
     for reference in references {

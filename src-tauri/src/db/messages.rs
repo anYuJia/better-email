@@ -459,14 +459,14 @@ impl MailStore {
                     &mut old_by_content_id,
                     &mut old_by_filename,
                 );
-                let (is_downloaded, local_path, size_bytes) =
+                let (is_downloaded, local_path, size_bytes, content_sha256) =
                     preserve_attachment_download_state(&matched, attachment);
                 conn.execute(
                     "INSERT INTO attachments(
                         message_id, filename, mime_type, size_bytes, is_downloaded,
-                        local_path, content_id, is_inline
+                        local_path, content_sha256, content_id, is_inline
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                     params![
                         message_id,
                         attachment.filename,
@@ -474,6 +474,7 @@ impl MailStore {
                         size_bytes,
                         bool_to_int(is_downloaded),
                         local_path,
+                        content_sha256,
                         attachment.content_id,
                         bool_to_int(attachment.is_inline)
                     ],
@@ -1546,6 +1547,7 @@ pub(super) struct AttachmentRow {
     pub filename: String,
     pub is_downloaded: bool,
     pub local_path: String,
+    pub content_sha256: String,
     pub content_id: String,
 }
 
@@ -1555,7 +1557,7 @@ pub(super) fn attachment_rows_for_conn(
 ) -> MailResult<Vec<AttachmentRow>> {
     let mut stmt = conn.prepare(
         "
-        SELECT filename, is_downloaded, local_path, content_id
+        SELECT filename, is_downloaded, local_path, content_sha256, content_id
         FROM attachments
         WHERE message_id = ?1
         ",
@@ -1566,7 +1568,8 @@ pub(super) fn attachment_rows_for_conn(
                 filename: row.get(0)?,
                 is_downloaded: row.get::<_, i64>(1)? != 0,
                 local_path: row.get(2)?,
-                content_id: row.get(3)?,
+                content_sha256: row.get(3)?,
+                content_id: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1595,8 +1598,14 @@ pub(super) fn has_pending_remote_write_for_conn(
 /// 重置为未下载、产生孤儿文件。
 fn match_old_attachment(
     attachment: &crate::models::RemoteAttachmentMetadata,
-    old_by_content_id: &mut std::collections::BTreeMap<String, std::collections::VecDeque<AttachmentRow>>,
-    old_by_filename: &mut std::collections::BTreeMap<String, std::collections::VecDeque<AttachmentRow>>,
+    old_by_content_id: &mut std::collections::BTreeMap<
+        String,
+        std::collections::VecDeque<AttachmentRow>,
+    >,
+    old_by_filename: &mut std::collections::BTreeMap<
+        String,
+        std::collections::VecDeque<AttachmentRow>,
+    >,
 ) -> Option<AttachmentRow> {
     if !attachment.content_id.trim().is_empty() {
         if let Some(bucket) = old_by_content_id.get_mut(&attachment.content_id) {
@@ -1618,20 +1627,21 @@ fn match_old_attachment(
 fn preserve_attachment_download_state(
     matched: &Option<AttachmentRow>,
     attachment: &crate::models::RemoteAttachmentMetadata,
-) -> (bool, String, i64) {
+) -> (bool, String, i64, String) {
     let Some(old) = matched else {
-        return (false, String::new(), attachment.size_bytes);
+        return (false, String::new(), attachment.size_bytes, String::new());
     };
     if !old.is_downloaded || old.local_path.trim().is_empty() {
-        return (false, String::new(), attachment.size_bytes);
+        return (false, String::new(), attachment.size_bytes, String::new());
     }
     match std::fs::metadata(&old.local_path) {
         Ok(metadata) if metadata.is_file() => (
             true,
             old.local_path.clone(),
             metadata.len().min(i64::MAX as u64) as i64,
+            old.content_sha256.clone(),
         ),
-        _ => (false, String::new(), attachment.size_bytes),
+        _ => (false, String::new(), attachment.size_bytes, String::new()),
     }
 }
 

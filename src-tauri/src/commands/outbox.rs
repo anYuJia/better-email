@@ -1,5 +1,7 @@
 use super::common::{command_info, mask_email, mask_recipient_list};
-use crate::commands::attachments::validate_outbound_attachment;
+use crate::commands::attachments::{
+    read_verified_outbound_message_attachments, validate_outbound_attachment_inputs,
+};
 use crate::credentials;
 use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
@@ -9,15 +11,22 @@ use crate::models::{
 use crate::smtp;
 use tauri::State;
 
-/// 发送前校验邮件全部附件：未授权路径、symlink/文件替换、大小变化都会被拒绝。
+/// 发件生命周期（保存/替换附件、发送、排队、刷新）中的临时附件清理使用 TTL=0：
+/// 不再被草稿/发件箱/待归档状态引用的临时文件立即删除。启动时单独的 60 秒
+/// TTL 只作为异常退出后的兜底，见 db.rs。
+const TEMP_ATTACHMENT_LIFECYCLE_TTL: std::time::Duration = std::time::Duration::from_secs(0);
+
+/// 仅供测试与遗留校验入口使用。生产发送/渲染必须使用单次读取的
+/// `read_verified_outbound_message_attachments`，避免验证后重新按路径读取。
+#[cfg(test)]
 fn validate_outbound_message_attachments(
     store: &MailStore,
     message: &OutboundMessage,
 ) -> MailResult<()> {
     for attachment in &message.attachments {
-        validate_outbound_attachment(store, attachment)?;
+        crate::commands::attachments::validate_outbound_attachment(store, attachment)?;
     }
-    Ok(())
+    crate::commands::attachments::validate_outbound_message_total_size(message)
 }
 
 #[tauri::command]
@@ -27,6 +36,9 @@ pub fn save_draft(
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<DraftSaveReport> {
     let was_update = input.draft_id > 0;
+    // 持久化前先校验 IPC 传入的附件：未授权路径 / symlink / 大小变化 / 总量超限
+    // 都在这里被拒绝，未经授权的附件绝不可能被保存并同步到远端。
+    validate_outbound_attachment_inputs(&store, &input.attachments)?;
     let previous_reference = if was_update {
         Some(store.get_message_remote_reference(input.draft_id)?)
     } else {
@@ -34,7 +46,11 @@ pub fn save_draft(
     };
     let draft_id = store.save_draft(input)?;
     store.set_message_threading(draft_id, threading)?;
+    // 保存/替换附件后清理不再被任何草稿/发件箱引用的临时附件。
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     let message = store.get_outbound_message(draft_id)?;
+    // 渲染/上传前再次校验持久化后的附件（拦截保存后到同步前的文件替换 TOCTOU）。
+    let attachment_bytes = read_verified_outbound_message_attachments(&store, &message)?;
     let message_id_header = smtp::outbound_message_id(&message);
     let account = store.get_account_by_id(Some(message.account_id))?;
     let local_action = if was_update {
@@ -119,7 +135,8 @@ pub fn save_draft(
             });
         }
     };
-    let raw_message = match smtp::render_outbound(&message) {
+    let raw_message = match smtp::render_outbound_with_attachment_bytes(&message, &attachment_bytes)
+    {
         Ok(raw_message) => raw_message,
         Err(error) => {
             return Ok(DraftSaveReport {
@@ -186,8 +203,10 @@ pub async fn send_message(
         input.subject.trim().chars().count(),
         input.attachments.len(),
     ));
+    validate_outbound_attachment_inputs(&store, &input.attachments)?;
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     let message = store.get_outbound_message(message_id)?;
     let account = store.get_account_by_id(Some(message.account_id))?;
     let secret = match store.get_account_secret(&account) {
@@ -206,8 +225,13 @@ pub async fn send_message(
             return Err(crate::db::MailError::Smtp(blocked_error));
         }
     };
-    validate_outbound_message_attachments(&store, &message)?;
-    let raw_message = match smtp::send_outbound(&account, &message, &secret) {
+    let attachment_bytes = read_verified_outbound_message_attachments(&store, &message)?;
+    let raw_message = match smtp::send_outbound_with_attachment_bytes(
+        &account,
+        &message,
+        &secret,
+        &attachment_bytes,
+    ) {
         Ok(raw_message) => raw_message,
         Err(error) => {
             let error_message = error.to_string();
@@ -222,6 +246,9 @@ pub async fn send_message(
     let message_id_header = smtp::outbound_message_id(&message);
     store.mark_outbox_smtp_sent_pending_archive(message_id, &message_id_header)?;
     archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
+    // 只有远端 Sent 留档已经成功并切换为 sent 后，这次直接发送的临时附件才
+    // 不再有引用，立即清理。归档失败会保持 sent_remote_pending，从而保留附件。
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     command_info(format!(
         "[better-email][send] direct smtp ok message_id={} account_id={} duration_ms={}",
         message_id,
@@ -248,8 +275,10 @@ pub fn queue_outbox_message(
         },
         input.attachments.len(),
     ));
+    validate_outbound_attachment_inputs(&store, &input.attachments)?;
     let item = store.queue_outbox_message(input)?;
     store.set_message_threading(item.message_id, threading)?;
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     command_info(format!(
         "[better-email][send] queue ok outbox_id={} message_id={} status={} duration_ms={}",
         item.id,
@@ -262,7 +291,9 @@ pub fn queue_outbox_message(
 
 #[tauri::command]
 pub fn cancel_outbox_item(store: State<'_, MailStore>, outbox_id: i64) -> MailResult<OutboxItem> {
-    store.cancel_outbox_item(outbox_id)
+    let item = store.cancel_outbox_item(outbox_id)?;
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+    Ok(item)
 }
 
 #[tauri::command]
@@ -330,16 +361,28 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
                 continue;
             }
         };
-        let raw_message = match smtp::render_outbound(&message) {
-            Ok(raw_message) => raw_message,
+        // 重建原始邮件前再次校验附件授权（拦截替换/删除后仍尝试上传 TOCTOU）。
+        let attachment_bytes = match read_verified_outbound_message_attachments(store, &message) {
+            Ok(bytes) => bytes,
             Err(error) => {
                 store.mark_outbox_remote_archive_failed(
                     message.id,
-                    &format!("SMTP 已发送；重建原始邮件以重试远端留档失败：{error}"),
+                    &format!("SMTP 已发送；重建原始邮件前附件校验失败，稍后仅重试留档：{error}"),
                 )?;
                 continue;
             }
         };
+        let raw_message =
+            match smtp::render_outbound_with_attachment_bytes(&message, &attachment_bytes) {
+                Ok(raw_message) => raw_message,
+                Err(error) => {
+                    store.mark_outbox_remote_archive_failed(
+                        message.id,
+                        &format!("SMTP 已发送；重建原始邮件以重试远端留档失败：{error}"),
+                    )?;
+                    continue;
+                }
+            };
         archive_sent_message(store, &account, &secret, &message, &raw_message)?;
     }
     Ok(())
@@ -377,8 +420,11 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                 continue;
             }
         };
-        match validate_outbound_message_attachments(store.inner(), &message) {
-            Ok(()) => {}
+        let attachment_bytes = match read_verified_outbound_message_attachments(
+            store.inner(),
+            &message,
+        ) {
+            Ok(bytes) => bytes,
             Err(error) => {
                 crate::logging::log_line(format!(
                     "[better-email][send] smtp item attachment rejected message_id={} account_id={} error={}",
@@ -389,8 +435,13 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                 store.mark_outbox_failed(message.id, &error.to_string())?;
                 continue;
             }
-        }
-        match smtp::send_outbound(&account, &message, &secret) {
+        };
+        match smtp::send_outbound_with_attachment_bytes(
+            &account,
+            &message,
+            &secret,
+            &attachment_bytes,
+        ) {
             Ok(raw_message) => {
                 let message_id_header = smtp::outbound_message_id(&message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
@@ -410,6 +461,9 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
         }
     }
 
+    // 发送完成后清理不再被引用的临时附件。
+    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+
     let outbox = store.list_outbox()?;
     command_info(format!(
         "[better-email][send] flush smtp done outbox_items={} duration_ms={}",
@@ -417,4 +471,210 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
         started_at.elapsed().as_millis(),
     ));
     Ok(outbox)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_outbound_attachment_inputs;
+    use crate::commands::attachments::{
+        authorize_outbound_path, validate_outbound_message_total_size,
+    };
+    use crate::db::MailStore;
+    use crate::models::{DraftInput, OutboundAttachmentInput};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DATABASE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn unique_test_database_path() -> std::path::PathBuf {
+        let unique = TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-outbox-test-{}-{}",
+            std::process::id(),
+            unique
+        ));
+        std::fs::create_dir_all(&dir).expect("test data dir created");
+        dir.join("better-email.sqlite3")
+    }
+
+    /// open_at 不播种演示数据，测试需自行创建账号才能保存草稿。
+    fn create_test_account(store: &MailStore) {
+        store
+            .create_account(crate::models::AccountCreateInput {
+                email: "outbox@better-email.local".to_string(),
+                display_name: "Outbox Tester".to_string(),
+                provider: "Local".to_string(),
+                imap_host: "imap.example.com:993".to_string(),
+                smtp_host: "smtp.example.com:465".to_string(),
+                incoming_protocol: "imap".to_string(),
+                auth_type: "password".to_string(),
+                sync_mode: "manual".to_string(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                fetch_history_attachments: false,
+                warn_external_senders: false,
+            })
+            .expect("account created");
+    }
+
+    fn draft_input(attachments: Vec<OutboundAttachmentInput>) -> DraftInput {
+        DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "friend@example.com".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Draft with attachment".to_string(),
+            body: "body".to_string(),
+            html_body: String::new(),
+            send_at: String::new(),
+            attachments,
+        }
+    }
+
+    fn outbound_input(
+        filename: &str,
+        local_path: &str,
+        size_bytes: i64,
+    ) -> OutboundAttachmentInput {
+        OutboundAttachmentInput {
+            filename: filename.to_string(),
+            mime_type: "application/octet-stream".to_string(),
+            size_bytes,
+            local_path: local_path.to_string(),
+            content_id: String::new(),
+            is_inline: false,
+        }
+    }
+
+    #[test]
+    fn unauthorized_draft_attachment_is_rejected_before_persistence_and_render() {
+        let store = MailStore::open_at(unique_test_database_path()).expect("store opens");
+        create_test_account(&store);
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-outbox-auth-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let secret = dir.join("passwd.txt");
+        std::fs::write(&secret, b"root:x:0:0").unwrap();
+        let real_size = std::fs::metadata(&secret).unwrap().len() as i64;
+
+        // 攻击者构造的草稿：未授权路径 + size_bytes=0。保存草稿命令在持久化前
+        // 会调用本校验器，因此这类草稿绝不可能落库，也不会被 render_outbound 上传。
+        let input = outbound_input("passwd.txt", &secret.to_string_lossy(), 0);
+        let err = validate_outbound_attachment_inputs(&store, &[input]).unwrap_err();
+        assert!(
+            err.to_string().contains("大小与授权不一致"),
+            "size_bytes=0 不得跳过大小校验：{err}"
+        );
+
+        // 即使声明大小与真实一致，未授权路径也必须被校验器拒绝。
+        let input = outbound_input("passwd.txt", &secret.to_string_lossy(), real_size);
+        let err = validate_outbound_attachment_inputs(&store, &[input]).unwrap_err();
+        assert!(
+            err.to_string().contains("未经授权"),
+            "未授权附件应被拒绝：{err}"
+        );
+
+        // 未授权草稿即使绕过命令层被持久化，渲染前校验也会阻断上传。
+        let draft = draft_input(vec![outbound_input(
+            "passwd.txt",
+            &secret.to_string_lossy(),
+            real_size,
+        )]);
+        let saved = store
+            .save_draft(draft.clone())
+            .expect("draft persists rows");
+        let message = store.get_outbound_message(saved).expect("message loads");
+        // 校验持久化后的附件必须失败 → 渲染前校验会阻断上传。
+        let persisted_error = super::validate_outbound_message_attachments(&store, &message)
+            .expect_err("persisted unauthorized attachment rejected");
+        assert!(
+            persisted_error.to_string().contains("未经授权"),
+            "持久化后的未授权附件在校验/渲染前应被拒绝：{persisted_error}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn authorized_draft_attachment_can_save_and_render() {
+        let store = MailStore::open_at(unique_test_database_path()).expect("store opens");
+        create_test_account(&store);
+        let dir = std::env::temp_dir().join(format!(
+            "better-email-outbox-ok-{}",
+            TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("notes.txt");
+        std::fs::write(&file, b"authorized draft attachment").unwrap();
+
+        // 先授权（与 pick_outbound_attachments 一致）。
+        let input = authorize_outbound_path(&store, &file, 0).expect("authorized");
+        let input = outbound_input("notes.txt", &input.local_path, input.size_bytes);
+        validate_outbound_attachment_inputs(&store, std::slice::from_ref(&input))
+            .expect("validated");
+
+        // 授权附件可以正常保存并渲染。
+        let draft_id = store
+            .save_draft(draft_input(vec![input]))
+            .expect("draft saved");
+        let message = store.get_outbound_message(draft_id).expect("message loads");
+        super::validate_outbound_message_attachments(&store, &message).expect("validated");
+        let raw = crate::smtp::render_outbound(&message).expect("rendered");
+        assert!(String::from_utf8_lossy(&raw).contains("authorized draft attachment"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn persisted_message_total_size_limit_is_enforced() {
+        let message = crate::models::OutboundMessage {
+            id: 1,
+            account_id: 1,
+            sender_name: "Me".to_string(),
+            sender_email: "me@example.com".to_string(),
+            reply_to: String::new(),
+            recipients: "friend@example.com".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Total".to_string(),
+            body: "body".to_string(),
+            html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: vec![
+                crate::models::Attachment {
+                    id: 1,
+                    message_id: 1,
+                    filename: "a.bin".to_string(),
+                    mime_type: "application/octet-stream".to_string(),
+                    size_bytes: 60 * 1024 * 1024,
+                    is_downloaded: true,
+                    local_path: String::new(),
+                    content_id: String::new(),
+                    is_inline: false,
+                },
+                crate::models::Attachment {
+                    id: 2,
+                    message_id: 1,
+                    filename: "b.bin".to_string(),
+                    mime_type: "application/octet-stream".to_string(),
+                    size_bytes: 60 * 1024 * 1024,
+                    is_downloaded: true,
+                    local_path: String::new(),
+                    content_id: String::new(),
+                    is_inline: false,
+                },
+            ],
+        };
+        let err = validate_outbound_message_total_size(&message).unwrap_err();
+        assert!(
+            err.to_string().contains("总大小超过上限"),
+            "持久化邮件附件总量超限应被拒绝：{err}"
+        );
+    }
 }

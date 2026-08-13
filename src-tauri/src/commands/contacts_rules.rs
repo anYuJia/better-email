@@ -1,4 +1,4 @@
-use super::common::MAX_VCARD_IMPORT_BYTES;
+use super::common::{read_file_with_limit, MAX_VCARD_IMPORT_BYTES};
 use crate::db::{MailResult, MailStore};
 use crate::models::{
     Contact, ContactCreateInput, ContactExportSummary, ContactImportBatch,
@@ -32,17 +32,12 @@ pub async fn pick_contact_import_file(app: AppHandle) -> MailResult<Option<Strin
 
 fn read_contact_file_by_path(path: &str) -> MailResult<(String, Vec<u8>, usize)> {
     let source_path = std::path::PathBuf::from(path);
-    let payload = fs::read(&source_path)?;
+    // 先 metadata 预检，再按上限流式读取，避免超大联系人文件被整体读入内存。
+    let payload = read_file_with_limit(&source_path, MAX_VCARD_IMPORT_BYTES)?;
     if payload.is_empty() {
         return Err(crate::db::MailError::Imap(
             "联系人文件为空，无法导入。".to_string(),
         ));
-    }
-    if payload.len() > MAX_VCARD_IMPORT_BYTES {
-        return Err(crate::db::MailError::Imap(format!(
-            "联系人文件超过 {} MB 导入上限。",
-            MAX_VCARD_IMPORT_BYTES / 1024 / 1024
-        )));
     }
     let file_name = source_path
         .file_name()
@@ -251,17 +246,12 @@ async fn read_contact_import_file(
     let source_path = source_path
         .into_path()
         .map_err(|error| crate::db::MailError::Imap(format!("无法解析联系人导入路径：{error}")))?;
-    let payload = fs::read(&source_path)?;
+    // 先 metadata 预检，再按上限流式读取，避免超大联系人文件被整体读入内存。
+    let payload = read_file_with_limit(&source_path, MAX_VCARD_IMPORT_BYTES)?;
     if payload.is_empty() {
         return Err(crate::db::MailError::Imap(
             "联系人文件为空，无法导入。".to_string(),
         ));
-    }
-    if payload.len() > MAX_VCARD_IMPORT_BYTES {
-        return Err(crate::db::MailError::Imap(format!(
-            "联系人文件超过 {} MB 导入上限。",
-            MAX_VCARD_IMPORT_BYTES / 1024 / 1024
-        )));
     }
     let raw = String::from_utf8(payload.clone())
         .map_err(|_| crate::db::MailError::Imap("联系人文件不是有效的 UTF-8 文本。".to_string()))?;

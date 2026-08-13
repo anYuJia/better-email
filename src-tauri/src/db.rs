@@ -4,11 +4,12 @@ use crate::models::{
     ContactImportCommitSummary, ContactImportPreviewEntry, ContactImportUndoReport, ContactInput,
     CredentialStatus, DraftInput, Folder, ImapFlagSnapshot, ImapFolderProbe, ImapHeaderBatch,
     ImapMailboxState, ImapReconcileResult, Label, LocalBackup, LocalBackupRow, LocalBackupSummary,
-    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats, Message, MessageSummary,
-    MessageThreadingInput, MailboxSyncTransactionResult, OAuthCallbackReport, OAuthSession, OAuthStartReport,
-    OAuthTokenExchangeReport, OutboundAttachmentInput, OutboundMessage, OutboxItem,
-    PendingRemoteWrite, ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage,
-    SyncRun, SyncSchedulePlan, ThreadSummary,
+    MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats,
+    MailboxSyncTransactionResult, Message, MessageSummary, MessageThreadingInput,
+    OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
+    OutboundAttachmentInput, OutboundMessage, OutboxItem, PendingRemoteWrite, ReleasedSnoozedCount,
+    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
+    SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -231,6 +232,8 @@ impl MailStore {
             store.remove_demo_seed_data()?;
         }
         store.seed_if_empty(should_seed_demo_data)?;
+        // 启动时清理不再被任何草稿/发件箱引用的临时附件（异常退出后的孤儿文件按安全 TTL 清理）。
+        let _ = store.prune_temp_attachments(std::time::Duration::from_secs(60));
         db_info("[better-email][db] open ok");
         Ok(store)
     }
@@ -758,11 +761,10 @@ mod tests {
         let reopened = MailStore::open_at(db_path).expect("legacy database reopens");
         let reopened_ok = reopened
             .with_conn(|conn| {
-                let count: i64 = conn.query_row(
-                    "SELECT COUNT(*) FROM messages WHERE id = 10",
-                    [],
-                    |row| row.get(0),
-                )?;
+                let count: i64 =
+                    conn.query_row("SELECT COUNT(*) FROM messages WHERE id = 10", [], |row| {
+                        row.get(0)
+                    })?;
                 Ok(count)
             })
             .expect("reopened messages query");
@@ -3119,7 +3121,10 @@ mod tests {
                     history_complete: false,
                     history_scanned: true,
                     cursor_reset: false,
-                    headers: vec![header(12, "<m12@example.com>"), header(5, "<m5@example.com>")],
+                    headers: vec![
+                        header(12, "<m12@example.com>"),
+                        header(5, "<m5@example.com>"),
+                    ],
                 },
             )
             .unwrap();
@@ -3181,7 +3186,10 @@ mod tests {
         };
 
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
+            store
+                .import_imap_headers_batch(mailbox.id, &batch)
+                .unwrap()
+                .0,
             2
         );
 
@@ -3476,7 +3484,10 @@ mod tests {
             }],
         };
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
+            store
+                .import_imap_headers_batch(mailbox.id, &batch)
+                .unwrap()
+                .0,
             1
         );
         let archive = store
@@ -3506,7 +3517,8 @@ mod tests {
         assert_eq!(
             store
                 .import_imap_headers_batch(mailbox.id, &rebound_batch)
-                .unwrap().0,
+                .unwrap()
+                .0,
             0
         );
         let rebound = store.get_message(message.id).unwrap();
@@ -3553,7 +3565,10 @@ mod tests {
         let initial_sync_runs = store.list_sync_runs().unwrap().len();
 
         assert_eq!(
-            store.import_imap_headers_batch(mailbox.id, &batch).unwrap().0,
+            store
+                .import_imap_headers_batch(mailbox.id, &batch)
+                .unwrap()
+                .0,
             1
         );
         assert_eq!(store.list_sync_runs().unwrap().len(), initial_sync_runs);
@@ -3689,7 +3704,8 @@ mod tests {
         assert_eq!(
             store
                 .import_imap_headers_batch(remote_custom.id, &batch)
-                .unwrap().0,
+                .unwrap()
+                .0,
             1
         );
         let imported = store
@@ -4042,13 +4058,7 @@ mod tests {
             .find(|folder| folder.role == "inbox")
             .unwrap();
         store
-            .list_messages_for_scope(
-                None,
-                inbox.id,
-                Some(subject.to_string()),
-                None,
-                10,
-            )
+            .list_messages_for_scope(None, inbox.id, Some(subject.to_string()), None, 10)
             .unwrap()
             .remove(0)
             .id
@@ -4083,7 +4093,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first body".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("report.pdf", "application/pdf", 100, "", false)],
+                    attachments: vec![remote_attachment(
+                        "report.pdf",
+                        "application/pdf",
+                        100,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4109,7 +4125,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second body".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("report.pdf", "application/pdf", 100, "", false)],
+                    attachments: vec![remote_attachment(
+                        "report.pdf",
+                        "application/pdf",
+                        100,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4138,7 +4160,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("gone.pdf", "application/pdf", 10, "", false)],
+                    attachments: vec![remote_attachment(
+                        "gone.pdf",
+                        "application/pdf",
+                        10,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4157,7 +4185,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("gone.pdf", "application/pdf", 10, "", false)],
+                    attachments: vec![remote_attachment(
+                        "gone.pdf",
+                        "application/pdf",
+                        10,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4188,7 +4222,10 @@ mod tests {
             .unwrap();
         let attachments = store.list_attachments(message_id).unwrap();
         assert_eq!(attachments.len(), 2);
-        let keep = attachments.iter().find(|a| a.filename == "keep.pdf").unwrap();
+        let keep = attachments
+            .iter()
+            .find(|a| a.filename == "keep.pdf")
+            .unwrap();
         let dir = store.attachment_dir(message_id);
         fs::create_dir_all(&dir).unwrap();
         let keep_path = dir.join(format!("{}-keep.pdf", keep.id));
@@ -4207,7 +4244,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("keep.pdf", "application/pdf", 10, "", false)],
+                    attachments: vec![remote_attachment(
+                        "keep.pdf",
+                        "application/pdf",
+                        10,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4278,7 +4321,10 @@ mod tests {
             .map(|a| a.local_path.clone())
             .collect::<Vec<_>>();
         downloaded_paths.sort();
-        let mut expected = vec![first_path.to_string_lossy().into_owned(), second_path.to_string_lossy().into_owned()];
+        let mut expected = vec![
+            first_path.to_string_lossy().into_owned(),
+            second_path.to_string_lossy().into_owned(),
+        ];
         expected.sort();
         assert_eq!(downloaded_paths, expected, "两个同名附件的下载状态都应保留");
     }
@@ -4306,8 +4352,14 @@ mod tests {
         let dir = store.attachment_dir(message_id);
         fs::create_dir_all(&dir).unwrap();
         let attachments = store.list_attachments(message_id).unwrap();
-        let a = attachments.iter().find(|a| a.content_id == "cid:a@example.com").unwrap();
-        let b = attachments.iter().find(|a| a.content_id == "cid:b@example.com").unwrap();
+        let a = attachments
+            .iter()
+            .find(|a| a.content_id == "cid:a@example.com")
+            .unwrap();
+        let b = attachments
+            .iter()
+            .find(|a| a.content_id == "cid:b@example.com")
+            .unwrap();
         let a_path = dir.join(format!("{}-a.png", a.id));
         let b_path = dir.join(format!("{}-b.png", b.id));
         fs::write(&a_path, b"aaa").unwrap();
@@ -4337,8 +4389,14 @@ mod tests {
             )
             .unwrap();
         let refreshed = store.list_attachments(message_id).unwrap();
-        let a = refreshed.iter().find(|a| a.content_id == "cid:a@example.com").unwrap();
-        let b = refreshed.iter().find(|a| a.content_id == "cid:b@example.com").unwrap();
+        let a = refreshed
+            .iter()
+            .find(|a| a.content_id == "cid:a@example.com")
+            .unwrap();
+        let b = refreshed
+            .iter()
+            .find(|a| a.content_id == "cid:b@example.com")
+            .unwrap();
         assert!(a.is_downloaded);
         assert_eq!(a.local_path, a_path.to_string_lossy());
         assert_eq!(a.size_bytes, 3);
@@ -4360,7 +4418,13 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
-                    attachments: vec![remote_attachment("old.pdf", "application/pdf", 10, "", false)],
+                    attachments: vec![remote_attachment(
+                        "old.pdf",
+                        "application/pdf",
+                        10,
+                        "",
+                        false,
+                    )],
                 },
             )
             .unwrap();
@@ -4501,7 +4565,9 @@ mod tests {
         let message_id = pop3_message_id(&store, account_id, "Pop custom");
 
         // 移到自定义文件夹 + 稍后处理。
-        store.create_custom_folder(Some(account_id), "项目 Alpha".to_string()).unwrap();
+        store
+            .create_custom_folder(Some(account_id), "项目 Alpha".to_string())
+            .unwrap();
         let custom = store
             .list_folders_for_account(Some(account_id))
             .unwrap()
@@ -4526,7 +4592,10 @@ mod tests {
         );
         let after = store.get_message(message_id).unwrap();
         assert_eq!(after.folder_id, custom.id, "自定义文件夹应保留");
-        assert_eq!(after.snoozed_until, "2099-01-01T00:00:00Z", "稍后状态应保留");
+        assert_eq!(
+            after.snoozed_until, "2099-01-01T00:00:00Z",
+            "稍后状态应保留"
+        );
     }
 
     #[test]
@@ -4565,7 +4634,9 @@ mod tests {
             )
             .unwrap();
         assert_eq!(messages.len(), 2);
-        assert!(messages.iter().all(|message| message.folder_role == "inbox"));
+        assert!(messages
+            .iter()
+            .all(|message| message.folder_role == "inbox"));
     }
 
     fn seed_custom_mailbox_message(
@@ -4635,7 +4706,10 @@ mod tests {
         assert!(result.is_err(), "import 应失败并使整个事务回滚");
 
         let after = store.get_message(message_id).unwrap();
-        assert!(!after.is_read, "reconcile 的 flags 更新不应在 import 失败后残留");
+        assert!(
+            !after.is_read,
+            "reconcile 的 flags 更新不应在 import 失败后残留"
+        );
     }
 
     #[test]
@@ -4681,9 +4755,14 @@ mod tests {
             seed_custom_mailbox_message(&store, "Projects/Gamma", 7, "Atomic commit");
         // 先建立自定义文件夹并映射，让 import 走通。
         let custom_folder = store
-            .create_custom_folder(Some(store.get_account().unwrap().id), "项目 Gamma".to_string())
+            .create_custom_folder(
+                Some(store.get_account().unwrap().id),
+                "项目 Gamma".to_string(),
+            )
             .unwrap();
-        store.map_imap_mailbox(mailbox_id, Some(custom_folder.id)).unwrap();
+        store
+            .map_imap_mailbox(mailbox_id, Some(custom_folder.id))
+            .unwrap();
 
         let snapshot = ImapFlagSnapshot {
             floor_uid: 0,
@@ -4766,7 +4845,9 @@ mod tests {
 
         // 本地标记已读（is_read=1），远端写回失败：记录待处理意图。
         store.set_message_read(message_id, true).unwrap();
-        store.record_pending_remote_write(message_id, "seen", "1").unwrap();
+        store
+            .record_pending_remote_write(message_id, "seen", "1")
+            .unwrap();
         // 远端快照说未读：待处理意图存在，不应被覆盖。
         store
             .reconcile_imap_flag_snapshot(
@@ -4780,7 +4861,9 @@ mod tests {
         );
 
         // 写回成功：清除待处理意图，远端恢复权威。
-        store.clear_pending_remote_write(message_id, "seen").unwrap();
+        store
+            .clear_pending_remote_write(message_id, "seen")
+            .unwrap();
         store
             .reconcile_imap_flag_snapshot(
                 inbox_mailbox_id(&store),
@@ -4801,7 +4884,9 @@ mod tests {
         // 用户本地移到废纸篓，远端移动写回失败。
         store.move_message_to_role(message_id, "trash").unwrap();
         assert_eq!(store.get_message(message_id).unwrap().folder_role, "trash");
-        store.record_pending_remote_write(message_id, "move", "trash").unwrap();
+        store
+            .record_pending_remote_write(message_id, "move", "trash")
+            .unwrap();
 
         // 下一次头同步（INBOX 仍返回该 UID）：待处理移动意图阻止拉回收件箱。
         let batch = ImapHeaderBatch {
@@ -4838,7 +4923,9 @@ mod tests {
 
         // 写回成功：清除待处理意图，远端成为权威（INBOX 不再包含该邮件时，
         // 下次 reconcile 才会删除；这里验证待处理清除即可）。
-        store.clear_pending_remote_write(message_id, "move").unwrap();
+        store
+            .clear_pending_remote_write(message_id, "move")
+            .unwrap();
         assert!(store.list_pending_remote_writes().unwrap().is_empty());
     }
 
@@ -4866,14 +4953,22 @@ mod tests {
     fn pending_remote_write_list_and_clear_round_trip() {
         let store = test_store();
         let message_id = seed_remote_message(&store, "Pending list", 34);
-        store.record_pending_remote_write(message_id, "flagged", "1").unwrap();
-        store.record_pending_remote_write(message_id, "move", "trash").unwrap();
+        store
+            .record_pending_remote_write(message_id, "flagged", "1")
+            .unwrap();
+        store
+            .record_pending_remote_write(message_id, "move", "trash")
+            .unwrap();
         let writes = store.list_pending_remote_writes().unwrap();
         assert_eq!(writes.len(), 2);
         assert!(writes.iter().any(|w| w.kind == "flagged" && w.value == "1"));
-        assert!(writes.iter().any(|w| w.kind == "move" && w.value == "trash"));
+        assert!(writes
+            .iter()
+            .any(|w| w.kind == "move" && w.value == "trash"));
 
-        store.clear_pending_remote_write(message_id, "flagged").unwrap();
+        store
+            .clear_pending_remote_write(message_id, "flagged")
+            .unwrap();
         let writes = store.list_pending_remote_writes().unwrap();
         assert_eq!(writes.len(), 1);
         assert_eq!(writes[0].kind, "move");
@@ -4920,8 +5015,9 @@ mod tests {
         let mut fetched_oldest_uid_1 = false;
         let mut next_uid = 100_i64;
         for round in 0..6 {
-            let pending =
-                store.list_messages_missing_body(account_id, "INBOX", 4).unwrap();
+            let pending = store
+                .list_messages_missing_body(account_id, "INBOX", 4)
+                .unwrap();
             assert!(!pending.is_empty(), "round {round} 不应为空");
             if pending.iter().any(|(_, uid)| *uid == 1) {
                 fetched_oldest_uid_1 = true;
@@ -4963,11 +5059,10 @@ mod tests {
         );
 
         // 新邮件不应长期饥饿：最新缺正文邮件也应很快出现在批次中。
-        let pending = store.list_messages_missing_body(account_id, "INBOX", 4).unwrap();
-        assert!(
-            !pending.is_empty(),
-            "仍有新增缺正文邮件时批次不应为空"
-        );
+        let pending = store
+            .list_messages_missing_body(account_id, "INBOX", 4)
+            .unwrap();
+        assert!(!pending.is_empty(), "仍有新增缺正文邮件时批次不应为空");
     }
 
     #[test]
@@ -6354,14 +6449,23 @@ mod tests {
         messages.insert("account_id".into(), serde_json::json!(1));
         messages.insert("folder_id".into(), serde_json::json!(1));
         messages.insert("sender_name".into(), serde_json::json!("Attacker"));
-        messages.insert("sender_email".into(), serde_json::json!("attacker@example.com"));
+        messages.insert(
+            "sender_email".into(),
+            serde_json::json!("attacker@example.com"),
+        );
         messages.insert("recipients".into(), serde_json::json!("me@example.com"));
         messages.insert("subject".into(), serde_json::json!("Malicious"));
         messages.insert("snippet".into(), serde_json::json!("snippet"));
-        messages.insert("body".into(), serde_json::json!(
+        messages.insert(
+            "body".into(),
+            serde_json::json!(
             "<p>Hello</p><script>alert(1)</script><img src=\"http://tracker.example/open.png\">"
-        ));
-        messages.insert("received_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        ),
+        );
+        messages.insert(
+            "received_at".into(),
+            serde_json::json!("2026-01-01T00:00:00Z"),
+        );
         // 备份携带的 sanitized_html 是恶意注入内容，导入时必须被当前 sanitizer 重写。
         messages.insert("sanitized_html".into(), serde_json::json!(
             "<script>alert(1)</script><img src=\"http://tracker.example/open.png\" onerror=\"bad()\">"
@@ -6386,7 +6490,10 @@ mod tests {
         accounts.insert("email".into(), serde_json::json!("restored@example.com"));
         accounts.insert("display_name".into(), serde_json::json!("Restored"));
         accounts.insert("provider".into(), serde_json::json!("gmail"));
-        accounts.insert("created_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        accounts.insert(
+            "created_at".into(),
+            serde_json::json!("2026-01-01T00:00:00Z"),
+        );
         tables.insert("accounts".to_string(), vec![accounts]);
         let mut folders = LocalBackupRow::new();
         folders.insert("id".into(), serde_json::json!(1));
@@ -6448,20 +6555,12 @@ mod tests {
                 let row = conn.query_row(
                     "SELECT is_downloaded, local_path FROM attachments WHERE id = 1",
                     [],
-                    |row| {
-                        Ok((
-                            row.get::<_, i64>(0)?,
-                            row.get::<_, String>(1)?,
-                        ))
-                    },
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
                 )?;
                 Ok(row)
             })
             .unwrap();
-        assert_eq!(
-            restored_attachment.0, 0,
-            "导入后附件必须是未下载状态"
-        );
+        assert_eq!(restored_attachment.0, 0, "导入后附件必须是未下载状态");
         assert!(
             restored_attachment.1.is_empty(),
             "导入后附件 local_path 必须清空（不能指向 /etc/passwd）：{}",
@@ -6478,7 +6577,10 @@ mod tests {
         accounts.insert("email".into(), serde_json::json!("a@example.com"));
         accounts.insert("display_name".into(), serde_json::json!("A"));
         accounts.insert("provider".into(), serde_json::json!("gmail"));
-        accounts.insert("created_at".into(), serde_json::json!("2026-01-01T00:00:00Z"));
+        accounts.insert(
+            "created_at".into(),
+            serde_json::json!("2026-01-01T00:00:00Z"),
+        );
         tables.insert("accounts".to_string(), vec![accounts]);
         // 超过行数上限。
         let many = (0..300_000)

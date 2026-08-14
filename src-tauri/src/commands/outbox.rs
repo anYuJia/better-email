@@ -244,11 +244,7 @@ pub async fn send_message(
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
     if let Some(task_progress) = task_progress {
-        task_progress.set(
-            &store,
-            24,
-            "邮件记录已落库，准备读取账号与账号凭据",
-        )?;
+        task_progress.set(&store, 24, "邮件记录已落库，准备读取账号与账号凭据")?;
     }
     let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     let message = store.get_outbound_message(message_id)?;
@@ -518,12 +514,7 @@ pub async fn flush_outbox_smtp(
                     task_progress.set(
                         &store,
                         step_progress.saturating_add(5).min(95),
-                        &format!(
-                            "第 {}/{} 封发送失败：{}",
-                            index + 1,
-                            total_items,
-                            error,
-                        ),
+                        &format!("第 {}/{} 封发送失败：{}", index + 1, total_items, error,),
                     )?;
                 }
                 continue;
@@ -546,12 +537,7 @@ pub async fn flush_outbox_smtp(
                     task_progress.set(
                         &store,
                         step_progress.saturating_add(5).min(95),
-                        &format!(
-                            "第 {}/{} 封附件校验失败：{}",
-                            index + 1,
-                            total_items,
-                            error,
-                        ),
+                        &format!("第 {}/{} 封附件校验失败：{}", index + 1, total_items, error,),
                     )?;
                 }
                 continue;
@@ -594,12 +580,7 @@ pub async fn flush_outbox_smtp(
                     task_progress.set(
                         &store,
                         85 + ((index as i64).saturating_mul(15) / total_items as i64),
-                        &format!(
-                            "第 {}/{} 封发送失败：{}",
-                            index + 1,
-                            total_items,
-                            error,
-                        ),
+                        &format!("第 {}/{} 封发送失败：{}", index + 1, total_items, error,),
                     )?;
                 }
             }

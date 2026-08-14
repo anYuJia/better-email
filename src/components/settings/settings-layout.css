@@ -178,19 +178,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.settings-action-spinner {
-  animation: ui-spin var(--ui-motion-800) linear infinite;
-}
-
-.settings-modal .spinning,
-.settings-modal .spin,
-.settings-modal .connection-spinner,
-.contact-import-backdrop .spinning,
-.settings-modal .writeback-validation-step .spin,
-.settings-modal .contact-transfer-actions .spinning {
-  animation: ui-spin var(--ui-motion-800) linear infinite;
-}
-
 .settings-connection-summary {
   padding: 8px 18px;
   border-bottom: 1px solid var(--st-border);
@@ -620,7 +607,6 @@
   border-radius: 50%;
   border: 2px solid var(--st-border-strong);
   border-top-color: var(--st-accent);
-  animation: ui-spin var(--ui-motion-700) linear infinite;
 }
 
 /* --- Mobile page picker (hidden on desktop) --- */
@@ -861,13 +847,5 @@
 
   .settings-modal .settings-page-picker > svg {
     transition: none;
-  }
-
-  .settings-modal .settings-action-spinner,
-  .settings-modal .spinning,
-  .settings-modal .spin,
-  .settings-modal .connection-spinner,
-  .settings-modal .settings-page-loading::before {
-    animation: none;
   }
 }

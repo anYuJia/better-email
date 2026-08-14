@@ -32,12 +32,10 @@
   border: 2px solid var(--ui-border-strong);
   border-top-color: var(--ui-accent);
   border-radius: 50%;
-  animation: ui-spin var(--ui-motion-680) linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .deferred-spinner {
-    animation: none;
     border-color: var(--ui-accent);
   }
 }

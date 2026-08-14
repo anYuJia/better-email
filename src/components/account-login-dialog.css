@@ -265,10 +265,6 @@
   opacity: 0.52;
 }
 
-.account-login-spinner {
-  animation: ui-spin var(--ui-motion-800) linear infinite;
-}
-
 .account-login-dialog footer {
   min-height: 36px;
   display: flex;

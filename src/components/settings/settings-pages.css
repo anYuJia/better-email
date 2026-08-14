@@ -4970,12 +4970,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .contact-import-backdrop .spinning {
-    animation: none;
-  }
-}
-
 /* =====================================================================
  * Appearance page: compact theme preference control.
  * ===================================================================== */

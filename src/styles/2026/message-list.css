@@ -94,10 +94,6 @@
   opacity: 0.85;
 }
 
-.animate-spin {
-  animation: ui-spin var(--ui-motion-1000) linear infinite;
-}
-
 .search-options-menu {
   flex: 0 0 auto;
 }

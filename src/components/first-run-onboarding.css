@@ -258,11 +258,6 @@
   cursor: default;
 }
 
-.spinning {
-  animation: ui-spin var(--ui-motion-900) linear infinite;
-}
-
-
 .onboarding-save-error {
   display: flex;
   align-items: flex-start;

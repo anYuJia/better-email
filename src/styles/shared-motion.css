@@ -6,3 +6,53 @@
     transform: rotate(360deg);
   }
 }
+
+.ui-spinner {
+  --ui-spinner-duration: var(--ui-motion-800);
+  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+}
+
+.animate-spin,
+.spinning,
+.spin,
+.connection-spinner,
+.settings-action-spinner,
+.reader-translation-spinner,
+.account-login-spinner,
+.deferred-spinner {
+  --ui-spinner-duration: var(--ui-motion-800);
+  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+}
+
+.spinning,
+.reader-translation-spinner {
+  --ui-spinner-duration: var(--ui-motion-900);
+}
+
+.deferred-spinner {
+  --ui-spinner-duration: var(--ui-motion-680);
+}
+
+.animate-spin {
+  --ui-spinner-duration: var(--ui-motion-1000);
+}
+
+.settings-page-loading::before {
+  --ui-spinner-duration: var(--ui-motion-700);
+  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-spinner,
+  .animate-spin,
+  .spinning,
+  .spin,
+  .connection-spinner,
+  .settings-action-spinner,
+  .reader-translation-spinner,
+  .account-login-spinner,
+  .deferred-spinner,
+  .settings-page-loading::before {
+    animation: none;
+  }
+}

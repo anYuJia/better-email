@@ -47,10 +47,6 @@
   background: var(--ui-accent-hover, #0b8aff);
 }
 
-.reader-translation-spinner {
-  animation: ui-spin var(--ui-motion-900) linear infinite;
-}
-
 .reader-translation-content {
   border: 1px solid rgba(10, 132, 255, 0.2);
   border-radius: 9px;

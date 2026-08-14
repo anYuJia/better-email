@@ -22,6 +22,10 @@ type MessageGroup = {
   messages: MessageSummary[];
 };
 
+type FlatListItem =
+  | { type: 'header'; id: string; key: string; label: string; count: number }
+  | { type: 'message'; key: string; message: MessageSummary };
+
 type MessageListViewProps = {
   groups: MessageGroup[];
   messages: MessageSummary[];
@@ -80,6 +84,9 @@ export default function MessageListView({
 
   const [viewportHeight, setViewportHeight] = useState(600);
   const [, setScrollTop] = useState(initialScrollTop);
+  const [heightCacheVersion, setHeightCacheVersion] = useState(0);
+  const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
+  const itemNodeRefs = useRef<Map<string, HTMLDivElement | HTMLHeadingElement | null>>(new Map());
 
   const newIds = useMemo(() => {
     const set = new Set<number>();
@@ -103,6 +110,12 @@ export default function MessageListView({
     return set;
   }, [messages, listStateKey]);
 
+  useEffect(() => {
+    itemHeightCacheRef.current.clear();
+    itemNodeRefs.current.clear();
+    setHeightCacheVersion((current) => current + 1);
+  }, [groups, listStateKey]);
+
   useEffect(() => () => {
     if (scrollSaveTimerRef.current !== null) {
       window.clearTimeout(scrollSaveTimerRef.current);
@@ -111,29 +124,38 @@ export default function MessageListView({
   }, [listStateKey, onScrollTopChange]);
 
   const flatItems = useMemo(() => {
-    const list: (
-      | { type: 'header'; id: string; label: string; count: number }
-      | { type: 'message'; message: MessageSummary }
-    )[] = [];
+    const list: FlatListItem[] = [];
     for (const group of groups) {
-      list.push({ type: 'header', id: group.id, label: group.label, count: group.messages.length });
+      list.push({
+        type: 'header',
+        id: group.id,
+        key: `header-${group.id}`,
+        label: group.label,
+        count: group.messages.length,
+      });
       for (const msg of group.messages) {
-        list.push({ type: 'message', message: msg });
+        list.push({ type: 'message', key: `message-${group.id}-${msg.id}`, message: msg });
       }
     }
     return list;
   }, [groups]);
 
   const { layout, totalHeight } = useMemo(() => {
+    const getItemHeight = (item: FlatListItem) => {
+      const cachedHeight = itemHeightCacheRef.current.get(item.key);
+      return cachedHeight && cachedHeight > 0
+        ? cachedHeight
+        : item.type === 'message' ? MESSAGE_ROW_HEIGHT : GROUP_HEADER_HEIGHT;
+    };
     const layout: { top: number; height: number }[] = [];
     let currentTop = 0;
     for (const item of flatItems) {
-      const height = item.type === 'message' ? MESSAGE_ROW_HEIGHT : GROUP_HEADER_HEIGHT;
+      const height = getItemHeight(item);
       layout.push({ top: currentTop, height });
       currentTop += height;
     }
     return { layout, totalHeight: currentTop };
-  }, [flatItems]);
+  }, [flatItems, heightCacheVersion]);
 
   const [visibleRange, setVisibleRange] = useState(() =>
     calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight)
@@ -279,6 +301,24 @@ export default function MessageListView({
     return items;
   }, [flatItems, layout, visibleRange]);
 
+  useLayoutEffect(() => {
+    let hasUpdate = false;
+    for (const { item } of visibleItems) {
+      const node = itemNodeRefs.current.get(item.key);
+      if (!node) continue;
+      const measuredHeight = Math.round(node.getBoundingClientRect().height);
+      if (measuredHeight <= 0) continue;
+      const currentHeight = itemHeightCacheRef.current.get(item.key) ?? 0;
+      if (currentHeight !== measuredHeight) {
+        itemHeightCacheRef.current.set(item.key, measuredHeight);
+        hasUpdate = true;
+      }
+    }
+    if (hasUpdate) {
+      setHeightCacheVersion((current) => current + 1);
+    }
+  }, [visibleItems]);
+
   return (
     <div className="message-list" ref={listRef} onScroll={handleListScroll}>
       {messages.length > 0 && (
@@ -291,6 +331,7 @@ export default function MessageListView({
           }}
         >
           {visibleItems.map(({ index, item, style }) => {
+            const itemKey = item.key;
             if (item.type === 'header') {
               return (
                 <header
@@ -299,7 +340,14 @@ export default function MessageListView({
                     index > 0 ? 'message-date-header--separated' : '',
                   ].filter(Boolean).join(' ')}
                   style={style}
-                  key={`header-${item.id}`}
+                  key={itemKey}
+                  ref={(element) => {
+                    if (element) {
+                      itemNodeRefs.current.set(itemKey, element);
+                    } else {
+                      itemNodeRefs.current.delete(itemKey);
+                    }
+                  }}
                 >
                   <span>{item.label}</span>
                   <em>{item.count} 封</em>
@@ -308,7 +356,18 @@ export default function MessageListView({
             } else {
               const message = item.message;
               return (
-                <div className="message-list-item" style={style} key={`msg-wrapper-${message.id}`}>
+                <div
+                  className="message-list-item"
+                  style={style}
+                  key={itemKey}
+                  ref={(element) => {
+                    if (element) {
+                      itemNodeRefs.current.set(itemKey, element);
+                    } else {
+                      itemNodeRefs.current.delete(itemKey);
+                    }
+                  }}
+                >
                   <MessageListCard
                     message={message}
                     isCurrentMessage={message.id === selectedId}

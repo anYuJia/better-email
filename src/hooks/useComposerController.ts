@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   emptyDraft,
   isDraftEmpty,
@@ -72,10 +72,12 @@ export default function useComposerController({
   refreshAll,
   focusMailboxRole,
 }: UseComposerControllerOptions) {
+  const COMPOSER_AUTOSAVE_DEBOUNCE_MS = 800;
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(true);
   const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
+  const composerAutosaveTimerRef = useRef<number | null>(null);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
@@ -352,8 +354,20 @@ export default function useComposerController({
       isRichComposer,
       saved_at: new Date().toISOString(),
     };
-    window.localStorage.setItem(composerAutosaveStorageKey, JSON.stringify(autosave));
-    setComposerAutosave(autosave);
+    if (composerAutosaveTimerRef.current !== null) {
+      window.clearTimeout(composerAutosaveTimerRef.current);
+    }
+    composerAutosaveTimerRef.current = window.setTimeout(() => {
+      window.localStorage.setItem(composerAutosaveStorageKey, JSON.stringify(autosave));
+      setComposerAutosave(autosave);
+      composerAutosaveTimerRef.current = null;
+    }, COMPOSER_AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (composerAutosaveTimerRef.current !== null) {
+        window.clearTimeout(composerAutosaveTimerRef.current);
+      }
+    };
   }, [draft, isRichComposer, isComposerOpen]);
 
 

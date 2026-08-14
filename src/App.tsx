@@ -17,6 +17,7 @@ import AccountLoginDialog from './components/AccountLoginDialog';
 import FirstRunOnboarding from './components/FirstRunOnboarding';
 import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
 import ConfirmationDialogs from './components/ConfirmationDialogs';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
 import MessageToastStack, { type MessageToast } from './components/MessageToastStack';
@@ -1388,58 +1389,60 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('sidebar', event)}
       />
 
-      <MessageListPane
-        searchInputRef={searchInputRef}
-        query={query}
-        searchScope={searchScope}
-        isRefreshing={isRefreshing || isBackgroundSyncRunning}
-        refreshNotice={refreshNotice}
-        filter={filter}
-        listMode={listMode}
-        listSort={listSort}
-        selectedMessageIds={selectedMessageIds}
-        folders={folders}
-        labels={labels}
-        threads={threads}
-        activeThread={activeThread}
-        messages={messages}
-        selectedId={selectedId}
-        hasMoreMessages={hasMoreMessages}
-        currentViewLabel={currentViewLabel}
-        visibleListSummary={visibleListSummary}
-        messageListSummary={messageListSummary}
-        listStateKey={mailboxListStateKey}
-        initialScrollTop={mailboxListScrollTop}
-        onScrollTopChange={handleMailboxListScrollTopChange}
-        onSearchSubmit={runSearch}
-        onQueryChange={handleQueryChange}
-        onSearchScopeChange={handleSearchScopeChange}
-        onClearSearchAndFilter={handleClearSearchAndFilter}
-        onApplySearchShortcut={handleApplySearchShortcut}
-        onRefresh={handleRefresh}
-        onShowMessages={handleShowMessages}
-        onShowThreads={handleShowThreads}
-        onFilterChange={setFilter}
-        onSortChange={setListSort}
-        onToggleAllVisible={toggleAllVisibleMessages}
-        onRunBulkAction={runBulkAction}
-        onRequestSnooze={requestSnooze}
-        onMoveBulkToFolder={handleMoveBulkToFolder}
-        onToggleBulkLabel={handleToggleBulkLabel}
-        onRunMessageAction={handleRunMessageAction}
-        onMoveMessageToFolder={handleMoveMessageToFolder}
-        onToggleMessageLabel={handleToggleMessageLabel}
-        onComposeFromMessage={composeFromMessage}
-        onOpenThread={openThread}
-        onRunThreadAction={handleRunThreadAction}
-        onMoveThreadToFolder={handleMoveThreadToFolder}
-        onToggleThreadLabel={handleToggleThreadLabel}
-        onToggleThreadMute={handleToggleThreadMute}
-        onSelectMessage={selectMessageForReading}
-        onToggleMessageSelection={toggleMessageSelection}
-        onLoadMore={handleLoadMore}
-        loadMoreStatus={loadMoreStatus}
-      />
+      <AppErrorBoundary>
+        <MessageListPane
+          searchInputRef={searchInputRef}
+          query={query}
+          searchScope={searchScope}
+          isRefreshing={isRefreshing || isBackgroundSyncRunning}
+          refreshNotice={refreshNotice}
+          filter={filter}
+          listMode={listMode}
+          listSort={listSort}
+          selectedMessageIds={selectedMessageIds}
+          folders={folders}
+          labels={labels}
+          threads={threads}
+          activeThread={activeThread}
+          messages={messages}
+          selectedId={selectedId}
+          hasMoreMessages={hasMoreMessages}
+          currentViewLabel={currentViewLabel}
+          visibleListSummary={visibleListSummary}
+          messageListSummary={messageListSummary}
+          listStateKey={mailboxListStateKey}
+          initialScrollTop={mailboxListScrollTop}
+          onScrollTopChange={handleMailboxListScrollTopChange}
+          onSearchSubmit={runSearch}
+          onQueryChange={handleQueryChange}
+          onSearchScopeChange={handleSearchScopeChange}
+          onClearSearchAndFilter={handleClearSearchAndFilter}
+          onApplySearchShortcut={handleApplySearchShortcut}
+          onRefresh={handleRefresh}
+          onShowMessages={handleShowMessages}
+          onShowThreads={handleShowThreads}
+          onFilterChange={setFilter}
+          onSortChange={setListSort}
+          onToggleAllVisible={toggleAllVisibleMessages}
+          onRunBulkAction={runBulkAction}
+          onRequestSnooze={requestSnooze}
+          onMoveBulkToFolder={handleMoveBulkToFolder}
+          onToggleBulkLabel={handleToggleBulkLabel}
+          onRunMessageAction={handleRunMessageAction}
+          onMoveMessageToFolder={handleMoveMessageToFolder}
+          onToggleMessageLabel={handleToggleMessageLabel}
+          onComposeFromMessage={composeFromMessage}
+          onOpenThread={openThread}
+          onRunThreadAction={handleRunThreadAction}
+          onMoveThreadToFolder={handleMoveThreadToFolder}
+          onToggleThreadLabel={handleToggleThreadLabel}
+          onToggleThreadMute={handleToggleThreadMute}
+          onSelectMessage={selectMessageForReading}
+          onToggleMessageSelection={toggleMessageSelection}
+          onLoadMore={handleLoadMore}
+          loadMoreStatus={loadMoreStatus}
+        />
+      </AppErrorBoundary>
 
       <button
         className="pane-resizer list-resizer"
@@ -1450,106 +1453,110 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('list', event)}
       />
 
-      <ReaderPane
-        activeThread={activeThread}
-        threadMessages={threadMessages}
-        activeThreadSelected={activeThreadSelected}
-        selected={readerSelectedDetail}
-        selectedId={readerDisplayedId}
-        activeSelectedId={selectedId}
-        attachmentsLoaded={attachmentsLoaded}
-        readTriggerKey={readerSelectionRevision}
-        accountScope={accountScope}
-        folders={folders}
-        labels={labels}
-        attachments={attachments}
-        selectedSenderTrusted={selectedSenderTrusted}
-        selectedSenderDomain={selectedSenderDomain}
-        selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
-        selectedSenderIsExternal={selectedSenderIsExternal}
-        selectedExternalBlocked={selectedExternalBlocked}
-        selectedWarnExternalSender={selectedWarnExternalSender}
-        selectedInterceptsHttps={selectedInterceptsHttps}
-        onOpenHttpsLink={handleOpenHttpsLink}
-        quickReplyBody={quickReplyBody}
-        onSelectMessage={selectMessageForReading}
-        onComposeNew={handleComposeNew}
-        onComposeFromMessage={composeFromMessage}
-        onRunThreadAction={handleRunActiveThreadAction}
-        onMoveThreadToFolder={handleMoveActiveThreadToFolder}
-        onToggleThreadLabel={handleToggleActiveThreadLabel}
-        onToggleThreadMute={handleToggleActiveThreadMute}
-        onToggleStar={toggleStar}
-        onEditDraft={editDraftMessage}
-        onRestoreFromTrash={restoreSelectedFromTrash}
-        onMoveArchive={handleMoveArchive}
-        onMoveTrash={handleMoveTrash}
-        onToggleRead={toggleRead}
-        onReadComplete={markMessageReadAfterReading}
-        onUnsnooze={unsnoozeSelected}
-        onSnooze={snoozeSelected}
-        onExportMessage={exportSelectedMessage}
-        onFetchBody={fetchSelectedBody}
-        onMarkNotSpam={markSelectedNotSpam}
-        onMarkAsSpam={markSelectedAsSpam}
-        onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
-        onTrustRemoteImages={trustRemoteImagesForSelected}
-        onBlockSender={blockSelectedSender}
-        onPermanentlyDelete={handlePermanentlyDelete}
-        onEmptyTrash={emptyCurrentTrash}
-        onMoveToFolder={handleMoveToFolder}
-        onToggleLabel={toggleLabel}
-        onCreateLabel={handleCreateLabel}
-        onUpdateLabel={handleUpdateLabel}
-        onDeleteLabel={handleDeleteLabel}
-        onOpenAttachment={openAttachment}
-        onDownloadAttachment={downloadAttachment}
-        onSaveAttachmentAs={saveAttachmentAs}
-        onQuickReplyChange={setQuickReplyBody}
-        onSendQuickReply={sendQuickReply}
-      />
+      <AppErrorBoundary>
+        <ReaderPane
+          activeThread={activeThread}
+          threadMessages={threadMessages}
+          activeThreadSelected={activeThreadSelected}
+          selected={readerSelectedDetail}
+          selectedId={readerDisplayedId}
+          activeSelectedId={selectedId}
+          attachmentsLoaded={attachmentsLoaded}
+          readTriggerKey={readerSelectionRevision}
+          accountScope={accountScope}
+          folders={folders}
+          labels={labels}
+          attachments={attachments}
+          selectedSenderTrusted={selectedSenderTrusted}
+          selectedSenderDomain={selectedSenderDomain}
+          selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
+          selectedSenderIsExternal={selectedSenderIsExternal}
+          selectedExternalBlocked={selectedExternalBlocked}
+          selectedWarnExternalSender={selectedWarnExternalSender}
+          selectedInterceptsHttps={selectedInterceptsHttps}
+          onOpenHttpsLink={handleOpenHttpsLink}
+          quickReplyBody={quickReplyBody}
+          onSelectMessage={selectMessageForReading}
+          onComposeNew={handleComposeNew}
+          onComposeFromMessage={composeFromMessage}
+          onRunThreadAction={handleRunActiveThreadAction}
+          onMoveThreadToFolder={handleMoveActiveThreadToFolder}
+          onToggleThreadLabel={handleToggleActiveThreadLabel}
+          onToggleThreadMute={handleToggleActiveThreadMute}
+          onToggleStar={toggleStar}
+          onEditDraft={editDraftMessage}
+          onRestoreFromTrash={restoreSelectedFromTrash}
+          onMoveArchive={handleMoveArchive}
+          onMoveTrash={handleMoveTrash}
+          onToggleRead={toggleRead}
+          onReadComplete={markMessageReadAfterReading}
+          onUnsnooze={unsnoozeSelected}
+          onSnooze={snoozeSelected}
+          onExportMessage={exportSelectedMessage}
+          onFetchBody={fetchSelectedBody}
+          onMarkNotSpam={markSelectedNotSpam}
+          onMarkAsSpam={markSelectedAsSpam}
+          onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
+          onTrustRemoteImages={trustRemoteImagesForSelected}
+          onBlockSender={blockSelectedSender}
+          onPermanentlyDelete={handlePermanentlyDelete}
+          onEmptyTrash={emptyCurrentTrash}
+          onMoveToFolder={handleMoveToFolder}
+          onToggleLabel={toggleLabel}
+          onCreateLabel={handleCreateLabel}
+          onUpdateLabel={handleUpdateLabel}
+          onDeleteLabel={handleDeleteLabel}
+          onOpenAttachment={openAttachment}
+          onDownloadAttachment={downloadAttachment}
+          onSaveAttachmentAs={saveAttachmentAs}
+          onQuickReplyChange={setQuickReplyBody}
+          onSendQuickReply={sendQuickReply}
+        />
+      </AppErrorBoundary>
 
       {!isAccountLoginActive && isComposerOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
-          <ComposerWindow
-          minimized={isComposerMinimized}
-          draft={draft}
-          accounts={accounts}
-          identities={identities}
-          fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
-          contacts={managedContacts}
-          templates={composeTemplates}
-          templateName={templateName}
-          richComposer={isRichComposer}
-          dropActive={isComposerDropActive}
-          status={status}
-          autosave={composerAutosave}
-          onMinimize={() => setComposerMinimized(true)}
-          onRestore={() => setComposerMinimized(false)}
-          onClose={closeComposer}
-          onDraftChange={setDraft}
-          onApplyTemplate={applyComposeTemplate}
-          onDeleteTemplate={deleteComposeTemplate}
-          onTemplateNameChange={setTemplateName}
-          onSaveTemplate={saveDraftAsTemplate}
-          onInsertSignature={insertSignatureIntoDraft}
-          onPickAttachments={() => { pickDraftAttachments().catch((error) => setStatus(String(error))); }}
-          onRemoveAttachment={removeDraftAttachment}
-          onAttachmentDrop={handleComposerAttachmentDrop}
-          onAttachmentDragEnter={handleComposerAttachmentDragEnter}
-          onAttachmentDragLeave={handleComposerAttachmentDragLeave}
-          onAttachmentDragOver={handleComposerAttachmentDragOver}
-          onAttachmentPaste={handleComposerAttachmentPaste}
-          buildInlineImageAttachments={buildInlineImageAttachments}
-          onInlineImagesAdded={addInlineImages}
-          onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
-          onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
-          onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
-          onSendRiskConfirm={confirmSendRisk}
-          onSendRiskCancel={() => setSendRiskConfirm(null)}
-          sendRiskConfirm={sendRiskConfirm}
-          crossAccountRisks={crossAccountRisks}
-          />
+          <AppErrorBoundary>
+            <ComposerWindow
+              minimized={isComposerMinimized}
+              draft={draft}
+              accounts={accounts}
+              identities={identities}
+              fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
+              contacts={managedContacts}
+              templates={composeTemplates}
+              templateName={templateName}
+              richComposer={isRichComposer}
+              dropActive={isComposerDropActive}
+              status={status}
+              autosave={composerAutosave}
+              onMinimize={() => setComposerMinimized(true)}
+              onRestore={() => setComposerMinimized(false)}
+              onClose={closeComposer}
+              onDraftChange={setDraft}
+              onApplyTemplate={applyComposeTemplate}
+              onDeleteTemplate={deleteComposeTemplate}
+              onTemplateNameChange={setTemplateName}
+              onSaveTemplate={saveDraftAsTemplate}
+              onInsertSignature={insertSignatureIntoDraft}
+              onPickAttachments={() => { pickDraftAttachments().catch((error) => setStatus(String(error))); }}
+              onRemoveAttachment={removeDraftAttachment}
+              onAttachmentDrop={handleComposerAttachmentDrop}
+              onAttachmentDragEnter={handleComposerAttachmentDragEnter}
+              onAttachmentDragLeave={handleComposerAttachmentDragLeave}
+              onAttachmentDragOver={handleComposerAttachmentDragOver}
+              onAttachmentPaste={handleComposerAttachmentPaste}
+              buildInlineImageAttachments={buildInlineImageAttachments}
+              onInlineImagesAdded={addInlineImages}
+              onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
+              onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
+              onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
+              onSendRiskConfirm={confirmSendRisk}
+              onSendRiskCancel={() => setSendRiskConfirm(null)}
+              sendRiskConfirm={sendRiskConfirm}
+              crossAccountRisks={crossAccountRisks}
+            />
+          </AppErrorBoundary>
         </Suspense>
       )}
 

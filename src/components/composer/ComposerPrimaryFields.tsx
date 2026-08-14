@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type React from 'react';
 import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput, OutboundAttachmentInput } from '../../app/types';
@@ -100,6 +100,11 @@ export default function ComposerPrimaryFields({
     () => buildContactSearchEntries(contacts),
     [contacts],
   );
+  const richBodySyncFrameRef = useRef<number | null>(null);
+  const syncedBodyRef = useRef({
+    body: '',
+    html: '',
+  });
   const { editableBody, originalQuote } = useMemo(
     () => splitEditableBody(draft.body),
     [draft.body],
@@ -149,7 +154,7 @@ export default function ComposerPrimaryFields({
     };
   }, [richComposer, draft.html_body, draft.attachments]);
 
-  function syncRichBodyFromEditor() {
+  const syncRichBodyFromEditor = useCallback(() => {
     const editor = richBodyRef.current;
     if (!editor) return;
     const hydrated = hydratedInlineSrcRef.current;
@@ -165,15 +170,36 @@ export default function ComposerPrimaryFields({
       }
     });
     const html = editor.innerHTML;
+    const nextBody = joinEditableBody(editor.textContent ?? '', originalQuote);
+    if (
+      syncedBodyRef.current.body === nextBody &&
+      syncedBodyRef.current.html === html
+    ) {
+      return;
+    }
+    syncedBodyRef.current = {
+      body: nextBody,
+      html,
+    };
     for (const { img, cid } of hydratedImages) {
       const assetUrl = hydrated.get(cid);
       if (assetUrl) img.setAttribute('src', assetUrl);
     }
     onPatchDraft({
       html_body: html,
-      body: joinEditableBody(editor.innerText, originalQuote),
+      body: nextBody,
     });
-  }
+  }, [onPatchDraft, originalQuote]);
+
+  const scheduleSyncRichBodyFromEditor = useCallback(() => {
+    if (richBodySyncFrameRef.current !== null) {
+      cancelAnimationFrame(richBodySyncFrameRef.current);
+    }
+    richBodySyncFrameRef.current = requestAnimationFrame(() => {
+      richBodySyncFrameRef.current = null;
+      syncRichBodyFromEditor();
+    });
+  }, [syncRichBodyFromEditor]);
 
   function insertHtmlAtCaret(html: string) {
     const editor = richBodyRef.current;
@@ -235,8 +261,14 @@ export default function ComposerPrimaryFields({
   }
 
   function handleRichBodyInput() {
-    syncRichBodyFromEditor();
+    scheduleSyncRichBodyFromEditor();
   }
+
+  useEffect(() => () => {
+    if (richBodySyncFrameRef.current !== null) {
+      cancelAnimationFrame(richBodySyncFrameRef.current);
+    }
+  }, []);
 
   return (
     <div className="composer-primary-fields">

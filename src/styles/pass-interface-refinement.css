@@ -152,7 +152,7 @@
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.68);
   color: var(--ink-1);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .sidebar-footer-actions .settings-button {
@@ -273,7 +273,7 @@
   padding: 0 11px;
   background: transparent;
   color: var(--ink-1);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .list-control-actions > button.active {
@@ -438,7 +438,7 @@
   color: var(--ink-1);
   justify-content: center;
   padding: 0 11px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-actions button:hover,
@@ -492,7 +492,7 @@
   border: 1px solid #e8edf2;
   border-radius: 10px;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .attachments .attachment-item:hover {
@@ -599,7 +599,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .attachments .attachment-actions button {
@@ -609,7 +609,7 @@
   border-radius: 5px;
   color: var(--ui-text-secondary, #59636e);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
   font-weight: 520;
 }
@@ -617,7 +617,7 @@
 .attachments .attachment-actions button:hover:not(:disabled) {
   color: var(--ui-text, #20242a);
   background: #eef1f4;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .attachments .attachment-actions .attachment-primary-button {

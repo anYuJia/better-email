@@ -11,7 +11,7 @@
   border-radius: 8px;
   color: var(--ui-text-secondary);
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .compact-menu[open] summary,
@@ -96,7 +96,7 @@
   border-color: var(--ui-border);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .danger-menu-item {

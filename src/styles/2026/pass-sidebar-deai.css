@@ -26,7 +26,7 @@
   border-radius: 8px;
   color: #ffffff;
   background: var(--ui-accent);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 13.5px;
   font-weight: 650;
 }
@@ -35,7 +35,7 @@
   color: #ffffff;
   border-color: var(--ui-accent-hover);
   background: var(--ui-accent-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .compose-button svg {
@@ -59,7 +59,7 @@
 .sidebar-disclosure[open] summary,
 .sidebar-disclosure[open] summary:hover {
   background: #f3f5f7;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .folder.active .folder-name svg,
@@ -72,7 +72,7 @@
 .sidebar-disclosure summary em {
   color: var(--ui-text-tertiary);
   background: transparent !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 .sidebar-secondary {
@@ -179,5 +179,5 @@
 .app-shell .attachments .attachment-item:hover {
   border-color: var(--ui-border-strong);
   background: var(--quiet-row-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }

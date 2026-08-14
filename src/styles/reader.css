@@ -267,7 +267,7 @@ h1 {
   background: rgba(255, 255, 255, 0.78);
   font-size: 12px;
   font-weight: 700;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-warning-primary-action:hover {
@@ -284,7 +284,7 @@ h1 {
   background: rgba(255, 255, 255, 0.66);
   font-size: 12px;
   font-weight: 700;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-warning-secondary-action:hover {

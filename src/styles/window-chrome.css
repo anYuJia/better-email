@@ -117,7 +117,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   border-radius: 6px;
   color: var(--ui-text-secondary, #4e5966);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .window-control:hover {

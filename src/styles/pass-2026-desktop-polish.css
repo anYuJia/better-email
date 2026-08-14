@@ -60,7 +60,7 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid #6b7280;
   outline-offset: 1px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 input,
@@ -142,7 +142,7 @@ input[type="checkbox"]:checked::before {
   background: transparent;
   cursor: col-resize;
   padding: 0;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .pane-resizer::before {
@@ -395,7 +395,7 @@ kbd {
 .sidebar-disclosure {
   border-color: transparent;
   background: rgba(255, 255, 255, 0.34);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .sidebar-quick-menus .sidebar-disclosure {
@@ -718,7 +718,7 @@ kbd {
 
 .bulk-toolbar .compact-menu summary {
   border-radius: 999px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .bulk-selection {
@@ -1021,7 +1021,7 @@ h1 {
 .composer select:focus {
   background: #fff;
   border-color: #9ca3af;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .raw-preview textarea {

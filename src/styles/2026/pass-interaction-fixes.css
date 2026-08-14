@@ -34,7 +34,7 @@
 .app-shell .folder.active:hover,
 .app-shell .sidebar-disclosure[open] summary,
 .app-shell .sidebar-disclosure[open] summary:hover {
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Sender addresses are actionable without looking like a browser link. */
@@ -45,7 +45,7 @@
   border: 0;
   color: inherit;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font: inherit;
   text-align: left;
   cursor: pointer;

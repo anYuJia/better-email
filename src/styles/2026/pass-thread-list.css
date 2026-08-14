@@ -16,7 +16,7 @@
   text-align: left;
   display: grid;
   gap: 6px;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
   transition: background-color var(--ui-motion-standard) var(--ui-ease-emphasized), border-color var(--ui-motion-standard) var(--ui-ease-emphasized) !important;
   min-width: 0;
   box-sizing: border-box !important;
@@ -25,14 +25,14 @@
 .thread-card:hover {
   border-color: transparent !important;
   background: var(--quiet-row-hover) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 .thread-card.selected,
 .thread-card.selected:hover {
   background: var(--quiet-row-selected) !important;
   border-color: transparent !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 .thread-unread-dot {

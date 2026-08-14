@@ -10,7 +10,7 @@
   border-top: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .quick-reply > header {
@@ -58,7 +58,7 @@
   border-radius: 7px;
   color: var(--ui-text);
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 13.5px;
   line-height: 1.55;
   resize: none;
@@ -70,12 +70,12 @@
 
 .quick-reply textarea:focus {
   border-color: var(--ui-accent);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .quick-reply textarea:focus-visible {
   border-color: var(--ui-accent) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
   outline: none;
 }
 
@@ -109,7 +109,7 @@
   border-radius: 7px;
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
   font-weight: 560;
 }
@@ -159,7 +159,7 @@
   color: var(--ui-text-secondary);
   font-size: 11px;
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .label-empty {
@@ -172,7 +172,7 @@
   color: var(--ui-text-tertiary);
   font-size: 11px;
   font-weight: normal;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .label-tools .label-menu {
@@ -193,7 +193,7 @@
   background: var(--ui-surface);
   font-size: 11px;
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
   transition: color var(--ui-motion-mid) var(--ui-ease-standard), background-color var(--ui-motion-mid) var(--ui-ease-standard), border-color var(--ui-motion-mid) var(--ui-ease-standard);
 }

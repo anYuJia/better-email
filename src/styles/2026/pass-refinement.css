@@ -62,7 +62,7 @@ body {
   border-color: transparent;
   border-radius: var(--ui-radius-panel);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .sidebar-label {
@@ -204,7 +204,7 @@ body {
 .message-list-panel {
   background: var(--ui-list);
   border-inline: 0;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .toolbar {
@@ -252,7 +252,7 @@ body {
   line-height: 30px;
   color: var(--ui-text);
   background: transparent;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -317,7 +317,7 @@ body {
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
   font-weight: 560;
 }
@@ -544,7 +544,7 @@ body {
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .body-text,

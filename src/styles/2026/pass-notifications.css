@@ -142,7 +142,7 @@
 
 .message-toast.toast-delayed {
   animation-delay: var(--ui-motion-280);
-  animation-fill-mode: backwards;
+  animation-fill-mode: var(--ui-animation-fill-backwards);
 }
 
 .message-toast-undo.leaving {

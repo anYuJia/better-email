@@ -20,7 +20,7 @@ textarea:focus-visible {
 
 .composer select:focus {
   border-color: #9ca3af;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Unread state is carried by font weight and the unread dot, not by
@@ -36,7 +36,7 @@ textarea:focus-visible {
 .message-card.is-unread.selected,
 .message-card.is-unread.selected:hover {
   background: #dce6f2;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Drag feedback is color/opacity only — no geometry change. */
@@ -48,13 +48,13 @@ textarea:focus-visible {
 /* Unread rows share the same hover feel as read rows. */
 .message-card.is-unread:hover {
   background: var(--quiet-row-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Thread view active states share the 2026 theme accent. */
 .thread-message.active {
   background: var(--ui-accent-soft);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-chips {
@@ -100,7 +100,7 @@ textarea:focus-visible {
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
   margin-bottom: 8px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .empty-reader-compose {

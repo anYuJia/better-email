@@ -18,7 +18,7 @@
 .folder,
 .sidebar-disclosure summary {
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .folder:hover,

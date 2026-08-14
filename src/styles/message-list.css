@@ -92,7 +92,7 @@
   justify-content: flex-start;
   border: none;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   color: var(--text-soft, #3f4a56);
   padding: 0 10px;
   display: inline-flex;

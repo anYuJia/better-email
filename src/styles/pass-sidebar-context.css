@@ -17,7 +17,7 @@
   border-radius: 7px;
   color: var(--muted);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   opacity: 0;
   transition:
     opacity var(--ui-motion-fast) var(--ui-ease-standard),

@@ -56,7 +56,7 @@
   min-height: 30px;
   border-radius: 7px;
   padding: 0 9px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-chips span {

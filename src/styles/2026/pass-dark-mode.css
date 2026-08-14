@@ -213,7 +213,7 @@
 
 :root[data-theme="dark"] .search-box {
   background: #1a2028;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .list-control-strip {
@@ -450,7 +450,7 @@
 :root[data-theme="dark"] .sidebar-disclosure {
   border-color: var(--ui-border);
   background: rgba(255, 255, 255, 0.05);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .sidebar-disclosure summary {
@@ -675,7 +675,7 @@
 :root[data-theme="dark"] input[type="checkbox"] {
   background: linear-gradient(180deg, #262e3a 0%, #1d242d 100%);
   border-color: rgba(148, 163, 184, 0.4);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] input[type="checkbox"]:checked {
@@ -710,7 +710,7 @@
 :root[data-theme="dark"] .list-summary .search-scope-indicator {
   border-color: transparent;
   background: var(--ui-surface-muted);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] :is(.list-control-actions > button, .search-shortcuts button, .compact-menu summary):hover,
@@ -770,14 +770,14 @@
 :root[data-theme="dark"] .reader-actions {
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary) {
   border-color: transparent;
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover {
@@ -799,7 +799,7 @@
 :root[data-theme="dark"] :is(.body-text, .reader-html) {
   border-color: transparent;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .reader-warning-panel {
@@ -856,13 +856,13 @@
 :root[data-theme="dark"] .sidebar {
   border-right-color: var(--ui-border);
   background: var(--ui-sidebar);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] :is(.account-switcher, .sidebar-disclosure, .sidebar-tool-section, .label-list, .saved-search-list, .task-stack) {
   border-color: transparent;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .sidebar .folder:hover,
@@ -890,7 +890,7 @@
 :root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button) {
   border-color: transparent;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button):hover {
@@ -949,20 +949,20 @@
   border-color: transparent !important;
   color: var(--ui-text) !important;
   background: var(--ui-surface) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 :root[data-theme="dark"] .thread-card:hover {
   border-color: transparent !important;
   background: var(--quiet-row-hover) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 :root[data-theme="dark"] .thread-card.selected,
 :root[data-theme="dark"] .thread-card.selected:hover {
   border-color: transparent !important;
   background: var(--quiet-row-selected) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 :root[data-theme="dark"] .thread-card.is-unread :is(.thread-subject, .thread-participants) {

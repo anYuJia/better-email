@@ -105,7 +105,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-actions button,
@@ -141,7 +141,7 @@
   color: #ffffff;
   border-color: var(--ui-accent, #087ff5);
   background: var(--ui-accent, #087ff5);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-weight: 600;
 }
 
@@ -311,7 +311,7 @@
   border: 1px solid #e8edf2;
   border-radius: 10px;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   box-sizing: border-box;
 }
 
@@ -497,7 +497,7 @@
   border-radius: 10px;
   color: var(--ui-warning);
   background: var(--ui-warning-bg);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-warning-heading {
@@ -527,7 +527,7 @@
   background: rgba(255, 255, 255, 0.72);
   font-size: 12px;
   font-weight: 650;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-warning-primary-action:hover {
@@ -544,7 +544,7 @@
   background: rgba(255, 255, 255, 0.66);
   font-size: 12px;
   font-weight: 650;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-warning-secondary-action:hover {
@@ -630,7 +630,7 @@
   border-radius: 0;
   color: var(--ui-text);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 14px;
   line-height: 1.72;
 }
@@ -811,7 +811,7 @@
   border-radius: 8px;
   color: #ffffff;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
   font-weight: 600;
 }
@@ -858,7 +858,7 @@
 /* While panning, transform updates every pointermove — disable the
    transition so the image tracks the pointer without lag. */
 .reader-image-preview-stage.is-panning img {
-  transition: none;
+  transition: var(--ui-transition-none);
 }
 
 .reader-image-context-menu {
@@ -913,7 +913,7 @@
   border: 1px solid var(--ui-border);
   border-radius: 9px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .quick-reply > header {
@@ -947,7 +947,7 @@
   border-bottom: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .thread-message:hover {
@@ -957,7 +957,7 @@
 .thread-message.active {
   border-color: var(--ui-border);
   background: var(--ui-accent-soft);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .thread-message header {
@@ -980,5 +980,5 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }

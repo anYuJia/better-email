@@ -57,7 +57,7 @@
   height: 8px;
   background: #2677d1;
   border: 2px solid var(--ui-list);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   pointer-events: none;
   transform: none;
 }
@@ -91,7 +91,7 @@
   border: 1px solid #aab8c6;
   border-radius: 4px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
 }
 
@@ -130,7 +130,7 @@
 .bulk-selection > input:checked {
   border-color: #2677d1;
   background: #2677d1;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-select input:checked::before,
@@ -159,7 +159,7 @@
   border: 1px solid #aab8c6;
   border-radius: 4px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
 }
 

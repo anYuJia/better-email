@@ -15,5 +15,5 @@
 
 .sidebar-footer-actions .settings-button:hover,
 .settings-button:hover {
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }

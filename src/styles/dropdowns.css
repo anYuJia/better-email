@@ -23,7 +23,7 @@
   border-radius: var(--ui-radius-control, 8px);
   color: var(--ui-text, #1d232b);
   background: var(--ui-surface, #ffffff);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
@@ -71,13 +71,13 @@
 .custom-select-summary[aria-expanded="true"] {
   border-color: var(--ui-border-strong, #c3ccd5);
   background: var(--ui-surface-muted, #f1f3f5);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .custom-select-summary:focus-visible {
   outline: var(--ui-focus-outline, 2px solid #6b7280);
   outline-offset: 1px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .custom-select-dropdown {
@@ -109,7 +109,7 @@
   border-radius: var(--ui-radius-control, 8px);
   color: var(--ui-text, #1d232b);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 14px;
   text-align: left;
 }
@@ -171,6 +171,6 @@
 @media (prefers-reduced-motion: reduce) {
   .custom-select-summary,
   .custom-select-dropdown button {
-    transition: none;
+    transition: var(--ui-transition-none);
   }
 }

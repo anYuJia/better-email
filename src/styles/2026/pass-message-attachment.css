@@ -44,6 +44,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .message-attachment {
-    transition: none;
+    transition: var(--ui-transition-none);
   }
 }

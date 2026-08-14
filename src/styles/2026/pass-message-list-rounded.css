@@ -12,14 +12,14 @@
   border: 1px solid transparent;
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-card:hover,
 .message-card.is-unread:hover {
   border-color: transparent;
   background: var(--quiet-row-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-card.selected,
@@ -28,12 +28,12 @@
 .message-card.is-unread.selected:hover {
   border-color: transparent;
   background: var(--quiet-row-selected);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-card.dragging {
   border-color: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .message-card .message-unread-dot {
@@ -61,7 +61,7 @@
 :root[data-theme="dark"] .message-card.is-unread:hover {
   border-color: transparent;
   background: var(--quiet-row-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .message-card.selected,
@@ -70,7 +70,7 @@
 :root[data-theme="dark"] .message-card.is-unread.selected:hover {
   border-color: transparent;
   background: var(--quiet-row-selected);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Virtualized date headers are direct children of the list, so a modifier

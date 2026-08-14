@@ -152,7 +152,7 @@
   border-radius: 8px;
   color: var(--ui-text-tertiary, #646f7b);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .dialog-card-close:hover {
@@ -304,7 +304,7 @@
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
   transition: var(--ui-transition-fast-color-background-border-shadow);
 }
@@ -366,6 +366,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dialog-button {
-    transition: none;
+    transition: var(--ui-transition-none);
   }
 }

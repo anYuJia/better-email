@@ -537,6 +537,44 @@ export default function useBackgroundTaskCoordinator({
     }
   }, [applyAccountSyncRefresh, runBackgroundSync, setBackgroundSyncStatus, setBackgroundTasks, setSyncRuns]);
 
+  const runOutboxSmtpTask = useCallback(async (task: BackgroundTask, execute: () => Promise<string>): Promise<string> => {
+    setBackgroundSyncStatus(
+      task.source === 'initial'
+        ? `${task.title}执行中...`
+        : task.source === 'timer'
+          ? '定时发送发件箱中...'
+          : `${task.title}执行中...`,
+    );
+
+    let lastProgress = -1;
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId: task.id });
+        setBackgroundTasks((current) => (
+          current.some((item) => item.id === latest.id)
+            ? current.map((item) => (item.id === latest.id ? latest : item))
+            : current
+        ));
+        if (latest.status !== 'running') {
+          window.clearInterval(pollTimer);
+          return;
+        }
+        if (latest.progress !== lastProgress && latest.message) {
+          lastProgress = latest.progress;
+          setBackgroundSyncStatus(`${latest.message}…`);
+        }
+      } catch {
+        window.clearInterval(pollTimer);
+      }
+    }, PROGRESS_POLL_INTERVAL_MS);
+
+    try {
+      return await execute();
+    } finally {
+      window.clearInterval(pollTimer);
+    }
+  }, [setBackgroundSyncStatus, setBackgroundTasks]);
+
   /**
    * 所有带 account_id 的同步任务都必须按该账号执行（不能只对
    * source === 'initial' 特判）；只有未绑定账号的同步才走全局路径。
@@ -548,10 +586,14 @@ export default function useBackgroundTaskCoordinator({
       }
       return runBackgroundSync(task.source === 'timer' ? 'timer' : 'manual', task.id);
     }
-    if (task.kind === 'outbox-smtp' && task.source === 'timer') return (await sendDueOutboxItems()).message;
-    if (task.kind === 'outbox-smtp') return flushOutboxSmtp();
+    if (task.kind === 'outbox-smtp' && task.source === 'timer') {
+      return runOutboxSmtpTask(task, async () => (await sendDueOutboxItems(task.id)).message);
+    }
+    if (task.kind === 'outbox-smtp') {
+      return runOutboxSmtpTask(task, async () => flushOutboxSmtp(task.id));
+    }
     return flushOutboxDryRun();
-  }, [flushOutboxDryRun, flushOutboxSmtp, runAccountSyncTask, runBackgroundSync, sendDueOutboxItems]);
+  }, [flushOutboxDryRun, flushOutboxSmtp, runAccountSyncTask, runBackgroundSync, runOutboxSmtp, sendDueOutboxItems]);
 
   const drainBackgroundTaskQueue = useCallback(async () => {
     if (backgroundTaskWorkerRef.current) return;

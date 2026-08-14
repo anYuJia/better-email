@@ -16,6 +16,35 @@ use tauri::State;
 /// TTL 只作为异常退出后的兜底，见 db.rs。
 const TEMP_ATTACHMENT_LIFECYCLE_TTL: std::time::Duration = std::time::Duration::from_secs(0);
 
+#[derive(Clone, Copy)]
+struct OutboxTaskProgress {
+    task_id: i64,
+}
+
+impl OutboxTaskProgress {
+    fn new(task_id: Option<i64>) -> Option<Self> {
+        task_id.filter(|id| *id > 0).map(|task_id| Self { task_id })
+    }
+
+    fn set(&self, store: &MailStore, progress: i64, message: &str) -> MailResult<()> {
+        store.update_background_task_progress(self.task_id, progress.clamp(0, 100), message)?;
+        Ok(())
+    }
+}
+
+fn ensure_outbox_task_not_cancelled(store: &MailStore, task_id: Option<i64>) -> MailResult<()> {
+    let task_id = match task_id.filter(|id| *id > 0) {
+        Some(task_id) => task_id,
+        None => return Ok(()),
+    };
+    if store.background_task_cancel_requested(task_id)? {
+        return Err(crate::db::MailError::Imap(
+            "发送任务已取消，已停止继续发送。".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// 仅供测试与遗留校验入口使用。生产发送/渲染必须使用单次读取的
 /// `read_verified_outbound_message_attachments`，避免验证后重新按路径读取。
 #[cfg(test)]
@@ -194,8 +223,10 @@ pub async fn send_message(
     store: State<'_, MailStore>,
     input: DraftInput,
     threading: Option<MessageThreadingInput>,
+    task_id: Option<i64>,
 ) -> MailResult<i64> {
     let started_at = std::time::Instant::now();
+    let task_progress = OutboxTaskProgress::new(task_id);
     command_info(format!(
         "[better-email][send] direct smtp start account_id={} to={} subject_len={} attachments={}",
         input.account_id,
@@ -203,11 +234,25 @@ pub async fn send_message(
         input.subject.trim().chars().count(),
         input.attachments.len(),
     ));
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 8, "正在校验邮件与附件...")?;
+    }
     validate_outbound_attachment_inputs(&store, &input.attachments)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 16, "草稿入库完成，准备获取账号")?;
+    }
     let message_id = store.send_message(input)?;
     store.set_message_threading(message_id, threading)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.set(
+            &store,
+            24,
+            "邮件记录已落库，准备读取账号与账号凭据",
+        )?;
+    }
     let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     let message = store.get_outbound_message(message_id)?;
+    ensure_outbox_task_not_cancelled(&store, task_id)?;
     let account = store.get_account_by_id(Some(message.account_id))?;
     let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
@@ -225,7 +270,13 @@ pub async fn send_message(
             return Err(crate::db::MailError::Smtp(blocked_error));
         }
     };
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 36, "附件校验通过，开始构建 MIME")?;
+    }
     let attachment_bytes = read_verified_outbound_message_attachments(&store, &message)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 60, "准备发送，执行 SMTP 提交")?;
+    }
     let raw_message = match smtp::send_outbound_with_attachment_bytes(
         &account,
         &message,
@@ -244,11 +295,20 @@ pub async fn send_message(
         }
     };
     let message_id_header = smtp::outbound_message_id(&message);
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 88, "SMTP 已提交，正在写入 sent 归档")?;
+    }
     store.mark_outbox_smtp_sent_pending_archive(message_id, &message_id_header)?;
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 96, "远端已发送归档完成")?;
+    }
     archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
     // 只有远端 Sent 留档已经成功并切换为 sent 后，这次直接发送的临时附件才
     // 不再有引用，立即清理。归档失败会保持 sent_remote_pending，从而保留附件。
     let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 100, "邮件已发送")?;
+    }
     command_info(format!(
         "[better-email][send] direct smtp ok message_id={} account_id={} duration_ms={}",
         message_id,
@@ -389,12 +449,49 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
 }
 
 #[tauri::command]
-pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+pub async fn flush_outbox_smtp(
+    store: State<'_, MailStore>,
+    task_id: Option<i64>,
+) -> MailResult<Vec<OutboxItem>> {
     let started_at = std::time::Instant::now();
+    let task_progress = OutboxTaskProgress::new(task_id);
     command_info("[better-email][send] flush smtp start");
     retry_pending_remote_archives(store.inner())?;
 
-    for message in store.pending_outbox_messages()? {
+    let pending = store.pending_outbox_messages()?;
+    let total_items = pending.len().max(1);
+    if pending.is_empty() {
+        if let Some(task_progress) = task_progress {
+            task_progress.set(&store, 100, "暂无待发送邮件")?;
+        }
+        let outbox = store.list_outbox()?;
+        command_info(format!(
+            "[better-email][send] flush smtp done outbox_items={} duration_ms={}",
+            outbox.len(),
+            started_at.elapsed().as_millis(),
+        ));
+        return Ok(outbox);
+    }
+
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 5, "开始发送发件箱邮件")?;
+    }
+
+    for (index, message) in pending.iter().enumerate() {
+        ensure_outbox_task_not_cancelled(store.inner(), task_id)?;
+        let step_progress = ((index as i64).saturating_mul(80) / total_items as i64).clamp(0, 80);
+        if let Some(task_progress) = task_progress {
+            task_progress.set(
+                &store,
+                step_progress,
+                &format!(
+                    "正在发送第 {}/{} 封：{}",
+                    index + 1,
+                    total_items,
+                    mask_recipient_list(&message.recipients),
+                ),
+            )?;
+        }
         let account = store.get_account_by_id(Some(message.account_id))?;
         command_info(format!(
             "[better-email][send] smtp item start message_id={} account_id={} email={} to={} attachments={}",
@@ -417,6 +514,18 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                     error,
                 ));
                 store.mark_outbox_blocked(message.id, &blocked_error)?;
+                if let Some(task_progress) = task_progress {
+                    task_progress.set(
+                        &store,
+                        step_progress.saturating_add(5).min(95),
+                        &format!(
+                            "第 {}/{} 封发送失败：{}",
+                            index + 1,
+                            total_items,
+                            error,
+                        ),
+                    )?;
+                }
                 continue;
             }
         };
@@ -433,6 +542,18 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                     error,
                 ));
                 store.mark_outbox_failed(message.id, &error.to_string())?;
+                if let Some(task_progress) = task_progress {
+                    task_progress.set(
+                        &store,
+                        step_progress.saturating_add(5).min(95),
+                        &format!(
+                            "第 {}/{} 封附件校验失败：{}",
+                            index + 1,
+                            total_items,
+                            error,
+                        ),
+                    )?;
+                }
                 continue;
             }
         };
@@ -446,6 +567,18 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                 let message_id_header = smtp::outbound_message_id(&message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
                 archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
+                if let Some(task_progress) = task_progress {
+                    task_progress.set(
+                        &store,
+                        85 + ((index as i64).saturating_mul(15) / total_items as i64),
+                        &format!(
+                            "第 {}/{} 封已发送：{}",
+                            index + 1,
+                            total_items,
+                            mask_recipient_list(&message.recipients),
+                        ),
+                    )?;
+                }
                 command_info(format!(
                     "[better-email][send] smtp item ok message_id={} account_id={}",
                     message.id, message.account_id,
@@ -457,8 +590,24 @@ pub async fn flush_outbox_smtp(store: State<'_, MailStore>) -> MailResult<Vec<Ou
                     message.id, message.account_id, error,
                 ));
                 store.mark_outbox_failed(message.id, &error.to_string())?;
+                if let Some(task_progress) = task_progress {
+                    task_progress.set(
+                        &store,
+                        85 + ((index as i64).saturating_mul(15) / total_items as i64),
+                        &format!(
+                            "第 {}/{} 封发送失败：{}",
+                            index + 1,
+                            total_items,
+                            error,
+                        ),
+                    )?;
+                }
             }
         }
+    }
+
+    if let Some(task_progress) = task_progress {
+        task_progress.set(&store, 100, "SMTP 发送完成")?;
     }
 
     // 发送完成后清理不再被引用的临时附件。

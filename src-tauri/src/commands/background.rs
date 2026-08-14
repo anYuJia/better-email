@@ -82,6 +82,30 @@ pub fn mark_background_task_running(
 }
 
 #[tauri::command]
+pub fn update_background_task_progress(
+    store: State<'_, MailStore>,
+    task_id: i64,
+    progress: i64,
+    message: String,
+) -> MailResult<BackgroundTask> {
+    match store.update_background_task_progress(task_id, progress, &message) {
+        Ok(task) => {
+            command_info(format!(
+                "[better-email][task] progress task_id={} kind={} source={} progress={} message={}",
+                task.id, task.kind, task.source, task.progress, task.message,
+            ));
+            Ok(task)
+        }
+        Err(error) => {
+            crate::logging::log_line(format!(
+                "[better-email][task] progress failed task_id={task_id} error={error}"
+            ));
+            Err(error)
+        }
+    }
+}
+
+#[tauri::command]
 pub fn complete_background_task(
     store: State<'_, MailStore>,
     task_id: i64,

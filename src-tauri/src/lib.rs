@@ -430,6 +430,7 @@ pub fn run() {
             commands::get_background_task,
             commands::next_background_task,
             commands::mark_background_task_running,
+            commands::update_background_task_progress,
             commands::complete_background_task,
             commands::fail_background_task,
             commands::flush_outbox_dry_run,

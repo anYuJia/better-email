@@ -11,6 +11,7 @@ import {
   cancelMockBackgroundTask,
   consumeMockBackgroundTaskCancel,
   retryMockBackgroundTask,
+  updateMockBackgroundTaskProgress,
 } from './state';
 
 export const handlers: Record<string, MockCommandHandler> = {
@@ -40,4 +41,5 @@ export const handlers: Record<string, MockCommandHandler> = {
   'mark_background_task_running': markMockBackgroundTaskRunning,
   'complete_background_task': completeMockBackgroundTask,
   'fail_background_task': failMockBackgroundTask,
+  'update_background_task_progress': updateMockBackgroundTaskProgress,
 };

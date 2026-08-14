@@ -118,6 +118,7 @@ export const IPC = {
   TrustRemoteImages: 'trust_remote_images',
   UndoContactImportBatch: 'undo_contact_import_batch',
   UnsnoozeMessage: 'unsnooze_message',
+  UpdateBackgroundTaskProgress: 'update_background_task_progress',
   UpdateAccountSettings: 'update_account_settings',
   UpdateContact: 'update_contact',
   UpdateLabel: 'update_label',

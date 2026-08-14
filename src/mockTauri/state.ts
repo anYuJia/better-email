@@ -1736,6 +1736,19 @@ export function markMockBackgroundTaskRunning(args?: InvokeArgs) {
   return updated;
 }
 
+export function updateMockBackgroundTaskProgress(args?: InvokeArgs) {
+  const taskId = Number(args?.taskId);
+  const task = backgroundTasks.find((item) => item.id === taskId);
+  if (!task) throw new Error('background task not found');
+  const updated = {
+    ...task,
+    progress: Number(args?.progress) || 0,
+    message: String(args?.message ?? ''),
+  };
+  backgroundTasks = backgroundTasks.map((item) => (item.id === taskId ? updated : item));
+  return updated;
+}
+
 export function completeMockBackgroundTask(args?: InvokeArgs) {
   const taskId = Number(args?.taskId);
   const task = backgroundTasks.find((item) => item.id === taskId);

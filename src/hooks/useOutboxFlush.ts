@@ -30,9 +30,9 @@ export default function useOutboxFlush({
     return message;
   }, [setOutbox, setStatus, refreshMailboxContext]);
 
-  const flushOutboxSmtp = useCallback(async (): Promise<string> => {
+  const flushOutboxSmtp = useCallback(async (taskId?: number): Promise<string> => {
     outboxFlowLog('manual smtp flush start');
-    const items = await invoke<OutboxItem[]>(IPC.FlushOutboxSmtp);
+    const items = await invoke<OutboxItem[]>(IPC.FlushOutboxSmtp, taskId == null ? undefined : { taskId });
     setOutbox(items);
     await refreshMailboxContext();
     const message = outboxFlushMessage(items);
@@ -45,11 +45,16 @@ export default function useOutboxFlush({
     return message;
   }, [setOutbox, setStatus, refreshMailboxContext]);
 
-  const sendDueOutboxItems = useCallback(async (): Promise<{ message: string; items: OutboxItem[] }> => {
+  const sendDueOutboxItems = useCallback(async (taskId?: number): Promise<{ message: string; items: OutboxItem[] }> => {
     outboxFlowLog('scheduled smtp due start');
     let items: OutboxItem[];
     try {
-      items = await runDueOutboxSmtp();
+      if (taskId == null) {
+        items = await runDueOutboxSmtp();
+      } else {
+        await invoke<OutboxItem[]>(IPC.ReleaseDueSnoozedMessages);
+        items = await invoke<OutboxItem[]>(IPC.FlushOutboxSmtp, { taskId });
+      }
     } catch (error) {
       outboxFlowWarn('scheduled smtp due failed', {
         error: error instanceof Error ? error.message : String(error),

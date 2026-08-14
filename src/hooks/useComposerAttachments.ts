@@ -94,7 +94,11 @@ export default function useComposerAttachments({
 
   async function buildInlineImageAttachments(files: File[]): Promise<OutboundAttachmentInput[]> {
     const savedAttachments: OutboundAttachmentInput[] = [];
+    const total = files.length;
     for (const [index, file] of files.entries()) {
+      if (total > 1) {
+        setStatus(`正在插入图片 (${index + 1}/${total})...`);
+      }
       const base64Data = await readFileAsBase64(file);
       const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
         filename: file.name,
@@ -116,10 +120,12 @@ export default function useComposerAttachments({
     const validFiles = Array.from(files).filter((file) => file.name.trim());
     if (validFiles.length === 0) return;
 
-    setStatus('正在导入附件...');
+    const totalFiles = validFiles.length;
+    setStatus(`正在导入附件...`);
     try {
       const savedAttachments: OutboundAttachmentInput[] = [];
-      for (const file of validFiles) {
+      for (const [index, file] of validFiles.entries()) {
+        setStatus(`正在导入附件 (${index + 1}/${totalFiles})...`);
         const base64Data = await readFileAsBase64(file);
         const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
           filename: file.name,

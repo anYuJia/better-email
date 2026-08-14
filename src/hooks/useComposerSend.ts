@@ -109,10 +109,12 @@ export default function useComposerSend({
     });
     if (sendUndoDelaySeconds === 0) {
       try {
+        setStatus('发送中：正在校验附件并构建邮件内容...');
         const messageId = await invoke<number>(IPC.SendMessage, {
           input,
           threading: threadingForDraft(draft),
         });
+        setStatus('发送完成，正在跳转到已发送文件夹...');
         setDraft(emptyDraft);
         clearComposerAutosave();
         forceCloseComposer();
@@ -126,6 +128,7 @@ export default function useComposerSend({
       } catch (error) {
         const message = String(error);
         closeComposer();
+        setStatus('正在写入草稿，发送失败的邮件已留在发件箱');
         await focusMailboxRole('outbox', input.account_id || account?.id || null, `发送失败，邮件已留在发件箱：${message}`);
         composerFlowWarn('sendDraft failed', {
           accountId: input.account_id,
@@ -190,11 +193,13 @@ export default function useComposerSend({
     });
     if (sendUndoDelaySeconds === 0) {
       try {
+        setStatus('发送中：正在校验附件并构建邮件内容...');
         const messageId = await invoke<number>(IPC.SendMessage, {
           input,
           threading: replyThreadingHeaders(message),
         });
         setQuickReplyBody('');
+        setStatus('快速回复发送完成，返回当前会话...');
         await refreshAll();
         setSelectedId(message.id);
         showToast(`已快速回复：${message.sender_name || message.sender_email}`);

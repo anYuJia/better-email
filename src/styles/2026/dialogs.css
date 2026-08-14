@@ -15,6 +15,20 @@
   transform: rotate(45deg) translateY(-1px);
 }
 
+.compact-menu > div button.danger-menu-item {
+  color: var(--ui-danger, #d92d20);
+}
+
+.compact-menu > div button.danger-menu-item:hover {
+  background: rgba(217, 45, 32, 0.09);
+  color: var(--ui-danger, #d92d20);
+}
+
+.compact-menu > div button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
 .compact-menu[open] {
   z-index: 40;
 }
@@ -58,6 +72,23 @@
 .compact-menu > div button.active {
   color: var(--ui-text);
   background: var(--quiet-row-selected);
+}
+
+.menu-section-title {
+  margin: 8px 8px 2px;
+  color: var(--ui-text-secondary, #68717d);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.label-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .composer-backdrop {

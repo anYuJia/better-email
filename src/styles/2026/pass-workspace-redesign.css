@@ -417,17 +417,6 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .list-control-actions > button:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-.app-shell .list-control-actions > button.active {
-  color: var(--ui-text);
-  background: var(--workspace-control-active);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
 .app-shell .message-date-header {
   min-height: 30px;
   padding: 9px 14px 4px;
@@ -588,18 +577,6 @@
   color: var(--ui-text);
   background: var(--workspace-control-active);
   box-shadow: var(--ui-shadow-popover);
-}
-
-.app-shell .bulk-toolbar button {
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .bulk-toolbar button:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
 }
 
 .app-shell .message-list-footer {

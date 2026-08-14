@@ -531,7 +531,7 @@ pub async fn flush_outbox_smtp(
         };
         let attachment_bytes = match read_verified_outbound_message_attachments(
             store.inner(),
-            &message,
+            message,
         ) {
             Ok(bytes) => bytes,
             Err(error) => {
@@ -559,14 +559,14 @@ pub async fn flush_outbox_smtp(
         };
         match smtp::send_outbound_with_attachment_bytes(
             &account,
-            &message,
+            message,
             &secret,
             &attachment_bytes,
         ) {
             Ok(raw_message) => {
-                let message_id_header = smtp::outbound_message_id(&message);
+                let message_id_header = smtp::outbound_message_id(message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
-                archive_sent_message(store.inner(), &account, &secret, &message, &raw_message)?;
+                archive_sent_message(store.inner(), &account, &secret, message, &raw_message)?;
                 if let Some(task_progress) = task_progress {
                     task_progress.set(
                         &store,

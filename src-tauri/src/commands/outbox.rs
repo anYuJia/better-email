@@ -1,4 +1,4 @@
-use super::common::{command_info, mask_email, mask_recipient_list};
+use super::common::{command_info, format_attachment_progress, mask_email, mask_recipient_list};
 use crate::commands::attachments::{
     read_verified_outbound_message_attachments, validate_outbound_attachment_inputs,
 };
@@ -43,6 +43,92 @@ fn ensure_outbox_task_not_cancelled(store: &MailStore, task_id: Option<i64>) -> 
         ));
     }
     Ok(())
+}
+
+fn read_verified_outbound_message_attachments_with_progress(
+    store: &MailStore,
+    message: &OutboundMessage,
+    task_progress: Option<&OutboxTaskProgress>,
+    start_progress: i64,
+    end_progress: i64,
+) -> MailResult<Vec<Vec<u8>>> {
+    let attachments = &message.attachments;
+    if attachments.is_empty() {
+        if let Some(task_progress) = task_progress {
+            task_progress.set(store, end_progress, "无附件，直接构建 MIME")?;
+        }
+        return Ok(Vec::new());
+    }
+
+    let total_size = attachments
+        .iter()
+        .map(|attachment| attachment.size_bytes.max(0))
+        .sum::<i64>();
+    let total_count = attachments.len();
+    let safe_count = total_count.max(1);
+    let span = (end_progress - start_progress).max(0);
+    let mut loaded_size = 0_i64;
+    let mut attachment_bytes = Vec::with_capacity(total_count);
+
+    for (index, attachment) in attachments.iter().enumerate() {
+        if let Some(task_progress) = task_progress {
+            let before_progress = if total_size > 0 {
+                let safe_total = total_size.max(1);
+                start_progress + span * loaded_size / safe_total
+            } else {
+                start_progress + span * (index as i64) / safe_count as i64
+            };
+            task_progress.set(
+                store,
+                before_progress,
+                &format!(
+                    "读取附件 {} / {}：{}（{}）",
+                    index + 1,
+                    total_count,
+                    attachment.filename,
+                    format_attachment_progress(attachment.size_bytes.max(0) as u64),
+                ),
+            )?;
+        }
+
+        let bytes = crate::commands::attachments::read_verified_outbound_attachment(store, attachment)?;
+        loaded_size = loaded_size.saturating_add(bytes.len() as i64);
+        attachment_bytes.push(bytes);
+
+        if let Some(task_progress) = task_progress {
+            let after_progress = if total_size > 0 {
+                let safe_total = total_size.max(1);
+                start_progress + span * loaded_size / safe_total
+            } else {
+                start_progress
+                    + span * (index as i64 + 1) / (safe_count as i64)
+            };
+            task_progress.set(
+                store,
+                after_progress,
+                &format!(
+                    "附件已读取 {} / {}，累计 {} / {}",
+                    index + 1,
+                    total_count,
+                    format_attachment_progress(loaded_size as u64),
+                    format_attachment_progress(total_size.max(0) as u64),
+                ),
+            )?;
+        }
+    }
+
+    if let Some(task_progress) = task_progress {
+        task_progress.set(
+            store,
+            end_progress,
+            &format!(
+                "附件读取完成（{}）",
+                format_attachment_progress(total_size.max(0) as u64),
+            ),
+        )?;
+    }
+
+    Ok(attachment_bytes)
 }
 
 /// 仅供测试与遗留校验入口使用。生产发送/渲染必须使用单次读取的
@@ -266,10 +352,13 @@ pub async fn send_message(
             return Err(crate::db::MailError::Smtp(blocked_error));
         }
     };
-    if let Some(task_progress) = task_progress {
-        task_progress.set(&store, 36, "附件校验通过，开始构建 MIME")?;
-    }
-    let attachment_bytes = read_verified_outbound_message_attachments(&store, &message)?;
+    let attachment_bytes = read_verified_outbound_message_attachments_with_progress(
+        &store,
+        &message,
+        task_progress.as_ref(),
+        36,
+        60,
+    )?;
     if let Some(task_progress) = task_progress {
         task_progress.set(&store, 60, "准备发送，执行 SMTP 提交")?;
     }
@@ -520,9 +609,14 @@ pub async fn flush_outbox_smtp(
                 continue;
             }
         };
-        let attachment_bytes = match read_verified_outbound_message_attachments(
+        let attachment_upload_start = step_progress;
+        let attachment_upload_end = step_progress.saturating_add(18).min(75);
+        let attachment_bytes = match read_verified_outbound_message_attachments_with_progress(
             store.inner(),
             message,
+            task_progress.as_ref(),
+            attachment_upload_start,
+            attachment_upload_end,
         ) {
             Ok(bytes) => bytes,
             Err(error) => {

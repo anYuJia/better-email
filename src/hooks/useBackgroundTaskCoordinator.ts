@@ -593,7 +593,7 @@ export default function useBackgroundTaskCoordinator({
       return runOutboxSmtpTask(task, async () => flushOutboxSmtp(task.id));
     }
     return flushOutboxDryRun();
-  }, [flushOutboxDryRun, flushOutboxSmtp, runAccountSyncTask, runBackgroundSync, runOutboxSmtp, sendDueOutboxItems]);
+  }, [flushOutboxDryRun, flushOutboxSmtp, runAccountSyncTask, runBackgroundSync, runOutboxSmtpTask, sendDueOutboxItems]);
 
   const drainBackgroundTaskQueue = useCallback(async () => {
     if (backgroundTaskWorkerRef.current) return;

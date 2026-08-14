@@ -562,14 +562,32 @@
 
 .composer-send-progress {
   position: relative;
-  flex: 1 1 180px;
-  max-width: 220px;
-  min-width: 120px;
+  width: 100%;
   height: 5px;
   border: 1px solid #dce2ea;
   border-radius: 999px;
   overflow: hidden;
   background: #eef2f7;
+}
+
+.composer-send-progress-wrapper {
+  flex: 1 1 220px;
+  max-width: 220px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer-send-progress-message {
+  display: block;
+  max-width: 100%;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer-send-progress-fill {
@@ -616,6 +634,11 @@
   }
 
   .composer footer .composer-send-progress {
+    display: none;
+  }
+
+  .composer footer .composer-send-progress-wrapper,
+  .composer footer .composer-send-progress-message {
     display: none;
   }
 }
@@ -2152,6 +2175,10 @@
 :root[data-theme="dark"] .composer-send-progress {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer-send-progress-message {
+  color: var(--ui-text-secondary);
 }
 
 :root[data-theme="dark"] .composer-minimized {

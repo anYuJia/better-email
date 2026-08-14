@@ -1,12 +1,2 @@
-@import './design-tokens.css';
-@import './styles/global.css';
-@import './styles/layout.css';
-@import './styles/sidebar.css';
-@import './styles/message-list.css';
-@import './styles/dialogs.css';
-@import './styles/responsive.css';
-@import './styles/dropdowns.css';
-/* Modern 2026 pass polish is now consolidated in ui-2026.css to avoid
-   duplicate passes across both style entrypoints. */
-@import './styles/window-chrome.css';
-@import './styles/shared-dialogs.css';
+/* Legacy stylesheet shim: 主入口统一收敛到 ui-2026.css。 */
+@import './ui-2026.css';

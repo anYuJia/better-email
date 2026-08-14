@@ -55,6 +55,7 @@ type UseComposerControllerOptions = {
   refreshAll: () => Promise<void>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   setSendProgress?: (progress: number | null) => void;
+  setSendProgressMessage?: (message: string | null) => void;
 };
 
 export default function useComposerController({
@@ -73,6 +74,7 @@ export default function useComposerController({
   refreshAll,
   focusMailboxRole,
   setSendProgress,
+  setSendProgressMessage,
 }: UseComposerControllerOptions) {
   const COMPOSER_AUTOSAVE_DEBOUNCE_MS = 800;
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
@@ -199,6 +201,7 @@ export default function useComposerController({
     refreshAll,
     loadMeta,
     setSendProgress,
+    setSendProgressMessage,
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
@@ -206,6 +209,7 @@ export default function useComposerController({
     setSendRiskConfirm(null);
     setRichComposer(true);
     setSendProgress?.(null);
+    setSendProgressMessage?.(null);
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
@@ -214,7 +218,7 @@ export default function useComposerController({
     }
     setComposerMinimized(false);
     setComposerOpen(true);
-  }, [draft, composerAutosave, setStatus, setSendProgress]);
+  }, [draft, composerAutosave, setStatus, setSendProgress, setSendProgressMessage]);
   const {
     composeFromMessage: rawComposeFromMessage,
     editDraftMessage: rawEditDraftMessage,
@@ -275,6 +279,7 @@ export default function useComposerController({
       return;
     }
     setSendProgress?.(null);
+    setSendProgressMessage?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     cleanupTempAttachments();
@@ -282,6 +287,7 @@ export default function useComposerController({
 
   function forceCloseComposer() {
     setSendProgress?.(null);
+    setSendProgressMessage?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     setComposerCloseConfirmOpen(false);

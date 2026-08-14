@@ -50,6 +50,7 @@ type ComposerSendOptions = {
   refreshAll: () => Promise<void>;
   loadMeta: (folderId?: number | null) => Promise<unknown>;
   setSendProgress?: (progress: number | null) => void;
+  setSendProgressMessage?: (message: string | null) => void;
 };
 
 function composerFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -83,8 +84,10 @@ export default function useComposerSend({
   refreshAll,
   loadMeta,
   setSendProgress,
+  setSendProgressMessage,
 }: ComposerSendOptions) {
   const lastSendProgressRef = useRef<number | null>(null);
+  const lastSendProgressMessageRef = useRef<string | null>(null);
 
   const reportSendProgress = (progress: number | null) => {
     if (progress == null) {
@@ -99,6 +102,18 @@ export default function useComposerSend({
     }
     lastSendProgressRef.current = clamped;
     setSendProgress?.(clamped);
+  };
+
+  const reportSendProgressMessage = (message: string | null) => {
+    if (message == null) {
+      if (lastSendProgressMessageRef.current == null) return;
+      lastSendProgressMessageRef.current = null;
+      setSendProgressMessage?.(null);
+      return;
+    }
+    if (message === lastSendProgressMessageRef.current) return;
+    lastSendProgressMessageRef.current = message;
+    setSendProgressMessage?.(message);
   };
 
   useEffect(() => {
@@ -146,23 +161,29 @@ export default function useComposerSend({
         const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
         if (latest.status === 'running') {
           const percent = Number.isFinite(latest.progress) ? latest.progress : 0;
-          reportSendProgress(percent);
-          setStatus(`发送中：${latest.message || '处理中'}（${percent}%）`);
+          const normalizedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+          const normalizedMessage = `发送中：${latest.message || '处理中'}（${normalizedPercent}%）`;
+          reportSendProgress(normalizedPercent);
+          reportSendProgressMessage(normalizedMessage);
+          setStatus(normalizedMessage);
           return;
         }
         stopPolling();
         reportSendProgress(null);
+        reportSendProgressMessage(null);
         if (latest.message) {
           setStatus(`发送完成：${latest.message}`);
         }
       } catch {
         stopPolling();
         reportSendProgress(null);
+        reportSendProgressMessage(null);
       }
     };
 
     try {
       setStatus('发送中：准备发送任务...');
+      reportSendProgressMessage('发送中：准备发送任务...');
       const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, {
         input: {
           kind: 'outbox-smtp',
@@ -172,8 +193,11 @@ export default function useComposerSend({
       });
       taskId = task.id;
       await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId });
-      reportSendProgress(Number.isFinite(task.progress) ? task.progress : 0);
-      setStatus(`发送中：${task.message || '处理中'}（${task.progress || 0}%）`);
+      const initialPercent = Math.max(0, Math.min(100, Math.round(task.progress || 0)));
+      const taskReadyMessage = `发送中：${task.message || '处理中'}（${initialPercent}%）`;
+      reportSendProgress(initialPercent);
+      setStatus(taskReadyMessage);
+      reportSendProgressMessage(taskReadyMessage);
       pollTimer = window.setInterval(() => {
         syncProgress().catch(() => {
           stopPolling();
@@ -190,12 +214,14 @@ export default function useComposerSend({
         message: '发送完成，正在跳转到已发送文件夹...',
       });
       stopPolling();
+      reportSendProgressMessage('发送完成，正在跳转到已发送文件夹...');
       await options.onSuccess(messageId);
       return;
     } catch (error) {
       const errorMessage = String(error);
       stopPolling();
       reportSendProgress(null);
+      reportSendProgressMessage(null);
       if (taskId) {
         try {
           const failedTask = await invoke<BackgroundTask>(IPC.FailBackgroundTask, {
@@ -214,7 +240,7 @@ export default function useComposerSend({
       await options.onFailure(errorMessage);
       return;
     }
-  }, [setStatus, setSendProgress]);
+  }, [setStatus, setSendProgress, setSendProgressMessage]);
 
   const sendDraft = useCallback(async () => {
     if (!draft.to.trim()) {

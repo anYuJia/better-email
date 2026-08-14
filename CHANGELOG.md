@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 1.0.25
+- Composer 发送进度增强：新增发送期专属文案状态（`sendProgressMessage`）并在发送条下展示，便于观察附件读取、构建 MIME 等阶段。
+- 样式入口继续收口：`styles.css` 改为兼容 shim，避免 legacy 与 2026 入口并存导致后续误改。
+
 ### 1.0.24
 - 发件路径增加“附件读取/组装”前置进度，队列发送和直接发送都可见 `read attachment` 进度文本。
 - 新增 CSS 入口收口：新增 `styles/2026/ui-stack.css` 聚合 `ui-2026` 全量 Pass 样式，`ui-2026.css` 入口更清晰、可维护性更高。

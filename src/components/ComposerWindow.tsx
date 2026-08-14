@@ -77,6 +77,7 @@ export type ComposerWindowProps = {
   sendRiskConfirm: CrossAccountRiskItem[] | null;
   crossAccountRisks: CrossAccountRiskItem[];
   sendProgress: number | null;
+  sendProgressMessage: string | null;
 };
 
 export default function ComposerWindow({
@@ -118,6 +119,7 @@ export default function ComposerWindow({
   sendRiskConfirm,
   crossAccountRisks,
   sendProgress,
+  sendProgressMessage,
 }: ComposerWindowProps) {
   const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
   const dragRef = useRef<ComposerDragState | null>(null);
@@ -301,15 +303,22 @@ export default function ComposerWindow({
 
         <footer>
           {normalizedSendProgress !== null && (
-            <div
-              className="composer-send-progress"
-              role="progressbar"
-              aria-label="发送进度"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={normalizedSendProgress}
-            >
-              <div className="composer-send-progress-fill" style={{ width: `${normalizedSendProgress}%` }} />
+            <div className="composer-send-progress-wrapper">
+              <div
+                className="composer-send-progress"
+                role="progressbar"
+                aria-label="发送进度"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={normalizedSendProgress}
+              >
+                <div className="composer-send-progress-fill" style={{ width: `${normalizedSendProgress}%` }} />
+              </div>
+              {sendProgressMessage ? (
+                <div className="composer-send-progress-message" title={sendProgressMessage}>
+                  {sendProgressMessage}
+                </div>
+              ) : null}
             </div>
           )}
           <span>

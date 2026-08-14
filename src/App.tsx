@@ -153,6 +153,7 @@ export default function App() {
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
+  const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
@@ -776,6 +777,7 @@ export default function App() {
     refreshAll,
     focusMailboxRole,
     setSendProgress: setComposerSendProgress,
+    setSendProgressMessage: setComposerSendProgressMessage,
   });
 
   useEffect(() => {
@@ -1556,6 +1558,7 @@ export default function App() {
               onSendRiskCancel={() => setSendRiskConfirm(null)}
               sendRiskConfirm={sendRiskConfirm}
               sendProgress={composerSendProgress}
+              sendProgressMessage={composerSendProgressMessage}
               crossAccountRisks={crossAccountRisks}
             />
           </AppErrorBoundary>

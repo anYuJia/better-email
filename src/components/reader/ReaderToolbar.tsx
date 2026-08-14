@@ -18,7 +18,7 @@ import { canSnoozeRole } from '../../app/snooze';
 import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
@@ -55,7 +55,7 @@ type ReaderToolbarProps = {
   onMoveToFolder: (folder: Folder) => void;
 };
 
-export default function ReaderToolbar({
+function ReaderToolbar({
   selected,
   folders,
   selectedSenderTrusted,
@@ -91,6 +91,10 @@ export default function ReaderToolbar({
   const isTrash = selected.folder_role === 'trash';
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef);
+  const movableFolders = useMemo(
+    () => movableFoldersForMessage(folders, selected),
+    [folders, selected],
+  );
 
   return (
     <header className="reader-header">
@@ -211,7 +215,7 @@ export default function ReaderToolbar({
               </>
             )}
             <span className="menu-section-title">移动到</span>
-            {movableFoldersForMessage(folders, selected).map((folder) => (
+            {movableFolders.map((folder) => (
               <button type="button" key={folder.id} onClick={() => onMoveToFolder(folder)}>
                 {folder.name}
               </button>
@@ -239,3 +243,5 @@ export default function ReaderToolbar({
     </header>
   );
 }
+
+export default memo(ReaderToolbar);

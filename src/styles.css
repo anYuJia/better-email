@@ -6,11 +6,9 @@
 @import './styles/message-list.css';
 @import './styles/dialogs.css';
 @import './styles/responsive.css';
-@import './styles/pass-2026-desktop-polish.css';
 @import './styles/dropdowns.css';
-@import './styles/pass-settings-declutter.css';
-@import './styles/pass-2026-ui-polish.css';
-@import './styles/pass-interface-refinement.css';
+/* Modern 2026 pass polish is now consolidated in ui-2026.css to avoid
+   duplicate passes across both style entrypoints. */
 @import './styles/pass-sidebar-context.css';
 @import './styles/window-chrome.css';
 @import './styles/shared-dialogs.css';

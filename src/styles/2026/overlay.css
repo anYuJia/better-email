@@ -32,7 +32,7 @@
   border: 2px solid var(--ui-border-strong);
   border-top-color: var(--ui-accent);
   border-radius: 50%;
-  animation: deferred-spin 680ms linear infinite;
+  animation: deferred-spin var(--ui-motion-680) linear infinite;
 }
 
 @keyframes deferred-spin {

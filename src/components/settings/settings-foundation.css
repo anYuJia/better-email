@@ -42,9 +42,9 @@
   font-size: var(--st-font-size-body);
   line-height: 1.45;
   transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    background-color 140ms ease;
+    border-color var(--ui-motion-short) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-short) var(--ui-ease-standard),
+    background-color var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):hover {
@@ -103,10 +103,10 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
+    border-color var(--ui-motion-fast) var(--ui-ease-standard),
+    background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    color var(--ui-motion-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 /* The shared dropdown trigger (CustomSelect) keeps its own border from the
@@ -152,10 +152,10 @@
 .settings-modal .settings-nav button,
 .settings-modal .settings-header-actions button {
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
+    border-color var(--ui-motion-fast) var(--ui-ease-standard),
+    background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    color var(--ui-motion-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 /* --- Mobile touch targets --- */

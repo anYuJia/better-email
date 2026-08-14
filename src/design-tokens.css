@@ -96,10 +96,36 @@
   --ui-scrollbar-thumb-hover: oklch(0.67 0.014 var(--primitive-hue-neutral));
 
   --ui-motion-fast: 120ms;
+  --ui-motion-mid: 150ms;
+  --ui-motion-compact: 130ms;
+  --ui-motion-short: 140ms;
+  --ui-motion-quiet: 160ms;
   --ui-motion-standard: 180ms;
+  --ui-motion-200: 200ms;
+  --ui-motion-220: 220ms;
+  --ui-motion-pop: 250ms;
   --ui-motion-slow: 240ms;
+  --ui-motion-260: 260ms;
+  --ui-motion-280: 280ms;
+  --ui-motion-300: 300ms;
+  --ui-motion-340: 340ms;
+  --ui-motion-400: 400ms;
+  --ui-motion-glance: 90ms;
+  --ui-motion-580: 580ms;
+  --ui-motion-500: 500ms;
+  --ui-motion-600: 600ms;
+  --ui-motion-700: 700ms;
+  --ui-motion-800: 800ms;
+  --ui-motion-900: 900ms;
+  --ui-motion-1000: 1000ms;
+  --ui-motion-1600: 1600ms;
+  --ui-motion-680: 680ms;
+  --ui-motion-1800: 1800ms;
   --ui-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ui-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui-ease-toast-in: cubic-bezier(0.21, 1.02, 0.73, 1);
+  --ui-ease-toast-out: cubic-bezier(0.55, 0, 0.55, 0.2);
+  --ui-ease-pop-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);
   --ui-sidebar: var(--color-surface-sidebar);

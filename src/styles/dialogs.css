@@ -235,9 +235,9 @@
   gap: 8px;
   background: #fbfcfd;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--ui-motion-quiet) var(--ui-ease-standard),
+    border-color var(--ui-motion-quiet) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
 }
 
 .composer-attachments.drop-active {

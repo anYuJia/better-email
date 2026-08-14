@@ -15,9 +15,9 @@
   box-shadow: var(--st-shadow-card);
   overflow: hidden;
   transition:
-    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    border-color var(--ui-motion-quiet) var(--ui-ease-emphasized),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized),
+    transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
 }
 
 .settings-modal .st-section:hover {
@@ -102,7 +102,7 @@
   border-right: 1.5px solid var(--st-text-tertiary);
   border-bottom: 1.5px solid var(--st-text-tertiary);
   transform: rotate(45deg) translate(-1px, -1px);
-  transition: transform 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .st-section.st-disclosure[open] > summary::after {
@@ -290,8 +290,8 @@
   font-weight: 650;
   cursor: pointer;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease;
+    border-color var(--ui-motion-short) var(--ui-ease-standard),
+    background-color var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .settings-modal .st-switch:hover {
@@ -313,8 +313,8 @@
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
   cursor: pointer;
   transition:
-    background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 160ms ease;
+    background-color var(--ui-motion-quiet) var(--ui-ease-emphasized),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
 }
 
 /* The global stylesheet draws a white checkmark via ::before; the switch
@@ -333,7 +333,7 @@
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25), 0 1px 2px rgba(15, 23, 42, 0.12);
-  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
 }
 
 .settings-modal .st-switch input[type="checkbox"]:checked {
@@ -397,10 +397,10 @@
   white-space: nowrap;
   box-shadow: none;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
+    border-color var(--ui-motion-fast) var(--ui-ease-standard),
+    background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    color var(--ui-motion-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .st-btn:active:not(:disabled) {

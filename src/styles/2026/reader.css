@@ -641,7 +641,7 @@
 
 .reader-html img:not([data-better-email-inline-cid]) {
   cursor: zoom-in;
-  transition: box-shadow 120ms ease, opacity 120ms ease;
+  transition: box-shadow var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .reader-html img:not([data-better-email-inline-cid]):hover {
@@ -851,7 +851,7 @@
   border-radius: 0;
   background: #ffffff;
   transform-origin: center center;
-  transition: transform 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
   user-select: none;
 }
 

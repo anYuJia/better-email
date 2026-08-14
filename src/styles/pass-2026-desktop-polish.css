@@ -44,10 +44,10 @@ select {
 
 button {
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--ui-motion-quiet) var(--ui-ease-standard),
+    border-color var(--ui-motion-quiet) var(--ui-ease-standard),
+    color var(--ui-motion-quiet) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
 }
 
 button:active {
@@ -101,9 +101,9 @@ input[type="checkbox"] {
   background: linear-gradient(180deg, #fff 0%, #f6f8fb 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86), var(--shadow-sm);
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--ui-motion-quiet) var(--ui-ease-standard),
+    border-color var(--ui-motion-quiet) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
 }
 
 input[type="checkbox"]::before {
@@ -114,7 +114,7 @@ input[type="checkbox"]::before {
   border-bottom: 2px solid #fff;
   transform: rotate(-45deg) scale(0);
   transform-origin: center;
-  transition: transform 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 input[type="checkbox"]:checked {
@@ -155,8 +155,8 @@ input[type="checkbox"]:checked::before {
   border-radius: 999px;
   background: transparent;
   transition:
-    background 160ms ease,
-    box-shadow 160ms ease;
+    background var(--ui-motion-quiet) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
 }
 
 .pane-resizer:hover::before,
@@ -742,7 +742,7 @@ kbd {
 
 .message-select {
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--ui-motion-quiet) var(--ui-ease-standard);
 }
 
 .message-card:hover .message-select,
@@ -866,8 +866,8 @@ h1 {
   height: min(700px, calc(100vh - 48px));
   transform-origin: bottom right;
   transition:
-    box-shadow 160ms ease,
-    border-color 160ms ease;
+    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard),
+    border-color var(--ui-motion-quiet) var(--ui-ease-standard);
   will-change: transform;
 }
 

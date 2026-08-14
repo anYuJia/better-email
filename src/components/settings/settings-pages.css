@@ -479,7 +479,7 @@
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard);
   position: relative;
   overflow: hidden;
 }
@@ -1035,7 +1035,7 @@
   background: var(--st-surface);
   box-shadow: var(--st-shadow-card);
   overflow: hidden;
-  transition: border-color 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color var(--ui-motion-quiet) var(--ui-ease-emphasized), box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
 }
 
 .settings-modal .settings-provider-advanced:hover {
@@ -1066,7 +1066,7 @@
   border-right: 1.5px solid var(--st-text-tertiary);
   border-bottom: 1.5px solid var(--st-text-tertiary);
   transform: rotate(45deg) translate(-1px, -1px);
-  transition: transform 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .settings-provider-advanced[open] > summary::after {
@@ -2444,7 +2444,7 @@
 .settings-modal .writeback-validation-step .spin,
 .settings-modal .connection-spinner,
 .settings-modal .contact-transfer-actions .spinning {
-  animation: settings-action-spin 0.8s linear infinite;
+  animation: settings-action-spin var(--ui-motion-800) linear infinite;
 }
 
 /* =====================================================================
@@ -3242,7 +3242,7 @@
 }
 
 .contact-import-backdrop .spinning {
-  animation: settings-action-spin 0.8s linear infinite;
+  animation: settings-action-spin var(--ui-motion-800) linear infinite;
 }
 
 /* 导入失败/解析失败/空文件/格式错误/超过大小限制等错误的可见反馈与重试入口。 */
@@ -3291,9 +3291,9 @@
   box-shadow: none;
   cursor: pointer;
   transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
+    border-color var(--ui-motion-fast) var(--ui-ease-standard),
+    background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    color var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .contact-import-dialog .st-btn:active:not(:disabled) {
@@ -3424,7 +3424,7 @@
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
-  transition: transform 130ms ease;
+  transition: transform var(--ui-motion-compact) var(--ui-ease-standard);
 }
 
 .contact-import-dialog .st-switch input[type="checkbox"]:checked {
@@ -3885,7 +3885,7 @@
 .settings-modal .settings-ai-config-area {
   display: grid;
   gap: 12px;
-  transition: opacity 120ms ease;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .settings-ai-service-pills {
@@ -3913,10 +3913,10 @@
   box-shadow: var(--st-shadow-card);
   cursor: pointer;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+    border-color var(--ui-motion-short) var(--ui-ease-standard),
+    background-color var(--ui-motion-short) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-short) var(--ui-ease-standard),
+    transform var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .settings-modal .settings-ai-service-option:hover {
@@ -4039,8 +4039,8 @@
   color: var(--st-text-tertiary);
   background: var(--st-surface);
   transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+    border-color var(--ui-motion-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .template-search:focus-within {
@@ -4104,7 +4104,7 @@
 
 .settings-modal .template-ai-chevron {
   color: var(--st-text-tertiary);
-  transition: transform 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .template-ai-generator:not(.is-collapsed) .template-ai-chevron {
@@ -4258,7 +4258,7 @@
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
   background: var(--st-surface-subtle);
-  transition: border-color 120ms ease;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .settings-modal .template-row:hover {
@@ -5025,9 +5025,9 @@
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
+    background-color var(--ui-motion-short) var(--ui-ease-standard),
+    color var(--ui-motion-short) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .settings-modal .settings-theme-option:hover {

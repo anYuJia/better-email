@@ -48,7 +48,7 @@
 }
 
 .reader-translation-spinner {
-  animation: reader-translation-spin 900ms linear infinite;
+  animation: reader-translation-spin var(--ui-motion-900) linear infinite;
 }
 
 @keyframes reader-translation-spin {

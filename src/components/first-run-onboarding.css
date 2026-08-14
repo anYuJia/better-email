@@ -259,7 +259,7 @@
 }
 
 .spinning {
-  animation: onboarding-spin 0.9s linear infinite;
+  animation: onboarding-spin var(--ui-motion-900) linear infinite;
 }
 
 @keyframes onboarding-spin {

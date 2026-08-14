@@ -89,7 +89,7 @@
   color: var(--ui-text-tertiary);
   font-size: 11.5px;
   font-weight: 650;
-  transition: background 140ms ease;
+  transition: background var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .composer-field-row:focus-within {
@@ -370,7 +370,7 @@
   flex: 1;
   gap: 6px;
   border-radius: 8px;
-  transition: background 140ms ease, box-shadow 140ms ease;
+  transition: background var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .composer-quick-tools .composer-attachments.drop-active {
@@ -1459,7 +1459,7 @@
 .composer .composer-advanced-chevron {
   flex: 0 0 auto;
   color: #83909c;
-  transition: transform 140ms ease;
+  transition: transform var(--ui-motion-short) var(--ui-ease-standard);
 }
 
 .composer .composer-advanced[open] .composer-advanced-chevron {

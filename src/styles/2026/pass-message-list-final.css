@@ -235,7 +235,7 @@
   line-height: 1.45;
   letter-spacing: 0;
   pointer-events: none;
-  animation: global-tooltip-in 90ms ease-out both;
+  animation: global-tooltip-in var(--ui-motion-glance) ease-out both;
   white-space: normal;
   overflow-wrap: anywhere;
   -webkit-font-smoothing: antialiased;

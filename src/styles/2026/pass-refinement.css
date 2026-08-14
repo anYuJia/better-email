@@ -576,7 +576,7 @@ body {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: var(--ui-shadow-popover);
   backdrop-filter: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--ui-motion-200) var(--ui-ease-emphasized), opacity var(--ui-motion-200) var(--ui-ease-emphasized);
   will-change: transform, opacity;
 }
 

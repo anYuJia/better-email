@@ -195,7 +195,7 @@
   font-weight: 600;
   box-shadow: none;
   cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  transition: color var(--ui-motion-mid) var(--ui-ease-standard), background-color var(--ui-motion-mid) var(--ui-ease-standard), border-color var(--ui-motion-mid) var(--ui-ease-standard);
 }
 
 .label-tools .label-menu summary::-webkit-details-marker {
@@ -267,7 +267,7 @@
   border: 1px solid transparent;
   cursor: pointer;
   padding: 0;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .color-dot-btn:hover {
@@ -294,7 +294,7 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: background-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard), transform var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .label-add-submit-btn:disabled {
@@ -317,7 +317,7 @@
   justify-content: space-between;
   gap: 4px;
   border-radius: 5px;
-  transition: background 120ms ease;
+  transition: background var(--ui-motion-fast) var(--ui-ease-standard);
   padding: 2px 4px;
 }
 
@@ -360,7 +360,7 @@
   align-items: center;
   gap: 2px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .label-menu-item-row:hover .label-item-actions {

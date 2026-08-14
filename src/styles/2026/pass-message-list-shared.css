@@ -10,3 +10,22 @@
 .message-card p {
   display: block;
 }
+
+/* Shared message-row layout anchors (used by multiple message list passes). */
+.message-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.message-card > .message-topline,
+.message-card > .subject,
+.message-card > p {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-card p {
+  width: 100%;
+  max-width: 100%;
+}

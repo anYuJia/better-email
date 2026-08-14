@@ -266,7 +266,7 @@
 }
 
 .account-login-spinner {
-  animation: account-login-spin var(--ui-motion-800) linear infinite;
+  animation: ui-spin var(--ui-motion-800) linear infinite;
 }
 
 .account-login-dialog footer {
@@ -281,9 +281,6 @@
   font-size: 10px;
 }
 
-@keyframes account-login-spin {
-  to { transform: rotate(360deg); }
-}
 
 @media (max-width: 480px) {
   .account-login-gate {

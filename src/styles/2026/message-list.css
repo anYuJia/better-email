@@ -95,16 +95,7 @@
 }
 
 .animate-spin {
-  animation: spin var(--ui-motion-1000) linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  animation: ui-spin var(--ui-motion-1000) linear infinite;
 }
 
 .search-options-menu {

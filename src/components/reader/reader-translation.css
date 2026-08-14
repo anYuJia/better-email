@@ -48,13 +48,7 @@
 }
 
 .reader-translation-spinner {
-  animation: reader-translation-spin var(--ui-motion-900) linear infinite;
-}
-
-@keyframes reader-translation-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  animation: ui-spin var(--ui-motion-900) linear infinite;
 }
 
 .reader-translation-content {

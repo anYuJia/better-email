@@ -2441,12 +2441,6 @@
   border-color: #a9cdf1;
 }
 
-.settings-modal .writeback-validation-step .spin,
-.settings-modal .connection-spinner,
-.settings-modal .contact-transfer-actions .spinning {
-  animation: settings-action-spin var(--ui-motion-800) linear infinite;
-}
-
 /* =====================================================================
  * Contacts & rules pages.
  * ===================================================================== */
@@ -3239,10 +3233,6 @@
  * 联系人导入 portal 必须显示在设置（200）与首次引导（2500）之上。 */
 .contact-import-backdrop {
   z-index: 2600;
-}
-
-.contact-import-backdrop .spinning {
-  animation: settings-action-spin var(--ui-motion-800) linear infinite;
 }
 
 /* 导入失败/解析失败/空文件/格式错误/超过大小限制等错误的可见反馈与重试入口。 */

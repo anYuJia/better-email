@@ -1,4 +1,5 @@
 @import './design-tokens.css';
+@import './styles/shared-motion.css';
 @import './styles/global.css';
 @import './styles/layout.css';
 @import './styles/sidebar.css';

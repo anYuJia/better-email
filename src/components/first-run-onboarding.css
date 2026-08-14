@@ -259,12 +259,9 @@
 }
 
 .spinning {
-  animation: onboarding-spin var(--ui-motion-900) linear infinite;
+  animation: ui-spin var(--ui-motion-900) linear infinite;
 }
 
-@keyframes onboarding-spin {
-  to { transform: rotate(360deg); }
-}
 
 .onboarding-save-error {
   display: flex;

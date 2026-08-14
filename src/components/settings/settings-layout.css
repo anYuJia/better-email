@@ -179,11 +179,16 @@
 }
 
 .settings-action-spinner {
-  animation: settings-action-spin var(--ui-motion-800) linear infinite;
+  animation: ui-spin var(--ui-motion-800) linear infinite;
 }
 
-@keyframes settings-action-spin {
-  to { transform: rotate(360deg); }
+.settings-modal .spinning,
+.settings-modal .spin,
+.settings-modal .connection-spinner,
+.contact-import-backdrop .spinning,
+.settings-modal .writeback-validation-step .spin,
+.settings-modal .contact-transfer-actions .spinning {
+  animation: ui-spin var(--ui-motion-800) linear infinite;
 }
 
 .settings-connection-summary {
@@ -615,11 +620,7 @@
   border-radius: 50%;
   border: 2px solid var(--st-border-strong);
   border-top-color: var(--st-accent);
-  animation: settings-page-spin var(--ui-motion-700) linear infinite;
-}
-
-@keyframes settings-page-spin {
-  to { transform: rotate(360deg); }
+  animation: ui-spin var(--ui-motion-700) linear infinite;
 }
 
 /* --- Mobile page picker (hidden on desktop) --- */

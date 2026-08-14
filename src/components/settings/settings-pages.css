@@ -4941,7 +4941,7 @@
   .settings-modal .settings-ai-config-area,
   .settings-modal .template-ai-chevron,
   .settings-modal .template-ai-generator {
-    transition: none;
+    transition: var(--ui-transition-none);
   }
 }
 

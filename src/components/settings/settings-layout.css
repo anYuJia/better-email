@@ -843,6 +843,6 @@
   }
 
   .settings-modal .settings-page-picker > svg {
-    transition: none;
+    transition: var(--ui-transition-none);
   }
 }

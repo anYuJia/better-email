@@ -708,7 +708,7 @@ kbd {
   background: var(--accent);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.20);
+  box-shadow: var(--ui-box-shadow-accent-pop);
 }
 
 .bulk-toolbar .bulk-primary-action:hover {
@@ -803,7 +803,7 @@ h1 {
   background: var(--accent);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.20);
+  box-shadow: var(--ui-box-shadow-accent-pop);
 }
 
 .reader-actions .icon-only-action {

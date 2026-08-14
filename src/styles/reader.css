@@ -183,7 +183,7 @@ h1 {
   border-color: transparent;
   background: var(--accent, #0a84ff);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.20);
+  box-shadow: var(--ui-box-shadow-accent-pop);
 }
 
 .quick-reply button:hover:not(:disabled) {

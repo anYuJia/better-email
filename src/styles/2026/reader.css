@@ -318,7 +318,7 @@
 .attachment-item:hover {
   border-color: #dce4eb;
   background: #fcfdfe;
-  box-shadow: 0 4px 14px rgba(30, 41, 59, 0.05);
+  box-shadow: var(--ui-box-shadow-subtle-border);
 }
 
 .attachment-item.attachment-download-failed {
@@ -338,7 +338,7 @@
   border-radius: 9px;
   color: #5f7183;
   background: linear-gradient(180deg, #fff 0%, #f7f9fb 100%);
-  box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04);
+  box-shadow: var(--ui-box-shadow-subtle-edge);
   --attachment-accent: #6f7b88;
 }
 

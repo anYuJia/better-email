@@ -169,7 +169,7 @@
   width: 14px;
   height: 14px;
   color: var(--ui-text-tertiary);
-  transition: none;
+  transition: var(--ui-transition-none);
 }
 
 .account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {

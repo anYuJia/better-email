@@ -28,7 +28,7 @@ summary:active {
   padding: 2px 8px;
   font-size: 11px;
   font-family: inherit;
-  transition: background-color var(--ui-motion-mid) var(--ui-ease-standard), border-color var(--ui-motion-mid) var(--ui-ease-standard), color var(--ui-motion-mid) var(--ui-ease-standard), opacity var(--ui-motion-mid) var(--ui-ease-standard);
+  transition: var(--ui-transition-mid-color-background-border-opacity);
   margin-left: 8px;
   text-decoration: none;
 }

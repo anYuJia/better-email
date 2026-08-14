@@ -7,6 +7,7 @@ import {
   substituteTemplateVariables,
 } from '../app/templateStore';
 import type { ComposeTemplate, DraftInput } from '../app/types';
+import { plainTextToRichHtml } from '../components/composer/composerBody';
 
 type ComposerTemplatesOptions = {
   draft: DraftInput;
@@ -51,16 +52,28 @@ export default function useComposerTemplates({
       notes.push('主题已保留');
     }
     const body = bodyResult.resolved.trim();
-    if (body && !draft.body.trim()) {
-      next.body = body;
-    } else if (body && draft.body.trim() !== body) {
-      next.body = `${draft.body.trimEnd()}\n\n—— 模板正文 ——\n${body}`;
+    const draftBody = draft.body.trim();
+    const hasBody = draftBody.length > 0;
+    const bodyReplaced = hasBody ? draftBody !== body : Boolean(body);
+    const bodyMerged = body
+      ? (hasBody ? `${draftBody}\n\n—— 模板正文 ——\n${body}` : body)
+      : draftBody;
+    if (bodyMerged !== draftBody) {
+      next.body = bodyMerged;
     }
     const html = htmlResult.resolved.trim();
     if (html && !draft.html_body.trim()) {
       next.html_body = html;
     } else if (html && draft.html_body.trim() !== html) {
       next.html_body = `${draft.html_body.trimEnd()}\n${html}`;
+    } else if (body && !html && bodyReplaced && !template.html_body.trim()) {
+      if (draft.html_body.trim()) {
+        next.html_body = hasBody
+          ? `${draft.html_body.trimEnd()}<br>—— 模板正文 ——<br>${plainTextToRichHtml(body)}`
+          : plainTextToRichHtml(body);
+      } else {
+        next.html_body = plainTextToRichHtml(bodyMerged);
+      }
     }
     setDraft(next);
     if (template.html_body.trim() || htmlResult.resolved.trim()) {

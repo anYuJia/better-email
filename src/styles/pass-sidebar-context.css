@@ -19,10 +19,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   opacity: 0;
-  transition:
-    opacity var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard),
-    background var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-opacity-color-bg);
 }
 
 .saved-search-row:hover > .row-more-button,
@@ -79,9 +76,7 @@
 }
 
 .message-card {
-  transition:
-    background-color var(--ui-motion-mid) var(--ui-ease-emphasized),
-    border-color var(--ui-motion-mid) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-mid-color-bg-border-emphasized);
 }
 
 .folder.message-drop-target .folder-name svg {
@@ -122,4 +117,3 @@
   font-size: 14px;
   font-weight: bold;
 }
-

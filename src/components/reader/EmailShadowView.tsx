@@ -103,7 +103,7 @@ export default function EmailShadowView({
         }
         img:not([data-better-email-inline-cid]) {
           cursor: zoom-in;
-          transition: box-shadow 120ms ease, opacity 120ms ease;
+          transition: var(--ui-transition-box-shadow-opacity-fast);
           border-radius: 8px;
         }
         img:not([data-better-email-inline-cid]):hover {

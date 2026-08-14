@@ -9,9 +9,5 @@ input,
 textarea,
 summary {
   transition:
-    color var(--ui-motion-standard) var(--ui-ease-standard),
-    border-color var(--ui-motion-standard) var(--ui-ease-standard),
-    background-color var(--ui-motion-standard) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-standard) var(--ui-ease-standard),
-    opacity var(--ui-motion-standard) var(--ui-ease-standard);
+    var(--ui-transition-standard-color-bg-border-box-shadow-opacity);
 }

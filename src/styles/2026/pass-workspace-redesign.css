@@ -45,8 +45,7 @@
   box-shadow: var(--ui-box-shadow-none);
   content: "";
   transform: translateX(-50%);
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-box-shadow-fast);
 }
 
 .app-shell .pane-resizer::after {

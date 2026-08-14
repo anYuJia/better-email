@@ -41,10 +41,7 @@
   box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-body);
   line-height: 1.45;
-  transition:
-    border-color var(--ui-motion-short) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-short) var(--ui-ease-standard),
-    background-color var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-short-bg-border-box-shadow);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):hover {

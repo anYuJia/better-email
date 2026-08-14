@@ -49,10 +49,7 @@
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 1px 2px rgba(24, 33, 45, 0.04);
   text-align: left;
-  transition:
-    border-color var(--ui-motion-short) var(--ui-ease-standard),
-    background-color var(--ui-motion-short) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-short-bg-border-box-shadow);
 }
 
 .account-switcher-trigger:hover {

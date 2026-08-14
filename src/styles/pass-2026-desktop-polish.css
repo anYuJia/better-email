@@ -43,11 +43,7 @@ select {
 }
 
 button {
-  transition:
-    background var(--ui-motion-quiet) var(--ui-ease-standard),
-    border-color var(--ui-motion-quiet) var(--ui-ease-standard),
-    color var(--ui-motion-quiet) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
+  transition: var(--ui-transition-quiet-color-bg-border-shadow);
 }
 
 button:active {
@@ -737,7 +733,7 @@ kbd {
 
 .message-select {
   opacity: 0;
-  transition: opacity var(--ui-motion-quiet) var(--ui-ease-standard);
+  transition: var(--ui-transition-opacity-quiet);
 }
 
 .message-card:hover .message-select,

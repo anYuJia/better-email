@@ -110,7 +110,7 @@
   background: rgba(255, 255, 255, 0.985);
   box-shadow: var(--ui-shadow-float);
   backdrop-filter: blur(18px) saturate(1.08);
-  transition: transform var(--ui-motion-standard) var(--ui-ease-standard), opacity var(--ui-motion-standard) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-standard-opacity);
   will-change: transform, opacity;
 }
 

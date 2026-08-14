@@ -17,7 +17,7 @@
   display: grid;
   gap: 6px;
   box-shadow: var(--ui-box-shadow-none) !important;
-  transition: background-color var(--ui-motion-standard) var(--ui-ease-emphasized), border-color var(--ui-motion-standard) var(--ui-ease-emphasized) !important;
+  transition: var(--ui-transition-bg-border-color-standard-emphasis) !important;
   min-width: 0;
   box-sizing: border-box !important;
 }

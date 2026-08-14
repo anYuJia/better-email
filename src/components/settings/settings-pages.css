@@ -1035,7 +1035,7 @@
   background: var(--st-surface);
   box-shadow: var(--st-shadow-card);
   overflow: hidden;
-  transition: border-color var(--ui-motion-quiet) var(--ui-ease-emphasized), box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-border-color-quiet-emphasis-shadow);
 }
 
 .settings-modal .settings-provider-advanced:hover {
@@ -3280,10 +3280,7 @@
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
 .contact-import-dialog .st-btn:active:not(:disabled) {
@@ -3414,7 +3411,7 @@
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
-  transition: transform var(--ui-motion-compact) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-compact);
 }
 
 .contact-import-dialog .st-switch input[type="checkbox"]:checked {
@@ -3902,11 +3899,7 @@
   background: var(--st-surface);
   box-shadow: var(--st-shadow-card);
   cursor: pointer;
-  transition:
-    border-color var(--ui-motion-short) var(--ui-ease-standard),
-    background-color var(--ui-motion-short) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-short) var(--ui-ease-standard),
-    var(--ui-transition-transform-short);
+  transition: var(--ui-transition-short-bg-border-shadow-transform);
 }
 
 .settings-modal .settings-ai-service-option:hover {
@@ -4246,7 +4239,7 @@
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-md);
   background: var(--st-surface-subtle);
-  transition: border-color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-border-color-fast);
 }
 
 .settings-modal .template-row:hover {
@@ -5006,10 +4999,7 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--ui-motion-short) var(--ui-ease-standard),
-    color var(--ui-motion-short) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-color-bg-shadow-short);
 }
 
 .settings-modal .settings-theme-option:hover {

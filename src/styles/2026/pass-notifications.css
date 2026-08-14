@@ -212,7 +212,7 @@
   background: var(--ui-accent);
   font-size: 11.5px;
   font-weight: 650;
-  transition: background-color var(--ui-motion-slow) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-color-slow);
   cursor: pointer;
   white-space: nowrap;
 }

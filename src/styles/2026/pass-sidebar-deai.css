@@ -148,7 +148,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--ui-accent);
-  transition: width var(--ui-motion-standard) ease-out;
+  transition: var(--ui-transition-width-standard-ease-out);
 }
 
 .app-shell .sidebar-footer.has-sync-status {

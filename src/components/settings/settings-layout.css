@@ -390,10 +390,7 @@
   font-size: 13.5px;
   font-weight: 520;
   text-align: left;
-  transition:
-    color var(--ui-motion-short) var(--ui-ease-standard),
-    background-color var(--ui-motion-short) var(--ui-ease-standard),
-    var(--ui-transition-transform-short);
+  transition: var(--ui-transition-color-bg-short), var(--ui-transition-transform-short);
 }
 
 .settings-nav-icon {
@@ -405,7 +402,7 @@
   border-radius: 6px;
   color: var(--st-text-tertiary);
   background: transparent;
-  transition: color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-color-bg-short);
 }
 
 .settings-modal .settings-nav-section > button:hover {

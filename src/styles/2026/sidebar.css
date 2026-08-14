@@ -9,7 +9,7 @@
   border-right: 0;
   box-shadow: var(--ui-box-shadow-none);
   backdrop-filter: none;
-  transition: width var(--ui-motion-300) var(--ui-ease-emphasized), transform var(--ui-motion-300) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-width-emphasized-move);
   will-change: width, transform;
 }
 
@@ -55,7 +55,7 @@
   border-radius: 8px;
   color: var(--ui-text-secondary);
   background: transparent;
-  transition: background-color var(--ui-motion-standard) var(--ui-ease-emphasized), color var(--ui-motion-standard) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-std-bg-emphasized);
 }
 
 .folder:hover {

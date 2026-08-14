@@ -641,7 +641,7 @@
 
 .reader-html img:not([data-better-email-inline-cid]) {
   cursor: zoom-in;
-  transition: box-shadow var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-box-shadow-opacity-fast);
 }
 
 .reader-html img:not([data-better-email-inline-cid]):hover {

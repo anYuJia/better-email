@@ -11,8 +11,7 @@
 .sidebar .folder {
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  transition: background-color var(--ui-motion-standard) var(--ui-ease-standard),
-              color var(--ui-motion-standard) var(--ui-ease-standard);
+  transition: var(--ui-transition-standard-color-background-inverse);
 }
 
 .sidebar .folder:hover,
@@ -94,7 +93,7 @@
  * 2. Subject & Light status
  * 3. Snippet summary */
 .message-card {
-  transition: background-color var(--ui-motion-standard) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-color-standard);
   border-bottom: 1px solid oklch(0.94 0.005 var(--primitive-hue-neutral));
 }
 
@@ -286,7 +285,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 11.5px;
-  transition: color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-color-fast);
 }
 
 .attachment-section-header button:hover:not(:disabled) {

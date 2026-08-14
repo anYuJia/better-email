@@ -89,7 +89,7 @@
   color: var(--ui-text-tertiary);
   font-size: 11.5px;
   font-weight: 650;
-  transition: background var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-short);
 }
 
 .composer-field-row:focus-within {
@@ -370,7 +370,7 @@
   flex: 1;
   gap: 6px;
   border-radius: 8px;
-  transition: background var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-box-shadow-short);
 }
 
 .composer-quick-tools .composer-attachments.drop-active {

@@ -14,10 +14,7 @@
   background: var(--st-surface);
   box-shadow: var(--st-shadow-card);
   overflow: hidden;
-  transition:
-    border-color var(--ui-motion-quiet) var(--ui-ease-emphasized),
-    box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized),
-    transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-border-shadow-transform-quiet-emphasis);
 }
 
 .settings-modal .st-section:hover {
@@ -289,9 +286,7 @@
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  transition:
-    border-color var(--ui-motion-short) var(--ui-ease-standard),
-    background-color var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-bg-border-short);
 }
 
 .settings-modal .st-switch:hover {
@@ -312,9 +307,7 @@
   background: #cbd5e1;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
   cursor: pointer;
-  transition:
-    background-color var(--ui-motion-quiet) var(--ui-ease-emphasized),
-    box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-bg-shadow-quiet-emphasis);
 }
 
 /* The global stylesheet draws a white checkmark via ::before; the switch
@@ -333,7 +326,7 @@
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25), 0 1px 2px rgba(15, 23, 42, 0.12);
-  transition: transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
+  transition: var(--ui-transition-transform-quiet-emphasis);
 }
 
 .settings-modal .st-switch input[type="checkbox"]:checked {

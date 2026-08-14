@@ -61,8 +61,7 @@
     padding: 2px;
   }
 
-  .list-control-actions > button,
-  .list-control-actions .compact-menu summary {
+  .list-control-actions > button {
     min-height: 28px;
     padding-inline: 7px;
     font-size: 11px;

@@ -202,8 +202,7 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.list-control-actions > button,
-.list-control-actions .compact-menu summary {
+.list-control-actions > button {
   min-height: 29px;
   padding: 0 9px;
   border: 0;

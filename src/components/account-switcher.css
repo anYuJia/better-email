@@ -114,7 +114,7 @@
 
 .account-switcher-chevron {
   color: var(--ui-text-tertiary);
-  transition: transform var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-short);
 }
 
 .account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {

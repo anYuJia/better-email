@@ -267,7 +267,7 @@
   border: 1px solid transparent;
   cursor: pointer;
   padding: 0;
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast), border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .color-dot-btn:hover {
@@ -294,7 +294,7 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard), transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard), var(--ui-transition-transform-fast);
 }
 
 .label-add-submit-btn:disabled {
@@ -360,7 +360,7 @@
   align-items: center;
   gap: 2px;
   opacity: 0;
-  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-opacity-fast);
 }
 
 .label-menu-item-row:hover .label-item-actions {

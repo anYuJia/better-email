@@ -218,7 +218,7 @@
 }
 
 .account-login-disclosure svg {
-  transition: transform var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-short);
 }
 
 .account-login-manual-settings {

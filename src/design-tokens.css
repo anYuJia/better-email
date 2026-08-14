@@ -126,6 +126,10 @@
   --ui-ease-toast-in: cubic-bezier(0.21, 1.02, 0.73, 1);
   --ui-ease-toast-out: cubic-bezier(0.55, 0, 0.55, 0.2);
   --ui-ease-pop-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ui-transition-transform-fast: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-transform-short: transform var(--ui-motion-short) var(--ui-ease-standard);
+  --ui-transition-opacity-fast: opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-transform-pop: transform var(--ui-motion-pop) var(--ui-ease-standard), opacity var(--ui-motion-pop) var(--ui-ease-standard);
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);
   --ui-sidebar: var(--color-surface-sidebar);

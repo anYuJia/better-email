@@ -102,7 +102,7 @@
   border-right: 1.5px solid var(--st-text-tertiary);
   border-bottom: 1.5px solid var(--st-text-tertiary);
   transform: rotate(45deg) translate(-1px, -1px);
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast);
 }
 
 .settings-modal .st-section.st-disclosure[open] > summary::after {

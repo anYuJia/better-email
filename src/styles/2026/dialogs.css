@@ -61,7 +61,7 @@
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 28px 80px rgba(18, 26, 36, 0.24), 0 3px 12px rgba(18, 26, 36, 0.12);
   backdrop-filter: blur(18px);
-  transition: transform var(--ui-motion-pop) var(--ui-ease-standard), opacity var(--ui-motion-pop) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-pop);
   will-change: transform, opacity;
 }
 

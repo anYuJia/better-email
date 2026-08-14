@@ -851,7 +851,7 @@
   border-radius: 0;
   background: #ffffff;
   transform-origin: center center;
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast);
   user-select: none;
 }
 

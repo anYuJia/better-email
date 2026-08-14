@@ -339,7 +339,7 @@
   background: #dbe8f5;
   font-size: 12px;
   font-weight: 760;
-  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-opacity-fast);
 }
 
 .message-card-main {

@@ -1066,7 +1066,7 @@
   border-right: 1.5px solid var(--st-text-tertiary);
   border-bottom: 1.5px solid var(--st-text-tertiary);
   transform: rotate(45deg) translate(-1px, -1px);
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast);
 }
 
 .settings-modal .settings-provider-advanced[open] > summary::after {
@@ -3875,7 +3875,7 @@
 .settings-modal .settings-ai-config-area {
   display: grid;
   gap: 12px;
-  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-opacity-fast);
 }
 
 .settings-modal .settings-ai-service-pills {
@@ -3906,7 +3906,7 @@
     border-color var(--ui-motion-short) var(--ui-ease-standard),
     background-color var(--ui-motion-short) var(--ui-ease-standard),
     box-shadow var(--ui-motion-short) var(--ui-ease-standard),
-    transform var(--ui-motion-short) var(--ui-ease-standard);
+    var(--ui-transition-transform-short);
 }
 
 .settings-modal .settings-ai-service-option:hover {
@@ -4094,7 +4094,7 @@
 
 .settings-modal .template-ai-chevron {
   color: var(--st-text-tertiary);
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast);
 }
 
 .settings-modal .template-ai-generator:not(.is-collapsed) .template-ai-chevron {

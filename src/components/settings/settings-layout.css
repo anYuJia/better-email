@@ -396,7 +396,10 @@
   font-size: 13.5px;
   font-weight: 520;
   text-align: left;
-  transition: color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard), transform var(--ui-motion-short) var(--ui-ease-standard);
+  transition:
+    color var(--ui-motion-short) var(--ui-ease-standard),
+    background-color var(--ui-motion-short) var(--ui-ease-standard),
+    var(--ui-transition-transform-short);
 }
 
 .settings-nav-icon {
@@ -702,7 +705,7 @@
 
   .settings-page-picker > svg {
     color: var(--st-text-tertiary);
-    transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+    transition: var(--ui-transition-transform-fast);
   }
 
   .settings-page-picker > svg.open {

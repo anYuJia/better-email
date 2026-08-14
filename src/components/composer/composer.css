@@ -1459,7 +1459,7 @@
 .composer .composer-advanced-chevron {
   flex: 0 0 auto;
   color: #83909c;
-  transition: transform var(--ui-motion-short) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-short);
 }
 
 .composer .composer-advanced[open] .composer-advanced-chevron {

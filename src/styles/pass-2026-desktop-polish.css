@@ -114,7 +114,7 @@ input[type="checkbox"]::before {
   border-bottom: 2px solid #fff;
   transform: rotate(-45deg) scale(0);
   transform-origin: center;
-  transition: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast);
 }
 
 input[type="checkbox"]:checked {

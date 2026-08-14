@@ -78,6 +78,7 @@ jobs:
         # gates below; keep the long browser smoke suite on branch/PR checks so
         # a tagged release cannot be blocked by an unrelated browser timeout.
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/'))
+        timeout-minutes: 45
         run: npm run test:ui
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable

@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### 1.0.18
+- 修复 `npm run test:ui` 在 Linux CI 上因 Node/WebSocket 环境导致 `WebSocket` 不可用导致的 `ReferenceError`。
+- 侧边栏同步与发件箱发送任务并行显示，支持 `outbox-smtp` 的运行/排队进度。
+- 修复标签快速连点场景下的竞态：按当前消息快照幂等计算标签状态，避免反复点击导致状态回退。
+- 统一版本号到 `1.0.18`（`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`Cargo.lock`）。
+
 ### 1.0.17
 - 发布 1.0.17 版本。
 

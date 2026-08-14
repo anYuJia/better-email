@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type {
   Folder,
   FolderRole,
@@ -57,6 +57,11 @@ export default function useSelectedMessageActions({
   patchSelectedDetailMetadata,
   visibleFolderIdForRole,
 }: SelectedMessageActionOptions) {
+  const selectedRef = useRef<MessageSummary | null>(null);
+  const labelActionInFlightRef = useRef(new Set<string>());
+
+  selectedRef.current = selected;
+
   return React.useMemo(() => {
     async function moveSelected(role: FolderRole) {
       if (!selected) return;
@@ -166,17 +171,29 @@ export default function useSelectedMessageActions({
     }
 
     async function toggleLabel(label: Label) {
-      if (!selected) return;
-      const undoSnapshots = snapshotMessages([selected]);
-      const hasLabel = selected.labels.includes(label.name);
-      await toggleMessagesLabel([selected], label, hasLabel);
-      const nextLabels = hasLabel
-        ? selected.labels.filter((l) => l !== label.name)
-        : [...selected.labels, label.name];
-      patchSelectedDetailMetadata(selected.id, { labels: nextLabels });
-      await refreshAll();
-      setStatus(hasLabel ? `已移除标签：${label.name}` : `已添加标签：${label.name}`);
-      queueUndoAction(hasLabel ? `移除标签 ${label.name}` : `添加标签 ${label.name}`, undoSnapshots);
+      const active = selectedRef.current;
+      if (!active) return;
+      const actionKey = `${active.id}:${label.id}`;
+      if (labelActionInFlightRef.current.has(actionKey)) return;
+      labelActionInFlightRef.current.add(actionKey);
+
+      const undoSnapshots = snapshotMessages([active]);
+      try {
+        const latestLabels = selectedRef.current?.id === active.id
+          ? selectedRef.current.labels
+          : active.labels;
+        const hasLabel = latestLabels.includes(label.name);
+        await toggleMessagesLabel([active], label, hasLabel);
+        const nextLabels = hasLabel
+          ? latestLabels.filter((l) => l !== label.name)
+          : [...latestLabels, label.name];
+        patchSelectedDetailMetadata(active.id, { labels: nextLabels });
+        await refreshAll();
+        setStatus(hasLabel ? `已移除标签：${label.name}` : `已添加标签：${label.name}`);
+        queueUndoAction(hasLabel ? `移除标签 ${label.name}` : `添加标签 ${label.name}`, undoSnapshots);
+      } finally {
+        labelActionInFlightRef.current.delete(actionKey);
+      }
     }
 
 

@@ -66,6 +66,23 @@ function syncTaskLabel(task: BackgroundTask): string {
   return `正在同步邮件${count}`;
 }
 
+function outboxTaskLabel(task: BackgroundTask): string {
+  if (task.status === 'queued') return `${task.title}已入队`;
+  if (task.message) return task.message;
+  return `正在${task.title}`;
+}
+
+function visibleTaskLabel(task: BackgroundTask): string {
+  if (task.kind === 'sync') return syncTaskLabel(task);
+  if (task.kind === 'outbox-smtp') return outboxTaskLabel(task);
+  return task.title;
+}
+
+function isVisibleTask(task: BackgroundTask): boolean {
+  return ['sync', 'outbox-smtp'].includes(task.kind)
+    && (task.status === 'running' || task.status === 'queued');
+}
+
 function syncFolderDisplayName(folderName: string): string {
   const normalized = folderName.trim().toLowerCase();
   if (normalized === 'inbox') return '收件箱';
@@ -110,10 +127,7 @@ function Sidebar({
   onOpenSettings,
   onOpenShortcuts,
 }: SidebarProps) {
-  const syncTask = backgroundTasks.find((task) => task.kind === 'sync' && task.status === 'running')
-    ?? backgroundTasks.find((task) => task.kind === 'sync' && task.status === 'queued');
-  const syncProgress = syncTask ? Math.min(100, Math.max(0, syncTask.progress)) : 0;
-  const syncLabel = syncTask ? syncTaskLabel(syncTask) : '';
+  const activeTasks = backgroundTasks.filter(isVisibleTask);
 
   return (
     <aside className="sidebar">
@@ -207,20 +221,31 @@ function Sidebar({
         )}
       </SidebarFolderNavigation>
 
-      <div className={`sidebar-footer${syncTask ? ' has-sync-status' : ''}`}>
-        {syncTask && (
-          <div className="sidebar-sync-status" role="status" aria-live="polite">
-            <span>{syncLabel}</span>
-            <div
-              className="sidebar-sync-progress"
-              role="progressbar"
-              aria-label={`${syncLabel}进度`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={syncProgress}
-            >
-              <span style={{ width: `${syncProgress}%` }} />
-            </div>
+      <div className={`sidebar-footer${activeTasks.length > 0 ? ' has-sync-status' : ''}`}>
+        {activeTasks.length > 0 && (
+          <div className="sidebar-task-stack" role="status" aria-live="polite">
+            {activeTasks.map((task) => {
+              const label = visibleTaskLabel(task);
+              const progress = Math.min(100, Math.max(0, task.progress));
+              return (
+                <div className="sidebar-task-item" key={task.id}>
+                  <span className="sidebar-task-title">{label}</span>
+                  <div
+                    className="sidebar-task-progress"
+                    role="progressbar"
+                    aria-label={`${label}进度`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progress}
+                  >
+                    <span style={{ width: `${progress}%` }} />
+                  </div>
+                  {task.status === 'queued' && (
+                    <small className="sidebar-task-status">等待开始</small>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="sidebar-footer-actions">

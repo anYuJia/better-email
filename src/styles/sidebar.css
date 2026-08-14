@@ -50,6 +50,48 @@
   gap: 7px;
 }
 
+.sidebar-task-stack {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.sidebar-task-item {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-task-title {
+  color: #dce3ea;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-task-status {
+  color: #9ba8b5;
+  font-size: 11px;
+}
+
+.sidebar-task-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sidebar-task-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2c80ff, #43d9ff);
+}
+
 .sidebar-secondary {
   padding-top: 6px;
   border-top: 1px solid rgba(255,255,255,0.10);

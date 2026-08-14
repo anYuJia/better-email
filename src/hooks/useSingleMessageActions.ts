@@ -50,6 +50,11 @@ export default function useSingleMessageActions({
   onRequestSnooze,
   onRequestPermanentDelete,
 }: SingleMessageActionOptions) {
+  const selectedRef = React.useRef<MessageSummary | null>(null);
+  const labelActionInFlightRef = React.useRef(new Set<string>());
+
+  selectedRef.current = selected;
+
   return React.useMemo(() => {
     const toggleRead = async (message: MessageSummary) => {
       const undoSnapshots = snapshotMessages([message]);
@@ -152,17 +157,28 @@ export default function useSingleMessageActions({
     }
 
     async function toggleMessageLabel(message: MessageSummary, label: Label) {
+      const actionKey = `${message.id}:${label.id}`;
+      if (labelActionInFlightRef.current.has(actionKey)) return;
+      labelActionInFlightRef.current.add(actionKey);
+
       const undoSnapshots = snapshotMessages([message]);
-      const hasLabel = message.labels.includes(label.name);
-      await toggleMessagesLabel([message], label, hasLabel);
-      // 同步更新 selectedDetail 和 cache 中的 labels
-      const nextLabels = hasLabel
-        ? message.labels.filter((l) => l !== label.name)
-        : [...message.labels, label.name];
-      patchSelectedDetailMetadata(message.id, { labels: nextLabels });
-      await refreshAll();
-      setStatus(`${hasLabel ? '已移除' : '已添加'}标签 ${label.name}`);
-      queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
+      try {
+        const latestLabels = selectedRef.current?.id === message.id
+          ? selectedRef.current.labels
+          : message.labels;
+        const hasLabel = latestLabels.includes(label.name);
+        await toggleMessagesLabel([message], label, hasLabel);
+        // 同步更新 selectedDetail 和 cache 中的 labels
+        const nextLabels = hasLabel
+          ? latestLabels.filter((l) => l !== label.name)
+          : [...latestLabels, label.name];
+        patchSelectedDetailMetadata(message.id, { labels: nextLabels });
+        await refreshAll();
+        setStatus(`${hasLabel ? '已移除' : '已添加'}标签 ${label.name}`);
+        queueUndoAction(`${hasLabel ? '移除' : '添加'}标签 ${label.name}`, undoSnapshots);
+      } finally {
+        labelActionInFlightRef.current.delete(actionKey);
+      }
     }
 
     return {

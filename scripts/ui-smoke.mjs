@@ -4,7 +4,21 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { WebSocket as UndiciWebSocket } from 'undici';
 
-const CDPWebSocket = globalThis.WebSocket ?? UndiciWebSocket;
+function resolveCdpWebSocket() {
+  if (typeof globalThis.WebSocket === 'function') {
+    return globalThis.WebSocket;
+  }
+  if (typeof UndiciWebSocket === 'function') {
+    return UndiciWebSocket;
+  }
+  throw new Error(
+    '当前运行环境不支持 WebSocket。'
+    + '请确认已安装 undici，或在支持 WebSocket 的 Node 版本上运行 npm run test:ui。',
+  );
+}
+
+const CDPWebSocket = resolveCdpWebSocket();
+const CDP_OPEN = typeof CDPWebSocket.OPEN === 'number' ? CDPWebSocket.OPEN : 1;
 
 const root = new URL('..', import.meta.url).pathname;
 const port = Number(
@@ -202,7 +216,7 @@ async function openCdp(debugPort, pageUrl) {
     });
 
     function sendOnce(method, params = {}) {
-      if (ws.readyState !== CDPWebSocket.OPEN) {
+      if (ws.readyState !== CDP_OPEN) {
         return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
       }
       const id = ++seq;

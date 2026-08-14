@@ -1224,9 +1224,9 @@ h1 {
   height: 2px;
   background: #5eb4ff;
   transform-origin: left;
-  animation-name: send-undo-countdown;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
+  animation-name: var(--ui-animation-send-undo-progress);
+  animation-timing-function: var(--ui-animation-send-undo-timing);
+  animation-fill-mode: var(--ui-animation-send-undo-fill-mode);
 }
 
 @keyframes send-undo-countdown {

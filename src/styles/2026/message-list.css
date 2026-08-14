@@ -313,7 +313,7 @@
 }
 
 .message-card.is-new {
-  animation: message-card-appear var(--ui-motion-580) var(--ui-ease-emphasized) forwards;
+  animation: var(--ui-animation-message-card-appear);
 }
 
 @keyframes message-card-appear {

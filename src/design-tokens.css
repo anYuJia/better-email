@@ -138,6 +138,16 @@
   --ui-transition-quiet-bg-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
   --ui-transition-quiet-border-shadow: border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
   --ui-transition-quiet-bg-border-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
+  --ui-animation-message-toast-in: message-toast-in var(--ui-motion-340) var(--ui-ease-toast-in);
+  --ui-animation-message-toast-out: message-toast-out var(--ui-motion-260) var(--ui-ease-toast-out) forwards;
+  --ui-animation-message-toast-count-pop: count-pop var(--ui-motion-400) var(--ui-ease-pop-soft);
+  --ui-animation-send-undo-progress: send-undo-countdown;
+  --ui-animation-send-undo-timing: linear;
+  --ui-animation-send-undo-fill-mode: forwards;
+  --ui-animation-message-card-appear: message-card-appear var(--ui-motion-580) var(--ui-ease-emphasized) forwards;
+  --ui-animation-reader-body-fade-in: reader-body-fade-in var(--ui-motion-280) var(--ui-ease-emphasized) forwards;
+  --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-glance) ease-out both;
+  --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);
   --ui-sidebar: var(--color-surface-sidebar);

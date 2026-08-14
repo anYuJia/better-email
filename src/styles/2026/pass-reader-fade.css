@@ -14,5 +14,5 @@
    every message switch re-triggers a full fade from blank. */
 .empty-state,
 .empty-reader {
-  animation: reader-body-fade-in var(--ui-motion-280) var(--ui-ease-emphasized) forwards;
+  animation: var(--ui-animation-reader-body-fade-in);
 }

@@ -36,7 +36,7 @@
     0 1px 3px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   transition: var(--ui-transition-transform-pop);
-  animation: message-toast-in var(--ui-motion-340) var(--ui-ease-toast-in);
+  animation: var(--ui-animation-message-toast-in);
 }
 
 .message-toast-progress {
@@ -47,9 +47,9 @@
   height: 3px;
   background: linear-gradient(90deg, var(--ui-accent), #00a3ff);
   transform-origin: left center;
-  animation-name: send-undo-countdown;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
+  animation-name: var(--ui-animation-send-undo-progress);
+  animation-timing-function: var(--ui-animation-send-undo-timing);
+  animation-fill-mode: var(--ui-animation-send-undo-fill-mode);
 }
 
 .undo-snackbar strong {
@@ -133,11 +133,11 @@
   box-shadow:
     0 8px 20px rgba(15, 23, 42, 0.1),
     0 1px 3px rgba(15, 23, 42, 0.06);
-  animation: message-toast-in var(--ui-motion-340) var(--ui-ease-toast-in);
+  animation: var(--ui-animation-message-toast-in);
 }
 
 .message-toast.leaving {
-  animation: message-toast-out var(--ui-motion-260) var(--ui-ease-toast-out) forwards;
+  animation: var(--ui-animation-message-toast-out);
 }
 
 .message-toast.toast-delayed {
@@ -146,7 +146,7 @@
 }
 
 .message-toast-undo.leaving {
-  animation: message-toast-out var(--ui-motion-260) var(--ui-ease-toast-out) forwards;
+  animation: var(--ui-animation-message-toast-out);
 }
 
 .message-toast svg {
@@ -190,7 +190,7 @@
   color: var(--ui-accent);
   font-weight: 720;
   font-variant-numeric: tabular-nums;
-  animation: count-pop var(--ui-motion-400) var(--ui-ease-pop-soft);
+  animation: var(--ui-animation-message-toast-count-pop);
 }
 
 .message-toast-undo-main span {

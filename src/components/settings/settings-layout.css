@@ -836,7 +836,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .settings-modal .settings-page {
-    animation: none;
+    animation: var(--ui-animation-none);
   }
 
   .settings-modal .settings-page-picker > svg {

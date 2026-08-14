@@ -289,7 +289,7 @@
   .message-toast,
   .message-toast-undo,
   .undo-snackbar {
-    animation-duration: 0.01ms;
+    animation-duration: var(--ui-motion-minimal);
     animation-iteration-count: 1;
   }
 }

@@ -53,6 +53,6 @@
   .account-login-spinner,
   .deferred-spinner,
   .settings-page-loading::before {
-    animation: none;
+    animation: var(--ui-animation-none);
   }
 }

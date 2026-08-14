@@ -111,6 +111,9 @@
   --ui-motion-340: 340ms;
   --ui-motion-400: 400ms;
   --ui-motion-glance: 90ms;
+  --ui-motion-none: 0ms;
+  --ui-motion-minimal: 0.01ms;
+  --ui-motion-reduced: 1ms;
   --ui-motion-580: 580ms;
   --ui-motion-500: 500ms;
   --ui-motion-600: 600ms;
@@ -194,6 +197,7 @@
   --ui-animation-reader-body-fade-in: reader-body-fade-in var(--ui-motion-280) var(--ui-ease-emphasized) forwards;
   --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-glance) ease-out both;
   --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
+  --ui-animation-none: none;
   --ui-animation-fill-backwards: backwards;
   --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-animation-settings-backdrop-fade: settings-backdrop-fade var(--ui-motion-standard) ease-out both;

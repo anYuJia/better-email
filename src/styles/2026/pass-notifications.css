@@ -47,6 +47,7 @@
   height: 3px;
   background: linear-gradient(90deg, var(--ui-accent), #00a3ff);
   transform-origin: left center;
+  animation-duration: var(--ui-animation-send-undo-progress-duration);
   animation-name: var(--ui-animation-send-undo-progress);
   animation-timing-function: var(--ui-animation-send-undo-timing);
   animation-fill-mode: var(--ui-animation-send-undo-fill-mode);

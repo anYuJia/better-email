@@ -199,6 +199,7 @@
   --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
   --ui-animation-spinner: ui-spin var(--ui-spinner-duration) linear infinite;
   --ui-animation-none: none;
+  --ui-animation-send-undo-progress-duration: var(--ui-motion-260);
   --ui-animation-fill-backwards: backwards;
   --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-animation-settings-backdrop-fade: settings-backdrop-fade var(--ui-motion-standard) ease-out both;

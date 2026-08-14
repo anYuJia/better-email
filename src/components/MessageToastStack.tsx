@@ -92,7 +92,9 @@ export default function MessageToastStack({
           </button>
           <span
             className="message-toast-progress"
-            style={{ animationDuration: `${renderedUndo.delaySeconds}s` }}
+            style={{
+              '--ui-animation-send-undo-progress-duration': `${renderedUndo.delaySeconds}s`,
+            }}
             aria-hidden="true"
           />
         </section>

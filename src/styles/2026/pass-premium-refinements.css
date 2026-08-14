@@ -107,7 +107,7 @@ textarea:focus-visible {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border-strong);
   color: var(--ui-text);
-  transition: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
 .empty-reader-compose:hover {
@@ -127,7 +127,7 @@ textarea:focus-visible {
 
 .reader-warning-primary-action {
   border-radius: var(--ui-radius-control);
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
 /* Bulk selection toolbar: neutralize the legacy green .bulk-toolbar.active

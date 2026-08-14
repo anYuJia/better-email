@@ -102,11 +102,7 @@
   color: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border-shadow);
 }
 
 /* The shared dropdown trigger (CustomSelect) keeps its own border from the
@@ -151,11 +147,7 @@
 .settings-modal .settings-page-content button,
 .settings-modal .settings-nav button,
 .settings-modal .settings-header-actions button {
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border-shadow);
 }
 
 /* --- Mobile touch targets --- */

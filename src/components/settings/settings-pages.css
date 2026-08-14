@@ -479,7 +479,7 @@
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border);
   position: relative;
   overflow: hidden;
 }
@@ -4028,9 +4028,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text-tertiary);
   background: var(--st-surface);
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-border-shadow);
 }
 
 .settings-modal .template-search:focus-within {

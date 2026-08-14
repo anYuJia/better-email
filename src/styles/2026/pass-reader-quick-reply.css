@@ -267,7 +267,7 @@
   border: 1px solid transparent;
   cursor: pointer;
   padding: 0;
-  transition: var(--ui-transition-transform-fast), border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-transform-fast), var(--ui-transition-fast-border-shadow);
 }
 
 .color-dot-btn:hover {

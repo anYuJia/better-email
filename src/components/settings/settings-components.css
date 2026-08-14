@@ -396,11 +396,7 @@
   line-height: 1;
   white-space: nowrap;
   box-shadow: none;
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border-shadow);
 }
 
 .settings-modal .st-btn:active:not(:disabled) {

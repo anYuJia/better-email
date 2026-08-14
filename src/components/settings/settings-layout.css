@@ -122,11 +122,7 @@
   box-shadow: var(--shadow-sm);
   font-size: 13px;
   font-weight: 580;
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-color-background-border-shadow);
 }
 
 .settings-header-button.secondary {
@@ -220,9 +216,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text-tertiary);
   background: var(--st-surface);
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-border-shadow);
 }
 
 .settings-nav-search:focus-within {

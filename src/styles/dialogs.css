@@ -234,10 +234,7 @@
   display: grid;
   gap: 8px;
   background: #fbfcfd;
-  transition:
-    background var(--ui-motion-quiet) var(--ui-ease-standard),
-    border-color var(--ui-motion-quiet) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
+  transition: var(--ui-transition-quiet-bg-border-shadow);
 }
 
 .composer-attachments.drop-active {

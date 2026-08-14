@@ -130,6 +130,14 @@
   --ui-transition-transform-short: transform var(--ui-motion-short) var(--ui-ease-standard);
   --ui-transition-opacity-fast: opacity var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-transform-pop: transform var(--ui-motion-pop) var(--ui-ease-standard), opacity var(--ui-motion-pop) var(--ui-ease-standard);
+  --ui-transition-fast-color-background: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-fast-color-background-border: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-fast-color-background-border-shadow: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-fast-border-shadow: border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-slow-color-background: color var(--ui-motion-slow) var(--ui-ease-standard), background-color var(--ui-motion-slow) var(--ui-ease-standard);
+  --ui-transition-quiet-bg-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
+  --ui-transition-quiet-border-shadow: border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
+  --ui-transition-quiet-bg-border-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);
   --ui-sidebar: var(--color-surface-sidebar);

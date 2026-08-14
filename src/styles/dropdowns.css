@@ -27,9 +27,7 @@
   font-size: 14px;
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: var(--ui-transition-fast-border-shadow);
 }
 
 .custom-select-summary > span {

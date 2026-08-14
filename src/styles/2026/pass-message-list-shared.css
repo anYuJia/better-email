@@ -1,0 +1,12 @@
+/* Shared message-row text clipping rules for list rows. */
+.sender,
+.subject,
+.message-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-card p {
+  display: block;
+}

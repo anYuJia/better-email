@@ -182,9 +182,6 @@
 
 .sender {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   line-height: 1.2;
 }
@@ -192,9 +189,6 @@
 .subject {
   margin-top: 1px;
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   line-height: 1.2;
 }
@@ -203,9 +197,6 @@
   width: 100%;
   max-width: 100%;
   margin-top: 1px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 11.5px;
   line-height: 1.25;
 }

@@ -197,6 +197,7 @@
   --ui-animation-reader-body-fade-in: reader-body-fade-in var(--ui-motion-280) var(--ui-ease-emphasized) forwards;
   --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-glance) ease-out both;
   --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
+  --ui-animation-spinner: ui-spin var(--ui-spinner-duration) linear infinite;
   --ui-animation-none: none;
   --ui-animation-fill-backwards: backwards;
   --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);

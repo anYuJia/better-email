@@ -9,7 +9,7 @@
 
 .ui-spinner {
   --ui-spinner-duration: var(--ui-motion-800);
-  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+  animation: var(--ui-animation-spinner);
 }
 
 .animate-spin,
@@ -21,7 +21,7 @@
 .account-login-spinner,
 .deferred-spinner {
   --ui-spinner-duration: var(--ui-motion-800);
-  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+  animation: var(--ui-animation-spinner);
 }
 
 .spinning,
@@ -39,7 +39,7 @@
 
 .settings-page-loading::before {
   --ui-spinner-duration: var(--ui-motion-700);
-  animation: ui-spin var(--ui-spinner-duration) linear infinite;
+  animation: var(--ui-animation-spinner);
 }
 
 @media (prefers-reduced-motion: reduce) {

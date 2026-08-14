@@ -821,7 +821,7 @@ pub fn copy_attachment_file_to_clipboard(
     attachment_id: i64,
 ) -> MailResult<String> {
     let attachment = store.get_attachment(attachment_id)?;
-    let _path = validated_attachment_read_path(&store, &attachment)?;
+    let path = validated_attachment_read_path(&store, &attachment)?;
 
     #[cfg(target_os = "macos")]
     {
@@ -832,7 +832,7 @@ pub fn copy_attachment_file_to_clipboard(
             .arg("set the clipboard to (POSIX file (item 1 of argv))")
             .arg("-e")
             .arg("end run")
-            .arg(_path.to_string_lossy().into_owned())
+            .arg(path.to_string_lossy().into_owned())
             .output()
             .map_err(crate::db::MailError::Io)?;
         if !output.status.success() {
@@ -870,6 +870,7 @@ pub fn copy_attachment_file_to_clipboard(
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let _ = &path;
         Err(crate::db::MailError::Imap(
             "当前系统暂不支持复制附件文件对象。".to_string(),
         ))

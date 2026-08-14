@@ -505,7 +505,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   text-align: left;
   cursor: pointer;
 }
@@ -825,7 +825,7 @@
 .settings-modal .settings-account-history-attachments > input:checked {
   border-color: var(--st-accent);
   background: var(--st-accent);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .settings-account-history-attachments > input:checked::before {
@@ -1119,7 +1119,7 @@
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
   background: var(--st-surface-subtle);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .st-section-body > .settings-provider-server-advanced > summary {
@@ -1160,7 +1160,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* --- Auth & OAuth --- */
@@ -1860,7 +1860,7 @@
   max-height: none;
   border: 0;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   background: transparent;
   padding: 16px;
 }
@@ -2569,7 +2569,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   text-align: left;
 }
 
@@ -2965,7 +2965,7 @@
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-secondary);
 }
 
@@ -3278,7 +3278,7 @@
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
   transition:
     border-color var(--ui-motion-fast) var(--ui-ease-standard),
@@ -3300,7 +3300,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .contact-import-dialog .st-btn-secondary {
@@ -4033,14 +4033,14 @@
 
 .settings-modal .template-search:focus-within {
   border-color: #93c5fd;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .template-search input {
   min-width: 0;
   flex: 1;
   border: 0;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   background: transparent;
 }
 
@@ -4636,7 +4636,7 @@
   border-radius: 999px;
   color: var(--st-text);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-aux);
   font-weight: 560;
 }
@@ -5000,7 +5000,7 @@
   border-radius: 6px;
   color: var(--st-text-secondary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-secondary);
   font-weight: 580;
   line-height: 1;

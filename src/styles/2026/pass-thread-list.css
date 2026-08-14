@@ -43,7 +43,7 @@
   height: 8px;
   border-radius: 50%;
   background-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-surface-outline);
 }
 
 .thread-topline {

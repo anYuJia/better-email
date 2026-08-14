@@ -975,5 +975,5 @@
 }
 
 :root[data-theme="dark"] .thread-unread-dot {
-  box-shadow: 0 0 0 2px var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-surface-outline);
 }

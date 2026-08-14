@@ -198,7 +198,7 @@
 .app-shell .sidebar-disclosure[open] summary:hover {
   color: var(--ui-text);
   background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-inset-accent);
 }
 
 .app-shell .folder.active .folder-main {
@@ -319,7 +319,7 @@
 .app-shell .search-box:focus-within {
   border-color: var(--ui-accent);
   background: var(--workspace-control-active);
-  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-accent-soft-outline);
 }
 
 .app-shell .search-box > svg,

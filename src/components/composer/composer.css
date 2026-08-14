@@ -61,7 +61,7 @@
   border: 0;
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
   font-weight: 640;
 }
@@ -102,7 +102,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
 }
 
@@ -110,7 +110,7 @@
 .composer .composer-field-row input:focus {
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-field-row input::placeholder,
@@ -150,7 +150,7 @@
   border-color: #e0e4e9;
   border-radius: 7px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .recipient-suggestions button:hover {
@@ -187,7 +187,7 @@
   border: 0;
   border-radius: 0;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 14px;
   line-height: 1.7;
 }
@@ -196,7 +196,7 @@
 .composer .composer-body-field textarea:focus {
   border: 0;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-quick-tools {
@@ -250,7 +250,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-quick-tools .composer-rich-toggle {
@@ -292,7 +292,7 @@
   border: 1px solid #bdc5cf;
   border-radius: 4px;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-quick-tools .checkbox-row input:checked {
@@ -329,7 +329,7 @@
   border-radius: 8px;
   color: var(--ui-text-secondary);
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
   font-weight: 650;
 }
@@ -522,7 +522,7 @@
 .composer-template-save button {
   min-height: 31px;
   border-radius: 7px;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
 }
 
@@ -648,7 +648,7 @@
 .composer-template-row button,
 .composer-template-save button {
   border-radius: var(--ui-radius-control);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
   font-weight: 560;
 }
@@ -727,7 +727,7 @@
   color: #202833;
   background: transparent;
   text-align: left;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .recipient-suggestions button:hover {
@@ -1103,7 +1103,7 @@
   border-radius: 11px;
   color: #24303d;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-attachment-tile:hover {
@@ -1261,7 +1261,7 @@
   border-radius: 8px;
   color: #3f6f9f;
   background: #f7fbff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
   font-weight: 560;
 }
@@ -1293,13 +1293,13 @@
 .composer :is(input, textarea):focus-visible {
   outline: none !important;
   border-color: var(--ui-border) !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
 }
 
 .composer .composer-field-row:focus-within,
 .composer-recipient-field .composer-field-row:focus-within {
   background: #fbfcfd;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .composer-field-row:focus-within {
@@ -1351,7 +1351,7 @@
   border-radius: 6px;
   color: #586575;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .rich-toolbar button:hover,
@@ -1379,7 +1379,7 @@
   border-radius: 6px;
   color: #4e5c6b;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   white-space: nowrap;
 }
 
@@ -1519,7 +1519,7 @@
   border-radius: 6px;
   color: #2d3946;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
 }
 
@@ -1545,7 +1545,7 @@
   border-radius: 6px;
   color: #354352;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .composer-delivery-controls .custom-select-summary > span {
@@ -1634,7 +1634,7 @@
   border-radius: 6px;
   color: #4f5d6b;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 10px;
 }
 
@@ -1670,7 +1670,7 @@
   border: 1px solid #d9e1e8;
   border-radius: 6px;
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
 }
 
@@ -1760,7 +1760,7 @@
   border-radius: 50%;
   color: #5a6675;
   background: #d9e0e8;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer .composer-recipient-chip button:hover {
@@ -1803,7 +1803,7 @@
 :root[data-theme="dark"] .composer-recipient-field .composer-field-row:focus-within {
   border-bottom-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .composer .composer-field-row input,

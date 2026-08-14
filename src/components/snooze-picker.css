@@ -102,7 +102,7 @@
   border-radius: 10px;
   color: #56616d;
   background: #fafbfc;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   text-align: left;
 }
 
@@ -305,7 +305,7 @@
 
 :root[data-theme="dark"] .snooze-custom input:focus {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-accent-soft-outline);
 }
 
 :root[data-theme="dark"] .snooze-custom button {

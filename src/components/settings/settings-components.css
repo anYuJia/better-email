@@ -339,7 +339,7 @@
 .settings-modal .st-switch input[type="checkbox"]:checked {
   border-color: transparent;
   background: var(--st-accent);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .st-switch input[type="checkbox"]:checked::after {
@@ -395,7 +395,7 @@
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   transition: var(--ui-transition-fast-color-background-border-shadow);
 }
 
@@ -413,7 +413,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .st-btn-secondary {

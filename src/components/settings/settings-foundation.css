@@ -38,7 +38,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
   background-color: var(--st-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-body);
   line-height: 1.45;
   transition:
@@ -55,7 +55,7 @@
 .settings-modal .settings-page-content :is(input, select, textarea):focus {
   border-color: var(--st-border-strong);
   outline: none;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea)[aria-invalid="true"] {
@@ -121,7 +121,7 @@
 .settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
   border-color: var(--st-focus-border);
   background: var(--st-surface-subtle);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .settings-page-content .custom-select-summary:disabled {

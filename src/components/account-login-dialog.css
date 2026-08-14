@@ -80,7 +80,7 @@
   border-radius: 7px;
   color: var(--ui-text);
   background: #fff;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .account-login-field > input {
@@ -120,7 +120,7 @@
   border-radius: 0;
   color: var(--ui-text);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
 }
 
@@ -250,7 +250,7 @@
   border-radius: 7px;
   color: #fff;
   background: #176eaa;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
   font-weight: 650;
 }
@@ -324,7 +324,7 @@
 :root[data-theme="dark"] .account-login-field > input:focus,
 :root[data-theme="dark"] .account-login-field > select:focus {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-accent-soft-outline);
 }
 
 :root[data-theme="dark"] .account-login-field input::placeholder {

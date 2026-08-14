@@ -35,7 +35,7 @@
 .sidebar-disclosure[open] summary:hover {
   color: var(--ui-text);
   background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--quiet-row-selected-border);
+  box-shadow: var(--ui-box-shadow-inset-selected);
 }
 
 .folder.active .folder-main {

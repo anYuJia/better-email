@@ -42,7 +42,7 @@ textarea:focus-visible {
 /* Drag feedback is color/opacity only — no geometry change. */
 .message-card.dragging {
   opacity: 0.58;
-  box-shadow: inset 2px 0 0 var(--quiet-row-selected-border);
+  box-shadow: var(--ui-box-shadow-inset-selected);
 }
 
 /* Unread rows share the same hover feel as read rows. */

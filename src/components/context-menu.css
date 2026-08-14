@@ -59,7 +59,7 @@
   border-radius: 7px;
   color: #263442;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12.5px;
   font-weight: 520;
   text-align: left;
@@ -137,7 +137,7 @@
   border: 0;
   color: #99a2ab;
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-family: inherit;
   font-size: 10px;
 }

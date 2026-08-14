@@ -147,7 +147,7 @@
   color: #ffffff;
   border-color: var(--st-accent-hover);
   background: var(--st-accent-hover);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-close-button {
@@ -161,7 +161,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
   background: var(--st-surface);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-close-button:hover {
@@ -221,7 +221,7 @@
 
 .settings-nav-search:focus-within {
   border-color: #93c5fd;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-nav-search input {
@@ -234,7 +234,7 @@
   outline: 0;
   color: var(--st-text);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
 }
 
@@ -282,7 +282,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text-tertiary);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-nav-search > button:hover {
@@ -386,7 +386,7 @@
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
   background: transparent;
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 13.5px;
   font-weight: 520;
   text-align: left;
@@ -412,7 +412,7 @@
   border-color: transparent;
   color: var(--st-text);
   background: rgba(15, 23, 42, 0.05);
-  box-shadow: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .settings-modal .settings-nav-section > button:hover .settings-nav-icon {
@@ -433,7 +433,7 @@
 
 .settings-modal .settings-nav-section > button:focus-visible {
   border-color: transparent !important;
-  box-shadow: none !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
   outline: 2px solid var(--st-focus-border);
   outline-offset: 1px;
 }
@@ -752,7 +752,7 @@
     border-radius: var(--st-radius-sm);
     color: var(--st-text);
     background: transparent;
-    box-shadow: none;
+    box-shadow: var(--ui-box-shadow-none);
     text-align: left;
   }
 

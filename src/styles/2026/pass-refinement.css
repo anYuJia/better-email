@@ -98,7 +98,7 @@ body {
 .sidebar-disclosure[open] summary {
   color: var(--ui-text);
   background: var(--quiet-row-selected);
-  box-shadow: inset 2px 0 0 var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-inset-accent);
 }
 
 .folder-main {

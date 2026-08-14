@@ -8,6 +8,7 @@ import type {
   Account,
   DraftInput,
   DraftSaveReport,
+  BackgroundTask,
   FolderRole,
   Message,
   OutboxItem,
@@ -17,6 +18,8 @@ import { formatDate, prefixedSubject, quoteMessage, replyThreadingHeaders } from
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+
+const DIRECT_SEND_PROGRESS_POLL_INTERVAL_MS = 1000;
 
 type ComposerSendOptions = {
   draft: DraftInput;
@@ -93,6 +96,96 @@ export default function useComposerSend({
     setStatus(report.message);
   }, [draft, draftInputForCurrentAccount, threadingForDraft, setDraft, clearComposerAutosave, forceCloseComposer, refreshAll, setStatus]);
 
+  const runDirectSendWithProgress = useCallback(async (
+    input: DraftInput,
+    threading: { in_reply_to: string; references: string } | null,
+    options: {
+      taskAccountId: number | null;
+      onSuccess: (messageId: number) => Promise<void> | void;
+      onFailure: (errorMessage: string) => Promise<void> | void;
+    },
+  ) => {
+    let taskId: number | null = null;
+    let pollTimer = 0;
+
+    const stopPolling = () => {
+      if (pollTimer) {
+        window.clearInterval(pollTimer);
+        pollTimer = 0;
+      }
+    };
+
+    const syncProgress = async () => {
+      if (!taskId) return;
+      try {
+        const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
+        if (latest.status === 'running') {
+          const percent = Number.isFinite(latest.progress) ? latest.progress : 0;
+          setStatus(`发送中：${latest.message || '处理中'}（${percent}%）`);
+          return;
+        }
+        stopPolling();
+        if (latest.message) {
+          setStatus(`发送完成：${latest.message}`);
+        }
+      } catch {
+        stopPolling();
+      }
+    };
+
+    try {
+      setStatus('发送中：准备发送任务...');
+      const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, {
+        input: {
+          kind: 'outbox-smtp',
+          source: 'manual',
+          account_id: options.taskAccountId,
+        },
+      });
+      taskId = task.id;
+      await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId });
+      setStatus(`发送中：${task.message || '处理中'}（${task.progress || 0}%）`);
+      pollTimer = window.setInterval(() => {
+        syncProgress().catch(() => {
+          stopPolling();
+        });
+      }, DIRECT_SEND_PROGRESS_POLL_INTERVAL_MS);
+
+      const messageId = await invoke<number>(IPC.SendMessage, {
+        input,
+        threading,
+        task_id: taskId,
+      });
+      await invoke<BackgroundTask>(IPC.CompleteBackgroundTask, {
+        taskId,
+        message: '发送完成，正在跳转到已发送文件夹...',
+      });
+      stopPolling();
+      await options.onSuccess(messageId);
+      return;
+    } catch (error) {
+      const errorMessage = String(error);
+      stopPolling();
+      if (taskId) {
+        try {
+          const failedTask = await invoke<BackgroundTask>(IPC.FailBackgroundTask, {
+            taskId,
+            message: errorMessage,
+          });
+          if (failedTask.message) {
+            setStatus(`发送失败：${failedTask.message}`);
+          }
+        } catch {
+          setStatus(`发送失败：${errorMessage}`);
+        }
+      } else {
+        setStatus(`发送失败：${errorMessage}`);
+      }
+      await options.onFailure(errorMessage);
+      return;
+    }
+  }, [setStatus]);
+
   const sendDraft = useCallback(async () => {
     if (!draft.to.trim()) {
       setStatus('请先填写收件人');
@@ -108,34 +201,32 @@ export default function useComposerSend({
       undoDelaySeconds: sendUndoDelaySeconds,
     });
     if (sendUndoDelaySeconds === 0) {
-      try {
-        setStatus('发送中：正在校验附件并构建邮件内容...');
-        const messageId = await invoke<number>(IPC.SendMessage, {
-          input,
-          threading: threadingForDraft(draft),
-        });
-        setStatus('发送完成，正在跳转到已发送文件夹...');
-        setDraft(emptyDraft);
-        clearComposerAutosave();
-        forceCloseComposer();
-        await focusMailboxRole('sent', input.account_id || account?.id || null, '');
-        showToast('邮件已发送');
-        composerFlowLog('sendDraft done', {
-          messageId,
-          accountId: input.account_id,
-          targetRole: 'sent',
-        });
-      } catch (error) {
-        const message = String(error);
-        closeComposer();
-        setStatus('正在写入草稿，发送失败的邮件已留在发件箱');
-        await focusMailboxRole('outbox', input.account_id || account?.id || null, `发送失败，邮件已留在发件箱：${message}`);
-        composerFlowWarn('sendDraft failed', {
-          accountId: input.account_id,
-          error: message,
-          targetRole: 'outbox',
-        });
-      }
+      await runDirectSendWithProgress(input, threadingForDraft(draft), {
+        taskAccountId: input.account_id || account?.id || null,
+        onSuccess: async (messageId) => {
+          setStatus('发送完成，正在跳转到已发送文件夹...');
+          setDraft(emptyDraft);
+          clearComposerAutosave();
+          forceCloseComposer();
+          await focusMailboxRole('sent', input.account_id || account?.id || null, '');
+          showToast('邮件已发送');
+          composerFlowLog('sendDraft done', {
+            messageId,
+            accountId: input.account_id,
+            targetRole: 'sent',
+          });
+        },
+        onFailure: async (message) => {
+          closeComposer();
+          setStatus('正在写入草稿，发送失败的邮件已留在发件箱');
+          await focusMailboxRole('outbox', input.account_id || account?.id || null, `发送失败，邮件已留在发件箱：${message}`);
+          composerFlowWarn('sendDraft failed', {
+            accountId: input.account_id,
+            error: message,
+            targetRole: 'outbox',
+          });
+        },
+      });
       return;
     }
 
@@ -165,7 +256,7 @@ export default function useComposerSend({
       accountId: input.account_id,
       targetRole: 'outbox',
     });
-  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, closeComposer, forceCloseComposer, focusMailboxRole, account, setOutbox, setPendingSendUndo, setStatus, showToast]);
+  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, closeComposer, forceCloseComposer, focusMailboxRole, account, setOutbox, setPendingSendUndo, setStatus, showToast, runDirectSendWithProgress]);
 
   const sendQuickReply = useCallback(async (message: Message) => {
     const body = quickReplyBody.trim();
@@ -192,32 +283,30 @@ export default function useComposerSend({
       undoDelaySeconds: sendUndoDelaySeconds,
     });
     if (sendUndoDelaySeconds === 0) {
-      try {
-        setStatus('发送中：正在校验附件并构建邮件内容...');
-        const messageId = await invoke<number>(IPC.SendMessage, {
-          input,
-          threading: replyThreadingHeaders(message),
-        });
-        setQuickReplyBody('');
-        setStatus('快速回复发送完成，返回当前会话...');
-        await refreshAll();
-        setSelectedId(message.id);
-        showToast(`已快速回复：${message.sender_name || message.sender_email}`);
-        composerFlowLog('sendQuickReply done', {
-          messageId,
-          accountId: message.account_id,
-          targetRole: 'current',
-        });
-      } catch (error) {
-        const errorMessage = String(error);
-        setQuickReplyBody('');
-        await focusMailboxRole('outbox', message.account_id, `快速回复发送失败，邮件已留在发件箱：${errorMessage}`);
-        composerFlowWarn('sendQuickReply failed', {
-          accountId: message.account_id,
-          error: errorMessage,
-          targetRole: 'outbox',
-        });
-      }
+      await runDirectSendWithProgress(input, replyThreadingHeaders(message), {
+        taskAccountId: message.account_id,
+        onSuccess: async (messageId) => {
+          setQuickReplyBody('');
+          setStatus('快速回复发送完成，返回当前会话...');
+          await refreshAll();
+          setSelectedId(message.id);
+          showToast(`已快速回复：${message.sender_name || message.sender_email}`);
+          composerFlowLog('sendQuickReply done', {
+            messageId,
+            accountId: message.account_id,
+            targetRole: 'current',
+          });
+        },
+        onFailure: async (errorMessage) => {
+          setQuickReplyBody('');
+          await focusMailboxRole('outbox', message.account_id, `快速回复发送失败，邮件已留在发件箱：${errorMessage}`);
+          composerFlowWarn('sendQuickReply failed', {
+            accountId: message.account_id,
+            error: errorMessage,
+            targetRole: 'outbox',
+          });
+        },
+      });
       return;
     }
 
@@ -255,7 +344,7 @@ export default function useComposerSend({
         targetRole: 'outbox',
       });
     }
-  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, refreshAll, setSelectedId, setStatus, showToast, focusMailboxRole, setOutbox, setPendingSendUndo]);
+  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, refreshAll, setSelectedId, setStatus, showToast, focusMailboxRole, setOutbox, setPendingSendUndo, runDirectSendWithProgress]);
 
   const queueDraft = useCallback(async () => {
     if (!draft.to.trim()) {

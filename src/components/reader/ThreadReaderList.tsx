@@ -18,7 +18,7 @@ import { formatDate } from '../../mailUtils';
 import type { BulkMessageAction } from '../messageContextMenu';
 import SenderIdentity from './SenderIdentity';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
@@ -37,7 +37,7 @@ type ThreadReaderListProps = {
   onToggleThreadMute: () => void;
 };
 
-export default function ThreadReaderList({
+function ThreadReaderList({
   activeThread,
   threadMessages,
   activeThreadSelected,
@@ -51,18 +51,36 @@ export default function ThreadReaderList({
   onToggleThreadLabel,
   onToggleThreadMute,
 }: ThreadReaderListProps) {
-  const allThreadRead = threadMessages.every((message) => message.is_read);
-  const allThreadStarred = threadMessages.every((message) => message.is_starred);
-  const threadMovableMessages = threadMessages.filter(
-    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
-  );
-  const threadArchiveCount = threadMessages.filter(
-    (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
-  ).length;
-  const threadTrashCount = threadMessages.filter(
-    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
-  ).length;
-  const threadMoveFolders = movableFoldersForBulk(folders, threadMovableMessages);
+  const threadStates = useMemo(() => {
+    const allThreadRead = threadMessages.every((message) => message.is_read);
+    const allThreadStarred = threadMessages.every((message) => message.is_starred);
+    const threadMovableMessages = threadMessages.filter(
+      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+    );
+    const threadArchiveCount = threadMessages.filter(
+      (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
+    ).length;
+    const threadTrashCount = threadMessages.filter(
+      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
+    ).length;
+    const threadMoveFolders = movableFoldersForBulk(folders, threadMovableMessages);
+    const labelStateByName = new Map<string, boolean>(
+      labels.map((label) => [
+        label.name,
+        threadMessages.every((message) => message.labels.includes(label.name)),
+      ]),
+    );
+
+    return {
+      allThreadRead,
+      allThreadStarred,
+      threadArchiveCount,
+      threadTrashCount,
+      threadMoveFolders,
+      labelStateByName,
+    };
+  }, [threadMessages, folders, labels]);
+
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef);
 
@@ -103,34 +121,34 @@ export default function ThreadReaderList({
           <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
             <button
               className="icon-only-action"
-              title={allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-              aria-label={allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-              onClick={() => onRunThreadAction(allThreadStarred ? 'unstar' : 'star')}
+              title={threadStates.allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
+              aria-label={threadStates.allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
+              onClick={() => onRunThreadAction(threadStates.allThreadStarred ? 'unstar' : 'star')}
             >
-              <Star size={17} fill={allThreadStarred ? 'currentColor' : 'none'} />
+              <Star size={17} fill={threadStates.allThreadStarred ? 'currentColor' : 'none'} />
             </button>
             <button
               className="icon-only-action"
               title="归档会话中的收件邮件"
               aria-label="归档会话中的收件邮件"
-              disabled={threadArchiveCount === 0}
+              disabled={threadStates.threadArchiveCount === 0}
               onClick={() => onRunThreadAction('archive')}
             >
               <Archive size={16} />
             </button>
             <button
               className="icon-only-action"
-              title={allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-              aria-label={allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-              onClick={() => onRunThreadAction(allThreadRead ? 'unread' : 'read')}
+              title={threadStates.allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
+              aria-label={threadStates.allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
+              onClick={() => onRunThreadAction(threadStates.allThreadRead ? 'unread' : 'read')}
             >
-              {allThreadRead ? <Mail size={16} /> : <MailOpen size={16} />}
+              {threadStates.allThreadRead ? <Mail size={16} /> : <MailOpen size={16} />}
             </button>
             <button
               className="icon-only-action danger-action"
               title="将会话移到废纸篓"
               aria-label="将会话移到废纸篓"
-              disabled={threadTrashCount === 0}
+              disabled={threadStates.threadTrashCount === 0}
               onClick={() => onRunThreadAction('trash')}
             >
               <Trash2 size={16} />
@@ -151,7 +169,7 @@ export default function ThreadReaderList({
                 <button
                   type="button"
                   key={label.id}
-                  className={threadMessages.every((message) => message.labels.includes(label.name)) ? 'active' : ''}
+                  className={threadStates.labelStateByName.get(label.name) ? 'active' : ''}
                   onClick={() => onToggleThreadLabel(label)}
                 >
                   <span className="label-dot" style={{ background: label.color }} />
@@ -159,12 +177,12 @@ export default function ThreadReaderList({
                 </button>
               ))}
               <span className="menu-section-title">移动到</span>
-              {threadMoveFolders.map((folder) => (
+              {threadStates.threadMoveFolders.map((folder) => (
                 <button type="button" key={folder.id} onClick={() => onMoveThreadToFolder(folder)}>
                   {folder.name}
                 </button>
               ))}
-              {threadMoveFolders.length === 0 && (
+              {threadStates.threadMoveFolders.length === 0 && (
                 <span className="menu-empty-note">多账号会话或当前邮件不可移动</span>
               )}
             </div>
@@ -194,3 +212,5 @@ export default function ThreadReaderList({
     </>
   );
 }
+
+export default memo(ThreadReaderList);

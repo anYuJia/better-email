@@ -51,7 +51,23 @@ export default function ReaderBodyContent({
           onLinkClick={(href) => {
             const lowerHref = href.toLowerCase();
             if (lowerHref.startsWith('mailto:')) {
-              onComposeNew(parseMailtoUrl(href));
+              try {
+                onComposeNew(parseMailtoUrl(href));
+              } catch (error) {
+                const fallbackTo = href.slice(7).split('?')[0];
+                let fallbackAddress = fallbackTo;
+
+                try {
+                  if (fallbackTo) {
+                    fallbackAddress = decodeURIComponent(fallbackTo);
+                  }
+                } catch (decodeError) {
+                  logWarn('Failed to decode mailto recipient, using raw value', fallbackTo, decodeError);
+                }
+
+                onComposeNew(fallbackAddress ? { to: fallbackAddress } : undefined);
+                logWarn('Failed to parse mailto URL, using fallback recipient:', href, error);
+              }
             } else if (lowerHref.startsWith('http://') || lowerHref.startsWith('https://')) {
               onOpenLink(href);
             } else {

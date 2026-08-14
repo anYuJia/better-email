@@ -14,6 +14,8 @@ const port = Number(
 );
 const url = `http://127.0.0.1:${port}`;
 const captureDir = process.env.BETTER_EMAIL_UI_CAPTURE_DIR;
+const globalSmokeTimeoutMs = Number(process.env.BETTER_EMAIL_UI_SMOKE_TIMEOUT_MS ?? 30 * 60_000);
+const heartbeatMs = Number(process.env.BETTER_EMAIL_UI_SMOKE_HEARTBEAT_MS ?? 30_000);
 const chromeCandidates = [
   process.env.CHROME_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -22,6 +24,65 @@ const chromeCandidates = [
   'chromium',
   'chrome',
 ].filter(Boolean);
+const startedAt = Date.now();
+let stepCounter = 0;
+let currentStep = 'startup';
+let heartbeatTimer = null;
+
+function formatDuration(ms) {
+  const roundedMs = Math.max(0, Math.floor(ms));
+  const totalSeconds = Math.floor(roundedMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m${seconds.toString().padStart(2, '0')}s`;
+}
+
+function shortText(value, limit = 120) {
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
+}
+
+function setStep(label) {
+  stepCounter += 1;
+  currentStep = `#${stepCounter} ${label}`;
+  return currentStep;
+}
+
+function assertGlobalTimeout(context = 'progressing') {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed > globalSmokeTimeoutMs) {
+    throw new Error(
+      `UI smoke timed out globally after ${formatDuration(elapsed)} (limit ${formatDuration(globalSmokeTimeoutMs)}): ${context}`,
+    );
+  }
+}
+
+async function withStep(label, action) {
+  const stepLabel = setStep(label);
+  const start = Date.now();
+  console.log(`[ui-smoke] START ${stepLabel}`);
+  assertGlobalTimeout(stepLabel);
+  try {
+    const result = await action();
+    console.log(`[ui-smoke] DONE ${stepLabel} in ${formatDuration(Date.now() - start)}`);
+    return result;
+  } catch (error) {
+    const message = error?.message ?? String(error);
+    throw new Error(`Step failed (${stepLabel}): ${message}`);
+  }
+}
+
+function startWatchdog() {
+  heartbeatTimer = setInterval(() => {
+    console.log(`[ui-smoke] heartbeat elapsed=${formatDuration(Date.now() - startedAt)} current=${currentStep}`);
+  }, heartbeatMs);
+  heartbeatTimer.unref();
+}
+
+function stopWatchdog() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+}
 
 function spawnLogged(command, args, options = {}) {
   const child = spawn(command, args, {
@@ -58,102 +119,112 @@ async function removeDirWithRetry(path) {
 }
 
 async function waitForHttp(target, timeoutMs = 15_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(target);
-      if (response.ok) return;
-    } catch {
-      // Server is still starting.
+  return withStep(`waitForHttp ${target}`, async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      assertGlobalTimeout(`waiting for ${target}`);
+      try {
+        const response = await fetch(target);
+        if (response.ok) return;
+      } catch {
+        // Server is still starting.
+      }
+      await sleep(200);
     }
-    await sleep(200);
-  }
-  throw new Error(`Timed out waiting for ${target}`);
+    throw new Error(`Timed out waiting for ${target}`);
+  });
 }
 
 async function findChrome() {
-  for (const candidate of chromeCandidates) {
-    const child = spawn(candidate, ['--version'], { stdio: 'ignore' });
-    const code = await new Promise((resolve) => child.once('exit', resolve));
-    if (code === 0) return candidate;
-  }
-  throw new Error('Chrome/Chromium executable not found; set CHROME_PATH to run UI smoke tests.');
+  return withStep('findChrome', async () => {
+    for (const candidate of chromeCandidates) {
+      const child = spawn(candidate, ['--version'], { stdio: 'ignore' });
+      const code = await new Promise((resolve) => child.once('exit', resolve));
+      if (code === 0) return candidate;
+    }
+    throw new Error('Chrome/Chromium executable not found; set CHROME_PATH to run UI smoke tests.');
+  });
 }
 
 async function chromeJson(debugPort, path) {
-  const response = await fetch(`http://127.0.0.1:${debugPort}${path}`);
-  if (!response.ok) throw new Error(`Chrome CDP request failed: ${path}`);
-  return response.json();
+  return withStep(`chromeJson ${path}`, async () => {
+    const response = await fetch(`http://127.0.0.1:${debugPort}${path}`);
+    if (!response.ok) throw new Error(`Chrome CDP request failed: ${path}`);
+    return response.json();
+  });
 }
 
 async function openCdp(debugPort, pageUrl) {
-  const deadline = Date.now() + 10_000;
-  let target = null;
-  while (Date.now() < deadline) {
-    const targets = await chromeJson(debugPort, '/json/list');
-    target =
-      targets.find((entry) => entry.type === 'page' && entry.url?.startsWith(pageUrl)) ??
-      targets.find((entry) => entry.type === 'page');
-    if (target?.webSocketDebuggerUrl) break;
-    await sleep(150);
-  }
-  if (!target?.webSocketDebuggerUrl) {
-    throw new Error(`Chrome page target not found for ${pageUrl}`);
-  }
-  const ws = new CDPWebSocket(target.webSocketDebuggerUrl);
-  let seq = 0;
-  const pending = new Map();
-  const events = [];
-
-  function failPending(error) {
-    for (const { reject, timer } of pending.values()) {
-      clearTimeout(timer);
-      reject(error);
+  return withStep(`openCdp ${pageUrl}`, async () => {
+    const deadline = Date.now() + 10_000;
+    let target = null;
+    while (Date.now() < deadline) {
+      assertGlobalTimeout(`waiting for CDP target ${pageUrl}`);
+      const targets = await chromeJson(debugPort, '/json/list');
+      target =
+        targets.find((entry) => entry.type === 'page' && entry.url?.startsWith(pageUrl)) ??
+        targets.find((entry) => entry.type === 'page');
+      if (target?.webSocketDebuggerUrl) break;
+      await sleep(150);
     }
-    pending.clear();
-  }
-
-  ws.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data);
-    if (message.id && pending.has(message.id)) {
-      const { resolve, reject, timer } = pending.get(message.id);
-      pending.delete(message.id);
-      clearTimeout(timer);
-      if (message.error) reject(new Error(message.error.message));
-      else resolve(message.result);
-    } else if (message.method) {
-      events.push(message);
+    if (!target?.webSocketDebuggerUrl) {
+      throw new Error(`Chrome page target not found for ${pageUrl}`);
     }
-  });
+    const ws = new CDPWebSocket(target.webSocketDebuggerUrl);
+    let seq = 0;
+    const pending = new Map();
+    const events = [];
 
-  await new Promise((resolve, reject) => {
-    ws.addEventListener('open', resolve, { once: true });
-    ws.addEventListener('error', reject, { once: true });
-  });
-
-  function sendOnce(method, params = {}) {
-    if (ws.readyState !== CDPWebSocket.OPEN) {
-      return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
+    function failPending(error) {
+      for (const { reject, timer } of pending.values()) {
+        clearTimeout(timer);
+        reject(error);
+      }
+      pending.clear();
     }
-    const id = ++seq;
-    ws.send(JSON.stringify({ id, method, params }));
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        reject(new Error(`Timed out waiting for Chrome CDP response: ${method}`));
-      }, 10_000);
-      pending.set(id, { resolve, reject, timer });
+
+    ws.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id && pending.has(message.id)) {
+        const { resolve, reject, timer } = pending.get(message.id);
+        pending.delete(message.id);
+        clearTimeout(timer);
+        if (message.error) reject(new Error(message.error.message));
+        else resolve(message.result);
+      } else if (message.method) {
+        events.push(message);
+      }
     });
-  }
 
-  ws.addEventListener('error', () => failPending(new Error('Chrome CDP socket error')));
-  ws.addEventListener('close', () => failPending(new Error('Chrome CDP socket closed')));
+    await new Promise((resolve, reject) => {
+      ws.addEventListener('open', resolve, { once: true });
+      ws.addEventListener('error', reject, { once: true });
+    });
 
-  function send(method, params = {}) {
-    return sendWithRetry(sendOnce, method, params);
-  }
+    function sendOnce(method, params = {}) {
+      if (ws.readyState !== CDPWebSocket.OPEN) {
+        return Promise.reject(new Error(`Chrome CDP socket is not open for ${method}`));
+      }
+      const id = ++seq;
+      ws.send(JSON.stringify({ id, method, params }));
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`Timed out waiting for Chrome CDP response: ${method}`));
+        }, 10_000);
+        pending.set(id, { resolve, reject, timer });
+      });
+    }
 
-  return { send, events, close: () => ws.close() };
+    ws.addEventListener('error', () => failPending(new Error('Chrome CDP socket error')));
+    ws.addEventListener('close', () => failPending(new Error('Chrome CDP socket closed')));
+
+    function send(method, params = {}) {
+      return sendWithRetry(sendOnce, method, params);
+    }
+
+    return { send, events, close: () => ws.close() };
+  });
 }
 
 function isTransientCdpError(error) {
@@ -183,47 +254,54 @@ async function sendWithRetry(sendOnce, method, params, retries = 1) {
 }
 
 async function waitForExpression(cdp, expression, timeoutMs = 10_000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastValue = null;
-  while (Date.now() < deadline) {
-    const result = await cdp.send('Runtime.evaluate', {
-      expression: `Boolean(${expression})`,
-      awaitPromise: true,
-      returnByValue: true,
-    });
-    lastValue = result.result?.value;    if (lastValue) return lastValue;
-    await sleep(150);
-  }
-  throw new Error(`Timed out waiting for expression: ${expression}; last=${JSON.stringify(lastValue)}`);
-}
-
-async function evalInPage(cdp, expression) {
-  let lastError = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await sleep(200);
-    try {
+  return withStep(`waitForExpression ${shortText(expression)}`, async () => {
+    const deadline = Date.now() + timeoutMs;
+    let lastValue = null;
+    while (Date.now() < deadline) {
+      assertGlobalTimeout(`waiting for expression ${shortText(expression)}`);
       const result = await cdp.send('Runtime.evaluate', {
-        expression,
+        expression: `Boolean(${expression})`,
         awaitPromise: true,
         returnByValue: true,
       });
-      if (result.exceptionDetails) {
-        const exception = result.exceptionDetails.exception;
-        const description = exception?.description || exception?.value || result.exceptionDetails.text;
-        lastError = new Error(description ?? 'Page evaluation failed');
-        if (attempt === 0 && isTransientPageError(lastError)) continue;
-        throw lastError;
-      }
-      return result.result?.value;
-    } catch (error) {
-      if (attempt === 0 && isTransientCdpError(error)) {
-        lastError = error;
-        continue;
-      }
-      throw error;
+      lastValue = result.result?.value;
+      if (lastValue) return lastValue;
+      await sleep(150);
     }
-  }
-  throw lastError ?? new Error('Page evaluation failed');
+    throw new Error(`Timed out waiting for expression: ${expression}; last=${JSON.stringify(lastValue)}`);
+  });
+}
+
+async function evalInPage(cdp, expression) {
+  return withStep(`evalInPage ${shortText(expression)}`, async () => {
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      assertGlobalTimeout(`eval in page ${shortText(expression)}`);
+      if (attempt > 0) await sleep(200);
+      try {
+        const result = await cdp.send('Runtime.evaluate', {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        if (result.exceptionDetails) {
+          const exception = result.exceptionDetails.exception;
+          const description = exception?.description || exception?.value || result.exceptionDetails.text;
+          lastError = new Error(description ?? 'Page evaluation failed');
+          if (attempt === 0 && isTransientPageError(lastError)) continue;
+          throw lastError;
+        }
+        return result.result?.value;
+      } catch (error) {
+        if (attempt === 0 && isTransientCdpError(error)) {
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError ?? new Error('Page evaluation failed');
+  });
 }
 
 /**
@@ -232,149 +310,172 @@ async function evalInPage(cdp, expression) {
  * 不在时点击触发器，短超时等待；仍不出现则重试，消除单次点击被吞的偶发。
  */
 async function openAccountSwitcherMenu(cdp, expectSelector) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const present = await evalInPage(
-      cdp,
-      `!!document.querySelector(${JSON.stringify(expectSelector)})`,
-    );
-    if (present) return;
-    await evalInPage(cdp, "(() => { const trigger = document.querySelector('.account-switcher-trigger'); if (!trigger) throw new Error('Account switcher trigger not found'); trigger.click(); })()");
-    const appeared = await waitForExpression(
-      cdp,
-      `!!document.querySelector(${JSON.stringify(expectSelector)})`,
-      2500,
-    ).catch(() => false);
-    if (appeared) return;
-  }
-  throw new Error(`Account switcher menu did not open for ${expectSelector}`);
+  return withStep(`openAccountSwitcherMenu ${expectSelector}`, async () => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      assertGlobalTimeout(`switching account menu ${expectSelector}`);
+      const present = await evalInPage(
+        cdp,
+        `!!document.querySelector(${JSON.stringify(expectSelector)})`,
+      );
+      if (present) return;
+      await evalInPage(cdp, "(() => { const trigger = document.querySelector('.account-switcher-trigger'); if (!trigger) throw new Error('Account switcher trigger not found'); trigger.click(); })()");
+      const appeared = await waitForExpression(
+        cdp,
+        `!!document.querySelector(${JSON.stringify(expectSelector)})`,
+        2500,
+      ).catch(() => false);
+      if (appeared) return;
+    }
+    throw new Error(`Account switcher menu did not open for ${expectSelector}`);
+  });
 }
 
 async function captureScreenshot(cdp, name) {
-  if (!captureDir) return;
-  mkdirSync(captureDir, { recursive: true });
-  const result = await cdp.send('Page.captureScreenshot', {
-    format: 'png',
-    fromSurface: true,
-    captureBeyondViewport: false,
+  return withStep(`captureScreenshot ${name}`, async () => {
+    if (!captureDir) return;
+    mkdirSync(captureDir, { recursive: true });
+    const result = await cdp.send('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false,
+    });
+    writeFileSync(join(captureDir, `${name}.png`), result.data, 'base64');
   });
-  writeFileSync(join(captureDir, `${name}.png`), result.data, 'base64');
 }
 
 async function waitForSettingsPageStable(cdp) {
-  await waitForExpression(
-    cdp,
-    "(() => { const page = document.querySelector('.settings-page'); return page && page.getAnimations().every((animation) => animation.playState === 'finished'); })()",
-  );
+  return withStep('waitForSettingsPageStable', async () => {
+    await waitForExpression(
+      cdp,
+      "(() => { const page = document.querySelector('.settings-page'); return page && page.getAnimations().every((animation) => animation.playState === 'finished'); })()",
+    );
+  });
 }
 
 async function clickButton(cdp, text, scope = 'document') {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const root = ${scope};
-      const button = [...root.querySelectorAll('button')].find((item) => {
-        const navLabel = item.querySelector('.settings-nav-label')?.textContent.trim();
-        return navLabel ? navLabel === ${JSON.stringify(text)} : item.textContent.includes(${JSON.stringify(text)});
-      });
-      if (!button) throw new Error('Button not found: ${text}');
-      button.click();
-    })()`,
-  );
+  return withStep(`clickButton ${text}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const root = ${scope};
+        const button = [...root.querySelectorAll('button')].find((item) => {
+          const navLabel = item.querySelector('.settings-nav-label')?.textContent.trim();
+          return navLabel ? navLabel === ${JSON.stringify(text)} : item.textContent.includes(${JSON.stringify(text)});
+        });
+        if (!button) throw new Error('Button not found: ${text}');
+        button.click();
+      })()`,
+    );
+  });
 }
 
 async function closeComposer(cdp) {
-  await evalInPage(
-    cdp,
-    "(() => { const composer = document.querySelector('.composer'); if (!composer) return; const button = composer.querySelector('header button[aria-label=\"关闭写信窗口\"]') ?? [...composer.querySelectorAll('header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()",
-  );
-  await waitForExpression(cdp, "!document.querySelector('.composer') || document.querySelector('.dialog-card')");
-  await evalInPage(
-    cdp,
-    "(() => { const dialog = document.querySelector('.dialog-card'); if (!dialog) return; const button = [...dialog.querySelectorAll('button')].find((item) => item.textContent.includes('舍弃草稿')); if (!button) throw new Error('Discard draft button not found'); button.click(); })()",
-  );
-  await waitForExpression(cdp, "!document.querySelector('.composer')");
+  return withStep('closeComposer', async () => {
+    await evalInPage(
+      cdp,
+      "(() => { const composer = document.querySelector('.composer'); if (!composer) return; const button = composer.querySelector('header button[aria-label=\"关闭写信窗口\"]') ?? [...composer.querySelectorAll('header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Composer close button not found'); button.click(); })()",
+    );
+    await waitForExpression(cdp, "!document.querySelector('.composer') || document.querySelector('.dialog-card')");
+    await evalInPage(
+      cdp,
+      "(() => { const dialog = document.querySelector('.dialog-card'); if (!dialog) return; const button = [...dialog.querySelectorAll('button')].find((item) => item.textContent.includes('舍弃草稿')); if (!button) throw new Error('Discard draft button not found'); button.click(); })()",
+    );
+    await waitForExpression(cdp, "!document.querySelector('.composer')");
+  });
 }
 
 async function openCardContextMenu(cdp, subject) {
-  await waitForExpression(cdp, `[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes(${JSON.stringify(subject)}))`);
-  await evalInPage(
-    cdp,
-    `(() => {
-      const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(${JSON.stringify(subject)}));
-      if (!card) throw new Error('Context menu target card not found: ${subject}');
-      card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 }));
-    })()`,
-  );
-  await waitForExpression(cdp, "document.querySelector('.context-menu')");
+  return withStep(`openCardContextMenu ${subject}`, async () => {
+    await waitForExpression(cdp, `[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes(${JSON.stringify(subject)}))`);
+    await evalInPage(
+      cdp,
+      `(() => {
+        const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(${JSON.stringify(subject)}));
+        if (!card) throw new Error('Context menu target card not found: ${subject}');
+        card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 }));
+      })()`,
+    );
+    await waitForExpression(cdp, "document.querySelector('.context-menu')");
+  });
 }
 
 async function clickContextMenuItem(cdp, text) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const button = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes(${JSON.stringify(text)}));
-      if (!button) throw new Error('Context menu item not found: ${text}');
-      button.click();
-    })()`,
-  );
+  return withStep(`clickContextMenuItem ${text}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const button = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes(${JSON.stringify(text)}));
+        if (!button) throw new Error('Context menu item not found: ${text}');
+        button.click();
+      })()`,
+    );
+  });
 }
 
 async function clickContextSubmenuItem(cdp, branchText, itemText) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const branch = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes(${JSON.stringify(branchText)}));
-      if (!branch) throw new Error('Context submenu branch not found: ${branchText}');
-      branch.focus();
-      branch.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
-    })()`,
-  );
-  await waitForExpression(
-    cdp,
-    `[...document.querySelectorAll('.context-submenu button')].some((item) => item.textContent.includes(${JSON.stringify(itemText)}))`,
-  );
-  await evalInPage(
-    cdp,
-    `(() => {
-      const button = [...document.querySelectorAll('.context-submenu button')].find((item) => item.textContent.includes(${JSON.stringify(itemText)}));
-      if (!button) throw new Error('Context submenu item not found: ${itemText}');
-      button.click();
-    })()`,
-  );
+  return withStep(`clickContextSubmenuItem ${branchText} > ${itemText}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const branch = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes(${JSON.stringify(branchText)}));
+        if (!branch) throw new Error('Context submenu branch not found: ${branchText}');
+        branch.focus();
+        branch.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      })()`,
+    );
+    await waitForExpression(
+      cdp,
+      `[...document.querySelectorAll('.context-submenu button')].some((item) => item.textContent.includes(${JSON.stringify(itemText)}))`,
+    );
+    await evalInPage(
+      cdp,
+      `(() => {
+        const button = [...document.querySelectorAll('.context-submenu button')].find((item) => item.textContent.includes(${JSON.stringify(itemText)}));
+        if (!button) throw new Error('Context submenu item not found: ${itemText}');
+        button.click();
+      })()`,
+    );
+  });
 }
 
 async function openSettingsSection(cdp, label, section, expectedSelector) {
-  await clickButton(cdp, label, "document.querySelector('.settings-nav')");
-  await waitForExpression(
-    cdp,
-    `document.querySelector('.settings-page-header strong')?.textContent.trim() === ${JSON.stringify(label)}
-      && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(label)})
-      && document.querySelector(${JSON.stringify(expectedSelector)})
-      && [...document.querySelectorAll('[data-settings-section]')]
-        .every((item) => item.dataset.settingsSection === ${JSON.stringify(section)}
-          || item.dataset.settingsSection.startsWith(${JSON.stringify(section)} + '-'))`,
-  );
+  return withStep(`openSettingsSection ${label}`, async () => {
+    await clickButton(cdp, label, "document.querySelector('.settings-nav')");
+    await waitForExpression(
+      cdp,
+      `document.querySelector('.settings-page-header strong')?.textContent.trim() === ${JSON.stringify(label)}
+        && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(label)})
+        && document.querySelector(${JSON.stringify(expectedSelector)})
+        && [...document.querySelectorAll('[data-settings-section]')]
+          .every((item) => item.dataset.settingsSection === ${JSON.stringify(section)}
+            || item.dataset.settingsSection.startsWith(${JSON.stringify(section)} + '-'))`,
+    );
+  });
 }
 
 async function openContactCreateDialog(cdp) {
-  await clickButton(
-    cdp,
-    '添加联系人',
-    "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions')",
-  );
-  await waitForExpression(cdp, "document.querySelector('.contact-create-form[role=\"dialog\"]')");
+  return withStep('openContactCreateDialog', async () => {
+    await clickButton(
+      cdp,
+      '添加联系人',
+      "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions')",
+    );
+    await waitForExpression(cdp, "document.querySelector('.contact-create-form[role=\"dialog\"]')");
+  });
 }
 
 async function openDetails(cdp, selector) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const details = document.querySelector(${JSON.stringify(selector)});
-      if (!details) throw new Error('Details menu not found: ${selector}');
-      details.open = true;
-      details.dispatchEvent(new Event('toggle', { bubbles: true }));
-    })()`,
-  );
+  return withStep(`openDetails ${selector}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const details = document.querySelector(${JSON.stringify(selector)});
+        if (!details) throw new Error('Details menu not found: ${selector}');
+        details.open = true;
+        details.dispatchEvent(new Event('toggle', { bubbles: true }));
+      })()`,
+    );
+  });
 }
 
 async function rectDetails(cdp, selector) {
@@ -738,50 +839,56 @@ async function assertSettingsPagesEnterable(cdp, label, pages) {
 }
 
 async function fillInput(cdp, selector, value, index = 0) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-      if (!element) throw new Error('Input not found: ${selector}[${index}]');
-      const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-      setter.call(element, ${JSON.stringify(value)});
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-    })()`,
-  );
+  return withStep(`fillInput ${selector} ${shortText(value)}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+        if (!element) throw new Error('Input not found: ${selector}[${index}]');
+        const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        setter.call(element, ${JSON.stringify(value)});
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`,
+    );
+  });
 }
 
 async function selectValue(cdp, selector, value, index = 0) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-      if (!element) throw new Error('Select not found: ${selector}[${index}]');
-      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-      setter.call(element, ${JSON.stringify(value)});
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`,
-  );
+  return withStep(`selectValue ${selector} -> ${shortText(value)}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+        if (!element) throw new Error('Select not found: ${selector}[${index}]');
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+        setter.call(element, ${JSON.stringify(value)});
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`,
+    );
+  });
 }
 
 async function fillComposerBody(cdp, value) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const rich = document.querySelector('.composer-richtext-body');
-      if (rich) {
-        rich.focus();
-        rich.innerHTML = '';
-        document.execCommand('insertText', false, ${JSON.stringify(value)});
-        return;
-      }
-      const plain = document.querySelector('.composer textarea[placeholder="正文"]');
-      if (!plain) throw new Error('Composer body field not found');
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      setter.call(plain, ${JSON.stringify(value)});
-      plain.dispatchEvent(new Event('input', { bubbles: true }));
-    })()`,
-  );
+  return withStep(`fillComposerBody ${shortText(value)}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const rich = document.querySelector('.composer-richtext-body');
+        if (rich) {
+          rich.focus();
+          rich.innerHTML = '';
+          document.execCommand('insertText', false, ${JSON.stringify(value)});
+          return;
+        }
+        const plain = document.querySelector('.composer textarea[placeholder="正文"]');
+        if (!plain) throw new Error('Composer body field not found');
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        setter.call(plain, ${JSON.stringify(value)});
+        plain.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`,
+    );
+  });
 }
 
 async function composerBodyHasText(cdp, fragment) {
@@ -797,67 +904,73 @@ async function composerBodyHasText(cdp, fragment) {
 }
 
 async function pickCustomSelect(cdp, summarySelector, optionText) {
-  await evalInPage(
-    cdp,
-    `(() => { const summary = document.querySelector(${JSON.stringify(summarySelector)}); if (!summary) throw new Error('Select summary not found: ${summarySelector}'); summary.click(); })()`,
-  );
-  await waitForExpression(
-    cdp,
-    `[...document.querySelectorAll('.custom-select-dropdown button[role="option"]')].some((item) => item.textContent.includes(${JSON.stringify(optionText)}))`,
-  );
-  await evalInPage(
-    cdp,
-    `[...document.querySelectorAll('.custom-select-dropdown button[role="option"]')].find((item) => item.textContent.includes(${JSON.stringify(optionText)})).click()`,
-  );
+  return withStep(`pickCustomSelect ${shortText(summarySelector)} -> ${shortText(optionText)}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => { const summary = document.querySelector(${JSON.stringify(summarySelector)}); if (!summary) throw new Error('Select summary not found: ${summarySelector}'); summary.click(); })()`,
+    );
+    await waitForExpression(
+      cdp,
+      `[...document.querySelectorAll('.custom-select-dropdown button[role="option"]')].some((item) => item.textContent.includes(${JSON.stringify(optionText)}))`,
+    );
+    await evalInPage(
+      cdp,
+      `[...document.querySelectorAll('.custom-select-dropdown button[role="option"]')].find((item) => item.textContent.includes(${JSON.stringify(optionText)})).click()`,
+    );
+  });
 }
 
 async function selectOptionByText(cdp, selector, text, index = 0) {
-  await evalInPage(
-    cdp,
-    `(() => {
-      const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-      if (!element) throw new Error('Select not found: ${selector}[${index}]');
-      const option = [...element.options].find((item) => item.textContent.includes(${JSON.stringify(text)}));
-      if (!option) throw new Error('Select option not found: ${text}');
-      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-      setter.call(element, option.value);
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`,
-  );
+  return withStep(`selectOptionByText ${selector} -> ${shortText(text)}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+        if (!element) throw new Error('Select not found: ${selector}[${index}]');
+        const option = [...element.options].find((item) => item.textContent.includes(${JSON.stringify(text)}));
+        if (!option) throw new Error('Select option not found: ${text}');
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+        setter.call(element, option.value);
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      })()` ,
+    );
+  });
 }
 
 async function dragElement(cdp, selector, deltaX) {
-  const rect = await evalInPage(
-    cdp,
-    `(() => {
-      const element = document.querySelector(${JSON.stringify(selector)});
-      if (!element) throw new Error('Drag target not found: ${selector}');
-      const box = element.getBoundingClientRect();
-      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-    })()`,
-  );
-  await cdp.send('Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x: rect.x,
-    y: rect.y,
-    button: 'left',
-    buttons: 1,
-    clickCount: 1,
-  });
-  await cdp.send('Input.dispatchMouseEvent', {
-    type: 'mouseMoved',
-    x: rect.x + deltaX,
-    y: rect.y,
-    button: 'left',
-    buttons: 1,
-  });
-  await cdp.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased',
-    x: rect.x + deltaX,
-    y: rect.y,
-    button: 'left',
-    buttons: 0,
-    clickCount: 1,
+  return withStep(`dragElement ${selector} ${deltaX}`, async () => {
+    const rect = await evalInPage(
+      cdp,
+      `(() => {
+        const element = document.querySelector(${JSON.stringify(selector)});
+        if (!element) throw new Error('Drag target not found: ${selector}');
+        const box = element.getBoundingClientRect();
+        return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+      })()`,
+    );
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: rect.x,
+      y: rect.y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+    });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: rect.x + deltaX,
+      y: rect.y,
+      button: 'left',
+      buttons: 1,
+    });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: rect.x + deltaX,
+      y: rect.y,
+      button: 'left',
+      buttons: 0,
+      clickCount: 1,
+    });
   });
 }
 
@@ -869,6 +982,8 @@ async function main() {
   let chrome;
   let cdp;
   try {
+    startWatchdog();
+    setStep('main: start smoke flow');
     await waitForHttp(url);
     const chromePath = await findChrome();
     const debugPort = port + 1000;
@@ -2286,6 +2401,7 @@ async function main() {
     };
     console.log(JSON.stringify(report, null, 2));
   } catch (error) {
+    console.error(`UI smoke failed at ${currentStep}; elapsed=${formatDuration(Date.now() - startedAt)}; ${error?.message ?? error}`);
     if (cdp) {
       try {
         await captureScreenshot(cdp, 'failure-debug');
@@ -2298,6 +2414,7 @@ async function main() {
     }
     throw error;
   } finally {
+    stopWatchdog();
     if (cdp) cdp.close();
     await stopChild(chrome);
     await stopChild(vite);

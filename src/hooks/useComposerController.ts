@@ -54,6 +54,7 @@ type UseComposerControllerOptions = {
   loadMeta: (folderId?: number | null) => Promise<LoadMetaResult>;
   refreshAll: () => Promise<void>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
+  setSendProgress?: (progress: number | null) => void;
 };
 
 export default function useComposerController({
@@ -71,6 +72,7 @@ export default function useComposerController({
   loadMeta,
   refreshAll,
   focusMailboxRole,
+  setSendProgress,
 }: UseComposerControllerOptions) {
   const COMPOSER_AUTOSAVE_DEBOUNCE_MS = 800;
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
@@ -195,6 +197,7 @@ export default function useComposerController({
     focusMailboxRole,
     refreshAll,
     loadMeta,
+    setSendProgress,
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {

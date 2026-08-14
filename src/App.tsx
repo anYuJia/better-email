@@ -153,6 +153,7 @@ export default function App() {
   const themeMode = useThemeMode();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
+  const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
@@ -775,6 +776,7 @@ export default function App() {
     loadMeta: (nextFolderId?: number | null) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     refreshAll,
     focusMailboxRole,
+    setSendProgress: setComposerSendProgress,
   });
 
   useEffect(() => {
@@ -1554,6 +1556,7 @@ export default function App() {
               onSendRiskConfirm={confirmSendRisk}
               onSendRiskCancel={() => setSendRiskConfirm(null)}
               sendRiskConfirm={sendRiskConfirm}
+              sendProgress={composerSendProgress}
               crossAccountRisks={crossAccountRisks}
             />
           </AppErrorBoundary>

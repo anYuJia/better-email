@@ -557,6 +557,9 @@
 .composer footer {
   min-height: 54px;
   padding: 0 11px 0 15px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .composer footer > span {
@@ -568,9 +571,30 @@
   white-space: nowrap;
 }
 
-.composer footer > div {
+.composer-footer-actions {
   flex: 0 0 auto;
+  display: flex;
   gap: 6px;
+}
+
+.composer-send-progress {
+  position: relative;
+  flex: 1 1 180px;
+  max-width: 220px;
+  min-width: 120px;
+  height: 5px;
+  border: 1px solid #dce2ea;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef2f7;
+}
+
+.composer-send-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ui-accent);
+  border-radius: inherit;
+  transition: width 0.25s ease;
 }
 
 @media (max-width: 720px) {
@@ -606,6 +630,10 @@
 
   .composer footer {
     justify-content: flex-end;
+  }
+
+  .composer footer .composer-send-progress {
+    display: none;
   }
 }
 
@@ -864,6 +892,9 @@
   border-top: 1px solid var(--ui-border);
   background: #fff;
   justify-content: space-between;
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .composer footer > span {
@@ -2131,6 +2162,11 @@
 
 :root[data-theme="dark"] .composer footer > span {
   color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer-send-progress {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
 }
 
 :root[data-theme="dark"] .composer-minimized {

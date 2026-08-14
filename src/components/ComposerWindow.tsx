@@ -76,6 +76,7 @@ export type ComposerWindowProps = {
   onSendRiskCancel: () => void;
   sendRiskConfirm: CrossAccountRiskItem[] | null;
   crossAccountRisks: CrossAccountRiskItem[];
+  sendProgress: number | null;
 };
 
 export default function ComposerWindow({
@@ -116,6 +117,7 @@ export default function ComposerWindow({
   onSendRiskCancel,
   sendRiskConfirm,
   crossAccountRisks,
+  sendProgress,
 }: ComposerWindowProps) {
   const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
   const dragRef = useRef<ComposerDragState | null>(null);
@@ -198,6 +200,8 @@ export default function ComposerWindow({
       </aside>
     );
   }
+
+  const normalizedSendProgress = sendProgress == null ? null : Math.max(0, Math.min(100, Math.round(sendProgress)));
 
   return (
     <div
@@ -296,11 +300,23 @@ export default function ComposerWindow({
         />
 
         <footer>
+          {normalizedSendProgress !== null && (
+            <div
+              className="composer-send-progress"
+              role="progressbar"
+              aria-label="发送进度"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={normalizedSendProgress}
+            >
+              <div className="composer-send-progress-fill" style={{ width: `${normalizedSendProgress}%` }} />
+            </div>
+          )}
           <span>
             {status}
             {autosave && !isDraftEmpty(draft) ? ` · 自动保存 ${formatDate(autosave.saved_at)}` : ''}
           </span>
-          <div>
+          <div className="composer-footer-actions">
             <button className="dialog-button dialog-button-secondary" onClick={onSaveDraft}>
               <Save size={14} />
               保存草稿

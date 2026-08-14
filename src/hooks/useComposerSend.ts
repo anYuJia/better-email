@@ -43,6 +43,7 @@ type ComposerSendOptions = {
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   loadMeta: (folderId?: number | null) => Promise<unknown>;
+  setSendProgress?: (progress: number | null) => void;
 };
 
 function composerFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -75,6 +76,7 @@ export default function useComposerSend({
   focusMailboxRole,
   refreshAll,
   loadMeta,
+  setSendProgress,
 }: ComposerSendOptions) {
   useEffect(() => {
     setQuickReplyBody('');
@@ -121,15 +123,18 @@ export default function useComposerSend({
         const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
         if (latest.status === 'running') {
           const percent = Number.isFinite(latest.progress) ? latest.progress : 0;
+          setSendProgress?.(percent);
           setStatus(`发送中：${latest.message || '处理中'}（${percent}%）`);
           return;
         }
         stopPolling();
+        setSendProgress?.(null);
         if (latest.message) {
           setStatus(`发送完成：${latest.message}`);
         }
       } catch {
         stopPolling();
+        setSendProgress?.(null);
       }
     };
 
@@ -144,6 +149,7 @@ export default function useComposerSend({
       });
       taskId = task.id;
       await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId });
+      setSendProgress?.(Number.isFinite(task.progress) ? task.progress : 0);
       setStatus(`发送中：${task.message || '处理中'}（${task.progress || 0}%）`);
       pollTimer = window.setInterval(() => {
         syncProgress().catch(() => {
@@ -166,6 +172,7 @@ export default function useComposerSend({
     } catch (error) {
       const errorMessage = String(error);
       stopPolling();
+      setSendProgress?.(null);
       if (taskId) {
         try {
           const failedTask = await invoke<BackgroundTask>(IPC.FailBackgroundTask, {
@@ -184,7 +191,7 @@ export default function useComposerSend({
       await options.onFailure(errorMessage);
       return;
     }
-  }, [setStatus]);
+  }, [setStatus, setSendProgress]);
 
   const sendDraft = useCallback(async () => {
     if (!draft.to.trim()) {

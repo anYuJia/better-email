@@ -560,7 +560,6 @@ body {
 
 .context-menu,
 .context-submenu,
-.compact-menu > div,
 .search-options-menu > div,
 .search-scope-menu > div {
   border-color: var(--ui-border);

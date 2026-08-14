@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 1.0.23
+- 样式体系收口：App 仅通过 `ui-2026.css` 统一注入，避免 `styles.css` 与 `ui-2026.css` 的并行基础样式叠加。
+- `ui-2026.css` 重新整合基础模块：补齐下拉、窗口边框、共享对话框与设计令牌依赖，减少样式覆盖链与重复加载风险。
+- 发件流程的进度展示统一收敛为 `sendProgress` 单向状态，发送状态文案与进度条联动更稳定。
+
 ### 1.0.18
 - 修复 `npm run test:ui` 在 Linux CI 上因 Node/WebSocket 环境导致 `WebSocket` 不可用导致的 `ReferenceError`。
 - 侧边栏同步与发件箱发送任务并行显示，支持 `outbox-smtp` 的运行/排队进度。

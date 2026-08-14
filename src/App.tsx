@@ -7,7 +7,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import './styles.css';
 import Sidebar from './components/Sidebar';
 import WindowChrome from './components/WindowChrome';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';

@@ -73,3 +73,95 @@
   min-height: 31px;
   font-size: 12.5px;
 }
+
+/* Keep folder controls tidy while preserving discoverability on hover/focus. */
+.saved-search-row {
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+}
+
+.saved-search-row > .row-more-button,
+.folder-actions button {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-tertiary, #6b7280);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  opacity: 0;
+  transition: var(--ui-transition-fast-opacity-color-bg);
+}
+
+.saved-search-row:hover > .row-more-button,
+.saved-search-row:focus-within > .row-more-button,
+.folder:hover .folder-actions button,
+.folder:focus-within .folder-actions button {
+  opacity: 1;
+}
+
+.saved-search-row > .row-more-button:hover,
+.folder-actions button:hover {
+  color: var(--ui-text, #111827);
+  background: rgba(31, 41, 55, 0.07);
+}
+
+.folder-actions {
+  padding-right: 4px;
+}
+
+.label-row {
+  display: block;
+}
+
+.label-row .label-row-main {
+  width: 100%;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.label-row .label-row-main:hover,
+.label-row .label-row-main:focus-visible {
+  background: rgba(31, 41, 55, 0.055);
+  outline: none;
+}
+
+.label-row .label-row-main strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-row .label-row-main em {
+  font-style: normal;
+}
+
+.folder.message-drop-target .folder-name svg {
+  color: #0073d8;
+}
+
+.sidebar-quick-menus .more-mailboxes {
+  overflow: hidden;
+}
+
+@media (hover: none) {
+  .saved-search-row > .row-more-button,
+  .folder-actions button {
+    opacity: 1;
+  }
+}

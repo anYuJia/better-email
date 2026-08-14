@@ -557,17 +557,6 @@ body {
   border-top: 1px solid var(--ui-border);
 }
 
-.context-menu,
-.context-submenu {
-  border-color: var(--ui-border);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: var(--ui-shadow-popover);
-  backdrop-filter: none;
-  transition: var(--ui-transition-transform-200-opacity-emphasized);
-  will-change: transform, opacity;
-}
-
 .context-menu.account-switcher-menu {
   width: min(238px, calc(100vw - 16px));
   padding: 4px;

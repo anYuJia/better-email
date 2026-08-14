@@ -180,7 +180,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .context-menu {
-    animation: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
+    animation: var(--ui-animation-context-menu-enter);
     transform-origin: top left;
   }
 

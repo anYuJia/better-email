@@ -195,6 +195,12 @@
   --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-glance) ease-out both;
   --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
   --ui-animation-fill-backwards: backwards;
+  --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-animation-settings-backdrop-fade: settings-backdrop-fade var(--ui-motion-standard) ease-out both;
+  --ui-animation-settings-modal-pop: settings-modal-pop var(--ui-motion-220) var(--ui-ease-emphasized) both;
+  --ui-animation-settings-floating-bar-slide: settings-floating-bar-slide var(--ui-motion-slow) var(--ui-ease-emphasized) both;
+  --ui-animation-settings-dot-pulse: settings-dot-pulse var(--ui-motion-1800) linear infinite;
+  --ui-animation-settings-page-enter: settings-page-enter var(--ui-motion-compact) ease-out both;
   --ui-box-shadow-none: none;
   /* Current UI aliases. Retain during migration from the pre-2026 layer. */
   --ui-bg: var(--color-canvas);

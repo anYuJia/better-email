@@ -86,7 +86,7 @@ export default function MessageListView({
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
-  const itemNodeRefs = useRef<Map<string, HTMLDivElement | HTMLHeadingElement | null>>(new Map());
+  const itemNodeRefs = useRef<Map<string, HTMLElement | null>>(new Map());
 
   const newIds = useMemo(() => {
     const set = new Set<number>();

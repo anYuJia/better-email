@@ -1,4 +1,10 @@
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import {
   emptyDraft,
   isDraftEmpty,
@@ -78,6 +84,23 @@ export default function useComposerSend({
   loadMeta,
   setSendProgress,
 }: ComposerSendOptions) {
+  const lastSendProgressRef = useRef<number | null>(null);
+
+  const reportSendProgress = (progress: number | null) => {
+    if (progress == null) {
+      if (lastSendProgressRef.current == null) return;
+      lastSendProgressRef.current = null;
+      setSendProgress?.(null);
+      return;
+    }
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
+    if (clamped === lastSendProgressRef.current) {
+      return;
+    }
+    lastSendProgressRef.current = clamped;
+    setSendProgress?.(clamped);
+  };
+
   useEffect(() => {
     setQuickReplyBody('');
   }, [selectedId]);
@@ -123,18 +146,18 @@ export default function useComposerSend({
         const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
         if (latest.status === 'running') {
           const percent = Number.isFinite(latest.progress) ? latest.progress : 0;
-          setSendProgress?.(percent);
+          reportSendProgress(percent);
           setStatus(`发送中：${latest.message || '处理中'}（${percent}%）`);
           return;
         }
         stopPolling();
-        setSendProgress?.(null);
+        reportSendProgress(null);
         if (latest.message) {
           setStatus(`发送完成：${latest.message}`);
         }
       } catch {
         stopPolling();
-        setSendProgress?.(null);
+        reportSendProgress(null);
       }
     };
 
@@ -149,7 +172,7 @@ export default function useComposerSend({
       });
       taskId = task.id;
       await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId });
-      setSendProgress?.(Number.isFinite(task.progress) ? task.progress : 0);
+      reportSendProgress(Number.isFinite(task.progress) ? task.progress : 0);
       setStatus(`发送中：${task.message || '处理中'}（${task.progress || 0}%）`);
       pollTimer = window.setInterval(() => {
         syncProgress().catch(() => {
@@ -172,7 +195,7 @@ export default function useComposerSend({
     } catch (error) {
       const errorMessage = String(error);
       stopPolling();
-      setSendProgress?.(null);
+      reportSendProgress(null);
       if (taskId) {
         try {
           const failedTask = await invoke<BackgroundTask>(IPC.FailBackgroundTask, {

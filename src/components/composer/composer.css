@@ -554,23 +554,6 @@
   gap: 6px;
 }
 
-.composer footer {
-  min-height: 54px;
-  padding: 0 11px 0 15px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.composer footer > span {
-  min-width: 0;
-  overflow: hidden;
-  color: #8b949f;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .composer-footer-actions {
   flex: 0 0 auto;
   display: flex;
@@ -903,6 +886,7 @@
   max-width: 360px;
   overflow: hidden;
   color: var(--ui-text-tertiary);
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2158,6 +2142,7 @@
 
 :root[data-theme="dark"] .composer footer {
   border-top-color: var(--ui-border);
+  background: var(--ui-surface);
 }
 
 :root[data-theme="dark"] .composer footer > span {

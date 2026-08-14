@@ -204,6 +204,7 @@ export default function useComposerController({
     setComposerContextAccountId(null);
     setSendRiskConfirm(null);
     setRichComposer(true);
+    setSendProgress?.(null);
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
@@ -212,7 +213,7 @@ export default function useComposerController({
     }
     setComposerMinimized(false);
     setComposerOpen(true);
-  }, [draft, composerAutosave, setStatus]);
+  }, [draft, composerAutosave, setStatus, setSendProgress]);
   const {
     composeFromMessage: rawComposeFromMessage,
     editDraftMessage: rawEditDraftMessage,
@@ -265,17 +266,21 @@ export default function useComposerController({
       to: contact.email,
     });
     setStatus(`正在给 ${contact.name || contact.email} 写邮件`);
-  }  function closeComposer() {
+  }
+
+  function closeComposer() {
     if (!isDraftEmpty(draft)) {
       setComposerCloseConfirmOpen(true);
       return;
     }
+    setSendProgress?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     cleanupTempAttachments();
   }
 
   function forceCloseComposer() {
+    setSendProgress?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     setComposerCloseConfirmOpen(false);

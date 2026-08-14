@@ -2,6 +2,19 @@
   position: relative;
 }
 
+.compact-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.compact-menu summary::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-right: 1.7px solid currentColor;
+  border-bottom: 1.7px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+}
+
 .compact-menu[open] {
   z-index: 40;
 }

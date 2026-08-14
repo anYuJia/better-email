@@ -382,10 +382,6 @@ body {
   background: var(--ui-list);
 }
 
-.message-date-section + .message-date-section {
-  border-top: 1px solid var(--ui-border);
-}
-
 .message-date-header {
   min-height: 25px;
   padding: 6px 12px 4px;

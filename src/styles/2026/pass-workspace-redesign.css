@@ -417,27 +417,12 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .list-control-actions > button,
-.app-shell .list-control-actions .compact-menu summary {
-  min-height: 29px;
-  padding-inline: 8px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.app-shell .list-control-actions > button:hover,
-.app-shell .list-control-actions .compact-menu summary:hover {
+.app-shell .list-control-actions > button:hover {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
 
-.app-shell .list-control-actions > button.active,
-.app-shell .list-control-actions .compact-menu summary.active {
+.app-shell .list-control-actions > button.active {
   color: var(--ui-text);
   background: var(--workspace-control-active);
   box-shadow: var(--ui-box-shadow-none);

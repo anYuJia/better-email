@@ -63,11 +63,30 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.list-control-actions > button.active,
-.list-control-actions .compact-menu summary.active {
+.app-shell .list-control-actions > button,
+.app-shell .list-control-actions .compact-menu summary {
+  min-height: 29px;
+  padding-inline: 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app-shell .list-control-actions > button:hover,
+.app-shell .list-control-actions .compact-menu summary:hover {
   color: var(--ui-text);
-  background: var(--ui-surface);
-  box-shadow: var(--shadow-sm);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .list-control-actions > button.active,
+.app-shell .list-control-actions .compact-menu summary.active {
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .list-summary em {

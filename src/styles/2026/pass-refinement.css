@@ -364,8 +364,7 @@ body {
   background: transparent;
 }
 
-.list-control-actions > button,
-.list-control-actions .compact-menu summary {
+.list-control-actions > button {
   min-height: 28px;
   padding: 0 7px;
   border-radius: var(--ui-radius-control);

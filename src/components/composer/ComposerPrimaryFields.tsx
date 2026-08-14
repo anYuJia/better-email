@@ -221,7 +221,7 @@ export default function ComposerPrimaryFields({
     } else {
       editor.insertAdjacentHTML('beforeend', html);
     }
-    syncRichBodyFromEditor();
+    scheduleSyncRichBodyFromEditor();
   }
 
   async function handleRichBodyPaste(event: React.ClipboardEvent<HTMLDivElement>) {

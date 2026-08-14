@@ -85,6 +85,7 @@ export default function useComposerController({
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
   const [sendRiskConfirm, setSendRiskConfirm] = useState<CrossAccountRiskItem[] | null>(null);
+  const pendingComposerAutosaveRef = useRef<string | null>(null);
   const {
     composeTemplates,
     setComposeTemplates,
@@ -362,12 +363,26 @@ export default function useComposerController({
       isRichComposer,
       saved_at: new Date().toISOString(),
     };
+    let nextAutosaveJson: string;
+    try {
+      nextAutosaveJson = JSON.stringify(autosave);
+    } catch {
+      return;
+    }
+    if (pendingComposerAutosaveRef.current === nextAutosaveJson) {
+      return;
+    }
     if (composerAutosaveTimerRef.current !== null) {
       window.clearTimeout(composerAutosaveTimerRef.current);
     }
     composerAutosaveTimerRef.current = window.setTimeout(() => {
-      window.localStorage.setItem(composerAutosaveStorageKey, JSON.stringify(autosave));
-      setComposerAutosave(autosave);
+      try {
+        window.localStorage.setItem(composerAutosaveStorageKey, nextAutosaveJson);
+        pendingComposerAutosaveRef.current = nextAutosaveJson;
+        setComposerAutosave(autosave);
+      } catch {
+        // Ignore autosave persistence failures to avoid blocking typing.
+      }
       composerAutosaveTimerRef.current = null;
     }, COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 

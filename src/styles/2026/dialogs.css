@@ -60,6 +60,17 @@
   will-change: transform, opacity;
 }
 
+.search-options-menu > div,
+.search-scope-menu > div {
+  border-color: var(--ui-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--ui-shadow-popover);
+  backdrop-filter: none;
+  transition: var(--ui-transition-transform-200-opacity-emphasized);
+  will-change: transform, opacity;
+}
+
 .compact-menu > div button {
   min-height: 34px;
   border-radius: 7px;

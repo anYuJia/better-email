@@ -559,9 +559,7 @@ body {
 }
 
 .context-menu,
-.context-submenu,
-.search-options-menu > div,
-.search-scope-menu > div {
+.context-submenu {
   border-color: var(--ui-border);
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.98);

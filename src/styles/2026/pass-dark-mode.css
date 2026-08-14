@@ -327,13 +327,19 @@
 }
 
 :root[data-theme="dark"] .bulk-toolbar button,
-:root[data-theme="dark"] .bulk-toolbar select {
+:root[data-theme="dark"] .bulk-toolbar select,
+:root[data-theme="dark"] .bulk-toolbar .compact-menu summary {
   background: rgba(255, 255, 255, 0.07);
   color: var(--ui-text-secondary);
   border-color: var(--ui-border);
 }
 
 :root[data-theme="dark"] .bulk-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .bulk-toolbar .compact-menu summary:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--ui-accent);
 }

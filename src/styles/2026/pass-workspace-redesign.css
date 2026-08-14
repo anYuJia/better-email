@@ -590,16 +590,14 @@
   box-shadow: var(--ui-shadow-popover);
 }
 
-.app-shell .bulk-toolbar button,
-.app-shell .bulk-toolbar .compact-menu summary {
+.app-shell .bulk-toolbar button {
   border-color: transparent;
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .bulk-toolbar button:hover:not(:disabled),
-.app-shell .bulk-toolbar .compact-menu summary:hover {
+.app-shell .bulk-toolbar button:hover:not(:disabled) {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }

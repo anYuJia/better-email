@@ -89,6 +89,20 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+.app-shell .bulk-toolbar button,
+.app-shell .bulk-toolbar .compact-menu summary {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar button:hover:not(:disabled),
+.app-shell .bulk-toolbar .compact-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
 .list-summary em {
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);

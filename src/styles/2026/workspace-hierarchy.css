@@ -80,6 +80,7 @@
 .app-shell .list-control-actions .compact-menu summary:hover {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
+  box-shadow: var(--quiet-row-shadow);
 }
 
 .app-shell .list-control-actions > button.active,

@@ -50,10 +50,7 @@ export default function useSingleMessageActions({
   onRequestSnooze,
   onRequestPermanentDelete,
 }: SingleMessageActionOptions) {
-  const selectedRef = React.useRef<MessageSummary | null>(null);
   const labelActionInFlightRef = React.useRef(new Set<string>());
-
-  selectedRef.current = selected;
 
   return React.useMemo(() => {
     const toggleRead = async (message: MessageSummary) => {
@@ -163,9 +160,7 @@ export default function useSingleMessageActions({
 
       const undoSnapshots = snapshotMessages([message]);
       try {
-        const latestLabels = selectedRef.current?.id === message.id
-          ? selectedRef.current.labels
-          : message.labels;
+        const latestLabels = message.labels;
         const hasLabel = latestLabels.includes(label.name);
         await toggleMessagesLabel([message], label, hasLabel);
         // 同步更新 selectedDetail 和 cache 中的 labels

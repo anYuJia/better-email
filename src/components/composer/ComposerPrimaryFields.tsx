@@ -159,16 +159,18 @@ export default function ComposerPrimaryFields({
     if (!editor) return;
     const hydrated = hydratedInlineSrcRef.current;
     const hydratedImages: Array<{ img: HTMLImageElement; cid: string }> = [];
-    editor.querySelectorAll<HTMLImageElement>('img[src]').forEach((img) => {
-      const src = img.getAttribute('src') ?? '';
-      for (const [cid, assetUrl] of hydrated) {
-        if (src === assetUrl) {
-          hydratedImages.push({ img, cid });
-          img.setAttribute('src', `cid:${cid}`);
-          break;
+    if (hydrated.size > 0) {
+      editor.querySelectorAll<HTMLImageElement>('img[src]').forEach((img) => {
+        const src = img.getAttribute('src') ?? '';
+        for (const [cid, assetUrl] of hydrated) {
+          if (src === assetUrl) {
+            hydratedImages.push({ img, cid });
+            img.setAttribute('src', `cid:${cid}`);
+            break;
+          }
         }
-      }
-    });
+      });
+    }
     const html = editor.innerHTML;
     const nextBody = joinEditableBody(editor.textContent ?? '', originalQuote);
     if (

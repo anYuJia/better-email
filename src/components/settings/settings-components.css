@@ -80,6 +80,115 @@
   line-height: 1.45;
 }
 
+.settings-modal .settings-preview-result {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-preview-result > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-modal .settings-preview-result > header svg {
+  flex: 0 0 auto;
+  color: var(--st-success);
+}
+
+.settings-modal .settings-preview-result > header span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  color: var(--st-text-secondary);
+}
+
+.settings-modal .settings-preview-result > header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-preview-result > header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-preview-result pre,
+.settings-modal .settings-sanitized-html-preview {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface);
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.settings-modal .settings-preview-result pre {
+  max-height: 120px;
+  overflow-wrap: anywhere;
+}
+
+.settings-modal .settings-sanitized-html-preview {
+  max-height: 180px;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-modal .settings-preview-result details {
+  padding: 8px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-modal .settings-preview-result summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--st-text);
+}
+
+.settings-modal .settings-sanitized-html-preview :is(p, ul, ol, blockquote, table) {
+  margin: 0 0 8px;
+}
+
+.settings-modal .settings-sanitized-html-preview p {
+  margin: 0;
+  color: #b7791f;
+  line-height: 1.4;
+}
+
+.settings-modal .settings-sanitized-html-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.settings-modal .settings-preview-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.settings-modal .settings-preview-metadata span,
+.settings-modal .settings-preview-metadata em {
+  border-radius: 999px;
+  background: var(--st-surface-subtle);
+  color: var(--st-text-secondary);
+  font-size: 12px;
+  font-style: normal;
+  padding: 4px 8px;
+}
+
 .settings-modal .st-section-body {
   display: grid;
   gap: 14px;

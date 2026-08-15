@@ -10,6 +10,10 @@
 - settings 页面样式收口：合并 OAuth/服务商卡片里的 `span/small/em` 重复文案规则到共享组件层，减少 settings pass 文件覆盖性冗余。
 - Composer 正文输入同步性能继续微调：`onInput` 改为传递事件快照而非重复读取内容，减少高频布局回读成本。
 
+### 1.0.36
+- settings 安全预览与通用预览样式继续收口：将 `settings-preview-result`、`settings-sanitized-html-preview`、`settings-preview-metadata` 等重复规则下沉到 `settings-components.css`，减少 settings-page 的重复样式体量。
+- composer 发送阶段新增“附件处理进度”联动：在发送任务中，当后端进度为附件读取/校验阶段时，附件进度条同时更新，发送中的进度反馈更清晰。
+
 ### 1.0.34
 - 样式系统收口再优化：移除已失效的 `styles.css` 与 `styles/2026/ui-stack.css` 入口壳，`ui-2026.css` 统一承接基础样式与 pass 栈导入。
 - 通知样式与主样式统一入口：`notifications.css` 迁移到 `ui-2026.css` 内，应用层不再维护单独样式补丁导入。

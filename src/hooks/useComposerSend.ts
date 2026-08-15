@@ -51,6 +51,7 @@ type ComposerSendOptions = {
   loadMeta: (folderId?: number | null) => Promise<unknown>;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
+  setAttachmentProgress?: (progress: number | null) => void;
 };
 
 function composerFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -85,9 +86,35 @@ export default function useComposerSend({
   loadMeta,
   setSendProgress,
   setSendProgressMessage,
+  setAttachmentProgress,
 }: ComposerSendOptions) {
   const lastSendProgressRef = useRef<number | null>(null);
   const lastSendProgressMessageRef = useRef<string | null>(null);
+  const lastAttachmentProgressRef = useRef<number | null>(null);
+
+  const reportAttachmentProgress = (progress: number | null) => {
+    if (progress == null) {
+      if (lastAttachmentProgressRef.current == null) return;
+      lastAttachmentProgressRef.current = null;
+      setAttachmentProgress?.(null);
+      return;
+    }
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
+    if (clamped === lastAttachmentProgressRef.current) {
+      return;
+    }
+    lastAttachmentProgressRef.current = clamped;
+    setAttachmentProgress?.(clamped);
+  };
+
+  const attachmentProgressMessagePattern = /\u8bfb\u53d6\u9644\u4ef6|\u9644\u4ef6\u5df2\u8bfb\u53d6|\u9644\u4ef6\u8bfb\u53d6\u5b8c\u6210|\u9644\u4ef6\u6821\u9a8c\u5931\u8d25|\u65e0\u9644\u4ef6\uff0c\u76f4\u63a5\u6784\u5efa MIME/;
+  const syncAttachmentProgressFromTask = (message: string | null, percent: number | null) => {
+    if (!message || !attachmentProgressMessagePattern.test(message)) {
+      reportAttachmentProgress(null);
+      return;
+    }
+    reportAttachmentProgress(percent);
+  };
 
   const reportSendProgress = (progress: number | null) => {
     if (progress == null) {
@@ -165,12 +192,14 @@ export default function useComposerSend({
           const normalizedMessage = `发送中：${latest.message || '处理中'}（${normalizedPercent}%）`;
           reportSendProgress(normalizedPercent);
           reportSendProgressMessage(normalizedMessage);
+          syncAttachmentProgressFromTask(latest.message, normalizedPercent);
           setStatus(normalizedMessage);
           return;
         }
         stopPolling();
         reportSendProgress(null);
         reportSendProgressMessage(null);
+        reportAttachmentProgress(null);
         if (latest.message) {
           setStatus(`发送完成：${latest.message}`);
         }
@@ -178,10 +207,12 @@ export default function useComposerSend({
         stopPolling();
         reportSendProgress(null);
         reportSendProgressMessage(null);
+        reportAttachmentProgress(null);
       }
     };
 
     try {
+      reportAttachmentProgress(null);
       setStatus('发送中：准备发送任务...');
       reportSendProgressMessage('发送中：准备发送任务...');
       const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, {
@@ -196,6 +227,7 @@ export default function useComposerSend({
       const initialPercent = Math.max(0, Math.min(100, Math.round(task.progress || 0)));
       const taskReadyMessage = `发送中：${task.message || '处理中'}（${initialPercent}%）`;
       reportSendProgress(initialPercent);
+      syncAttachmentProgressFromTask(task.message, initialPercent);
       setStatus(taskReadyMessage);
       reportSendProgressMessage(taskReadyMessage);
       pollTimer = window.setInterval(() => {
@@ -215,6 +247,7 @@ export default function useComposerSend({
       });
       stopPolling();
       reportSendProgressMessage('发送完成，正在跳转到已发送文件夹...');
+      reportAttachmentProgress(null);
       await options.onSuccess(messageId);
       return;
     } catch (error) {
@@ -222,6 +255,7 @@ export default function useComposerSend({
       stopPolling();
       reportSendProgress(null);
       reportSendProgressMessage(null);
+      reportAttachmentProgress(null);
       if (taskId) {
         try {
           const failedTask = await invoke<BackgroundTask>(IPC.FailBackgroundTask, {
@@ -240,7 +274,7 @@ export default function useComposerSend({
       await options.onFailure(errorMessage);
       return;
     }
-  }, [setStatus, setSendProgress, setSendProgressMessage]);
+  }, [setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
 
   const sendDraft = useCallback(async () => {
     if (!draft.to.trim()) {

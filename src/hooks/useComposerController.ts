@@ -205,6 +205,7 @@ export default function useComposerController({
     loadMeta,
     setSendProgress,
     setSendProgressMessage,
+    setAttachmentProgress,
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {

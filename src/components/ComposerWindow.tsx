@@ -207,6 +207,11 @@ export default function ComposerWindow({
 
   const normalizedSendProgress = sendProgress == null ? null : Math.max(0, Math.min(100, Math.round(sendProgress)));
   const normalizedAttachmentProgress = attachmentProgress == null ? null : Math.max(0, Math.min(100, Math.round(attachmentProgress)));
+  const attachmentProgressMessage = sendProgressMessage && /\u9644\u4ef6/.test(sendProgressMessage)
+    ? sendProgressMessage
+    : normalizedAttachmentProgress == null
+      ? ''
+      : `附件处理中（${normalizedAttachmentProgress}%）`;
 
   return (
     <div
@@ -318,7 +323,9 @@ export default function ComposerWindow({
                 >
                   <div className="composer-attachment-progress-fill" style={{ width: `${normalizedAttachmentProgress}%` }} />
                 </div>
-                <div className="composer-attachment-progress-message">附件导入中...</div>
+                <div className="composer-attachment-progress-message" title={attachmentProgressMessage}>
+                  {attachmentProgressMessage}
+                </div>
               </div>
             )}
             {normalizedSendProgress !== null && (

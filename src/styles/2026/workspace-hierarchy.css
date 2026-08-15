@@ -57,6 +57,15 @@
   backdrop-filter: none;
 }
 
+.app-shell .list-control-actions {
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--workspace-control);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
 .list-control-actions {
   border-color: transparent;
   background: var(--ui-surface-muted);
@@ -102,6 +111,15 @@
 .app-shell .bulk-toolbar .compact-menu summary:hover {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
+}
+
+.app-shell .bulk-toolbar {
+  min-height: 40px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .list-summary em {

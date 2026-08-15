@@ -408,15 +408,6 @@
   font-weight: 600;
 }
 
-.app-shell .list-control-actions {
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--workspace-control);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
 .app-shell .message-date-header {
   min-height: 30px;
   padding: 9px 14px 4px;
@@ -568,15 +559,6 @@
   border-color: transparent !important;
   background: var(--quiet-row-selected) !important;
   box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-.app-shell .bulk-toolbar {
-  min-height: 40px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  color: var(--ui-text);
-  background: var(--workspace-control-active);
-  box-shadow: var(--ui-shadow-popover);
 }
 
 .app-shell .message-list-footer {

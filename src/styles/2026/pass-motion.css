@@ -63,7 +63,6 @@
 .icon-button:hover,
 .reader-actions button:hover,
 .reader-actions .reader-more-menu summary:hover,
-.list-control-actions > button:hover,
 .sidebar-footer-actions .settings-button:hover,
 .settings-button:hover {
   box-shadow: var(--quiet-row-shadow);

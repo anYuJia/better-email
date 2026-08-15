@@ -306,10 +306,7 @@ body {
   color: #8a939f;
 }
 
-.icon-button,
-.reader-actions button,
-.reader-actions .reader-more-menu summary,
-.reader-actions select {
+.icon-button {
   width: 32px;
   height: 32px;
   min-height: 32px;
@@ -322,10 +319,7 @@ body {
   font-weight: 560;
 }
 
-.icon-button:hover,
-.reader-actions button:hover,
-.reader-actions .reader-more-menu summary:hover,
-.reader-actions select:hover {
+.icon-button:hover {
   border-color: var(--ui-border);
   color: var(--ui-text);
   background: var(--quiet-row-hover);
@@ -486,19 +480,6 @@ body {
 
 .reader-actions {
   gap: 3px;
-}
-
-.reader-actions .primary-action {
-  min-width: 68px;
-  border-color: var(--ui-border);
-  color: var(--ui-accent);
-  background: transparent;
-  font-weight: 650;
-}
-
-.reader-actions .primary-action:hover {
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
 }
 
 .reader-meta,

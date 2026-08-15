@@ -1,5 +1,7 @@
 /* Notifications: keep undo visible, move routine status to screen readers only. */
-:root {
+/* Keep notification primitives local to the notification layer to avoid global token bleed. */
+.snackbar-stack,
+.message-toast-stack {
   --notification-inline-action-height: 26px;
   --notification-inline-action-radius: 7px;
   --notification-inline-action-padding-x: 10px;

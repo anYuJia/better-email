@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 1.0.37
+- CSS 入口清理：删除未被任何样式入口引用的 `src/styles/2026/dialogs.css`、`src/styles/2026/global.css`、`src/styles/2026/layout.css`、`src/styles/2026/responsive.css`、`src/styles/2026/sidebar.css`、`src/styles/reader.css`，降低样式层级混乱和维护冗余。
+- 保持 settings/发送链路优化不变：延续 1.0.36 的附件进度联动与预览样式收口，并继续收紧发布版本号。
+
 ### 1.0.35
 - settings 页面样式收口：合并 OAuth/服务商卡片里的 `span/small/em` 重复文案规则到共享组件层，减少 settings pass 文件覆盖性冗余。
 - Composer 正文输入同步性能继续微调：`onInput` 改为传递事件快照而非重复读取内容，减少高频布局回读成本。

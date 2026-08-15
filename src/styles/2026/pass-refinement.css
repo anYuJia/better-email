@@ -356,26 +356,6 @@ body {
   font-weight: 560;
 }
 
-.list-control-actions {
-  padding: 0;
-  gap: 1px;
-  border: 0;
-  border-radius: var(--ui-radius-control);
-  background: transparent;
-}
-
-.list-control-actions > button {
-  min-height: 28px;
-  padding: 0 7px;
-  border-radius: var(--ui-radius-control);
-  font-size: 11px;
-}
-
-.bulk-toolbar {
-  min-height: 38px;
-  background: #f7f9fb;
-}
-
 .message-list,
 .thread-list {
   background: var(--ui-list);

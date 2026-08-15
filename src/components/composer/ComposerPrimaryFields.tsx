@@ -154,7 +154,7 @@ export default function ComposerPrimaryFields({
     };
   }, [richComposer, draft.html_body, draft.attachments]);
 
-  const syncRichBodyFromEditor = useCallback(() => {
+  const syncRichBodyFromEditor = useCallback((nextTextContent?: string, nextHtml?: string) => {
     const editor = richBodyRef.current;
     if (!editor) return;
     const hydrated = hydratedInlineSrcRef.current;
@@ -171,8 +171,8 @@ export default function ComposerPrimaryFields({
         }
       });
     }
-    const html = editor.innerHTML;
-    const nextBody = joinEditableBody(editor.textContent ?? '', originalQuote);
+    const html = nextHtml ?? editor.innerHTML;
+    const nextBody = joinEditableBody(nextTextContent ?? editor.textContent ?? '', originalQuote);
     if (
       syncedBodyRef.current.body === nextBody &&
       syncedBodyRef.current.html === html
@@ -193,13 +193,13 @@ export default function ComposerPrimaryFields({
     });
   }, [onPatchDraft, originalQuote]);
 
-  const scheduleSyncRichBodyFromEditor = useCallback(() => {
+  const scheduleSyncRichBodyFromEditor = useCallback((nextTextContent?: string, nextHtml?: string) => {
     if (richBodySyncFrameRef.current !== null) {
       cancelAnimationFrame(richBodySyncFrameRef.current);
     }
     richBodySyncFrameRef.current = requestAnimationFrame(() => {
       richBodySyncFrameRef.current = null;
-      syncRichBodyFromEditor();
+      syncRichBodyFromEditor(nextTextContent, nextHtml);
     });
   }, [syncRichBodyFromEditor]);
 
@@ -262,8 +262,9 @@ export default function ComposerPrimaryFields({
     }
   }
 
-  function handleRichBodyInput() {
-    scheduleSyncRichBodyFromEditor();
+  function handleRichBodyInput(event: React.FormEvent<HTMLDivElement>) {
+    const editor = event.currentTarget;
+    scheduleSyncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
   }
 
   useEffect(() => () => {

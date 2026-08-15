@@ -73,6 +73,13 @@
   min-width: 0;
 }
 
+.settings-modal :is(.settings-provider-matrix > button, .settings-oauth-result, .settings-oauth-sessions) :is(span, small, em) {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-style: normal;
+  line-height: 1.45;
+}
+
 .settings-modal .st-section-body {
   display: grid;
   gap: 14px;

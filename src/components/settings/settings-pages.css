@@ -1018,15 +1018,6 @@
   font-weight: 580;
 }
 
-.settings-modal .settings-provider-matrix > button span,
-.settings-modal .settings-provider-matrix > button small,
-.settings-modal .settings-provider-matrix > button em {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-style: normal;
-  line-height: 1.45;
-}
-
 /* --- Provider advanced (details disclosure) --- */
 .settings-modal .settings-provider-advanced {
   width: 100%;
@@ -1318,14 +1309,6 @@
   color: var(--st-text);
   font-size: var(--st-font-size-body);
   font-weight: 580;
-}
-
-.settings-modal .settings-oauth-result span,
-.settings-modal .settings-oauth-result small,
-.settings-modal .settings-oauth-result em {
-  color: var(--st-text-secondary);
-   font-size: var(--st-font-size-secondary);
-   font-style: normal;
 }
 
 /* =====================================================================

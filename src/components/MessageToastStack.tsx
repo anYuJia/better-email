@@ -94,7 +94,7 @@ export default function MessageToastStack({
             className="message-toast-progress"
             style={{
               '--ui-animation-send-undo-progress-duration': `${renderedUndo.delaySeconds}s`,
-            }}
+            } as React.CSSProperties}
             aria-hidden="true"
           />
         </section>

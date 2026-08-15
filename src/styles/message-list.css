@@ -1,9 +1,7 @@
-@import './2026/message-list.css';
-
-/* Legacy compatibility layer for message-list markup that is still emitted by
-   older components and tests. The runtime source of truth is now
-   src/styles/2026/message-list.css; this file only keeps the remaining class
-   rules that are not yet covered there. */
+/* Compatibility-only message list overrides.
+ * This file keeps legacy-compatible classes that are intentionally
+ * expressed separately from the main 2026 message-list pipeline.
+ */
 .bulk-toolbar {
   min-height: 38px;
   display: flex;

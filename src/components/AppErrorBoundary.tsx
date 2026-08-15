@@ -3,6 +3,12 @@ import { logError } from '../app/logger';
 
 type AppErrorBoundaryProps = {
   children: React.ReactNode;
+  title?: string;
+  description?: string;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  onPrimaryAction?: () => void;
+  onSecondaryAction?: () => void;
 };
 
 type AppErrorBoundaryState = {
@@ -53,19 +59,38 @@ export default class AppErrorBoundary extends React.Component<
     window.location.reload();
   };
 
+  handlePrimaryAction = () => {
+    this.reset();
+    this.props.onPrimaryAction?.();
+  };
+
+  handleSecondaryAction = () => {
+    if (this.props.onSecondaryAction) {
+      this.props.onSecondaryAction();
+      return;
+    }
+    this.reload();
+  };
+
   render() {
-    const { error, errorInfo } = this.state;
+    const {
+      error,
+      errorInfo,
+    } = this.state;
+    const {
+      title = '界面没有崩掉，我们先把它接住了',
+      description = '当前视图渲染失败，但本地数据没有被清空。你可以先重试当前界面；\n            如果仍然失败，再刷新应用。',
+      primaryLabel = '重试界面',
+      secondaryLabel = '刷新应用',
+    } = this.props;
     if (!error) return this.props.children;
 
     return (
       <main className="app-error-boundary" role="alert" aria-live="assertive">
         <section className="app-error-card">
           <p className="app-error-eyebrow">Better Email 遇到一个界面错误</p>
-          <h1>界面没有崩掉，我们先把它接住了</h1>
-          <p>
-            当前视图渲染失败，但本地数据没有被清空。你可以先重试当前界面；
-            如果仍然失败，再刷新应用。
-          </p>
+          <h1>{title}</h1>
+          <p>{description}</p>
           <pre>{errorSummary(error)}</pre>
           {errorInfo?.componentStack ? (
             <details>
@@ -74,9 +99,11 @@ export default class AppErrorBoundary extends React.Component<
             </details>
           ) : null}
           <div className="app-error-actions">
-            <button type="button" onClick={this.reset}>重试界面</button>
-            <button type="button" className="secondary" onClick={this.reload}>
-              刷新应用
+            <button type="button" onClick={this.handlePrimaryAction}>
+              {primaryLabel}
+            </button>
+            <button type="button" className="secondary" onClick={this.handleSecondaryAction}>
+              {secondaryLabel}
             </button>
           </div>
         </section>

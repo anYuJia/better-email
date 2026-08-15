@@ -1,13 +1,56 @@
 @import './design-tokens.css';
+
+/* Base */
 @import './styles/global.css';
 @import './styles/layout.css';
 @import './styles/sidebar.css';
-@import './styles/message-list.css';
 @import './styles/dialogs.css';
 @import './styles/responsive.css';
 @import './styles/dropdowns.css';
 @import './styles/window-chrome.css';
 @import './styles/shared-motion.css';
 @import './styles/shared-dialogs.css';
-@import './styles/2026/pass-stylesheet-stack.css';
+
+/* Reader and shared overlays */
+@import './styles/2026/reader.css';
+@import './styles/2026/overlay.css';
+
+/* Message list / thread refinements */
+@import './styles/2026/pass-refinement.css';
+@import './styles/2026/message-list.css';
+@import './styles/2026/message-list-typography.css';
+@import './styles/2026/pass-message-list-density.css';
+@import './styles/2026/pass-message-list-final.css';
+@import './styles/2026/pass-message-list-rounded.css';
+@import './styles/2026/pass-message-attachment.css';
+@import './styles/2026/pass-thread-list.css';
+@import './styles/2026/pass-skeleton.css';
+@import './styles/2026/workspace-hierarchy.css';
+
+/* Sidebar and composer interaction passes */
+@import './styles/2026/pass-sidebar-deai.css';
+@import './styles/2026/pass-sidebar-density.css';
+@import './styles/2026/pass-sidebar-clarity.css';
+@import './styles/2026/pass-sidebar-selection.css';
+@import './styles/2026/pass-search-suggestions.css';
+@import './styles/2026/pass-folder-icons.css';
+
+/* Reader, compose and workflow passes */
+@import './styles/2026/pass-reader-quick-reply.css';
+@import './styles/2026/pass-plain-text-mail.css';
+@import './styles/2026/pass-reader-fade.css';
+@import './styles/2026/pass-avatar-hardening.css';
+@import './styles/2026/pass-premium-refinements.css';
+@import './styles/2026/pass-workspace-redesign.css';
+@import './styles/2026/pass-interaction-fixes.css';
+@import './styles/2026/pass-dark-mode.css';
+@import './styles/2026/pass-text-selection.css';
+
+/* Motion / transitions */
+@import './styles/2026/pass-motion.css';
+@import './styles/2026/pass-transitions.css';
+@import './styles/2026/pass-micro-interactions.css';
+
+/* Compatibility and component layers */
+@import './styles/message-list.css';
 @import './components/notifications.css';

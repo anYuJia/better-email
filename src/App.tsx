@@ -1583,227 +1583,238 @@ export default function App() {
       )}
 
       {!isAccountLoginActive && isSettingsOpen && (
-        <SettingsOverlay
-          accountForm={accountForm}
-          accounts={accounts}
-          newAccountForm={newAccountForm}
-          themeMode={themeMode.mode}
-          onThemeModeChange={themeMode.setMode}
-          activeSettingsSection={activeSettingsSection}
-          accountSettingsDirty={accountSettingsDirty}
-          accountSettingsSaving={accountSettingsSaving}
-          saveAndVerifyRunning={saveAndVerifyRunning}
-          saveAndVerifyReport={saveAndVerifyReport}
-          providerVerifications={providerVerifications}
-          activeProviderVerification={activeProviderVerification}
-          oauthClientId={oauthClientId}
-          oauthClientSecret={oauthClientSecret}
-          oauthRedirectUri={oauthRedirectUri}
-          oauthCallbackState={oauthCallbackState}
-          oauthCallbackCode={oauthCallbackCode}
-          oauthReport={oauthReport}
-          oauthCallbackReport={oauthCallbackReport}
-          oauthExchangeReport={oauthExchangeReport}
-          oauthRefreshReport={oauthRefreshReport}
-          oauthSessions={oauthSessions}
-          authTypeChanged={authTypeChanged}
-          authTypeChangeNotice={authTypeChangeNotice}
-          connectionReport={connectionReport}
-          credentialVerification={credentialVerification}
-          providerValidationReport={providerValidationReport}
-          providerValidationRunning={providerValidationRunning}
-          credentialSecret={credentialSecret}
-          credentialStatus={credentialStatus}
-          notificationPolicy={notificationPolicy}
-          sendUndoDelaySeconds={sendUndoDelaySeconds}
-          remoteImageTrusts={remoteImageTrusts}
-          identities={identities}
-          identityForm={identityForm}
-          diagnosticExport={diagnosticExport}
-          localBackupSummary={localBackupSummary}
-          storageUsage={storageUsage}
-          storageBusy={storageBusy}
-          appSettings={appSettings}
-          downloadDirBusy={downloadDirBusy}
-          downloadDirError={downloadDirError}
-          imapProbe={imapProbe}
-          syncSchedulePlan={syncSchedulePlan}
-          imapMailboxes={imapMailboxes}
-          folders={folders}
-          outbox={outbox}
-          labels={labels}
-          rules={rules}
-          ruleForm={ruleForm}
-          ruleBuilderField={ruleBuilderField}
-          ruleBuilderNeedle={ruleBuilderNeedle}
-          editingRuleId={editingRuleId}
-          rawMessage={rawMessage}
-          parsedPreview={parsedPreview}
-          contactForm={contactForm}
-          contactFormAliases={contactFormAliases}
-          contacts={managedContacts}
-          editingContactId={editingContactId}
-          contactEditName={contactEditName}
-          contactEditAliases={contactEditAliases}
-          contactTransferBusy={contactTransferBusy}
-          providerWriteValidationStatus={providerWriteValidationStatus}
-          providerWriteValidationLoading={providerWriteValidationLoading}
-          providerWritebackValidationProgress={providerWritebackValidationProgress}
-          setStatus={setStatus}
-          onNavigate={scrollSettingsSection}
-          onClose={() => {
+        <AppErrorBoundary
+          title="设置界面渲染失败"
+          description="设置弹窗发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置界面回到主界面；如果问题持续，尝试刷新应用。"
+          primaryLabel="返回主视图"
+          secondaryLabel="刷新应用"
+          onPrimaryAction={() => {
             resetSaveAndVerifyReport();
             setSettingsOpen(false);
           }}
-          onTestConnection={() => {
-            if (!accountForm) {
-              setStatus('请先添加邮箱账号');
-              return;
-            }
-            testConnection().catch((error) => setStatus(String(error)));
-          }}
-          onSave={() => {
-            if (!accountForm) {
-              setStatus('请先添加邮箱账号');
-              return;
-            }
-            saveSettings()
-              .then((saved) => {
-                if (saved && selected && selected.account_id === saved.id) {
-                  renderSelectedWithRemoteImagePolicy(selected.id).catch(() => undefined);
-                }
-              })
-              .catch((error) => setStatus(String(error)));
-          }}
-          onSaveAndVerify={accountForm ? () => {
-            saveAndVerify().catch((error) => setStatus(String(error)));
-          } : undefined}
-          onAccountFormChange={setAccountForm}
-          onSelectAccount={(next) => {
-            setAccountForm(next);
-            invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: next.id })
-              .then(setRemoteImageTrusts)
-              .catch((error) => setStatus(String(error)));
-          }}
-          onNewAccountFormChange={setNewAccountForm}
-          onApplyProviderPreset={applyProviderPreset}
-          onApplyNewAccountPreset={applyNewAccountPreset}
-          onCreateNewAccount={async (secret, onProgress) => {
-            try {
-              await createNewAccount(secret, onProgress);
-            } catch (error) {
-              setStatus(String(error));
-              throw error;
-            }
-          }}
-          onRemoveAccount={(deleteSecret) => removeCurrentAccount(deleteSecret)}
-          onUpdateProviderVerification={updateProviderVerification}
-          onSaveProviderVerification={saveProviderVerification}
-          onSaveAccountSettings={async (updatedAccount) => {
-            const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
-              accountId: updatedAccount.id,
-              input: updatedAccount,
-            });
-            setAccount(updated);
-            setAccountForm(updated);
-            setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-            setStatus('账号配置已保存');
-          }}
-          onOauthClientIdChange={setOauthClientId}
-          onOauthClientSecretChange={setOauthClientSecret}
-          onOauthRedirectUriChange={setOauthRedirectUri}
-          onOauthCallbackStateChange={setOauthCallbackState}
-          onOauthCallbackCodeChange={setOauthCallbackCode}
-          onStartOAuth2Pkce={() => { startOAuth2Pkce().catch((error) => setStatus(String(error))); }}
-          onRefreshOAuth2Token={() => { refreshOAuth2Token().catch((error) => setStatus(String(error))); }}
-          onCompleteOAuth2Callback={() => { completeOAuth2Callback().catch((error) => setStatus(String(error))); }}
-          onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
-          onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
-          onCredentialSecretChange={setCredentialSecret}
-          onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
-          onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
-          onRunProviderValidation={() => {
-            runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
-          }}
-          onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
-          onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
-          onStoreAndVerifyCredential={() => {
-            storeAndVerifyCredential().catch((error) => setStatus(String(error)));
-          }}
-          onNotificationPolicyChange={setNotificationPolicy}
-          onSendUndoDelayChange={setSendUndoDelaySeconds}
-          onDeleteRemoteImageTrust={deleteRemoteImageTrust}
-          onIdentityFormChange={setIdentityForm}
-          onEditIdentity={editIdentity}
-          onDeleteIdentity={deleteIdentity}
-          onSaveIdentity={() => saveIdentity()}
-          onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
-          onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
-          onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
-          onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
-          onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
-          onRefreshStorage={() => refreshStorageUsage()}
-          onClearAttachmentCache={() => clearAttachmentCache()}
-          onPickDownloadDir={() => pickDownloadDir()}
-          onResetDownloadDir={() => resetDownloadDir()}
-          onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
-          onPrepareWriteValidation={prepareProviderWriteValidation}
-          onRefreshWriteValidation={() => {
-            refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
-          }}
-          onLocateWriteValidation={(role) => {
-            locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
-          }}
-          onRunWritebackValidationStep={(step) => {
-            runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
-          }}
-          onResetWritebackValidation={resetProviderWritebackValidation}
-          onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
-          onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
-          onMapImapMailbox={(mailbox, targetFolderId) => {
-            mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
-          }}
-          onCreateAndMapImapMailbox={(mailbox) => {
-            createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
-          }}
-          onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
-          onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
-          onContactFormChange={setContactForm}
-          onContactFormAliasesChange={setContactFormAliases}
-          filteredContacts={filteredContacts}
-          contactQuery={contactQuery}
-          onContactQueryChange={setContactQuery}
-          onCreateContact={createManagedContact}
-          onEditNameChange={setContactEditName}
-          onEditAliasesChange={setContactEditAliases}
-          onSaveContactOverride={async (contact) => {
-            try {
-              await saveContactOverride(contact);
-            } catch (error) {
-              setStatus(String(error));
-              throw error;
-            }
-          }}
-          onCancelEdit={() => setEditingContactId(null)}
-          onComposeToContact={composeToContact}
-          onStartEditContact={startEditContact}
-          onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
-          onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
-          onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
-          onRefreshContacts={refreshManagedContacts}
-          onStatus={setStatus}
-          onRuleFormChange={setRuleForm}
-          onRuleConditionFieldChange={updateRuleConditionField}
-          onRuleConditionValueChange={updateRuleConditionValue}
-          onRuleLabelActionChange={updateRuleLabelAction}
-          onToggleRuleAction={toggleRuleAction}
-          onSaveRule={saveRule}
-          onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
-          onEditRule={editRule}
-          onRemoveRule={(rule) => { removeRule(rule); }}
-          onRawMessageChange={setRawMessage}
-          onParseRawMessage={parseRawMessage}
-        />
+        >
+          <SettingsOverlay
+            accountForm={accountForm}
+            accounts={accounts}
+            newAccountForm={newAccountForm}
+            themeMode={themeMode.mode}
+            onThemeModeChange={themeMode.setMode}
+            activeSettingsSection={activeSettingsSection}
+            accountSettingsDirty={accountSettingsDirty}
+            accountSettingsSaving={accountSettingsSaving}
+            saveAndVerifyRunning={saveAndVerifyRunning}
+            saveAndVerifyReport={saveAndVerifyReport}
+            providerVerifications={providerVerifications}
+            activeProviderVerification={activeProviderVerification}
+            oauthClientId={oauthClientId}
+            oauthClientSecret={oauthClientSecret}
+            oauthRedirectUri={oauthRedirectUri}
+            oauthCallbackState={oauthCallbackState}
+            oauthCallbackCode={oauthCallbackCode}
+            oauthReport={oauthReport}
+            oauthCallbackReport={oauthCallbackReport}
+            oauthExchangeReport={oauthExchangeReport}
+            oauthRefreshReport={oauthRefreshReport}
+            oauthSessions={oauthSessions}
+            authTypeChanged={authTypeChanged}
+            authTypeChangeNotice={authTypeChangeNotice}
+            connectionReport={connectionReport}
+            credentialVerification={credentialVerification}
+            providerValidationReport={providerValidationReport}
+            providerValidationRunning={providerValidationRunning}
+            credentialSecret={credentialSecret}
+            credentialStatus={credentialStatus}
+            notificationPolicy={notificationPolicy}
+            sendUndoDelaySeconds={sendUndoDelaySeconds}
+            remoteImageTrusts={remoteImageTrusts}
+            identities={identities}
+            identityForm={identityForm}
+            diagnosticExport={diagnosticExport}
+            localBackupSummary={localBackupSummary}
+            storageUsage={storageUsage}
+            storageBusy={storageBusy}
+            appSettings={appSettings}
+            downloadDirBusy={downloadDirBusy}
+            downloadDirError={downloadDirError}
+            imapProbe={imapProbe}
+            syncSchedulePlan={syncSchedulePlan}
+            imapMailboxes={imapMailboxes}
+            folders={folders}
+            outbox={outbox}
+            labels={labels}
+            rules={rules}
+            ruleForm={ruleForm}
+            ruleBuilderField={ruleBuilderField}
+            ruleBuilderNeedle={ruleBuilderNeedle}
+            editingRuleId={editingRuleId}
+            rawMessage={rawMessage}
+            parsedPreview={parsedPreview}
+            contactForm={contactForm}
+            contactFormAliases={contactFormAliases}
+            contacts={managedContacts}
+            editingContactId={editingContactId}
+            contactEditName={contactEditName}
+            contactEditAliases={contactEditAliases}
+            contactTransferBusy={contactTransferBusy}
+            providerWriteValidationStatus={providerWriteValidationStatus}
+            providerWriteValidationLoading={providerWriteValidationLoading}
+            providerWritebackValidationProgress={providerWritebackValidationProgress}
+            setStatus={setStatus}
+            onNavigate={scrollSettingsSection}
+            onClose={() => {
+              resetSaveAndVerifyReport();
+              setSettingsOpen(false);
+            }}
+            onTestConnection={() => {
+              if (!accountForm) {
+                setStatus('请先添加邮箱账号');
+                return;
+              }
+              testConnection().catch((error) => setStatus(String(error)));
+            }}
+            onSave={() => {
+              if (!accountForm) {
+                setStatus('请先添加邮箱账号');
+                return;
+              }
+              saveSettings()
+                .then((saved) => {
+                  if (saved && selected && selected.account_id === saved.id) {
+                    renderSelectedWithRemoteImagePolicy(selected.id).catch(() => undefined);
+                  }
+                })
+                .catch((error) => setStatus(String(error)));
+            }}
+            onSaveAndVerify={accountForm ? () => {
+              saveAndVerify().catch((error) => setStatus(String(error)));
+            } : undefined}
+            onAccountFormChange={setAccountForm}
+            onSelectAccount={(next) => {
+              setAccountForm(next);
+              invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: next.id })
+                .then(setRemoteImageTrusts)
+                .catch((error) => setStatus(String(error)));
+            }}
+            onNewAccountFormChange={setNewAccountForm}
+            onApplyProviderPreset={applyProviderPreset}
+            onApplyNewAccountPreset={applyNewAccountPreset}
+            onCreateNewAccount={async (secret, onProgress) => {
+              try {
+                await createNewAccount(secret, onProgress);
+              } catch (error) {
+                setStatus(String(error));
+                throw error;
+              }
+            }}
+            onRemoveAccount={(deleteSecret) => removeCurrentAccount(deleteSecret)}
+            onUpdateProviderVerification={updateProviderVerification}
+            onSaveProviderVerification={saveProviderVerification}
+            onSaveAccountSettings={async (updatedAccount) => {
+              const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
+                accountId: updatedAccount.id,
+                input: updatedAccount,
+              });
+              setAccount(updated);
+              setAccountForm(updated);
+              setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+              setStatus('账号配置已保存');
+            }}
+            onOauthClientIdChange={setOauthClientId}
+            onOauthClientSecretChange={setOauthClientSecret}
+            onOauthRedirectUriChange={setOauthRedirectUri}
+            onOauthCallbackStateChange={setOauthCallbackState}
+            onOauthCallbackCodeChange={setOauthCallbackCode}
+            onStartOAuth2Pkce={() => { startOAuth2Pkce().catch((error) => setStatus(String(error))); }}
+            onRefreshOAuth2Token={() => { refreshOAuth2Token().catch((error) => setStatus(String(error))); }}
+            onCompleteOAuth2Callback={() => { completeOAuth2Callback().catch((error) => setStatus(String(error))); }}
+            onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
+            onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
+            onCredentialSecretChange={setCredentialSecret}
+            onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
+            onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
+            onRunProviderValidation={() => {
+              runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
+            }}
+            onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
+            onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
+            onStoreAndVerifyCredential={() => {
+              storeAndVerifyCredential().catch((error) => setStatus(String(error)));
+            }}
+            onNotificationPolicyChange={setNotificationPolicy}
+            onSendUndoDelayChange={setSendUndoDelaySeconds}
+            onDeleteRemoteImageTrust={deleteRemoteImageTrust}
+            onIdentityFormChange={setIdentityForm}
+            onEditIdentity={editIdentity}
+            onDeleteIdentity={deleteIdentity}
+            onSaveIdentity={() => saveIdentity()}
+            onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
+            onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
+            onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
+            onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
+            onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
+            onRefreshStorage={() => refreshStorageUsage()}
+            onClearAttachmentCache={() => clearAttachmentCache()}
+            onPickDownloadDir={() => pickDownloadDir()}
+            onResetDownloadDir={() => resetDownloadDir()}
+            onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
+            onPrepareWriteValidation={prepareProviderWriteValidation}
+            onRefreshWriteValidation={() => {
+              refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
+            }}
+            onLocateWriteValidation={(role) => {
+              locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
+            }}
+            onRunWritebackValidationStep={(step) => {
+              runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
+            }}
+            onResetWritebackValidation={resetProviderWritebackValidation}
+            onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
+            onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
+            onMapImapMailbox={(mailbox, targetFolderId) => {
+              mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
+            }}
+            onCreateAndMapImapMailbox={(mailbox) => {
+              createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
+            }}
+            onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
+            onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
+            onContactFormChange={setContactForm}
+            onContactFormAliasesChange={setContactFormAliases}
+            filteredContacts={filteredContacts}
+            contactQuery={contactQuery}
+            onContactQueryChange={setContactQuery}
+            onCreateContact={createManagedContact}
+            onEditNameChange={setContactEditName}
+            onEditAliasesChange={setContactEditAliases}
+            onSaveContactOverride={async (contact) => {
+              try {
+                await saveContactOverride(contact);
+              } catch (error) {
+                setStatus(String(error));
+                throw error;
+              }
+            }}
+            onCancelEdit={() => setEditingContactId(null)}
+            onComposeToContact={composeToContact}
+            onStartEditContact={startEditContact}
+            onToggleContactVip={(contact) => { toggleContactVip(contact).catch((error) => setStatus(String(error))); }}
+            onDeleteContact={(contact) => { setContactToDeleteFromHook(contact); }}
+            onExportContacts={() => { exportContactsVcard().catch((error) => setStatus(String(error))); }}
+            onRefreshContacts={refreshManagedContacts}
+            onStatus={setStatus}
+            onRuleFormChange={setRuleForm}
+            onRuleConditionFieldChange={updateRuleConditionField}
+            onRuleConditionValueChange={updateRuleConditionValue}
+            onRuleLabelActionChange={updateRuleLabelAction}
+            onToggleRuleAction={toggleRuleAction}
+            onSaveRule={saveRule}
+            onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
+            onEditRule={editRule}
+            onRemoveRule={(rule) => { removeRule(rule); }}
+            onRawMessageChange={setRawMessage}
+            onParseRawMessage={parseRawMessage}
+          />
+        </AppErrorBoundary>
       )}
       {!isAccountLoginActive && isShortcutsOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>

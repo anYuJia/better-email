@@ -302,6 +302,61 @@
   background: transparent;
 }
 
+.app-shell .reader-actions {
+  gap: 6px;
+}
+
+.app-shell .reader-action-group {
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--workspace-control);
+}
+
+.app-shell .reader-actions button,
+.app-shell .reader-actions .reader-more-menu summary,
+.app-shell .reader-actions select {
+  min-height: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .reader-actions button:hover:not(:disabled),
+.app-shell .reader-actions .reader-more-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .reader-actions .primary-action {
+  min-width: 66px;
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  font-weight: 650;
+}
+
+.app-shell .reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .reader-actions .reader-translate-action,
+.app-shell .reader-actions .reader-translate-action.active {
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.app-shell .reader-actions .reader-translate-action:hover:not(:disabled),
+.app-shell .reader-actions .reader-translate-action.active:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
 /* Attachment list: continuous reading stream */
 .attachment-section {
   margin: var(--ui-space-4) 0 var(--ui-space-5);

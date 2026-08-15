@@ -560,6 +560,13 @@
   gap: 6px;
 }
 
+.composer-footer-status {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .composer-send-progress {
   position: relative;
   width: 100%;
@@ -598,6 +605,56 @@
   transition: width 0.25s ease;
 }
 
+.composer-attachment-progress {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border: 1px solid #dce2ea;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef2f7;
+}
+
+.composer-attachment-progress-wrapper {
+  flex: 1 1 220px;
+  max-width: 220px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer-attachment-progress-message {
+  display: block;
+  max-width: 100%;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ui-accent);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.composer footer > span,
+.composer-footer-status > span {
+  display: block;
+  min-width: 0;
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .composer-backdrop {
     padding: 10px;
@@ -625,7 +682,10 @@
     grid-template-columns: 1fr;
   }
 
-  .composer footer > span {
+  .composer footer > span,
+  .composer .composer-footer-status > span,
+  .composer .composer-attachment-progress-wrapper,
+  .composer .composer-attachment-progress-message {
     display: none;
   }
 
@@ -633,12 +693,15 @@
     justify-content: flex-end;
   }
 
-  .composer footer .composer-send-progress {
+  .composer footer .composer-send-progress,
+  .composer footer .composer-attachment-progress {
     display: none;
   }
 
   .composer footer .composer-send-progress-wrapper,
-  .composer footer .composer-send-progress-message {
+  .composer footer .composer-send-progress-message,
+  .composer footer .composer-attachment-progress-wrapper,
+  .composer footer .composer-attachment-progress-message {
     display: none;
   }
 }
@@ -2172,12 +2235,25 @@
   color: var(--ui-text-tertiary);
 }
 
+:root[data-theme="dark"] .composer-footer-status > span {
+  color: var(--ui-text-tertiary);
+}
+
 :root[data-theme="dark"] .composer-send-progress {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
 }
 
+:root[data-theme="dark"] .composer-attachment-progress {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
+}
+
 :root[data-theme="dark"] .composer-send-progress-message {
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .composer-attachment-progress-message {
   color: var(--ui-text-secondary);
 }
 

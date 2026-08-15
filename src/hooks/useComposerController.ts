@@ -56,6 +56,7 @@ type UseComposerControllerOptions = {
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
+  setAttachmentProgress?: (progress: number | null) => void;
 };
 
 export default function useComposerController({
@@ -75,6 +76,7 @@ export default function useComposerController({
   focusMailboxRole,
   setSendProgress,
   setSendProgressMessage,
+  setAttachmentProgress,
 }: UseComposerControllerOptions) {
   const COMPOSER_AUTOSAVE_DEBOUNCE_MS = 800;
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
@@ -169,6 +171,7 @@ export default function useComposerController({
     setStatus,
     onAttachmentsReady,
     onInlineImagesReady: insertInlineImagesAtEnd,
+    setAttachmentProgress,
   });
 
   const {
@@ -210,6 +213,7 @@ export default function useComposerController({
     setRichComposer(true);
     setSendProgress?.(null);
     setSendProgressMessage?.(null);
+    setAttachmentProgress?.(null);
     if (nextDraft) {
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
@@ -218,7 +222,7 @@ export default function useComposerController({
     }
     setComposerMinimized(false);
     setComposerOpen(true);
-  }, [draft, composerAutosave, setStatus, setSendProgress, setSendProgressMessage]);
+  }, [draft, composerAutosave, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
   const {
     composeFromMessage: rawComposeFromMessage,
     editDraftMessage: rawEditDraftMessage,
@@ -280,6 +284,7 @@ export default function useComposerController({
     }
     setSendProgress?.(null);
     setSendProgressMessage?.(null);
+    setAttachmentProgress?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     cleanupTempAttachments();
@@ -288,6 +293,7 @@ export default function useComposerController({
   function forceCloseComposer() {
     setSendProgress?.(null);
     setSendProgressMessage?.(null);
+    setAttachmentProgress?.(null);
     setComposerOpen(false);
     setComposerMinimized(false);
     setComposerCloseConfirmOpen(false);

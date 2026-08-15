@@ -154,6 +154,7 @@ export default function App() {
   const [status, setStatus] = useState('本地原型已就绪');
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
+  const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
@@ -778,6 +779,7 @@ export default function App() {
     focusMailboxRole,
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
+    setAttachmentProgress: setComposerAttachmentProgress,
   });
 
   useEffect(() => {
@@ -1542,7 +1544,10 @@ export default function App() {
               onTemplateNameChange={setTemplateName}
               onSaveTemplate={saveDraftAsTemplate}
               onInsertSignature={insertSignatureIntoDraft}
-              onPickAttachments={() => { pickDraftAttachments().catch((error) => setStatus(String(error))); }}
+              onPickAttachments={() => {
+                setComposerAttachmentProgress(null);
+                pickDraftAttachments().catch((error) => setStatus(String(error)));
+              }}
               onRemoveAttachment={removeDraftAttachment}
               onAttachmentDrop={handleComposerAttachmentDrop}
               onAttachmentDragEnter={handleComposerAttachmentDragEnter}
@@ -1559,6 +1564,7 @@ export default function App() {
               sendRiskConfirm={sendRiskConfirm}
               sendProgress={composerSendProgress}
               sendProgressMessage={composerSendProgressMessage}
+              attachmentProgress={composerAttachmentProgress}
               crossAccountRisks={crossAccountRisks}
             />
           </AppErrorBoundary>

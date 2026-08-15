@@ -9,6 +9,7 @@ type ComposerAttachmentsOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
   onAttachmentsReady: (attachments: OutboundAttachmentInput[], statusPrefix?: string) => void;
   onInlineImagesReady: (attachments: OutboundAttachmentInput[]) => void;
+  setAttachmentProgress?: (progress: number | null) => void;
 };
 
 function readFileAsBase64(file: File) {
@@ -32,6 +33,7 @@ export default function useComposerAttachments({
   setStatus,
   onAttachmentsReady,
   onInlineImagesReady,
+  setAttachmentProgress,
 }: ComposerAttachmentsOptions) {
   const [isComposerDropActive, setComposerDropActive] = useState(false);
 
@@ -83,6 +85,20 @@ export default function useComposerAttachments({
     setComposerDropActive(next);
   }
 
+  function reportAttachmentProgress(completed: number, total: number) {
+    if (!setAttachmentProgress) return;
+    if (total <= 0) {
+      setAttachmentProgress(0);
+      return;
+    }
+    const normalized = Math.max(0, Math.min(100, Math.round((completed / total) * 100)));
+    setAttachmentProgress(normalized);
+  }
+
+  function clearAttachmentProgress() {
+    setAttachmentProgress?.(null);
+  }
+
   async function pickDraftAttachments() {
     const newAttachments = await invoke<OutboundAttachmentInput[]>(IPC.PickOutboundAttachments);
     if (newAttachments.length === 0) {
@@ -95,24 +111,35 @@ export default function useComposerAttachments({
   async function buildInlineImageAttachments(files: File[]): Promise<OutboundAttachmentInput[]> {
     const savedAttachments: OutboundAttachmentInput[] = [];
     const total = files.length;
-    for (const [index, file] of files.entries()) {
-      if (total > 1) {
-        setStatus(`正在插入图片 (${index + 1}/${total})...`);
-      }
-      const base64Data = await readFileAsBase64(file);
-      const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
-        filename: file.name,
-        base64Data,
-      });
-      savedAttachments.push({
-        filename: file.name,
-        mime_type: file.type || 'application/octet-stream',
-        size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
-        local_path: savedPath,
-        content_id: nextInlineContentId(index),
-        is_inline: true,
-      });
+    if (total === 0) {
+      return savedAttachments;
     }
+    reportAttachmentProgress(0, total);
+    for (const [index, file] of files.entries()) {
+      try {
+        if (total > 1) {
+          setStatus(`正在插入图片 (${index + 1}/${total})...`);
+        }
+        const base64Data = await readFileAsBase64(file);
+        const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
+          filename: file.name,
+          base64Data,
+        });
+        savedAttachments.push({
+          filename: file.name,
+          mime_type: file.type || 'application/octet-stream',
+          size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
+          local_path: savedPath,
+          content_id: nextInlineContentId(index),
+          is_inline: true,
+        });
+        reportAttachmentProgress(index + 1, total);
+      } catch (error) {
+        clearAttachmentProgress();
+        throw error;
+      }
+    }
+    clearAttachmentProgress();
     return savedAttachments;
   }
 
@@ -122,6 +149,7 @@ export default function useComposerAttachments({
 
     const totalFiles = validFiles.length;
     setStatus(`正在导入附件...`);
+    reportAttachmentProgress(0, totalFiles);
     try {
       const savedAttachments: OutboundAttachmentInput[] = [];
       for (const [index, file] of validFiles.entries()) {
@@ -138,12 +166,15 @@ export default function useComposerAttachments({
           size_bytes: Math.min(file.size, Number.MAX_SAFE_INTEGER),
           local_path: savedPath,
         });
+        reportAttachmentProgress(index + 1, totalFiles);
       }
 
       onAttachmentsReady(savedAttachments, statusPrefix);
     } catch (error) {
       logError(error);
       setStatus(`添加附件失败: ${String(error)}`);
+    } finally {
+      clearAttachmentProgress();
     }
   }
 

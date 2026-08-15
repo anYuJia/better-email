@@ -348,15 +348,6 @@
   border-bottom: 1px solid oklch(0.94 0.005 var(--primitive-hue-neutral));
 }
 
-/* Shared message-row clipping and width constraints used across message-layout passes. */
-.sender,
-.subject,
-.message-card p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .message-card p {
   display: block;
 }

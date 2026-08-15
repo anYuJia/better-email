@@ -16,6 +16,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cssCascade = [
   'styles/message-list.css',
   'styles/2026/message-list.css',
+  'styles/2026/message-list-typography.css',
   'styles/2026/pass-refinement.css',
   'styles/2026/workspace-hierarchy.css',
 ].map((file) => readFileSync(join(root, file), 'utf8'));

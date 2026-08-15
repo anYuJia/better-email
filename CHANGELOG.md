@@ -6,14 +6,15 @@
 
 ## [Unreleased]
 
-### 1.0.32
+### 1.0.33
 - 样式系统收口再优化：移除已失效的 `styles.css` 与 `styles/2026/ui-stack.css` 入口壳，`ui-2026.css` 统一承接基础样式与 pass 栈导入。
 - 通知样式与主样式统一入口：`notifications.css` 迁移到 `ui-2026.css` 内，应用层不再维护单独样式补丁导入。
 - 继续细化 UI Smoke 稳定性：`scripts/ui-smoke.mjs` 在缺失全局 WebSocket 时自动回退到 `undici`。
-- 版本号推进至 `1.0.31` 与 `src-tauri/tauri.conf.json` 保持同步。
+- 版本号推进至 `1.0.33` 与 `src-tauri/tauri.conf.json` 保持同步。
 - 通知样式提取基础动作样式，减少重复定义，降低后续 CSS 维护开销。
 - 将通知样式的 token 变量范围收敛到本地层，避免全局变量污染并降低链路样式耦合。
 - `pass-stylesheet-stack` 注释与入口说明同步为当前扁平化结构。
+- 提取 `message-card`/`sender`/`subject` 的公共行文截断规则到 `message-list-typography.css`，减少 pass 层重复覆盖，提升样式可维护性。
 
 ### 1.0.25
 - Composer 发送进度增强：新增发送期专属文案状态（`sendProgressMessage`）并在发送条下展示，便于观察附件读取、构建 MIME 等阶段。

@@ -26,6 +26,7 @@ function readCss(name) {
 }
 
 describe('message list preview single-line rule', () => {
+  const sharedTypography = 'message-list-typography.css';
   const cascadeOrder = [
     'message-list.css',
     'pass-message-list-density.css',
@@ -34,14 +35,23 @@ describe('message list preview single-line rule', () => {
     'workspace-hierarchy.css',
   ];
 
-  it('keeps white-space: nowrap in every effective .message-card p rule', () => {
+  it('keeps .message-card p clipping in the shared typography contract', () => {
+    const blocks = extractRule(readCss(sharedTypography), '.message-card p');
+    expect(blocks.length, `${sharedTypography} 应有 .message-card p 规则`).toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(block, `${sharedTypography} 必须保持单行`).toContain('white-space: nowrap');
+      expect(block).toContain('overflow: hidden');
+      expect(block).toContain('text-overflow: ellipsis');
+    }
+  });
+
+  it('does not duplicate truncation declarations in pass-specific message-list layers', () => {
     for (const name of cascadeOrder) {
       const blocks = extractRule(readCss(name), '.message-card p');
-      expect(blocks.length, `${name} 应有 .message-card p 规则`).toBeGreaterThan(0);
       for (const block of blocks) {
-        expect(block, `${name} 必须保持单行`).toContain('white-space: nowrap');
-        expect(block).toContain('overflow: hidden');
-        expect(block).toContain('text-overflow: ellipsis');
+        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('overflow: hidden');
+        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('text-overflow: ellipsis');
+        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('white-space: nowrap');
       }
     }
   });

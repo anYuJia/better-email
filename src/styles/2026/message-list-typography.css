@@ -1,0 +1,8 @@
+/* Shared message-card typography truncation for preview/title lines. */
+.sender,
+.subject,
+.message-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

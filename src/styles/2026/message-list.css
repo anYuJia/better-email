@@ -312,12 +312,9 @@
 }
 
 .sender {
-  overflow: hidden;
   color: var(--ui-text-secondary);
   font-size: 12.5px;
   font-weight: 620;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .message-card time {
@@ -327,24 +324,18 @@
 }
 
 .subject {
-  overflow: hidden;
   color: #303945;
   font-size: 12.5px;
   font-weight: 570;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .message-card p {
   display: block;
   margin: 3px 0 0;
-  overflow: hidden;
   color: var(--ui-text-tertiary);
   font-size: 11.5px;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .message-chips {

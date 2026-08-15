@@ -104,7 +104,6 @@ const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
 import SettingsOverlay from './components/settings/SettingsOverlay';
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
-import './components/notifications.css';
 
 import {
   buildMailboxListStateKey,

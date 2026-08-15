@@ -1,7 +1,7 @@
 /* 2026 style patch stack
  *
  * Keep all pass-layered style entry files in one place so future passes can be
- * added/removed by touching only this file instead of ui-stack.css.
+ * added/removed by touching only this file.
  */
 @import './reader.css';
 @import './overlay.css';

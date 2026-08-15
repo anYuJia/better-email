@@ -319,8 +319,7 @@ body {
 .body-text,
 .reader-html,
 .quick-reply,
-.empty-reader-card,
-.reader-warning-panel {
+.empty-reader-card {
   border: 0;
   border-radius: 0;
   background: transparent;

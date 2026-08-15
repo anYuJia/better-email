@@ -8,7 +8,7 @@ const stylesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'styles', 
 /**
  * 邮件列表正文预览必须固定为一行：
  * white-space: nowrap + overflow: hidden + text-overflow: ellipsis。
- * 项目存在多层样式覆盖（styles.css 与 ui-2026.css 系列），
+ * 项目存在样式分层（2026 pass 风格栈 + 组件兼容层），
  * 这里断言所有实际生效的 .message-card p 规则收敛为同一三件套。
  */
 function extractRule(css, selector) {

@@ -1,2 +1,12 @@
 @import './design-tokens.css';
-@import './styles/2026/ui-stack.css';
+@import './styles/global.css';
+@import './styles/layout.css';
+@import './styles/sidebar.css';
+@import './styles/message-list.css';
+@import './styles/dialogs.css';
+@import './styles/responsive.css';
+@import './styles/dropdowns.css';
+@import './styles/window-chrome.css';
+@import './styles/shared-motion.css';
+@import './styles/shared-dialogs.css';
+@import './styles/2026/pass-stylesheet-stack.css';

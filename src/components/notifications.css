@@ -1,4 +1,21 @@
 /* Notifications: keep undo visible, move routine status to screen readers only. */
+:root {
+  --notification-inline-action-height: 26px;
+  --notification-inline-action-radius: 7px;
+  --notification-inline-action-padding-x: 10px;
+  --notification-inline-action-size: 26px;
+  --notification-inline-action-bg: var(--ui-accent);
+  --notification-inline-action-bg-hover: var(--ui-accent-hover);
+  --notification-inline-action-text: #ffffff;
+  --notification-inline-action-transition: var(--ui-transition-slow-color-background);
+  --notification-surface: var(--ui-surface);
+  --notification-surface-shadow: 0 12px 28px rgba(15, 23, 42, 0.12),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+  --notification-toast-shadow: 0 8px 20px rgba(15, 23, 42, 0.1),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+  --notification-progress-end: var(--ui-accent-hover);
+}
+
 .status-live-region {
   position: absolute;
   width: 1px;
@@ -30,10 +47,8 @@
   border: 1px solid var(--ui-border);
   border-radius: 10px;
   color: var(--ui-text);
-  background: #ffffff;
-  box-shadow:
-    0 12px 28px rgba(15, 23, 42, 0.12),
-    0 1px 3px rgba(15, 23, 42, 0.08);
+  background: var(--notification-surface);
+  box-shadow: var(--notification-surface-shadow);
   overflow: hidden;
   transition: var(--ui-transition-transform-pop);
   animation: var(--ui-animation-message-toast-in);
@@ -45,7 +60,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--ui-accent), #00a3ff);
+  background: linear-gradient(90deg, var(--ui-accent), var(--notification-progress-end));
   transform-origin: left center;
   animation-duration: var(--ui-animation-send-undo-progress-duration);
   animation-name: var(--ui-animation-send-undo-progress);
@@ -53,56 +68,87 @@
   animation-fill-mode: var(--ui-animation-send-undo-fill-mode);
 }
 
-.undo-snackbar strong {
-  color: var(--ui-text);
-  font-size: 12px;
-  font-weight: 680;
-  letter-spacing: 0;
-}
-
-.undo-snackbar span {
-  color: var(--ui-text-secondary);
-  font-size: 10.5px;
-  margin-top: 2px;
+.undo-snackbar strong,
+.message-toast-undo strong {
   display: block;
+  font-size: 12px;
+  letter-spacing: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.undo-snackbar button {
-  min-height: 26px;
-  padding: 0 10px;
+.undo-snackbar strong {
+  color: var(--ui-text);
+  font-weight: 680;
+}
+
+.message-toast-undo strong {
+  color: var(--ui-text);
+  font-weight: 650;
+}
+
+.undo-snackbar span,
+.message-toast-undo-main span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--ui-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-snackbar button,
+.message-toast-undo-btn {
+  min-height: var(--notification-inline-action-height);
+  padding: 0 var(--notification-inline-action-padding-x);
   border: 0;
-  border-radius: 7px;
-  color: #ffffff;
-  background: var(--ui-accent);
+  border-radius: var(--notification-inline-action-radius);
+  color: var(--notification-inline-action-text);
+  background: var(--notification-inline-action-bg);
   font-size: 11.5px;
   font-weight: 650;
-  transition: var(--ui-transition-slow-color-background);
   cursor: pointer;
   white-space: nowrap;
 }
 
-.undo-snackbar button:hover {
-  background: var(--ui-accent-hover);
+.undo-snackbar button {
+  transition: var(--notification-inline-action-transition);
 }
 
-.undo-snackbar button.undo-close {
-  width: 26px;
-  height: 26px;
-  min-height: 26px;
-  min-width: 26px;
+.message-toast-undo-btn {
+  transition: var(--ui-transition-bg-color-slow);
+}
+
+.undo-snackbar button:hover,
+.message-toast-undo-btn:hover {
+  background: var(--notification-inline-action-bg-hover);
+}
+
+.undo-snackbar button.undo-close,
+.message-toast-close {
+  width: var(--notification-inline-action-size);
+  height: var(--notification-inline-action-size);
+  min-width: var(--notification-inline-action-size);
+  min-height: var(--notification-inline-action-size);
   padding: 0;
+  border: 0;
+  border-radius: 50%;
   color: var(--ui-text-tertiary);
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  transition: var(--ui-transition-slow-color-background);
 }
 
-.undo-snackbar button.undo-close:hover {
+.message-toast-close {
+  --notification-inline-action-size: 24px;
+}
+
+.undo-snackbar button.undo-close:hover,
+.message-toast-close:hover {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
   transform: none;
@@ -126,14 +172,12 @@
   justify-content: center;
   gap: 6px;
   padding: 7px 12px;
-  background: #ffffff;
+  background: var(--notification-surface);
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   color: var(--ui-text);
   font-size: 11.5px;
-  box-shadow:
-    0 8px 20px rgba(15, 23, 42, 0.1),
-    0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--notification-toast-shadow);
   animation: var(--ui-animation-message-toast-in);
 }
 
@@ -151,7 +195,7 @@
 }
 
 .message-toast svg {
-  color: #10a37f;
+  color: var(--ui-accent);
   flex: 0 0 auto;
 }
 
@@ -176,72 +220,12 @@
   min-width: 0;
 }
 
-.message-toast-undo strong {
-  display: block;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .message-toast-undo .message-toast-count {
   display: inline-block;
   color: var(--ui-accent);
   font-weight: 720;
   font-variant-numeric: tabular-nums;
   animation: var(--ui-animation-message-toast-count-pop);
-}
-
-.message-toast-undo-main span {
-  display: block;
-  margin-top: 2px;
-  font-size: 10.5px;
-  color: var(--ui-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.message-toast-undo-btn {
-  min-height: 26px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 7px;
-  color: #ffffff;
-  background: var(--ui-accent);
-  font-size: 11.5px;
-  font-weight: 650;
-  transition: var(--ui-transition-bg-color-slow);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.message-toast-undo-btn:hover {
-  background: var(--ui-accent-hover);
-}
-
-.message-toast-close {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: var(--ui-text-tertiary);
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--ui-transition-slow-color-background);
-  cursor: pointer;
-}
-
-.message-toast-close:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
 }
 
 .message-toast-close svg {

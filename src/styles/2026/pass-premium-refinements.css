@@ -103,19 +103,6 @@ textarea:focus-visible {
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.empty-reader-compose {
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
-  color: var(--ui-text);
-  transition: var(--ui-transition-fast-color-background-border);
-}
-
-.empty-reader-compose:hover {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-}
-
 /* Bulk selection toolbar: neutralize the legacy green .bulk-toolbar.active
    background/border so the strip matches the 2026 blue palette. */
 .bulk-toolbar.active {

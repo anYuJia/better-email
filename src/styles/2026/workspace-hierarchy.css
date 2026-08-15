@@ -446,6 +446,99 @@
   box-shadow: 0 0 0 2px var(--ui-list);
 }
 
+/* List and reader shell baseline moved from pass-refinement. */
+.message-list-panel {
+  background: var(--ui-list);
+  border-inline: 0;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-list-footer {
+  min-height: 36px;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
+  border-bottom: 0;
+}
+
+.mailbox-empty-state,
+.message-list .empty-state {
+  padding: 32px;
+  background: var(--ui-list);
+  color: var(--ui-text-secondary);
+}
+
+.mailbox-empty-state strong,
+.empty-reader-card strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mailbox-empty-state span,
+.empty-reader-card span {
+  max-width: 360px;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
+.reader-panel {
+  background: var(--ui-reader);
+}
+
+.reader {
+  max-width: 920px;
+  padding: 22px 34px 44px;
+}
+
+.reader-header {
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.reader-header h1 {
+  margin-bottom: 10px;
+  color: var(--ui-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.32;
+}
+
+.reader-header p {
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
+}
+
+.reader-sender-copy strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.reader-meta,
+.label-tools {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.body-text,
+.reader-html,
+.empty-reader-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.body-text,
+.reader-html {
+  padding: 0;
+  color: var(--ui-text);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar .folder,
   .message-card {

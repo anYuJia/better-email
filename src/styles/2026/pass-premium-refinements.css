@@ -116,20 +116,6 @@ textarea:focus-visible {
   color: var(--ui-accent);
 }
 
-.reader-warning-panel {
-  margin: 12px 0;
-  padding: 10px 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-warning-bg);
-  color: var(--ui-warning);
-}
-
-.reader-warning-primary-action {
-  border-radius: var(--ui-radius-control);
-  transition: var(--ui-transition-fast-color-background-border);
-}
-
 /* Bulk selection toolbar: neutralize the legacy green .bulk-toolbar.active
    background/border so the strip matches the 2026 blue palette. */
 .bulk-toolbar.active {

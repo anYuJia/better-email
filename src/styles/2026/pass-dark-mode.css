@@ -221,27 +221,6 @@
   border-bottom-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .list-control-actions {
-  background: #1c222b;
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .list-control-actions > button {
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .list-control-actions > button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .list-control-actions > button.active {
-  background: #262e3a;
-  color: var(--ui-accent);
-  border-color: var(--ui-border-strong);
-}
-
 :root[data-theme="dark"] .list-summary .search-scope-indicator {
   color: var(--ui-text-secondary);
   background: #232b36;
@@ -334,12 +313,7 @@
   border-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .bulk-toolbar button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-accent);
-}
-
-:root[data-theme="dark"] .bulk-toolbar .compact-menu summary:hover {
+:root[data-theme="dark"] :is(.bulk-toolbar button:hover, .bulk-toolbar .compact-menu summary:hover) {
   background: rgba(255, 255, 255, 0.12);
   color: var(--ui-accent);
 }

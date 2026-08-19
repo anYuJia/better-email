@@ -4,53 +4,29 @@
  * The token layer (design-tokens.css) re-maps the semantic colours for
  * <html data-theme="dark">, which covers everything built on the ui tokens.
  * Legacy surface variables used by pre-token sheets already resolve in the
- * token layer (:root defines aliases that follow the re-mapped --ui-*),
- * so this sheet only re-themes concrete surfaces and controls.
+ * token layer, so this sheet only re-themes concrete surfaces and controls
+ * that still use hardcoded light values.
  *
- * The resolved theme is applied to <html data-theme="dark"> by the inline
- * bootstrap script in index.html and kept in sync by useThemeMode, so a
- * manual light/dark/system preference drives these rules. When a light
- * theme is active, :root:not([data-theme="dark"]) colour and glass values
- * live with their owning sheet (window-chrome.css, layout.css); this file
- * only carries the dark variants plus the translucent-glass main workspace.
+ * Composer dark mode lives in composer/composer.css (its own section 22).
+ * Context menu dark mode lives in context-menu.css.
+ * Reader dark mode lives in reader.css.
+ *
+ * This file covers: workspace glass, dialog backdrops, toast, snooze picker,
+ * account switcher, global tooltip, dropdowns, shortcut modal, legacy
+ * checkbox, and avatar-tone palette.
  */
+
 :root[data-theme="dark"] body {
   background: var(--ui-bg);
 }
 
-:root[data-theme="dark"] .composer-backdrop .composer,
-:root[data-theme="dark"] .composer{
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  border-color: var(--ui-border-strong);
-}
+/* --- Dialogs / modals / popovers --- */
 
-:root[data-theme="dark"] .composer-backdrop .composer header,
-:root[data-theme="dark"] .composer header{
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] .composer input,
-:root[data-theme="dark"] .composer textarea,
-:root[data-theme="dark"] .composer select,
-:root[data-theme="dark"] .composer .field-shell,
-:root[data-theme="dark"] .composer .composer-recipient-grid,
-:root[data-theme="dark"] .composer .composer-advanced,
-:root[data-theme="dark"] .composer .composer-toolbar,
-:root[data-theme="dark"] .composer .composer-attachments,
-:root[data-theme="dark"] .composer .composer-from{
-  background: var(--ui-surface-muted);
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .composer ::placeholder{
-  color: var(--ui-text-tertiary);
-}
-
-:root[data-theme="dark"] .composer-advanced-panel,
-:root[data-theme="dark"] .composer-backdrop-minimized{
-  background: var(--ui-surface);
+:root[data-theme="dark"] .dialog-backdrop,
+:root[data-theme="dark"] .confirm-dialog-backdrop,
+:root[data-theme="dark"] .snooze-backdrop,
+:root[data-theme="dark"] .account-login-backdrop {
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
 }
 
 :root[data-theme="dark"] .dialog-backdrop .dialog,
@@ -61,7 +37,7 @@
 :root[data-theme="dark"] .snooze-picker-menu,
 :root[data-theme="dark"] .account-switcher-menu,
 :root[data-theme="dark"] .account-switcher-dropdown,
-:root[data-theme="dark"] .account-login-dialog{
+:root[data-theme="dark"] .account-login-dialog {
   background: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border-strong);
@@ -73,85 +49,41 @@
 :root[data-theme="dark"] .snooze-picker h2,
 :root[data-theme="dark"] .account-switcher-menu h3,
 :root[data-theme="dark"] .account-login-dialog h2,
-:root[data-theme="dark"] .snooze-picker strong{
+:root[data-theme="dark"] .snooze-picker strong {
   color: var(--ui-text);
 }
 
 :root[data-theme="dark"] .dialog p,
 :root[data-theme="dark"] .confirm-dialog p,
 :root[data-theme="dark"] .snooze-picker small,
-:root[data-theme="dark"] .account-switcher-menu small{
+:root[data-theme="dark"] .account-switcher-menu small {
   color: var(--ui-text-secondary);
 }
 
-:root[data-theme="dark"] .dialog-backdrop,
-:root[data-theme="dark"] .confirm-dialog-backdrop,
-:root[data-theme="dark"] .snooze-backdrop,
-:root[data-theme="dark"] .account-login-backdrop{
-  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
-}
-
-:root[data-theme="dark"] body .context-menu,
-:root[data-theme="dark"] .context-menu,
-:root[data-theme="dark"] .context-menu-panel{
-  background: oklch(0.27 0.016 var(--primitive-hue-neutral) / 0.98);
-  border-color: var(--ui-border-strong);
-}
-
-:root[data-theme="dark"] .context-menu-item,
-:root[data-theme="dark"] .context-menu button,
-:root[data-theme="dark"] .context-menu .menu-item{
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .context-menu-item:hover,
-:root[data-theme="dark"] .context-menu-item:focus-visible{
-  background: var(--ui-accent-soft);
-}
-
-:root[data-theme="dark"] .context-menu-separator,
-:root[data-theme="dark"] .menu-separator{
-  background: var(--ui-border);
-}
-
-:root[data-theme="dark"] .account-switcher-trigger,
-:root[data-theme="dark"] .account-row,
-:root[data-theme="dark"] .account-menu-row{
-  background: var(--ui-surface-muted);
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .snooze-picker button,
-:root[data-theme="dark"] .snooze-picker .snooze-option,
-:root[data-theme="dark"] .snooze-picker summary{
-  background: var(--ui-surface-muted);
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .snooze-picker button:hover{
-  background: var(--ui-accent-soft);
-}
+/* --- Toast / snackbar --- */
 
 :root[data-theme="dark"] body .toast,
 :root[data-theme="dark"] .toast,
 :root[data-theme="dark"] .message-toast,
 :root[data-theme="dark"] .undo-snackbar,
-:root[data-theme="dark"] .undo-card{
+:root[data-theme="dark"] .undo-card {
   background: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border-strong);
 }
 
 :root[data-theme="dark"] .toast small,
-:root[data-theme="dark"] .undo-card small{
+:root[data-theme="dark"] .undo-card small {
   color: var(--ui-text-secondary);
 }
+
+/* --- Dropdown / picker --- */
 
 :root[data-theme="dark"] body .emoji-picker,
 :root[data-theme="dark"] .emoji-picker,
 :root[data-theme="dark"] .template-picker,
 :root[data-theme="dark"] .dropdown-panel,
-:root[data-theme="dark"] .custom-select-menu{
+:root[data-theme="dark"] .custom-select-menu {
   background: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border-strong);
@@ -159,95 +91,197 @@
 
 :root[data-theme="dark"] .dropdown-item:hover,
 :root[data-theme="dark"] .custom-select-menu li:hover,
-:root[data-theme="dark"] .template-picker li:hover{
+:root[data-theme="dark"] .template-picker li:hover {
   background: var(--ui-accent-soft);
 }
 
-:root[data-theme="dark"] .image-preview-overlay{
+/* --- Snooze / account picker --- */
+
+:root[data-theme="dark"] .account-switcher-trigger,
+:root[data-theme="dark"] .account-row,
+:root[data-theme="dark"] .account-menu-row {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .snooze-picker button,
+:root[data-theme="dark"] .snooze-picker .snooze-option,
+:root[data-theme="dark"] .snooze-picker summary {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .snooze-picker button:hover {
+  background: var(--ui-accent-soft);
+}
+
+/* --- Image preview --- */
+
+:root[data-theme="dark"] .image-preview-overlay {
   background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.9);
 }
 
-:root[data-theme="dark"] .window-chrome{
+/* --- Window chrome --- */
+
+:root[data-theme="dark"] .window-chrome {
   background: var(--ui-surface-sidebar);
   color: var(--ui-text);
 }
 
 /* --- Toolbar / list controls --- */
-/* Dark mode surfaces already resolve through the semantic --ui-* tokens
-   re-mapped in design-tokens.css, so the toolbar / list control strip /
-   search box / summary inherit the dark list surface automatically. */
 
-:root[data-theme="dark"] .stats-strip{
+:root[data-theme="dark"] .stats-strip {
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
 }
 
-:root[data-theme="dark"] .search-shortcuts button{
+:root[data-theme="dark"] .search-shortcuts button {
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
   border-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .search-shortcuts button:hover{
-  background: var(--quiet-row-hover);
+:root[data-theme="dark"] .search-shortcuts button:hover {
+  background: var(--ui-control-hover);
   color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .compact-menu > div{
+:root[data-theme="dark"] .compact-menu > div {
   background: var(--ui-surface);
   border-color: var(--ui-border-strong);
   box-shadow: var(--ui-shadow-popover);
 }
 
 /* --- Message list --- */
-/* Row surfaces, date headers, footer and chips resolve via semantic
-   tokens; only the avatar-tone palette needs explicit dark hues so a dense
-   list stays scannable without becoming saturated. */
 
-:root[data-theme="dark"] .message-chips span{
+:root[data-theme="dark"] .message-chips span {
   color: var(--ui-text-tertiary);
-  background: #232b36;
+  background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] .message-list-footer{
+:root[data-theme="dark"] .message-list-footer {
   background: var(--ui-list);
   color: var(--ui-text-tertiary);
 }
 
-:root[data-theme="dark"] .bulk-toolbar{
+:root[data-theme="dark"] .bulk-toolbar {
   border-color: var(--ui-border);
   color: var(--ui-text);
   background: var(--ui-surface-muted);
   box-shadow: var(--ui-box-shadow-none);
 }
 
-:root[data-theme="dark"] .bulk-toolbar.active{
+:root[data-theme="dark"] .bulk-toolbar.active {
   background: var(--ui-surface-muted);
 }
 
 :root[data-theme="dark"] .bulk-toolbar button,
 :root[data-theme="dark"] .bulk-toolbar select,
-:root[data-theme="dark"] .bulk-toolbar .compact-menu summary{
+:root[data-theme="dark"] .bulk-toolbar .compact-menu summary {
   background: transparent;
   color: var(--ui-text-secondary);
   border-color: transparent;
 }
 
-:root[data-theme="dark"] :is(.bulk-toolbar button:hover, .bulk-toolbar .compact-menu summary:hover){
-  background: var(--quiet-row-hover);
+:root[data-theme="dark"] :is(.bulk-toolbar button:hover, .bulk-toolbar .compact-menu summary:hover) {
+  background: var(--ui-control-hover);
   color: var(--ui-text);
 }
 
-:root[data-theme="dark"] .empty-reader{
+:root[data-theme="dark"] .empty-reader {
   color: var(--ui-text-secondary);
 }
 
 /* --- Reader --- */
-/* Reader-specific dark overrides moved to the token-based sections below
-   (reader-actions, body-text/reader-html, quick-reply, reader-warning-panel
-   are all defined with semantic tokens in their respective dark-mode sections). */
+
+:root[data-theme="dark"] .reader-actions {
+  border: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary) {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] :is(.body-text, .reader-html) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-warning-panel {
+  border-color: var(--ui-warning-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-warning-bg);
+}
+
+:root[data-theme="dark"] .reader-warning-badge {
+  border-color: transparent;
+  color: var(--ui-warning);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply textarea {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .quick-reply textarea::placeholder,
+:root[data-theme="dark"] .quick-reply > footer > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .quick-reply > footer button {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply > footer button:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send:disabled {
+  color: var(--ui-text-tertiary);
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+}
 
 /* --- Icon buttons (toolbar / reader / composer chrome) --- */
+
 :root[data-theme="dark"] .icon-button,
 :root[data-theme="dark"] .composer header button,
 :root[data-theme="dark"] .label-tools button,
@@ -255,9 +289,9 @@
 :root[data-theme="dark"] .composer-signature button,
 :root[data-theme="dark"] .composer-attachment-button,
 :root[data-theme="dark"] .rich-toolbar button,
-:root[data-theme="dark"] .composer-mini-actions button{
-  background: rgba(255, 255, 255, 0.07);
-  border-color: var(--ui-border);
+:root[data-theme="dark"] .composer-mini-actions button {
+  border-color: transparent;
+  background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
 }
 
@@ -268,331 +302,196 @@
 :root[data-theme="dark"] .composer-signature button:hover,
 :root[data-theme="dark"] .composer-attachment-button:hover,
 :root[data-theme="dark"] .rich-toolbar button:hover,
-:root[data-theme="dark"] .composer-mini-actions button:hover{
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(96, 165, 250, 0.3);
-  color: var(--ui-accent);
+:root[data-theme="dark"] .composer-mini-actions button:hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
 }
 
 /* --- Shortcut modal --- */
-:root[data-theme="dark"] .shortcut-modal{
-  background: #1a2029;
+
+:root[data-theme="dark"] .shortcut-modal {
+  background: var(--ui-surface);
   border-color: var(--ui-border-strong);
 }
 
-:root[data-theme="dark"] .shortcut-modal header{
-  background: rgba(15, 19, 24, 0.8);
+:root[data-theme="dark"] .shortcut-modal header {
+  background: var(--ui-surface-muted);
   border-bottom-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .shortcut-modal header button{
-  background: rgba(255, 255, 255, 0.06);
+:root[data-theme="dark"] .shortcut-modal header button {
+  background: var(--ui-surface-muted);
   border-color: var(--ui-border);
   color: var(--ui-text-secondary);
 }
 
-:root[data-theme="dark"] .shortcut-modal header button:hover{
-  background: rgba(255, 255, 255, 0.12);
+:root[data-theme="dark"] .shortcut-modal header button:hover {
+  background: var(--ui-control-hover);
   color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .shortcut-group{
-  background: rgba(23, 28, 35, 0.7);
+:root[data-theme="dark"] .shortcut-group {
+  background: var(--ui-surface-muted);
   border-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .shortcut-row{
+:root[data-theme="dark"] .shortcut-row {
   border-top-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] kbd{
-  background: linear-gradient(180deg, #232b36, #1b2129);
-  border-color: rgba(148, 163, 184, 0.25);
-  border-bottom-color: rgba(148, 163, 184, 0.4);
+:root[data-theme="dark"] kbd {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border-strong);
+  border-bottom-color: var(--ui-border-strong);
   color: var(--ui-text);
-  box-shadow: inset 0 -1px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
-/* --- Composer internals (post-token surfaces) --- */
+/* --- Legacy composer dark overrides (dialogs.css styles) --- */
+
 :root[data-theme="dark"] .composer input,
-:root[data-theme="dark"] .composer select{
-  background: rgba(255, 255, 255, 0.06);
+:root[data-theme="dark"] .composer select {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
 }
 
 :root[data-theme="dark"] .composer input:focus,
-:root[data-theme="dark"] .composer textarea:focus{
-  background: rgba(255, 255, 255, 0.1);
+:root[data-theme="dark"] .composer textarea:focus {
+  background: var(--ui-surface);
 }
 
-:root[data-theme="dark"] .composer select:focus{
-  background: rgba(255, 255, 255, 0.1);
+:root[data-theme="dark"] .composer select:focus {
+  background: var(--ui-surface);
   border-color: var(--ui-border-strong);
 }
 
-:root[data-theme="dark"] .composer textarea{
-  background: #171c22;
+:root[data-theme="dark"] .composer ::placeholder {
+  color: var(--ui-text-tertiary);
 }
 
-:root[data-theme="dark"] .composer-from select{
-  background: #1d242d;
+:root[data-theme="dark"] .composer-advanced {
+  background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] .composer-advanced{
-  background: rgba(15, 19, 24, 0.8);
-}
-
-:root[data-theme="dark"] .composer-advanced[open] summary{
-  background: rgba(255, 255, 255, 0.06);
+:root[data-theme="dark"] .composer-advanced[open] summary {
+  background: var(--ui-control-hover);
 }
 
 :root[data-theme="dark"] .composer-tool-card input,
-:root[data-theme="dark"] .composer-tool-card select{
-  background: #1d242d;
+:root[data-theme="dark"] .composer-tool-card select {
+  background: var(--ui-surface);
 }
 
 :root[data-theme="dark"] .composer-rich-toggle,
 :root[data-theme="dark"] .composer-signature,
 :root[data-theme="dark"] .composer-attachments,
-:root[data-theme="dark"] .composer-schedule{
-  background: rgba(15, 19, 24, 0.8);
-}
-
-/* Recipient autocomplete must stay fully opaque above the compose fields. */
-:root[data-theme="dark"] .composer .recipient-suggestions{
-  background: var(--ui-surface) !important;
-  opacity: 1;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+:root[data-theme="dark"] .composer-schedule {
+  background: var(--ui-surface-muted);
 }
 
 :root[data-theme="dark"] .recipient-suggestions button,
-:root[data-theme="dark"] .composer-attachment-chip{
-  background: #1d242d;
+:root[data-theme="dark"] .composer-attachment-chip {
+  background: var(--ui-surface);
   border-color: var(--ui-border);
 }
 
-:root[data-theme="dark"] .raw-preview textarea{
-  background: #171c22;
+:root[data-theme="dark"] .raw-preview textarea {
+  background: var(--ui-surface);
   color: var(--ui-text);
 }
 
-:root[data-theme="dark"] .composer-minimized{
-  background: #1d242d;
+:root[data-theme="dark"] .composer-minimized {
+  background: var(--ui-surface);
   border-color: var(--ui-border-strong);
 }
 
-:root[data-theme="dark"] input[type="checkbox"]{
-  background: linear-gradient(180deg, #262e3a 0%, #1d242d 100%);
-  border-color: rgba(148, 163, 184, 0.4);
+:root[data-theme="dark"] input[type="checkbox"] {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border-strong);
   box-shadow: var(--ui-box-shadow-none);
 }
 
-:root[data-theme="dark"] input[type="checkbox"]:checked{
-  background: linear-gradient(180deg, #3b82f6 0%, var(--ui-accent) 100%);
+:root[data-theme="dark"] input[type="checkbox"]:checked {
+  background: var(--ui-accent);
   border-color: var(--ui-accent);
 }
 
 :root[data-theme="dark"] .mailbox-grid div,
 :root[data-theme="dark"] .sync-schedule-card,
-:root[data-theme="dark"] .notification-account-grid > div{
-  background: #171c22;
+:root[data-theme="dark"] .notification-account-grid > div {
+  background: var(--ui-surface);
   border-color: var(--ui-border);
 }
 
 /* ---------------------------------------------------------------------
  * Workspace reconciliation.
  *
- * Persistent workspace surfaces (toolbar, list, footer, date headers,
- * search, controls, chips, attachment) now resolve entirely through the
- * semantic --ui-* tokens re-mapped in design-tokens.css, so no explicit
- * dark overrides are needed for them. Only the avatar-tone palette keeps
- * distinct dark hues so a dense list stays scannable without saturation.
+ * Persistent workspace surfaces resolve entirely through the semantic
+ * --ui-* tokens re-mapped in design-tokens.css. Only the avatar-tone
+ * palette keeps distinct dark hues for list scannability.
  * --------------------------------------------------------------------- */
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar){
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar) {
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-0{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-0 {
   color: oklch(0.80 0.045 250);
   background: oklch(0.315 0.028 250);
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-1{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-1 {
   color: oklch(0.80 0.040 305);
   background: oklch(0.312 0.026 305);
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-2{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-2 {
   color: oklch(0.80 0.040 152);
   background: oklch(0.310 0.026 152);
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-3{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-3 {
   color: oklch(0.83 0.045 var(--primitive-hue-warning));
   background: oklch(0.320 0.030 var(--primitive-hue-warning));
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-4{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-4 {
   color: oklch(0.80 0.035 225);
   background: oklch(0.312 0.022 225);
 }
 
-:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-5{
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-5 {
   color: oklch(0.80 0.040 15);
   background: oklch(0.312 0.025 15);
 }
 
 :root[data-theme="dark"] .message-chips span,
-:root[data-theme="dark"] .message-attachment{
+:root[data-theme="dark"] .message-attachment {
   color: var(--ui-text-tertiary);
   background: transparent;
 }
 
-:root[data-theme="dark"] .reader-actions{
-  border: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
+/* --- Global tooltip / compact menu dark --- */
 
-:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary){
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover{
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] .reader-actions .primary-action{
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled){
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] :is(.body-text, .reader-html){
-  border-color: transparent;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .reader-warning-panel{
-  border-color: var(--ui-warning-border);
-  color: var(--ui-text-secondary);
-  background: var(--ui-warning-bg);
-}
-
-:root[data-theme="dark"] .reader-warning-badge{
-  border-color: transparent;
-  color: var(--ui-warning);
-  background: transparent;
-}
-
-:root[data-theme="dark"] .quick-reply{
-  background: transparent;
-}
-
-:root[data-theme="dark"] .quick-reply textarea{
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .quick-reply textarea::placeholder,
-:root[data-theme="dark"] .quick-reply > footer > span{
-  color: var(--ui-text-tertiary);
-}
-
-:root[data-theme="dark"] .quick-reply > footer button{
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
-
-:root[data-theme="dark"] .quick-reply > footer button:hover:not(:disabled){
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] .quick-reply > footer .quick-reply-send{
-  color: var(--color-text-on-accent);
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-}
-
-:root[data-theme="dark"] .quick-reply > footer .quick-reply-send:disabled{
-  color: var(--ui-text-tertiary);
-  border-color: transparent;
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] :is(
-  .icon-button,
-  .composer header button,
-  .label-tools button,
-  .attachments button,
-  .composer-signature button,
-  .composer-attachment-button,
-  .rich-toolbar button,
-  .composer-mini-actions button
-){
-  border-color: transparent;
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] :is(
-  .icon-button,
-  .composer header button,
-  .label-tools button,
-  .attachments button,
-  .composer-signature button,
-  .composer-attachment-button,
-  .rich-toolbar button,
-  .composer-mini-actions button
-):hover{
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] :is(.composer input, .composer textarea, .composer select, .composer .field-shell){
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] :is(.composer input, .composer textarea, .composer select):focus{
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] :is(.global-tooltip, .compact-menu > div, .search-options-menu > div, .search-scope-menu > div){
+:root[data-theme="dark"] :is(.global-tooltip, .compact-menu > div, .search-options-menu > div, .search-scope-menu > div) {
   border-color: var(--ui-border-strong);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-tooltip);
 }
 
-/* Thread list resolves through semantic tokens like the message list;
-   no !important card overrides are needed in dark mode. */
+/* --- Thread list --- */
 
-:root[data-theme="dark"] .thread-unread-dot{
+:root[data-theme="dark"] .thread-unread-dot {
   box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Dark workspace: the persistent panes stay opaque planes on the semantic
- * neutral scale. The token layer already re-maps every --workspace-* / --ui-*
- * surface for dark mode; only the native window chrome strip keeps a
- * translucent platform treatment. */
+ * neutral scale. Only the native window chrome strip keeps a translucent
+ * platform treatment. */
 
 :root[data-theme="dark"] .app-shell .window-chrome {
   border-bottom: 1px solid oklch(0.43 0.016 var(--primitive-hue-neutral) / 0.64);

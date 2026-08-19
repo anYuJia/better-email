@@ -4,6 +4,14 @@
  * Owns the full-screen deferred surface shown while the app waits for the
  * heavy mail/account bootstrapping work (DeferredSurface). Purely a
  * transient layer: fixed, above the workspace, below dialogs.
+ *
+ * Z-index strategy (semantic token reference):
+ *   --z-sticky    20    toolbar / sticky headers
+ *   --z-popover   100   dropdowns, menus, autocomplete
+ *   --z-composer  1000  composer shell
+ *   --z-dialog     10000 modal backdrops
+ *   --z-tooltip    10000 global tooltips
+ *   --z-toast      10001 notification toasts
  */
 
 .deferred-overlay {
@@ -12,8 +20,8 @@
   z-index: 1400;
   display: grid;
   place-items: center;
-  padding: 16px;
-  background: rgba(18, 26, 36, 0.5);
+  padding: var(--ui-space-4);
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.5);
 }
 
 .deferred-surface {
@@ -23,9 +31,9 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 12px 16px;
+  padding: var(--ui-space-3) var(--ui-space-4);
   border: 1px solid var(--ui-border-strong);
-  border-radius: 10px;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-float);

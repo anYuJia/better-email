@@ -6,17 +6,16 @@
  *    (design-tokens.css) and component CSS,
  *  - global transition discipline: interactive controls only (no all-property
  *    transitions on big subtrees) with identical timing across surfaces,
- *  - the press "micro-scale" cue and the prefers-reduced-motion kill switch,
+ *  - the prefers-reduced-motion kill switch,
  *  - panel-level transition-property restrictions so hover feedback is quiet.
  *
- * Values must come from the --ui-motion-* / --ui-ease-* / --ui-transition-*
- * tokens; no bare durations or bezier curves here.
+ * No scale transforms on press — desktop tools don't need to "squish".
+ * Composer controls share the same discipline as the workspace panes.
  */
 
 /* Spinner rotation -------------------------------------------------------
  * --ui-motion-spin is the single functional period for continuous rotation;
- * historic per-surface speeds were collapsed onto it in the token layer
- * (the old --ui-motion-680…1000 numeric tokens are gone).
+ * historic per-surface speeds were collapsed onto it in the token layer.
  */
 .ui-spinner {
   --ui-spinner-duration: var(--ui-motion-spin);
@@ -55,31 +54,23 @@ summary {
     var(--ui-transition-standard-color-bg-border-box-shadow-opacity);
 }
 
-/* Press feedback: a gentle scale-down while the pointer is down. */
-button:active,
-.btn:active,
-.icon-button:active,
-.compose-button:active,
-.refresh-text-button:active,
-summary:active {
-  transform: scale(0.97);
-}
-
 /* Panel-scoped transition restriction: hover feedback is colour/opacity only;
  * geometry and transforms must never animate inside large subtrees. */
 .sidebar *,
 .message-list-panel *,
 .reader-panel *,
-.account-switcher * {
+.account-switcher *,
+.composer * {
   transition-property: color, background-color, border-color, opacity;
 }
 
-/* No lift, no wobble: persistent-pane controls never transform, so their
- * hover/active states stay purely surface-level. */
+/* No lift, no wobble: persistent-pane and composer controls never transform,
+ * so their hover/active states stay purely surface-level. */
 .sidebar :is(button, summary, .folder, .folder-main),
 .message-list-panel :is(button, .message-card, .thread-card),
 .reader-panel :is(button, summary, select),
-.account-switcher :is(button, summary) {
+.account-switcher :is(button, summary),
+.composer :is(button, summary, input, select, textarea) {
   transform: none !important;
 }
 

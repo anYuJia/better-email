@@ -4,11 +4,11 @@
  * variant lives in dark-mode.css. */
 .global-tooltip {
   position: fixed;
-  z-index: 10000;
+  z-index: var(--ui-z-tooltip, 10000);
   max-width: min(300px, calc(100vw - 24px));
   padding: 6px 10px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-control, 8px);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-tooltip);

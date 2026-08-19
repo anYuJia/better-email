@@ -19,10 +19,10 @@
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border: 1px solid var(--ui-border, #dde2e8);
-  border-radius: var(--ui-radius-control, 8px);
-  color: var(--ui-text, #1d232b);
-  background: var(--ui-surface, #ffffff);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 14px;
   text-align: left;
@@ -46,7 +46,7 @@
 
 .custom-select-summary small {
   overflow: hidden;
-  color: var(--ui-text-tertiary, #646f7b);
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   font-weight: 460;
   text-overflow: ellipsis;
@@ -54,103 +54,23 @@
 }
 
 .custom-select-summary > svg {
-  color: var(--ui-text-tertiary, #646f7b);
+  color: var(--ui-text-tertiary);
 }
 
-.custom-select-summary.dense {
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 6px;
-}
-
-.custom-select-summary:hover {
-  border-color: var(--ui-border-strong, #c3ccd5);
-}
-
-.custom-select-menu[data-open="true"] .custom-select-summary,
-.custom-select-summary[aria-expanded="true"] {
-  border-color: var(--ui-border-strong, #c3ccd5);
-  background: var(--ui-surface-muted, #f1f3f5);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.custom-select-summary:focus-visible {
-  outline: var(--ui-focus-outline, 2px solid #6b7280);
-  outline-offset: 1px;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.custom-select-dropdown {
-  /* Most settings menus sit above regular content. Modal callers override
-   * this through CustomSelect's explicit inline z-index. */
-  z-index: 1000;
-  display: grid;
-  gap: 2px;
-  min-width: max-content;
-  max-width: min(92vw, 480px);
-  max-height: 260px;
-  padding: 6px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  border: 1px solid var(--ui-border-strong, #c3ccd5);
-  border-radius: var(--ui-radius-panel, 10px);
-  background: var(--ui-surface, #ffffff);
-  box-shadow: var(--ui-shadow-float, 0 16px 40px rgba(15, 23, 42, 0.14));
-}
-
-.custom-select-dropdown button {
-  min-height: 40px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-control, 8px);
-  color: var(--ui-text, #1d232b);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 14px;
-  text-align: left;
-}
-
-.custom-select-dropdown.dense button {
-  min-height: 30px;
-  padding: 3px 10px;
-}
-
-.custom-select-dropdown button > span {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.custom-select-dropdown button strong,
-.custom-select-dropdown button small {
-  overflow: visible;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.custom-select-dropdown button strong {
-  font-size: 14px;
-  font-weight: 540;
-}
-
-.custom-select-dropdown button small {
-  color: var(--ui-text-tertiary, #646f7b);
+.custom-select-summary > svg {
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   font-weight: 460;
 }
 
 .custom-select-dropdown button:hover {
-  color: var(--ui-text, #1d232b);
-  background: var(--ui-surface-muted, #f1f3f5);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
 }
 
 .custom-select-dropdown button.active {
-  color: var(--ui-text, #1d232b);
-  background: var(--quiet-row-selected, #e5e7eb);
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
 }
 
 .custom-select-dropdown button:disabled {

@@ -1,3 +1,11 @@
+/*
+ * Context menu: canonical stylesheet
+ *
+ * Unified popover menu for right-click, dropdown, and action menus.
+ * Uses semantic tokens only. No blur, no gradient, no hardcoded colors.
+ * Dark mode variants inline at bottom.
+ */
+
 .context-menu {
   position: fixed;
   z-index: 2400;
@@ -6,14 +14,11 @@
   overflow-y: auto;
   overflow-x: visible;
   padding: 5px;
-  border: 1px solid rgba(28, 38, 51, 0.12);
-  border-radius: 11px;
-  color: #1f2933;
-  background: rgba(255, 255, 255, 0.965);
-  box-shadow:
-    0 20px 52px rgba(29, 40, 54, 0.17),
-    0 3px 10px rgba(29, 40, 54, 0.08);
-  backdrop-filter: blur(22px) saturate(1.28);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .context-menu-heading {
@@ -21,7 +26,7 @@
   gap: 2px;
   margin: 1px 3px 5px;
   padding: 7px 8px 8px;
-  border-bottom: 1px solid rgba(31, 41, 55, 0.075);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .context-menu-heading strong,
@@ -33,13 +38,13 @@
 }
 
 .context-menu-heading strong {
-  color: #1d2935;
+  color: var(--ui-text);
   font-size: 12px;
   font-weight: 680;
 }
 
 .context-menu-heading span {
-  color: #7c8792;
+  color: var(--ui-text-tertiary);
   font-size: 10.5px;
 }
 
@@ -54,15 +59,16 @@
   grid-template-columns: 19px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 7px;
-  padding: 0 8px;
+  padding: 0 var(--ui-space-2);
   border: 0;
-  border-radius: 7px;
-  color: #263442;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 12.5px;
   font-weight: 520;
   text-align: left;
+  transition: var(--ui-transition-fast-color-background);
 }
 
 .context-menu button.has-detail {
@@ -74,24 +80,26 @@
 .context-menu button:hover,
 .context-menu button:focus-visible,
 .context-menu-branch:focus-within > button {
-  color: #10202f;
-  background: #edf3f8;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
   outline: none;
 }
 
 .context-menu button:disabled {
-  color: #a5adb5;
+  color: var(--ui-text-tertiary);
   background: transparent;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .context-menu button.danger {
-  color: #b53a3a;
+  color: var(--ui-danger);
 }
 
 .context-menu button.danger:hover,
 .context-menu button.danger:focus-visible {
-  color: #a52f2f;
-  background: #fff0ef;
+  color: var(--ui-danger-hover);
+  background: var(--ui-danger-bg);
 }
 
 .context-menu-icon {
@@ -100,7 +108,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #687684;
+  color: var(--ui-text-secondary);
 }
 
 .context-menu button.danger .context-menu-icon {
@@ -122,20 +130,20 @@
 }
 
 .context-menu-copy small {
-  color: #87929d;
+  color: var(--ui-text-tertiary);
   font-size: 9.5px;
   font-weight: 500;
 }
 
 .context-menu button:hover .context-menu-copy small,
 .context-menu button:focus-visible .context-menu-copy small {
-  color: #637281;
+  color: var(--ui-text-secondary);
 }
 
 .context-menu kbd {
   padding: 0;
   border: 0;
-  color: #99a2ab;
+  color: var(--ui-text-tertiary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-family: inherit;
@@ -143,13 +151,13 @@
 }
 
 .context-menu-chevron {
-  color: #98a2ad;
+  color: var(--ui-text-tertiary);
 }
 
 .context-menu-separator {
   height: 1px;
   margin: 5px 7px;
-  background: #e9edf0;
+  background: var(--ui-border);
 }
 
 .context-menu-branch {
@@ -165,12 +173,10 @@
   display: none;
   overflow: auto;
   padding: 5px;
-  border: 1px solid rgba(28, 38, 51, 0.12);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow:
-    0 16px 38px rgba(29, 40, 54, 0.15),
-    0 2px 8px rgba(29, 40, 54, 0.07);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .context-menu-branch:hover > .context-submenu,
@@ -196,8 +202,8 @@
   }
 }
 
-/* Context menus render through a portal, so their nested submenus and
- * interaction states need their own dark-theme treatment. */
+/* --- Dark mode --- */
+
 :root[data-theme="dark"] .context-menu-heading {
   border-bottom-color: var(--ui-border);
 }
@@ -228,7 +234,7 @@
 :root[data-theme="dark"] .context-menu button:focus-visible,
 :root[data-theme="dark"] .context-menu-branch:focus-within > button {
   color: var(--ui-text);
-  background: var(--quiet-row-hover);
+  background: var(--ui-control-hover);
 }
 
 :root[data-theme="dark"] .context-menu button:hover .context-menu-copy small,

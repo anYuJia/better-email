@@ -1,53 +1,36 @@
+/*
+ * Legacy dialogs sheet (dialogs.css)
+ *
+ * Originally held composer and early settings page styles.
+ * Composer styles are now canonical in composer/composer.css.
+ * This file retains only the non-composer settings and utility styles
+ * that haven't yet migrated to their owning component sheets.
+ *
+ * TODO: migrate remaining rules to settings-pages.css or their component.
+ */
+
 .composer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(23, 31, 39, 0.22);
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.22);
   display: flex;
   justify-content: flex-end;
   align-items: flex-end;
-  padding: 24px;
-}
-.composer {
-  width: min(620px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  background: #fff;
-  border: 1px solid #d8dde4;
-  border-radius: 8px;
-  box-shadow: 0 16px 50px rgba(0,0,0,0.22);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.composer header, .composer footer {
-  min-height: 48px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #1f2933;
-  color: white;
-}
-.composer input, .composer select {
-  border: none;
-  border-bottom: 1px solid #edf0f3;
-  padding: 13px 14px;
-  outline: none;
-  width: 100%;
+  padding: var(--ui-space-6);
 }
 
 .composer-advanced {
-  border-top: 1px solid #edf0f3;
-  background: #fbfcfd;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
 }
 
 .composer-advanced summary {
   min-height: 44px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
   padding: 0 14px;
-  color: #3f4a56;
+  color: var(--ui-text-secondary);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -59,7 +42,7 @@
 
 .composer-advanced summary span {
   margin-left: auto;
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
 }
 
@@ -73,15 +56,15 @@
 .composer-tool-card {
   min-width: 0;
   display: grid;
-  gap: 8px;
-  border: 1px solid #edf0f3;
-  border-radius: 8px;
-  background: #fff;
+  gap: var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
   padding: 10px;
 }
 
 .composer-tool-card > strong {
-  color: #20242a;
+  color: var(--ui-text);
   font-size: 12px;
 }
 
@@ -89,7 +72,7 @@
 .composer-template-save {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .composer-template-list {
@@ -98,7 +81,7 @@
 }
 
 .composer-template-list small {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
 }
 
 .composer-template-row {
@@ -109,10 +92,10 @@
 
 .composer-template-row button,
 .composer-template-save button {
-  border: 1px solid #cfd6dd;
-  border-radius: 8px;
-  background: #fff;
-  color: #20242a;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text);
   min-height: 32px;
   padding: 0 10px;
 }
@@ -129,26 +112,29 @@
 }
 
 .composer-template-row button:last-child {
-  color: #c0392b;
+  color: var(--ui-danger);
 }
+
 .recipient-suggestions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-space-2);
   padding: 10px 14px;
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--ui-border);
   overflow-x: auto;
 }
+
 .recipient-suggestions span {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   white-space: nowrap;
 }
+
 .recipient-suggestions button {
-  border: 1px solid #d8dde4;
-  border-radius: 999px;
-  background: #fff;
-  color: #20242a;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -156,262 +142,164 @@
   padding: 0 10px;
   white-space: nowrap;
 }
+
 .recipient-suggestions small {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 11px;
 }
-.composer textarea {
-  border: none;
-  resize: none;
-  outline: none;
-  flex: 1;
-  padding: 14px;
-  line-height: 1.55;
-}
-.composer-rich-toggle {
-  border-top: 1px solid #edf0f3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 14px;
-  background: #fbfcfd;
-}
-.rich-toolbar {
-  display: flex;
-  gap: 6px;
-}
-.rich-toolbar button {
-  border: 1px solid #cfd6dd;
-  border-radius: 6px;
-  background: #fff;
-  min-height: 28px;
-  padding: 0 9px;
-}
-.composer-signature {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-top: 1px solid #edf0f3;
-  background: #f8fafb;
-  padding: 8px 14px;
-  color: #68717d;
-  font-size: 12px;
-}
-.composer-signature span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.composer-signature button {
-  border: 1px solid #cfd6dd;
-  border-radius: 7px;
-  background: #fff;
-  color: #20242a;
-  min-height: 28px;
-  padding: 0 9px;
-  white-space: nowrap;
-}
+
+/* composer-from: only the layout properties (colors are in composer.css) */
 .composer-from {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  color: #4b5563;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .composer-from select {
   flex: 1;
 }
 
-.composer-attachments {
-  border-top: 1px solid #edf0f3;
-  border-bottom: 1px solid transparent;
-  padding: 10px 14px;
-  display: grid;
-  gap: 8px;
-  background: #fbfcfd;
-  transition: var(--ui-transition-quiet-bg-border-shadow);
-}
-
-.composer-attachments.drop-active {
-  border-color: rgba(10, 132, 255, 0.34);
-  background: rgba(232, 243, 255, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.12);
-}
-
-.composer-schedule {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  border-top: 1px solid #edf0f3;
-  color: #4b5563;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.composer-schedule input {
-  flex: 1;
-  max-width: 240px;
-}
-.composer-attachment-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #68717d;
-  font-size: 12px;
-}
-.composer-attachment-button {
-  border: 1px solid #d8dde4;
-  border-radius: 7px;
-  background: #fff;
-  color: #20242a;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 10px;
-  font-weight: 700;
-}
-
-.composer-attachments.drop-active .composer-attachment-button {
-  border-color: rgba(10, 132, 255, 0.34);
-  color: var(--accent-strong, #0066d6);
-}
+/* composer-attachment-list: layout only (colors/borders in composer.css) */
 .composer-attachment-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
+
 .composer-attachment-chip {
-  border: 1px solid #d8dde4;
-  border-radius: 999px;
-  background: #fff;
-  color: #20242a;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 30px;
-  padding: 0 8px;
   max-width: 100%;
+  padding: 0 var(--ui-space-2);
+  overflow: hidden;
 }
+
 .composer-attachment-chip strong {
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .composer-attachment-chip em {
-  color: #68717d;
   font-size: 11px;
   font-style: normal;
 }
+
 .composer-attachment-chip button {
   border: none;
   background: transparent;
-  color: #c0392b;
   font-weight: 700;
   padding: 0 2px;
 }
-.composer footer { background: #f5f6f8; color: #68717d; }
-.composer footer div { display: flex; gap: 8px; }
-.checkbox-row {
-  display: flex !important;
-  grid-template-columns: none;
-  flex-direction: row;
-  align-items: center;
+
+.checkbox-row input {
+  width: auto;
 }
-.checkbox-row input { width: auto; }
+
+/* --- Non-composer utility styles (settings / sync / notifications) --- */
+
 .mailbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
+
 .mailbox-grid div {
-  border: 1px solid #edf0f3;
-  border-radius: 7px;
-  background: #fff;
-  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  padding: var(--ui-space-2);
   display: grid;
   gap: 4px;
 }
+
 .mailbox-grid strong {
-  color: #1f2933;
+  color: var(--ui-text);
   overflow-wrap: anywhere;
 }
+
 .mailbox-grid span {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
 }
+
 .sync-schedule-card {
-  border: 1px solid rgba(10, 132, 255, 0.18);
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(232, 243, 255, 0.90), rgba(255, 255, 255, 0.96));
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.86) inset;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
   display: grid;
   gap: 10px;
-  padding: 12px;
+  padding: var(--ui-space-3);
 }
+
 .sync-schedule-card > div:first-child {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--ui-space-3);
 }
+
 .sync-schedule-card span {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   font-weight: 650;
 }
+
 .sync-schedule-card strong {
-  color: #0f172a;
+  color: var(--ui-text);
   font-size: 14px;
-  font-weight: 820;
+  font-weight: 800;
 }
+
 .sync-schedule-card p {
-  color: #52616f;
+  color: var(--ui-text-secondary);
   font-size: 12px;
   line-height: 1.45;
   margin: 0;
 }
+
 .sync-schedule-metrics,
 .sync-account-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
+
 .sync-schedule-metrics span,
 .sync-account-strip span {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #52616f;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
   padding: 5px 9px;
 }
+
 .sync-account-strip span.active {
-  border-color: rgba(10, 132, 255, 0.24);
-  background: rgba(10, 132, 255, 0.10);
-  color: #075ca8;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
 }
+
 .notification-account-grid {
   display: grid;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
+
 .notification-account-grid > div {
   align-items: center;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
   display: grid;
   gap: 4px 10px;
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 9px 10px;
 }
+
 .notification-account-grid strong,
 .notification-account-grid span {
   min-width: 0;
@@ -419,64 +307,73 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .notification-account-grid span {
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
 }
+
 .notification-account-grid > div > div {
   display: flex;
   gap: 6px;
   grid-column: 2;
   grid-row: 1 / span 2;
 }
+
 .notification-account-grid button {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 999px;
-  background: #fff;
-  color: #52616f;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 700;
   padding: 5px 9px;
 }
+
 .notification-account-grid button.active {
-  border-color: rgba(10, 132, 255, 0.24);
-  background: rgba(10, 132, 255, 0.10);
-  color: #075ca8;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
 }
+
 .raw-preview textarea {
   width: 100%;
   min-height: 120px;
   resize: vertical;
-  border: 1px solid #e2e6ea;
-  border-radius: 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
   padding: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
+
 .grid-tools {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: start;
 }
+
 .grid-tools div {
   display: grid;
   gap: 6px;
   min-width: 0;
 }
+
 .grid-tools p {
   margin: 0;
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .status-line {
   position: fixed;
   left: 250px;
   bottom: 10px;
-  color: #68717d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   pointer-events: none;
 }

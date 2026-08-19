@@ -1,34 +1,78 @@
-/* Composer: compact desktop mail workflow with QQ-like tool density. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+/*
+ * Composer: canonical stylesheet
+ *
+ * Quiet desktop mail editor — focused, compact, calm, direct.
+ * The editor is the visual center. Everything else serves it.
+ *
+ * Section order:
+ *  1. Shell & backdrop
+ *  2. Header
+ *  3. Recipient fields
+ *  4. Recipient chips
+ *  5. Recipient autocomplete
+ *  6. Subject
+ *  7. Editor body
+ *  8. Rich-text body
+ *  9. Original quote
+ * 10. Attachments
+ * 11. Formatting toolbar
+ * 12. Quick tools strip
+ * 13. Advanced panel
+ * 14. Delivery controls
+ * 15. Template controls
+ * 16. Footer & actions
+ * 17. Progress indicators
+ * 18. Minimized state
+ * 19. Drag & drop
+ * 20. Risk banner
+ * 21. Responsive
+ * 22. Dark mode
+ */
+
+/* 1. Shell & backdrop ==================================================== */
+
+.composer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.22);
 }
 
 .composer {
-  width: min(800px, calc(100vw - 44px));
-  height: min(720px, calc(100vh - 44px));
+  width: min(760px, calc(100vw - 44px));
+  height: min(680px, calc(100vh - 44px));
   max-height: calc(100vh - 44px);
-  border-radius: 12px;
-  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-modal);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+  transform-origin: center;
 }
 
+/* 2. Header ============================================================== */
+
 .composer header {
-  min-height: 52px;
-  padding: 0 12px 0 17px;
-  background: rgba(250, 251, 252, 0.98);
+  flex: 0 0 auto;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 0 var(--ui-space-3) 0 14px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
 }
 
 .composer-title-copy {
   min-width: 0;
-  display: grid;
   flex: 1;
+  display: grid;
   gap: 2px;
 }
 
@@ -42,68 +86,87 @@
 
 .composer-title-copy strong {
   color: var(--ui-text);
-  font-size: 13.5px;
-  font-weight: 720;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .composer-title-copy small {
-  color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  display: none;
 }
 
 .composer-header-actions {
-  gap: 4px;
+  display: flex;
+  gap: var(--ui-space-1);
 }
 
 .composer-header-actions button {
-  min-height: 30px;
-  padding: 0 9px;
+  min-height: 28px;
+  padding: 0 var(--ui-space-2);
   border: 0;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
-  font-weight: 640;
+  font-weight: 560;
+  transition: var(--ui-transition-fast-color-background);
 }
 
 .composer-header-actions button:hover {
   color: var(--ui-text);
-  background: #eef1f4;
+  background: var(--ui-control-hover);
 }
+
+/* 3. Recipient fields ==================================================== */
 
 .composer-primary-fields {
   min-height: 0;
   display: flex;
   flex: 1;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--ui-surface);
 }
 
 .composer-field-row {
-  min-height: 46px;
+  min-height: 40px;
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
-  padding: 0 17px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text-tertiary);
-  font-size: 11.5px;
-  font-weight: 650;
+  font-size: 11px;
+  font-weight: 560;
   transition: var(--ui-transition-bg-short);
 }
 
 .composer-field-row:focus-within {
-  background: #fbfdff;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.composer-recipient-field {
+  position: relative;
+  z-index: 4;
+}
+
+.composer-recipient-field.has-suggestions {
+  z-index: 80;
+}
+
+.composer-recipient-field .composer-field-row:focus-within {
+  box-shadow: inset 2px 0 0 var(--ui-accent);
 }
 
 .composer .composer-field-row input {
-  min-height: 44px;
+  min-height: 39px;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
+  color: var(--ui-text);
 }
 
 .composer .composer-field-row input:hover,
@@ -115,132 +178,564 @@
 
 .composer-field-row input::placeholder,
 .composer-body-field textarea::placeholder {
-  color: #a2a9b3;
+  color: var(--ui-text-tertiary);
 }
+
+/* 4. Recipient chips ===================================================== */
+
+.composer .composer-recipient-editor {
+  min-height: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 0;
+}
+
+.composer .composer-recipient-editor input {
+  min-width: 90px;
+  min-height: 30px;
+  flex: 1 1 140px;
+}
+
+.composer .composer-recipient-chip {
+  display: inline-flex;
+  max-width: 220px;
+  min-height: 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  font-size: 11.5px;
+  font-weight: 560;
+}
+
+.composer .composer-recipient-chip-copy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer .composer-recipient-chip button {
+  display: inline-flex;
+  width: 17px;
+  min-height: 17px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-control-hover);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 0;
+  transition: var(--ui-transition-fast-color-background);
+}
+
+.composer .composer-recipient-chip button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+/* 5. Recipient autocomplete ============================================== */
 
 .composer .recipient-suggestions {
-  min-height: 40px;
-  gap: 6px;
-  padding: 6px 17px 7px 79px;
-  border-bottom: 1px solid var(--ui-border);
-  background: #fafbfc;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: none;
-}
-
-.composer .recipient-suggestions::-webkit-scrollbar {
-  display: none;
+  position: absolute;
+  left: 72px;
+  right: auto;
+  top: calc(100% + 5px);
+  z-index: 80;
+  width: min(390px, calc(100% - 88px));
+  max-height: 190px;
+  min-height: 0;
+  display: grid;
+  gap: 2px;
+  padding: var(--ui-space-1);
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+  isolation: isolate;
+  overscroll-behavior: contain;
 }
 
 .composer .recipient-suggestions > span {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  flex: 0 0 auto;
-  padding-right: 4px;
-  background: #fafbfc;
-  color: #939ba6;
-  font-size: 10.5px;
+  padding: 3px var(--ui-space-2) 4px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .composer .recipient-suggestions button {
-  min-height: 27px;
-  gap: 5px;
-  padding: 0 9px;
-  border-color: #e0e4e9;
-  border-radius: 7px;
-  background: #ffffff;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  padding: 5px var(--ui-space-2);
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: transparent;
+  text-align: left;
   box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-fast-color-background);
 }
 
 .composer .recipient-suggestions button:hover {
-  color: var(--ui-accent);
-  border-color: #c2daf3;
-  background: #f5faff;
+  background: var(--ui-control-hover);
 }
 
 .composer .recipient-suggestions button strong {
-  font-size: 10.5px;
-  font-weight: 680;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer .recipient-suggestions button small {
-  max-width: 150px;
   overflow: hidden;
-  color: #9aa1ab;
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.composer .recipient-suggestions button.is-active,
+.composer .recipient-suggestions button.is-active:hover {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+}
+
+/* 6. Subject ============================================================= */
+
+/* Subject uses the same .composer-field-row structure as recipients.
+   No extra Card, no thick border, no floating label. */
+
+/* 7. Editor body ========================================================= */
+
 .composer-body-field {
-  min-height: 150px;
+  min-height: 0;
   display: flex;
   flex: 1;
   flex-direction: column;
   position: relative;
+  overflow: auto;
+  background: var(--ui-surface);
+}
+
+.composer .composer-body-field::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background: var(--ui-border);
 }
 
 .composer .composer-body-field textarea {
-  min-height: 150px;
+  min-height: 120px;
   width: 100%;
-  flex: 1 1 auto;
-  padding: 18px 20px;
+  flex: 1 0 140px;
+  padding: 17px 18px;
   border: 0;
   border-radius: 0;
-  background: #ffffff;
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 14px;
-  line-height: 1.7;
+  color: var(--ui-text);
+  font-size: 13px;
+  line-height: 1.65;
+  resize: none;
 }
 
 .composer .composer-body-field textarea:hover,
 .composer .composer-body-field textarea:focus {
   border: 0;
-  background: #ffffff;
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
+  outline: none;
 }
+
+/* 8. Rich-text body ====================================================== */
+
+.composer .composer-body-field .composer-richtext-body {
+  min-height: 150px;
+  flex: 1 1 auto;
+  padding: 17px 18px;
+  overflow-y: auto;
+  outline: none;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-size: 13px;
+  line-height: 1.65;
+  cursor: text;
+  user-select: text;
+  word-break: break-word;
+}
+
+.composer .composer-body-field .composer-richtext-body:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ui-text-tertiary);
+  pointer-events: none;
+}
+
+.composer .composer-body-field .composer-richtext-body img {
+  display: block;
+  max-width: min(100%, 420px);
+  max-height: min(42vh, 280px);
+  width: auto;
+  height: auto;
+  margin: var(--ui-space-2) 0;
+  border-radius: var(--ui-radius-sm);
+}
+
+/* 9. Original quote ====================================================== */
+
+.composer-original-quote {
+  flex: 0 0 auto;
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0 18px 16px;
+  padding: 11px 13px;
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  user-select: text;
+}
+
+.composer-original-quote header {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.composer-original-quote header span {
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.composer-original-quote header small {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.composer-original-quote dl {
+  display: grid;
+  gap: var(--ui-space-1);
+  margin: 0;
+  padding: 0 0 var(--ui-space-2);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.composer-original-quote dl > div {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.composer-original-quote dt,
+.composer-original-quote dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.composer-original-quote dt {
+  color: var(--ui-text-tertiary);
+}
+
+.composer-original-quote dd {
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-original-quote pre {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Reply mode: quoted content above, writable area below */
+.composer .composer-body-field.has-original-quote {
+  align-content: start;
+  justify-content: flex-start;
+  gap: 0;
+  overflow: auto;
+}
+
+.composer .composer-body-field.has-original-quote textarea,
+.composer .composer-body-field.has-original-quote .composer-richtext-body {
+  height: 112px;
+  min-height: 112px;
+  flex: 0 0 112px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.composer .composer-body-field.has-original-quote textarea:placeholder-shown {
+  height: 96px;
+  min-height: 96px;
+  flex-basis: 96px;
+}
+
+.composer .composer-body-field.has-original-quote::after {
+  display: none;
+}
+
+.composer .composer-body-field.has-original-quote .composer-original-quote {
+  margin-top: var(--ui-space-2);
+}
+
+/* 10. Attachments ======================================================== */
+
+.composer-body-attachments {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  padding: 0 18px 14px;
+  background: var(--ui-surface);
+}
+
+.composer-attachment-tile {
+  width: 228px;
+  min-height: 70px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px 9px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.composer-attachment-tile:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+.composer-attachment-filemark {
+  width: 48px;
+  height: 52px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: var(--ui-surface);
+}
+
+.composer-attachment-filemark::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 15px;
+  background: var(--ui-accent-soft);
+}
+
+.composer-attachment-filemark-fold {
+  width: 13px;
+  height: 13px;
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  border-left: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.composer-attachment-filemark-icon {
+  position: relative;
+  z-index: 1;
+  margin-top: -5px;
+}
+
+.composer-attachment-filemark-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  z-index: 1;
+  overflow: hidden;
+  padding: 0 4px;
+  color: currentColor;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Attachment type variants — semantic tokens only */
+.composer-attachment-tile.attachment-image .composer-attachment-filemark {
+  color: var(--ui-success);
+  border-color: var(--ui-success);
+  background: var(--ui-success-bg);
+}
+
+.composer-attachment-tile.attachment-image .composer-attachment-filemark::after {
+  background: var(--ui-success-bg);
+}
+
+.composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
+  color: var(--ui-success);
+  border-color: var(--ui-success);
+  background: var(--ui-success-bg);
+}
+
+.composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
+  background: var(--ui-success-bg);
+}
+
+.composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
+  color: var(--ui-danger);
+  border-color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+.composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
+  background: var(--ui-danger-bg);
+}
+
+.composer-attachment-tile.attachment-archive .composer-attachment-filemark {
+  color: var(--ui-warning);
+  border-color: var(--ui-warning-border);
+  background: var(--ui-warning-bg);
+}
+
+.composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
+  background: var(--ui-warning-bg);
+}
+
+.composer-attachment-tile-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.composer-attachment-tile-copy strong {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-tile-copy small {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.composer-attachment-tile button {
+  width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-danger);
+  background: transparent;
+  font-size: 0;
+  transition: var(--ui-transition-fast-color-background);
+}
+
+.composer-attachment-tile button:hover {
+  color: var(--ui-danger-hover);
+  background: var(--ui-danger-bg);
+}
+
+.composer-body-attachment-empty {
+  width: fit-content;
+  margin: 0 18px 16px;
+  padding: 7px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+/* 11. Formatting toolbar ================================================== */
+
+.composer .rich-toolbar {
+  min-height: 30px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding-right: var(--ui-space-2);
+  border-right: 1px solid var(--ui-border);
+}
+
+.composer .rich-toolbar button {
+  width: 29px;
+  min-height: 29px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.composer .rich-toolbar button:hover,
+.composer .rich-toolbar button:focus-visible {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent-soft);
+  background: var(--ui-accent-soft);
+}
+
+.composer .rich-toolbar button span {
+  font-size: 0;
+}
+
+/* 12. Quick tools strip ================================================== */
 
 .composer-quick-tools {
   flex: 0 0 auto;
   border-top: 1px solid var(--ui-border);
-  background: #fafbfc;
-}
-
-.composer-risk-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 9px 12px;
-  border-bottom: 1px solid rgba(250, 204, 21, 0.28);
-  background: rgba(250, 204, 21, 0.09);
-  color: #b45309;
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.composer-risk-banner > svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: #d97706;
-}
-
-.composer-risk-banner p {
-  margin: 0 0 4px;
-}
-
-.composer-risk-banner p:last-child {
-  margin-bottom: 0;
-}
-
-.composer-risk-banner strong {
-  font-weight: 600;
+  background: var(--ui-surface-muted);
 }
 
 .composer-quick-toolbar {
-  min-height: 45px;
+  min-height: 38px;
   display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 7px 11px;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: 4px 10px;
+  overflow: hidden;
 }
 
 .composer-quick-tools .composer-rich-toggle,
@@ -254,7 +749,7 @@
 }
 
 .composer-quick-tools .composer-rich-toggle {
-  min-height: 31px;
+  min-height: 30px;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -262,23 +757,24 @@
 }
 
 .composer-quick-tools .checkbox-row {
-  min-height: 31px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 0 9px;
-  border: 1px solid #dde2e8;
-  border-radius: 8px;
+  padding: 0 var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: #ffffff;
+  background: var(--ui-surface);
   font-size: 10.5px;
-  font-weight: 650;
+  font-weight: 560;
   cursor: pointer;
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
 .composer-quick-tools .checkbox-row:hover {
   color: var(--ui-text);
-  border-color: #c8d0d9;
+  border-color: var(--ui-border-strong);
 }
 
 .composer-quick-tools .checkbox-row input {
@@ -289,9 +785,9 @@
   margin: 0;
   padding: 0;
   appearance: none;
-  border: 1px solid #bdc5cf;
+  border: 1px solid var(--ui-border-strong);
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -307,119 +803,139 @@
   top: 3px;
   width: 6px;
   height: 3px;
-  border-left: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
+  border-left: 2px solid var(--color-text-on-accent);
+  border-bottom: 2px solid var(--color-text-on-accent);
   transform: rotate(-45deg);
 }
 
-.composer-quick-tools .rich-toolbar {
-  gap: 3px;
-}
-
-.composer-quick-tools .rich-toolbar button,
-.composer-quick-tools .composer-signature button,
-.composer-quick-tools .composer-attachment-button {
-  min-height: 31px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 1px solid #dde2e8;
-  border-radius: 8px;
-  color: var(--ui-text-secondary);
-  background: #ffffff;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 10.5px;
-  font-weight: 650;
-}
-
-.composer-quick-tools .rich-toolbar button:hover,
-.composer-quick-tools .composer-signature button:hover,
-.composer-quick-tools .composer-attachment-button:hover {
-  color: var(--ui-accent);
-  border-color: #bdd8f3;
-  background: #f5faff;
-}
-
-.composer-quick-tools .rich-toolbar button span {
-  font-size: 0;
-}
-
-.composer-quick-tools .composer-signature {
-  min-height: 31px;
+.composer .composer-signature {
   min-width: 0;
+  min-height: 30px;
   display: inline-flex;
-  flex: 0 1 230px;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
+  overflow: hidden;
 }
 
-.composer-quick-tools .composer-signature small {
+.composer .composer-signature button,
+.composer .composer-attachment-button {
+  min-height: 29px;
+  padding: 0 var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  white-space: nowrap;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.composer .composer-signature button:hover,
+.composer .composer-attachment-button:hover {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer .composer-signature small,
+.composer .composer-attachment-controls > span {
   min-width: 0;
   overflow: hidden;
-  color: #929aa5;
+  color: var(--ui-text-tertiary);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.composer-quick-tools .composer-attachments {
-  min-width: 220px;
-  display: grid;
-  flex: 1;
-  gap: 6px;
-  border-radius: 8px;
+.composer .composer-attachments {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow: hidden;
   transition: var(--ui-transition-bg-box-shadow-short);
 }
 
-.composer-quick-tools .composer-attachments.drop-active {
-  background: #eaf5ff;
-  box-shadow: 0 0 0 2px rgba(8, 127, 245, 0.18);
+.composer .composer-attachments.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--ui-accent);
 }
 
-.composer-quick-tools .composer-attachment-controls {
-  min-height: 31px;
-  gap: 8px;
+.composer .composer-attachment-controls {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
 }
 
-.composer-quick-tools .composer-attachment-controls > span {
-  color: #929aa5;
+.composer .composer-attachment-controls > span {
+  color: var(--ui-text-tertiary);
   font-size: 10px;
 }
+
+/* 13. Advanced panel ====================================================== */
 
 .composer-advanced {
   flex: 0 0 auto;
   border-top: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: #f7f8fa;
+  background: var(--ui-surface-muted);
 }
 
-.composer-advanced summary {
-  min-height: 39px;
-  padding: 0 14px;
+.composer .composer-advanced summary {
+  min-height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 var(--ui-space-3);
   color: var(--ui-text-secondary);
+  background: transparent;
   font-size: 11px;
+  font-weight: 600;
+  transition: var(--ui-transition-fast-color-background);
 }
 
-.composer-advanced summary:hover,
-.composer-advanced[open] summary {
+.composer .composer-advanced summary:hover,
+.composer .composer-advanced[open] summary {
   color: var(--ui-text);
-  background: #f1f3f6;
+  background: var(--ui-control-hover);
 }
 
-.composer-advanced summary span {
-  color: #939ba6;
+.composer .composer-advanced summary > strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.composer .composer-advanced summary > span {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
   font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer .composer-advanced-chevron {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  transition: var(--ui-transition-transform-short);
+}
+
+.composer .composer-advanced[open] .composer-advanced-chevron {
+  transform: rotate(180deg);
 }
 
 .composer-advanced-panel {
   max-height: 220px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-  padding: 0 12px 10px;
-  background: #f8f9fa;
+  gap: var(--ui-space-2);
+  padding: 7px var(--ui-space-3) 9px;
+  overflow: auto;
+  background: var(--ui-surface-muted);
 }
 
 .composer-tool-card {
@@ -434,12 +950,12 @@
 .composer-tool-card > strong {
   color: var(--ui-text);
   font-size: 11.5px;
-  font-weight: 720;
+  font-weight: 650;
 }
 
 .composer-advanced-row {
   display: grid;
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .composer-route-row {
@@ -450,108 +966,219 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(190px, 1.1fr);
 }
 
-.composer-delivery-card .composer-from,
-.composer-inline-input,
-.composer-delivery-card .composer-schedule {
-  min-height: 32px;
+/* 14. Delivery controls =================================================== */
+
+.composer .composer-delivery-controls {
+  min-width: 0;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(120px, .8fr) minmax(170px, 1.05fr);
   gap: 7px;
+  align-items: center;
+}
+
+.composer .composer-delivery-controls .composer-inline-select,
+.composer .composer-delivery-controls .composer-inline-input,
+.composer .composer-delivery-controls .composer-schedule {
+  min-width: 0;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
   padding: 0;
   border: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 10.5px;
-  font-weight: 560;
+  font-size: 10px;
+  font-weight: 600;
 }
 
-.composer-inline-input input,
-.composer-template-save input,
-.composer-delivery-card .composer-schedule input {
-  min-height: 32px;
-  padding: 0 9px;
-  border-radius: 7px;
-  border-color: #dce2e8;
-  background: #fff;
-  font-size: 11px;
+.composer .composer-delivery-controls .composer-schedule {
+  grid-template-columns: 40px minmax(0, 1fr);
 }
 
-.composer-inline-select {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: visible;
-}
-
-.composer-inline-select > span {
-  flex: 0 0 auto;
-}
-
-.composer-inline-select .custom-select-menu {
-  flex: 1 1 auto;
-}
-
-.composer-delivery-card .composer-schedule > span {
+.composer .composer-delivery-controls .composer-schedule > span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   color: var(--ui-text-secondary);
 }
 
-.composer-delivery-card .composer-schedule input {
-  max-width: none;
-  font-size: 10.5px;
-}
-
-.composer-template-card {
-  grid-template-columns: minmax(0, 1fr) 238px;
-  align-items: center;
-}
-
-.composer-template-list {
-  min-height: 32px;
-  max-height: 74px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  overflow: auto;
-}
-
-.composer-template-row button,
-.composer-template-save button {
-  min-height: 31px;
-  border-radius: 7px;
+.composer .composer-delivery-controls input {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
-.composer-template-row {
-  display: inline-flex;
-  gap: 3px;
+.composer .composer-delivery-controls input:hover,
+.composer .composer-delivery-controls input:focus {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
 }
 
-.composer-template-row button:first-child {
-  max-width: 132px;
-  justify-content: flex-start;
+.composer .composer-delivery-controls .custom-select-menu,
+.composer .composer-delivery-controls .custom-select-summary {
+  min-width: 0;
+  width: 100%;
 }
 
-.composer-template-row button:last-child {
-  width: 28px;
-  padding: 0;
-  color: #8f4f4f;
+.composer .composer-delivery-controls .custom-select-summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
-.composer-template-list small {
-  align-self: center;
+.composer .composer-delivery-controls .custom-select-summary > span {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.composer .composer-delivery-controls .custom-select-summary strong,
+.composer .composer-delivery-controls .custom-select-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer .composer-delivery-controls .custom-select-summary strong {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.composer .composer-delivery-controls .custom-select-summary small {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 9px;
 }
 
-.composer-template-save {
+/* 15. Template controls ================================================== */
+
+.composer .composer-template-controls {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 74px;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 226px;
+  gap: var(--ui-space-2);
+  align-items: center;
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+
+.composer .composer-template-list {
+  min-width: 0;
+  min-height: 30px;
+  max-height: 31px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.composer .composer-template-list::-webkit-scrollbar {
+  display: none;
+}
+
+.composer .composer-template-list > small {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.composer .composer-template-row {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.composer .composer-template-row button,
+.composer .composer-template-save button {
+  min-height: 30px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 10px;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.composer .composer-template-row button:first-child {
+  max-width: 132px;
+  padding: 0 var(--ui-space-2);
+}
+
+.composer .composer-template-row button:last-child {
+  width: 25px;
+  padding: 0;
+  color: var(--ui-danger);
+}
+
+.composer .composer-template-row button:hover,
+.composer .composer-template-save button:hover {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer .composer-template-save {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  gap: 5px;
+}
+
+.composer .composer-template-save input {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 10.5px;
+  color: var(--ui-text);
+}
+
+.composer .composer-template-save button {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+.composer .composer-template-save button:hover {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+/* 16. Footer & actions ==================================================== */
+
+.composer footer {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  justify-content: space-between;
 }
 
 .composer-footer-actions {
@@ -567,82 +1194,6 @@
   gap: 6px;
 }
 
-.composer-send-progress {
-  position: relative;
-  width: 100%;
-  height: 5px;
-  border: 1px solid #dce2ea;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #eef2f7;
-}
-
-.composer-send-progress-wrapper {
-  flex: 1 1 220px;
-  max-width: 220px;
-  min-width: 120px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.composer-send-progress-message {
-  display: block;
-  max-width: 100%;
-  color: var(--ui-text-tertiary);
-  font-size: 10px;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-send-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--ui-accent);
-  border-radius: inherit;
-  transition: width 0.25s ease;
-}
-
-.composer-attachment-progress {
-  position: relative;
-  width: 100%;
-  height: 5px;
-  border: 1px solid #dce2ea;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #eef2f7;
-}
-
-.composer-attachment-progress-wrapper {
-  flex: 1 1 220px;
-  max-width: 220px;
-  min-width: 120px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.composer-attachment-progress-message {
-  display: block;
-  max-width: 100%;
-  color: var(--ui-text-tertiary);
-  font-size: 10px;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-attachment-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--ui-accent);
-  border-radius: inherit;
-  transition: width 0.25s ease;
-}
-
 .composer footer > span,
 .composer-footer-status > span {
   display: block;
@@ -655,6 +1206,112 @@
   white-space: nowrap;
 }
 
+/* 17. Progress indicators ================================================ */
+
+.composer-send-progress,
+.composer-attachment-progress {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  overflow: hidden;
+  background: var(--ui-surface-muted);
+}
+
+.composer-send-progress-wrapper,
+.composer-attachment-progress-wrapper {
+  flex: 1 1 220px;
+  max-width: 220px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer-send-progress-message,
+.composer-attachment-progress-message {
+  display: block;
+  max-width: 100%;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-send-progress-fill,
+.composer-attachment-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ui-accent);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+/* 18. Minimized state ==================================================== */
+
+.composer-minimized-layer {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1000;
+  width: min(440px, calc(100vw - 44px));
+  pointer-events: none;
+}
+
+.composer-minimized {
+  pointer-events: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+/* 19. Drag & drop ======================================================== */
+
+.composer .composer-body-field.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+/* Drop zone label is rendered by the React component. */
+
+/* 20. Risk banner ======================================================== */
+
+.composer-risk-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-warning-border);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.composer-risk-banner > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--ui-warning);
+}
+
+.composer-risk-banner p {
+  margin: 0 0 4px;
+}
+
+.composer-risk-banner p:last-child {
+  margin-bottom: 0;
+}
+
+.composer-risk-banner strong {
+  font-weight: 600;
+}
+
+/* 21. Responsive ========================================================= */
+
 @media (max-width: 720px) {
   .composer-backdrop {
     padding: 10px;
@@ -666,20 +1323,25 @@
     max-height: calc(100vh - 20px);
   }
 
-  .composer .recipient-suggestions {
-    padding-left: 17px;
-  }
-
-  .composer-quick-toolbar {
+  .composer .composer-quick-toolbar {
     flex-wrap: wrap;
+    overflow: visible;
   }
 
-  .composer-quick-tools .composer-attachments {
-    min-width: 100%;
+  .composer .composer-attachments {
+    flex-basis: 100%;
   }
 
   .composer-advanced-panel {
     grid-template-columns: 1fr;
+  }
+
+  .composer .composer-delivery-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .composer .composer-template-controls {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .composer footer > span,
@@ -706,1186 +1368,14 @@
   }
 }
 
-/* Quiet composer override: mail body first, tools stay secondary. */
-.composer-backdrop {
-  background: rgba(24, 29, 36, 0.22);
-  backdrop-filter: blur(14px);
-}
-
-.composer {
-  width: min(760px, calc(100vw - 44px));
-  height: min(680px, calc(100vh - 44px));
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-modal);
-  background: #fff;
-  box-shadow: var(--ui-shadow-popover);
-}
-
-.composer header {
-  min-height: 46px;
-  padding: 0 10px 0 14px;
-  border-bottom: 1px solid var(--ui-border);
-  background: #fff;
-}
-
-.composer-title-copy strong {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.composer-title-copy small {
-  display: none;
-}
-
-.composer-header-actions button,
-.composer-quick-tools .rich-toolbar button,
-.composer-quick-tools .composer-signature button,
-.composer-quick-tools .composer-attachment-button,
-.composer-quick-tools .checkbox-row,
-.composer-template-row button,
-.composer-template-save button {
-  border-radius: var(--ui-radius-control);
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 11px;
-  font-weight: 560;
-}
-
-.composer-header-actions button {
-  min-height: 28px;
-  padding: 0 8px;
-}
-
-.composer-field-row {
-  min-height: 40px;
-  grid-template-columns: 54px minmax(0, 1fr);
-  padding: 0 14px;
-  color: var(--ui-text-tertiary);
-  font-size: 11px;
-  font-weight: 560;
-}
-
-.composer-field-row:focus-within {
-  background: #fff;
-}
-
-.composer .composer-field-row input {
-  min-height: 39px;
-  font-size: 13px;
-}
-
-.composer-recipient-field {
-  position: relative;
-  z-index: 4;
-}
-
-.composer-recipient-field.has-suggestions {
-  z-index: 80;
-}
-
-.composer .recipient-suggestions {
-  position: absolute;
-  left: 68px;
-  right: 14px;
-  top: calc(100% - 1px);
-  z-index: 8;
-  width: auto;
-  max-height: 218px;
-  min-height: 0;
-  display: grid;
-  gap: 2px;
-  padding: 5px;
-  overflow: auto;
-  border: 1px solid #d9dee5;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow:
-    0 12px 26px rgba(31, 35, 40, 0.13),
-    0 1px 4px rgba(31, 35, 40, 0.08);
-}
-
-.composer .recipient-suggestions > span {
-  position: static;
-  padding: 3px 7px 4px;
-  background: transparent;
-  color: #8b95a1;
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.composer .recipient-suggestions button {
-  min-height: 32px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.9fr);
-  gap: 8px;
-  justify-content: stretch;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  color: #202833;
-  background: transparent;
-  text-align: left;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .recipient-suggestions button:hover {
-  color: #1f2a36;
-  background: #f2f5f8;
-}
-
-.composer .recipient-suggestions button strong {
-  overflow: hidden;
-  font-size: 12.5px;
-  font-weight: 560;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .recipient-suggestions button small {
-  overflow: hidden;
-  color: #8b95a1;
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .composer-body-field textarea {
-  padding: 17px 18px;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
-.composer .composer-body-field textarea:is(:hover, :focus) {
-  outline: none;
-}
-
-.composer .composer-body-field textarea {
-  color: #202833;
-}
-
-.composer .composer-body-field .composer-richtext-body {
-  min-height: 150px;
-  flex: 1 1 auto;
-  padding: 17px 18px;
-  overflow-y: auto;
-  outline: none;
-  color: #202833;
-  background: #ffffff;
-  font-size: 13px;
-  line-height: 1.65;
-  cursor: text;
-  user-select: text;
-  word-break: break-word;
-}
-
-.composer .composer-body-field .composer-richtext-body:empty::before {
-  content: attr(data-placeholder);
-  color: #a2a9b3;
-  pointer-events: none;
-}
-
-.composer .composer-body-field .composer-richtext-body img {
-  display: block;
-  max-width: min(100%, 420px);
-  max-height: min(42vh, 280px);
-  width: auto;
-  height: auto;
-  margin: 6px 0;
-  border-radius: 6px;
-}
-
-.composer .composer-body-field.has-original-quote .composer-richtext-body {
-  height: 112px;
-  min-height: 112px;
-  flex: 0 0 112px;
-  padding: 18px 18px 12px;
-  border-bottom: 1px solid #eef1f4;
-}
-
-.composer .composer-body-field.has-original-quote .composer-richtext-body:empty {
-  height: 96px;
-  min-height: 96px;
-  flex-basis: 96px;
-}
-
-.composer .composer-body-field textarea {
-  background:
-    linear-gradient(#fff, #fff) padding-box;
-}
-
-.composer-quick-tools,
-.composer-advanced {
-  background: #f8f9fa;
-}
-
-.composer-quick-toolbar {
-  min-height: 40px;
-  padding: 5px 10px;
-  gap: 6px;
-}
-
-.composer-quick-tools .composer-signature small,
-.composer-quick-tools .composer-attachment-controls > span,
-.composer-advanced summary span {
-  color: var(--ui-text-tertiary);
-  font-size: 10px;
-}
-
-.composer-advanced summary {
-  min-height: 34px;
-  padding: 0 12px;
-}
-
-.composer-advanced-panel {
-  max-height: 190px;
-  gap: 0;
-  padding: 0 12px 9px;
-  background: #f8f9fa;
-}
-
-.composer-tool-card {
-  padding: 9px;
-  border: 0;
-  border-top: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: transparent;
-}
-
-.composer-tool-card > strong {
-  font-size: 11.5px;
-  font-weight: 650;
-}
-
-.composer footer {
-  min-height: 48px;
-  padding: 0 10px;
-  border-top: 1px solid var(--ui-border);
-  background: #fff;
-  justify-content: space-between;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.composer footer > span {
-  display: block;
-  min-width: 0;
-  max-width: 360px;
-  overflow: hidden;
-  color: var(--ui-text-tertiary);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-minimized {
-  pointer-events: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: var(--ui-shadow-popover);
-}
-
-/* Reply composer: keep quoted/original content visually secondary inside the textarea. */
-.composer .composer-body-field {
-  position: relative;
-}
-
-.composer .composer-body-field::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 0;
-  height: 1px;
-  pointer-events: none;
-  background: #eef1f4;
-}
-
-/* Composer polish: softer recipient menu and read-only quoted mail. */
-.composer-recipient-field .composer-field-row:focus-within {
-  background: #fbfcfd;
-  box-shadow: inset 2px 0 0 #9fc4ea;
-}
-
-.composer .recipient-suggestions {
-  left: 72px;
-  right: auto;
-  top: calc(100% + 6px);
-  width: min(390px, calc(100% - 88px));
-  max-height: 190px;
-  padding: 6px;
-  border-color: rgba(31, 35, 40, 0.12);
-  border-radius: 13px;
-  background: #ffffff;
-  box-shadow:
-    0 14px 30px rgba(31, 35, 40, 0.13),
-    0 1px 4px rgba(31, 35, 40, 0.07);
-}
-
-.composer .recipient-suggestions > span {
-  padding: 4px 9px 5px;
-  font-size: 11px;
-}
-
-.composer .recipient-suggestions button {
-  min-height: 34px;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
-  padding: 5px 9px;
-  border-radius: 9px;
-}
-
-.composer .recipient-suggestions button small {
-  font-size: 11px;
-}
-
-.composer .composer-body-field {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: auto;
-  background: #fff;
-}
-
-.composer .composer-body-field textarea {
-  min-height: 120px;
-  flex: 1 0 140px;
-  resize: none;
-}
-
-.composer-original-quote {
-  flex: 0 0 auto;
-  display: grid;
-  gap: 9px;
-  margin: 0 18px 16px;
-  padding: 11px 13px;
-  border: 1px solid #e0e5ea;
-  border-left: 3px solid #c9d3de;
-  border-radius: 10px;
-  color: #4f5a66;
-  background: #f7f9fb;
-  user-select: text;
-}
-
-.composer-original-quote header {
-  min-height: 18px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.composer-original-quote header span {
-  color: #5d6875;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.composer-original-quote header small {
-  color: #8d96a1;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.composer-original-quote dl {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0 0 8px;
-  border-bottom: 1px solid #e5e9ee;
-}
-
-.composer-original-quote dl > div {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 7px;
-}
-
-.composer-original-quote dt,
-.composer-original-quote dd {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.composer-original-quote dt {
-  color: #8b95a1;
-}
-
-.composer-original-quote dd {
-  overflow: hidden;
-  color: #3e4854;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-original-quote pre {
-  margin: 0;
-  color: #4f5a66;
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Reply layout: keep the writable area short and the readonly source close. */
-.composer .composer-body-field.has-original-quote {
-  align-content: start;
-  justify-content: flex-start;
-  gap: 0;
-  overflow: auto;
-}
-
-.composer .composer-body-field.has-original-quote textarea {
-  height: 112px;
-  min-height: 112px;
-  flex: 0 0 112px;
-  padding: 18px 18px 12px;
-  border-bottom: 1px solid #eef1f4;
-}
-
-.composer .composer-body-field.has-original-quote textarea:placeholder-shown {
-  height: 96px;
-  min-height: 96px;
-  flex-basis: 96px;
-}
-
-.composer .composer-body-field.has-original-quote::after {
-  display: none;
-}
-
-.composer .composer-body-field.has-original-quote .composer-original-quote {
-  margin-top: 8px;
-}
-
-.composer .composer-body-field.drop-active {
-  background: #f8fbff;
-  box-shadow: inset 0 0 0 1px #b8d4ef;
-}
-
-.composer .composer-body-field.drop-active::before {
-  content: "松开添加附件";
-  position: absolute;
-  left: 50%;
-  top: 18px;
-  z-index: 2;
-  padding: 5px 10px;
-  border: 1px solid #c9dced;
-  border-radius: 999px;
-  color: #3f6f9f;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 18px rgba(31, 35, 40, 0.10);
-  font-size: 12px;
-  font-weight: 560;
-  pointer-events: none;
-  transform: translateX(-50%);
-}
-
-.composer-body-attachments {
-  flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  padding: 0 18px 14px;
-  background: #fff;
-}
-
-.composer-attachment-tile {
-  width: 228px;
-  min-height: 70px;
-  position: relative;
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 22px;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 8px 9px 10px;
-  border: 1px solid #dde4eb;
-  border-radius: 11px;
-  color: #24303d;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer-attachment-tile:hover {
-  border-color: #c8d4df;
-  background: #ffffff;
-}
-
-.composer-attachment-filemark {
-  width: 48px;
-  height: 52px;
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid #cfd9e3;
-  border-radius: 10px;
-  color: #466f9a;
-  background:
-    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
-    linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
-}
-
-.composer-attachment-filemark::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 15px;
-  background: #e9f2fb;
-}
-
-.composer-attachment-filemark-fold {
-  width: 13px;
-  height: 13px;
-  position: absolute;
-  right: -1px;
-  top: -1px;
-  border-left: 1px solid #cfd9e3;
-  border-bottom: 1px solid #cfd9e3;
-  background: #ffffff;
-}
-
-.composer-attachment-filemark-icon {
-  position: relative;
-  z-index: 1;
-  margin-top: -5px;
-}
-
-.composer-attachment-filemark-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  z-index: 1;
-  overflow: hidden;
-  padding: 0 4px;
-  color: #426b95;
-  font-size: 8.5px;
-  font-weight: 760;
-  letter-spacing: 0;
-  line-height: 12px;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.composer-attachment-tile.attachment-image .composer-attachment-filemark {
-  color: #2f7f76;
-  border-color: #c9dedb;
-  background:
-    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
-    linear-gradient(180deg, #f5fbfa 0%, #e9f5f2 100%);
-}
-
-.composer-attachment-tile.attachment-image .composer-attachment-filemark::after {
-  background: #dff0ed;
-}
-
-.composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
-  color: #317547;
-  border-color: #c8ddce;
-  background:
-    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
-    linear-gradient(180deg, #f5fbf6 0%, #e8f4eb 100%);
-}
-
-.composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
-  background: #dceee2;
-}
-
-.composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
-  color: #9a4a4a;
-  border-color: #e2caca;
-  background:
-    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
-    linear-gradient(180deg, #fff8f8 0%, #f7ecec 100%);
-}
-
-.composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
-  background: #f2dddd;
-}
-
-.composer-attachment-tile.attachment-archive .composer-attachment-filemark {
-  color: #8a6a34;
-  border-color: #e0d5be;
-  background:
-    linear-gradient(135deg, transparent 0 78%, rgba(255, 255, 255, 0.88) 78% 100%),
-    linear-gradient(180deg, #fffaf1 0%, #f5edda 100%);
-}
-
-.composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
-  background: #eee3c9;
-}
-
-.composer-attachment-tile-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.composer-attachment-tile-copy strong {
-  overflow: hidden;
-  font-size: 12.5px;
-  font-weight: 610;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-attachment-tile-copy small {
-  color: #87919d;
-  font-size: 11px;
-}
-
-.composer-attachment-tile button {
-  width: 22px;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  color: #9d4f4f;
-  background: transparent;
-  font-size: 0;
-}
-
-.composer-attachment-tile button:hover {
-  color: #7f2f2f;
-  background: #f3eaea;
-}
-
-.composer-body-attachment-empty {
-  width: fit-content;
-  margin: 0 18px 16px;
-  padding: 7px 11px;
-  border: 1px solid #cbdced;
-  border-radius: 8px;
-  color: #3f6f9f;
-  background: #f7fbff;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
-  font-weight: 560;
-}
-
-.composer-recipient-field .composer-field-row:focus-within {
-  background: #fff;
-  box-shadow: inset 2px 0 0 #8fb8e2;
-}
-
-.composer .recipient-suggestions {
-  top: calc(100% + 5px);
-  border-radius: 12px;
-}
-
-/* Composer shell: keep the window centered; only the backdrop closes it. */
-.composer-backdrop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 22px;
-}
-
-.composer {
-  transform-origin: center;
-}
-
-/* Composer focus: avoid heavy blue rings inside the mail editor. */
-.composer :is(input, textarea):focus,
-.composer :is(input, textarea):focus-visible {
-  outline: none !important;
-  border-color: var(--ui-border) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-.composer .composer-field-row:focus-within,
-.composer-recipient-field .composer-field-row:focus-within {
-  background: #fbfcfd;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .composer-field-row:focus-within {
-  border-bottom-color: #d7dde4;
-}
-
-.composer .composer-body-field textarea:focus {
-  background: #fff;
-}
-
-.composer-minimized-layer {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 1000;
-  width: min(440px, calc(100vw - 44px));
-  pointer-events: none;
-}
-
-/* Compact composer controls: keep secondary actions readable without adding cards. */
-.composer .composer-quick-tools {
-  border-top: 1px solid #e2e7ec;
-  background: #f8fafc;
-}
-
-.composer .composer-quick-toolbar {
-  min-height: 38px;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  overflow: hidden;
-}
-
-.composer .rich-toolbar {
-  min-height: 30px;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 2px;
-  padding-right: 8px;
-  border-right: 1px solid #e1e6eb;
-}
-
-.composer .rich-toolbar button {
-  width: 29px;
-  min-height: 29px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: #586575;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .rich-toolbar button:hover,
-.composer .rich-toolbar button:focus-visible {
-  color: #1769aa;
-  border-color: #c9def1;
-  background: #edf6fd;
-}
-
-.composer .composer-signature {
-  min-width: 0;
-  min-height: 30px;
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.composer .composer-signature button,
-.composer .composer-attachment-button {
-  min-height: 29px;
-  padding: 0 8px;
-  border: 1px solid #dce3e9;
-  border-radius: 6px;
-  color: #4e5c6b;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-  white-space: nowrap;
-}
-
-.composer .composer-signature button:hover,
-.composer .composer-attachment-button:hover {
-  color: #1769aa;
-  border-color: #c5dcef;
-  background: #f4f9fd;
-}
-
-.composer .composer-signature small,
-.composer .composer-attachment-controls > span {
-  min-width: 0;
-  overflow: hidden;
-  color: #8a95a1;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .composer-attachments {
-  min-width: 0;
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  overflow: hidden;
-}
-
-.composer .composer-attachment-controls {
-  min-width: 0;
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 7px;
-  overflow: hidden;
-}
-
-.composer .composer-advanced {
-  border-top: 1px solid #e2e7ec;
-  background: #f8fafc;
-}
-
-.composer .composer-advanced summary {
-  min-height: 35px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 12px;
-  color: #4f5d6b;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 620;
-}
-
-.composer .composer-advanced summary:hover,
-.composer .composer-advanced[open] summary {
-  color: #263544;
-  background: #f1f6fa;
-}
-
-.composer .composer-advanced summary > strong {
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.composer .composer-advanced summary > span {
-  min-width: 0;
-  margin-left: auto;
-  overflow: hidden;
-  color: #8995a1;
-  font-size: 10px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .composer-advanced-chevron {
-  flex: 0 0 auto;
-  color: #83909c;
-  transition: var(--ui-transition-transform-short);
-}
-
-.composer .composer-advanced[open] .composer-advanced-chevron {
-  transform: rotate(180deg);
-}
-
-.composer .composer-advanced-panel {
-  max-height: 220px;
-  display: grid;
-  gap: 8px;
-  padding: 7px 12px 9px;
-  overflow: auto;
-  background: #f8fafc;
-}
-
-.composer .composer-delivery-controls {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(120px, .8fr) minmax(170px, 1.05fr);
-  gap: 7px;
-  align-items: center;
-}
-
-.composer .composer-delivery-controls .composer-inline-select,
-.composer .composer-delivery-controls .composer-inline-input,
-.composer .composer-delivery-controls .composer-schedule {
-  min-width: 0;
-  min-height: 31px;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  color: #7d8995;
-  background: transparent;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.composer .composer-delivery-controls .composer-schedule {
-  grid-template-columns: 40px minmax(0, 1fr);
-}
-
-.composer .composer-delivery-controls .composer-schedule > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: #647281;
-}
-
-.composer .composer-delivery-controls input {
-  min-width: 0;
-  min-height: 31px;
-  padding: 0 8px;
-  border: 1px solid #d9e1e8;
-  border-radius: 6px;
-  color: #2d3946;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 10.5px;
-}
-
-.composer .composer-delivery-controls input:hover,
-.composer .composer-delivery-controls input:focus {
-  border-color: #b8d3eb;
-  background: #fff;
-}
-
-.composer .composer-delivery-controls .custom-select-menu,
-.composer .composer-delivery-controls .custom-select-summary {
-  min-width: 0;
-  width: 100%;
-}
-
-.composer .composer-delivery-controls .custom-select-summary {
-  min-height: 31px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  border: 1px solid #d9e1e8;
-  border-radius: 6px;
-  color: #354352;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .composer-delivery-controls .custom-select-summary > span {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.composer .composer-delivery-controls .custom-select-summary strong,
-.composer .composer-delivery-controls .custom-select-summary small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .composer-delivery-controls .custom-select-summary strong {
-  font-size: 10.5px;
-  font-weight: 640;
-}
-
-.composer .composer-delivery-controls .custom-select-summary small {
-  color: #8a95a1;
-  font-size: 9px;
-}
-
-/* Delivery controls use a compact variant with stronger light-mode rules.
- * Rejoin the shared semantic control scale in dark mode instead of exposing
- * white select triggers inside the composer. */
-:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary {
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"] {
-  border-color: var(--ui-border-strong);
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary small {
-  color: var(--ui-text-tertiary);
-}
-
-.composer .composer-template-controls {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 226px;
-  gap: 8px;
-  align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid #e4e9ee;
-}
-
-.composer .composer-template-list {
-  min-width: 0;
-  min-height: 30px;
-  max-height: 31px;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 5px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.composer .composer-template-list::-webkit-scrollbar {
-  display: none;
-}
-
-.composer .composer-template-list > small {
-  flex: 0 0 auto;
-  color: #8a95a1;
-  font-size: 10px;
-}
-
-.composer .composer-template-row {
-  flex: 0 0 auto;
-  display: inline-flex;
-  gap: 2px;
-}
-
-.composer .composer-template-row button,
-.composer .composer-template-save button {
-  min-height: 30px;
-  border: 1px solid #d9e1e8;
-  border-radius: 6px;
-  color: #4f5d6b;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 10px;
-}
-
-.composer .composer-template-row button:first-child {
-  max-width: 132px;
-  padding: 0 8px;
-}
-
-.composer .composer-template-row button:last-child {
-  width: 25px;
-  padding: 0;
-  color: #9b6262;
-}
-
-.composer .composer-template-row button:hover,
-.composer .composer-template-save button:hover {
-  color: #1769aa;
-  border-color: #bfd8ed;
-  background: #f3f8fc;
-}
-
-.composer .composer-template-save {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 68px;
-  gap: 5px;
-}
-
-.composer .composer-template-save input {
-  min-width: 0;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 1px solid #d9e1e8;
-  border-radius: 6px;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 10.5px;
-}
-
-.composer .composer-template-save button {
-  color: #fff;
-  border-color: #1774bd;
-  background: #1774bd;
-}
-
-.composer .composer-template-save button:hover {
-  color: #fff;
-  border-color: #125f9d;
-  background: #125f9d;
-}
-
-@media (max-width: 720px) {
-  .composer .composer-quick-toolbar {
-    flex-wrap: wrap;
-    overflow: visible;
-  }
-
-  .composer .composer-attachments {
-    flex-basis: 100%;
-  }
-
-  .composer .composer-delivery-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .composer .composer-template-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 430px) {
   .composer .composer-delivery-controls {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-/* Recipient chips: committed addresses become removable tags, live input stays text. */
-.composer .composer-recipient-editor {
-  min-height: 44px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 0;
-}
+/* 22. Dark mode =========================================================== */
 
-.composer .composer-recipient-editor input {
-  min-width: 90px;
-  min-height: 32px;
-  flex: 1 1 140px;
-}
-
-.composer .composer-recipient-chip {
-  display: inline-flex;
-  max-width: 220px;
-  min-height: 26px;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 4px 2px 10px;
-  border: 1px solid #d6dde5;
-  border-radius: 999px;
-  background: #eef2f6;
-  color: #3c4757;
-  font-size: 11.5px;
-  font-weight: 620;
-}
-
-.composer .composer-recipient-chip-copy {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer .composer-recipient-chip button {
-  display: inline-flex;
-  width: 17px;
-  min-height: 17px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: #5a6675;
-  background: #d9e0e8;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .composer-recipient-chip button:hover {
-  color: #1d2430;
-  background: #c6d0db;
-}
-
-.composer .recipient-suggestions button.is-active,
-.composer .recipient-suggestions button.is-active:hover {
-  color: #125f9d;
-  background: #edf4fb;
-  outline: 1.5px solid rgba(18, 95, 157, 0.35);
-  outline-offset: -1.5px;
-}
-
-/*
- * Composer dark mode
- *
- * The composer is loaded lazily, after the global dark-mode pass. Its compact
- * light-mode refinements above therefore need their own semantic dark
- * counterparts rather than relying on the older global selectors. Keep the
- * message canvas quiet, retain a subtle tonal separation for controls, and
- * reserve accent colour for focus and active/drop states.
- */
 :root[data-theme="dark"] .composer .composer-primary-fields,
 :root[data-theme="dark"] .composer .composer-body-field,
 :root[data-theme="dark"] .composer .composer-body-attachments,
@@ -1989,13 +1479,6 @@
 :root[data-theme="dark"] .composer .composer-body-field.drop-active {
   background: var(--ui-accent-soft);
   box-shadow: inset 0 0 0 1px var(--ui-accent);
-}
-
-:root[data-theme="dark"] .composer .composer-body-field.drop-active::before {
-  border-color: var(--ui-border-strong);
-  color: var(--ui-accent);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
 }
 
 :root[data-theme="dark"] .composer .composer-original-quote {
@@ -2153,11 +1636,6 @@
   color: var(--ui-text-tertiary);
 }
 
-:root[data-theme="dark"] .composer .composer-attachments.drop-active {
-  background: var(--ui-accent-soft);
-  box-shadow: inset 0 0 0 2px var(--ui-accent);
-}
-
 :root[data-theme="dark"] .composer .composer-advanced summary {
   color: var(--ui-text-secondary);
 }
@@ -2172,6 +1650,21 @@
 :root[data-theme="dark"] .composer .composer-delivery-controls .composer-inline-input,
 :root[data-theme="dark"] .composer .composer-delivery-controls .composer-schedule,
 :root[data-theme="dark"] .composer .composer-delivery-controls .composer-schedule > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary small {
   color: var(--ui-text-tertiary);
 }
 
@@ -2231,28 +1724,18 @@
   background: var(--ui-surface);
 }
 
-:root[data-theme="dark"] .composer footer > span {
-  color: var(--ui-text-tertiary);
-}
-
+:root[data-theme="dark"] .composer footer > span,
 :root[data-theme="dark"] .composer-footer-status > span {
   color: var(--ui-text-tertiary);
 }
 
-:root[data-theme="dark"] .composer-send-progress {
-  border-color: var(--ui-border-strong);
-  background: var(--ui-surface-muted);
-}
-
+:root[data-theme="dark"] .composer-send-progress,
 :root[data-theme="dark"] .composer-attachment-progress {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] .composer-send-progress-message {
-  color: var(--ui-text-secondary);
-}
-
+:root[data-theme="dark"] .composer-send-progress-message,
 :root[data-theme="dark"] .composer-attachment-progress-message {
   color: var(--ui-text-secondary);
 }
@@ -2263,25 +1746,15 @@
   color: var(--ui-text);
 }
 
-/* Recipient search is a solid, four-row menu. It must not inherit any of
- * the workspace glass effects or allow the compose fields to show through. */
-.composer .recipient-suggestions {
-  max-height: 218px;
-  z-index: 80;
-  isolation: isolate;
-  background: #ffffff !important;
-  opacity: 1 !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
-
-.composer-minimized {
-  background: #ffffff;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-:root[data-theme="dark"] .composer .recipient-suggestions,
-:root[data-theme="dark"] .composer-minimized {
-  background: var(--ui-surface) !important;
+/* Accessibility: screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -1254,6 +1254,15 @@
   border-color: transparent;
 }
 
+/* Multi-selected rows (checkbox checked but not the reader-open row): give
+ * them a quiet hover-level tint so the user can see which rows belong to the
+ * bulk selection. The reader-open (.is-current/.selected) row stays on the
+ * stronger --quiet-row-selected surface, so current vs multi-selected stays
+ * distinguishable at a glance. */
+.app-shell .message-card:has(.message-select input:checked):not(.is-current) {
+  background: var(--quiet-row-hover);
+}
+
 /* New message appear animation — brief, color only. */
 .message-card.is-new {
   animation: var(--ui-animation-message-card-appear);

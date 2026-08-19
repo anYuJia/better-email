@@ -111,6 +111,17 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+/* Compact shell (≤1180px): the grid collapses to a fixed three-column
+ * layout without resizable gutters. The resizer buttons must not occupy
+ * grid cells here — otherwise they steal a content column and push the
+ * reader onto a second row. Hide them so the three columns map cleanly
+ * to sidebar / message-list / reader. */
+@media (max-width: 1180px) {
+  .app-shell .pane-resizer {
+    display: none;
+  }
+}
+
 /* Workspace sub-surface resolution ----------------------------------------
  * Opaque by default (tokens in design-tokens.css); the dark theme re-maps
  * them in dark-mode.css. No translucent glass values remain — panes are

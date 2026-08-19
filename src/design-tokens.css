@@ -193,6 +193,35 @@
   --ui-animation-shimmer: shimmer var(--ui-motion-loop) infinite var(--ui-ease-standard);
   --ui-animation-spinner: ui-spin var(--ui-motion-spin) linear infinite;
 
+  /* Semantic surface roles. Component CSS consumes these --ui-* tokens (or
+     their legacy aliases below); the --color-* primitives above are the only
+     place raw palette values are resolved. */
+  --ui-bg: var(--color-canvas);
+  --ui-sidebar: var(--color-surface-sidebar);
+  --ui-list: var(--color-surface-list);
+  --ui-reader: var(--color-surface-reader);
+  --ui-surface: var(--color-surface-raised);
+  --ui-surface-muted: var(--color-surface-muted);
+  --ui-control-bg: var(--color-surface-raised);
+  --ui-control-hover: var(--color-surface-hover);
+  --ui-text: var(--color-text-primary);
+  --ui-text-secondary: var(--color-text-secondary);
+  --ui-text-tertiary: var(--color-text-tertiary);
+  --ui-border: var(--color-border-subtle);
+  --ui-border-strong: var(--color-border-strong);
+  --ui-accent: var(--color-accent);
+  --ui-accent-hover: var(--color-accent-hover);
+  --ui-accent-pressed: var(--color-accent-pressed);
+  --ui-accent-soft: var(--color-accent-soft);
+  --ui-success: var(--color-success);
+  --ui-success-bg: var(--color-success-soft);
+  --ui-danger: var(--color-danger);
+  --ui-danger-hover: var(--color-danger-hover);
+  --ui-danger-bg: var(--color-danger-soft);
+  --ui-warning: var(--color-warning);
+  --ui-warning-bg: var(--color-warning-soft);
+  --ui-warning-border: var(--color-warning-border);
+
   /* Workspace sub-surfaces: default aliases resolved by the app-shell layer
      in styles/layout.css; the dark theme re-maps them in styles/dark-mode.css. */
   --workspace-sidebar: var(--ui-sidebar);

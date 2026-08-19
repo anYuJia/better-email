@@ -18,9 +18,7 @@
   background: var(--ui-bg);
 }
 
-:root[data-theme="dark"] .app-shell {
-  background: var(--app-bg);
-}:root[data-theme="dark"] .composer-backdrop .composer,
+:root[data-theme="dark"] .composer-backdrop .composer,
 :root[data-theme="dark"] .composer{
   background: var(--ui-surface);
   color: var(--ui-text);
@@ -343,140 +341,6 @@
   color: var(--ui-text-secondary);
 }
 
-/* --- Sidebar --- */
-:root[data-theme="dark"] .sidebar{
-  background:
-    linear-gradient(180deg, rgba(23, 28, 35, 0.9), rgba(19, 24, 30, 0.9));
-  border-right-color: var(--ui-border);
-  box-shadow:
-    inset -1px 0 rgba(255, 255, 255, 0.04),
-    10px 0 34px rgba(0, 0, 0, 0.2);
-}
-
-:root[data-theme="dark"] .brand span{
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .account-switcher{
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .account-switcher span{
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .folder-main{
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .folder:hover{
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .folder.active{
-  color: var(--ui-accent);
-  background: rgba(96, 165, 250, 0.14);
-}
-
-:root[data-theme="dark"] .badge,
-:root[data-theme="dark"] .sidebar-disclosure summary em{
-  color: var(--ui-accent);
-  background: rgba(96, 165, 250, 0.16);
-}
-
-:root[data-theme="dark"] .sidebar-disclosure{
-  border-color: var(--ui-border);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .sidebar-disclosure summary{
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .sidebar-disclosure summary:hover{
-  color: var(--ui-text);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-:root[data-theme="dark"] .sidebar-disclosure[open] summary{
-  color: var(--ui-text);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-:root[data-theme="dark"] .sidebar-tool-section{
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .sidebar-quick-menus .sidebar-disclosure > :not(summary){
-  background: #1d242d;
-  border-color: rgba(148, 163, 184, 0.2);
-  box-shadow: var(--shadow-lg);
-}
-
-:root[data-theme="dark"] .label-list,
-:root[data-theme="dark"] .saved-search-list{
-  background: rgba(255, 255, 255, 0.04);
-}
-
-:root[data-theme="dark"] .account-switcher select,
-:root[data-theme="dark"] .saved-search-form input,
-:root[data-theme="dark"] .saved-search-form button,
-:root[data-theme="dark"] .saved-search-row > button,
-:root[data-theme="dark"] .background-sync-card,
-:root[data-theme="dark"] .background-sync-card button,
-:root[data-theme="dark"] .folder-actions button,
-:root[data-theme="dark"] .folder-rename button,
-:root[data-theme="dark"] .custom-folder-form button,
-:root[data-theme="dark"] .folder-rename input,
-:root[data-theme="dark"] .custom-folder-form input{
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .saved-search-form input:hover,
-:root[data-theme="dark"] .folder-rename input:hover,
-:root[data-theme="dark"] .custom-folder-form input:hover{
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(96, 165, 250, 0.3);
-}
-
-:root[data-theme="dark"] .settings-button{
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--ui-border);
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .settings-button:hover,
-:root[data-theme="dark"] .sidebar-footer-actions .settings-button:hover{
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-accent);
-}
-
-:root[data-theme="dark"] .layout-reset-button{
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--ui-border);
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .layout-reset-button:hover{
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-accent);
-}
-
-:root[data-theme="dark"] .label-row{
-  color: var(--ui-text-secondary);
-}
-
-:root[data-theme="dark"] .task-stack{
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--ui-border);
-}
-
 /* --- Icon buttons (toolbar / reader / composer chrome) --- */
 :root[data-theme="dark"] .icon-button,
 :root[data-theme="dark"] .composer header button,
@@ -791,51 +655,6 @@
   background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] .sidebar{
-  border-right-color: var(--ui-border);
-  background: var(--ui-sidebar);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] :is(.account-switcher, .sidebar-disclosure, .sidebar-tool-section, .label-list, .saved-search-list, .task-stack){
-  border-color: transparent;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .sidebar .folder:hover,
-:root[data-theme="dark"] .sidebar-disclosure summary:hover,
-:root[data-theme="dark"] .sidebar-disclosure[open] summary{
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] .sidebar .folder:hover .folder-main{
-  background: transparent;
-}
-
-:root[data-theme="dark"] .sidebar .folder.active,
-:root[data-theme="dark"] .sidebar .folder.active:hover{
-  color: var(--ui-text);
-  background: var(--quiet-row-selected);
-}
-
-:root[data-theme="dark"] .sidebar .folder.active .folder-name svg,
-:root[data-theme="dark"] .sidebar .folder.active .badge{
-  color: var(--ui-text);
-}
-
-:root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button){
-  border-color: transparent;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] :is(.sidebar-footer-actions .settings-button, .settings-button, .layout-reset-button):hover{
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
 :root[data-theme="dark"] :is(
   .icon-button,
   .composer header button,
@@ -916,93 +735,14 @@
   box-shadow: var(--ui-box-shadow-surface-outline);
 }
 
-
-/* The workspace glass construction: earlier dark passes made the persistent
- * panes opaque to eliminate white leaks; these alpha surfaces retain that
- * contrast while letting the blurred desktop breathe through the app
- * instead of painting an opaque dark rectangle. */
-:root[data-theme="dark"] .app-shell {
-  --workspace-sidebar: oklch(0.216 0.014 var(--primitive-hue-neutral) / 0.72);
-  --workspace-list: oklch(0.238 0.012 var(--primitive-hue-neutral) / 0.78);
-  --workspace-reader: oklch(0.260 0.010 var(--primitive-hue-paper) / 0.82);
-  --workspace-toolbar: oklch(0.238 0.012 var(--primitive-hue-neutral) / 0.64);
-  --workspace-control: oklch(0.304 0.014 var(--primitive-hue-neutral) / 0.74);
-  --workspace-control-active: oklch(0.282 0.014 var(--primitive-hue-neutral) / 0.82);
-
-  background: oklch(0.16 0.012 var(--primitive-hue-neutral) / 0.48);
-  -webkit-backdrop-filter: blur(42px) saturate(1.12);
-  backdrop-filter: blur(42px) saturate(1.12);
-}
+/* Dark workspace: the persistent panes stay opaque planes on the semantic
+ * neutral scale. The token layer already re-maps every --workspace-* / --ui-*
+ * surface for dark mode; only the native window chrome strip keeps a
+ * translucent platform treatment. */
 
 :root[data-theme="dark"] .app-shell .window-chrome {
   border-bottom: 1px solid oklch(0.43 0.016 var(--primitive-hue-neutral) / 0.64);
   background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.52);
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
   backdrop-filter: blur(24px) saturate(1.12);
-}
-
-:root[data-theme="dark"] .app-shell :is(.sidebar, .message-list-panel, .reader-panel) {
-  -webkit-backdrop-filter: blur(24px) saturate(1.1);
-  backdrop-filter: blur(24px) saturate(1.1);
-}
-
-/* Older dark-mode passes set a few persistent sub-surfaces directly. Repeat
- * the glass values at the same scope so the visible panes do not revert to
- * opaque slate after the parent has become translucent. */
-:root[data-theme="dark"] .app-shell .sidebar {
-  background: var(--workspace-sidebar);
-}
-
-:root[data-theme="dark"] .app-shell :is(.message-list, .thread-list, .message-date-header, .message-list-footer) {
-  background: var(--workspace-list);
-}
-
-:root[data-theme="dark"] .app-shell :is(.toolbar, .list-control-strip) {
-  background: var(--workspace-toolbar);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
-  backdrop-filter: blur(20px) saturate(1.14);
-}
-
-/* List/thread cards keep the flat scan rail in dark mode: the earlier card
- * layout used !important, so these match its specificity deliberately. */
-:root[data-theme="dark"] .app-shell .message-card {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: inset 0 -1px 0 var(--ui-border);
-}
-
-:root[data-theme="dark"] .app-shell .message-card:hover,
-:root[data-theme="dark"] .app-shell .message-card.is-unread:hover {
-  border-color: transparent;
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .app-shell .message-card.selected,
-:root[data-theme="dark"] .app-shell .message-card.selected:hover,
-:root[data-theme="dark"] .app-shell .message-card.is-unread.selected,
-:root[data-theme="dark"] .app-shell .message-card.is-unread.selected:hover {
-  border-color: transparent;
-  background: var(--quiet-row-selected);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .app-shell .thread-card {
-  border-color: transparent !important;
-  color: var(--ui-text) !important;
-  background: transparent !important;
-  box-shadow: inset 0 -1px 0 var(--ui-border) !important;
-}
-
-:root[data-theme="dark"] .app-shell .thread-card:hover {
-  border-color: transparent !important;
-  background: var(--quiet-row-hover) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-:root[data-theme="dark"] .app-shell .thread-card.selected,
-:root[data-theme="dark"] .app-shell .thread-card.selected:hover {
-  border-color: transparent !important;
-  background: var(--quiet-row-selected) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
 }

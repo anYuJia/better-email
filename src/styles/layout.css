@@ -3,18 +3,20 @@
  *
  * Owns the desktop workspace geometry and the workspace sub-surface mapping:
  *  - the three-pane grid (sidebar / message list / reader) and its dividers,
- *  - the --workspace-* token resolution (defaults in design-tokens.css;
- *    translucent-glass values and dark variants live here and in
- *    dark-mode.css respectively),
- *  - the light-mode glass treatment of panes and toolbar.
+ *  - the --workspace-* token resolution (opaque semantic surfaces by default;
+ *    the dark theme re-maps them in dark-mode.css),
+ *  - pane surface mapping only — component styling lives in the owning
+ *    sheets (sidebar.css, message-list.css, reader.css, …).
  *
- * Surface *colours* belong to the token layer and dark-mode.css; this sheet
- * only carries the structure that consumes them.
+ * The workspace is deliberately opaque and quiet: no backdrop-filter, no
+ * floating panes. Hierarchy comes from surface luminance, 1px dividers and
+ * spacing. The only translucent surface in the app is the native window
+ * chrome strip (window-chrome.css), which is platform chrome, not workspace.
  */
 
 .app-shell {
   display: grid;
-  grid-template-columns: 228px 1px 372px 1px minmax(430px, 1fr);
+  grid-template-columns: 244px 5px 388px 5px minmax(0, 1fr);
   height: 100vh;
   width: 100vw;
   background: var(--ui-bg);
@@ -22,58 +24,39 @@
   font-size: 13px;
 }
 
-.sidebar {
-  background: #1f2933;
-  color: #f6f8fb;
-  padding: 18px 14px;
+/* Pane surfaces: each pane is a flat plane of the workspace, distinguished
+ * by luminance only. The resizer columns stay transparent so the app canvas
+ * shows through the 1px divider lines. */
+.app-shell .sidebar {
+  background: var(--workspace-sidebar);
+}
+
+/* The list pane is a column of toolbar / bulk toolbar / virtual list; the
+ * flex chain is what bounds the virtual list's viewport height. */
+.message-list-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
-  overflow: hidden;
 }
 
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  display: block;
-  object-fit: contain;
-  border-radius: 8px;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-.brand strong { display: block; font-size: 16px; }
-.brand span { color: #b6c0ca; font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: block; }
-
-.compose-button, .settings-button {
-  height: 40px;
-  border: none;
-  border-radius: 8px;
-  background: #3aa675;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 700;
-}
-.settings-button { margin-top: auto; background: rgba(255,255,255,0.12); }
-.layout-reset-button {
-  min-height: 32px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.10);
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
+.app-shell .message-list-panel {
+  background: var(--workspace-list);
 }
 
-/* Divider hit areas stay comfortable for resizing, but no longer create a
- * visually heavy black gutter between otherwise quiet panes.
- * Base resizer from pass-refinement.css kept as an unscoped fallback; the
- * .app-shell construction below overrides it in the real workspace. */
+.app-shell .reader-panel {
+  background: var(--workspace-reader);
+}
+
+.app-shell .toolbar,
+.app-shell .list-control-strip {
+  background: var(--workspace-toolbar);
+}
+
+/* Resizers ----------------------------------------------------------------
+ * Visual line: 1px, semantic border token. Hit target: the 5px grid gutter
+ * plus a 4px overhang on each side. Hover/drag lifts the line to the accent
+ * colour only — no glow, no shadow. */
+
 .pane-resizer {
   width: 1px;
   min-width: 1px;
@@ -94,8 +77,12 @@
   z-index: 16;
   overflow: visible;
   padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   opacity: 1;
+  cursor: col-resize;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .pane-resizer::before {
@@ -114,96 +101,17 @@
 
 .app-shell .pane-resizer::after {
   inset: 0 -4px;
+  content: "";
 }
 
 .app-shell .pane-resizer:hover::before,
 .app-shell .pane-resizer:focus-visible::before,
 .pane-resizing .app-shell .pane-resizer::before {
   background: var(--ui-accent);
-  box-shadow: 0 0 0 1px var(--ui-accent-soft);
-}
-
-/* Workspace sub-surface resolution --------------------------------------
- * Defaults (opaque semantic surfaces) live in design-tokens.css. The light
- * theme re-resolves them as translucent glass so the desktop breathes
- * through the workspace; dark re-resolves them in dark-mode.css. */
-
-:root:not([data-theme="dark"]) .app-shell {
-  --workspace-sidebar: oklch(0.945 0.008 var(--primitive-hue-neutral) / 0.78);
-  --workspace-list: oklch(0.979 0.004 var(--primitive-hue-neutral) / 0.82);
-  --workspace-reader: oklch(0.992 0.004 var(--primitive-hue-paper) / 0.86);
-  --workspace-toolbar: oklch(0.979 0.004 var(--primitive-hue-neutral) / 0.68);
-  --workspace-control: oklch(0.955 0.006 var(--primitive-hue-neutral) / 0.78);
-  --workspace-control-active: oklch(0.996 0.003 var(--primitive-hue-paper) / 0.84);
-
-  /* The white app material is intentionally translucent: macOS's already
-     transparent webview can softly carry the desktop through the workspace
-     while the white canvas remains unmistakably light. */
-  background: oklch(1 0 0 / 0.64);
-  -webkit-backdrop-filter: blur(42px) saturate(1.16);
-  backdrop-filter: blur(42px) saturate(1.16);
-}
-
-:root:not([data-theme="dark"]) .app-shell :is(.sidebar, .message-list-panel, .reader-panel) {
-  -webkit-backdrop-filter: blur(24px) saturate(1.14);
-  backdrop-filter: blur(24px) saturate(1.14);
-}
-
-:root:not([data-theme="dark"]) .app-shell :is(.toolbar, .list-control-strip) {
-  -webkit-backdrop-filter: blur(20px) saturate(1.18);
-  backdrop-filter: blur(20px) saturate(1.18);
-}
-
-:root:not([data-theme="dark"]) .app-shell .message-card,
-:root:not([data-theme="dark"]) .app-shell .thread-card {
-  box-shadow: inset 0 -1px 0 oklch(0.89 0.006 var(--primitive-hue-neutral) / 0.68);
-}
-
-:root:not([data-theme="dark"]) .app-shell .message-card:hover,
-:root:not([data-theme="dark"]) .app-shell .message-card.is-unread:hover,
-:root:not([data-theme="dark"]) .app-shell .thread-card:hover {
   box-shadow: var(--ui-box-shadow-none);
 }
 
-/* The account selector reads as a compact workspace switcher rather than a
- * second card competing with the compose action. */
-.app-shell .account-switcher {
-  gap: 0;
-}
-
-.app-shell .account-switcher-trigger {
-  min-height: 38px;
-  grid-template-columns: minmax(0, 1fr) 14px;
-  gap: 7px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-control);
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .account-switcher-trigger:hover,
-.app-shell .account-switcher-trigger[aria-expanded='true'] {
-  border-color: var(--ui-border);
-  color: var(--ui-text);
-  background: var(--workspace-control);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .account-switcher-trigger:focus-visible {
-  outline: var(--ui-focus-outline);
-  outline-offset: 1px;
-}
-
-.app-shell .account-switcher-copy strong {
-  color: var(--ui-text);
-  font-size: 12.5px;
-  font-weight: 660;
-}
-
-.app-shell .account-switcher .account-switcher-copy > span,
-.app-shell .account-switcher-chevron {
-  color: var(--ui-text-tertiary);
-  font-size: 11px;
-}
+/* Workspace sub-surface resolution ----------------------------------------
+ * Opaque by default (tokens in design-tokens.css); the dark theme re-maps
+ * them in dark-mode.css. No translucent glass values remain — panes are
+ * quiet planes, not glass panels. */

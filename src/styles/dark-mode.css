@@ -173,73 +173,36 @@
 }
 
 /* --- Toolbar / list controls --- */
-:root[data-theme="dark"] .toolbar{
-  background: rgba(23, 28, 35, 0.9);
-  border-bottom-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .search-box{
-  background: #1a2028;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .list-control-strip{
-  background: #171c22;
-  border-bottom-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .list-summary .search-scope-indicator{
-  color: var(--ui-text-secondary);
-  background: #232b36;
-}
-
-:root[data-theme="dark"] .list-summary small{
-  color: var(--ui-text-tertiary);
-}
+/* Dark mode surfaces already resolve through the semantic --ui-* tokens
+   re-mapped in design-tokens.css, so the toolbar / list control strip /
+   search box / summary inherit the dark list surface automatically. */
 
 :root[data-theme="dark"] .stats-strip{
-  background: rgba(15, 19, 24, 0.7);
+  background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
 }
 
 :root[data-theme="dark"] .search-shortcuts button{
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
   border-color: var(--ui-border);
 }
 
 :root[data-theme="dark"] .search-shortcuts button:hover{
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--quiet-row-hover);
   color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .compact-menu summary{
-  background: rgba(255, 255, 255, 0.08);
-}
-
 :root[data-theme="dark"] .compact-menu > div{
-  background: #1d242d;
+  background: var(--ui-surface);
   border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 /* --- Message list --- */
-:root[data-theme="dark"] .message-date-section + .message-date-section{
-  border-top-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .message-date-header{
-  color: var(--ui-text-tertiary);
-  background: rgba(15, 19, 24, 0.92);
-}
-
-:root[data-theme="dark"] .message-date-header em{
-  color: var(--ui-text-tertiary);
-}
-
-:root[data-theme="dark"] .message-avatar{
-  color: #cfe0f2;
-  background: #26334a;
-}
+/* Row surfaces, date headers, footer and chips resolve via semantic
+   tokens; only the avatar-tone palette needs explicit dark hues so a dense
+   list stays scannable without becoming saturated. */
 
 :root[data-theme="dark"] .message-chips span{
   color: var(--ui-text-tertiary);
@@ -247,32 +210,32 @@
 }
 
 :root[data-theme="dark"] .message-list-footer{
-  background: #171c22;
+  background: var(--ui-list);
   color: var(--ui-text-tertiary);
 }
 
 :root[data-theme="dark"] .bulk-toolbar{
-  border-color: #3a4654;
+  border-color: var(--ui-border);
   color: var(--ui-text);
-  background: #1d242d;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 :root[data-theme="dark"] .bulk-toolbar.active{
-  background: #20262f;
+  background: var(--ui-surface-muted);
 }
 
 :root[data-theme="dark"] .bulk-toolbar button,
 :root[data-theme="dark"] .bulk-toolbar select,
 :root[data-theme="dark"] .bulk-toolbar .compact-menu summary{
-  background: rgba(255, 255, 255, 0.07);
+  background: transparent;
   color: var(--ui-text-secondary);
-  border-color: var(--ui-border);
+  border-color: transparent;
 }
 
 :root[data-theme="dark"] :is(.bulk-toolbar button:hover, .bulk-toolbar .compact-menu summary:hover){
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-accent);
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
 }
 
 :root[data-theme="dark"] .empty-reader{
@@ -496,38 +459,13 @@
 /* ---------------------------------------------------------------------
  * Workspace reconciliation.
  *
- * A few older passes are intentionally more decorative in light mode. In
- * dark mode those translucent whites, paper surfaces and elevated cards turn
- * into unrelated patches. Keep all persistent workspace surfaces on the
- * semantic neutral scale; reserve elevation for menus and dialogs.
+ * Persistent workspace surfaces (toolbar, list, footer, date headers,
+ * search, controls, chips, attachment) now resolve entirely through the
+ * semantic --ui-* tokens re-mapped in design-tokens.css, so no explicit
+ * dark overrides are needed for them. Only the avatar-tone palette keeps
+ * distinct dark hues so a dense list stays scannable without saturation.
  * --------------------------------------------------------------------- */
-:root[data-theme="dark"] :is(.toolbar, .list-control-strip, .message-list, .thread-list, .message-list-footer){
-  background: var(--ui-list);
-}
 
-:root[data-theme="dark"] .search-box,
-:root[data-theme="dark"] .list-control-actions,
-:root[data-theme="dark"] .compact-menu summary,
-:root[data-theme="dark"] .search-shortcuts button,
-:root[data-theme="dark"] .list-summary .search-scope-indicator{
-  border-color: transparent;
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] :is(.list-control-actions > button, .search-shortcuts button, .compact-menu summary):hover,
-:root[data-theme="dark"] :is(.list-control-actions > button, .search-shortcuts button, .compact-menu summary).active{
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-:root[data-theme="dark"] .message-date-header{
-  background: var(--ui-list);
-}
-
-/* Initial avatars remain deliberately muted, but retain the distinct hue
-   families available in light mode so a dense list stays scannable. */
 :root[data-theme="dark"] :is(.message-avatar, .reader-avatar){
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
@@ -701,38 +639,11 @@
   box-shadow: var(--ui-shadow-tooltip);
 }
 
-/* The thread list intentionally uses !important in its local layout pass. */
-:root[data-theme="dark"] .thread-card{
-  border-color: transparent !important;
-  color: var(--ui-text) !important;
-  background: var(--ui-surface) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-:root[data-theme="dark"] .thread-card:hover{
-  border-color: transparent !important;
-  background: var(--quiet-row-hover) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-:root[data-theme="dark"] .thread-card.selected,
-:root[data-theme="dark"] .thread-card.selected:hover{
-  border-color: transparent !important;
-  background: var(--quiet-row-selected) !important;
-  box-shadow: var(--ui-box-shadow-none) !important;
-}
-
-:root[data-theme="dark"] .thread-card.is-unread :is(.thread-subject, .thread-participants){
-  color: var(--ui-text) !important;
-}
-
-:root[data-theme="dark"] .thread-count-badge{
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-}
+/* Thread list resolves through semantic tokens like the message list;
+   no !important card overrides are needed in dark mode. */
 
 :root[data-theme="dark"] .thread-unread-dot{
-  box-shadow: var(--ui-box-shadow-surface-outline);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* Dark workspace: the persistent panes stay opaque planes on the semantic

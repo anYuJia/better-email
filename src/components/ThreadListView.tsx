@@ -5,11 +5,11 @@ import { formatDate } from '../mailUtils';
 import { calculateVisibleRange } from './messageListLayout';
 
 /**
- * 会话卡片行高 —— 与 `styles/2026/pass-thread-list.css` 中 `.thread-card`
- * 的 `height: 88px` 保持一致，虚拟计算高度必须等于实际渲染高度，
+ * 会话行高 —— 与 `styles/message-list.css` 中 `.thread-card` 的
+ * `height: 72px` 保持一致，虚拟计算高度必须等于实际渲染高度，
  * 否则滚动会跳动、选中/悬停会错位。
  */
-export const THREAD_ROW_HEIGHT = 88;
+export const THREAD_ROW_HEIGHT = 72;
 
 type ThreadListViewProps = {
   threads: ThreadSummary[];

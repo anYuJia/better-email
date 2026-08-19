@@ -77,7 +77,9 @@
   --ui-control-height-comfortable: 40px;
   --ui-control-height-touch: 44px;
   --ui-control-padding-inline: 10px;
-  --ui-radius-xs: 6px;
+
+  /* Radius scale: small (controls, rows), control-sized affordances, panels,
+     modals; 999px is reserved for true pills (badges, status, segmented chips). */
   --ui-radius-sm: 6px;
   --ui-radius-control: 8px;
   --ui-radius-panel: 12px;
@@ -95,145 +97,110 @@
   --ui-scrollbar-thumb: oklch(0.78 0.012 var(--primitive-hue-neutral));
   --ui-scrollbar-thumb-hover: oklch(0.67 0.014 var(--primitive-hue-neutral));
 
+  /* Motion: four interaction speeds. Everything that expresses a felt state
+     change resolves to one of these; un-semantic numeric tokens are gone.
+     --ui-motion-loop and --ui-motion-spin are functional periods for infinite
+     keyframe animations (shimmer, dot pulse, spinner rotation), not feel. */
+  --ui-motion-instant: 80ms;
   --ui-motion-fast: 120ms;
-  --ui-motion-mid: 150ms;
-  --ui-motion-compact: 130ms;
-  --ui-motion-short: 140ms;
-  --ui-motion-quiet: 160ms;
-  --ui-motion-standard: 180ms;
-  --ui-motion-200: 200ms;
-  --ui-motion-220: 220ms;
-  --ui-motion-pop: 250ms;
+  --ui-motion-normal: 180ms;
   --ui-motion-slow: 240ms;
-  --ui-motion-260: 260ms;
-  --ui-motion-280: 280ms;
-  --ui-motion-300: 300ms;
-  --ui-motion-340: 340ms;
-  --ui-motion-400: 400ms;
-  --ui-motion-glance: 90ms;
+  --ui-motion-loop: 1600ms;
+  --ui-motion-spin: 800ms;
   --ui-motion-none: 0ms;
-  --ui-motion-minimal: 0.01ms;
-  --ui-motion-reduced: 1ms;
-  --ui-motion-580: 580ms;
-  --ui-motion-500: 500ms;
-  --ui-motion-600: 600ms;
-  --ui-motion-700: 700ms;
-  --ui-motion-800: 800ms;
-  --ui-motion-900: 900ms;
-  --ui-motion-1000: 1000ms;
-  --ui-motion-1600: 1600ms;
-  --ui-motion-680: 680ms;
-  --ui-motion-1800: 1800ms;
+  /* Historic aliases retained during migration so existing var() references
+     keep resolving; all collapse onto the four core speeds. */
+  --ui-motion-standard: var(--ui-motion-normal);
+  --ui-motion-short: var(--ui-motion-fast);
+  --ui-motion-compact: var(--ui-motion-fast);
+  --ui-motion-mid: var(--ui-motion-fast);
+  --ui-motion-quiet: var(--ui-motion-fast);
+  --ui-motion-pop: var(--ui-motion-slow);
+  --ui-motion-glance: var(--ui-motion-instant);
+
   --ui-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ui-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-ease-toast-in: cubic-bezier(0.21, 1.02, 0.73, 1);
   --ui-ease-toast-out: cubic-bezier(0.55, 0, 0.55, 0.2);
   --ui-ease-pop-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   --ui-transition-transform-fast: transform var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-transform-short: transform var(--ui-motion-short) var(--ui-ease-standard);
+  --ui-transition-transform-short: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-transform-compact: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-transform-quiet: transform var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-transform-quiet-emphasis: transform var(--ui-motion-fast) var(--ui-ease-emphasized);
+  --ui-transition-transform-pop: transform var(--ui-motion-slow) var(--ui-ease-standard), opacity var(--ui-motion-slow) var(--ui-ease-standard);
   --ui-transition-opacity-fast: opacity var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-transform-pop: transform var(--ui-motion-pop) var(--ui-ease-standard), opacity var(--ui-motion-pop) var(--ui-ease-standard);
-  --ui-transition-standard-color-background: color var(--ui-motion-standard) var(--ui-ease-standard), background-color var(--ui-motion-standard) var(--ui-ease-standard);
-  --ui-transition-standard-color-background-inverse: background-color var(--ui-motion-standard) var(--ui-ease-standard), color var(--ui-motion-standard) var(--ui-ease-standard);
-  --ui-transition-standard-color-bg-border-box-shadow-opacity: color var(--ui-motion-standard) var(--ui-ease-standard), border-color var(--ui-motion-standard) var(--ui-ease-standard), background-color var(--ui-motion-standard) var(--ui-ease-standard), box-shadow var(--ui-motion-standard) var(--ui-ease-standard), opacity var(--ui-motion-standard) var(--ui-ease-standard);
+  --ui-transition-box-shadow-opacity-fast: box-shadow var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-bg-color-opacity-transform-fast: background-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard), transform var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-fast-color-background: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-fast-color-background-border: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-fast-color-background-border-shadow: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-fast-border-shadow: border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-fast-opacity-color-bg: opacity var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-bg-color-opacity-transform-fast: background-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard), transform var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-slow-color-background: color var(--ui-motion-slow) var(--ui-ease-standard), background-color var(--ui-motion-slow) var(--ui-ease-standard);
-  --ui-transition-mid-color-background-border-opacity: color var(--ui-motion-mid) var(--ui-ease-standard), background-color var(--ui-motion-mid) var(--ui-ease-standard), border-color var(--ui-motion-mid) var(--ui-ease-standard), opacity var(--ui-motion-mid) var(--ui-ease-standard);
-  --ui-transition-color-mid-bg-border: color var(--ui-motion-mid) var(--ui-ease-standard), background-color var(--ui-motion-mid) var(--ui-ease-standard), border-color var(--ui-motion-mid) var(--ui-ease-standard);
-  --ui-transition-mid-color-bg-border-emphasized: color var(--ui-motion-mid) var(--ui-ease-emphasized), background-color var(--ui-motion-mid) var(--ui-ease-emphasized), border-color var(--ui-motion-mid) var(--ui-ease-emphasized);
-  --ui-transition-bg-color-standard: background-color var(--ui-motion-standard) var(--ui-ease-standard);
+  --ui-transition-border-color-fast: border-color var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-color-fast: color var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-bg-fast: background var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-bg-color-slow: background-color var(--ui-motion-slow) var(--ui-ease-standard);
-  --ui-transition-std-bg-emphasized: background-color var(--ui-motion-standard) var(--ui-ease-emphasized), color var(--ui-motion-standard) var(--ui-ease-emphasized);
-  --ui-transition-color-bg-standard: color var(--ui-motion-standard) var(--ui-ease-standard);
-  --ui-transition-bg-border-short: border-color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-bg-short: background var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-bg-box-shadow-short: background var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-color-bg-short: color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-bg-shadow-quiet-emphasis: background-color var(--ui-motion-quiet) var(--ui-ease-emphasized), box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
-  --ui-transition-bg-border-color-standard-emphasis: background-color var(--ui-motion-standard) var(--ui-ease-emphasized), border-color var(--ui-motion-standard) var(--ui-ease-emphasized);
-  --ui-transition-quiet-color-bg-border-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), border-color var(--ui-motion-quiet) var(--ui-ease-standard), color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
-  --ui-transition-border-shadow-transform-quiet-emphasis: border-color var(--ui-motion-quiet) var(--ui-ease-emphasized), box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized), transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
-  --ui-transition-short-bg-border-shadow-transform: border-color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard), transform var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-box-shadow-opacity-fast: box-shadow var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-bg-box-shadow-fast: background-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-width-emphasized-move: width var(--ui-motion-300) var(--ui-ease-emphasized), transform var(--ui-motion-300) var(--ui-ease-emphasized);
-  --ui-transition-width-standard-ease-out: width var(--ui-motion-standard) ease-out;
-  --ui-transition-transform-quiet: transform var(--ui-motion-quiet) var(--ui-ease-standard);
-  --ui-transition-transform-quiet-emphasis: transform var(--ui-motion-quiet) var(--ui-ease-emphasized);
-  --ui-transition-transform-compact: transform var(--ui-motion-compact) var(--ui-ease-standard);
-  --ui-transition-transform-200-opacity-emphasized: transform var(--ui-motion-200) var(--ui-ease-emphasized), opacity var(--ui-motion-200) var(--ui-ease-emphasized);
-  --ui-transition-transform-standard-opacity: transform var(--ui-motion-standard) var(--ui-ease-standard), opacity var(--ui-motion-standard) var(--ui-ease-standard);
-  --ui-transition-border-color-quiet-emphasis-shadow: border-color var(--ui-motion-quiet) var(--ui-ease-emphasized), box-shadow var(--ui-motion-quiet) var(--ui-ease-emphasized);
-  --ui-transition-color-bg-shadow-short: color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-short-bg-border-box-shadow: border-color var(--ui-motion-short) var(--ui-ease-standard), background-color var(--ui-motion-short) var(--ui-ease-standard), box-shadow var(--ui-motion-short) var(--ui-ease-standard);
-  --ui-transition-border-color-fast: border-color var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-transition-opacity-quiet: opacity var(--ui-motion-quiet) var(--ui-ease-standard);
+  --ui-transition-bg-color-standard: background-color var(--ui-motion-normal) var(--ui-ease-standard);
+  --ui-transition-standard-color-background-inverse: background-color var(--ui-motion-normal) var(--ui-ease-standard), color var(--ui-motion-normal) var(--ui-ease-standard);
+  --ui-transition-standard-color-bg-border-box-shadow-opacity: color var(--ui-motion-normal) var(--ui-ease-standard), border-color var(--ui-motion-normal) var(--ui-ease-standard), background-color var(--ui-motion-normal) var(--ui-ease-standard), box-shadow var(--ui-motion-normal) var(--ui-ease-standard), opacity var(--ui-motion-normal) var(--ui-ease-standard);
+  --ui-transition-bg-border-color-standard-emphasis: background-color var(--ui-motion-normal) var(--ui-ease-emphasized), border-color var(--ui-motion-normal) var(--ui-ease-emphasized);
+  --ui-transition-bg-color-slow: background-color var(--ui-motion-slow) var(--ui-ease-standard);
+  --ui-transition-slow-color-background: color var(--ui-motion-slow) var(--ui-ease-standard), background-color var(--ui-motion-slow) var(--ui-ease-standard);
+  --ui-transition-mid-color-background-border: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-mid-color-background-border-opacity: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard), opacity var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-bg-border-short: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-bg-short: background var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-bg-box-shadow-short: background var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-color-bg-short: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-color-bg-shadow-short: color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-short-bg-border-box-shadow: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-short-bg-border-shadow-transform: border-color var(--ui-motion-fast) var(--ui-ease-standard), background-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard), transform var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-bg-shadow-quiet-emphasis: background-color var(--ui-motion-fast) var(--ui-ease-emphasized), box-shadow var(--ui-motion-fast) var(--ui-ease-emphasized);
+  --ui-transition-border-color-quiet-emphasis-shadow: border-color var(--ui-motion-fast) var(--ui-ease-emphasized), box-shadow var(--ui-motion-fast) var(--ui-ease-emphasized);
+  --ui-transition-border-shadow-transform-quiet-emphasis: border-color var(--ui-motion-fast) var(--ui-ease-emphasized), box-shadow var(--ui-motion-fast) var(--ui-ease-emphasized), transform var(--ui-motion-fast) var(--ui-ease-emphasized);
+  --ui-transition-quiet-bg-border-shadow: background var(--ui-motion-fast) var(--ui-ease-standard), border-color var(--ui-motion-fast) var(--ui-ease-standard), box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-transition-width-standard-ease-out: width var(--ui-motion-normal) ease-out;
   --ui-transition-none: none;
-  --ui-transition-quiet-bg-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
-  --ui-transition-quiet-border-shadow: border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
-  --ui-transition-quiet-bg-border-shadow: background var(--ui-motion-quiet) var(--ui-ease-standard), border-color var(--ui-motion-quiet) var(--ui-ease-standard), box-shadow var(--ui-motion-quiet) var(--ui-ease-standard);
-  --ui-box-shadow-accent-pop: 0 8px 18px rgba(10, 132, 255, 0.20);
+
+  --ui-box-shadow-none: none;
   --ui-box-shadow-subtle-border: 0 4px 14px rgba(30, 41, 59, 0.05);
   --ui-box-shadow-subtle-edge: 0 1px 2px rgba(30, 41, 59, 0.04);
   --ui-box-shadow-accent-soft-outline: 0 0 0 2px var(--ui-accent-soft);
   --ui-box-shadow-surface-outline: 0 0 0 2px var(--ui-surface);
   --ui-box-shadow-inset-accent: inset 2px 0 0 var(--ui-accent);
   --ui-box-shadow-inset-selected: inset 2px 0 0 var(--quiet-row-selected-border);
-  --ui-box-shadow-popover-depth: 0 18px 46px rgba(15, 23, 42, 0.07);
-  --ui-animation-message-toast-in: message-toast-in var(--ui-motion-340) var(--ui-ease-toast-in);
-  --ui-animation-message-toast-out: message-toast-out var(--ui-motion-260) var(--ui-ease-toast-out) forwards;
-  --ui-animation-message-toast-count-pop: count-pop var(--ui-motion-400) var(--ui-ease-pop-soft);
+
+  --ui-animation-none: none;
+  --ui-animation-fill-backwards: backwards;
+  --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
+  --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-instant) ease-out both;
+  --ui-animation-message-toast-in: message-toast-in var(--ui-motion-slow) var(--ui-ease-toast-in);
+  --ui-animation-message-toast-out: message-toast-out var(--ui-motion-slow) var(--ui-ease-toast-out) forwards;
+  --ui-animation-message-toast-count-pop: count-pop var(--ui-motion-slow) var(--ui-ease-pop-soft);
+  --ui-animation-message-card-appear: message-card-appear var(--ui-motion-slow) var(--ui-ease-emphasized) forwards;
+  --ui-animation-reader-body-fade-in: reader-body-fade-in var(--ui-motion-slow) var(--ui-ease-emphasized) forwards;
   --ui-animation-send-undo-progress: send-undo-countdown;
   --ui-animation-send-undo-timing: linear;
   --ui-animation-send-undo-fill-mode: forwards;
-  --ui-animation-message-card-appear: message-card-appear var(--ui-motion-580) var(--ui-ease-emphasized) forwards;
-  --ui-animation-reader-body-fade-in: reader-body-fade-in var(--ui-motion-280) var(--ui-ease-emphasized) forwards;
-  --ui-animation-global-tooltip-in: global-tooltip-in var(--ui-motion-glance) ease-out both;
-  --ui-animation-shimmer: shimmer var(--ui-motion-1600) infinite var(--ui-ease-standard);
-  --ui-animation-spinner: ui-spin var(--ui-spinner-duration) linear infinite;
-  --ui-animation-none: none;
-  --ui-animation-send-undo-progress-duration: var(--ui-motion-260);
-  --ui-animation-fill-backwards: backwards;
-  --ui-animation-context-menu-enter: context-menu-enter var(--ui-motion-fast) var(--ui-ease-standard);
-  --ui-animation-settings-backdrop-fade: settings-backdrop-fade var(--ui-motion-standard) ease-out both;
-  --ui-animation-settings-modal-pop: settings-modal-pop var(--ui-motion-220) var(--ui-ease-emphasized) both;
+  --ui-animation-send-undo-progress-duration: var(--ui-motion-slow);
+  --ui-animation-settings-backdrop-fade: settings-backdrop-fade var(--ui-motion-normal) ease-out both;
+  --ui-animation-settings-modal-pop: settings-modal-pop var(--ui-motion-slow) var(--ui-ease-emphasized) both;
   --ui-animation-settings-floating-bar-slide: settings-floating-bar-slide var(--ui-motion-slow) var(--ui-ease-emphasized) both;
-  --ui-animation-settings-dot-pulse: settings-dot-pulse var(--ui-motion-1800) linear infinite;
-  --ui-animation-settings-page-enter: settings-page-enter var(--ui-motion-compact) ease-out both;
-  --ui-box-shadow-none: none;
-  /* Current UI aliases. Retain during migration from the pre-2026 layer. */
-  --ui-bg: var(--color-canvas);
-  --ui-sidebar: var(--color-surface-sidebar);
-  --ui-list: var(--color-surface-list);
-  --ui-reader: var(--color-surface-reader);
-  --ui-surface: var(--color-surface-raised);
-  --ui-surface-muted: var(--color-surface-muted);
-  --ui-control-bg: var(--color-surface-raised);
-  --ui-control-hover: var(--color-surface-hover);
-  --ui-text: var(--color-text-primary);
-  --ui-text-secondary: var(--color-text-secondary);
-  --ui-text-tertiary: var(--color-text-tertiary);
-  --ui-border: var(--color-border-subtle);
-  --ui-border-strong: var(--color-border-strong);
-  --ui-accent: var(--color-accent);
-  --ui-accent-hover: var(--color-accent-hover);
-  --ui-accent-pressed: var(--color-accent-pressed);
-  --ui-accent-soft: var(--color-accent-soft);
-  --ui-success: var(--color-success);
-  --ui-success-bg: var(--color-success-soft);
-  --ui-danger: var(--color-danger);
-  --ui-danger-hover: var(--color-danger-hover);
-  --ui-danger-bg: var(--color-danger-soft);
-  --ui-warning: var(--color-warning);
-  --ui-warning-bg: var(--color-warning-soft);
-  --ui-warning-border: var(--color-warning-border);
+  --ui-animation-settings-dot-pulse: settings-dot-pulse var(--ui-motion-loop) linear infinite;
+  --ui-animation-settings-page-enter: settings-page-enter var(--ui-motion-fast) ease-out both;
+  --ui-animation-shimmer: shimmer var(--ui-motion-loop) infinite var(--ui-ease-standard);
+  --ui-animation-spinner: ui-spin var(--ui-motion-spin) linear infinite;
+
+  /* Workspace sub-surfaces: default aliases resolved by the app-shell layer
+     in styles/layout.css; the dark theme re-maps them in styles/dark-mode.css. */
+  --workspace-sidebar: var(--ui-sidebar);
+  --workspace-list: var(--ui-list);
+  --workspace-reader: var(--ui-reader);
+  --workspace-toolbar: var(--ui-list);
+  --workspace-control: var(--ui-surface-muted);
+  --workspace-control-active: var(--ui-surface);
 
   /* Quiet list states use luminance before colour. */
   --quiet-row-hover: var(--color-surface-hover);
@@ -285,12 +252,13 @@
 }
 
 /*
- * Dark mode: re-map semantic colour roles for the 2026 layer (which is fully
- * token-driven). Overlays and legacy sheets with hard-coded light surfaces
- * are re-themed in styles/2026/pass-dark-mode.css. The resolved theme is
- * applied to <html data-theme="dark"> by the inline bootstrap script (and
- * kept in sync by useThemeMode), so a manual light/dark/system preference is
- * honoured without a flash of the wrong theme.
+ * Dark mode: re-map semantic colour roles. The dark theme layer
+ * (styles/dark-mode.css) re-themes legacy sheets that hard-code light
+ * surfaces, and re-resolves the app-shell workspace sub-surfaces. The
+ * resolved theme is applied to <html data-theme="dark"> by the inline
+ * bootstrap script (and kept in sync by useThemeMode), so a manual
+ * light/dark/system preference is honoured without a flash of the wrong
+ * theme.
  */
 :root[data-theme="dark"] {
   color-scheme: dark;

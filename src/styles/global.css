@@ -1,3 +1,17 @@
+/*
+ * Global layer (global.css)
+ *
+ * Owns document-level defaults and application-wide behaviours that are
+ * independent of any pane or component:
+ *  - typography, colour and box-sizing defaults,
+ *  - native selection behaviour scoped to copyable content,
+ *  - the slim scrollbar treatment applied to every scrollable surface,
+ *  - the error boundary card.
+ *
+ * Everything pane-specific lives in the owning sheet (sidebar.css,
+ * message-list.css, reader.css, dialogs.css, …).
+ */
+
 :root {
   color: var(--ui-text);
   background: var(--ui-bg);
@@ -6,10 +20,81 @@
   letter-spacing: -0.01em;
 }
 
+/* The app root follows the token background so panes can sit on translucent
+ * glass without exposing a white document edge behind them. */
+html,
+body,
+#root {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+
+/* Keep native WebView selection inside copyable content. Selecting across
+ * mailbox chrome paints every crossed grid/flex line box, including its
+ * whitespace, which makes an ordinary drag look like a broken page overlay. */
+.app-shell > :is(.sidebar, .pane-resizer, .message-list-panel, .reader-panel) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Keyboard focus always gets a visible ring, regardless of pane. More
+ * specific surfaces may refine it; this guarantees a baseline. */
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #6b7280;
+  outline-offset: 1px;
+}
+
+/* Inputs remain editable, while only message content opts back into copying. */
+.app-shell > :is(.sidebar, .message-list-panel, .reader-panel) :is(
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  .body-text,
+  .reader-html,
+  .reader-translation-text
+) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* All scrollable surfaces use a narrow, low-contrast thumb. It becomes
+ * slightly stronger only while the user is actually hovering the surface. */
+.app-shell * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-text-tertiary) 28%, transparent) transparent;
+}
+
+.app-shell *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-shell *::-webkit-scrollbar-thumb {
+  min-height: 30px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text-tertiary) 24%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-thumb:hover,
+.app-shell :is(.sidebar, .message-list, .thread-list, .reader-panel, .reader, .label-menu-list):hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-text-tertiary) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-track {
+  background: transparent;
+}
 
 .app-error-boundary {
   min-height: 100vh;

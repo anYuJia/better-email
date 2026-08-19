@@ -1,3 +1,10 @@
+/* Loading skeletons (from pass-skeleton.css + pass-avatar-hardening.css).
+ *
+ * This file owns loading skeleton styles. The shimmer sweep keyframes come
+ * from pass-avatar-hardening.css and are required by --ui-animation-shimmer,
+ * which the skeleton lines reference. The .width-* row helpers are skeleton
+ * utilities used by EmailReaderSkeleton.tsx (also from pass-avatar-hardening). */
+
 /* EmailReaderSkeleton Styles */
 .email-reader-skeleton-container {
   display: flex;
@@ -108,4 +115,21 @@
 
 .skeleton-body-line {
   height: 13px;
+}
+
+/* Skeleton row width helpers (from pass-avatar-hardening.css); used by
+ * EmailReaderSkeleton.tsx. */
+.width-100 { width: 100%; }
+.width-95 { width: 95%; }
+.width-90 { width: 90%; }
+.width-80 { width: 80%; }
+.width-60 { width: 60%; }
+.width-40 { width: 40%; }
+
+/* Shimmer sweep keyframes (from pass-avatar-hardening.css; required by
+ * --ui-animation-shimmer which the skeleton lines reference). */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

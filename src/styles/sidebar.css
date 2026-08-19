@@ -1,7 +1,16 @@
-.background-sync-card {
-  display: grid;
-  gap: 8px;
-}
+/* ==========================================================================
+   sidebar.css — consolidated sidebar styling
+   Merged from: base sidebar.css + 2026 refinement/rehierarchy passes.
+   Cascade semantics preserved: later sections win at equal specificity;
+   higher-specificity selectors win regardless of position.
+   ========================================================================== */
+
+/* ==========================================================================
+   Section 1: base sidebar.css (unchanged values; duplicate-selector rules
+   that are re-declared by later passes appear once, merged, in their
+   respective later section)
+   ========================================================================== */
+
 .background-sync-card span {
   color: #b6c0ca;
   font-size: 12px;
@@ -16,14 +25,6 @@
   overflow-wrap: anywhere;
 }
 .background-sync-card small { color: #9ba8b5; }
-
-.task-stack {
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.05);
-}
 
 .task-stack small {
   display: block;
@@ -42,12 +43,6 @@
 .sidebar-footer {
   display: grid;
   gap: 8px;
-}
-
-.sidebar-footer-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
 }
 
 .sidebar-task-stack {
@@ -92,49 +87,7 @@
   background: linear-gradient(90deg, #2c80ff, #43d9ff);
 }
 
-.sidebar-secondary {
-  padding-top: 6px;
-  border-top: 1px solid rgba(255,255,255,0.10);
-}
-
-.sidebar-footer {
-  margin-top: auto;
-}
-
-.sidebar-disclosure {
-  border: 1px solid rgba(255,255,255,0.11);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.06);
-  overflow: hidden;
-}
-
-.sidebar-disclosure summary {
-  min-height: 36px;
-  padding: 0 10px;
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  color: #dce3ea;
-  cursor: pointer;
-  list-style: none;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .sidebar-disclosure summary::-webkit-details-marker { display: none; }
-
-.sidebar-disclosure summary::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-  opacity: 0.55;
-  justify-self: start;
-  grid-column: 1;
-}
 
 .sidebar-disclosure summary span {
   min-width: 0;
@@ -159,30 +112,6 @@
 .label-list,
 .saved-search-list {
   padding: 8px;
-}
-
-.sidebar-tool-stack {
-  display: grid;
-  gap: 10px;
-  padding: 10px;
-}
-
-.sidebar-tool-section {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 8px;
-  background: rgba(9, 14, 22, 0.18);
-}
-
-.sidebar-tool-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #edf4fb;
-  font-size: 12px;
 }
 
 .sidebar-tool-heading span {
@@ -210,7 +139,6 @@
   justify-content: space-between;
 }
 .folder:hover, .folder.active { background: rgba(255,255,255,0.10); color: #fff; }
-.folder-name { display: flex; align-items: center; gap: 9px; }
 .badge {
   min-width: 22px;
   height: 22px;
@@ -225,14 +153,6 @@
 
 .sidebar-section { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 12px; }
 .sidebar-title { color: #9ba8b5; font-size: 12px; margin-bottom: 8px; }
-.label-row {
-  display: grid;
-  grid-template-columns: 10px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  color: #dce3ea;
-}
 .label-row > span,
 .label-tools .label-dot {
   width: 10px;
@@ -270,12 +190,6 @@
 }
 .saved-search-list { display: flex; flex-direction: column; gap: 6px; }
 .saved-search-list small { color: #9ba8b5; font-size: 12px; }
-.saved-search-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
-  align-items: center;
-}
 .saved-search-row > button:first-child {
   display: flex;
   flex-direction: column;
@@ -509,23 +423,6 @@
   font-size: 12px;
   border-bottom: 1px solid #edf0f3;
 }
-.folder-main {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.folder-actions {
-  display: inline-flex;
-  gap: 4px;
-  padding-right: 6px;
-}
 .folder-actions button,
 .folder-rename button,
 .custom-folder-form button {
@@ -554,3 +451,856 @@
   font-size: 12px;
 }
 .custom-folder-form { border-top: 0; }
+
+/* ==========================================================================
+   Section 2: quiet refinement (sidebar scope, from 2026/pass-refinement.css)
+   Global/app-shell/pane-resizer/account-switcher/attachments/status-line
+   rules excluded — they are owned by other stylesheets.
+   ========================================================================== */
+
+.folder-list,
+.sidebar-quick-menus,
+.sidebar-nav-section {
+  gap: 1px;
+}
+
+.folder:hover,
+.sidebar-disclosure summary:hover {
+  color: var(--ui-text);
+  background: rgba(31, 35, 40, 0.045);
+}
+
+.folder.active,
+.sidebar-disclosure[open] summary {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-inset-accent);
+}
+
+.sidebar-disclosure {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.sidebar-tool-stack {
+  display: grid;
+  max-height: 34vh;
+  padding: 5px 0 6px 8px;
+  gap: 6px;
+}
+
+.sidebar-tool-heading span,
+.sidebar-tool-section small,
+.background-sync-card > span,
+.background-sync-card > em,
+.background-sync-card > small {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+.background-sync-card {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.task-stack {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+/* ==========================================================================
+   Section 3: workspace hierarchy (sidebar scope, from 2026/workspace-hierarchy.css)
+   Dead rules deleted: `.sidebar .folder:hover/:focus-within` and
+   `.sidebar .folder.active/:active:hover` (proven dead by app-shell scoped
+   rules); the :media reduced-motion `.message-card` half is owned by
+   message-list.css.
+   ========================================================================== */
+
+/* Sidebar: neutral icons and a quiet selected row keep the navigation in the
+ * background until the user needs it. */
+.sidebar .folder.active .folder-main {
+  font-weight: 680;
+}
+
+.sidebar .folder-name svg,
+.sidebar .folder.active .folder-name svg {
+  color: currentColor;
+}
+
+.sidebar .badge,
+.sidebar .sidebar-disclosure summary em {
+  color: var(--ui-text-secondary);
+  background: transparent !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar .folder.active .badge {
+  color: var(--ui-text);
+  background: transparent !important;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar .folder {
+    transition: var(--ui-transition-none);
+  }
+}
+
+/* ==========================================================================
+   Section 4: sidebar de-AI pass (from 2026/pass-sidebar-deai.css)
+   `.app-shell .attachments*` rules excluded — owned by reader.css.
+   ========================================================================== */
+
+.brand {
+  min-height: 28px;
+  padding: 0 8px 2px;
+  gap: 9px;
+}
+
+.brand strong {
+  color: var(--ui-text);
+  font-size: 13.5px;
+  font-weight: 680;
+}
+
+.brand span {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  display: none;
+}
+
+.compose-button {
+  min-height: 38px;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid var(--ui-accent);
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.compose-button:hover {
+  color: #ffffff;
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.compose-button svg {
+  color: currentColor;
+}
+
+.sidebar-label {
+  margin: 5px 0 1px;
+  padding: 0 8px;
+  color: #7d858f;
+  font-size: 10.5px;
+  font-weight: 560;
+  text-transform: none;
+  margin-top: 7px;
+  padding-inline: 8px;
+}
+
+.folder.active .folder-name svg,
+.folder.message-drop-target .folder-name svg,
+.sidebar-disclosure[open] summary::before {
+  color: var(--ui-text-secondary);
+}
+
+.badge,
+.sidebar-disclosure summary em {
+  min-width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent !important;
+  font-size: 10.5px;
+  font-weight: 600;
+  box-shadow: var(--ui-box-shadow-none) !important;
+}
+
+.sidebar-secondary {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.sidebar-disclosure summary {
+  min-height: 30px;
+  padding: 0 8px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+  list-style: none;
+  font-size: 11.5px;
+  font-weight: 540;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  background: var(--ui-sidebar);
+}
+
+.sidebar-footer-actions .settings-button,
+.settings-button {
+  flex: 1 1 0;
+  height: 28px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 520;
+}
+
+.sidebar-sync-status {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 8px 7px;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sidebar-sync-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-sync-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ui-border);
+}
+
+.sidebar-sync-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ui-accent);
+  transition: var(--ui-transition-width-standard-ease-out);
+}
+
+.app-shell .sidebar-footer.has-sync-status {
+  gap: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.app-shell .sidebar-footer.has-sync-status .sidebar-footer-actions {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* ==========================================================================
+   Section 5: sidebar density pass (from 2026/pass-sidebar-density.css)
+   No .global-tooltip rules present in this source; all rules are sidebar
+   scope and kept, including the !important popover-flattening rules.
+   ========================================================================== */
+
+.sidebar-quick-menus .sidebar-disclosure > :not(summary),
+.sidebar-tools > .sidebar-tool-stack {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  max-height: min(320px, 38vh);
+  margin-top: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  backdrop-filter: none;
+}
+
+.sidebar-tools > .sidebar-tool-stack {
+  display: grid;
+  gap: 0;
+  padding: 3px 0 5px 10px;
+}
+
+.sidebar-tool-section {
+  display: grid;
+  gap: 8px;
+  padding: 9px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.sidebar-tool-section:last-child {
+  border-bottom: 0;
+}
+
+.sidebar-tool-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #edf4fb;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.sidebar-tool-heading strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.saved-search-form,
+.custom-folder-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.saved-search-form input,
+.custom-folder-form input {
+  min-height: 31px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.saved-search-form button,
+.custom-folder-form button {
+  min-height: 31px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.saved-search-row > button,
+.label-row .label-row-main {
+  min-height: 31px;
+  font-size: 12.5px;
+}
+
+.saved-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Keep folder controls tidy while preserving discoverability on hover/focus. */
+.saved-search-row > .row-more-button,
+.folder-actions button {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-tertiary, #6b7280);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  opacity: 0;
+  transition: var(--ui-transition-fast-opacity-color-bg);
+}
+
+.saved-search-row:hover > .row-more-button,
+.saved-search-row:focus-within > .row-more-button,
+.folder:hover .folder-actions button,
+.folder:focus-within .folder-actions button {
+  opacity: 1;
+}
+
+.saved-search-row > .row-more-button:hover,
+.folder-actions button:hover {
+  color: var(--ui-text, #111827);
+  background: rgba(31, 41, 55, 0.07);
+}
+
+.folder-actions {
+  display: inline-flex;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+.label-row {
+  display: block;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: #dce3ea;
+}
+
+.label-row .label-row-main {
+  width: 100%;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.label-row .label-row-main:hover,
+.label-row .label-row-main:focus-visible {
+  background: rgba(31, 41, 55, 0.055);
+  outline: none;
+}
+
+.label-row .label-row-main strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-row .label-row-main em {
+  font-style: normal;
+}
+
+.folder.message-drop-target .folder-name svg {
+  color: #0073d8;
+}
+
+.sidebar-quick-menus .more-mailboxes {
+  overflow: hidden;
+}
+
+@media (hover: none) {
+  .saved-search-row > .row-more-button,
+  .folder-actions button {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Section 6: sidebar clarity pass (from 2026/pass-sidebar-clarity.css)
+   The .sender/.subject rule, the .message-card p / .message-chips span
+   rules, the .active-label-chip and the reader-meta span rules are excluded
+   — owned by message-list.css / reader.css.
+   ========================================================================== */
+
+.app-shell {
+  font-size: 14.5px;
+}
+
+.sidebar {
+  color: var(--ui-text-secondary);
+  background: var(--ui-sidebar);
+  border-right: 0;
+  padding: 12px 10px 10px;
+  gap: 9px;
+  font-size: 14px;
+}
+
+.brand strong,
+.account-switcher-copy strong,
+.compose-button,
+.folder-main,
+.sidebar-disclosure summary,
+.settings-button {
+  font-size: 14px;
+}
+
+/* Restored from workspace-hierarchy.css: agent A dropped these as "proven
+ * dead" behind the .app-shell scoped equivalents, but the pass layer
+ * explicitly lists the unscoped hover/active interactions, so they stay. */
+.sidebar .folder:hover,
+.sidebar .folder:focus-within {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.sidebar .folder.active,
+.sidebar .folder.active:hover {
+  color: #172f49;
+  background: #c8dcf1;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.account-switcher .account-switcher-copy > span,
+.sidebar-label,
+.badge,
+.sidebar-disclosure summary em,
+.sidebar-tool-heading span,
+.sidebar-tool-section small,
+.background-sync-card > span,
+.background-sync-card > em,
+.background-sync-card > small {
+  font-size: 12.5px;
+}
+
+.sidebar-footer-actions {
+  display: flex;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  padding-top: 9px;
+}
+
+.folder-main {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0 8px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  font-weight: 520;
+}
+
+.folder-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.folder-name svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.7;
+}
+
+/* ==========================================================================
+   Section 7: sidebar selection pass (from 2026/pass-sidebar-selection.css)
+   ========================================================================== */
+
+.sidebar .folder {
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  transition: var(--ui-transition-standard-color-background-inverse);
+}
+
+.sidebar .folder.active .folder-name svg {
+  color: #3f6594;
+}
+
+.sidebar .folder:not(.active):hover .folder-main {
+  font-weight: 540;
+}
+
+.sidebar-footer-actions .settings-button:hover,
+.settings-button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* ==========================================================================
+   Section 8: folder icon colors (from 2026/pass-folder-icons.css)
+   ========================================================================== */
+
+/* Sidebar folder icons: neutral by default; quiet warm cue only for the
+   danger folders (trash / spam). */
+.sidebar .folder[data-folder-role="trash"] .folder-name svg {
+  color: #8b6f68;
+}
+
+.sidebar .folder[data-folder-role="spam"] .folder-name svg {
+  color: #8a6655;
+}
+
+.sidebar .folder.active[data-folder-role="trash"] .folder-name svg,
+.sidebar .folder[data-folder-role="trash"]:hover .folder-name svg {
+  color: #805f57;
+}
+
+.sidebar .folder.active[data-folder-role="spam"] .folder-name svg,
+.sidebar .folder[data-folder-role="spam"]:hover .folder-name svg {
+  color: #7a5545;
+}
+
+/* ==========================================================================
+   Section 9: desktop workspace redesign — navigation rail
+   (from 2026/pass-workspace-redesign.css)
+   .app-shell var block, pane-resizer, account-switcher blocks and all
+   list/reader rules excluded — owned by other stylesheets.
+   ========================================================================== */
+
+/* Navigation rail -------------------------------------------------------- */
+
+/* Do not declare padding-top: the desktop window-chrome stylesheet reserves
+ * platform-specific headroom for the title-bar drag region. */
+.app-shell .sidebar {
+  gap: 10px;
+  padding-right: 10px;
+  padding-bottom: 10px;
+  padding-left: 10px;
+  color: var(--ui-text-secondary);
+  background: var(--workspace-sidebar);
+}
+
+.app-shell .brand {
+  min-height: 40px;
+  padding-inline: 6px;
+  gap: 8px;
+}
+
+.app-shell .brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.app-shell .brand strong {
+  color: var(--ui-text);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.app-shell .compose-button {
+  min-height: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.app-shell .compose-button:hover:not(:disabled) {
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .sidebar-label {
+  margin: 7px 0 2px;
+  padding-inline: 9px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.app-shell .folder-list,
+.app-shell .sidebar-quick-menus,
+.app-shell .sidebar-nav-section {
+  gap: 2px;
+}
+
+.app-shell .folder,
+.app-shell .sidebar-disclosure summary {
+  min-height: 34px;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .folder-main {
+  min-height: 34px;
+  padding-inline: 9px;
+  font-weight: 560;
+}
+
+.app-shell .folder:hover,
+.app-shell .folder:focus-within,
+.app-shell .sidebar-disclosure summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .folder.active .folder-main {
+  font-weight: 680;
+}
+
+.app-shell .sidebar .badge,
+.app-shell .sidebar .sidebar-disclosure summary em {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .sidebar-secondary {
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top-color: var(--ui-border);
+}
+
+.app-shell .sidebar-disclosure {
+  background: transparent;
+}
+
+.app-shell .sidebar-disclosure summary {
+  padding-inline: 9px;
+}
+
+.app-shell .sidebar-footer {
+  gap: 4px;
+  padding: 8px 2px 0;
+  border-top: 1px solid var(--ui-border);
+  background: var(--workspace-sidebar);
+}
+
+.app-shell .sidebar-footer-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.app-shell .sidebar-footer-actions .settings-button,
+.app-shell .settings-button {
+  min-height: 32px;
+  height: 32px;
+  gap: 5px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.app-shell .sidebar-footer-actions .settings-button:hover,
+.app-shell .settings-button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .sidebar-utility-actions button {
+  min-height: 30px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .sidebar-utility-actions button:hover:not(:disabled) {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--workspace-control);
+}
+
+/* ==========================================================================
+   Section 10: interaction fixes (sidebar scope, from 2026/pass-interaction-fixes.css)
+   FINAL winner for the active-folder shadow: must come after Section 9's
+   active rule so box-shadow: none wins.
+   ========================================================================== */
+
+/* Selected folders use a quiet fill only; the old inset blue rail was too
+ * visually loud and looked like a resize affordance. */
+.app-shell .folder.active,
+.app-shell .folder.active:hover,
+.app-shell .sidebar-disclosure[open] summary,
+.app-shell .sidebar-disclosure[open] summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* ==========================================================================
+   Section 11: premium refinements (sidebar scope, from 2026/pass-premium-refinements.css)
+   ========================================================================== */
+
+/* Sidebar disclosure chevron rotates with the same easing as the settings
+   disclosure arrow instead of snapping while the background fades. */
+.sidebar-disclosure summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0.42;
+  justify-self: start;
+  grid-column: 1;
+  transition: var(--ui-transition-transform-quiet);
+}
+
+/* ==========================================================================
+   Section 12: motion cleanup — sidebar hover feedback
+   (from 2026/pass-motion.css, sidebar parts only)
+   Pane transition caps, .message-card and icon-button hovers belong to
+   motion.css — not included.
+   NOTE: authorized value change — `.folder.message-drop-target` background
+   #eef3f8 → var(--ui-accent-soft) (fixes dark-mode light leak).
+   ========================================================================== */
+
+.folder,
+.sidebar-disclosure summary {
+  min-height: 31px;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.folder:hover,
+.sidebar-disclosure summary:hover,
+.folder:focus-within {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--quiet-row-shadow);
+}
+
+.folder.active,
+.folder.active:hover,
+.sidebar-disclosure[open] summary,
+.sidebar-disclosure[open] summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-inset-selected);
+}
+
+.folder.active .folder-main {
+  color: inherit;
+  font-weight: 650;
+}
+
+.folder.active .folder-name svg,
+.folder.message-drop-target .folder-name svg {
+  color: var(--ui-text-secondary);
+}
+
+.folder.message-drop-target,
+.folder.message-drop-target:hover,
+.folder.message-drop-target.active {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--quiet-row-selected-border);
+}

@@ -1,3 +1,11 @@
+/*
+ * Deferred overlay layer (overlay.css)
+ *
+ * Owns the full-screen deferred surface shown while the app waits for the
+ * heavy mail/account bootstrapping work (DeferredSurface). Purely a
+ * transient layer: fixed, above the workspace, below dialogs.
+ */
+
 .deferred-overlay {
   position: fixed;
   inset: 0;

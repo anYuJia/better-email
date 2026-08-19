@@ -1,3 +1,1780 @@
+/* ===========================================================================
+ * MESSAGE LIST — consolidated stylesheet
+ *
+ * Collapses the historic pass-override cascade into one file while
+ * preserving today's effective cascade exactly. Sources are appended in
+ * source order (the same order they were imported); where the SAME
+ * selector text appears in several sources, one rule is emitted at the
+ * last source's position with the union of properties (last source's
+ * value wins on overlap; !important kept wherever it wins today).
+ *
+ * The final section reproduces the legacy src/styles/message-list.css
+ * content, keeping its last-import-wins role.
+ * ========================================================================= */
+
+/* ---------------------------------------------------------------------------
+ * 1 · Message list base (src/styles/2026/message-list.css)
+ * -------------------------------------------------------------------------
+ * Rules shared with later passes (`.message-list-panel`, `.toolbar`,
+ * `.search-box`, `.search-box input`, `.icon-button`, `.icon-button:hover`,
+ * `.search-scope-menu > summary`, `.list-control-strip`, `.list-summary
+ * strong/em`, `.message-list, .thread-list`, `.message-date-section +
+ * .message-date-section`, `.message-date-header`, `.message-card`,
+ * `.message-avatar`, `.sender`, `.subject`, `.message-card time`,
+ * `.message-card p`, `.message-chips`, `.message-chips span`,
+ * `.message-list-footer`, `.message-list .empty-state`,
+ * `.thread-muted-indicator`) are emitted once, merged, at the position of
+ * their last source (sections 4, 7, 8, 9, 10, 11, 12, 14, 15). Everything
+ * below that is unique to this source is verbatim. */
+
+.search-cluster {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refresh-text-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 90px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: var(--ui-transition-mid-color-background-border-opacity);
+  cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.refresh-text-button:hover {
+  color: var(--ui-accent);
+  border-color: #bad8f7;
+  background: var(--ui-accent-soft);
+}
+
+.refresh-text-button.refreshing {
+  color: var(--ui-accent);
+  border-color: #bad8f7;
+  background: var(--ui-accent-soft);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.search-options-menu {
+  flex: 0 0 auto;
+}
+
+.search-scope-menu {
+  flex: 0 0 auto;
+}
+
+.search-scope-menu > summary::after {
+  content: none;
+}
+
+.search-scope-menu > div {
+  top: 42px;
+  right: 0;
+  left: auto;
+}
+
+.search-options-menu > summary {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.search-options-menu > summary::after {
+  content: none;
+}
+
+.search-options-menu > div {
+  top: 42px;
+  right: 0;
+  left: auto;
+}
+
+.list-summary {
+  min-width: 0;
+  gap: 7px;
+}
+
+.list-summary span,
+.list-summary em {
+  min-height: auto;
+  max-width: 100px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-summary .search-scope-indicator {
+  color: #4f5d6c;
+  background: #e9edf2;
+}
+
+/* The bulk toolbar is pinned near the bottom of the list, so its menu must
+   expand into the available space above it instead of being clipped below. */
+.bulk-toolbar .bulk-more-menu > div {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.message-date-section {
+  display: grid;
+}
+
+.message-date-header em {
+  color: #64748b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.message-card.selected {
+  border-color: #dce2e8;
+}
+
+.message-card.is-new {
+  animation: var(--ui-animation-message-card-appear);
+}
+
+@keyframes message-card-appear {
+  from {
+    opacity: 0;
+    background: #e6f1fc;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.message-card-main {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.message-list .empty-state button {
+  min-height: 33px;
+  border: 1px solid #bad8f7;
+  border-radius: 8px;
+  color: #0867bd;
+  background: var(--ui-accent-soft);
+}
+
+/* ---------------------------------------------------------------------------
+ * 2 · List typography truncation (src/styles/2026/message-list-typography.css)
+ * ------------------------------------------------------------------------ */
+
+/* Shared message-card typography truncation for preview/title lines. */
+.sender,
+.subject,
+.message-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3 · List density (from pass-message-list-density.css)
+ * ------------------------------------------------------------------------ */
+
+.message-list {
+  background: var(--ui-list);
+}
+
+.avatar-tone-0 {
+  color: #425466;
+  background: #e4ebf4;
+}
+
+.avatar-tone-1 {
+  color: #4d5264;
+  background: #ece8f4;
+}
+
+.avatar-tone-2 {
+  color: #3f5a50;
+  background: #e4eee9;
+}
+
+.avatar-tone-3 {
+  color: #62533f;
+  background: #f0ebe1;
+}
+
+.avatar-tone-4 {
+  color: #4c5967;
+  background: #e6edf1;
+}
+
+.avatar-tone-5 {
+  color: #604d55;
+  background: #f1e7ea;
+}
+
+.sender.unread,
+.subject.unread {
+  color: #18212d;
+  font-weight: 720;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4 · List final layout (from pass-message-list-final.css)
+ * ------------------------------------------------------------------------ */
+
+.message-leading {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 40px;
+  height: 44px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.message-card:hover .message-avatar,
+.message-card:has(.message-card-main:focus-visible) .message-avatar,
+.message-card:has(.message-select input:checked) .message-avatar {
+  opacity: 1;
+}
+
+.message-select {
+  left: 6px;
+  top: 6px;
+  z-index: 3;
+  opacity: 0;
+  transform: none;
+}
+
+.message-select input {
+  box-sizing: border-box;
+  flex: 0 0 16px;
+  inline-size: 16px;
+  block-size: 16px;
+  width: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  max-height: 16px;
+  margin: 0;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aab8c6;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: var(--ui-box-shadow-none);
+  cursor: pointer;
+}
+
+.message-card:hover .message-select,
+.message-card:has(.message-card-main:focus-visible) .message-select,
+.message-card:has(.message-select input:checked) .message-select {
+  opacity: 1;
+}
+
+.message-card.is-current .message-select,
+.message-card.is-current:hover .message-select,
+.message-card.is-current:has(.message-card-main:focus-visible) .message-select {
+  display: none;
+}
+
+/* The unread marker owns the selection slot until an explicit selection
+   control is shown. This keeps the list's left edge stable while preserving
+   a clear unread signal. */
+.message-card:hover > .message-unread-dot,
+.message-card:has(.message-card-main:focus-visible) > .message-unread-dot,
+.message-card:has(.message-select input:checked) > .message-unread-dot {
+  opacity: 0;
+}
+
+.message-select input::before,
+.bulk-selection > input::before {
+  width: 7px;
+  height: 4px;
+  border: solid #ffffff;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+
+.message-select input:checked,
+.bulk-selection > input:checked {
+  border-color: #2677d1;
+  background: #2677d1;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-select input:checked::before,
+.bulk-selection > input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.message-select input:focus-visible,
+.bulk-selection > input:focus-visible {
+  outline: 2px solid #78aee6;
+  outline-offset: 2px;
+}
+
+.bulk-selection > input {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aab8c6;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: var(--ui-box-shadow-none);
+  cursor: pointer;
+}
+
+.message-list,
+.message-date-section {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+/* ---------------------------------------------------------------------------
+ * 5 · Rounded rows (from pass-message-list-rounded.css)
+ * ------------------------------------------------------------------------ */
+
+/* Rounded rows keep the inbox approachable without turning it into a sparse
+   card grid. The virtual row includes the gap; the card itself stays 62px.
+   Height 68px is the single source of truth shared with
+   MessageListView's MESSAGE_ROW_HEIGHT in messageListLayout.ts. */
+.message-list-item {
+  box-sizing: border-box;
+  height: 68px;
+  padding: 0 6px 6px;
+}
+
+.message-card:hover,
+.message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-card .message-unread-dot {
+  border-color: var(--ui-surface);
+}
+
+.message-card:hover .message-unread-dot {
+  border-color: var(--quiet-row-hover);
+}
+
+.message-card.selected .message-unread-dot {
+  border-color: var(--quiet-row-selected);
+}
+
+:root[data-theme="dark"] .message-card {
+  border-color: transparent;
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .message-card:hover,
+:root[data-theme="dark"] .message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .message-card.selected,
+:root[data-theme="dark"] .message-card.selected:hover,
+:root[data-theme="dark"] .message-card.is-unread.selected,
+:root[data-theme="dark"] .message-card.is-unread.selected:hover {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Virtualized date headers are direct children of the list, so a modifier
+   carries the group separator without relying on a light-only inline style. */
+.message-date-header.message-date-header--separated {
+  border-top: 1px solid var(--ui-border);
+}
+
+/* Older refinement passes make the final empty-state action a translucent
+ * white button. Keep both empty-state actions on the semantic control scale
+ * when the workspace is dark. */
+:root[data-theme="dark"] .message-list .empty-state button {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .message-list .empty-state button:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+}
+
+/* ---------------------------------------------------------------------------
+ * 6 · Attachment chips (from pass-message-attachment.css)
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Message list: attachment indicator.
+ * The attachment chip used to live in the bottom chip row, which overflows
+ * the fixed 62px card height and gets clipped. It now sits inline on the
+ * subject line so it never pushes content below the card bounds.
+ */
+
+.message-subject-line {
+  grid-column: 1;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+}
+
+.message-subject-line > .subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.message-attachment {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 999px;
+  color: var(--ui-text-tertiary, #646f7b);
+  background: rgba(17, 24, 39, 0.07);
+  font-size: 10.5px;
+  font-weight: 560;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.message-card.is-current .message-attachment,
+.message-card:hover .message-attachment {
+  color: var(--ui-accent, #0a63c4);
+  background: rgba(10, 99, 196, 0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-attachment {
+    transition: var(--ui-transition-none);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 7 · Thread list (from pass-thread-list.css)
+ * ------------------------------------------------------------------------ */
+
+/* Session list follows the same quiet, borderless row language as mail. */
+.thread-list {
+  padding: 12px 14px !important;
+  gap: 10px !important;
+  background: var(--ui-list);
+}
+
+.thread-card {
+  position: relative;
+  width: 100%;
+  height: 88px;
+  border: 1px solid transparent !important;
+  border-radius: var(--ui-radius-sm) !important;
+  background: var(--ui-surface) !important;
+  padding: 12px 16px 12px 28px !important;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  box-shadow: var(--ui-box-shadow-none) !important;
+  transition: var(--ui-transition-bg-border-color-standard-emphasis) !important;
+  min-width: 0;
+  box-sizing: border-box !important;
+}
+
+.thread-card:hover {
+  border-color: transparent !important;
+  background: var(--quiet-row-hover) !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
+}
+
+.thread-card.selected,
+.thread-card.selected:hover {
+  background: var(--quiet-row-selected) !important;
+  border-color: transparent !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
+}
+
+.thread-unread-dot {
+  position: absolute;
+  left: 12px;
+  top: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-surface-outline);
+}
+
+.thread-topline {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.thread-subject {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--ui-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.thread-card.is-unread .thread-subject {
+  font-weight: 750;
+  color: var(--ui-text);
+}
+
+.thread-card time {
+  font-size: 11px;
+  color: var(--ui-text-tertiary) !important;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.thread-card.is-unread time {
+  color: var(--ui-accent) !important;
+  font-weight: 600;
+}
+
+.thread-participants {
+  margin: 0 !important;
+  font-size: 12px !important;
+  color: var(--ui-text-secondary) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 450;
+}
+
+.thread-card.is-unread .thread-participants {
+  color: var(--ui-text) !important;
+  font-weight: 600;
+}
+
+.thread-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ui-text-tertiary);
+  margin-top: 2px;
+}
+
+.thread-count-badge {
+  padding: 1.5px 6px;
+  border-radius: 5px;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  font-weight: 500;
+}
+
+.thread-unread-badge {
+  padding: 1.5px 6px;
+  border-radius: 5px;
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+  font-weight: 600;
+}
+
+/* merged: .thread-muted-indicator (from message-list.css, pass-thread-list.css) */
+.thread-muted-indicator {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  color: var(--ui-text-tertiary) !important;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+/* ---------------------------------------------------------------------------
+ * 8 · Workspace hierarchy (from workspace-hierarchy.css)
+ *
+ * Pane framing, list containers, toolbar, search box, list controls,
+ * bulk toolbar, message cards and empty states. Sidebar, reader, label,
+ * attachment-section and layer-contract rules are owned by their own
+ * files and are intentionally not repeated here.
+ * ------------------------------------------------------------------------ */
+
+.toolbar,
+.list-control-strip {
+  background: var(--ui-list);
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* merged: .toolbar (from message-list.css, workspace-hierarchy.css) */
+.toolbar {
+  position: relative;
+  z-index: 20;
+  min-height: 50px;
+  padding: 8px 10px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(251, 252, 253, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.search-box:hover {
+  border-color: transparent;
+  background: #eef1f4;
+  box-shadow: inset 0 0 0 1px rgba(31, 35, 40, 0.08);
+}
+
+.search-box:focus-within {
+  border-color: #93c5fd;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(31, 35, 40, 0.06);
+}
+
+.search-box > svg {
+  width: 15px;
+  height: 15px;
+  color: #7b8490;
+  flex: 0 0 auto;
+}
+
+/* merged: .search-box input (from message-list.css, workspace-hierarchy.css) */
+.search-box input {
+  min-width: 0;
+  height: 30px;
+  border: 0 !important;
+  font-size: 13px;
+  line-height: 30px;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none) !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.search-box input:focus,
+.search-box input:focus-visible {
+  outline: none;
+}
+
+.search-box input::placeholder {
+  color: #8f98a3;
+}
+
+.search-clear-button {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  border: 0;
+  border-radius: 999px;
+  color: #7d8793;
+  background: transparent;
+}
+
+.search-clear-button:hover,
+.search-clear-button:focus-visible {
+  color: #4f5965;
+  background: #edf0f3;
+  outline: none;
+}
+
+.search-scope-menu[open] > summary,
+.search-scope-menu > summary:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: #fff;
+}
+
+.search-scope-menu > summary svg {
+  color: #8a939f;
+}
+
+/* merged: .list-control-strip (from message-list.css, workspace-hierarchy.css) */
+.list-control-strip {
+  min-height: 39px;
+  padding: 5px 10px;
+  gap: 8px;
+  border-bottom: 1px solid var(--ui-border);
+  background: #f8f9fb;
+}
+
+.app-shell .list-control-strip {
+  min-height: 42px;
+  padding: 5px 12px;
+  gap: 9px;
+  border-bottom-color: var(--ui-border);
+  background: var(--workspace-toolbar);
+}
+
+.app-shell .list-summary {
+  gap: 7px;
+}
+
+.app-shell .list-summary strong {
+  color: var(--ui-text);
+  font-size: 13.5px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+
+.app-shell .list-summary span {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.app-shell .list-summary em,
+.app-shell .list-summary .search-scope-indicator {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--ui-text-secondary);
+  background: var(--workspace-control);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.app-shell .message-date-header {
+  min-height: 30px;
+  padding: 9px 14px 4px;
+  color: var(--ui-text-tertiary);
+  background: var(--workspace-list);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.app-shell .message-date-header em {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-weight: 560;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* merged: .icon-button (from message-list.css, workspace-hierarchy.css) */
+.icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+/* merged: .icon-button:hover (from message-list.css, workspace-hierarchy.css) */
+.icon-button:hover {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .list-control-actions {
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--workspace-control);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.list-control-actions {
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .list-control-actions > button,
+.app-shell .list-control-actions .compact-menu summary {
+  min-height: 29px;
+  padding-inline: 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app-shell .list-control-actions > button:hover,
+.app-shell .list-control-actions .compact-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--quiet-row-shadow);
+}
+
+.app-shell .list-control-actions > button.active,
+.app-shell .list-control-actions .compact-menu summary.active {
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar button,
+.app-shell .bulk-toolbar .compact-menu summary {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar button:hover:not(:disabled),
+.app-shell .bulk-toolbar .compact-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .bulk-toolbar {
+  min-height: 40px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+/* merged: .list-summary em (from message-list.css, workspace-hierarchy.css) */
+.list-summary em {
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* merged: .list-summary strong (from message-list.css, workspace-hierarchy.css) */
+.list-summary strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-summary span,
+.list-summary em,
+.list-summary .search-scope-indicator {
+  max-width: 132px;
+  padding: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 560;
+}
+
+/* merged: .message-list, .thread-list (from message-list.css, workspace-hierarchy.css) */
+.message-list,
+.thread-list {
+  min-height: 0;
+  background: var(--ui-list);
+}
+
+/* merged: .message-date-section + .message-date-section (from message-list.css,
+   pass-message-list-density.css, workspace-hierarchy.css) */
+.message-date-section + .message-date-section {
+  border-top: 1px solid var(--ui-border);
+  border-top-color: transparent;
+}
+
+/* merged: .message-date-header (from message-list.css,
+   pass-message-list-density.css, pass-message-list-rounded.css,
+   workspace-hierarchy.css) */
+.message-date-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  min-height: 23px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 14px;
+  padding: 10px 12px 5px;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
+  backdrop-filter: none;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  font-weight: 720;
+  border-bottom: 0;
+}
+
+/* Three-line scanning structure:
+ * 1. Sender & Time
+ * 2. Subject & Light status
+ * 3. Snippet summary */
+/* merged: .message-card (from message-list.css, pass-message-list-final.css,
+   pass-message-list-rounded.css, workspace-hierarchy.css) */
+.message-card {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  box-sizing: border-box !important;
+  overflow: hidden;
+  margin: 0;
+  padding: 6px 12px 6px 66px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-bg-color-standard);
+  border-bottom: 1px solid oklch(0.94 0.005 var(--primitive-hue-neutral));
+  width: 100%;
+  max-width: 100%;
+}
+
+.message-card > .message-topline,
+.message-card > .subject,
+.message-card > p {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-card:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-card-main:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -3px;
+}
+
+/* merged: .message-topline (from pass-message-list-density.css,
+   pass-message-list-final.css, workspace-hierarchy.css) */
+.message-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 16px;
+  overflow: hidden;
+  margin-bottom: 1px;
+}
+
+/* merged: .sender (from message-list.css, pass-message-list-final.css,
+   workspace-hierarchy.css) */
+.sender {
+  min-width: 0;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 540;
+}
+
+.sender.unread {
+  color: var(--ui-text);
+  font-weight: 720;
+}
+
+/* merged: .subject (from message-list.css, pass-message-list-density.css,
+   pass-message-list-final.css, workspace-hierarchy.css) */
+.subject {
+  margin-top: 1px;
+  display: block;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.subject.unread {
+  color: var(--ui-text);
+  font-weight: 720;
+}
+
+.message-attachment,
+.message-card.is-current .message-attachment,
+.message-card:hover .message-attachment {
+  color: var(--ui-text-tertiary);
+  background: var(--ui-surface-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* merged: .message-unread-dot (from pass-message-list-final.css,
+   workspace-hierarchy.css) */
+.message-unread-dot {
+  left: 10px;
+  top: 10px;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--ui-list);
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-list);
+  pointer-events: none;
+  transform: none;
+}
+
+/* List and reader shell baseline moved from pass-refinement. */
+/* merged: .message-list-panel (from message-list.css, workspace-hierarchy.css) */
+.message-list-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-inline: 0;
+  background: var(--ui-list);
+  box-shadow: var(--ui-box-shadow-none);
+  backdrop-filter: none;
+}
+
+/* merged: .message-list-footer (from message-list.css,
+   pass-message-list-rounded.css, workspace-hierarchy.css) */
+.message-list-footer {
+  box-sizing: border-box;
+  min-height: 36px;
+  height: 40px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 0;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
+}
+
+/* split from workspace-hierarchy: reader-owned .empty-reader-card selectors
+   stay in reader.css. */
+.mailbox-empty-state,
+.message-list .empty-state {
+  padding: 32px;
+  background: var(--ui-list);
+  color: var(--ui-text-secondary);
+}
+
+.mailbox-empty-state strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mailbox-empty-state span {
+  max-width: 360px;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
+/* split from workspace-hierarchy (the .sidebar .folder selector in the same
+   media block is sidebar-owned). */
+@media (prefers-reduced-motion: reduce) {
+  .message-card {
+    transition: var(--ui-transition-none);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 9 · Search suggestions (from pass-search-suggestions.css)
+ * ------------------------------------------------------------------------ */
+
+/* merged: .search-box (from message-list.css, workspace-hierarchy.css,
+   pass-search-suggestions.css) */
+.search-box {
+  position: relative;
+  overflow: visible;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f1f3f5;
+  color: var(--ui-text-secondary);
+  box-shadow: inset 0 0 0 1px rgba(31, 35, 40, 0.06);
+}
+
+.search-suggestion-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  display: grid;
+  gap: 0;
+  padding: 3px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.search-suggestion-panel button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 35px;
+  padding: 5px 7px 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: transparent;
+  text-align: left;
+}
+
+.search-suggestion-title {
+  display: block;
+  padding: 5px 9px 2px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.search-suggestion-panel button.active {
+  background: var(--quiet-row-selected);
+}
+
+.search-suggestion-panel button:hover,
+.search-suggestion-panel button:focus-visible {
+  background: var(--quiet-row-hover);
+  outline: none;
+}
+
+.search-suggestion-panel span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.search-suggestion-panel strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.search-suggestion-panel em {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 450;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * 10 · Desktop workspace redesign (from pass-workspace-redesign.css)
+ *
+ * Light-mode glass value blocks (:root:not([data-theme="dark"]) --workspace-*,
+ * sidebar/reader blocks, pane-resizer and dark-only overrides) live in their
+ * owning files; only the list-facing rules are repeated here.
+ * ------------------------------------------------------------------------ */
+
+.app-shell .message-list-panel,
+.app-shell .message-list,
+.app-shell .thread-list {
+  background: var(--workspace-list);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .toolbar {
+  min-height: 54px;
+  padding: 10px 12px;
+  gap: 8px;
+  border-bottom-color: var(--ui-border);
+  background: var(--workspace-toolbar);
+  backdrop-filter: none;
+}
+
+.app-shell .search-cluster {
+  gap: 6px;
+}
+
+/* A compact omnibox gives search a stable home without turning the header
+ * into a stack of floating cards. */
+.app-shell .search-box {
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-tertiary);
+  background: var(--workspace-control);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+
+.app-shell .search-box:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .search-box:focus-within {
+  border-color: var(--ui-accent);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-accent-soft-outline);
+}
+
+.app-shell .search-box > svg,
+.app-shell .search-clear-button {
+  color: var(--ui-text-tertiary);
+}
+
+.app-shell .search-box input {
+  color: var(--ui-text);
+}
+
+.app-shell .search-box input::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+.app-shell .search-clear-button:hover,
+.app-shell .search-clear-button:focus-visible {
+  color: var(--ui-text-secondary);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .search-scope-menu > summary,
+.app-shell .refresh-text-button {
+  min-height: 34px;
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--workspace-control-active);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* merged: .search-scope-menu > summary (from message-list.css,
+   workspace-hierarchy.css) */
+.search-scope-menu > summary {
+  min-width: 58px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-color: #d9dee5;
+  border-radius: 8px;
+  color: var(--ui-text-secondary);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+/* from pass-workspace-redesign.css — own app-shell scoped rule, kept separate
+   from the un-prefixed one above (different selector text). */
+.app-shell .search-scope-menu > summary {
+  min-width: 62px;
+  padding-inline: 8px;
+  font-size: 11px;
+}
+
+.app-shell .refresh-text-button {
+  min-width: 96px;
+  padding-inline: 10px;
+  font-size: 11.5px;
+  font-weight: 620;
+}
+
+.app-shell .search-scope-menu[open] > summary,
+.app-shell .search-scope-menu > summary:hover,
+.app-shell .refresh-text-button:hover:not(:disabled),
+.app-shell .refresh-text-button.refreshing {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--workspace-control);
+}
+
+/* The virtualized row retains a small, consistent breathing space. The card
+ * itself reads as a list row, not a grid of independently raised panels. */
+.app-shell .message-list-item {
+  padding: 0 8px 3px;
+}
+
+.app-shell .message-card {
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--ui-border);
+}
+
+.app-shell .message-card:hover,
+.app-shell .message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-card.selected,
+.app-shell .message-card.selected:hover,
+.app-shell .message-card.is-unread.selected,
+.app-shell .message-card.is-unread.selected:hover {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-card .message-unread-dot {
+  border-color: var(--workspace-list);
+}
+
+.app-shell .message-card:hover .message-unread-dot {
+  border-color: var(--quiet-row-hover);
+}
+
+.app-shell .message-card.selected .message-unread-dot {
+  border-color: var(--quiet-row-selected);
+}
+
+.app-shell .sender,
+.app-shell .subject {
+  color: var(--ui-text);
+}
+
+.app-shell .sender:not(.unread) {
+  color: var(--ui-text-secondary);
+}
+
+.app-shell .message-card time,
+.app-shell .message-card p {
+  color: var(--ui-text-tertiary);
+}
+
+.app-shell .message-chips span {
+  color: var(--ui-text-tertiary);
+  background: var(--workspace-control);
+}
+
+/* Thread view uses the same scan rail. The old pass uses !important, so this
+ * intentionally narrow override clears only its elevated-card treatment. */
+.app-shell .thread-list {
+  padding: 0 8px 8px !important;
+  gap: 3px !important;
+}
+
+.app-shell .thread-card {
+  border-color: transparent !important;
+  border-radius: var(--ui-radius-control) !important;
+  background: transparent !important;
+  padding: 10px 12px 10px 28px !important;
+  box-shadow: inset 0 -1px 0 var(--ui-border) !important;
+}
+
+.app-shell .thread-card:hover {
+  border-color: transparent !important;
+  background: var(--quiet-row-hover) !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
+}
+
+.app-shell .thread-card.selected,
+.app-shell .thread-card.selected:hover {
+  border-color: transparent !important;
+  background: var(--quiet-row-selected) !important;
+  box-shadow: var(--ui-box-shadow-none) !important;
+}
+
+.app-shell .message-list-footer {
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 0;
+  color: var(--ui-text-tertiary);
+  background: var(--workspace-list);
+}
+
+.app-shell .message-list .empty-state {
+  color: var(--ui-text-secondary);
+  background: var(--workspace-list);
+}
+
+.app-shell .message-list .empty-state .empty-state-mark {
+  border-radius: var(--ui-radius-panel);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root:not([data-theme="dark"]) .app-shell .message-card,
+:root:not([data-theme="dark"]) .app-shell .thread-card {
+  box-shadow: inset 0 -1px 0 oklch(0.89 0.006 var(--primitive-hue-neutral) / 0.68);
+}
+
+:root:not([data-theme="dark"]) .app-shell .message-card:hover,
+:root:not([data-theme="dark"]) .app-shell .message-card.is-unread:hover,
+:root:not([data-theme="dark"]) .app-shell .thread-card:hover {
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Message selection controls ------------------------------------------------
+ * Keep bulk selection independent from the reader's current-message state.
+ * The current row remains highlighted, but its checkbox is a real, clickable
+ * control rather than a hidden affordance. A small circular control in the
+ * trailing gutter also keeps the sender/subject scan line unobstructed. */
+.app-shell .message-card {
+  padding-right: 42px;
+}
+
+.app-shell .message-select {
+  left: auto;
+  right: 12px;
+  top: 50%;
+  z-index: 5;
+  display: grid;
+  opacity: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.app-shell .message-card:hover .message-select,
+.app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
+.app-shell .message-card:has(.message-select input:checked) .message-select,
+.app-shell .message-card.is-current .message-select {
+  display: grid;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-shell .message-select input {
+  inline-size: 18px;
+  block-size: 18px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  max-width: 18px;
+  max-height: 18px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.10);
+}
+
+.app-shell .message-select input:checked {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-select input:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.app-shell .message-card.selected,
+.app-shell .message-card.selected:hover,
+.app-shell .message-card.is-unread.selected,
+.app-shell .message-card.is-unread.selected:hover,
+.app-shell .message-card.is-current {
+  /* Selection is communicated by the quiet row surface, never a blue rail. */
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Opening the reader focuses the full-row button. Do not turn that reader
+ * state into a second blue border around the current message. The checkbox
+ * keeps its own focus ring when it receives keyboard focus. */
+.app-shell .message-card:is(.selected, .is-current) .message-card-main:focus-visible {
+  outline: none;
+}
+
+/* split from pass-workspace-redesign (the .app-shell .reader part of this
+   media block belongs to reader.css). */
+@media (max-width: 1180px) {
+  .app-shell .refresh-text-button {
+    min-width: 34px;
+    width: 34px;
+    padding-inline: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 11 · Premium refinements (from pass-premium-refinements.css)
+ *
+ * Global focus rules, .thread-message.active and .sidebar-disclosure
+ * chevron rules are owned elsewhere and not repeated here.
+ * ------------------------------------------------------------------------ */
+
+/* Unread state is carried by font weight and the unread dot, not by
+   background color: read and unread rows share the same surface. */
+.message-card.is-unread {
+  background: transparent;
+}
+
+/* Every card state shares the same flat geometry. The selected row is a
+   full-width, low-saturation tint — no floating rounded block. */
+/* merged: .message-card.selected, .selected:hover, .is-unread.selected,
+   .is-unread.selected:hover (from pass-message-list-rounded.css,
+   workspace-hierarchy.css, pass-premium-refinements.css) */
+.message-card.selected,
+.message-card.selected:hover,
+.message-card.is-unread.selected,
+.message-card.is-unread.selected:hover {
+  border-color: transparent;
+  background: #dce6f2;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Drag feedback is color/opacity only — no geometry change. */
+/* merged: .message-card.dragging (from pass-message-list-rounded.css,
+   pass-premium-refinements.css) */
+.message-card.dragging {
+  border-color: transparent;
+  opacity: 0.58;
+  box-shadow: var(--ui-box-shadow-inset-selected);
+}
+
+/* Unread rows share the same hover feel as read rows. */
+.message-card.is-unread:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* merged: .message-chips (from message-list.css, pass-premium-refinements.css) */
+.message-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  gap: 8px;
+  background: var(--ui-list);
+}
+
+.empty-state-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  margin-bottom: 8px;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Bulk selection toolbar: neutralize the legacy green .bulk-toolbar.active
+   background/border so the strip matches the 2026 blue palette. */
+.bulk-toolbar.active {
+  background: #f7faff;
+}
+
+.bulk-toolbar.active button {
+  border-color: #bad8f7;
+}
+
+/* ---------------------------------------------------------------------------
+ * 12 · Avatar hardening (from pass-avatar-hardening.css)
+ *
+ * .reader-avatar rules live in reader.css; the .width-* skeleton row
+ * helpers and the shimmer keyframes live in skeleton.css.
+ * ------------------------------------------------------------------------ */
+
+/* Final avatar hardening: Avatar renders this element as the fixed-size
+   clipping shell, with any remote image nested inside it. */
+/* merged: .message-avatar (from message-list.css,
+   pass-message-list-density.css, pass-message-list-final.css,
+   pass-avatar-hardening.css) */
+.message-avatar {
+  position: absolute;
+  left: 3px;
+  top: 5px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  overflow: hidden;
+  border-radius: 9999px;
+  color: #405061;
+  background: #e6ebf1;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 1;
+  transform: none;
+  transition: var(--ui-transition-opacity-fast);
+}
+
+/* merged: .message-avatar > img (from pass-message-list-final.css,
+   pass-avatar-hardening.css) */
+.message-avatar > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Text (initial) fallback avatar: same shell, legible centered letter.
+   Split from pass-avatar-hardening: the .reader-avatar.avatar-initial
+   selector in the same group belongs to reader.css. */
+.message-avatar.avatar-initial {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * 13 · Interaction fixes (from pass-interaction-fixes.css)
+ *
+ * Reader, folder and scrollbar rules are owned elsewhere and not repeated.
+ * ------------------------------------------------------------------------ */
+
+/* Details-based menus used by labels, reader actions and list controls should
+ * not be painted below the body or another pane. The list/context menus that
+ * already use portals retain their own higher layer. */
+.app-shell .compact-menu[open] {
+  position: relative;
+  z-index: 2400;
+}
+
+.app-shell .compact-menu[open] > div {
+  z-index: 2500;
+}
+
+/* Remove the extra rules above the list controls; pane boundaries already
+ * provide enough structure. */
+.app-shell .toolbar,
+.app-shell .list-control-strip {
+  border-top: 0;
+  border-bottom-color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * 14 · List typography clarity (from pass-sidebar-clarity.css)
+ *
+ * Sidebar selectors are owned by sidebar.css; the .reader-sender-copy,
+ * .reader-header and .reader-meta selectors in the same comma groups
+ * belong to reader.css and are dropped here.
+ * ------------------------------------------------------------------------ */
+
+/* merged: .sender, .subject (from pass-message-list-density.css,
+   pass-sidebar-clarity.css) */
+.sender,
+.subject {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+/* merged: .message-card p (from message-list.css,
+   pass-message-list-density.css, pass-message-list-final.css,
+   workspace-hierarchy.css, pass-sidebar-clarity.css) */
+.message-card p {
+  display: block;
+  margin: 3px 0 0;
+  margin-top: 2px;
+  width: 100%;
+  max-width: 100%;
+  color: var(--ui-text-tertiary);
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+/* merged: .message-chips span (from message-list.css,
+   pass-premium-refinements.css, pass-sidebar-clarity.css) */
+.message-chips span {
+  min-width: 0;
+  max-width: 145px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1.5px 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid var(--ui-border);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+/* merged: .message-card time (from message-list.css,
+   pass-message-list-density.css, pass-message-list-final.css,
+   workspace-hierarchy.css, pass-sidebar-clarity.css) */
+.message-card time {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+ * 15 · Legacy compatibility overrides (src/styles/message-list.css)
+ *
+ * Final section: preserves the last-import-wins role of the historic
+ * file that was imported after every pass.
+ * ------------------------------------------------------------------------ */
+
 /* Compatibility-only message list overrides.
  * This file keeps legacy-compatible classes that are intentionally
  * expressed separately from the main 2026 message-list pipeline.
@@ -66,11 +1843,19 @@
   height: 100%;
 }
 
+/* merged: .message-list .empty-state (from message-list.css,
+   src/styles/message-list.css) */
 .message-list .empty-state {
+  height: 100%;
+  min-height: 280px;
+  margin: 0;
+  padding: 28px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-list);
   align-content: center;
   justify-items: center;
   gap: 10px;
-  padding: 28px;
   text-align: center;
 }
 
@@ -84,4 +1869,28 @@
   color: #7a8490;
   font-size: 12px;
   line-height: 1.55;
+}
+
+/* "Load more" affordance shown below the scan rail. */
+
+.btn-load-more {
+  background: var(--ui-control-bg, #edf0f3);
+  border: 1px solid var(--ui-border, #d1d5db);
+  border-radius: var(--ui-radius-control, 4px);
+  color: var(--ui-text-secondary, #4b5563);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: var(--ui-transition-mid-color-background-border-opacity);
+  margin-left: 8px;
+  text-decoration: none;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: var(--ui-control-hover, #e2e5e9);
+  color: var(--ui-text, #111);
+}
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

@@ -3,13 +3,13 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const stylesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'styles', '2026');
+const stylesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'styles');
 
 /**
  * 邮件列表正文预览必须固定为一行：
  * white-space: nowrap + overflow: hidden + text-overflow: ellipsis。
- * 项目存在样式分层（2026 pass 风格栈 + 组件兼容层），
- * 这里断言所有实际生效的 .message-card p 规则收敛为同一三件套。
+ * 2026 pass 层已合并进 message-list.css，这里代表"唯一实际生效的级联"：
+ * 三件套规则存在且不重复、无 text-wrap 冲突、不以 !important 取胜。
  */
 function extractRule(css, selector) {
   const blocks = [];
@@ -21,52 +21,41 @@ function extractRule(css, selector) {
   return blocks;
 }
 
-function readCss(name) {
-  return readFileSync(join(stylesDir, name), 'utf8');
-}
+const css = readFileSync(join(stylesDir, 'message-list.css'), 'utf8');
 
 describe('message list preview single-line rule', () => {
-  const sharedTypography = 'message-list-typography.css';
-  const cascadeOrder = [
-    'message-list.css',
-    'pass-message-list-density.css',
-    'pass-message-list-final.css',
-    'pass-refinement.css',
-    'workspace-hierarchy.css',
-  ];
+  const blocks = extractRule(css, '.message-card p');
 
   it('keeps .message-card p clipping in the shared typography contract', () => {
-    const blocks = extractRule(readCss(sharedTypography), '.message-card p');
-    expect(blocks.length, `${sharedTypography} 应有 .message-card p 规则`).toBeGreaterThan(0);
-    for (const block of blocks) {
-      expect(block, `${sharedTypography} 必须保持单行`).toContain('white-space: nowrap');
-      expect(block).toContain('overflow: hidden');
-      expect(block).toContain('text-overflow: ellipsis');
-    }
+    expect(blocks.length).toBeGreaterThan(0);
+    const complete = blocks.find(
+      (b) =>
+        b.includes('white-space: nowrap') &&
+        b.includes('overflow: hidden') &&
+        b.includes('text-overflow: ellipsis'),
+    );
+    expect(complete, 'message-list.css 必须有一处完整单行三件套').toBeDefined();
   });
 
-  it('does not duplicate truncation declarations in pass-specific message-list layers', () => {
-    for (const name of cascadeOrder) {
-      const blocks = extractRule(readCss(name), '.message-card p');
-      for (const block of blocks) {
-        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('overflow: hidden');
-        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('text-overflow: ellipsis');
-        expect(block, `${name} .message-card p 不应重复收口截断三件套`).not.toContain('white-space: nowrap');
-      }
-    }
+  it('does not duplicate truncation declarations', () => {
+    const withClip = blocks.filter(
+      (b) =>
+        b.includes('white-space: nowrap') ||
+        b.includes('overflow: hidden') ||
+        b.includes('text-overflow: ellipsis'),
+    );
+    expect(withClip.length, '截断三件套只允许收口一次').toBe(1);
   });
 
   it('removes the text-wrap: pretty conflict from the final cascade layer', () => {
-    for (const block of extractRule(readCss('workspace-hierarchy.css'), '.message-card p')) {
+    for (const block of blocks) {
       expect(block).not.toContain('text-wrap');
     }
   });
 
   it('does not rely on !important to win the cascade', () => {
-    for (const name of cascadeOrder) {
-      for (const block of extractRule(readCss(name), '.message-card p')) {
-        expect(block, `${name} 不应使用 !important`).not.toContain('!important');
-      }
+    for (const block of blocks) {
+      expect(block).not.toContain('!important');
     }
   });
 });

@@ -27,7 +27,11 @@ function extractZIndex(css, selector) {
 }
 
 describe('modal 层叠层级契约', () => {
-  const hierarchyCss = readCss('src/styles/2026/workspace-hierarchy.css');
+  // 2026 合并后层级分散在各自归属文件：web 弹层在组件/设置层，
+  // 阅读区图片预览在 reader.css，关闭按钮在 window-chrome.css。
+  const importCss = readCss('src/components/settings/settings-pages.css');
+  const previewCss = readCss('src/styles/reader.css');
+  const hierarchyCss = `${importCss}\n${previewCss}`;
   const onboardingCss = readCss('src/components/first-run-onboarding.css');
   const windowChromeCss = readCss('src/styles/window-chrome.css');
 

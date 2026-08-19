@@ -56,7 +56,7 @@ export default function ReaderLabelMenu({
         const label = labels.find((item) => item.name === labelName);
         return (
           <span className="active-label-chip" key={labelName}>
-            <span className="label-dot" style={{ background: label?.color ?? '#8b95a1' }} />
+            <span className="label-dot" style={{ background: label?.color ?? 'var(--ui-text-tertiary)' }} />
             {labelName}
           </span>
         );

@@ -243,66 +243,9 @@
 }
 
 /* --- Reader --- */
-:root[data-theme="dark"] .reader-avatar{
-  color: #cfe0f2;
-  background: #26334a;
-}
-
-:root[data-theme="dark"] .reader-actions{
-  background: rgba(23, 28, 35, 0.85);
-  border-color: var(--ui-border);
-  box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.4),
-    inset 0 1px rgba(255, 255, 255, 0.05);
-}
-
-:root[data-theme="dark"] .reader-actions button,
-:root[data-theme="dark"] .reader-actions select{
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ui-text-secondary);
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .reader-actions button:hover,
-:root[data-theme="dark"] .reader-actions select:hover{
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-accent);
-  border-color: rgba(96, 165, 250, 0.3);
-}
-
-:root[data-theme="dark"] .reader-actions .reader-more-menu summary:hover{
-  color: var(--ui-text-secondary);
-  border-color: var(--ui-border-strong);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-:root[data-theme="dark"] .reader-actions .danger-action:hover{
-  color: var(--ui-danger);
-  border-color: rgba(248, 113, 113, 0.3);
-  background: rgba(248, 113, 113, 0.14);
-}
-
-:root[data-theme="dark"] .body-text,
-:root[data-theme="dark"] .reader-html{
-  background: #1a2029;
-  border-color: var(--ui-border);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-}
-
-:root[data-theme="dark"] .quick-reply{
-  background: rgba(23, 28, 35, 0.85);
-}
-
-:root[data-theme="dark"] .reader-warning-panel{
-  background: rgba(146, 64, 14, 0.22);
-  border-color: rgba(251, 191, 36, 0.3);
-}
-
-:root[data-theme="dark"] .status-line{
-  background: rgba(23, 28, 35, 0.9);
-  border-color: var(--ui-border);
-  color: var(--ui-text-secondary);
-}
+/* Reader-specific dark overrides moved to the token-based sections below
+   (reader-actions, body-text/reader-html, quick-reply, reader-warning-panel
+   are all defined with semantic tokens in their respective dark-mode sections). */
 
 /* --- Icon buttons (toolbar / reader / composer chrome) --- */
 :root[data-theme="dark"] .icon-button,

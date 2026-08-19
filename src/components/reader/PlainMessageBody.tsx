@@ -119,7 +119,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           <span
             key={index}
             style={{
-              color: 'var(--color-primary, #2563eb)',
+              color: 'var(--ui-accent)',
               cursor: 'default',
             }}
           >

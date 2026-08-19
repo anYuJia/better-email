@@ -1,88 +1,190 @@
 /* =========================================================================
- * reader.css — consolidated reader stylesheet
+ * reader.css — email reader stylesheet
  *
- * Single owner of the reader styling stack. The historic "pass override"
- * cascade (reader.css base + a layered set of later pass files) is collapsed
- * into one file: sections below are kept in original load order, and
- * same-selector rules that appeared in multiple sources were merged into
- * ONE rule at the LAST source's position, with the last source winning on
- * overlapping properties. No values were changed.
+ * Single owner of the reader styling stack. Organised by semantic region,
+ * not by historical pass. The reader is a quiet reading workspace:
+ * content first, reading first, actions second, metadata third.
  *
- * Sections:
- *   1.  base reader ............... (from 2026/reader.css)
- *   2.  quick reply + label tools . (from pass-reader-quick-reply.css)
- *   3.  plain text mail ........... (from pass-plain-text-mail.css)
- *   4.  reader fade-in ............ (from pass-reader-fade.css)
- *   5.  reader avatar hardening ... (from pass-avatar-hardening.css, reader parts)
- *   6.  workspace hierarchy ....... (from workspace-hierarchy.css, reader parts)
- *   7.  refinement: attachments ... (from pass-refinement.css)
- *   8.  attachment rows ........... (from pass-sidebar-deai.css, reader parts)
- *   9.  reader type scale ......... (from pass-sidebar-clarity.css, reader parts)
- *   10. reading canvas ............ (from pass-workspace-redesign.css)
- *   11. thread active state ........ (from pass-premium-refinements.css)
- *   12. reader interaction fixes .. (from pass-interaction-fixes.css)
+ * Regions:
+ *   1.  Reader shell        — pane, article, scroll
+ *   2.  Reader toolbar      — header, title, actions
+ *   3.  Sender identity      — avatar, name, email, recipients
+ *   4.  Metadata             — reader-meta, label tools
+ *   5.  Message body         — body-text, reader-html, plain text
+ *   6.  HTML content safety  — images, blockquotes, long content
+ *   7.  Attachments          — section, rows, actions
+ *   8.  Security banner      — warnings, trust actions
+ *   9.  Thread               — stack, messages, active state
+ *  10.  Quick reply          — entry, textarea, footer
+ *  11.  Translation panel    — banner, content
+ *  12.  Image preview        — backdrop, toolbar, stage, context menu
+ *  13.  Empty / loading      — empty state, skeleton hooks
+ *  14.  Responsive           — narrow reader adjustments
  * ========================================================================= */
 
 /* ---------------------------------------------------------------------------
- * Section 1 — base reader (from 2026/reader.css)
- * ---------------------------------------------------------------------------
- * Rules below that also existed in later pass files were merged into the
- * final pass section (last source wins) and are not repeated here:
- * .reader-panel, .reader, .reader-header, .reader-header h1 (-> 6),
- * .reader-header p, .reader-sender-copy strong, .reader-sender-copy > span,
- * .active-label-chip (-> 9), .reader-avatar, .reader-avatar > img (-> 5),
- * .reader-actions, .reader-actions button/summary/select,
- * .reader-actions .primary-action, .reader-actions .reader-translate-action,
- * .reader-actions .reader-translate-action:disabled, .reader-meta span (-> 6/9),
- * .attachment-section, .attachment-section-header* (-> 6),
- * .attachments (-> 7), .body-text + .reader-html (-> 6),
- * .thread-stack, .thread-message (-> 3),
- * .thread-message.active (-> 11).
- * .reader-image-preview-backdrop is NOT merged: its base rule stays here
- * (before the @media 760 backup) and the workspace z-index contract rule
- * stands alone in Section 6 (see both rules for the reasoning). */
+ * 1. Reader shell
+ * --------------------------------------------------------------------------- */
+
+/* The reader is the workspace itself: a full-height opaque pane, not a
+   floating card. One scroll owner: the panel. */
+.reader-panel {
+  min-width: 0;
+  overflow: auto;
+  background: var(--ui-reader);
+}
+
+.app-shell .reader-panel,
+.app-shell .empty-reader {
+  background: var(--workspace-reader);
+}
+
+/* The article holds header + body + attachments + reply. It uses a readable
+   max-width so wide windows don't stretch lines past a comfortable measure,
+   while the header/toolbar can use the full pane width. */
+.reader {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 22px clamp(24px, 4vw, 48px) 52px;
+  overflow: visible;
+}
+
+.app-shell .reader {
+  max-width: 900px;
+  padding: 24px clamp(24px, 4vw, 48px) 52px;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Reader toolbar (header)
+ * --------------------------------------------------------------------------- */
+
+.reader-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.app-shell .reader-header {
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom-color: var(--ui-border);
+}
 
 .reader-title-block {
   min-width: 0;
 }
 
-.reader-sender {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Subject: the most important heading, but not a hero. 18–20px, 600,
+   line-height ~1.3. Long subjects wrap naturally to two lines. */
+.reader-header h1 {
+  max-width: 100%;
+  margin: 0 0 8px;
+  color: var(--ui-text);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-.reader-sender-copy {
-  min-width: 0;
-  display: grid;
+.app-shell .reader-header h1 {
+  margin-bottom: 8px;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.reader-header p {
+  margin: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* Toolbar action groups */
+.reader-actions {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .reader-actions {
+  gap: 6px;
+}
+
+.reader-action-group {
+  display: inline-flex;
+  align-items: center;
   gap: 2px;
 }
 
-.reader-sender-copy strong,
-.reader-sender-copy > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.app-shell .reader-action-group {
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--workspace-control);
 }
 
-.reader-actions button:hover {
-  color: var(--ui-accent);
-  border-color: #bad8f7;
-  background: var(--ui-accent-soft);
+.reader-message-actions {
+  margin-inline-start: var(--ui-space-1);
 }
 
-.reader-actions .reader-more-menu summary:hover {
+/* Toolbar controls: 30–32px height, transparent default, neutral hover.
+   No pill, no shadow, no gradient. */
+.reader-actions button,
+.reader-actions .reader-more-menu summary,
+.reader-actions select {
+  width: auto;
+  min-width: 32px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  border-color: #9ca3af;
-  background: #f8fafc;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11.5px;
+  transition: var(--ui-transition-fast-color-background);
 }
 
-.reader-actions .primary-action:hover {
-  color: #ffffff;
-  border-color: var(--ui-accent-hover);
-  background: var(--ui-accent-hover);
+.app-shell .reader-actions button,
+.app-shell .reader-actions .reader-more-menu summary,
+.app-shell .reader-actions select {
+  min-height: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.reader-actions button:hover:not(:disabled),
+.reader-actions .reader-more-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .reader-actions button:hover:not(:disabled),
+.app-shell .reader-actions .reader-more-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .reader-actions .icon-only-action {
@@ -95,24 +197,94 @@
   padding: 0;
 }
 
-.reader-actions .danger-action:hover {
+/* Primary reply action: icon + text, quiet emphasis */
+.reader-actions .primary-action {
+  width: auto;
+  min-width: 68px;
+  padding-left: 10px;
+  padding-right: 12px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+  font-weight: 650;
+}
+
+.app-shell .reader-actions .primary-action {
+  min-width: 66px;
+  color: var(--ui-text);
+  background: var(--workspace-control-active);
+  font-weight: 650;
+}
+
+.reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+/* Delete: neutral by default, danger on hover. Not a permanent red hot-spot. */
+.reader-actions .danger-action:hover:not(:disabled) {
   color: var(--ui-danger);
-  border-color: #f0c4c0;
-  background: #fff1f0;
+  background: var(--ui-danger-bg);
 }
 
-.reader-actions .reader-translate-action:hover {
-  color: #ffffff;
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
+/* Translate action: same utility language as other toolbar controls */
+.reader-actions .reader-translate-action {
+  width: auto;
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
+.reader-actions .reader-translate-action:hover:not(:disabled),
 .reader-actions .reader-translate-action.active {
-  color: #ffffff;
-  border-color: var(--ui-accent, #087ff5);
-  background: var(--ui-accent, #087ff5);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
+.reader-actions .reader-translate-action:disabled {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  cursor: default;
+}
+
+.app-shell .reader-actions .reader-translate-action,
+.app-shell .reader-actions .reader-translate-action.active {
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.app-shell .reader-actions .reader-translate-action:hover:not(:disabled),
+.app-shell .reader-actions .reader-translate-action.active:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+/* Danger menu item: danger colour on hover for destructive actions in the
+   more-menu (permanent delete, empty trash). */
+.compact-menu .danger-menu-item:hover {
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+/* More menu */
 .reader-more-menu > div {
   right: 0;
   left: auto;
@@ -127,6 +299,155 @@
   line-height: 1.45;
 }
 
+/* Open menus paint above reader content */
+.app-shell .reader-more-menu[open] > div,
+.app-shell .label-menu[open] > .label-menu-container {
+  z-index: 2500;
+}
+
+/* The outer panel owns scrolling; the article paints overflow so label/action
+   menus aren't clipped by the article scroll box. */
+.app-shell .reader-panel {
+  overflow: auto;
+}
+
+@media (max-width: 1180px) {
+  .reader-action-group {
+    gap: 1px;
+  }
+
+  .reader-message-actions {
+    margin-inline-start: 2px;
+  }
+
+  .app-shell .reader {
+    padding-inline: 24px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Sender identity
+ * --------------------------------------------------------------------------- */
+
+.reader-sender {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-shell .reader-sender {
+  gap: 9px;
+}
+
+.reader-sender-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+/* Primary: sender display name, 13–14px, 600 */
+.reader-sender-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .reader-sender-copy strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Secondary: email, recipients, 11.5–12px, tertiary */
+.reader-sender-copy > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
+.app-shell .reader-sender-copy > span {
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
+}
+
+/* Sender email is actionable but doesn't look like a browser link */
+.app-shell .reader-sender-email {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-shell .reader-sender-email:hover,
+.app-shell .reader-sender-email:focus-visible {
+  color: var(--ui-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Avatar: 32–36px, subdued identity. No gradient, no ring, no shadow. */
+.reader-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  line-height: 1;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reader-avatar > img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
+}
+
+.reader-avatar.avatar-initial {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Avatar tones: muted neutral, same system as inbox */
+.avatar-tone-0,
+.avatar-tone-1,
+.avatar-tone-2,
+.avatar-tone-3,
+.avatar-tone-4,
+.avatar-tone-5 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Metadata
+ * --------------------------------------------------------------------------- */
+
 .reader-meta {
   gap: 6px;
   margin: 0;
@@ -135,701 +456,34 @@
   color: var(--ui-text-tertiary);
 }
 
-.attachment-section-header small {
-  color: var(--ui-text-tertiary);
-  font-size: 9.5px;
-}
-
-.attachment-item {
-  display: grid;
-  grid-template-columns: 50px minmax(0, 1fr) auto;
-  width: 100%;
-  min-height: 70px;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border: 1px solid #e8edf2;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: var(--ui-box-shadow-none);
-  box-sizing: border-box;
-}
-
-.attachment-item:hover {
-  border-color: #dce4eb;
-  background: #fcfdfe;
-  box-shadow: var(--ui-box-shadow-subtle-border);
-}
-
-.attachment-item.attachment-download-failed {
-  border-color: #edc7c7;
-  background: #fffafa;
-}
-
-.attachment-file-icon {
-  position: relative;
-  width: 44px;
-  height: 52px;
-  flex: 0 0 44px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid #d9e1e8;
-  border-radius: 9px;
-  color: #5f7183;
-  background: linear-gradient(180deg, #fff 0%, #f7f9fb 100%);
-  box-shadow: var(--ui-box-shadow-subtle-edge);
-  --attachment-accent: #6f7b88;
-}
-
-.attachment-file-icon::before {
-  position: absolute;
-  top: -1px;
-  right: -1px;
-  width: 15px;
-  height: 15px;
-  content: '';
-  border-left: 1px solid #d9e1e8;
-  border-bottom: 1px solid #d9e1e8;
-  border-radius: 0 8px 0 5px;
-  background: #eef2f6;
-  clip-path: polygon(100% 0, 100% 100%, 0 0);
-}
-
-.attachment-file-icon-image {
-  color: #2f7a57;
-  --attachment-accent: #2f8a60;
-}
-
-.attachment-file-icon-archive {
-  color: #8a6827;
-  --attachment-accent: #b87818;
-}
-
-.attachment-file-icon-presentation {
-  color: #9a5730;
-  --attachment-accent: #d1612f;
-}
-
-.attachment-file-icon-spreadsheet {
-  color: #2f7650;
-  --attachment-accent: #278557;
-}
-
-.attachment-file-icon-audio,
-.attachment-file-icon-video {
-  color: #69569a;
-  --attachment-accent: #7357b8;
-}
-
-.attachment-file-type-mark {
-  position: relative;
-  z-index: 1;
-  display: inline-grid;
-  min-width: 30px;
-  height: 18px;
-  place-items: center;
-  border-radius: 4px;
-  color: #fff;
-  background: var(--attachment-accent);
-  font-size: 9.5px;
-  font-weight: 760;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.attachment-copy {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.attachment-copy strong {
-  overflow: hidden;
-  color: var(--ui-text);
-  font-size: 13.5px;
-  font-weight: 640;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.attachment-copy small {
-  overflow: hidden;
-  color: var(--ui-text-tertiary);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.attachment-state {
-  display: none;
-}
-
-.attachment-state.is-ready {
-  color: #53715f;
-}
-
-.attachment-actions {
-  display: inline-flex;
-  align-items: center;
-  justify-self: end;
-  gap: 5px;
-  min-width: max-content;
-}
-
-.attachment-actions button {
-  width: auto;
-  min-width: 0;
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.attachment-actions button:hover {
-  color: var(--ui-text);
-  background: #eef2f6;
-}
-
-.attachment-actions .attachment-preview-button {
-  color: var(--ui-text-tertiary);
-  background: transparent;
-}
-
-.attachment-actions .attachment-preview-button:hover {
-  color: var(--ui-text-secondary);
-  background: #eef2f6;
-}
-
-.attachment-actions .attachment-primary-button {
-  min-width: 0;
-  color: #225f9a;
-  background: transparent;
-}
-
-.attachment-actions button[aria-busy="true"] {
-  color: var(--ui-text-tertiary);
-  cursor: progress;
-  background: #f2f4f6;
-}
-
-.attachment-transfer-status {
-  flex: 1 0 100%;
-  margin-left: 36px;
-  color: #b42318;
-  font-size: 10.5px;
-  font-weight: 560;
-  line-height: 1.45;
-}
-
-.inline-image-notice {
-  width: min(100%, 760px);
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 12px;
-  padding: 8px 9px;
-  border: 1px solid var(--ui-border);
-  border-radius: 9px;
-  color: var(--ui-text-secondary);
-  background: #f8fafc;
-}
-
-.inline-image-notice-icon {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.inline-image-notice-copy {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 2px;
-}
-
-.inline-image-notice-copy strong {
-  color: var(--ui-text);
-  font-size: 11px;
-  font-weight: 680;
-}
-
-.inline-image-notice-copy small {
-  overflow: hidden;
-  color: var(--ui-text-tertiary);
-  font-size: 9.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inline-image-notice button {
-  min-height: 29px;
-  padding: 0 10px;
-  border: 1px solid #bad8f7;
-  border-radius: 7px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  font-size: 10px;
-  font-weight: 680;
-}
-
-.inline-image-notice button:hover:not(:disabled) {
-  border-color: #91c3f5;
-  background: #e8f3ff;
-}
-
-.inline-image-notice button:disabled {
-  color: var(--ui-text-tertiary);
-  cursor: progress;
-  border-color: var(--ui-border);
-  background: #f2f4f6;
-}
-
-.reader-html img[data-better-email-inline-cid] {
-  display: none;
-}
-
-.reader-html img:not([data-better-email-inline-cid]) {
-  cursor: zoom-in;
-  transition: var(--ui-transition-box-shadow-opacity-fast);
-}
-
-.reader-html img:not([data-better-email-inline-cid]):hover {
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-}
-
-/* Kept as its own rule in Section 1 (before the @media (max-width: 760px)
-   block below): merging it into the Section 6 z-index rule would move its
-   `padding: 28px` past that media rule and clobber the 8px padding. */
-.reader-image-preview-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2700;
-  display: grid;
-  place-items: center;
-  padding: 28px;
-  background: rgba(16, 20, 27, 0.58);
-  backdrop-filter: blur(10px);
-}
-
-.reader-image-preview {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: min(1040px, calc(100vw - 56px));
-  height: min(760px, calc(100vh - 56px));
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(18, 23, 31, 0.82);
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
-}
-
-.reader-image-preview-title {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
-  font-weight: 650;
-  text-align: left;
-}
-
-.reader-image-preview-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-
-.reader-image-preview-toolbar .reader-image-preview-close {
-  margin-left: 4px;
-  min-width: 34px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.10);
-}
-
-.reader-image-preview-toolbar .reader-image-preview-close:hover {
-  background: rgba(239, 68, 68, 0.55);
-}
-
-.reader-image-preview-toolbar button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.reader-image-preview-loading {
-  position: absolute;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
+.reader-meta,
+.label-tools {
   gap: 8px;
-  padding: 9px 14px;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(18, 23, 31, 0.85);
-  font-size: 12.5px;
+  margin-bottom: 12px;
 }
 
-.reader-image-preview-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  flex: 1;
-  padding: 28px;
-  color: rgba(255, 255, 255, 0.86);
-  text-align: center;
-}
-
-.reader-image-preview-error strong {
-  font-size: 15px;
-}
-
-.reader-image-preview-error p {
-  max-width: 480px;
-  margin: 0;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.reader-image-preview-error-close {
-  min-width: 88px;
-  height: 34px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.reader-image-preview-error-close:hover {
-  background: rgba(255, 255, 255, 0.26);
-}
-
-@media (max-width: 760px) {
-  .reader-image-preview-backdrop {
-    padding: 8px;
-  }
-
-  .reader-image-preview {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    border-radius: 10px;
-  }
-
-  .reader-image-preview-toolbar {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    row-gap: 2px;
-  }
-
-  .reader-image-preview-toolbar-actions button {
-    padding: 0 6px;
-    min-width: 28px;
-  }
-}
-
-.reader-image-preview-toolbar {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  min-height: 44px;
-  padding: 6px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.86);
-  background: rgba(18, 23, 31, 0.72);
-  backdrop-filter: blur(12px);
-}
-
-.reader-image-preview-toolbar button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  color: #ffffff;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.reader-image-preview-toolbar button:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.reader-image-preview-toolbar span {
-  min-width: 46px;
-  padding: 0 4px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  text-align: center;
-}
-
-.reader-image-preview-stage {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  overflow: hidden;
-  padding: 18px;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-}
-
-.reader-image-preview-stage:active {
-  cursor: grabbing;
-}
-
-.reader-image-preview-stage img {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 0;
-  background: #ffffff;
-  transform-origin: center center;
-  transition: var(--ui-transition-transform-fast);
-  user-select: none;
-}
-
-/* While panning, transform updates every pointermove — disable the
-   transition so the image tracks the pointer without lag. */
-.reader-image-preview-stage.is-panning img {
-  transition: var(--ui-transition-none);
-}
-
-.reader-image-context-menu {
-  position: fixed;
-  z-index: 110;
-  min-width: 176px;
-  padding: 6px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 10px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
-  backdrop-filter: blur(14px);
-}
-
-.reader-image-context-menu button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--ui-text);
-  background: transparent;
-  font-size: 12px;
-  text-align: left;
-}
-
-.reader-image-context-menu button:hover {
-  background: var(--quiet-row-hover);
-}
-
-.thread-message:hover {
-  background: #fafbfc;
-}
-
-.thread-message header {
-  align-items: center;
-}
-
-.thread-message time {
-  color: var(--ui-text-tertiary);
-  font-size: 10.5px;
-  white-space: nowrap;
-}
-
-.empty-reader {
-  padding: 32px;
-  background: var(--ui-reader);
-}
-
-.empty-reader-card {
-  padding: 24px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* ---------------------------------------------------------------------------
- * Section 2 — quick reply + label tools (from pass-reader-quick-reply.css)
- * --------------------------------------------------------------------------- */
-
-/* Reader quick reply: quiet inline composer, not a floating card. */
-.quick-reply {
-  max-width: none;
-  margin-top: 24px;
-  padding: 16px 0 0;
-  display: grid;
-  gap: 10px;
-  overflow: visible;
-  border: 0;
-  border-top: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.quick-reply > header {
-  min-height: 24px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 0;
-  background: transparent;
-}
-
-.quick-reply > header > div {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
+.app-shell .reader-meta,
+.app-shell .label-tools {
   gap: 8px;
+  margin-bottom: 14px;
 }
 
-.quick-reply > header strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.quick-reply > header span {
-  overflow: hidden;
+.reader-meta span {
+  padding: 3px 7px;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-tertiary);
+  background: var(--ui-surface-muted);
   font-size: 12px;
-  font-weight: 400;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.quick-reply > header svg {
+.app-shell .reader-meta span,
+.app-shell .active-label-chip,
+.app-shell .label-empty {
   color: var(--ui-text-tertiary);
-}
-
-.quick-reply textarea {
-  min-height: 86px;
-  width: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 7px;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 13.5px;
-  line-height: 1.55;
-  resize: none;
-}
-
-.quick-reply textarea::placeholder {
-  color: var(--ui-text-tertiary);
-}
-
-.quick-reply textarea:focus {
-  border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* !important removed from border-color/box-shadow: nothing fights these
-   declarations and this file is now the single owner of the rule. */
-.quick-reply textarea:focus-visible {
-  border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-none);
-  outline: none;
-}
-
-.quick-reply > footer {
-  min-height: 30px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 0;
   background: transparent;
 }
 
-.quick-reply > footer > span {
-  min-width: 36px;
-  color: var(--ui-text-tertiary);
-  font-size: 11.5px;
-}
-
-.quick-reply > footer > div {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.quick-reply > footer button {
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
-  font-weight: 560;
-}
-
-.quick-reply > footer button:hover:not(:disabled) {
-  color: var(--ui-text);
-  border-color: transparent;
-  background: var(--quiet-row-hover);
-}
-
-.quick-reply > footer button:disabled {
-  opacity: 0.42;
-  cursor: default;
-}
-
-.quick-reply > footer .quick-reply-send {
-  color: var(--color-text-on-accent);
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-  font-weight: 620;
-}
-
-.quick-reply > footer .quick-reply-send:hover:not(:disabled) {
-  border-color: var(--ui-accent-hover);
-  background: var(--ui-accent-hover);
-}
-
+/* Label tools */
 .label-tools {
   display: flex;
   align-items: center;
@@ -839,9 +493,6 @@
   position: relative;
   z-index: 100;
 }
-
-/* .active-label-chip — merged into Section 9 (pass-sidebar-clarity.css is
-   the last source for this selector and wins on font-size). */
 
 .label-empty {
   display: inline-flex;
@@ -856,6 +507,32 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+/* Label dot: small coloured circle used in chips, menu items, thread list. */
+.label-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 8px;
+}
+
+.active-label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Label menu (details/summary popover) */
 .label-tools .label-menu {
   position: relative;
 }
@@ -869,7 +546,7 @@
   height: 24px;
   padding: 0 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 999px;
+  border-radius: var(--ui-radius-pill);
   color: var(--ui-text-secondary);
   background: var(--ui-surface);
   font-size: 11px;
@@ -908,7 +585,7 @@
   padding: 8px;
   gap: 8px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-control);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
   z-index: 200;
@@ -957,7 +634,7 @@
 
 .color-dot-btn.active {
   border-color: var(--ui-text);
-  box-shadow: 0 0 0 1.5px var(--ui-surface), 0 0 0 3px var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-surface-outline), 0 0 0 1.5px var(--ui-surface), 0 0 0 3px var(--ui-accent);
 }
 
 .label-add-submit-btn {
@@ -966,7 +643,7 @@
   height: 18px;
   border-radius: 50%;
   background: var(--ui-accent);
-  color: #fff;
+  color: var(--color-text-on-accent);
   border: none;
   font-size: 13px;
   line-height: 18px;
@@ -1107,7 +784,7 @@
 
 .label-edit-actions button:first-child {
   background: var(--ui-accent);
-  color: #fff;
+  color: var(--color-text-on-accent);
   border-color: var(--ui-accent);
 }
 
@@ -1123,10 +800,47 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Section 3 — plain text mail (from pass-plain-text-mail.css)
+ * 5. Message body
  * --------------------------------------------------------------------------- */
 
-/* Plain text mail: separate current text from quoted/original mail quietly. */
+/* Body typography: 14–15px, line-height 1.55–1.65. Reader = read, not scan. */
+.body-text,
+.reader-html,
+.empty-reader-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.body-text,
+.reader-html {
+  min-height: 84px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .body-text,
+.app-shell .reader-html {
+  max-width: 760px;
+  min-height: 0;
+  padding: 22px 0 28px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+/* Plain text body */
 .body-text {
   display: grid;
   gap: 14px;
@@ -1137,16 +851,39 @@
   white-space: pre-wrap;
 }
 
+/* Empty body: quiet centered note, not a bordered card. */
+.reader-empty-body {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 120px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.reader-empty-body strong {
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reader-empty-body span {
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
+/* Quoted / original message block: muted left rule, secondary text. Not a
+   big grey rounded card. */
 .original-message-block {
   display: grid;
   gap: 10px;
   margin-top: 4px;
   padding: 12px 14px;
-  border: 1px solid #e1e5ea;
-  border-left: 3px solid #c7d2de;
-  border-radius: 8px;
-  color: #46515d;
-  background: #f8f9fb;
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
 }
 
 .original-message-block + .original-message-block {
@@ -1164,13 +901,13 @@
 }
 
 .original-message-block header span {
-  color: #596574;
+  color: var(--ui-text-secondary);
   font-size: 12px;
   font-weight: 650;
 }
 
 .original-message-block header small {
-  color: #8b95a1;
+  color: var(--ui-text-tertiary);
   font-size: 11px;
   font-weight: 500;
 }
@@ -1182,11 +919,11 @@
   row-gap: 4px;
   margin: 0;
   padding: 0 0 8px;
-  border-bottom: 1px solid #e6e9ed;
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .original-message-block dt {
-  color: #8a929d;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   font-weight: 500;
 }
@@ -1195,7 +932,7 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: #3f4854;
+  color: var(--ui-text-secondary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1204,7 +941,7 @@
 .original-message-block pre {
   margin: 0;
   overflow: auto;
-  color: #4e5966;
+  color: var(--ui-text-secondary);
   font: inherit;
   font-size: 13px;
   line-height: 1.58;
@@ -1212,53 +949,7 @@
   word-break: break-word;
 }
 
-.reader-html blockquote {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  border-left: 3px solid #c7d2de;
-  border-radius: 0 7px 7px 0;
-  color: #58636f;
-  background: #f8f9fb;
-}
-
-/* .thread-stack: merged from reader.css + pass-plain-text-mail.css —
-   plain-text wins on gap/border-top; reader.css's max-width kept. */
-.thread-stack {
-  max-width: none;
-  gap: 0;
-  border-top: 1px solid #e2e6ea;
-}
-
-/* .thread-message: merged from reader.css + pass-plain-text-mail.css —
-   plain-text wins on padding; reader.css's flat geometry kept. */
-.thread-message {
-  position: relative;
-  padding: 13px 10px 13px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.thread-message + .thread-message {
-  border-top: 0;
-}
-
-.thread-message p {
-  display: -webkit-box;
-  margin: 4px 0 6px;
-  overflow: hidden;
-  color: #697582;
-  font-size: 12.5px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-/* The original-message card is rendered by the reader (not the lazy
- * composer), so it needs its own dark surface mapping. Keep the metadata
- * hierarchy readable without bringing the light paper card into dark mode. */
+/* Dark mode for original-message-block and blockquote */
 :root[data-theme="dark"] .original-message-block {
   border-color: var(--ui-border);
   border-left-color: var(--ui-border-strong);
@@ -1284,369 +975,56 @@
   border-bottom-color: var(--ui-border);
 }
 
+/* ---------------------------------------------------------------------------
+ * 6. HTML content safety
+ * --------------------------------------------------------------------------- */
+
+/* Only targeted, safe normalizations. Never generic tag selectors that could
+   eat the email's own styles. */
+
+/* Inline CID images are hidden until resolved */
+.reader-html img[data-better-email-inline-cid] {
+  display: none;
+}
+
+/* Non-inline images: zoom cursor, subtle hover. No rounded card, no shadow
+   that would alter the email's visual intent. */
+.reader-html img:not([data-better-email-inline-cid]) {
+  cursor: zoom-in;
+  transition: var(--ui-transition-box-shadow-opacity-fast);
+}
+
+.reader-html img:not([data-better-email-inline-cid]):hover {
+  box-shadow: var(--ui-shadow-popover);
+}
+
+/* Blockquote: muted left rule, secondary text. Respects email structure. */
+.reader-html blockquote {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
 :root[data-theme="dark"] .reader-html blockquote {
   border-left-color: var(--ui-border-strong);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
 }
 
-:root[data-theme="dark"] .thread-stack {
-  border-top-color: var(--ui-border);
-}
-
 /* ---------------------------------------------------------------------------
- * Section 4 — reader fade (from pass-reader-fade.css)
+ * 7. Attachments
  * --------------------------------------------------------------------------- */
 
-/* Premium fade-in animation for email reader body transition */
-@keyframes reader-body-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Empty states animate on mount; the reader body itself must not, otherwise
-   every message switch re-triggers a full fade from blank. */
-.empty-state,
-.empty-reader {
-  animation: var(--ui-animation-reader-body-fade-in);
-}
-
-/* ---------------------------------------------------------------------------
- * Section 5 — reader avatar hardening (from pass-avatar-hardening.css,
- *             reader parts only)
- *
- * .message-avatar / .avatar-initial / .width-* / @keyframes shimmer excluded
- * (owned by message-list.css and skeleton.css).
- * --------------------------------------------------------------------------- */
-
-/* .reader-avatar: merged from reader.css + pass-avatar-hardening.css —
-   hardening wins on shell geometry (min-size, aspect-ratio, overflow,
-   border-radius 9999px, line-height); reader.css's colors kept. */
-.reader-avatar {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
-  aspect-ratio: 1 / 1;
-  display: grid;
-  place-items: center;
-  flex: 0 0 36px;
-  overflow: hidden;
-  border-radius: 9999px;
-  line-height: 1;
-  color: #37506c;
-  background: #dbe8f5;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-/* Avatar images inside reader get clipped to a circle */
-/* .reader-avatar > img: merged from reader.css + pass-avatar-hardening.css —
-   hardening wins on border-radius (inherit) and declaration order. */
-.reader-avatar > img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-  display: block;
-}
-
-/* Text (initial) fallback avatar: same shell, legible centered letter.
-   Split from pass-avatar-hardening: the .message-avatar.avatar-initial
-   selector in the same group is owned by message-list.css. */
-.reader-avatar.avatar-initial {
-  font-size: 13.5px;
-  font-weight: 650;
-  line-height: 1;
-  user-select: none;
-}
-
-/* ---------------------------------------------------------------------------
- * Section 6 — workspace hierarchy, reader parts (from workspace-hierarchy.css)
- *
- * Sidebar/list/toolbar/search/message-card rules excluded (owned by
- * sidebar.css / message-list.css); .global-tooltip and
- * .contact-import-backdrop excluded (layout.css). The @media
- * (prefers-reduced-motion) block only targeted .sidebar .folder +
- * .message-card, so it is excluded entirely.
- * --------------------------------------------------------------------------- */
-
-/* Split from `.mailbox-empty-state strong, .empty-reader-card strong`:
-   the empty-reader-card half is reader-owned. */
-.empty-reader-card strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-/* Split from `.mailbox-empty-state span, .empty-reader-card span`. */
-.empty-reader-card span {
-  max-width: 360px;
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-}
-
-/* .reader-panel: merged from reader.css + workspace-hierarchy.css —
-   hierarchy restates background; reader.css's min-width/overflow kept. */
-.reader-panel {
-  min-width: 0;
-  overflow: auto;
-  background: var(--ui-reader);
-}
-
-/* .reader: merged from reader.css + workspace-hierarchy.css —
-   hierarchy wins on max-width/padding; reader.css's width/margin kept. */
-.reader {
-  width: 100%;
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 22px 34px 44px;
-}
-
-/* .reader-header: merged from reader.css + workspace-hierarchy.css —
-   hierarchy wins on gap/padding-bottom; grid layout kept. */
-.reader-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-/* .reader-header h1: merged from reader.css + workspace-hierarchy.css —
-   hierarchy wins on margin-bottom/color/size/weight/line-height. */
-.reader-header h1 {
-  max-width: 100%;
-  margin: 0 0 12px;
-  margin-bottom: 10px;
-  color: var(--ui-text);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.32;
-  overflow-wrap: anywhere;
-}
-
-.reader-meta,
-.label-tools {
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.body-text,
-.reader-html,
-.empty-reader-card {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* .body-text, .reader-html: merged from reader.css + workspace-hierarchy.css —
-   hierarchy wins on padding/color/size/line-height; reader.css's spacing
-   strip kept. */
-.body-text,
-.reader-html {
-  min-height: 84px;
-  padding: 0;
-  border: 0;
-  border-top: 1px solid var(--ui-border);
-  border-radius: 0;
-  color: var(--ui-text);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 13px;
-  line-height: 1.65;
-}
-
-/* Reader toolbar action hierarchy */
-/* .reader-actions: merged from reader.css + workspace-hierarchy.css —
-   hierarchy wins on gap/display; reader.css's quiet base kept. */
-.reader-actions {
-  width: fit-content;
-  max-width: 100%;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  flex-wrap: nowrap;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.reader-action-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.reader-message-actions {
-  margin-inline-start: var(--ui-space-1);
-}
-
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   border/background/box-shadow, adds transition; geometry kept. */
-.reader-actions button,
-.reader-actions .reader-more-menu summary,
-.reader-actions select {
-  width: auto;
-  min-width: 32px;
-  min-height: 32px;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 11.5px;
-  transition: var(--ui-transition-fast-color-background);
-}
-
-.reader-actions button:hover:not(:disabled),
-.reader-actions .reader-more-menu summary:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* Low-saturation emphasis for primary reply action */
-/* .reader-actions .primary-action: merged from reader.css +
-   workspace-hierarchy.css — hierarchy wins on size/color/background. */
-.reader-actions .primary-action {
-  width: auto;
-  min-width: 68px;
-  padding-left: 10px;
-  padding-right: 12px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
-  border-color: var(--ui-accent, #087ff5);
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
-  font-weight: 650;
-}
-
-.reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: oklch(0.92 0.01 var(--primitive-hue-neutral));
-}
-
-.reader-actions .danger-action:hover:not(:disabled) {
-  color: var(--ui-danger);
-  background: var(--ui-danger-bg);
-}
-
-/* .reader-actions .reader-translate-action: merged from reader.css +
-   workspace-hierarchy.css — hierarchy wins on border/color/background,
-   adds shadow/inset padding; reader.css's geometry kept. */
-.reader-actions .reader-translate-action {
-  width: auto;
-  min-width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--ui-radius-control);
-  color: var(--ui-text-secondary);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 650;
-  padding-left: 8px;
-  padding-right: 10px;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.reader-actions .reader-translate-action:hover:not(:disabled),
-.reader-actions .reader-translate-action.active {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   background; reader.css's border-color/cursor kept. */
-.reader-actions .reader-translate-action:disabled {
-  color: var(--ui-text-tertiary);
-  border-color: var(--ui-border);
-  background: transparent;
-  cursor: default;
-}
-
-.app-shell .reader-actions {
-  gap: 6px;
-}
-
-.app-shell .reader-action-group {
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--workspace-control);
-}
-
-.app-shell .reader-actions button,
-.app-shell .reader-actions .reader-more-menu summary,
-.app-shell .reader-actions select {
-  min-height: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .reader-actions button:hover:not(:disabled),
-.app-shell .reader-actions .reader-more-menu summary:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .reader-actions .primary-action {
-  min-width: 66px;
-  color: var(--ui-text);
-  background: var(--workspace-control-active);
-  font-weight: 650;
-}
-
-.app-shell .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-.app-shell .reader-actions .reader-translate-action,
-.app-shell .reader-actions .reader-translate-action.active {
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
-
-.app-shell .reader-actions .reader-translate-action:hover:not(:disabled),
-.app-shell .reader-actions .reader-translate-action.active:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-/* Attachment list: continuous reading stream */
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on margin. */
+/* Compact attachment rows, not big cards. File icon + filename + metadata +
+   download/open action. */
 .attachment-section {
   max-width: 760px;
   margin: var(--ui-space-4) 0 var(--ui-space-5);
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   min-height/padding, adds border-bottom. */
 .attachment-section-header {
   min-height: 28px;
   display: flex;
@@ -1657,7 +1035,6 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on gap. */
 .attachment-section-header > span {
   min-width: 0;
   display: flex;
@@ -1665,16 +1042,17 @@
   gap: 6px;
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   font-weight. */
 .attachment-section-header strong {
   color: var(--ui-text);
   font-size: 11.5px;
   font-weight: 680;
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   size/border/color/background/shadow/font-size, adds transition. */
+.attachment-section-header small {
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+}
+
 .attachment-section-header button {
   min-height: 26px;
   display: inline-flex;
@@ -1692,28 +1070,39 @@
   transition: var(--ui-transition-color-fast);
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   color/background, adds underline. */
 .attachment-section-header button:hover:not(:disabled) {
   color: var(--ui-text);
-  border-color: #bad8f7;
   background: transparent;
   text-decoration: underline;
 }
 
-/* merged: reader.css + workspace-hierarchy.css — hierarchy wins on
-   background. */
 .attachment-section-header button:disabled {
   color: var(--ui-text-tertiary);
   cursor: progress;
   background: transparent;
 }
 
-/* .attachments — merged into the pass-refinement section below (it is the
-   last source to declare this selector). */
+/* Attachment list: compact rows with divider, not card grid */
+.attachments {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  border-bottom: 1px solid var(--ui-border);
+  margin-top: 14px;
+}
+
+.app-shell .attachments {
+  gap: 4px;
+  border-bottom: 0;
+}
+
+/* Individual attachment row: flat, 44–48px height, no card */
 .attachments .attachment-item {
   grid-template-columns: 36px minmax(0, 1fr) auto;
-  min-height: 52px;
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
   gap: 10px;
   padding: 6px 0;
   border: 0;
@@ -1723,7 +1112,23 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+.app-shell .attachments .attachment-item {
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-top: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+}
+
 .attachments .attachment-item:hover {
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .attachments .attachment-item:hover {
+  border-color: var(--ui-border-strong);
   background: var(--quiet-row-hover);
   box-shadow: var(--ui-box-shadow-none);
 }
@@ -1732,23 +1137,110 @@
   background: var(--ui-danger-bg);
 }
 
+/* File icon: small, flat, semantic. No gradient, no large card icon. */
 .attachments .attachment-file-icon {
   width: 32px;
-  height: 38px;
+  height: 36px;
   flex-basis: 32px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 6px;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
   box-shadow: var(--ui-box-shadow-none);
+}
+
+.attachment-file-icon {
+  position: relative;
+  width: 44px;
+  height: 52px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+  --attachment-accent: var(--ui-text-tertiary);
+}
+
+.attachment-file-icon-image {
+  color: var(--ui-success);
+  --attachment-accent: var(--ui-success);
+}
+
+.attachment-file-icon-archive {
+  color: var(--ui-warning);
+  --attachment-accent: var(--ui-warning);
+}
+
+.attachment-file-icon-presentation {
+  color: var(--ui-danger);
+  --attachment-accent: var(--ui-danger);
+}
+
+.attachment-file-icon-spreadsheet {
+  color: var(--ui-success);
+  --attachment-accent: var(--ui-success);
+}
+
+.attachment-file-icon-audio,
+.attachment-file-icon-video {
+  color: var(--ui-text-secondary);
+  --attachment-accent: var(--ui-text-secondary);
+}
+
+.attachment-file-type-mark {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  min-width: 30px;
+  height: 18px;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--color-text-on-accent);
+  background: var(--attachment-accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* File copy: filename primary, metadata secondary */
+.attachment-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
 }
 
 .attachments .attachment-copy {
   gap: 1px;
 }
 
+.attachment-copy strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .attachments .attachment-copy strong {
   font-size: 12.5px;
   font-weight: 600;
+}
+
+.attachment-copy small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attachments .attachment-copy small {
@@ -1757,8 +1249,42 @@
   font-variant-numeric: tabular-nums;
 }
 
+.attachment-state {
+  display: none;
+}
+
+.attachment-state.is-ready {
+  color: var(--ui-success);
+}
+
+/* Actions: icon button or small text, not a high-saturation primary button */
+.attachment-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 5px;
+  min-width: max-content;
+}
+
 .attachments .attachment-actions {
   gap: 4px;
+}
+
+.attachment-actions button {
+  width: auto;
+  min-width: 0;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .attachments .attachment-actions button {
@@ -1772,9 +1298,31 @@
   transition: var(--ui-transition-fast-color-background);
 }
 
+.attachment-actions button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
 .attachments .attachment-actions button:hover:not(:disabled) {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
+}
+
+.attachment-actions .attachment-preview-button {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.attachment-actions .attachment-preview-button:hover {
+  color: var(--ui-text-secondary);
+  background: var(--quiet-row-hover);
+}
+
+.attachment-actions .attachment-primary-button {
+  min-width: 0;
+  color: var(--ui-text);
+  font-weight: 600;
+  background: var(--ui-surface-muted);
 }
 
 .attachments .attachment-actions .attachment-primary-button {
@@ -1783,27 +1331,123 @@
   background: var(--ui-surface-muted);
 }
 
+.attachment-actions .attachment-primary-button:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
 .attachments .attachment-actions .attachment-primary-button:hover:not(:disabled) {
   color: var(--ui-text);
-  background: oklch(0.92 0.01 var(--primitive-hue-neutral));
+  background: var(--quiet-row-hover);
+}
+
+.attachment-actions button[aria-busy="true"] {
+  color: var(--ui-text-tertiary);
+  cursor: progress;
+  background: var(--ui-surface-muted);
+}
+
+.attachment-transfer-status {
+  flex: 1 0 100%;
+  margin-left: 36px;
+  color: var(--ui-danger);
+  font-size: 10.5px;
+  font-weight: 560;
+  line-height: 1.45;
 }
 
 .attachments .attachment-transfer-status {
   grid-column: 2 / -1;
+  flex: 0;
   margin: -2px 0 2px;
+  margin-left: 0;
   color: var(--ui-danger);
   font-size: 11px;
 }
 
-/* Quiet Security status line */
+/* Inline image notice */
+.inline-image-notice {
+  width: min(100%, 760px);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.inline-image-notice-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.inline-image-notice-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.inline-image-notice-copy strong {
+  color: var(--ui-text);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.inline-image-notice-copy small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inline-image-notice button {
+  min-height: 29px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.inline-image-notice button:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-accent-soft);
+}
+
+.inline-image-notice button:disabled {
+  color: var(--ui-text-tertiary);
+  cursor: progress;
+  border-color: var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * 8. Security banner
+ * --------------------------------------------------------------------------- */
+
+/* Quiet security status: a note, not a big red alert card. */
 .reader-warning-panel {
   max-width: 760px;
   margin: var(--ui-space-3) 0 var(--ui-space-4);
   padding: var(--ui-space-3);
-  border: 1px solid oklch(0.88 0.03 var(--primitive-hue-warning));
+  border: 1px solid var(--ui-warning-border);
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: oklch(0.985 0.01 var(--primitive-hue-warning));
+  background: var(--ui-warning-bg);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1822,7 +1466,7 @@
 }
 
 .reader-warning-badge {
-  color: oklch(0.42 0.1 var(--primitive-hue-warning));
+  color: var(--ui-warning);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1880,227 +1524,596 @@
   background: var(--quiet-row-hover);
 }
 
-@media (max-width: 1180px) {
-  .reader-action-group {
-    gap: 1px;
-  }
-
-  .reader-message-actions {
-    margin-inline-start: 2px;
-  }
+/* Reader primary action link inside body content */
+.reader-warning-primary-action {
+  color: var(--ui-text);
 }
 
 /* ---------------------------------------------------------------------------
- * 统一 modal/layer 层级契约
- *
- * 所有全屏遮罩弹层以固定层级从低到高：
- *   200   settings-backdrop（设置、登录后各设置弹窗）
- *   2500  first-run-onboarding-backdrop（首次引导，门禁期唯一主遮罩）
- *   2550  CustomSelect 菜单（首次引导内，portal 到 body）
- *   2600  contact-import-backdrop（联系人导入，portal 到 body；
- *        在设置或首次引导之上，可操作、可关闭）
- *   2650  CustomSelect 菜单（联系人导入内，portal 到 body）
- *   2700  reader-image-preview-backdrop（正文图片预览，portal 到 body）
- *   3000  window-chrome（真实 WindowChrome 关闭按钮，登录/引导期间可见可点）
- * 新增遮罩必须复用上述值，禁止把弹层写进阅读区等局部 stacking context。
- * ------------------------------------------------------------------------- */
-
-/* .reader-image-preview-backdrop — z-index contract rule (from
-   workspace-hierarchy.css). Kept separate from the Section 1 base rule
-   (which sits before its @media 760 backup) so the media padding stays
-   effective; this rule only re-declares the 2700 contract. */
-.reader-image-preview-backdrop {
-  z-index: 2700;
-}
-
-/* ---------------------------------------------------------------------------
- * Section 7 — refinement: attachments + status line (from pass-refinement.css)
+ * 9. Thread
  * --------------------------------------------------------------------------- */
 
-/* .attachments: merged from reader.css + workspace-hierarchy.css +
-   pass-refinement.css — refinement wins on gap/margin-top; hierarchy's
-   border-bottom and reader.css's grid layout kept. */
-.attachments {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  border-bottom: 1px solid var(--ui-border);
-  margin-top: 14px;
+/* Current message is the visual focus; history recedes. Thread messages are
+   separated by dividers, not floating cards. */
+.thread-stack {
+  max-width: none;
+  gap: 0;
+  border-top: 1px solid var(--ui-border);
 }
 
+.thread-message {
+  position: relative;
+  padding: 13px 10px 13px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.thread-message + .thread-message {
+  border-top: 0;
+}
+
+.thread-message:hover {
+  background: var(--quiet-row-hover);
+}
+
+.thread-message header {
+  align-items: center;
+}
+
+.thread-message time {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.thread-message p {
+  display: -webkit-box;
+  margin: 4px 0 6px;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 12.5px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Active (current) message: subtle accent-soft background, not a card */
+.thread-message.active {
+  border-color: var(--ui-border);
+  background: var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .thread-stack {
+  border-top-color: var(--ui-border);
+}
+
+/* ---------------------------------------------------------------------------
+ * 10. Quick reply
+ * --------------------------------------------------------------------------- */
+
+/* Quick reply: a quiet inline entry, not a large input card. Border-top,
+   compact textarea, small actions. */
+.quick-reply {
+  max-width: none;
+  margin-top: 24px;
+  padding: 16px 0 0;
+  display: grid;
+  gap: 10px;
+  overflow: visible;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.quick-reply > header {
+  min-height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.quick-reply > header > div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.quick-reply > header strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.quick-reply > header span {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-reply > header svg {
+  color: var(--ui-text-tertiary);
+}
+
+.quick-reply textarea {
+  min-height: 86px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 13.5px;
+  line-height: 1.55;
+  resize: none;
+}
+
+.quick-reply textarea::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+.quick-reply textarea:focus {
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.quick-reply textarea:focus-visible {
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+  outline: none;
+}
+
+.quick-reply > footer {
+  min-height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.quick-reply > footer > span {
+  min-width: 36px;
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
+}
+
+.quick-reply > footer > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-reply > footer button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.quick-reply > footer button:hover:not(:disabled) {
+  color: var(--ui-text);
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+}
+
+.quick-reply > footer button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.quick-reply > footer .quick-reply-send {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  font-weight: 620;
+}
+
+.quick-reply > footer .quick-reply-send:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+/* ---------------------------------------------------------------------------
+ * 11. Translation panel
+ * --------------------------------------------------------------------------- */
+
+/* Translation is a utility note, not an AI magic card. Small neutral surface,
+   simple heading, plain text. */
+
+.reader-translation-panel {
+  max-width: 760px;
+  margin: 10px 0 0;
+}
+
+.reader-translation-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+}
+
+.reader-translation-banner.failed {
+  border-color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger);
+}
+
+.reader-translation-banner button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.reader-translation-banner button:hover {
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
+}
+
+.reader-translation-content {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  overflow: hidden;
+}
+
+.reader-translation-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text-secondary);
+}
+
+.reader-translation-header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reader-translation-header button {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-tertiary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.reader-translation-header button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.reader-translation-text {
+  margin: 0;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--ui-text);
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------------------------
+ * 12. Image preview (transient overlay)
+ * --------------------------------------------------------------------------- */
+
+/* Image preview is a transient overlay: shadow and blur are allowed here
+   (elevation belongs to dialogs/menus/popovers), not on the reader workspace. */
+
+.reader-image-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2700;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(16, 20, 27, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.reader-image-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, calc(100vw - 56px));
+  height: min(760px, calc(100vh - 56px));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--ui-radius-modal);
+  background: rgba(18, 23, 31, 0.82);
+  box-shadow: var(--ui-shadow-float);
+}
+
+.reader-image-preview-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.reader-image-preview-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.reader-image-preview-toolbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(18, 23, 31, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.reader-image-preview-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: #ffffff;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reader-image-preview-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.reader-image-preview-toolbar .reader-image-preview-close {
+  margin-left: 4px;
+  min-width: 34px;
+  border-radius: var(--ui-radius-control);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.reader-image-preview-toolbar .reader-image-preview-close:hover {
+  background: rgba(239, 68, 68, 0.55);
+}
+
+.reader-image-preview-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.reader-image-preview-toolbar span {
+  min-width: 46px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  text-align: center;
+}
+
+.reader-image-preview-loading {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--ui-radius-pill);
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(18, 23, 31, 0.85);
+  font-size: 12.5px;
+}
+
+.reader-image-preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+  padding: 28px;
+  color: rgba(255, 255, 255, 0.86);
+  text-align: center;
+}
+
+.reader-image-preview-error strong {
+  font-size: 15px;
+}
+
+.reader-image-preview-error p {
+  max-width: 480px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.reader-image-preview-error-close {
+  min-width: 88px;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reader-image-preview-error-close:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.reader-image-preview-stage {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  overflow: hidden;
+  padding: 18px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.reader-image-preview-stage:active {
+  cursor: grabbing;
+}
+
+.reader-image-preview-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  background: #ffffff;
+  transform-origin: center center;
+  transition: var(--ui-transition-transform-fast);
+  user-select: none;
+}
+
+.reader-image-preview-stage.is-panning img {
+  transition: var(--ui-transition-none);
+}
+
+@media (max-width: 760px) {
+  .reader-image-preview-backdrop {
+    padding: 8px;
+  }
+
+  .reader-image-preview {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+    border-radius: 10px;
+  }
+
+  .reader-image-preview-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 2px;
+  }
+
+  .reader-image-preview-toolbar-actions button {
+    padding: 0 6px;
+    min-width: 28px;
+  }
+}
+
+/* Image context menu (popover: shadow + blur allowed) */
+.reader-image-context-menu {
+  position: fixed;
+  z-index: 110;
+  min-width: 176px;
+  padding: 6px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+  backdrop-filter: blur(14px);
+}
+
+.reader-image-context-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+}
+
+.reader-image-context-menu button:hover {
+  background: var(--quiet-row-hover);
+}
+
+/* Status line (toast-like) */
 .status-line {
-  border-color: rgba(20, 26, 34, 0.12);
-  border-radius: 9px;
-  background: rgba(32, 36, 42, 0.92);
+  border-color: var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
 
 /* ---------------------------------------------------------------------------
- * Section 8 — attachment rows (from pass-sidebar-deai.css, reader parts)
- *
- * These are the final winners for attachment rows: higher specificity than
- * Section 6's `.attachments .attachment-item` rules.
+ * 13. Empty / loading states
  * --------------------------------------------------------------------------- */
 
-.app-shell .attachments {
-  gap: 8px;
-  border-bottom: 0;
-}
-
-.app-shell .attachments .attachment-item {
-  width: min(100%, 620px);
-  min-height: 64px;
-  padding: 8px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--ui-surface);
-}
-
-.app-shell .attachments .attachment-item:hover {
-  border-color: var(--ui-border-strong);
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* ---------------------------------------------------------------------------
- * Section 9 — reader type scale (from pass-sidebar-clarity.css, reader parts
- *             — mixed comma groups split; list selectors excluded)
- * --------------------------------------------------------------------------- */
-
-/* .reader-sender-copy strong: merged from workspace-hierarchy.css +
-   pass-sidebar-clarity.css (split from `.sender, .subject,
-   .reader-sender-copy strong`) — clarity wins on font-size. */
-.reader-sender-copy strong {
-  color: var(--ui-text);
-  font-size: 14px;
-  font-weight: 650;
-}
-
-/* .reader-header p: merged from reader.css + workspace-hierarchy.css +
-   pass-sidebar-clarity.css (split from `.message-card p, .reader-header p,
-   .message-chips span, .active-label-chip, .reader-meta span`) — clarity
-   wins on font-size. */
-.reader-header p {
-  margin: 0;
-  color: var(--ui-text-tertiary);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-/* .active-label-chip: merged from pass-reader-quick-reply.css +
-   pass-sidebar-clarity.css (split from the same group as .reader-header p)
-   — clarity wins on font-size. */
-.active-label-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  background: var(--ui-surface-muted);
-  color: var(--ui-text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* .reader-meta span: merged from reader.css + pass-sidebar-clarity.css
-   (split from the same group as .reader-header p) — clarity wins on
-   font-size. */
-.reader-meta span {
-  padding: 3px 7px;
-  border-radius: 6px;
-  color: var(--ui-text-tertiary);
-  background: var(--ui-surface-muted);
-  font-size: 12.5px;
-}
-
-/* .reader-sender-copy > span: merged from reader.css +
-   pass-sidebar-clarity.css (split from `.message-card time,
-   .reader-sender-copy > span`) — clarity wins on font-size. */
-.reader-sender-copy > span {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-}
-
-/* ---------------------------------------------------------------------------
- * Section 10 — reading canvas (from pass-workspace-redesign.css, lines
- *              531-642 + @media (max-width: 1180px) reader part)
- * --------------------------------------------------------------------------- */
-
-.app-shell .reader-panel,
-.app-shell .empty-reader {
-  background: var(--workspace-reader);
-}
-
-/* Intentionally NOT merged with the Section 12 `.app-shell .reader` rule:
-   merging would move this rule's `padding` shorthand past the
-   @media (max-width: 1180px) override below and clobber its
-   `padding-inline: 28px`. Two same-selector rules, one per section. */
-.app-shell .reader {
-  max-width: 900px;
-  padding: 30px clamp(28px, 5vw, 56px) 52px;
-}
-
-.app-shell .reader-header {
-  gap: 14px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom-color: var(--ui-border);
-}
-
-.app-shell .reader-header h1 {
-  margin-bottom: 10px;
-  color: var(--ui-text);
-  font-size: clamp(21px, 2vw, 25px);
-  font-weight: 720;
-  letter-spacing: -0.025em;
-  line-height: 1.24;
-}
-
-.app-shell .reader-sender {
-  gap: 9px;
-}
-
-.app-shell .reader-sender-copy strong {
-  color: var(--ui-text);
-  font-size: 12.5px;
-  font-weight: 660;
-}
-
-.app-shell .reader-sender-copy > span {
-  color: var(--ui-text-tertiary);
-  font-size: 11px;
-}
-
-.app-shell .reader-meta,
-.app-shell .label-tools {
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.app-shell .reader-meta span,
-.app-shell .active-label-chip,
-.app-shell .label-empty {
-  color: var(--ui-text-tertiary);
-  background: transparent;
-}
-
-.app-shell .body-text,
-.app-shell .reader-html {
-  max-width: 760px;
-  min-height: 0;
-  padding: 22px 0 28px;
-  border-top: 1px solid var(--ui-border);
-  color: var(--ui-text);
-  background: transparent;
-  font-size: 14px;
-  line-height: 1.72;
+/* Empty reader: a weak icon + text. Not a marketing empty state. */
+.empty-reader {
+  padding: 32px;
+  background: var(--ui-reader);
 }
 
 .app-shell .empty-reader {
   padding: 40px;
+}
+
+.empty-reader-card {
+  padding: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .empty-reader-card {
@@ -2111,14 +2124,10 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .empty-reader-card .empty-state-mark {
-  width: 46px;
-  height: 46px;
-  margin-bottom: 3px;
-  border-radius: var(--ui-radius-panel);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  box-shadow: var(--ui-box-shadow-none);
+.empty-reader-card strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .app-shell .empty-reader-card strong {
@@ -2127,8 +2136,24 @@
   font-weight: 680;
 }
 
+.empty-reader-card span {
+  max-width: 360px;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
 .app-shell .empty-reader-card span {
   color: var(--ui-text-tertiary);
+}
+
+.app-shell .empty-reader-card .empty-state-mark {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 3px;
+  border-radius: var(--ui-radius-panel);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .empty-reader-compose {
@@ -2146,65 +2171,30 @@
   background: var(--workspace-control);
 }
 
-@media (max-width: 1180px) {
-  .app-shell .reader {
-    padding-inline: 28px;
+/* Reader body fade-in (empty states only; body must not re-fade on switch) */
+@keyframes reader-body-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Section 11 — thread active state (from pass-premium-refinements.css,
- *              .thread-message.active only)
- * --------------------------------------------------------------------------- */
-
-/* .thread-message.active: merged from reader.css + pass-premium-refinements.css
-   — premium restates background/box-shadow; reader.css's border-color kept. */
-.thread-message.active {
-  border-color: var(--ui-border);
-  background: var(--ui-accent-soft);
-  box-shadow: var(--ui-box-shadow-none);
+.empty-state,
+.empty-reader {
+  animation: var(--ui-animation-reader-body-fade-in);
 }
 
 /* ---------------------------------------------------------------------------
- * Section 12 — reader interaction fixes (from pass-interaction-fixes.css,
- *              reader parts only)
+ * 14. Responsive
  * --------------------------------------------------------------------------- */
 
-.app-shell .reader-more-menu[open] > div,
-.app-shell .label-menu[open] > .label-menu-container {
-  z-index: 2500;
-}
-
-/* The outer panel owns scrolling; allowing the article to paint overflow
- * keeps a label/action menu from being clipped by the article scroll box. */
-.app-shell .reader-panel {
-  overflow: auto;
-}
-
-/* Intentionally NOT merged with the Section 10 `.app-shell .reader` rule
-   (see the note there): this rule only adds overflow so the media-query
-   padding override stays in force. */
-.app-shell .reader {
-  overflow: visible;
-}
-
-/* Sender addresses are actionable without looking like a browser link. */
-.app-shell .reader-sender-email {
-  display: inline;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.app-shell .reader-sender-email:hover,
-.app-shell .reader-sender-email:focus-visible {
-  color: var(--ui-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .empty-state,
+  .empty-reader {
+    animation: var(--ui-animation-none);
+  }
 }

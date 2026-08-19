@@ -71,6 +71,8 @@ export default function EmailShadowView({
       shadowRootRef.current = shadowRoot;
 
       // Base styles for email content, isolated from the host app, and mimicking the styles previously targeted at .reader-html children.
+      // Semantic tokens (inherited from :root via the host element) keep dark
+      // mode and theme switching working inside the Shadow DOM.
       const styleContent = `
         :host {
           display: block;
@@ -86,10 +88,10 @@ export default function EmailShadowView({
           margin-bottom: 14px;
         }
         a {
-          color: var(--accent, #0066cc);
+          color: var(--ui-accent);
         }
         a[data-better-email-hidden-link] {
-          color: var(--accent, #0066cc);
+          color: var(--ui-accent);
           text-decoration: none;
           cursor: default;
         }
@@ -107,15 +109,15 @@ export default function EmailShadowView({
           border-radius: 8px;
         }
         img:not([data-better-email-inline-cid]):hover {
-          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+          box-shadow: var(--ui-shadow-popover);
         }
         blockquote {
           margin: 14px 0 0;
           padding: 10px 12px;
-          border-left: 3px solid #c7d2de;
+          border-left: 3px solid var(--ui-border-strong);
           border-radius: 0 7px 7px 0;
-          color: #58636f;
-          background: #f8f9fb;
+          color: var(--ui-text-secondary);
+          background: var(--ui-surface-muted);
         }
       `;
       const style = document.createElement('style');

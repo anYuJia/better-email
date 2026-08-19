@@ -24,8 +24,7 @@
 
 :root[data-theme="dark"] .dialog-backdrop,
 :root[data-theme="dark"] .confirm-dialog-backdrop,
-:root[data-theme="dark"] .snooze-backdrop,
-:root[data-theme="dark"] .account-login-backdrop {
+:root[data-theme="dark"] .snooze-backdrop {
   background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
 }
 
@@ -36,8 +35,7 @@
 :root[data-theme="dark"] .snooze-picker,
 :root[data-theme="dark"] .snooze-picker-menu,
 :root[data-theme="dark"] .account-switcher-menu,
-:root[data-theme="dark"] .account-switcher-dropdown,
-:root[data-theme="dark"] .account-login-dialog {
+:root[data-theme="dark"] .account-switcher-dropdown {
   background: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border-strong);
@@ -48,7 +46,6 @@
 :root[data-theme="dark"] .confirm-dialog h2,
 :root[data-theme="dark"] .snooze-picker h2,
 :root[data-theme="dark"] .account-switcher-menu h3,
-:root[data-theme="dark"] .account-login-dialog h2,
 :root[data-theme="dark"] .snooze-picker strong {
   color: var(--ui-text);
 }

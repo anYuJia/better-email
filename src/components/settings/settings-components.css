@@ -1,45 +1,41 @@
 /*
  * Settings components.
- * Styles for the shared primitives (SettingsSection / Row / Field / Switch /
- * Button / Badge / Notice / EmptyState). Page styles must compose these, not
- * re-implement them.
+ * Shared primitives: Section / Row / Field / Switch / Button / Badge /
+ * Notice / EmptyState. Page styles compose these, never re-implement them.
+ *
+ * Design principle: Settings is a configuration tool, not a dashboard.
+ * Sections are separated by spacing and dividers, not by card chrome.
+ * No permanent surface has shadow or border-box treatment.
  */
+
+/* ── Section ─────────────────────────────────────────────────────── */
 
 .settings-modal .st-section {
   width: 100%;
   box-sizing: border-box;
   min-width: 0;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-  box-shadow: var(--st-shadow-card);
-  overflow: hidden;
-  transition: var(--ui-transition-border-shadow-transform-quiet-emphasis);
-}
-
-.settings-modal .st-section:hover {
-  border-color: var(--st-border-strong);
-  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .settings-modal .st-section-header {
-  min-height: 52px;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px 16px;
-  padding: 12px 18px;
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  gap: 4px 12px;
+  padding: 0;
+  position: static;
   color: var(--st-text);
-  border-bottom: 1px solid var(--st-border-subtle, rgba(0, 0, 0, 0.06));
-  border-top-color: var(--st-header-border);
-  border-right-color: var(--st-header-border);
-  border-left-color: var(--st-header-border);
-  background: var(--st-surface);
-}.settings-modal .st-section-heading {
+  border: 0;
+  background: transparent;
+}
+
+.settings-modal .st-section-heading {
   min-width: 0;
   display: grid;
   gap: 2px;
@@ -50,8 +46,8 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -60,7 +56,7 @@
 .settings-modal .st-section-heading em {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 440;
+  font-weight: 400;
   font-style: normal;
   line-height: 1.45;
 }
@@ -73,19 +69,656 @@
   min-width: 0;
 }
 
-.settings-modal :is(.settings-provider-matrix > button, .settings-oauth-result, .settings-oauth-sessions) :is(span, small, em) {
+.settings-modal .st-section-body {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+/* ── Disclosure section (details/summary) ────────────────────────── */
+
+.settings-modal .st-section.st-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-modal .st-section.st-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-modal .st-section.st-disclosure > summary::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+  border-right: 1.5px solid var(--st-text-tertiary);
+  border-bottom: 1.5px solid var(--st-text-tertiary);
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: var(--ui-transition-transform-fast);
+}
+
+.settings-modal .st-section.st-disclosure[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.settings-modal .st-section.st-disclosure[open] > .st-section-header {
+  border-bottom: 0;
+}
+
+/* ── Subsection (group inside a section body) ───────────────────── */
+
+.settings-modal .st-subsection {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .st-subsection:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-modal .st-subsection-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-modal .st-subsection-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .st-subsection-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .st-subsection-header small {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-style: normal;
+  font-weight: 400;
   line-height: 1.45;
 }
+
+.settings-modal .st-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Row ────────────────────────────────────────────────────────── */
+
+.settings-modal .st-row {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-modal .st-section-body > .st-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-modal .st-row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .st-row-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+}
+
+.settings-modal .st-row-copy small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.settings-modal .st-row-control {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .settings-modal .st-row-control {
+    width: 100%;
+  }
+
+  .settings-modal .st-row-control > :is(select, input, button) {
+    width: 100%;
+  }
+}
+
+/* ── Field ──────────────────────────────────────────────────────── */
+
+.settings-modal .st-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.settings-modal label.st-field {
+  padding: 10px 0;
+  color: var(--st-text);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 500;
+}
+
+.settings-modal .settings-rule-editor label.st-field {
+  align-items: center;
+}
+
+.settings-modal .st-field-label {
+  color: var(--st-text);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 500;
+}
+
+.settings-modal label.st-field-label {
+  padding: 10px 0;
+}
+
+.settings-modal .st-field > :is(input, select, textarea) {
+  width: 100%;
+}
+
+.settings-modal .st-field-hint {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.5;
+}
+
+.settings-modal .st-field-error {
+  color: var(--st-danger);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.5;
+}
+
+/* ── Switch (toggle) ─────────────────────────────────────────────── */
+
+.settings-modal .st-switch {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .st-section-body > .st-switch:first-child,
+.settings-modal .st-section-body > *:first-child .st-switch:first-child {
+  border-top: 0;
+}
+
+.settings-modal .st-switch:hover {
+  background: transparent;
+}
+
+.settings-modal .st-switch input[type="checkbox"] {
+  position: relative;
+  width: 36px;
+  min-width: 36px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--st-border-strong);
+  cursor: pointer;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .st-switch input[type="checkbox"]::before {
+  content: none;
+}
+
+.settings-modal .st-switch input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--st-surface);
+  box-shadow: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.18);
+  transition: var(--ui-transition-transform-fast);
+}
+
+.settings-modal .st-switch input[type="checkbox"]:checked {
+  background: var(--st-accent);
+}
+
+.settings-modal .st-switch input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+.settings-modal .st-switch input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-modal .st-switch input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--st-focus-border);
+  outline-offset: 2px;
+}
+
+.settings-modal .st-switch-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .st-switch-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+}
+
+.settings-modal .st-switch-copy small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-switch {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+/* ── Button ─────────────────────────────────────────────────────── */
+
+.settings-modal .st-btn {
+  min-height: var(--st-control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .st-btn:active:not(:disabled) {
+  transform: none;
+}
+
+.settings-modal .st-btn-primary {
+  color: var(--st-on-accent);
+  border-color: var(--st-accent);
+  background: var(--st-accent);
+}
+
+.settings-modal .st-btn-primary:hover:not(:disabled) {
+  color: var(--st-on-accent);
+  border-color: var(--st-accent-hover);
+  background: var(--st-accent-hover);
+  box-shadow: none;
+}
+
+.settings-modal .st-btn-secondary {
+  color: var(--st-text);
+  border-color: transparent;
+  background: var(--st-surface);
+}
+
+.settings-modal .st-btn-secondary:hover:not(:disabled) {
+  color: var(--st-accent);
+  border-color: transparent;
+  background: var(--st-accent-soft);
+}
+
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface);
+}
+
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary:hover:not(:disabled) {
+  color: var(--st-text);
+  border-color: var(--st-focus-border);
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .st-btn-danger {
+  color: var(--st-on-accent);
+  border-color: var(--st-danger);
+  background: var(--st-danger);
+}
+
+.settings-modal .st-btn-danger:hover:not(:disabled) {
+  border-color: var(--st-danger-hover);
+  background: var(--st-danger-hover);
+}
+
+.settings-modal .st-btn-danger-secondary {
+  color: var(--st-danger);
+  border-color: transparent;
+  background: var(--st-danger-soft);
+}
+
+.settings-modal .st-btn-danger-secondary:hover:not(:disabled) {
+  color: var(--st-danger-hover);
+  border-color: transparent;
+  background: var(--st-danger-soft);
+}
+
+.settings-modal .st-btn-ghost {
+  color: var(--st-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.settings-modal .st-btn-ghost:hover:not(:disabled) {
+  color: var(--st-text);
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .st-btn-sm {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .st-btn-icon {
+  width: var(--st-control-height);
+  min-width: var(--st-control-height);
+  padding: 0;
+}
+
+.settings-modal .st-btn-icon.st-btn-sm {
+  width: 30px;
+  min-width: 30px;
+}
+
+/* ── Actions row ────────────────────────────────────────────────── */
+
+.settings-modal .st-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-modal .st-actions.spread {
+  justify-content: space-between;
+}
+
+.settings-modal .st-actions.end {
+  justify-self: end;
+}
+
+/* ── Badge ──────────────────────────────────────────────────────── */
+
+.settings-modal .st-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--st-font-size-aux);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.settings-modal .st-badge-neutral {
+  color: var(--st-text-secondary);
+  border-color: transparent;
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .st-badge-info {
+  color: var(--st-info);
+  border-color: transparent;
+  background: var(--st-info-soft);
+}
+
+.settings-modal .st-badge-success {
+  color: var(--st-success);
+  border-color: transparent;
+  background: var(--st-success-soft);
+}
+
+.settings-modal .st-badge-warning {
+  color: var(--st-warning);
+  border-color: transparent;
+  background: var(--st-warning-soft);
+}
+
+.settings-modal .st-badge-danger {
+  color: var(--st-danger);
+  border-color: transparent;
+  background: var(--st-danger-soft);
+}
+
+/* ── Notice ─────────────────────────────────────────────────────── */
+
+.settings-modal .st-notice {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+}
+
+.settings-modal .st-notice-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.settings-modal .st-notice-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .st-notice-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .st-notice-copy small,
+.settings-modal .st-notice-copy p {
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 400;
+}
+
+.settings-modal .st-notice-action {
+  flex: 0 0 auto;
+}
+
+.settings-modal .st-notice-info .st-notice-icon {
+  color: var(--st-info);
+}
+
+.settings-modal .st-notice-info .st-notice-copy strong {
+  color: var(--st-info);
+}
+
+.settings-modal .st-notice-warning {
+  border-color: var(--ui-warning-border);
+}
+
+.settings-modal .st-notice-warning .st-notice-icon {
+  color: var(--st-warning);
+}
+
+.settings-modal .st-notice-warning .st-notice-copy strong {
+  color: var(--st-warning);
+}
+
+.settings-modal .st-notice-danger {
+  border-color: var(--st-danger);
+}
+
+.settings-modal .st-notice-danger .st-notice-icon {
+  color: var(--st-danger);
+}
+
+.settings-modal .st-notice-danger .st-notice-copy strong {
+  color: var(--st-danger);
+}
+
+.settings-modal .st-notice-success .st-notice-icon {
+  color: var(--st-success);
+}
+
+.settings-modal .st-notice-success .st-notice-copy strong {
+  color: var(--st-success);
+}
+
+/* ── Key-value list (trust list etc.) ────────────────────────────── */
+
+.settings-modal .st-trust-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .st-trust-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .st-trust-row:first-child {
+  border-top: 0;
+}
+
+.settings-modal .st-trust-row em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--st-text);
+  font-style: normal;
+  font-size: var(--st-font-size-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .st-trust-row small {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .settings-modal .st-trust-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .settings-modal .st-trust-row small {
+    display: none;
+  }
+}
+
+/* ── Empty state ────────────────────────────────────────────────── */
+
+.settings-modal .st-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 20px 16px;
+  border: 1px dashed var(--st-border-strong);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+  background: transparent;
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.settings-modal .st-empty strong {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+}
+
+.settings-modal .st-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Preview / code blocks (security preview etc.) ───────────────── */
 
 .settings-modal .settings-preview-result {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
+  border-radius: var(--st-radius-sm);
   background: var(--st-surface-subtle);
 }
 
@@ -140,20 +773,20 @@
 
 .settings-modal .settings-sanitized-html-preview {
   max-height: 180px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .settings-modal .settings-preview-result details {
   padding: 8px;
-  border: 1px solid rgba(17, 24, 39, 0.1);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface);
+  box-shadow: none;
 }
 
 .settings-modal .settings-preview-result summary {
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--st-text);
 }
 
@@ -163,7 +796,7 @@
 
 .settings-modal .settings-sanitized-html-preview p {
   margin: 0;
-  color: #b7791f;
+  color: var(--st-text-secondary);
   line-height: 1.4;
 }
 
@@ -186,639 +819,14 @@
   color: var(--st-text-secondary);
   font-size: 12px;
   font-style: normal;
-  padding: 4px 8px;
+  padding: 3px 8px;
 }
 
-.settings-modal .st-section-body {
-  display: grid;
-  gap: 14px;
-  padding: 14px 18px;
-  min-width: 0;
-}
+/* ── Provider/OAuth metadata text ───────────────────────────────── */
 
-/* --- Disclosure section (details) --- */
-.settings-modal .st-section.st-disclosure > summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.settings-modal .st-section.st-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-modal .st-section.st-disclosure > summary::after {
-  content: '';
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-right: 2px;
-  border-right: 1.5px solid var(--st-text-tertiary);
-  border-bottom: 1.5px solid var(--st-text-tertiary);
-  transform: rotate(45deg) translate(-1px, -1px);
-  transition: var(--ui-transition-transform-fast);
-}
-
-.settings-modal .st-section.st-disclosure[open] > summary::after {
-  transform: rotate(225deg) translate(-1px, -1px);
-}
-
-.settings-modal .st-section.st-disclosure[open] > .st-section-header {
-  border-bottom-color: var(--st-border);
-}
-
-/* --- Subsection (group inside a section body) --- */
-.settings-modal .st-subsection {
-  display: grid;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--st-border);
-}
-
-.settings-modal .st-subsection:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.settings-modal .st-subsection-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.settings-modal .st-subsection-header > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .st-subsection-header strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .st-subsection-header small {
+.settings-modal :is(.settings-provider-matrix > button, .settings-oauth-result, .settings-oauth-sessions) :is(span, small, em) {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 440;
-  line-height: 1.45;
-}
-
-.settings-modal .st-field-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-@media (max-width: 640px) {
-  .settings-modal .st-field-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* --- Row --- */
-.settings-modal .st-row {
-  min-width: 0;
-  min-height: 50px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 0;
-  border: 0;
-  border-top: 1px solid var(--st-border);
-  border-radius: 0;
-  background: transparent;
-}
-
-.settings-modal .st-section-body > .st-row:first-child {
-  border-top: 0;
-}
-
-.settings-modal .st-row-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .st-row-copy strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
-}
-
-.settings-modal .st-row-copy small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 440;
-  line-height: 1.45;
-}
-
-.settings-modal .st-row-control {
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
-@media (max-width: 640px) {
-  .settings-modal .st-row {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .settings-modal .st-row-control {
-    width: 100%;
-  }
-
-  .settings-modal .st-row-control > :is(select, input, button) {
-    width: 100%;
-  }
-}
-
-/* --- Field --- */
-.settings-modal .st-field {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-  align-content: start;
-}
-
-/* Legacy label chrome: the old global `.settings-modal label` rules only ever
- * reached the <label> variant of SettingsField, so the type scale and inset
- * padding below are scoped to label.st-field. */
-.settings-modal label.st-field {
-  padding: 10px 14px;
-  color: var(--st-text);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.settings-modal .settings-rule-editor label.st-field {
-  align-items: center;
-}
-
-.settings-modal .st-field-label {
-  color: var(--st-text);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 560;
-}
-
-/* Raw <label class="st-field-label"> rows keep the inset the legacy
- * `.settings-modal label` rules applied; SettingsField spans stay flush. */
-.settings-modal label.st-field-label {
-  padding: 10px 14px;
-}
-
-.settings-modal .st-field > :is(input, select, textarea) {
-  width: 100%;
-}
-
-.settings-modal .st-field-hint {
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  line-height: 1.5;
-}
-
-.settings-modal .st-field-error {
-  color: var(--st-danger);
-  font-size: var(--st-font-size-aux);
-  line-height: 1.5;
-}
-
-/* --- Switch --- */
-.settings-modal .st-switch {
-  min-width: 0;
-  min-height: 52px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-sm);
-  background: transparent;
-  color: var(--st-text);
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-  transition: var(--ui-transition-bg-border-short);
-}
-
-.settings-modal .st-switch:hover {
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .st-switch input[type="checkbox"] {
-  position: relative;
-  width: 44px;
-  min-width: 44px;
-  height: 24px;
-  min-height: 24px;
-  margin: 0;
-  padding: 0;
-  appearance: none;
-  border: 0;
-  border-radius: 999px;
-  background: #cbd5e1;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
-  cursor: pointer;
-  transition: var(--ui-transition-bg-shadow-quiet-emphasis);
-}
-
-/* The global stylesheet draws a white checkmark via ::before; the switch
- * thumb uses ::after, so suppress the inherited checkmark. */
-.settings-modal .st-switch input[type="checkbox"]::before {
-  content: none;
-}
-
-.settings-modal .st-switch input[type="checkbox"]::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25), 0 1px 2px rgba(15, 23, 42, 0.12);
-  transition: var(--ui-transition-transform-quiet-emphasis);
-}
-
-.settings-modal .st-switch input[type="checkbox"]:checked {
-  border-color: transparent;
-  background: var(--st-accent);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.settings-modal .st-switch input[type="checkbox"]:checked::after {
-  transform: translateX(20px);
-}
-
-.settings-modal .st-switch input[type="checkbox"]:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.settings-modal .st-switch input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--st-accent);
-  outline-offset: 2px;
-}
-
-.settings-modal .st-switch-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .st-switch-copy strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
-}
-
-.settings-modal .st-switch-copy small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 440;
-  line-height: 1.45;
-}
-
-@media (max-width: 640px) {
-  .settings-modal .st-switch {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-}
-
-/* --- Button --- */
-.settings-modal .st-btn {
-  min-height: var(--st-control-height);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-sm);
-  font-size: var(--st-font-size-body);
-  font-weight: 560;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background-border-shadow);
-}
-
-.settings-modal .st-btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.settings-modal .st-btn-primary {
-  color: #ffffff;
-  border-color: var(--st-accent);
-  background: var(--st-accent);
-}
-
-.settings-modal .st-btn-primary:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: var(--st-accent-hover);
-  background: var(--st-accent-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.settings-modal .st-btn-secondary {
-  color: var(--st-text);
-  border-color: transparent;
-  background: var(--st-surface);
-}
-
-.settings-modal .st-btn-secondary:hover:not(:disabled) {
-  color: var(--st-accent);
-  border-color: transparent;
-  background: var(--st-accent-soft);
-}
-
-/* Dialog actions need a visible secondary boundary so the safe exit remains
- * distinct from the surrounding surface. */
-.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary {
-  border-color: var(--st-border-strong);
-  background: var(--st-surface);
-}
-
-.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary:hover:not(:disabled) {
-  color: var(--st-text);
-  border-color: var(--st-focus-border);
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .st-btn-danger {
-  color: var(--st-on-accent);
-  border-color: var(--st-danger);
-  background: var(--st-danger);
-}
-
-.settings-modal .st-btn-danger:hover:not(:disabled) {
-  border-color: var(--st-danger-hover);
-  background: var(--st-danger-hover);
-}
-
-.settings-modal .st-btn-danger-secondary {
-  color: var(--st-danger);
-  border-color: transparent;
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .st-btn-danger-secondary:hover:not(:disabled) {
-  color: var(--st-danger-hover);
-  border-color: transparent;
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .st-btn-ghost {
-  color: var(--st-text);
-  border-color: transparent;
-  background: transparent;
-}
-
-.settings-modal .st-btn-ghost:hover:not(:disabled) {
-  color: var(--st-text);
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .st-btn-sm {
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-modal .st-btn-icon {
-  width: var(--st-control-height);
-  min-width: var(--st-control-height);
-  padding: 0;
-}
-
-.settings-modal .st-btn-icon.st-btn-sm {
-  width: 32px;
-  min-width: 32px;
-}
-
-/* --- Actions row --- */
-.settings-modal .st-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-modal .st-actions.spread {
-  justify-content: space-between;
-}
-
-.settings-modal .st-actions.end {
-  justify-self: end;
-}
-
-/* --- Badge --- */
-.settings-modal .st-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: var(--st-font-size-aux);
-  font-weight: 560;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-.settings-modal .st-badge-neutral {
-  color: var(--st-text-secondary);
-  border-color: transparent;
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .st-badge-info {
-  color: var(--st-info);
-  border-color: transparent;
-  background: var(--st-info-soft);
-}
-
-.settings-modal .st-badge-success {
-  color: var(--st-success);
-  border-color: transparent;
-  background: var(--st-success-soft);
-}
-
-.settings-modal .st-badge-warning {
-  color: var(--st-warning);
-  border-color: transparent;
-  background: var(--st-warning-soft);
-}
-
-.settings-modal .st-badge-danger {
-  color: var(--st-danger);
-  border-color: transparent;
-  background: var(--st-danger-soft);
-}
-
-/* --- Notice --- */
-.settings-modal .st-notice {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
-}
-
-.settings-modal .st-notice-icon {
-  flex: 0 0 auto;
-  margin-top: 1px;
-}
-
-.settings-modal .st-notice-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .st-notice-copy strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .st-notice-copy small,
-.settings-modal .st-notice-copy p {
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 440;
-}
-
-.settings-modal .st-notice-action {
-  flex: 0 0 auto;
-}
-
-.settings-modal .st-notice-info {
-  border-color: transparent;
-  background: var(--st-info-soft);
-}
-
-.settings-modal .st-notice-info .st-notice-icon,
-.settings-modal .st-notice-info .st-notice-copy strong {
-  color: var(--st-info);
-}
-
-.settings-modal .st-notice-warning {
-  border-color: transparent;
-  background: var(--st-warning-soft);
-}
-
-.settings-modal .st-notice-warning .st-notice-icon,
-.settings-modal .st-notice-warning .st-notice-copy strong {
-  color: var(--st-warning);
-}
-
-.settings-modal .st-notice-danger {
-  border-color: transparent;
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .st-notice-danger .st-notice-icon,
-.settings-modal .st-notice-danger .st-notice-copy strong {
-  color: var(--st-danger);
-}
-
-.settings-modal .st-notice-success {
-  border-color: transparent;
-  background: var(--st-success-soft);
-}
-
-.settings-modal .st-notice-success .st-notice-icon,
-.settings-modal .st-notice-success .st-notice-copy strong {
-  color: var(--st-success);
-}
-
-/* --- Key-value list (trust list etc.) --- */
-.settings-modal .st-trust-list {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .st-trust-row {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--st-border);
-}
-
-.settings-modal .st-trust-row:first-child {
-  border-top: 0;
-}
-
-.settings-modal .st-trust-row em {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--st-text);
   font-style: normal;
-  font-size: var(--st-font-size-body);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-modal .st-trust-row small {
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .settings-modal .st-trust-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .settings-modal .st-trust-row small {
-    display: none;
-  }
-}
-
-/* --- Empty state --- */
-.settings-modal .st-empty {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 20px 16px;
-  border: 1px dashed var(--st-border-strong);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-tertiary);
-  background: var(--st-surface-subtle);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
-  text-align: center;
-}
-
-.settings-modal .st-empty strong {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 580;
-}
-
-.settings-modal .st-empty-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 4px;
+  line-height: 1.45;
 }

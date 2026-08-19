@@ -107,13 +107,13 @@
 }
 
 .dialog-card-mark-info {
-  color: #0284c7;
-  background: #e0f2fe;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
 .dialog-card-mark-warning {
-  color: var(--ui-warning, #8a5a00);
-  background: var(--ui-warning-bg, #fdf6e7);
+  color: var(--ui-warning);
+  background: var(--ui-warning-bg);
 }
 
 .dialog-card-mark-danger {
@@ -129,13 +129,13 @@
 }
 
 .dialog-card-heading strong {
-  color: var(--ui-text, #1d232b);
+  color: var(--ui-text);
   font-size: 15px;
   font-weight: 620;
 }
 
 .dialog-card-heading small {
-  color: var(--ui-text-secondary, #4e5966);
+  color: var(--ui-text-secondary);
   font-size: 13px;
   font-weight: 460;
   line-height: 1.4;
@@ -237,7 +237,7 @@
 }
 
 .http-link-row strong {
-  color: var(--ui-text, #1d232b);
+  color: var(--ui-text);
   font-size: 13px;
   font-weight: 560;
 }
@@ -343,9 +343,9 @@
 }
 
 .dialog-button-danger:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: #941d16;
-  background: #941d16;
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-danger-hover);
+  background: var(--ui-danger-hover);
 }
 
 .dialog-button:disabled {

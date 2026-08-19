@@ -20,12 +20,14 @@
   box-sizing: border-box;
 }
 
-/* --- Typography helpers --- */
+/* ── Typography helpers ─────────────────────────────────────────── */
+
 .settings-modal strong {
-  font-weight: 620;
+  font-weight: 600;
 }
 
-/* --- Form controls --- */
+/* ── Form controls ──────────────────────────────────────────────── */
+
 .settings-modal :is(input, select, textarea, button) {
   font: inherit;
   letter-spacing: 0;
@@ -33,12 +35,12 @@
 
 .settings-modal .settings-page-content :is(input, select, textarea) {
   min-height: var(--st-control-height);
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
   color: var(--st-text);
   background-color: var(--st-surface);
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: none;
   font-size: var(--st-font-size-body);
   line-height: 1.45;
   transition: var(--ui-transition-short-bg-border-box-shadow);
@@ -50,9 +52,9 @@
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea):focus {
-  border-color: var(--st-border-strong);
+  border-color: var(--st-focus-border);
   outline: none;
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: none;
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea)[aria-invalid="true"] {
@@ -75,22 +77,24 @@
 
 .settings-modal .settings-page-content select {
   appearance: none;
-  padding-right: 34px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--st-text-tertiary) 50%),
-    linear-gradient(135deg, var(--st-text-tertiary) 50%, transparent 50%);
-  background-position:
-    calc(100% - 16px) 50%,
-    calc(100% - 11px) 50%;
-  background-size: 5px 5px, 5px 5px;
+  padding-right: 30px;
+  background-image: none;
   background-repeat: no-repeat;
+}
+
+/* Native select chevron via inline SVG that uses currentColor */
+.settings-modal .settings-page-content select:not([multiple]):not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='currentColor' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-size: 10px 6px;
 }
 
 .settings-modal input[type="checkbox"] {
   accent-color: var(--st-accent);
 }
 
-/* --- Buttons (base) --- */
+/* ── Buttons (base) ─────────────────────────────────────────────── */
+
 .settings-modal .settings-page-content button {
   min-height: var(--st-control-height);
   border: 1px solid transparent;
@@ -99,11 +103,10 @@
   color: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: var(--ui-transition-fast-color-background-border-shadow);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
-/* The shared dropdown trigger (CustomSelect) keeps its own border from the
- * global dropdown stylesheet; do not collapse it to transparent. */
+/* CustomSelect keeps its own border; do not collapse it to transparent. */
 .settings-modal .settings-page-content .custom-select-summary {
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
@@ -118,7 +121,7 @@
 .settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
   border-color: var(--st-focus-border);
   background: var(--st-surface-subtle);
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: none;
 }
 
 .settings-modal .settings-page-content .custom-select-summary:disabled {
@@ -130,7 +133,8 @@
   opacity: 0.55;
 }
 
-/* --- Focus visibility --- */
+/* ── Focus visibility ───────────────────────────────────────────── */
+
 .settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--st-focus-border);
   outline-offset: 1px;
@@ -140,14 +144,16 @@
   outline: none;
 }
 
-/* --- Motion --- */
+/* ── Motion ─────────────────────────────────────────────────────── */
+
 .settings-modal .settings-page-content button,
 .settings-modal .settings-nav button,
 .settings-modal .settings-header-actions button {
-  transition: var(--ui-transition-fast-color-background-border-shadow);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
-/* --- Mobile touch targets --- */
+/* ── Mobile touch targets ───────────────────────────────────────── */
+
 @media (max-width: 640px) {
   .settings-modal .settings-page-content :is(input, select, textarea),
   .settings-modal .settings-page-content button {

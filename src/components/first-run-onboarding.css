@@ -1,3 +1,9 @@
+/*
+ * First-run onboarding.
+ * A setup assistant, not a product tour. Simple modal with minimal chrome:
+ * no gradient logo, no heavy blur, no celebratory animations.
+ */
+
 .first-run-onboarding-backdrop {
   position: fixed;
   inset: 0;
@@ -7,38 +13,40 @@
   padding: 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: rgba(24, 31, 40, 0.30);
-  backdrop-filter: blur(12px);
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.3);
+  backdrop-filter: blur(2px);
 }
 
 .first-run-onboarding {
-  width: min(460px, calc(100vw - 40px));
+  width: min(480px, calc(100vw - 40px));
   border: 1px solid var(--ui-border);
-  border-radius: 10px;
+  border-radius: var(--ui-radius-modal);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-float);
   overflow: hidden;
 }
 
+/* ── Header ─────────────────────────────────────────────────────── */
+
 .first-run-onboarding-header {
-  min-height: 66px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .first-run-onboarding-mark {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 9px;
-  color: #fff;
-  background: linear-gradient(135deg, #2f7ed8, #5b5bd6);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
 .first-run-onboarding-header > span:last-child {
@@ -49,16 +57,19 @@
 }
 
 .first-run-onboarding-header strong {
-  font-size: 15px;
+  font-size: var(--ui-font-size-body);
+  font-weight: 600;
 }
 
 .first-run-onboarding-header small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Progress ───────────────────────────────────────────────────── */
 
 .first-run-onboarding-progress {
   display: flex;
@@ -78,8 +89,10 @@
 }
 
 .onboarding-progress-step.done {
-  background: #2f9e6e;
+  background: var(--ui-success);
 }
+
+/* ── Body ──────────────────────────────────────────────────────── */
 
 .first-run-onboarding-body {
   padding: 16px 18px 6px;
@@ -97,7 +110,8 @@
 
 .first-run-onboarding-body h2 {
   margin: 0 0 10px;
-  font-size: 17px;
+  font-size: var(--ui-font-size-body);
+  font-weight: 600;
 }
 
 .onboarding-step-content {
@@ -112,24 +126,27 @@
   flex-direction: column;
   gap: 3px;
   color: var(--ui-text-secondary);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 1.5;
 }
 
 .onboarding-step-content > p small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
 }
+
+/* ── Toggle (setting row style, not toggle card) ────────────────── */
 
 .onboarding-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--ui-surface-muted);
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .onboarding-toggle > span {
@@ -140,25 +157,28 @@
 }
 
 .onboarding-toggle strong {
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 500;
 }
 
 .onboarding-toggle small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
   line-height: 1.4;
 }
 
 .onboarding-toggle input[type='checkbox'] {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--ui-accent);
 }
 
 .onboarding-toggle.is-disabled {
   opacity: 0.6;
 }
+
+/* ── Form field ─────────────────────────────────────────────────── */
 
 .onboarding-field {
   display: flex;
@@ -168,12 +188,16 @@
 
 .onboarding-field > span {
   color: var(--ui-text-secondary);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
 }
+
+/* ── Security step ──────────────────────────────────────────────── */
 
 .onboarding-security {
   gap: 8px;
 }
+
+/* ── Contact step ──────────────────────────────────────────────── */
 
 .onboarding-contact-actions {
   display: flex;
@@ -185,12 +209,12 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 14px;
+  padding: 8px 14px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
   background: var(--ui-surface-muted);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   cursor: pointer;
 }
 
@@ -208,9 +232,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #2f9e6e;
-  font-size: 12px;
+  color: var(--ui-success);
+  font-size: var(--ui-font-size-aux);
 }
+
+/* ── Footer / actions ───────────────────────────────────────────── */
 
 .first-run-onboarding-actions {
   display: flex;
@@ -222,11 +248,11 @@
 
 .onboarding-skip-all {
   border: 0;
-  padding: 8px 12px;
-  border-radius: 7px;
+  padding: 6px 10px;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-aux);
   cursor: pointer;
 }
 
@@ -239,18 +265,18 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 18px;
+  padding: 8px 16px;
   border: 0;
-  border-radius: 8px;
-  color: #fff;
+  border-radius: var(--ui-radius-sm);
+  color: var(--color-text-on-accent);
   background: var(--ui-accent);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
   cursor: pointer;
 }
 
 .onboarding-primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: var(--ui-accent-hover);
 }
 
 .onboarding-primary:disabled {
@@ -258,16 +284,18 @@
   cursor: default;
 }
 
+/* ── Error ──────────────────────────────────────────────────────── */
+
 .onboarding-save-error {
   display: flex;
   align-items: flex-start;
   gap: 9px;
   margin-bottom: 12px;
   padding: 9px 11px;
-  border: 1px solid #e3b7b2;
-  border-radius: 8px;
-  color: #8f2f24;
-  background: #fdf1ef;
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
 }
 
 .onboarding-save-error > span {
@@ -279,11 +307,11 @@
 }
 
 .onboarding-save-error strong {
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .onboarding-save-error small {
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
   line-height: 1.4;
 }
 
@@ -293,16 +321,16 @@
   gap: 5px;
   flex: 0 0 auto;
   padding: 5px 10px;
-  border: 1px solid #e3b7b2;
-  border-radius: 7px;
-  color: #8f2f24;
-  background: #fff;
-  font-size: 12px;
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-danger);
+  background: var(--ui-surface);
+  font-size: var(--ui-font-size-aux);
   cursor: pointer;
 }
 
 .onboarding-error-retry:hover:not(:disabled) {
-  background: #fff5f3;
+  background: var(--ui-danger-bg);
 }
 
 .onboarding-error-retry:disabled {

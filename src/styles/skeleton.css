@@ -70,10 +70,10 @@
   transform: translateX(-100%);
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.6) 20%,
-    rgba(255, 255, 255, 0.6) 60%,
-    rgba(255, 255, 255, 0) 100%
+    oklch(1 0 0 / 0) 0%,
+    oklch(1 0 0 / 0.6) 20%,
+    oklch(1 0 0 / 0.6) 60%,
+    oklch(1 0 0 / 0) 100%
   );
   animation: var(--ui-animation-shimmer);
 }

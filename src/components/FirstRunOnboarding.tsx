@@ -399,7 +399,7 @@ export default function FirstRunOnboarding({
             <Mailbox size={20} />
           </span>
           <span>
-            <strong id="first-run-onboarding-title">欢迎使用 Better Email</strong>
+            <strong id="first-run-onboarding-title">设置 Better Email</strong>
             <small>{account.email}</small>
           </span>
         </header>

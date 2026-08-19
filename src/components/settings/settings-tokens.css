@@ -1,109 +1,30 @@
 /*
- * Settings consumes the application semantic layer. The `--st-*` names remain
- * as a local component contract while the values deliberately come from the
- * same system as the three-pane workspace.
- */
-
-/*
- * Settings consumes the application semantic layer.
- * Settings stays on an opaque light theme: solid surfaces, no glass, no dark
- * mode override, so every panel keeps a consistent white card look.
+ * Settings tokens.
+ * The --st-* names are a local component contract; values come from the
+ * application semantic layer (--ui-* / --color-*), so Settings shares the
+ * same palette as the three-pane workspace and dark mode is automatic.
  */
 
 .settings-backdrop {
-  /* Opaque light surfaces */
-  --st-canvas: #f8fafc;
-  --st-surface: #ffffff;
-  --st-surface-subtle: #f1f5f9;
-  --st-surface-muted: #e8eef4;
-  --st-sidebar: #f1f5f9;
-
-  /* Borders */
-  --st-border: #e5e7eb;
-  --st-border-strong: #d1d5db;
-  --st-border-subtle: #e5e7eb;
-  /* Header chrome border: matches the app-level border-subtle token the
-   * legacy global header rules applied inside the settings modal. */
-  --st-header-border: #e5e7eb;
-  /* Text hierarchy: primary for titles/labels/values/actions, secondary for
-   * auxiliary copy (descriptions, hints, timestamps), tertiary for the weakest
-   * tier (placeholders, nav group labels, disabled). */
-  --st-text: #1f2937;
-  --st-text-secondary: #6b7280;
-  --st-text-tertiary: #9ca3af;
-
-  /* Interaction and Accent Gradient Colors */
-  --st-accent: #2563eb;
-  --st-accent-hover: #1d4ed8;
-  --st-accent-soft: rgba(37, 99, 235, 0.08);
-  --st-on-accent: #ffffff;
-  --st-danger: #dc2626;
-  --st-danger-hover: #b91c1c;
-  --st-danger-soft: rgba(220, 38, 38, 0.08);
-  --st-success: #0f766e;
-  --st-success-soft: rgba(15, 118, 110, 0.08);
-  --st-warning: #92400e;
-  --st-warning-soft: rgba(146, 64, 14, 0.12);
-  --st-info: #2563eb;
-  --st-info-soft: rgba(37, 99, 235, 0.08);
-
-  /* Type and rhythm */
-  --st-font-size-body: 13.5px;
-  --st-font-size-secondary: 12.5px;
-  --st-font-size-aux: 11.5px;
-  --st-font-size-card-title: 15px;
-  --st-font-size-page-title: 20px;
-  --st-space-1: 4px;
-  --st-space-2: 8px;
-  --st-space-3: 12px;
-  --st-space-4: 16px;
-  --st-space-5: 20px;
-  --st-space-6: 24px;
-  --st-space-7: 32px;
-
-  /* Concentric geometry and restrained elevation (UI/UX Pro Max Standard) */
-  --st-radius-sm: 8px;
-  --st-radius-md: 12px;
-  --st-radius-lg: 16px;
-  --st-radius-modal: 20px;
-  --st-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px -1px rgba(15, 23, 42, 0.05);
-  --st-shadow-float: 0 4px 16px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --st-shadow-modal: 0 24px 64px -12px rgba(15, 23, 42, 0.25), 0 8px 24px -4px rgba(15, 23, 42, 0.12);
-
-  /* Controls */
-  --st-control-height: 38px;
-  --st-control-height-mobile: 44px;
-  --st-focus-ring: none;
-  --st-focus-border: #9ca3af;
-
-  /* Layout constants */
-  --st-sidebar-width: 240px;
-  --st-content-max-width: 820px;
-  --st-breakpoint-narrow: 900px;
-  --st-breakpoint-mobile: 640px;
-}
-
-/*
- * Dark appearance for the settings layer. The resolved theme lives on
- * <html data-theme="dark"> (set by useThemeMode / the index.html bootstrap
- * script), so the modal re-maps every --st-* token the same way the 2026
- * token layer does.
- */
-:root[data-theme="dark"] .settings-backdrop {
+  /* Surfaces */
   --st-canvas: var(--ui-bg);
   --st-surface: var(--ui-surface);
   --st-surface-subtle: var(--ui-surface-muted);
   --st-surface-muted: var(--ui-surface-muted);
   --st-sidebar: var(--ui-sidebar);
 
+  /* Borders */
   --st-border: var(--ui-border);
   --st-border-strong: var(--ui-border-strong);
   --st-border-subtle: var(--ui-border);
   --st-header-border: var(--ui-border);
+
+  /* Text hierarchy */
   --st-text: var(--ui-text);
   --st-text-secondary: var(--ui-text-secondary);
   --st-text-tertiary: var(--ui-text-tertiary);
 
+  /* Semantic interaction colors */
   --st-accent: var(--ui-accent);
   --st-accent-hover: var(--ui-accent-hover);
   --st-accent-soft: var(--ui-accent-soft);
@@ -118,88 +39,68 @@
   --st-info: var(--ui-accent);
   --st-info-soft: var(--ui-accent-soft);
 
+  /* Type and rhythm */
+  --st-font-size-body: 13px;
+  --st-font-size-secondary: 12px;
+  --st-font-size-aux: 11.5px;
+  --st-font-size-card-title: 13.5px;
+  --st-font-size-page-title: 18px;
+  --st-space-1: 4px;
+  --st-space-2: 8px;
+  --st-space-3: 12px;
+  --st-space-4: 16px;
+  --st-space-5: 20px;
+  --st-space-6: 24px;
+  --st-space-7: 32px;
+
+  /* Geometry: permanent content has 0 radius; controls use small radius */
+  --st-radius-sm: 6px;
+  --st-radius-md: 8px;
+  --st-radius-lg: 8px;
+  --st-radius-modal: 10px;
+
+  /* Shadows: only transient layers get elevation */
   --st-shadow-card: none;
   --st-shadow-float: var(--ui-shadow-popover);
   --st-shadow-modal: var(--ui-shadow-float);
 
-  --st-focus-border: var(--ui-accent);
-}
+  /* Controls */
+  --st-control-height: var(--ui-control-height);
+  --st-control-height-mobile: var(--ui-control-height-touch);
+  --st-focus-ring: none;
+  --st-focus-border: var(--color-focus);
 
-:root[data-theme="dark"] .settings-backdrop {
-  background: rgba(0, 0, 0, 0.6);
+  /* Layout constants */
+  --st-sidebar-width: 220px;
+  --st-content-max-width: 720px;
+  --st-breakpoint-narrow: 900px;
+  --st-breakpoint-mobile: 640px;
 }
 
 /*
- * Filled danger buttons keep a saturated red so white labels stay readable;
- * the lighter --st-danger remains for danger text and soft badges.
+ * Dark appearance: every --st-* token already resolves through --ui-*, so
+ * the dark theme is automatic. Only the backdrop needs a explicit dark scrim.
  */
-:root[data-theme="dark"] .settings-modal .st-btn-danger {
-  color: #ffffff;
-  border-color: #dc2626;
-  background: #dc2626;
-}
-
-:root[data-theme="dark"] .settings-modal .st-btn-danger:hover:not(:disabled) {
-  border-color: #b91c1c;
-  background: #b91c1c;
-}
-
-/* Hard-coded light surfaces inside settings that the token layer cannot reach. */
-:root[data-theme="dark"] .settings-modal .settings-close-button {
-  background: var(--st-surface);
-}
-
-:root[data-theme="dark"] .settings-modal .settings-floating-unsaved-bar {
-  background: var(--st-surface);
-}
-
-:root[data-theme="dark"] .settings-modal .st-switch input[type="checkbox"] {
-  background: var(--st-surface-muted);
-}
-
-:root[data-theme="dark"] .settings-modal .settings-preview-result details {
-  border-color: var(--st-border);
-  background: var(--st-surface-muted);
-}
-
-:root[data-theme="dark"] .settings-modal .settings-oauth-result {
-  border-color: rgba(96, 165, 250, 0.25);
-}
-
-:root[data-theme="dark"] .settings-modal .settings-provider-presets button.active,
-:root[data-theme="dark"] .settings-modal .settings-provider-matrix > button.active,
-:root[data-theme="dark"] .settings-modal .settings-rule-action-chips button.active,
-:root[data-theme="dark"] .settings-modal .template-filter-button.active,
-:root[data-theme="dark"] .settings-modal .write-validation-stage.active {
-  border-color: rgba(96, 165, 250, 0.35);
+:root[data-theme="dark"] .settings-backdrop {
+  background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
 }
 
 /*
- * The cache-clear confirm dialog portals into <body>, outside the modal, so
- * it re-declares the small token set it needs and follows the dark theme
- * through the html attribute.
+ * The cache-clear confirm dialog portals into <body>, outside the modal,
+ * so it re-declares the small token set it needs.
  */
 .settings-cache-confirm-backdrop {
-  --st-text: #1f2937;
-  --st-text-secondary: #6b7280;
-  --st-text-tertiary: #9ca3af;
-  --st-surface: #ffffff;
-  --st-surface-muted: #f1f3f5;
-  --st-border-strong: #c3ccd5;
-  --st-accent: #0a63c4;
-  --st-danger: #b3261e;
-  --st-danger-hover: #941d16;
+  --st-text: var(--ui-text);
+  --st-text-secondary: var(--ui-text-secondary);
+  --st-text-tertiary: var(--ui-text-tertiary);
+  --st-surface: var(--ui-surface);
+  --st-surface-muted: var(--ui-surface-muted);
+  --st-border-strong: var(--ui-border-strong);
+  --st-accent: var(--ui-accent);
+  --st-danger: var(--ui-danger);
+  --st-danger-hover: var(--ui-danger-hover);
 }
 
 :root[data-theme="dark"] .settings-cache-confirm-backdrop {
-  --st-text: #e6eaf0;
-  --st-text-secondary: #9aa5b3;
-  --st-text-tertiary: #66707f;
-  --st-surface: #1a2028;
-  --st-surface-muted: #252d39;
-  --st-border-strong: #3a4656;
-  --st-accent: #60a5fa;
-  --st-danger: #f87171;
-  --st-danger-hover: #fca5a5;
-  background: rgba(0, 0, 0, 0.6);
+  background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
 }

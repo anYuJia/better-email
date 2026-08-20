@@ -12,21 +12,18 @@ import WindowChrome from './components/WindowChrome';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
-import AccountLoginDialog from './components/AccountLoginDialog';
-import FirstRunOnboarding from './components/FirstRunOnboarding';
-import ComposerCloseConfirmDialog from './components/ComposerCloseConfirmDialog';
-import ConfirmationDialogs from './components/ConfirmationDialogs';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
-import UndoSnackbarStack, { type PendingSendUndo } from './components/UndoSnackbarStack';
-import MessageToastStack, { type MessageToast } from './components/MessageToastStack';
-import useAppLayout from './hooks/useAppLayout';
+import type { PendingSendUndo } from './components/UndoSnackbarStack';
+import type { MessageToast } from './components/MessageToastStack';
+import useAppLayout, { APP_LAYOUT_BOUNDS } from './hooks/useAppLayout';
 import { logError } from './app/logger';
 import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useContactManagement from './hooks/useContactManagement';
 import useMailboxData from './hooks/useMailboxData';
+import useMailboxBootstrap from './hooks/useMailboxBootstrap';
 import useBulkMessageActions from './hooks/useBulkMessageActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
 import useProviderWriteValidation from './hooks/useProviderWriteValidation';
@@ -102,13 +99,19 @@ import './ui-2026.css';
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
-import SettingsOverlay from './components/settings/SettingsOverlay';
+const SettingsOverlay = lazy(() => import('./components/settings/SettingsOverlay'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
+const FirstRunOnboarding = lazy(() => import('./components/FirstRunOnboarding'));
+const AccountLoginDialog = lazy(() => import('./components/AccountLoginDialog'));
+const ComposerCloseConfirmDialog = lazy(() => import('./components/ComposerCloseConfirmDialog'));
+const ConfirmationDialogs = lazy(() => import('./components/ConfirmationDialogs'));
+const UndoSnackbarStack = lazy(() => import('./components/UndoSnackbarStack'));
+const MessageToastStack = lazy(() => import('./components/MessageToastStack'));
+const NARROW_SHELL_MEDIA_QUERY = '(max-width: 880px)';
 
 import {
   buildMailboxListStateKey,
   loadMailboxListStates,
-  loadMailboxMessageLimit,
   saveMailboxListState,
 } from './app/mailboxListState';
 import { accountScopeStorageKey } from './app/storageConfig';
@@ -149,6 +152,7 @@ export default function App() {
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
+  const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
   const themeMode = useThemeMode();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
@@ -170,7 +174,8 @@ export default function App() {
   const mailboxRefreshRef = useRef(0);
   const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
   const {
-    query,
+    queryDraft,
+    appliedQuery,
     setQuery,
     searchScope,
     filter,
@@ -281,6 +286,8 @@ export default function App() {
     moveLayoutMouseResize,
     endLayoutResize,
     endLayoutMouseResize,
+    adjustAppLayout,
+    resetAppLayoutPane,
   } = useAppLayout();
   const {
     undoAction,
@@ -328,8 +335,8 @@ export default function App() {
     onAccountListLoaded: () => setInitialAccountListLoaded(true),
   });
   const mailboxContextKey = useMemo(
-    () => buildMailboxContextKey({ accountScope, folderId, query, filter, listMode }),
-    [accountScope, folderId, query, filter, listMode],
+    () => buildMailboxContextKey({ accountScope, folderId, query: appliedQuery, filter, listMode }),
+    [accountScope, folderId, appliedQuery, filter, listMode],
   );
   const {
     selectedId,
@@ -352,6 +359,10 @@ export default function App() {
     attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
+    bodyFetchState,
+    markBodyFetchStarted,
+    markBodyFetchSucceeded,
+    markBodyFetchFailed,
   } = useMailboxSelectionController({
     messages,
     threadMessages,
@@ -379,7 +390,7 @@ export default function App() {
     currentAccountId: account?.id ?? null,
     folderId,
     searchScope,
-    query,
+    query: appliedQuery,
     filter,
     listMode,
     listSort,
@@ -401,12 +412,12 @@ export default function App() {
     () => buildMailboxListStateKey({
       accountScope,
       folderId,
-      query,
+      query: appliedQuery,
       filter,
       searchScope,
       listSort,
     }),
-    [accountScope, folderId, query, filter, searchScope, listSort],
+    [accountScope, folderId, appliedQuery, filter, searchScope, listSort],
   );
   useAppGlobalEffects({
     notificationPolicy,
@@ -425,7 +436,7 @@ export default function App() {
     accountScope,
     mailboxRefreshRef,
     folderId,
-    query,
+    query: appliedQuery,
     filter,
     messages,
     outbox,
@@ -478,7 +489,7 @@ export default function App() {
     providerVerifications,
     diagnosticExport,
     folderId,
-    query,
+    query: appliedQuery,
     filter,
     setAccount,
     setAccounts,
@@ -578,23 +589,21 @@ export default function App() {
     setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
   }
 
-  useEffect(() => {
-    // 导航动作已认领该 scope 时跳过：由导航动作自己驱动加载，避免双重驱动竞态。
-    if (navigationScopeClaimRef.current === accountScope) return;
-    skipNextFolderEffectLoadRef.current = true;
-    refreshMailbox(accountScope, null)
-      .catch((error) => {
-        if (typeof accountScope === 'number') {
-          // 上次记住的账号可能已被删除，回退到统一邮箱视图
-          setAccountScope('all');
-          return;
-        }
-        setStatus(String(error));
-      })
-      .finally(() => {
-        skipNextFolderEffectLoadRef.current = false;
-      });
-  }, [accountScope]);
+  useMailboxBootstrap({
+    accountScope,
+    folderId,
+    appliedQuery,
+    filter,
+    listSort,
+    mailboxListStateKey,
+    mailboxRefreshRef,
+    navigationScopeClaimRef,
+    skipNextFolderEffectLoadRef,
+    refreshMailbox,
+    loadMessages,
+    setAccountScope,
+    setStatus,
+  });
 
   useEffect(() => {
     window.localStorage.setItem(accountScopeStorageKey, String(accountScope));
@@ -603,16 +612,6 @@ export default function App() {
   // 焦点监听：只在挂载与账号 scope 切换时订阅，聚焦时刷新未读角标/托盘。
   // refreshUnreadIndicators 是稳定 useCallback，任何无关渲染都不会重新订阅或触发 GetStats。
   useUnreadFocusSync(refreshUnreadIndicators, accountScope);
-
-  useEffect(() => {
-    if (!folderId) return;
-    if (skipNextFolderEffectLoadRef.current) {
-      skipNextFolderEffectLoadRef.current = false;
-      return;
-    }
-    const restoredLimit = loadMailboxMessageLimit(mailboxListStateKey);
-    loadMessages(folderId, query, filter, accountScope, mailboxRefreshRef.current, restoredLimit).catch((error) => setStatus(String(error)));
-  }, [folderId, filter, listSort]);
 
   const selectedMessageSet = useMemo(() => new Set(selectedMessageIds), [selectedMessageIds]);
   const selectedMessages = useMemo(
@@ -682,6 +681,9 @@ export default function App() {
     loadMessages: (fid) => loadMessages(fid),
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
+    onBodyFetchStart: markBodyFetchStarted,
+    onBodyFetchSuccess: markBodyFetchSucceeded,
+    onBodyFetchError: markBodyFetchFailed,
   });
 
   useEffect(() => {
@@ -699,7 +701,7 @@ export default function App() {
     folderId,
     accountScope,
     searchScope,
-    query,
+    query: appliedQuery,
     filter,
     messageLimit,
     mailboxListStateKey,
@@ -1299,25 +1301,66 @@ export default function App() {
     moveSelectedToFolder(folder).catch((error) => setStatus(String(error)));
   }, [moveSelectedToFolder, setStatus]);
 
-  const [shellWidth, setShellWidth] = useState<number>(() => window.innerWidth);
-  useEffect(() => {
-    const handleResize = () => setShellWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  const focusNarrowNavigationControl = useCallback((selector: string) => {
+    if (!window.matchMedia(NARROW_SHELL_MEDIA_QUERY).matches) return;
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(selector)?.focus();
+    });
   }, []);
 
-  const isCompactShell = shellWidth <= 1180;
-  const shellColumns = isCompactShell
-    ? '200px 320px minmax(0, 1fr)'
-    : `${appLayout.sidebar}px 5px ${appLayout.list}px 5px minmax(0, 1fr)`;
-  const sidebarWidth = isCompactShell ? 200 : appLayout.sidebar;
+  const showNarrowSidebar = useCallback(() => {
+    setNarrowView('sidebar');
+    focusNarrowNavigationControl('[data-narrow-sidebar-close]');
+  }, [focusNarrowNavigationControl]);
+
+  const showNarrowList = useCallback(() => {
+    setNarrowView('list');
+    focusNarrowNavigationControl('[data-narrow-sidebar-open]');
+  }, [focusNarrowNavigationControl]);
+
+  const showMessageInNarrowReader = useCallback((messageId: number) => {
+    setNarrowView('reader');
+    selectMessageForReading(messageId);
+    focusNarrowNavigationControl('[data-narrow-reader-back]');
+  }, [focusNarrowNavigationControl, selectMessageForReading]);
+
+  const showThreadInNarrowReader = useCallback((thread: ThreadSummary) => {
+    setNarrowView('reader');
+    focusNarrowNavigationControl('[data-narrow-reader-back]');
+    return openThread(thread);
+  }, [focusNarrowNavigationControl, openThread]);
+
+  const handlePaneResizerKeyDown = useCallback((
+    pane: keyof typeof APP_LAYOUT_BOUNDS,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) => {
+    if (event.key === 'Home') {
+      event.preventDefault();
+      resetAppLayoutPane(pane);
+      return;
+    }
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const step = event.shiftKey ? 24 : 8;
+    adjustAppLayout(pane, event.key === 'ArrowRight' ? step : -step);
+  }, [adjustAppLayout, resetAppLayoutPane]);
+
+  const confirmationDialogsOpen = Boolean(
+    confirmDeleteFolder
+    || confirmDeleteIdentity
+    || confirmDeleteRule
+    || contactToDeleteFromHook
+    || confirmDeleteLabel
+    || confirmEmptyTrashState
+    || confirmPermanentlyDelete,
+  );
 
   return (
     <main
-      className="app-shell"
+      className={`app-shell narrow-view-${narrowView}`}
       style={{
-        gridTemplateColumns: shellColumns,
-        '--app-sidebar-width': `${sidebarWidth}px`,
+        '--app-sidebar-width-preferred': `${appLayout.sidebar}px`,
+        '--app-list-width-preferred': `${appLayout.list}px`,
       } as React.CSSProperties}
       onPointerMove={moveLayoutResize}
       onPointerUp={endLayoutResize}
@@ -1338,7 +1381,10 @@ export default function App() {
         savedSearchName={savedSearchName}
         savedSearches={savedSearches}
         customFolderName={customFolderName}
-        onAccountScopeChange={changeAccountScope}
+        onAccountScopeChange={(value) => {
+          showNarrowList();
+          changeAccountScope(value);
+        }}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
@@ -1352,7 +1398,7 @@ export default function App() {
           }
         }}
         onSavedSearchNameChange={setSavedSearchName}
-        onSaveCurrentSearch={() => saveCurrentSearch(query, filter, searchScope)}
+        onSaveCurrentSearch={() => saveCurrentSearch(queryDraft, filter, searchScope)}
         onRunSavedSearch={(savedSearch) => {
           runSavedSearch(savedSearch).catch((error) => setStatus(String(error)));
         }}
@@ -1361,7 +1407,10 @@ export default function App() {
         onCreateCustomFolder={() => {
           createCustomFolder().catch((error) => setStatus(String(error)));
         }}
-        onSelectFolder={selectFolder}
+        onSelectFolder={(nextFolderId) => {
+          showNarrowList();
+          selectFolder(nextFolderId);
+        }}
         onDropMessagesToFolder={(folder, messageIds) => {
           moveMessagesToFolderByIds(folder, messageIds).catch((error) => setStatus(String(error)));
         }}
@@ -1383,13 +1432,22 @@ export default function App() {
         onEmptyTrash={() => { emptyCurrentTrash(); }}
         onOpenSettings={openSettingsHome}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        onCloseNavigation={showNarrowList}
       />
 
       <button
         className="pane-resizer sidebar-resizer"
         type="button"
+        role="separator"
+        aria-orientation="vertical"
         aria-label="调整侧边栏宽度"
+        aria-valuemin={APP_LAYOUT_BOUNDS.sidebar.min}
+        aria-valuemax={APP_LAYOUT_BOUNDS.sidebar.max}
+        aria-valuenow={appLayout.sidebar}
+        aria-valuetext={`${appLayout.sidebar} 像素`}
         title="拖拽调整侧边栏宽度"
+        onKeyDown={(event) => handlePaneResizerKeyDown('sidebar', event)}
+        onDoubleClick={() => resetAppLayoutPane('sidebar')}
         onPointerDown={(event) => beginLayoutResize('sidebar', event)}
         onMouseDown={(event) => beginLayoutMouseResize('sidebar', event)}
       />
@@ -1397,10 +1455,12 @@ export default function App() {
       <AppErrorBoundary>
         <MessageListPane
           searchInputRef={searchInputRef}
-          query={query}
+          queryDraft={queryDraft}
+          appliedQuery={appliedQuery}
           searchScope={searchScope}
           isRefreshing={isRefreshing || isBackgroundSyncRunning}
           refreshNotice={refreshNotice}
+          onOpenNavigation={showNarrowSidebar}
           filter={filter}
           listMode={listMode}
           listSort={listSort}
@@ -1437,12 +1497,12 @@ export default function App() {
           onMoveMessageToFolder={handleMoveMessageToFolder}
           onToggleMessageLabel={handleToggleMessageLabel}
           onComposeFromMessage={composeFromMessage}
-          onOpenThread={openThread}
+          onOpenThread={showThreadInNarrowReader}
           onRunThreadAction={handleRunThreadAction}
           onMoveThreadToFolder={handleMoveThreadToFolder}
           onToggleThreadLabel={handleToggleThreadLabel}
           onToggleThreadMute={handleToggleThreadMute}
-          onSelectMessage={selectMessageForReading}
+          onSelectMessage={showMessageInNarrowReader}
           onToggleMessageSelection={toggleMessageSelection}
           onLoadMore={handleLoadMore}
           loadMoreStatus={loadMoreStatus}
@@ -1452,8 +1512,16 @@ export default function App() {
       <button
         className="pane-resizer list-resizer"
         type="button"
+        role="separator"
+        aria-orientation="vertical"
         aria-label="调整邮件列表宽度"
+        aria-valuemin={APP_LAYOUT_BOUNDS.list.min}
+        aria-valuemax={APP_LAYOUT_BOUNDS.list.max}
+        aria-valuenow={appLayout.list}
+        aria-valuetext={`${appLayout.list} 像素`}
         title="拖拽调整邮件列表宽度"
+        onKeyDown={(event) => handlePaneResizerKeyDown('list', event)}
+        onDoubleClick={() => resetAppLayoutPane('list')}
         onPointerDown={(event) => beginLayoutResize('list', event)}
         onMouseDown={(event) => beginLayoutMouseResize('list', event)}
       />
@@ -1499,6 +1567,7 @@ export default function App() {
           onSnooze={snoozeSelected}
           onExportMessage={exportSelectedMessage}
           onFetchBody={fetchSelectedBody}
+          bodyFetchState={bodyFetchState}
           onMarkNotSpam={markSelectedNotSpam}
           onMarkAsSpam={markSelectedAsSpam}
           onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
@@ -1516,6 +1585,7 @@ export default function App() {
           onSaveAttachmentAs={saveAttachmentAs}
           onQuickReplyChange={setQuickReplyBody}
           onSendQuickReply={sendQuickReply}
+          onBackToList={showNarrowList}
         />
       </AppErrorBoundary>
 
@@ -1583,17 +1653,18 @@ export default function App() {
       )}
 
       {!isAccountLoginActive && isSettingsOpen && (
-        <AppErrorBoundary
-          title="设置界面渲染失败"
-          description="设置弹窗发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置界面回到主界面；如果问题持续，尝试刷新应用。"
-          primaryLabel="返回主视图"
-          secondaryLabel="刷新应用"
-          onPrimaryAction={() => {
-            resetSaveAndVerifyReport();
-            setSettingsOpen(false);
-          }}
-        >
-          <SettingsOverlay
+        <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
+          <AppErrorBoundary
+            title="设置界面渲染失败"
+            description="设置弹窗发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置界面回到主界面；如果问题持续，尝试刷新应用。"
+            primaryLabel="返回主视图"
+            secondaryLabel="刷新应用"
+            onPrimaryAction={() => {
+              resetSaveAndVerifyReport();
+              setSettingsOpen(false);
+            }}
+          >
+            <SettingsOverlay
             accountForm={accountForm}
             accounts={accounts}
             newAccountForm={newAccountForm}
@@ -1813,8 +1884,9 @@ export default function App() {
             onRemoveRule={(rule) => { removeRule(rule); }}
             onRawMessageChange={setRawMessage}
             onParseRawMessage={parseRawMessage}
-          />
-        </AppErrorBoundary>
+            />
+          </AppErrorBoundary>
+        </Suspense>
       )}
       {!isAccountLoginActive && isShortcutsOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>
@@ -1824,83 +1896,101 @@ export default function App() {
           />
         </Suspense>
       )}
-      {!isAccountLoginActive && <UndoSnackbarStack
-        undoAction={undoAction}
-        onUndoAction={() => {
-          restoreUndoAction().catch((error) => setStatus(String(error)));
-        }}
-        onDismissAction={clearUndoAction}
-      />}
-      {!isAccountLoginActive && <MessageToastStack
-        toasts={messageToasts}
-        pendingSendUndo={pendingSendUndo}
-        onUndoSend={() => {
-          undoPendingSend().catch((error) => setStatus(String(error)));
-        }}
-        onDismissSend={() => setPendingSendUndo(null)}
-      />}
+      {!isAccountLoginActive && undoAction && (
+        <Suspense fallback={null}>
+          <UndoSnackbarStack
+            undoAction={undoAction}
+            onUndoAction={() => {
+              restoreUndoAction().catch((error) => setStatus(String(error)));
+            }}
+            onDismissAction={clearUndoAction}
+          />
+        </Suspense>
+      )}
+      {!isAccountLoginActive && (messageToasts.length > 0 || pendingSendUndo) && (
+        <Suspense fallback={null}>
+          <MessageToastStack
+            toasts={messageToasts}
+            pendingSendUndo={pendingSendUndo}
+            onUndoSend={() => {
+              undoPendingSend().catch((error) => setStatus(String(error)));
+            }}
+            onDismissSend={() => setPendingSendUndo(null)}
+          />
+        </Suspense>
+      )}
       {!isAccountLoginActive && <GlobalTooltip />}
       {!isAccountLoginActive && composerCloseConfirmOpen && (
-        <ComposerCloseConfirmDialog
-          setOpen={setComposerCloseConfirmOpen}
-          onClose={() => setComposerCloseConfirmOpen(false)}
-          onDiscard={() => {
-            setDraft(emptyDraft);
-            clearComposerAutosave();
-            forceCloseComposer();
-          }}
-          onSaveDraft={saveDraft}
-        />
+        <Suspense fallback={<DeferredSurface label="正在打开关闭写信确认" />}>
+          <ComposerCloseConfirmDialog
+            setOpen={setComposerCloseConfirmOpen}
+            onClose={() => setComposerCloseConfirmOpen(false)}
+            onDiscard={() => {
+              setDraft(emptyDraft);
+              clearComposerAutosave();
+              forceCloseComposer();
+            }}
+            onSaveDraft={saveDraft}
+          />
+        </Suspense>
       )}
-      {!isAccountLoginActive && <ConfirmationDialogs
-        confirmDeleteFolder={confirmDeleteFolder}
-        confirmDeleteIdentity={confirmDeleteIdentity}
-        confirmDeleteRule={confirmDeleteRule}
-        confirmDeleteContact={contactToDeleteFromHook}
-        confirmDeleteLabel={confirmDeleteLabel}
-        confirmEmptyTrashState={confirmEmptyTrashState}
-        confirmPermanentlyDelete={confirmPermanentlyDelete}
-        setConfirmDeleteFolder={setConfirmDeleteFolder}
-        setConfirmDeleteIdentity={setConfirmDeleteIdentity}
-        setConfirmDeleteRule={setConfirmDeleteRule}
-        setConfirmDeleteContact={setContactToDeleteFromHook}
-        setConfirmDeleteLabel={setConfirmDeleteLabel}
-        setConfirmEmptyTrashState={setConfirmEmptyTrashState}
-        setConfirmPermanentlyDelete={setConfirmPermanentlyDelete}
-        onDeleteFolderConfirmed={deleteCustomFolderConfirmed}
-        onDeleteIdentityConfirmed={deleteIdentityConfirmed}
-        onDeleteRuleConfirmed={removeRuleConfirmed}
-        onDeleteContactConfirmed={deleteManagedContact}
-        onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
-        onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
-        onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
-      />}
+      {!isAccountLoginActive && confirmationDialogsOpen && (
+        <Suspense fallback={<DeferredSurface label="正在打开操作确认" />}>
+          <ConfirmationDialogs
+            confirmDeleteFolder={confirmDeleteFolder}
+            confirmDeleteIdentity={confirmDeleteIdentity}
+            confirmDeleteRule={confirmDeleteRule}
+            confirmDeleteContact={contactToDeleteFromHook}
+            confirmDeleteLabel={confirmDeleteLabel}
+            confirmEmptyTrashState={confirmEmptyTrashState}
+            confirmPermanentlyDelete={confirmPermanentlyDelete}
+            setConfirmDeleteFolder={setConfirmDeleteFolder}
+            setConfirmDeleteIdentity={setConfirmDeleteIdentity}
+            setConfirmDeleteRule={setConfirmDeleteRule}
+            setConfirmDeleteContact={setContactToDeleteFromHook}
+            setConfirmDeleteLabel={setConfirmDeleteLabel}
+            setConfirmEmptyTrashState={setConfirmEmptyTrashState}
+            setConfirmPermanentlyDelete={setConfirmPermanentlyDelete}
+            onDeleteFolderConfirmed={deleteCustomFolderConfirmed}
+            onDeleteIdentityConfirmed={deleteIdentityConfirmed}
+            onDeleteRuleConfirmed={removeRuleConfirmed}
+            onDeleteContactConfirmed={deleteManagedContact}
+            onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
+            onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
+            onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
+          />
+        </Suspense>
+      )}
       {isAccountLoginActive && (
-        <AccountLoginDialog
-          form={newAccountForm}
-          onFormChange={setNewAccountForm}
-          onSubmit={async (secret, onProgress) => {
-            setSettingsOpen(false);
-            setAccountLoginProvisioning(true);
-            try {
-              return await createNewAccount(secret, onProgress);
-            } finally {
-              setAccountLoginProvisioning(false);
-            }
-          }}
-        />
+        <Suspense fallback={<DeferredSurface label="正在准备账号登录" />}>
+          <AccountLoginDialog
+            form={newAccountForm}
+            onFormChange={setNewAccountForm}
+            onSubmit={async (secret, onProgress) => {
+              setSettingsOpen(false);
+              setAccountLoginProvisioning(true);
+              try {
+                return await createNewAccount(secret, onProgress);
+              } finally {
+                setAccountLoginProvisioning(false);
+              }
+            }}
+          />
+        </Suspense>
       )}
       {!isAccountLoginActive && pendingOnboardingAccount && (
-        <FirstRunOnboarding
-          accountId={pendingOnboardingAccount.id}
-          account={pendingOnboardingAccount}
-          sendUndoDelaySeconds={sendUndoDelaySeconds}
-          onAccountSettingsChange={(patch) => handleOnboardingAccountPatch(pendingOnboardingAccount.id, patch)}
-          onSendUndoDelayChange={setSendUndoDelaySeconds}
-          onComplete={() => completeOnboarding(pendingOnboardingAccount.id)}
-          onSkipAll={() => completeOnboarding(pendingOnboardingAccount.id)}
-          onStatus={setStatus}
-        />
+        <Suspense fallback={<DeferredSurface label="正在准备首次设置" />}>
+          <FirstRunOnboarding
+            accountId={pendingOnboardingAccount.id}
+            account={pendingOnboardingAccount}
+            sendUndoDelaySeconds={sendUndoDelaySeconds}
+            onAccountSettingsChange={(patch) => handleOnboardingAccountPatch(pendingOnboardingAccount.id, patch)}
+            onSendUndoDelayChange={setSendUndoDelaySeconds}
+            onComplete={() => completeOnboarding(pendingOnboardingAccount.id)}
+            onSkipAll={() => completeOnboarding(pendingOnboardingAccount.id)}
+            onStatus={setStatus}
+          />
+        </Suspense>
       )}
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>

@@ -32,6 +32,7 @@
   min-width: 0;
   overflow: auto;
   background: var(--ui-reader);
+  container-type: inline-size;
 }
 
 .app-shell .reader-panel,
@@ -380,9 +381,12 @@
 
 /* Sender email is actionable but doesn't look like a browser link */
 .app-shell .reader-sender-email {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
-  padding: 0;
+  min-height: 24px;
+  margin-block: -5px;
+  padding: 5px 0;
   border: 0;
   color: inherit;
   background: transparent;
@@ -639,14 +643,14 @@
 
 .label-add-submit-btn {
   margin-left: auto;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--ui-accent);
   color: var(--color-text-on-accent);
   border: none;
   font-size: 13px;
-  line-height: 18px;
+  line-height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -726,8 +730,8 @@
 }
 
 .label-item-actions button {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
   background: transparent;
   border: none;
@@ -880,8 +884,7 @@
   margin-top: 4px;
   padding: 12px 14px;
   border: 1px solid var(--ui-border);
-  border-left: 3px solid var(--ui-border-strong);
-  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
 }
@@ -1002,14 +1005,14 @@
 .reader-html blockquote {
   margin: 14px 0 0;
   padding: 10px 12px;
-  border-left: 3px solid var(--ui-border-strong);
-  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
 }
 
 :root[data-theme="dark"] .reader-html blockquote {
-  border-left-color: var(--ui-border-strong);
+  border-color: var(--ui-border);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
 }
@@ -1524,6 +1527,21 @@
   background: var(--quiet-row-hover);
 }
 
+@container (max-width: 500px) {
+  .reader-warning-action-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reader-warning-primary-action,
+  .reader-warning-secondary-action {
+    width: 100%;
+    min-height: var(--ui-control-height);
+    padding: 4px 8px;
+    line-height: 1.25;
+  }
+}
+
 /* Reader primary action link inside body content */
 .reader-warning-primary-action {
   color: var(--ui-text);
@@ -1911,7 +1929,7 @@
   padding: 0 10px;
   border: 0;
   border-radius: var(--ui-radius-control);
-  color: #ffffff;
+  color: var(--color-text-on-accent);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
@@ -1990,7 +2008,7 @@
   padding: 0 16px;
   border: 0;
   border-radius: var(--ui-radius-control);
-  color: #fff;
+  color: var(--color-text-on-accent);
   background: rgba(255, 255, 255, 0.16);
   font-size: 13px;
   font-weight: 600;
@@ -2022,7 +2040,7 @@
   max-height: 100%;
   object-fit: contain;
   border-radius: 0;
-  background: #ffffff;
+  background: oklch(0.99 0.004 var(--primitive-hue-paper));
   transform-origin: center center;
   transition: var(--ui-transition-transform-fast);
   user-select: none;

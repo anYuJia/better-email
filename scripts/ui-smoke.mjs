@@ -688,10 +688,10 @@ async function assertOAuthResultCardGeometry(cdp, label) {
     }
   }
   const expectedChildren = {
-    strong: { fontSize: '13.5px', fontWeight: '580', fontStyle: 'normal' },
-    span: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
-    small: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
-    em: { fontSize: '12.5px', fontWeight: '400', fontStyle: 'normal' },
+    strong: { fontSize: '13px', fontWeight: '580', fontStyle: 'normal' },
+    span: { fontSize: '12px', fontWeight: '400', fontStyle: 'normal' },
+    small: { fontSize: '12px', fontWeight: '400', fontStyle: 'normal' },
+    em: { fontSize: '12px', fontWeight: '400', fontStyle: 'normal' },
   };
   for (const [sel, exp] of Object.entries(expectedChildren)) {
     const child = data.children[sel];
@@ -758,9 +758,9 @@ async function assertSettingsV2LayoutContract(cdp, label, viewport) {
   if (viewport === 'desktop') {
     if (data.nav && style('nav', 'display') !== 'flex') failures.push(`nav display=${style('nav', 'display')}`);
     if (data.mobileToolbar && style('mobileToolbar', 'display') !== 'none') failures.push(`mobileToolbar display=${style('mobileToolbar', 'display')}`);
-    if (data.mainHeader && style('mainHeader', 'minHeight') !== '48px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
+    if (data.mainHeader && style('mainHeader', 'minHeight') !== '44px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
     if (data.mainHeader && style('mainHeader', 'position') !== 'sticky') failures.push(`mainHeader position=${style('mainHeader', 'position')}`);
-    if (data.pageHeader && style('pageHeader', 'minHeight') !== '48px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
+    if (data.pageHeader && style('pageHeader', 'minHeight') !== '44px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
     if (data.content && style('content', 'paddingTop') !== '16px') failures.push(`content paddingTop=${style('content', 'paddingTop')}`);
     if (data.content && style('content', 'paddingBottom') !== '30px') failures.push(`content paddingBottom=${style('content', 'paddingBottom')}`);
     const m = rect('modal');
@@ -893,13 +893,18 @@ async function fillComposerBody(cdp, value) {
           rich.focus();
           rich.innerHTML = '';
           document.execCommand('insertText', false, ${JSON.stringify(value)});
-          return;
+          return new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+          });
         }
         const plain = document.querySelector('.composer textarea[placeholder="正文"]');
         if (!plain) throw new Error('Composer body field not found');
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
         setter.call(plain, ${JSON.stringify(value)});
         plain.dispatchEvent(new Event('input', { bubbles: true }));
+        return new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
       })()`,
     );
   });
@@ -1026,13 +1031,13 @@ async function main() {
       cdp,
       "localStorage.removeItem('better-email.appLayout.v2'); localStorage.setItem('swiftmail.appLayout.v2', JSON.stringify({ sidebar: 278, list: 422 })); location.reload()",
     );
-    await waitForExpression(cdp, "document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('278px') && document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('422px')");
+    await waitForExpression(cdp, "(() => { const shell = document.querySelector('.app-shell'); if (!shell) return false; const style = getComputedStyle(shell); return style.getPropertyValue('--app-sidebar-width').trim() === '278px' && style.getPropertyValue('--app-list-width').trim() === '422px'; })()");
     await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === 278 && localStorage.getItem('swiftmail.appLayout.v2') === null");
     await evalInPage(
       cdp,
       "localStorage.setItem('better-email.appLayout.v2', JSON.stringify({ sidebar: 244, list: 388 })); location.reload()",
     );
-    await waitForExpression(cdp, "document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('244px') && document.querySelector('.app-shell')?.style.gridTemplateColumns.includes('388px')");
+    await waitForExpression(cdp, "(() => { const shell = document.querySelector('.app-shell'); if (!shell) return false; const style = getComputedStyle(shell); return style.getPropertyValue('--app-sidebar-width').trim() === '244px' && style.getPropertyValue('--app-list-width').trim() === '388px'; })()");
 
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length <= 40 && document.querySelectorAll('.message-card').length > 5 && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
@@ -1045,20 +1050,25 @@ async function main() {
     const initialLayout = await evalInPage(
       cdp,
       `(() => {
-        const columns = document.querySelector('.app-shell')?.style.gridTemplateColumns ?? '';
-        const match = columns.match(/^(\\d+)px 5px (\\d+)px 5px/);
-        if (!match) throw new Error('Initial app layout was not rendered');
-        return { sidebar: Number(match[1]), list: Number(match[2]) };
+        const shell = document.querySelector('.app-shell');
+        if (!shell) throw new Error('Initial app layout was not rendered');
+        const style = getComputedStyle(shell);
+        const sidebar = Number.parseFloat(style.getPropertyValue('--app-sidebar-width'));
+        const list = Number.parseFloat(style.getPropertyValue('--app-list-width'));
+        if (!Number.isFinite(sidebar) || !Number.isFinite(list)) {
+          throw new Error('Initial app layout widths were not resolved');
+        }
+        return { sidebar, list };
       })()`,
     );
     const expectedSidebar = Math.min(320, Math.max(228, initialLayout.sidebar + 34));
     const expectedList = Math.min(500, Math.max(340, initialLayout.list - 44));
 
     await dragElement(cdp, '.sidebar-resizer', 34);
-    await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedSidebar}px')`);
+    await waitForExpression(cdp, `getComputedStyle(document.querySelector('.app-shell')).getPropertyValue('--app-sidebar-width').trim() === '${expectedSidebar}px'`);
     await waitForExpression(cdp, `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).sidebar === ${expectedSidebar}`);
     await dragElement(cdp, '.list-resizer', -44);
-    await waitForExpression(cdp, `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedList}px')`);
+    await waitForExpression(cdp, `getComputedStyle(document.querySelector('.app-shell')).getPropertyValue('--app-list-width').trim() === '${expectedList}px'`);
     await waitForExpression(cdp, `JSON.parse(localStorage.getItem('better-email.appLayout.v2')).list === ${expectedList}`);
     // 布局拖拽结果在页面重载后仍被应用并持久化（不再依赖已删除的重置布局控件）。
     await cdp.send('Page.reload', { ignoreCache: true });
@@ -1068,7 +1078,7 @@ async function main() {
     );
     await waitForExpression(
       cdp,
-      `document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedSidebar}px') && document.querySelector('.app-shell').style.gridTemplateColumns.includes('${expectedList}px')`,
+      `(() => { const style = getComputedStyle(document.querySelector('.app-shell')); return style.getPropertyValue('--app-sidebar-width').trim() === '${expectedSidebar}px' && style.getPropertyValue('--app-list-width').trim() === '${expectedList}px'; })()`,
     );
     await waitForExpression(cdp, "(() => { const mark = document.querySelector('.brand-mark'); return mark && (mark.tagName === 'IMG' ? (mark.getAttribute('alt') !== null && mark.complete) : (mark.textContent ?? '').trim().length > 0); })()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher-trigger') && !document.querySelector('.account-switcher select')");

@@ -1,11 +1,28 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Maximize2, Minus, X } from 'lucide-react';
-import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 import { logError } from '../app/logger';
 
 type DesktopPlatform = 'macos' | 'windows' | 'linux' | 'web';
+type TauriWindowModule = typeof import('@tauri-apps/api/window');
+
+let tauriWindowModule: Promise<TauriWindowModule> | null = null;
+
+function loadTauriWindowModule() {
+  tauriWindowModule ??= import('@tauri-apps/api/window');
+  return tauriWindowModule;
+}
+
+async function getCurrentTauriWindow() {
+  const { getCurrentWindow } = await loadTauriWindowModule();
+  return getCurrentWindow();
+}
+
+async function setCurrentWindowPosition(x: number, y: number) {
+  const { getCurrentWindow, LogicalPosition } = await loadTauriWindowModule();
+  await getCurrentWindow().setPosition(new LogicalPosition(x, y));
+}
 
 export function detectDesktopPlatform(): DesktopPlatform {
   if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
@@ -77,26 +94,24 @@ export default function WindowChrome() {
       const dx = event.screenX - drag.startX;
       const dy = event.screenY - drag.startY;
       if (dx === 0 && dy === 0) return;
-      void getCurrentWindow()
-        .setPosition(new LogicalPosition(drag.winX + dx, drag.winY + dy))
-        .catch(() => undefined);
+      void setCurrentWindowPosition(drag.winX + dx, drag.winY + dy).catch(() => undefined);
     };
 
     const handleMouseUp = () => {
       dragRef.current = null;
     };
 
+    const handleWindowBlur = () => {
+      dragRef.current = null;
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('blur', () => {
-      dragRef.current = null;
-    });
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('blur', () => {
-        dragRef.current = null;
-      });
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [platform]);
 
@@ -134,9 +149,10 @@ export default function WindowChrome() {
    * manual setPosition drag.
    */
   const beginWindowDrag = async (event: ReactPointerEvent<HTMLDivElement>) => {
-    const tauriWindow = getCurrentWindow();
     const startX = event.screenX;
     const startY = event.screenY;
+    const tauriWindow = await getCurrentTauriWindow().catch(() => null);
+    if (!tauriWindow) return;
     let winX = 0;
     let winY = 0;
     try {
@@ -171,7 +187,7 @@ export default function WindowChrome() {
   };
 
   async function toggleMaximize() {
-    const tauriWindow = getCurrentWindow();
+    const tauriWindow = await getCurrentTauriWindow();
     if (typeof tauriWindow.toggleMaximize === 'function') {
       await tauriWindow.toggleMaximize();
     } else if (await tauriWindow.isMaximized()) {
@@ -212,7 +228,7 @@ export default function WindowChrome() {
             className="window-control"
             aria-label="最小化窗口"
             title="最小化"
-            onClick={() => void getCurrentWindow().minimize()}
+            onClick={() => void getCurrentTauriWindow().then((tauriWindow) => tauriWindow.minimize())}
           >
             <Minus size={15} strokeWidth={1.7} />
           </button>
@@ -230,7 +246,7 @@ export default function WindowChrome() {
             className="window-control window-control-close"
             aria-label="关闭窗口"
             title="关闭"
-            onClick={() => void getCurrentWindow().close()}
+            onClick={() => void getCurrentTauriWindow().then((tauriWindow) => tauriWindow.close())}
           >
             <X size={15} strokeWidth={1.7} />
           </button>

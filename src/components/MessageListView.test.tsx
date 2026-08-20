@@ -104,6 +104,12 @@ describe('MessageListView theme-safe separators', () => {
     );
 
     const checkbox = container.querySelector('.message-select input') as HTMLInputElement;
+    const list = container.querySelector('[role="list"]');
+    const listItem = container.querySelector('[role="listitem"]');
+    expect(list?.getAttribute('aria-label')).toBe('邮件列表');
+    expect(listItem?.getAttribute('aria-current')).toBe('true');
+    expect(listItem?.getAttribute('aria-posinset')).toBe('1');
+    expect(listItem?.getAttribute('aria-setsize')).toBe('1');
     expect(checkbox).not.toBeNull();
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);

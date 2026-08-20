@@ -510,10 +510,13 @@
 
 .sidebar-task-progress > span {
   display: block;
+  width: 100%;
   height: 100%;
   border-radius: inherit;
   background: var(--ui-accent);
-  transition: var(--ui-transition-width-standard-ease-out);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: var(--ui-transition-transform-fast);
 }
 
 /* Footer ----------------------------------------------------------------------

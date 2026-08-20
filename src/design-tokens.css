@@ -31,8 +31,10 @@
 
   --color-text-primary: oklch(0.235 0.017 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.445 0.015 var(--primitive-hue-neutral));
-  --color-text-tertiary: oklch(0.61 0.012 var(--primitive-hue-neutral));
-  --color-text-on-accent: #ffffff;
+  /* Small metadata must remain readable on every persistent and selected
+     surface. This resolves to at least 4.5:1 even on the blue selection tint. */
+  --color-text-tertiary: oklch(0.505 0.012 var(--primitive-hue-neutral));
+  --color-text-on-accent: oklch(0.985 0.004 var(--primitive-hue-neutral));
 
   --color-border-subtle: oklch(0.885 0.007 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.8 0.011 var(--primitive-hue-neutral));
@@ -122,7 +124,7 @@
   --ui-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-ease-toast-in: cubic-bezier(0.21, 1.02, 0.73, 1);
   --ui-ease-toast-out: cubic-bezier(0.55, 0, 0.55, 0.2);
-  --ui-ease-pop-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ui-ease-pop-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   --ui-transition-transform-fast: transform var(--ui-motion-fast) var(--ui-ease-standard);
   --ui-transition-transform-short: transform var(--ui-motion-fast) var(--ui-ease-standard);
@@ -305,7 +307,7 @@
 
   --color-text-primary: oklch(0.92 0.012 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.78 0.012 var(--primitive-hue-neutral));
-  --color-text-tertiary: oklch(0.64 0.012 var(--primitive-hue-neutral));
+  --color-text-tertiary: oklch(0.745 0.012 var(--primitive-hue-neutral));
   --color-text-on-accent: oklch(0.99 0.008 var(--primitive-hue-accent));
 
   --color-border-subtle: oklch(0.33 0.014 var(--primitive-hue-neutral));

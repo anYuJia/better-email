@@ -15,7 +15,7 @@
 :root {
   color: var(--ui-text);
   background: var(--ui-bg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  font-family: var(--ui-font-sans);
   font-size: 14px;
   letter-spacing: -0.01em;
 }

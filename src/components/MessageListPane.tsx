@@ -34,7 +34,8 @@ export type { BulkMessageAction, MessageContextAction } from './messageContextMe
 
 export type MessageListPaneProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
-  query: string;
+  queryDraft: string;
+  appliedQuery: string;
   searchScope: SearchScope;
   filter: FilterMode;
   listMode: ListMode;
@@ -83,11 +84,13 @@ export type MessageListPaneProps = {
   loadMoreStatus?: string | null;
   isRefreshing?: boolean;
   refreshNotice?: string | null;
+  onOpenNavigation?: () => void;
 };
 
 function MessageListPane({
   searchInputRef,
-  query,
+  queryDraft,
+  appliedQuery,
   searchScope,
   filter,
   listMode,
@@ -136,6 +139,7 @@ function MessageListPane({
   loadMoreStatus,
   isRefreshing = false,
   refreshNotice = null,
+  onOpenNavigation,
 }: MessageListPaneProps) {
   const [messageMenu, setMessageMenu] = React.useState<{
     x: number;
@@ -290,8 +294,10 @@ function MessageListPane({
   return (
     <section className="message-list-panel">
       <MessageListToolbar
+        onOpenNavigation={onOpenNavigation}
         searchInputRef={searchInputRef}
-        query={query}
+        query={queryDraft}
+        appliedQuery={appliedQuery}
         searchScope={searchScope}
         filter={filter}
         listMode={listMode}
@@ -338,7 +344,7 @@ function MessageListPane({
         <MessageListView
           groups={groupedMessages}
           messages={messages}
-          query={query}
+          query={appliedQuery}
           filter={filter}
           selectedId={selectedId}
           hasMoreMessages={hasMoreMessages}

@@ -15,8 +15,10 @@
  */
 
 .app-shell {
+  --app-sidebar-width: var(--app-sidebar-width-preferred, 244px);
+  --app-list-width: var(--app-list-width-preferred, 388px);
   display: grid;
-  grid-template-columns: 244px 5px 388px 5px minmax(0, 1fr);
+  grid-template-columns: var(--app-sidebar-width) 5px var(--app-list-width) 5px minmax(0, 1fr);
   height: 100vh;
   width: 100vw;
   background: var(--ui-bg);
@@ -70,6 +72,7 @@
 }
 
 .app-shell .pane-resizer {
+  position: relative;
   align-self: stretch;
   width: 100%;
   min-width: 0;
@@ -82,6 +85,7 @@
   background: transparent;
   opacity: 1;
   cursor: col-resize;
+  touch-action: none;
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -95,12 +99,15 @@
   background: var(--ui-border);
   box-shadow: var(--ui-box-shadow-none);
   content: "";
+  pointer-events: none;
   transform: translateX(-50%);
   transition: var(--ui-transition-bg-box-shadow-fast);
 }
 
 .app-shell .pane-resizer::after {
+  position: absolute;
   inset: 0 -4px;
+  background: transparent;
   content: "";
 }
 
@@ -117,6 +124,12 @@
  * reader onto a second row. Hide them so the three columns map cleanly
  * to sidebar / message-list / reader. */
 @media (max-width: 1180px) {
+  .app-shell {
+    --app-sidebar-width: 200px;
+    --app-list-width: 320px;
+    grid-template-columns: var(--app-sidebar-width) var(--app-list-width) minmax(0, 1fr);
+  }
+
   .app-shell .pane-resizer {
     display: none;
   }

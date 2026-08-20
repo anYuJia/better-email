@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   Mail,
   MailPlus,
 } from 'lucide-react';
@@ -20,7 +21,6 @@ import useInlineImages from './reader/useInlineImages';
 import useReaderAttachments from '../hooks/useReaderAttachments';
 import InlineImageNotice from './reader/InlineImageNotice';
 import ReaderBodyContent from './ReaderBodyContent';
-import ImagePreviewOverlay from './reader/ImagePreviewOverlay';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
 import QuickReplySection from './reader/QuickReplySection';
@@ -28,9 +28,14 @@ import AttachmentList from './reader/AttachmentList';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
-import ThreadReaderList from './reader/ThreadReaderList';
 import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
 import useMessageTranslation from '../hooks/useMessageTranslation';
+import type { ReaderBodyFetchState } from '../hooks/useReaderBodyLoading';
+import EmailReaderSkeleton from './EmailReaderSkeleton';
+import DeferredSurface from './DeferredSurface';
+
+const ImagePreviewOverlay = lazy(() => import('./reader/ImagePreviewOverlay'));
+const ThreadReaderList = lazy(() => import('./reader/ThreadReaderList'));
 
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 type TrustScope = 'sender' | 'domain';
@@ -83,6 +88,7 @@ export type ReaderPaneProps = {
   onSnooze: () => void;
   onExportMessage: () => void;
   onFetchBody: (isSilent?: boolean) => void | Promise<void>;
+  bodyFetchState?: ReaderBodyFetchState | null;
   onMarkNotSpam: () => void;
   onMarkAsSpam: () => void;
   onAllowRemoteImagesOnce: () => void;
@@ -100,7 +106,20 @@ export type ReaderPaneProps = {
   onSaveAttachmentAs: (attachment: Attachment) => void;
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
+  onBackToList?: () => void;
 };
+
+function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
+  if (!onBack) return null;
+  return (
+    <nav className="narrow-reader-navigation" aria-label="阅读导航">
+      <button type="button" data-narrow-reader-back onClick={onBack}>
+        <ArrowLeft size={17} aria-hidden="true" />
+        返回邮件列表
+      </button>
+    </nav>
+  );
+}
 
 function ReaderPane({
   activeThread,
@@ -142,6 +161,7 @@ function ReaderPane({
   onSnooze,
   onExportMessage,
   onFetchBody,
+  bodyFetchState = null,
   onMarkNotSpam,
   onMarkAsSpam,
   onAllowRemoteImagesOnce,
@@ -159,6 +179,7 @@ function ReaderPane({
   onSaveAttachmentAs,
   onQuickReplyChange,
   onSendQuickReply,
+  onBackToList,
 }: ReaderPaneProps) {
   const [linksRevealed, setLinksRevealed] = useState(false);
   const {
@@ -327,21 +348,24 @@ function ReaderPane({
 if (activeThread && threadMessages.length > 0) {
     return (
       <section className="reader-panel">
+        <NarrowReaderNavigation onBack={onBackToList} />
         <article className="reader thread-reader">
-          <ThreadReaderList
-            activeThread={activeThread}
-            threadMessages={threadMessages}
-            activeThreadSelected={activeThreadSelected}
-            selectedId={selectedId}
-            folders={folders}
-            labels={labels}
-            onSelectMessage={onSelectMessage}
-            onRunThreadAction={onRunThreadAction}
-            onComposeFromMessage={onComposeFromMessage}
-            onMoveThreadToFolder={onMoveThreadToFolder}
-            onToggleThreadLabel={onToggleThreadLabel}
-            onToggleThreadMute={onToggleThreadMute}
-          />
+          <Suspense fallback={<EmailReaderSkeleton />}>
+            <ThreadReaderList
+              activeThread={activeThread}
+              threadMessages={threadMessages}
+              activeThreadSelected={activeThreadSelected}
+              selectedId={selectedId}
+              folders={folders}
+              labels={labels}
+              onSelectMessage={onSelectMessage}
+              onRunThreadAction={onRunThreadAction}
+              onComposeFromMessage={onComposeFromMessage}
+              onMoveThreadToFolder={onMoveThreadToFolder}
+              onToggleThreadLabel={onToggleThreadLabel}
+              onToggleThreadMute={onToggleThreadMute}
+            />
+          </Suspense>
         </article>
       </section>
     );
@@ -350,6 +374,7 @@ if (activeThread && threadMessages.length > 0) {
   if (!selected) {
     return (
       <section className="reader-panel">
+        <NarrowReaderNavigation onBack={onBackToList} />
         <div className="empty-reader">
           <div className="empty-reader-card">
             <div className="empty-state-mark">
@@ -372,6 +397,7 @@ if (activeThread && threadMessages.length > 0) {
 
   return (
     <section className="reader-panel" ref={readerRef} onScroll={maybeCompleteReading}>
+      <NarrowReaderNavigation onBack={onBackToList} />
       <article className="reader">
         <ReaderToolbar
           selected={selected}
@@ -479,6 +505,9 @@ if (activeThread && threadMessages.length > 0) {
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onOpenLink={onOpenHttpsLink}
           onComposeNew={onComposeNew}
+          bodyFetchStatus={bodyFetchState?.status ?? null}
+          bodyFetchError={bodyFetchState?.error ?? null}
+          onRetryBodyFetch={() => onFetchBody(false)}
         />
 
         <ReaderTranslationPanel
@@ -501,31 +530,33 @@ if (activeThread && threadMessages.length > 0) {
         )}
       </article>
       {imagePreview && (
-        <ImagePreviewOverlay
-          imagePreview={imagePreview}
-          imagePreviewFit={imagePreviewFit}
-          imagePreviewZoom={imagePreviewZoom}
-          imagePreviewPan={imagePreviewPan}
-          imagePreviewLoading={imagePreviewLoading}
-          imagePreviewError={imagePreviewError}
-          imagePreviewStageRef={imagePreviewStageRef}
-          imagePreviewImageRef={imagePreviewImageRef}
-          zoomIn={zoomIn}
-          zoomOut={zoomOut}
-          showOriginalSize={showOriginalSize}
-          resetImagePreview={resetImagePreview}
-          saveImageAs={saveImageAs}
-          downloadImage={downloadImage}
-          handleImageLoad={handleImageLoad}
-          handleImagePreviewError={handleImagePreviewError}
-          handleImagePreviewWheel={handleImagePreviewWheel}
-          handleImagePreviewPointerDown={handleImagePreviewPointerDown}
-          handleImagePreviewPointerMove={handleImagePreviewPointerMove}
-          stopImagePreviewPanning={stopImagePreviewPanning}
-          isPanning={isImagePreviewPanning}
-          onClose={closeImagePreview}
-          onBackgroundRestored={restoreImagePreviewFocus}
-        />
+        <Suspense fallback={<DeferredSurface label="正在打开图片预览" />}>
+          <ImagePreviewOverlay
+            imagePreview={imagePreview}
+            imagePreviewFit={imagePreviewFit}
+            imagePreviewZoom={imagePreviewZoom}
+            imagePreviewPan={imagePreviewPan}
+            imagePreviewLoading={imagePreviewLoading}
+            imagePreviewError={imagePreviewError}
+            imagePreviewStageRef={imagePreviewStageRef}
+            imagePreviewImageRef={imagePreviewImageRef}
+            zoomIn={zoomIn}
+            zoomOut={zoomOut}
+            showOriginalSize={showOriginalSize}
+            resetImagePreview={resetImagePreview}
+            saveImageAs={saveImageAs}
+            downloadImage={downloadImage}
+            handleImageLoad={handleImageLoad}
+            handleImagePreviewError={handleImagePreviewError}
+            handleImagePreviewWheel={handleImagePreviewWheel}
+            handleImagePreviewPointerDown={handleImagePreviewPointerDown}
+            handleImagePreviewPointerMove={handleImagePreviewPointerMove}
+            stopImagePreviewPanning={stopImagePreviewPanning}
+            isPanning={isImagePreviewPanning}
+            onClose={closeImagePreview}
+            onBackgroundRestored={restoreImagePreviewFocus}
+          />
+        </Suspense>
       )}
       {imageContextMenu && (
         <ImageContextMenuOverlay

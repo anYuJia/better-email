@@ -19,6 +19,7 @@ function rulesOnly(css) {
 }
 
 const composerCss = rulesOnly(readCss('src/components/composer/composer.css'));
+const sharedDialogsCss = rulesOnly(readCss('src/styles/shared-dialogs.css'));
 const darkModeCss = rulesOnly(readCss('src/styles/dark-mode.css'));
 const globalCss = rulesOnly(readCss('src/styles/global.css'));
 const sharedMotionCss = rulesOnly(readCss('src/styles/shared-motion.css'));
@@ -120,14 +121,14 @@ describe('composer de-AI contract — recipient chips are small, not pills', () 
 
 describe('composer de-AI contract — send button is accent, not flashy', () => {
   it('send button has no gradient', () => {
-    const rules = findRules(composerCss, 'composer-send');
+    const rules = findRules(sharedDialogsCss, '.dialog-button-primary');
     for (const r of rules) {
       expect(r.body).not.toMatch(/gradient/);
     }
   });
 
   it('send button has no glow/box-shadow (except --ui-box-shadow-none)', () => {
-    const rules = findRules(composerCss, 'composer-send');
+    const rules = findRules(sharedDialogsCss, '.dialog-button-primary');
     for (const r of rules) {
       if (r.body.includes('box-shadow')) {
         expect(r.body).not.toMatch(/box-shadow:\s*(?!var\(--ui-box-shadow-none\))/);
@@ -136,7 +137,7 @@ describe('composer de-AI contract — send button is accent, not flashy', () => 
   });
 
   it('send button has no scale animation', () => {
-    const rules = findRules(composerCss, 'composer-send');
+    const rules = findRules(sharedDialogsCss, '.dialog-button-primary');
     for (const r of rules) {
       expect(r.body).not.toMatch(/transform:\s*scale/);
     }

@@ -26,8 +26,8 @@ const AccountRow = memo(function AccountRow({
   return (
     <div
       className={['settings-account-row', active ? 'active' : ''].filter(Boolean).join(' ')}
-      role="option"
-      aria-selected={active}
+      role="listitem"
+      aria-current={active ? 'true' : undefined}
     >
       <button
         type="button"
@@ -73,7 +73,7 @@ export default function AccountList({
           </SettingsButton>
         </span>
       </header>
-      <div className="st-section-body settings-account-list" role="listbox" aria-label="邮箱账号">
+      <div className="st-section-body settings-account-list" role="list" aria-label="邮箱账号">
         {accounts.map((account) => (
           <AccountRow
             key={account.id}

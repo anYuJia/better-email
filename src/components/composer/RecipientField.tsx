@@ -217,6 +217,8 @@ export default function RecipientField({
           <input
             ref={inputRef}
             autoComplete="off"
+            role="combobox"
+            aria-haspopup="listbox"
             aria-autocomplete="list"
             aria-controls={menuOpen ? suggestionListId : undefined}
             aria-expanded={menuOpen}

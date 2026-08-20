@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ArrowDownUp,
   ChevronDown,
+  Menu,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -28,6 +29,7 @@ import { useDetailsMenu } from '../hooks/useDetailsMenu';
 type MessageListToolbarProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
   query: string;
+  appliedQuery: string;
   searchScope: SearchScope;
   filter: FilterMode;
   listMode: ListMode;
@@ -48,11 +50,13 @@ type MessageListToolbarProps = {
   onShowThreads: () => void;
   onFilterChange: (filter: FilterMode) => void;
   onSortChange: (sort: ListSort) => void;
+  onOpenNavigation?: () => void;
 };
 
 export default function MessageListToolbar({
   searchInputRef,
   query,
+  appliedQuery,
   searchScope,
   filter,
   listMode,
@@ -73,9 +77,12 @@ export default function MessageListToolbar({
   onShowThreads,
   onFilterChange,
   onSortChange,
+  onOpenNavigation,
 }: MessageListToolbarProps) {
   const [searchFocused, setSearchFocused] = React.useState(false);
+  const [activeSearchSuggestionIndex, setActiveSearchSuggestionIndex] = React.useState(-1);
   const searchBlurTimerRef = React.useRef<number | null>(null);
+  const searchSuggestionListId = React.useId();
   const deferredQuery = React.useDeferredValue(query);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
     ?? searchScopeOptions[0];
@@ -97,6 +104,9 @@ export default function MessageListToolbar({
   const filterMenu = useDetailsMenu(filterMenuRef);
   const sortMenu = useDetailsMenu(sortMenuRef);
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
+  const activeSearchSuggestion = activeSearchSuggestionIndex >= 0
+    ? searchSuggestions[activeSearchSuggestionIndex]
+    : null;
 
   function clearSearchBlurTimer() {
     if (searchBlurTimerRef.current === null) return;
@@ -112,11 +122,23 @@ export default function MessageListToolbar({
     clearSearchBlurTimer();
     onApplySearchShortcut(nextQuery);
     setSearchFocused(false);
+    setActiveSearchSuggestionIndex(-1);
   }
 
   return (
     <>
       <header className="toolbar">
+        {onOpenNavigation && (
+          <button
+            type="button"
+            className="narrow-navigation-button list-narrow-navigation"
+            data-narrow-sidebar-open
+            aria-label="打开邮箱和文件夹导航"
+            onClick={onOpenNavigation}
+          >
+            <Menu size={18} aria-hidden="true" />
+          </button>
+        )}
         <div className="search-cluster">
           <form
             onSubmit={(event) => {
@@ -131,11 +153,13 @@ export default function MessageListToolbar({
               value={query}
               onChange={(event) => {
                 setSearchFocused(true);
+                setActiveSearchSuggestionIndex(-1);
                 onQueryChange(event.target.value);
               }}
               onFocus={() => {
                 clearSearchBlurTimer();
                 setSearchFocused(true);
+                setActiveSearchSuggestionIndex(-1);
               }}
               onBlur={() => {
                 clearSearchBlurTimer();
@@ -144,23 +168,68 @@ export default function MessageListToolbar({
                   setSearchFocused(false);
                 }, 120);
               }}
+              onKeyDown={(event) => {
+                if (!showSearchSuggestions) return;
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  const direction = event.key === 'ArrowDown' ? 1 : -1;
+                  setActiveSearchSuggestionIndex((current) => {
+                    if (current < 0) return direction > 0 ? 0 : searchSuggestions.length - 1;
+                    return (current + direction + searchSuggestions.length) % searchSuggestions.length;
+                  });
+                  return;
+                }
+                if (event.key === 'Home' || event.key === 'End') {
+                  event.preventDefault();
+                  setActiveSearchSuggestionIndex(event.key === 'Home' ? 0 : searchSuggestions.length - 1);
+                  return;
+                }
+                if (event.key === 'Enter' && activeSearchSuggestion) {
+                  event.preventDefault();
+                  applySuggestedSearch(activeSearchSuggestion.query);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setSearchFocused(false);
+                  setActiveSearchSuggestionIndex(-1);
+                }
+              }}
+              role="combobox"
+              aria-label="搜索主题、发件人、正文"
+              aria-haspopup="listbox"
+              aria-autocomplete="list"
+              aria-expanded={showSearchSuggestions}
+              aria-controls={showSearchSuggestions ? searchSuggestionListId : undefined}
+              aria-activedescendant={activeSearchSuggestion
+                ? `${searchSuggestionListId}-${activeSearchSuggestion.id}`
+                : undefined}
               placeholder="搜索主题、发件人、正文"
             />
-            {(query.trim() || filter !== 'all') && (
+            {(query.trim() || appliedQuery.trim() || filter !== 'all') && (
               <button type="button" className="search-clear-button" title="清空搜索和筛选" aria-label="清空搜索和筛选" onClick={onClearSearchAndFilter}>
                 <X size={14} />
               </button>
             )}
             {showSearchSuggestions && (
-              <div className="search-suggestion-panel" role="listbox" aria-label="搜索范围选项">
-                <span className="search-suggestion-title">搜索范围</span>
-                {searchSuggestions.map((item) => (
+              <div
+                className="search-suggestion-panel"
+                id={searchSuggestionListId}
+                role="listbox"
+                aria-label="搜索范围选项"
+              >
+                <span className="search-suggestion-title" aria-hidden="true">搜索范围</span>
+                {searchSuggestions.map((item, index) => (
                   <button
                     type="button"
+                    role="option"
+                    id={`${searchSuggestionListId}-${item.id}`}
                     key={item.id}
-                    className={item.active ? 'active' : ''}
-                    aria-selected={item.active}
+                    className={item.active || index === activeSearchSuggestionIndex ? 'active' : ''}
+                    aria-selected={index === activeSearchSuggestionIndex}
+                    tabIndex={-1}
                     onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveSearchSuggestionIndex(index)}
                     onClick={() => applySuggestedSearch(item.query)}
                   >
                     <span>
@@ -185,6 +254,8 @@ export default function MessageListToolbar({
               {searchScopeOptions.map((item) => (
                 <button
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={item.id === searchScope}
                   className={item.id === searchScope ? 'active' : ''}
                   key={item.id}
                   onClick={(event) => {
@@ -221,6 +292,7 @@ export default function MessageListToolbar({
           <button
             type="button"
             className={listMode === 'messages' ? 'active' : ''}
+            aria-pressed={listMode === 'messages'}
             onClick={onShowMessages}
           >
             邮件
@@ -228,6 +300,7 @@ export default function MessageListToolbar({
           <button
             type="button"
             className={listMode === 'threads' ? 'active' : ''}
+            aria-pressed={listMode === 'threads'}
             onClick={onShowThreads}
           >
             会话
@@ -241,6 +314,8 @@ export default function MessageListToolbar({
               {filters.map((item) => (
                 <button
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={filter === item.id}
                   key={item.id}
                   className={filter === item.id ? 'active' : ''}
                   onClick={() => {
@@ -263,6 +338,8 @@ export default function MessageListToolbar({
               {listSortOptions.map((item) => (
                 <button
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={listSort === item.id}
                   key={item.id}
                   className={listSort === item.id ? 'active' : ''}
                   onClick={() => {

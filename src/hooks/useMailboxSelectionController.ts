@@ -206,6 +206,10 @@ export default function useMailboxSelectionController({
     attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
+    bodyFetchState,
+    markBodyFetchStarted,
+    markBodyFetchSucceeded,
+    markBodyFetchFailed,
   } = useReaderBodyLoading({
     readerSelectedDetail,
     selectedDetail,
@@ -251,5 +255,9 @@ export default function useMailboxSelectionController({
     attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
+    bodyFetchState: bodyFetchState?.messageId === readerDisplayedId ? bodyFetchState : null,
+    markBodyFetchStarted,
+    markBodyFetchSucceeded,
+    markBodyFetchFailed,
   };
 }

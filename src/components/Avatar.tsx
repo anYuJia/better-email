@@ -2,23 +2,6 @@ import React from 'react';
 import { senderInitial } from '../app/messageDetailUtils';
 
 const minUsableAvatarPixelSize = 32;
-const serviceAvatarDomains: Record<string, string> = {
-  'github.com': 'github.com',
-  'facebook.com': 'facebook.com',
-  'facebookmail.com': 'facebook.com',
-  'instagram.com': 'instagram.com',
-  'linkedin.com': 'linkedin.com',
-  'twitter.com': 'twitter.com',
-  'x.com': 'x.com',
-  'youtube.com': 'youtube.com',
-  'google.com': 'google.com',
-  'openai.com': 'openai.com',
-  'anthropic.com': 'anthropic.com',
-  'figma.com': 'figma.com',
-  'notion.so': 'notion.so',
-  'slack.com': 'slack.com',
-  'stripe.com': 'stripe.com',
-};
 
 type AvatarProps = {
   email: string;
@@ -37,26 +20,10 @@ export function isValidAvatarUrl(value: string): boolean {
   }
 }
 
-export function inferredAvatarCandidates(email: string, name: string): string[] {
-  const trimmedEmail = email.trim().toLowerCase();
-  if (!trimmedEmail) return [];
-
-  const domain = trimmedEmail.split('@')[1]?.trim();
-  const serviceDomain = domain ? serviceAvatarDomains[domain] : '';
-  if (!serviceDomain) return [];
-
-  const candidates: string[] = [];
-
-  if (domain === 'github.com' && name.trim()) {
-    const cleanName = name.split(/\s+/)[0].trim().replace(/[^a-zA-Z0-9\-_]/g, '');
-    if (cleanName) {
-      candidates.push(`https://unavatar.io/github/${encodeURIComponent(cleanName)}`);
-    }
-  }
-
-  candidates.push(`https://unavatar.io/${encodeURIComponent(serviceDomain)}?fallback=false`);
-
-  return candidates;
+export function inferredAvatarCandidates(_email: string, _name: string): string[] {
+  // Local-first privacy: never turn a sender address into an automatic
+  // third-party request. A caller may still provide an explicit, trusted src.
+  return [];
 }
 
 export default function Avatar({ email, name, src, className, fallbackInitial }: AvatarProps) {

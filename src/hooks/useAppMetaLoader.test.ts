@@ -176,6 +176,22 @@ describe('useAppMetaLoader', () => {
     expect(setters.setFolderId).toHaveBeenCalledWith(101);
   });
 
+  it('uses mailbox metadata as the single startup owner for stats and tray state', async () => {
+    setupInvokeMocks();
+    const { result } = renderMetaLoader();
+
+    await act(async () => {
+      await result.current.loadMeta(101, 1, { mode: 'mailbox' });
+      await Promise.resolve();
+    });
+
+    const statsCalls = mockInvoke.mock.calls.filter(([command]) => command === 'get_stats');
+    const trayCalls = mockInvoke.mock.calls.filter(([command]) => command === 'set_tray_unread_count');
+    expect(statsCalls).toEqual([['get_stats', { accountId: 1 }]]);
+    expect(trayCalls).toEqual([['set_tray_unread_count', { unreadCount: 1 }]]);
+    expect(mockSetBadgeCount).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to the first folder when the requested folder is missing', async () => {
     setupInvokeMocks();
     const { result, setters } = renderMetaLoader();

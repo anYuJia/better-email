@@ -3,6 +3,7 @@ import {
   Edit3,
   Keyboard,
   Settings,
+  X,
 } from 'lucide-react';
 import type {
   Account,
@@ -46,6 +47,7 @@ export type SidebarProps = {
   onEmptyTrash: () => void;
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
+  onCloseNavigation?: () => void;
 };
 
 function syncTaskLabel(task: BackgroundTask): string {
@@ -126,6 +128,7 @@ function Sidebar({
   onEmptyTrash,
   onOpenSettings,
   onOpenShortcuts,
+  onCloseNavigation,
 }: SidebarProps) {
   const activeTasks = backgroundTasks.filter(isVisibleTask);
 
@@ -134,7 +137,7 @@ function Sidebar({
       <div className="brand">
         <img
           className="brand-mark"
-          src="/brand/v4/brand-mark.png"
+          src="/brand/v4/brand-mark-64.png"
           alt=""
           width={28}
           height={28}
@@ -143,6 +146,17 @@ function Sidebar({
         <div>
           <strong>Better Email</strong>
         </div>
+        {onCloseNavigation && (
+          <button
+            type="button"
+            className="narrow-navigation-button sidebar-narrow-close"
+            data-narrow-sidebar-close
+            aria-label="关闭邮箱导航"
+            onClick={onCloseNavigation}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        )}
       </div>
       <AccountSwitcher
         accountScope={accountScope}
@@ -238,7 +252,7 @@ function Sidebar({
                     aria-valuemax={100}
                     aria-valuenow={progress}
                   >
-                    <span style={{ width: `${progress}%` }} />
+                    <span style={{ transform: `scaleX(${progress / 100})` }} />
                   </div>
                   {task.status === 'queued' && (
                     <small className="sidebar-task-status">等待开始</small>

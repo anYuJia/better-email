@@ -87,13 +87,41 @@ export default function useMailboxSearchController({
   setThreadMessages,
   setStatus,
 }: UseMailboxSearchControllerOptions) {
-  const [query, setQuery] = useState('');
+  const [queryState, setQueryState] = useState({
+    queryDraft: '',
+    appliedQuery: '',
+  });
+  const { queryDraft, appliedQuery } = queryState;
   const [searchScope, setSearchScope] = useState<SearchScope>('folder');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [listMode, setListMode] = useState<ListMode>('messages');
   const [listSort, setListSort] = useState<ListSort>(loadListSort);
-  const searchClearTimerRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Programmatic query changes are committed immediately because navigation,
+  // saved searches and imports already represent explicit user actions. Text
+  // entry uses handleQueryChange below and only changes the draft.
+  const setQuery = useCallback<Dispatch<SetStateAction<string>>>((nextQuery) => {
+    setQueryState((current) => {
+      const resolvedQuery = typeof nextQuery === 'function'
+        ? nextQuery(current.queryDraft)
+        : nextQuery;
+      if (
+        current.queryDraft === resolvedQuery
+        && current.appliedQuery === resolvedQuery
+      ) {
+        return current;
+      }
+      return {
+        queryDraft: resolvedQuery,
+        appliedQuery: resolvedQuery,
+      };
+    });
+  }, []);
+
+  const applyQuery = useCallback((nextQuery: string) => {
+    setQuery(nextQuery);
+  }, [setQuery]);
 
   // 搜索/范围/筛选/排序/清空都生成独立请求 token：自增 mailbox 世代后返回新值，
   // 使上一轮搜索的在途慢响应因 refreshId 不再匹配而失效，避免旧结果覆盖新结果。
@@ -126,7 +154,7 @@ export default function useMailboxSearchController({
     account,
     accountScope,
     folderId,
-    query,
+    query: appliedQuery,
     filter,
     searchScope,
     folders,
@@ -141,9 +169,10 @@ export default function useMailboxSearchController({
     event.preventDefault();
     const loaders = loadersRef.current;
     if (!loaders) return;
+    applyQuery(queryDraft);
     await loaders.loadMessagesWithVisibleFallback(
       folderId,
-      query,
+      queryDraft,
       filter,
       accountScope,
       nextSearchRefreshId(),
@@ -152,17 +181,18 @@ export default function useMailboxSearchController({
       searchScope,
       listMode === 'threads',
     );
-    setStatus(query.trim() ? `已搜索：${query.trim()}` : '已刷新搜索范围');
+    setStatus(queryDraft.trim() ? `已搜索：${queryDraft.trim()}` : '已刷新搜索范围');
   }, [
     loadersRef,
     folderId,
-    query,
+    queryDraft,
     filter,
     accountScope,
     nextSearchRefreshId,
     folders,
     searchScope,
     listMode,
+    applyQuery,
     setStatus,
   ]);
 
@@ -175,7 +205,7 @@ export default function useMailboxSearchController({
     setThreadMessages([]);
     await loaders.loadMessagesWithVisibleFallback(
       folderId,
-      query,
+      appliedQuery,
       filter,
       accountScope,
       nextSearchRefreshId(),
@@ -189,7 +219,7 @@ export default function useMailboxSearchController({
   }, [
     loadersRef,
     folderId,
-    query,
+    appliedQuery,
     filter,
     accountScope,
     nextSearchRefreshId,
@@ -203,9 +233,9 @@ export default function useMailboxSearchController({
     const loaders = loadersRef.current;
     if (!loaders) return;
     const nextQuery = shortcutQuery.endsWith(':')
-      ? `${query.trim()} ${shortcutQuery}`.trim()
+      ? `${queryDraft.trim()} ${shortcutQuery}`.trim()
       : shortcutQuery;
-    setQuery(nextQuery);
+    applyQuery(nextQuery);
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
@@ -228,7 +258,7 @@ export default function useMailboxSearchController({
       setStatus(`已搜索：${nextQuery}`);
     }
   }, [
-    query,
+    queryDraft,
     loadersRef,
     folderId,
     filter,
@@ -236,6 +266,7 @@ export default function useMailboxSearchController({
     nextSearchRefreshId,
     folders,
     searchScope,
+    applyQuery,
     setActiveThread,
     setThreadMessages,
     setStatus,
@@ -244,7 +275,7 @@ export default function useMailboxSearchController({
   const clearSearchAndFilter = useCallback(async () => {
     const loaders = loadersRef.current;
     if (!loaders) return;
-    setQuery('');
+    applyQuery('');
     setFilter('all');
     setSearchScope('folder');
     setActiveThread(null);
@@ -268,6 +299,7 @@ export default function useMailboxSearchController({
     nextSearchRefreshId,
     folders,
     listMode,
+    applyQuery,
     setActiveThread,
     setThreadMessages,
     setStatus,
@@ -277,7 +309,7 @@ export default function useMailboxSearchController({
   const runSavedSearch = useCallback(async (savedSearch: SavedSearch) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
-    setQuery(savedSearch.query);
+    applyQuery(savedSearch.query);
     setFilter(savedSearch.filter);
     setSearchScope(savedSearch.scope);
     setListMode('messages');
@@ -300,43 +332,26 @@ export default function useMailboxSearchController({
     accountScope,
     nextSearchRefreshId,
     messagePageSize,
+    applyQuery,
     setActiveThread,
     setThreadMessages,
     setStatus,
   ]);
 
   const resetSearch = useCallback(() => {
-    setQuery('');
+    applyQuery('');
     setFilter('all');
     setSearchScope('folder');
     setListMode('messages');
-  }, []);
+  }, [applyQuery]);
 
   const handleQueryChange = useCallback((val: string) => {
-    setQuery(val);
-    if (searchClearTimerRef.current !== null) {
-      window.clearTimeout(searchClearTimerRef.current);
-      searchClearTimerRef.current = null;
-    }
-    if (!val.trim()) {
-      searchClearTimerRef.current = window.setTimeout(() => {
-        searchClearTimerRef.current = null;
-        const loaders = loadersRef.current;
-        if (!loaders) return;
-        loaders.loadMessagesWithVisibleFallback(
-          folderId,
-          '',
-          filter,
-          accountScope,
-          nextSearchRefreshId(),
-          folders,
-          messagePageSize,
-          searchScope,
-          false,
-        ).catch((error) => setStatus(String(error)));
-      }, 100);
-    }
-  }, [loadersRef, folderId, filter, accountScope, nextSearchRefreshId, folders, searchScope, setStatus]);
+    setQueryState((current) => (
+      current.queryDraft === val
+        ? current
+        : { ...current, queryDraft: val }
+    ));
+  }, []);
 
   const handleSearchScopeChange = useCallback((nextScope: SearchScope) => {
     changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
@@ -375,7 +390,7 @@ export default function useMailboxSearchController({
     setListMode('threads');
     loaders.loadMessagesWithVisibleFallback(
       folderId,
-      query,
+      appliedQuery,
       filter,
       accountScope,
       nextSearchRefreshId(),
@@ -387,7 +402,7 @@ export default function useMailboxSearchController({
   }, [
     loadersRef,
     folderId,
-    query,
+    appliedQuery,
     filter,
     accountScope,
     nextSearchRefreshId,
@@ -398,7 +413,8 @@ export default function useMailboxSearchController({
   ]);
 
   return {
-    query,
+    queryDraft,
+    appliedQuery,
     setQuery,
     searchScope,
     setSearchScope,

@@ -75,7 +75,13 @@ export default function AboutSettings() {
         className="settings-about-hero"
       >
         <div className="settings-about-brand">
-          <img src="/brand/v4/brand-mark.png" alt="Better Email" className="settings-about-brand-mark" />
+          <img
+            src="/brand/v4/brand-mark-64.png"
+            alt="Better Email"
+            className="settings-about-brand-mark"
+            width={64}
+            height={64}
+          />
           <div>
             <strong>Better Email</strong>
             <p>桌面邮箱客户端</p>

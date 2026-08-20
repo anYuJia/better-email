@@ -12,6 +12,7 @@ export type ContextMenuItem = {
   danger?: boolean;
   disabled?: boolean;
   checked?: boolean;
+  selectionRole?: 'checkbox' | 'radio';
   separatorBefore?: boolean;
   children?: ContextMenuItem[];
   onSelect?: () => void;
@@ -86,7 +87,10 @@ function MenuItems({
       >
         <button
           type="button"
-          role="menuitem"
+          role={item.selectionRole === 'radio'
+            ? 'menuitemradio'
+            : item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+          aria-checked={item.selectionRole || item.checked !== undefined ? Boolean(item.checked) : undefined}
           data-context-item={item.id}
           className={[
             item.danger ? 'danger' : '',

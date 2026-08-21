@@ -34,10 +34,13 @@ describe('Avatar', () => {
     });
 
     it('supports service domains that use a brand sender name', () => {
-      expect(inferredAvatarCandidates('noreply@gitee.com', 'Gitee')).toEqual([
-        'https://unavatar.io/gitee.com?fallback=false',
-      ]);
-    });
+    expect(inferredAvatarCandidates('noreply@gitee.com', 'Gitee')).toEqual([
+      'https://unavatar.io/gitee.com?fallback=false',
+    ]);
+    expect(inferredAvatarCandidates('no-reply@mailer.oschina.net', 'Gitee')).toEqual([
+      'https://unavatar.io/gitee.com?fallback=false',
+    ]);
+  });
   });
 
   it('renders an inferred service avatar when no explicit source exists', () => {

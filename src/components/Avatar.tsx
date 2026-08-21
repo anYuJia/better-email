@@ -19,6 +19,7 @@ const serviceAvatarDomains: Record<string, string> = {
   'slack.com': 'slack.com',
   'stripe.com': 'stripe.com',
   'gitee.com': 'gitee.com',
+  'mailer.oschina.net': 'gitee.com',
 };
 
 type AvatarProps = {

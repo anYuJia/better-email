@@ -91,7 +91,8 @@ fn read_verified_outbound_message_attachments_with_progress(
             )?;
         }
 
-        let bytes = crate::commands::attachments::read_verified_outbound_attachment(store, attachment)?;
+        let bytes =
+            crate::commands::attachments::read_verified_outbound_attachment(store, attachment)?;
         loaded_size = loaded_size.saturating_add(bytes.len() as i64);
         attachment_bytes.push(bytes);
 
@@ -100,8 +101,7 @@ fn read_verified_outbound_message_attachments_with_progress(
                 let safe_total = total_size.max(1);
                 start_progress + span * loaded_size / safe_total
             } else {
-                start_progress
-                    + span * (index as i64 + 1) / (safe_count as i64)
+                start_progress + span * (index as i64 + 1) / (safe_count as i64)
             };
             task_progress.set(
                 store,

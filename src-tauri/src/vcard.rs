@@ -88,12 +88,14 @@ fn decode_utf16_with_bom(payload: &[u8]) -> Result<Option<String>, String> {
         return Err("文件编码无法识别。请将 CSV 或 vCard 另存为 UTF-8 编码后再导入。".to_string());
     }
     let units: Vec<u16> = bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|chunk| {
             if little_endian {
-                u16::from_le_bytes([chunk[0], chunk[1]])
+                u16::from_le_bytes(*chunk)
             } else {
-                u16::from_be_bytes([chunk[0], chunk[1]])
+                u16::from_be_bytes(*chunk)
             }
         })
         .collect();

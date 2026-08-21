@@ -1755,6 +1755,459 @@
   color: var(--ui-text);
 }
 
+/* 23. Quiet surface pass =================================================
+ *
+ * The composer is a writing surface, not a stack of bordered form cards.
+ * Keep the outer elevation and semantic states, but let spacing and subtle
+ * tonal shifts do the grouping inside the editor.
+ */
+
+.composer {
+  width: min(740px, calc(100vw - 44px));
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 28px 72px oklch(0.16 0.018 var(--primitive-hue-neutral) / 0.24);
+}
+
+.composer header {
+  min-height: 54px;
+  padding: 0 18px;
+  border-bottom: 0;
+}
+
+.composer-title-copy {
+  gap: 3px;
+}
+
+.composer-title-copy strong {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.composer-title-copy small {
+  display: block;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.composer-header-actions {
+  gap: 2px;
+}
+
+.composer-header-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 10.5px;
+}
+
+.composer-primary-fields {
+  background: var(--ui-surface);
+}
+
+.composer-field-row {
+  min-height: 42px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  margin: 1px 10px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard);
+}
+
+.composer-field-row:focus-within {
+  background: var(--ui-surface-muted);
+  box-shadow: none;
+}
+
+.composer-recipient-field .composer-field-row:focus-within {
+  box-shadow: none;
+}
+
+.composer .composer-field-row input,
+.composer .composer-field-row input:hover,
+.composer .composer-field-row input:focus {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.composer .composer-field-row input:focus {
+  background: var(--ui-surface);
+}
+
+.composer .composer-recipient-editor {
+  min-height: 42px;
+  gap: 5px;
+  padding: 4px 0;
+}
+
+.composer .composer-recipient-chip {
+  min-height: 26px;
+  padding: 2px 5px 2px 10px;
+  border: 0;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-accent-soft);
+  color: var(--ui-text-secondary);
+}
+
+.composer .composer-recipient-chip button {
+  background: transparent;
+}
+
+.composer .composer-recipient-chip button:hover {
+  color: var(--ui-text);
+  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
+}
+
+.composer .composer-body-field::after {
+  display: none;
+}
+
+.composer .composer-body-field:focus-within {
+  box-shadow: none;
+}
+
+.composer .composer-body-field textarea,
+.composer .composer-body-field .composer-richtext-body {
+  padding: 18px 24px 22px;
+}
+
+.composer .composer-body-field textarea:hover,
+.composer .composer-body-field textarea:focus,
+.composer .composer-body-field .composer-richtext-body:focus {
+  outline: none;
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+.composer .composer-body-field.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 3px var(--ui-accent-soft);
+}
+
+.composer-original-quote {
+  margin: 0 24px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ui-surface-muted);
+}
+
+.composer-original-quote dl {
+  border-bottom: 0;
+}
+
+.composer .composer-body-attachments {
+  gap: 8px;
+  padding: 0 24px 16px;
+}
+
+.composer-attachment-tile {
+  width: 220px;
+  min-height: 64px;
+  grid-template-columns: 44px minmax(0, 1fr) 22px;
+  gap: 9px;
+  padding: 8px 8px 8px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ui-surface-muted);
+}
+
+.composer-attachment-tile:hover {
+  border: 0;
+  background: var(--ui-control-hover);
+}
+
+.composer-attachment-filemark {
+  width: 40px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ui-accent-soft);
+}
+
+.composer-attachment-filemark::after,
+.composer-attachment-filemark-fold {
+  display: none;
+}
+
+.composer-attachment-filemark-icon {
+  margin-top: 0;
+}
+
+.composer-body-attachment-empty {
+  margin: 0 24px 16px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ui-accent-soft);
+}
+
+.composer-quick-tools {
+  border-top: 0;
+  background: var(--ui-surface-muted);
+}
+
+.composer-quick-toolbar {
+  min-height: 44px;
+  gap: 6px;
+  padding: 6px 16px;
+}
+
+.composer .rich-toolbar {
+  gap: 1px;
+  padding-right: 3px;
+  border-right: 0;
+}
+
+.composer .rich-toolbar button {
+  width: 30px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+}
+
+.composer .composer-quick-tools .checkbox-row,
+.composer .composer-signature button,
+.composer .composer-attachment-button {
+  min-height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.composer .composer-quick-tools .checkbox-row:hover,
+.composer .composer-signature button:hover,
+.composer .composer-attachment-button:hover,
+.composer .rich-toolbar button:hover,
+.composer .rich-toolbar button:focus-visible {
+  border: 0;
+  background: var(--ui-control-hover);
+}
+
+.composer .composer-signature small,
+.composer .composer-attachment-controls > span {
+  font-size: 10.5px;
+}
+
+.composer .composer-attachments.drop-active {
+  background: var(--ui-accent-soft);
+  box-shadow: none;
+  border-radius: 8px;
+}
+
+.composer-advanced {
+  border-top: 0;
+  background: var(--ui-surface);
+}
+
+.composer .composer-advanced summary {
+  min-height: 40px;
+  margin: 0 10px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.composer .composer-advanced summary:hover,
+.composer .composer-advanced[open] summary {
+  background: var(--ui-surface-muted);
+}
+
+.composer-advanced-panel {
+  max-height: 220px;
+  margin: 0 10px 8px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  background: var(--ui-surface-muted);
+}
+
+.composer-tool-card {
+  padding: 5px 0;
+  border-top: 0;
+}
+
+.composer .composer-delivery-controls .composer-inline-select,
+.composer .composer-delivery-controls .composer-inline-input,
+.composer .composer-delivery-controls .composer-schedule {
+  min-height: 34px;
+}
+
+.composer .composer-delivery-controls input,
+.composer .composer-delivery-controls .custom-select-summary {
+  min-height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ui-surface);
+}
+
+.composer .composer-delivery-controls input:hover,
+.composer .composer-delivery-controls input:focus,
+.composer .composer-delivery-controls .custom-select-summary:hover,
+.composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"] {
+  border: 0;
+  outline: none;
+  background: var(--ui-control-hover);
+  box-shadow: none;
+}
+
+.composer .composer-template-controls {
+  padding-top: 8px;
+  border-top: 0;
+}
+
+.composer .composer-template-row button,
+.composer .composer-template-save button,
+.composer .composer-template-save input {
+  border: 0;
+  border-radius: 7px;
+}
+
+.composer .composer-template-row button,
+.composer .composer-template-save input {
+  background: var(--ui-surface);
+}
+
+.composer .composer-template-row button:hover,
+.composer .composer-template-save input:focus {
+  border: 0;
+  outline: none;
+  background: var(--ui-control-hover);
+}
+
+.composer footer {
+  min-height: 64px;
+  padding: 10px 16px 14px;
+  border-top: 0;
+  background: var(--ui-surface);
+}
+
+.composer-footer-actions {
+  gap: 4px;
+}
+
+.composer footer .dialog-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.composer footer .dialog-button-secondary {
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.composer footer .dialog-button-secondary:hover:not(:disabled) {
+  border: 0;
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.composer footer .dialog-button-primary {
+  padding-inline: 18px;
+}
+
+.composer-send-progress,
+.composer-attachment-progress {
+  height: 4px;
+  border: 0;
+  background: var(--ui-surface-muted);
+}
+
+.composer-risk-banner {
+  border-bottom: 0;
+  border-radius: 10px;
+  margin: 4px 12px 0;
+}
+
+/* Keep the quiet pass consistent with the higher-specificity dark theme
+ * rules above. The semantic tokens already switch for dark mode. */
+
+:root[data-theme="dark"] .composer {
+  border: 0;
+  box-shadow: 0 28px 72px oklch(0.02 0.01 var(--primitive-hue-neutral) / 0.48);
+}
+
+:root[data-theme="dark"] .composer .composer-field-row,
+:root[data-theme="dark"] .composer .composer-field-row:focus-within {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .composer .composer-field-row:focus-within,
+:root[data-theme="dark"] .composer .composer-field-row input:focus {
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-recipient-chip {
+  border: 0;
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-body-field::after,
+:root[data-theme="dark"] .composer .composer-body-field.has-original-quote textarea,
+:root[data-theme="dark"] .composer .composer-body-field.has-original-quote .composer-richtext-body {
+  border: 0;
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-original-quote,
+:root[data-theme="dark"] .composer .composer-attachment-tile,
+:root[data-theme="dark"] .composer .composer-advanced-panel {
+  border: 0;
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-tile:hover {
+  border: 0;
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer .composer-attachment-filemark,
+:root[data-theme="dark"] .composer .composer-attachment-filemark-fold {
+  border: 0;
+  background: var(--ui-accent-soft);
+}
+
+:root[data-theme="dark"] .composer .composer-quick-tools,
+:root[data-theme="dark"] .composer .composer-advanced,
+:root[data-theme="dark"] .composer footer {
+  border: 0;
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-advanced[open] summary,
+:root[data-theme="dark"] .composer .composer-advanced summary:hover {
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-delivery-controls input,
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary,
+:root[data-theme="dark"] .composer .composer-template-row button,
+:root[data-theme="dark"] .composer .composer-template-save input {
+  border: 0;
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer footer .dialog-button-secondary:hover:not(:disabled),
+:root[data-theme="dark"] .composer .composer-delivery-controls input:focus,
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary:hover,
+:root[data-theme="dark"] .composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"],
+:root[data-theme="dark"] .composer .composer-template-row button:hover,
+:root[data-theme="dark"] .composer .composer-template-save input:focus {
+  border: 0;
+  background: var(--ui-control-hover);
+}
+
 /* Accessibility: screen-reader only utility */
 .sr-only {
   position: absolute;

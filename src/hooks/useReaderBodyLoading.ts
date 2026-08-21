@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { htmlHasRemoteVisualContent, isMessageBodyCorrupted } from '../mailUtils';
 import type {
   Attachment,
@@ -31,6 +31,12 @@ type ReaderBodyLoadingOptions = {
   setThreadMessages: Dispatch<SetStateAction<MessageSummary[]>>;
 };
 
+export type ReaderBodyFetchState = {
+  messageId: number;
+  status: 'loading' | 'error';
+  error: string | null;
+};
+
 export default function useReaderBodyLoading({
   readerSelectedDetail,
   selectedDetail,
@@ -45,11 +51,24 @@ export default function useReaderBodyLoading({
 }: ReaderBodyLoadingOptions) {
   const bodyFetchInFlightRef = useRef<Set<number>>(new Set());
   const bodyFetchFailedRef = useRef<Set<number>>(new Set());
+  const [bodyFetchState, setBodyFetchState] = useState<ReaderBodyFetchState | null>(null);
   const trustedRemoteImageRenderRef = useRef<Set<number>>(new Set());
   /** 附件列表当前属于哪封邮件；解析结果只在与当前选中一致时才生效 */
   const attachmentsOwnerRef = useRef<number | null>(null);
   /** 附件列表是否已加载完成（或加载失败）——内嵌图片解析、快速回复框都要等它 */
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
+
+  const markBodyFetchStarted = useCallback((messageId: number) => {
+    setBodyFetchState({ messageId, status: 'loading', error: null });
+  }, []);
+
+  const markBodyFetchSucceeded = useCallback((messageId: number) => {
+    setBodyFetchState((current) => current?.messageId === messageId ? null : current);
+  }, []);
+
+  const markBodyFetchFailed = useCallback((messageId: number, error: string) => {
+    setBodyFetchState({ messageId, status: 'error', error });
+  }, []);
 
   useEffect(() => {
     setAttachments([]);
@@ -157,6 +176,7 @@ export default function useReaderBodyLoading({
     const selectedRemoteUid = readerSelectedDetail.remote_uid;
     const activeThreadKey = activeThread?.thread_key ?? null;
     let cancelled = false;
+    markBodyFetchStarted(selectedMessageId);
 
     const cancelScheduledWork = scheduleReaderBackgroundWork(() => {
       bodyFetchInFlightRef.current.add(selectedMessageId);
@@ -169,6 +189,7 @@ export default function useReaderBodyLoading({
       invoke<Message>(IPC.FetchMessageBody, { messageId: selectedMessageId })
         .then((updated) => {
           bodyFetchFailedRef.current.delete(updated.id);
+          markBodyFetchSucceeded(updated.id);
           if (cancelled) return [];
           startTransition(() => {
             const { body, sanitized_html, ...summary } = updated;
@@ -198,6 +219,7 @@ export default function useReaderBodyLoading({
         .catch((error) => {
           bodyFetchFailedRef.current.add(selectedMessageId);
           const message = String(error).replace(/^Error:\s*/i, '');
+          markBodyFetchFailed(selectedMessageId, message);
           readerFlowWarn('autoFetchBody failed', {
             messageId: selectedMessageId,
             accountId: selectedAccountId,
@@ -219,6 +241,9 @@ export default function useReaderBodyLoading({
   }, [
     activeThread?.thread_key,
     messageDetailCacheRef,
+    markBodyFetchFailed,
+    markBodyFetchStarted,
+    markBodyFetchSucceeded,
     readerSelectedDetail?.id,
     readerSelectedDetail?.remote_uid,
     selectedDetail?.id,
@@ -233,5 +258,9 @@ export default function useReaderBodyLoading({
     attachmentsLoaded,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
+    bodyFetchState,
+    markBodyFetchStarted,
+    markBodyFetchSucceeded,
+    markBodyFetchFailed,
   };
 }

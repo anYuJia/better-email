@@ -24,6 +24,7 @@ import ConfirmDialog from './ConfirmDialog';
 import ComposerAdvancedTools from './composer/ComposerAdvancedTools';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools from './composer/ComposerQuickTools';
+import useModalAccessibility from '../hooks/useModalAccessibility';
 import './composer/composer.css';
 
 type ComposerPosition = {
@@ -36,7 +37,31 @@ type ComposerDragState = {
   startY: number;
   originX: number;
   originY: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 };
+
+const COMPOSER_VIEWPORT_MARGIN = 10;
+
+function clampComposerPosition(
+  panel: HTMLElement | null,
+  current: ComposerPosition,
+): ComposerPosition {
+  if (!panel) return current;
+  const rect = panel.getBoundingClientRect();
+  const naturalLeft = rect.left - current.x;
+  const naturalTop = rect.top - current.y;
+  const minX = COMPOSER_VIEWPORT_MARGIN - naturalLeft;
+  const maxX = window.innerWidth - COMPOSER_VIEWPORT_MARGIN - naturalLeft - rect.width;
+  const minY = COMPOSER_VIEWPORT_MARGIN - naturalTop;
+  const maxY = window.innerHeight - COMPOSER_VIEWPORT_MARGIN - naturalTop - rect.height;
+  return {
+    x: Math.min(Math.max(current.x, Math.min(minX, maxX)), Math.max(minX, maxX)),
+    y: Math.min(Math.max(current.y, Math.min(minY, maxY)), Math.max(minY, maxY)),
+  };
+}
 
 export type ComposerWindowProps = {
   minimized: boolean;
@@ -126,6 +151,9 @@ export default function ComposerWindow({
   const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
   const dragRef = useRef<ComposerDragState | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
+  const composerOpenerRef = useRef<HTMLElement | null>(null);
   const title = draft.subject.trim() || '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
   const draftIdentities = identities.filter((identity) => identity.account_id === accountId);
@@ -140,23 +168,70 @@ export default function ComposerWindow({
   }
 
   useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
-    (firstField ?? panel)?.focus();
+    composerOpenerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     return () => {
-      previouslyFocused?.focus?.();
+      const opener = composerOpenerRef.current;
+      // The background inert cleanup runs later in the same React commit.
+      // Restore in a microtask so the original compose trigger can receive
+      // focus after every modal attribute has been removed.
+      queueMicrotask(() => {
+        if (opener?.isConnected) opener.focus({ preventScroll: true });
+      });
     };
   }, []);
+
+  useModalAccessibility({
+    open: !minimized,
+    dialogRef: panelRef,
+    backdropRef,
+    focusTrapDisabled: sendRiskConfirm !== null,
+  });
+
+  useEffect(() => {
+    if (minimized) {
+      minimizedRestoreRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const panel = panelRef.current;
+    const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
+    (firstField ?? panel)?.focus({ preventScroll: true });
+  }, [minimized]);
+
+  useEffect(() => {
+    if (minimized) return undefined;
+    const handleResize = () => {
+      setPosition((current) => clampComposerPosition(panelRef.current, current));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [minimized]);
 
   function beginDrag(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('button, input, textarea, select, label, a')) return;
+    const panel = panelRef.current;
+    const rect = panel?.getBoundingClientRect();
+    const naturalLeft = rect ? rect.left - position.x : 0;
+    const naturalTop = rect ? rect.top - position.y : 0;
+    const minX = COMPOSER_VIEWPORT_MARGIN - naturalLeft;
+    const maxX = rect
+      ? window.innerWidth - COMPOSER_VIEWPORT_MARGIN - naturalLeft - rect.width
+      : 0;
+    const minY = COMPOSER_VIEWPORT_MARGIN - naturalTop;
+    const maxY = rect
+      ? window.innerHeight - COMPOSER_VIEWPORT_MARGIN - naturalTop - rect.height
+      : 0;
     dragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
       originX: position.x,
       originY: position.y,
+      minX: Math.min(minX, maxX),
+      maxX: Math.max(minX, maxX),
+      minY: Math.min(minY, maxY),
+      maxY: Math.max(minY, maxY),
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -164,10 +239,14 @@ export default function ComposerWindow({
   function moveDrag(event: React.PointerEvent<HTMLElement>) {
     const drag = dragRef.current;
     if (!drag) return;
-    const maxX = Math.max(window.innerWidth * 0.42, 120);
-    const maxY = Math.max(window.innerHeight * 0.36, 120);
-    const nextX = Math.min(Math.max(drag.originX + event.clientX - drag.startX, -maxX), maxX);
-    const nextY = Math.min(Math.max(drag.originY + event.clientY - drag.startY, -maxY), maxY);
+    const nextX = Math.min(
+      Math.max(drag.originX + event.clientX - drag.startX, drag.minX),
+      drag.maxX,
+    );
+    const nextY = Math.min(
+      Math.max(drag.originY + event.clientY - drag.startY, drag.minY),
+      drag.maxY,
+    );
     setPosition({ x: nextX, y: nextY });
   }
 
@@ -183,7 +262,7 @@ export default function ComposerWindow({
     return (
       <aside className="composer-minimized-layer" aria-label="已最小化的新邮件">
         <section className="composer-minimized" aria-label="已最小化的新邮件">
-          <button className="composer-mini-main" type="button" onClick={onRestore}>
+          <button ref={minimizedRestoreRef} className="composer-mini-main" type="button" onClick={onRestore}>
             <Mail size={17} />
             <span>
               <strong>{title}</strong>
@@ -215,6 +294,7 @@ export default function ComposerWindow({
 
   return (
     <div
+      ref={backdropRef}
       className="composer-backdrop"
       role="dialog"
       aria-modal="true"
@@ -321,7 +401,10 @@ export default function ComposerWindow({
                   aria-valuemax={100}
                   aria-valuenow={normalizedAttachmentProgress}
                 >
-                  <div className="composer-attachment-progress-fill" style={{ width: `${normalizedAttachmentProgress}%` }} />
+                  <div
+                    className="composer-attachment-progress-fill"
+                    style={{ transform: `scaleX(${normalizedAttachmentProgress / 100})` }}
+                  />
                 </div>
                 <div className="composer-attachment-progress-message" title={attachmentProgressMessage}>
                   {attachmentProgressMessage}
@@ -338,7 +421,10 @@ export default function ComposerWindow({
                   aria-valuemax={100}
                   aria-valuenow={normalizedSendProgress}
                 >
-                  <div className="composer-send-progress-fill" style={{ width: `${normalizedSendProgress}%` }} />
+                  <div
+                    className="composer-send-progress-fill"
+                    style={{ transform: `scaleX(${normalizedSendProgress / 100})` }}
+                  />
                 </div>
                 {sendProgressMessage ? (
                   <div className="composer-send-progress-message" title={sendProgressMessage}>

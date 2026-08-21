@@ -46,6 +46,9 @@ type UseReaderActionsOptions = {
   loadMessages: (folderId: number | null) => Promise<any>;
   bodyFetchFailedRef: MutableRefObject<Set<number>>;
   bodyFetchInFlightRef: MutableRefObject<Set<number>>;
+  onBodyFetchStart: (messageId: number) => void;
+  onBodyFetchSuccess: (messageId: number) => void;
+  onBodyFetchError: (messageId: number, error: string) => void;
 };
 
 export default function useReaderActions({
@@ -67,6 +70,9 @@ export default function useReaderActions({
   loadMessages,
   bodyFetchFailedRef,
   bodyFetchInFlightRef,
+  onBodyFetchStart,
+  onBodyFetchSuccess,
+  onBodyFetchError,
 }: UseReaderActionsOptions) {
 
   async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
@@ -88,6 +94,7 @@ export default function useReaderActions({
     if (!selected) return;
     bodyFetchFailedRef.current.delete(selected.id);
     bodyFetchInFlightRef.current.add(selected.id);
+    onBodyFetchStart(selected.id);
     appFlowLog('manualFetchBody start', {
       messageId: selected.id,
       accountId: selected.account_id,
@@ -105,20 +112,30 @@ export default function useReaderActions({
         setSelectedDetail(updated);
       }
       onUpdateCache(updated);
-      const refreshedAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: updated.id });
-      setAttachments(refreshedAttachments);
+      onBodyFetchSuccess(updated.id);
+      let refreshedAttachments: Attachment[] = [];
+      let attachmentRefreshFailed = false;
+      try {
+        refreshedAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: updated.id });
+        setAttachments(refreshedAttachments);
+      } catch (attachmentError) {
+        attachmentRefreshFailed = true;
+        const attachmentMessage = String(attachmentError).replace(/^Error:\s*/i, '');
+        setStatus(`正文已加载，但附件列表刷新失败：${attachmentMessage}`);
+      }
       appFlowLog('manualFetchBody done', {
         messageId: updated.id,
         bodyLength: updated.body.length,
         htmlLength: updated.sanitized_html.length,
         attachments: refreshedAttachments.length,
       });
-      if (!isSilent) {
+      if (!isSilent && !attachmentRefreshFailed) {
         setStatus('远端正文已拉取并缓存到本地');
       }
     } catch (error) {
       const message = String(error).replace(/^Error:\s*/i, '');
       bodyFetchFailedRef.current.add(selected.id);
+      onBodyFetchError(selected.id, message);
       appFlowWarn('manualFetchBody failed', {
         messageId: selected.id,
         accountId: selected.account_id,

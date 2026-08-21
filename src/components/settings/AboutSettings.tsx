@@ -71,19 +71,24 @@ export default function AboutSettings() {
   return (
     <div className="settings-about-stack">
       <SettingsSection
-        title="About Better Email"
-        description="本地优先、隐私至上的桌面邮箱客户端。"
+        title="关于 Better Email"
         className="settings-about-hero"
       >
         <div className="settings-about-brand">
-          <img src="/brand/v4/brand-mark.png" alt="Better Email" className="settings-about-brand-mark" />
+          <img
+            src="/brand/v4/brand-mark-64.png"
+            alt="Better Email"
+            className="settings-about-brand-mark"
+            width={64}
+            height={64}
+          />
           <div>
             <strong>Better Email</strong>
-            <p>Calm, private email for your desktop.</p>
+            <p>桌面邮箱客户端</p>
           </div>
         </div>
         <p className="settings-about-copy">
-          Better Email is free and open source software. Your mail data stays on your device and is never uploaded by the app.
+          Better Email 是免费开源软件，邮件数据保留在你的设备上，不会被上传到服务器。
         </p>
       </SettingsSection>
 

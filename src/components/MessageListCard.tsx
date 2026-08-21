@@ -85,6 +85,7 @@ export default React.memo(function MessageListCard({
         type="button"
         className="message-card-main"
         aria-label={cardLabel}
+        aria-current={isCurrentMessage ? 'true' : undefined}
         onClick={(event) => {
           event.stopPropagation();
           onSelectMessage(message.id);
@@ -98,14 +99,14 @@ export default React.memo(function MessageListCard({
           className={`message-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
       </span>
-      <span className="message-select" onClick={(event) => event.stopPropagation()}>
+      <label className="message-select" onClick={(event) => event.stopPropagation()}>
         <input
           aria-label={`选择 ${message.subject || '无主题'}`}
           checked={isSelected}
           type="checkbox"
           onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
         />
-      </span>
+      </label>
       <div className="message-topline">
         <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
         <time>{formatDate(message.received_at)}</time>

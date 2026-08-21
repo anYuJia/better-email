@@ -169,7 +169,12 @@ function FolderItems({
           </form>
         ) : (
           <>
-            <button type="button" className="folder-main" onClick={() => onSelectFolder(folder.id)}>
+            <button
+              type="button"
+              className="folder-main"
+              aria-current={folder.id === folderId ? 'page' : undefined}
+              onClick={() => onSelectFolder(folder.id)}
+            >
               <span className="folder-name">
                 {folderIconForRole(folder.role)}
                 {displayNameForFolder(folder)}

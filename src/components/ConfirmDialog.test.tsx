@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import ConfirmDialog from './ConfirmDialog';
 
 describe('ConfirmDialog Component robust behaviors', () => {
@@ -8,6 +8,7 @@ describe('ConfirmDialog Component robust behaviors', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -55,14 +56,51 @@ describe('ConfirmDialog Component robust behaviors', () => {
     const closeBtn = screen.getByRole('button', { name: '关闭确认' });
     const confirmBtn = screen.getByRole('button', { name: '确认' });
 
-    // Focus close button
-    closeBtn.focus();
+    // Forward Tab from the final action wraps to the first close action.
+    confirmBtn.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
     expect(document.activeElement).toBe(closeBtn);
 
-    // Tab on last element should cycle to first
-    confirmBtn.focus();
-    fireEvent.keyDown(window, { key: 'Tab' });
-    // Tab cycle logic traps shift/no-shift tabs
+    // Reverse Tab from the first action wraps back to the final action.
+    closeBtn.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(confirmBtn);
+    unmount();
+  });
+
+  it('makes the background inert and hidden from assistive technology while open', () => {
+    const background = document.createElement('button');
+    background.textContent = '背景操作';
+    document.body.appendChild(background);
+    background.focus();
+
+    const { rerender, unmount } = render(
+      <ConfirmDialog
+        open
+        title="永久删除"
+        description="该操作不可逆。"
+        onConfirm={() => undefined}
+        onCancel={() => undefined}
+      />
+    );
+
+    expect(background.hasAttribute('inert')).toBe(true);
+    expect(background.getAttribute('aria-hidden')).toBe('true');
+
+    rerender(
+      <ConfirmDialog
+        open={false}
+        title="永久删除"
+        description="该操作不可逆。"
+        onConfirm={() => undefined}
+        onCancel={() => undefined}
+      />
+    );
+
+    expect(background.hasAttribute('inert')).toBe(false);
+    expect(background.hasAttribute('aria-hidden')).toBe(false);
+    expect(document.activeElement).toBe(background);
+    background.remove();
     unmount();
   });
 
@@ -80,7 +118,7 @@ describe('ConfirmDialog Component robust behaviors', () => {
       />
     );
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledTimes(1);
     unmount();
   });
@@ -118,14 +156,12 @@ describe('ConfirmDialog Component robust behaviors', () => {
     expect(confirmBtn.hasAttribute('disabled')).toBe(true);
 
     // Try background dismiss
-    const backdrop = document.querySelector('.settings-cache-confirm-backdrop');
-    if (backdrop) {
-      fireEvent.mouseDown(backdrop);
-    }
+    const backdrop = document.querySelector('.dialog-backdrop') as HTMLElement;
+    fireEvent.mouseDown(backdrop);
     expect(onCancel).not.toHaveBeenCalled();
 
     // Try Escape key
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -154,7 +190,7 @@ describe('ConfirmDialog Component robust behaviors', () => {
       fireEvent.click(confirmBtn);
     });
 
-    expect(screen.getByText('错误: 网络连接超时，请重试')).toBeDefined();
+    expect(screen.getByRole('alert').textContent).toBe('错误: 网络连接超时，请重试');
     expect(confirmBtn.hasAttribute('disabled')).toBe(false); // Enabled for retry
 
     // Retry confirm

@@ -72,6 +72,7 @@ export default function AccountSwitcher({
       detail: accounts.length > 1 ? `${accounts.length} 个账号` : defaultAccount?.email,
       icon: <Mails size={15} />,
       checked: accountScope === 'all',
+      selectionRole: 'radio' as const,
       onSelect: () => onChange('all'),
     },
     ...accounts.map((account, index) => ({
@@ -82,6 +83,7 @@ export default function AccountSwitcher({
         : `${account.email} · ${providerLabel(account.provider)}`,
       icon: <Mail size={15} />,
       checked: accountScope === account.id,
+      selectionRole: 'radio' as const,
       separatorBefore: index === 0,
       onSelect: () => onChange(String(account.id)),
     })),

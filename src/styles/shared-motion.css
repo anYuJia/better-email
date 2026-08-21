@@ -1,14 +1,24 @@
-@keyframes ui-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+/*
+ * Motion layer (shared-motion.css)
+ *
+ * Owns:
+ *  - the @keyframes and animation/speed primitives consumed via tokens
+ *    (design-tokens.css) and component CSS,
+ *  - global transition discipline: interactive controls only (no all-property
+ *    transitions on big subtrees) with identical timing across surfaces,
+ *  - the prefers-reduced-motion kill switch,
+ *  - panel-level transition-property restrictions so hover feedback is quiet.
+ *
+ * No scale transforms on press — desktop tools don't need to "squish".
+ * Composer controls share the same discipline as the workspace panes.
+ */
 
+/* Spinner rotation -------------------------------------------------------
+ * --ui-motion-spin is the single functional period for continuous rotation;
+ * historic per-surface speeds were collapsed onto it in the token layer.
+ */
 .ui-spinner {
-  --ui-spinner-duration: var(--ui-motion-800);
+  --ui-spinner-duration: var(--ui-motion-spin);
   animation: var(--ui-animation-spinner);
 }
 
@@ -20,39 +30,57 @@
 .reader-translation-spinner,
 .account-login-spinner,
 .deferred-spinner {
-  --ui-spinner-duration: var(--ui-motion-800);
+  --ui-spinner-duration: var(--ui-motion-spin);
   animation: var(--ui-animation-spinner);
-}
-
-.spinning,
-.reader-translation-spinner {
-  --ui-spinner-duration: var(--ui-motion-900);
-}
-
-.deferred-spinner {
-  --ui-spinner-duration: var(--ui-motion-680);
-}
-
-.animate-spin {
-  --ui-spinner-duration: var(--ui-motion-1000);
 }
 
 .settings-page-loading::before {
-  --ui-spinner-duration: var(--ui-motion-700);
+  --ui-spinner-duration: var(--ui-motion-spin);
   animation: var(--ui-animation-spinner);
 }
 
+/* Global transition discipline: only interactive controls transition, and
+ * only the properties those controls actually animate between. */
+button,
+.btn,
+.icon-button,
+.compose-button,
+.refresh-text-button,
+select,
+input,
+textarea,
+summary {
+  transition:
+    var(--ui-transition-standard-color-bg-border-box-shadow-opacity);
+}
+
+/* Panel-scoped transition restriction: hover feedback is colour/opacity only;
+ * geometry and transforms must never animate inside large subtrees. */
+.sidebar *,
+.message-list-panel *,
+.reader-panel *,
+.account-switcher *,
+.composer * {
+  transition-property: color, background-color, border-color, opacity;
+}
+
+/* No lift, no wobble: persistent-pane and composer controls never transform,
+ * so their hover/active states stay purely surface-level. */
+.sidebar :is(button, summary, .folder, .folder-main),
+.message-list-panel :is(button, .message-card, .thread-card),
+.reader-panel :is(button, summary, select),
+.account-switcher :is(button, summary),
+.composer :is(button, summary, input, select, textarea) {
+  transform: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ui-spinner,
-  .animate-spin,
-  .spinning,
-  .spin,
-  .connection-spinner,
-  .settings-action-spinner,
-  .reader-translation-spinner,
-  .account-login-spinner,
-  .deferred-spinner,
-  .settings-page-loading::before {
-    animation: var(--ui-animation-none);
+  *, ::before, ::after {
+    animation-delay: var(--ui-motion-none) !important;
+    animation-duration: var(--ui-motion-none) !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: var(--ui-motion-none) !important;
+    transition-duration: var(--ui-motion-none) !important;
+    scroll-behavior: auto !important;
   }
 }

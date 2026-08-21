@@ -1,6 +1,5 @@
 import { Languages, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import type { MessageTranslationState } from '../../hooks/useMessageTranslation';
-import './reader-translation.css';
 
 type ReaderTranslationPanelProps = {
   state: MessageTranslationState;

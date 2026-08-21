@@ -17,6 +17,11 @@ import {
 
 type ResizablePane = 'sidebar' | 'list';
 
+export const APP_LAYOUT_BOUNDS = {
+  sidebar: { min: 228, max: 320 },
+  list: { min: 340, max: 500 },
+} as const;
+
 type LayoutResize = {
   pane: ResizablePane;
   startX: number;
@@ -48,14 +53,37 @@ export default function useAppLayout() {
     if (resize.pane === 'sidebar') {
       setAppLayout({
         ...resize.origin,
-        sidebar: clampNumber(resize.origin.sidebar + delta, 228, 320),
+        sidebar: clampNumber(
+          resize.origin.sidebar + delta,
+          APP_LAYOUT_BOUNDS.sidebar.min,
+          APP_LAYOUT_BOUNDS.sidebar.max,
+        ),
       });
       return;
     }
     setAppLayout({
       ...resize.origin,
-      list: clampNumber(resize.origin.list + delta, 340, 500),
+      list: clampNumber(
+        resize.origin.list + delta,
+        APP_LAYOUT_BOUNDS.list.min,
+        APP_LAYOUT_BOUNDS.list.max,
+      ),
     });
+  }, []);
+
+  const adjustAppLayout = useCallback((pane: ResizablePane, delta: number) => {
+    const bounds = APP_LAYOUT_BOUNDS[pane];
+    setAppLayout((current) => ({
+      ...current,
+      [pane]: clampNumber(current[pane] + delta, bounds.min, bounds.max),
+    }));
+  }, []);
+
+  const resetAppLayoutPane = useCallback((pane: ResizablePane) => {
+    setAppLayout((current) => ({
+      ...current,
+      [pane]: defaultAppLayout[pane],
+    }));
   }, []);
 
   const finishResize = useCallback(() => {
@@ -161,6 +189,8 @@ export default function useAppLayout() {
     moveLayoutMouseResize,
     endLayoutResize,
     endLayoutMouseResize,
+    adjustAppLayout,
+    resetAppLayoutPane,
     resetAppLayout,
   };
 }

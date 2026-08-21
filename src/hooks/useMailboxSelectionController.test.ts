@@ -454,4 +454,34 @@ describe('useMailboxSelectionController', () => {
     });
     expect(setters.setMessages).toHaveBeenCalled();
   });
+
+  it('exposes a reactive inline error when automatic body loading fails', async () => {
+    mockInvoke.mockImplementation(((command: string) => {
+      if (command === 'get_message_detail') {
+        return Promise.resolve(message(1, {
+          body: '',
+          sanitized_html: '',
+          remote_uid: 123,
+        }));
+      }
+      if (command === 'fetch_message_body') {
+        return Promise.reject(new Error('network unavailable'));
+      }
+      return Promise.resolve([]);
+    }) as never);
+    const { result } = renderController();
+
+    act(() => result.current.setSelectedId(1));
+
+    await waitFor(() => {
+      expect(result.current.bodyFetchState?.status).toBe('error');
+    });
+    expect(result.current.bodyFetchState?.messageId).toBe(1);
+    expect(result.current.bodyFetchState?.error).toBe('network unavailable');
+
+    act(() => result.current.markBodyFetchStarted(1));
+    expect(result.current.bodyFetchState?.status).toBe('loading');
+    act(() => result.current.markBodyFetchSucceeded(1));
+    expect(result.current.bodyFetchState).toBeNull();
+  });
 });

@@ -10,15 +10,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * 邮件列表正文摘要必须固定为一行：渲染真实长正文，加载实际生效的 CSS
- * 级联（styles 与 2026 系列），断言计算样式、title 无障碍文本，
+ * 级联（合并后的 message-list.css 已收纳 2026 系列的摘要排版规则），
+ * 断言计算样式、title 无障碍文本，
  * 且渲染结果始终只有一行高度（line-height 唯一来源）。
  */
 const cssCascade = [
   'styles/message-list.css',
-  'styles/2026/message-list.css',
-  'styles/2026/message-list-typography.css',
-  'styles/2026/pass-refinement.css',
-  'styles/2026/workspace-hierarchy.css',
 ].map((file) => readFileSync(join(root, file), 'utf8'));
 
 const longBody = '这是一封包含超长正文摘要的测试邮件，'.repeat(80);

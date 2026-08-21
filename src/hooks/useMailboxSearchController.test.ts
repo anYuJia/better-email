@@ -126,18 +126,6 @@ function renderController({
   return { ...utils, ...loaders, setStatus, setActiveThread, setThreadMessages };
 }
 
-const defaultSearchArgs = (folderId: number | null = 101, limit = messagePageSize) => ({
-  folderId,
-  query: '',
-  filter: 'all' as const,
-  scope: 'all',
-  refreshId: 1,
-  visibleFolders: folders,
-  limit,
-  searchScope: 'folder',
-  includeThreads: false,
-});
-
 describe('useMailboxSearchController', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -146,7 +134,8 @@ describe('useMailboxSearchController', () => {
 
   it('starts with a clean mailbox search state', () => {
     const { result } = renderController();
-    expect(result.current.query).toBe('');
+    expect(result.current.queryDraft).toBe('');
+    expect(result.current.appliedQuery).toBe('');
     expect(result.current.searchScope).toBe('folder');
     expect(result.current.filter).toBe('all');
     expect(result.current.listMode).toBe('messages');
@@ -181,34 +170,23 @@ describe('useMailboxSearchController', () => {
     ]);
   });
 
-  it('runSearch submits the current query in the current scope', async () => {
+  it('runSearch applies the draft once and submits it in the current scope', async () => {
     const { result, loadMessagesWithVisibleFallback, setStatus } = renderController();
     const event = { preventDefault: vi.fn() } as unknown as FormEvent;
+    act(() => result.current.handleQueryChange('invoice'));
+    expect(result.current.queryDraft).toBe('invoice');
+    expect(result.current.appliedQuery).toBe('');
+    expect(loadMessagesWithVisibleFallback).not.toHaveBeenCalled();
     await act(async () => {
       await result.current.runSearch(event);
     });
-    expect(event.preventDefault).toHaveBeenCalled();
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(result.current.appliedQuery).toBe('invoice');
+    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledTimes(1);
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      defaultSearchArgs().folderId,
-      '',
-      'all',
-      'all',
-      2,
-      folders,
-      messagePageSize,
-      'folder',
-      false,
+      101, 'invoice', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
-    expect(setStatus).toHaveBeenCalledWith('已刷新搜索范围');
-
-    act(() => result.current.setQuery('invoice'));
-    await act(async () => {
-      await result.current.runSearch(event);
-    });
-    expect(loadMessagesWithVisibleFallback).toHaveBeenLastCalledWith(
-      101, 'invoice', 'all', 'all', 3, folders, messagePageSize, 'folder', false,
-    );
-    expect(setStatus).toHaveBeenLastCalledWith('已搜索：invoice');
+    expect(setStatus).toHaveBeenCalledWith('已搜索：invoice');
   });
 
   it('changeSearchScope reloads with the new scope and resets the list view', async () => {
@@ -236,7 +214,8 @@ describe('useMailboxSearchController', () => {
     await act(async () => {
       await result.current.applySearchShortcut('from:');
     });
-    expect(result.current.query).toBe('安全 from:');
+    expect(result.current.queryDraft).toBe('安全 from:');
+    expect(result.current.appliedQuery).toBe('安全 from:');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
       101, '安全 from:', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
@@ -250,7 +229,8 @@ describe('useMailboxSearchController', () => {
     await act(async () => {
       await result.current.applySearchShortcut('invoice');
     });
-    expect(result.current.query).toBe('invoice');
+    expect(result.current.queryDraft).toBe('invoice');
+    expect(result.current.appliedQuery).toBe('invoice');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
       101, 'invoice', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
     );
@@ -268,7 +248,8 @@ describe('useMailboxSearchController', () => {
     await act(async () => {
       await result.current.clearSearchAndFilter();
     });
-    expect(result.current.query).toBe('');
+    expect(result.current.queryDraft).toBe('');
+    expect(result.current.appliedQuery).toBe('');
     expect(result.current.filter).toBe('all');
     expect(result.current.searchScope).toBe('folder');
     expect(result.current.listMode).toBe('threads');
@@ -336,7 +317,8 @@ describe('useMailboxSearchController', () => {
     await act(async () => {
       await result.current.runSavedSearch(savedSearch);
     });
-    expect(result.current.query).toBe('invoice');
+    expect(result.current.queryDraft).toBe('invoice');
+    expect(result.current.appliedQuery).toBe('invoice');
     expect(result.current.filter).toBe('starred');
     expect(result.current.searchScope).toBe('all');
     expect(result.current.listMode).toBe('messages');
@@ -391,37 +373,29 @@ describe('useMailboxSearchController', () => {
     expect(result.current.savedSearches.map((item) => item.id)).toEqual(['s2']);
   });
 
-  it('handleQueryChange reloads the cleared query after a debounce', async () => {
-    vi.useFakeTimers();
-    const { result, loadMessagesWithVisibleFallback, setStatus } = renderController();
-    await act(async () => {
-      result.current.handleQueryChange('');
+  it('handleQueryChange only updates the draft and never invokes a loader', () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    act(() => {
+      result.current.setQuery('existing');
     });
-    expect(result.current.query).toBe('');
+    loadMessagesWithVisibleFallback.mockClear();
+    act(() => {
+      result.current.handleQueryChange('i');
+      result.current.handleQueryChange('in');
+      result.current.handleQueryChange('invoice');
+    });
+    expect(result.current.queryDraft).toBe('invoice');
+    expect(result.current.appliedQuery).toBe('existing');
     expect(loadMessagesWithVisibleFallback).not.toHaveBeenCalled();
-    await act(async () => {
-      vi.advanceTimersByTime(100);
-    });
-    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 2, folders, messagePageSize, 'folder', false,
-    );
-    expect(setStatus).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
-  it('handleQueryChange cancels the pending reload when typing resumes', async () => {
-    vi.useFakeTimers();
+  it('clearing the input by typing keeps the current applied search until explicit clear', () => {
     const { result, loadMessagesWithVisibleFallback } = renderController();
-    await act(async () => {
-      result.current.handleQueryChange('');
-    });
-    await act(async () => {
-      result.current.handleQueryChange('invoice');
-      vi.advanceTimersByTime(100);
-    });
+    act(() => result.current.setQuery('invoice'));
+    act(() => result.current.handleQueryChange(''));
+    expect(result.current.queryDraft).toBe('');
+    expect(result.current.appliedQuery).toBe('invoice');
     expect(loadMessagesWithVisibleFallback).not.toHaveBeenCalled();
-    expect(result.current.query).toBe('invoice');
-    vi.useRealTimers();
   });
 
   it('handleShowMessages resets to the message list and clears the open thread', () => {
@@ -453,7 +427,8 @@ describe('useMailboxSearchController', () => {
       result.current.setListMode('threads');
     });
     act(() => result.current.resetSearch());
-    expect(result.current.query).toBe('');
+    expect(result.current.queryDraft).toBe('');
+    expect(result.current.appliedQuery).toBe('');
     expect(result.current.filter).toBe('all');
     expect(result.current.searchScope).toBe('folder');
     expect(result.current.listMode).toBe('messages');

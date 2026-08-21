@@ -7,6 +7,7 @@ import {
   X,
 } from 'lucide-react';
 import SettingsPageShell from './SettingsPageShell';
+import useModalAccessibility from '../../hooks/useModalAccessibility';
 import {
   SettingsMobileNavigation,
   SettingsSidebar,
@@ -71,80 +72,13 @@ export default function SettingsFrame({
     && connectionSummary !== '尚未开始验证';
   const modalRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedRef = useRef<Element | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // Focus the dialog on open and restore focus to the previously focused
-  // element when it closes.
-  useEffect(() => {
-    previouslyFocusedRef.current = document.activeElement;
-    const modal = modalRef.current;
-    const focusTarget = modal?.querySelector<HTMLElement>('.settings-close-button')
-      ?? modal?.querySelector<HTMLElement>('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])');
-    focusTarget?.focus();
-    return () => {
-      const previouslyFocused = previouslyFocusedRef.current;
-      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
-        previouslyFocused.focus();
-      }
-    };
-  }, []);
-
-  // Make the rest of the application inert while settings are open so that
-  // keyboard and screen-reader focus cannot escape the dialog.
-  useEffect(() => {
-    const backdrop = backdropRef.current;
-    const container = backdrop?.parentElement;
-    if (!backdrop || !container) return undefined;
-    const siblings = Array.from(container.children).filter((element) => element !== backdrop);
-    const previouslyInert = new Map<Element, boolean>();
-    for (const sibling of siblings) {
-      previouslyInert.set(sibling, sibling.hasAttribute('inert'));
-      sibling.setAttribute('inert', '');
-      sibling.setAttribute('aria-hidden', 'true');
-    }
-    return () => {
-      for (const sibling of siblings) {
-        if (previouslyInert.get(sibling)) continue;
-        sibling.removeAttribute('inert');
-        sibling.removeAttribute('aria-hidden');
-      }
-    };
-  }, []);
-
-  // Keep Tab navigation inside the dialog while it is open.
-  useEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-    const modalElement: HTMLElement = modal;
-
-    const focusableSelector = 'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Tab') return;
-      const focusable = Array.from(modalElement.querySelectorAll<HTMLElement>(focusableSelector))
-        .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (!modalElement.contains(active)) {
-        event.preventDefault();
-        first.focus();
-        return;
-      }
-      if (event.shiftKey) {
-        if (active === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    modalElement.addEventListener('keydown', handleKeyDown);
-    return () => modalElement.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  useModalAccessibility({
+    dialogRef: modalRef,
+    backdropRef,
+    initialFocusRef: closeButtonRef,
+  });
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -225,6 +159,7 @@ export default function SettingsFrame({
               </button>
             )}
             <button
+              ref={closeButtonRef}
               type="button"
               className="settings-close-button"
               aria-label="关闭设置"

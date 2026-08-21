@@ -86,15 +86,17 @@ type EmptyMessageBodyProps = {
   title?: string;
   detail?: string;
   action?: React.ReactNode;
+  role?: 'status' | 'alert';
 };
 
 export function EmptyMessageBody({
   title = '无正文',
   detail,
   action,
+  role = 'status',
 }: EmptyMessageBodyProps) {
   return (
-    <div className="body-text reader-empty-body" role="status">
+    <div className="body-text reader-empty-body" role={role}>
       <strong>{title}</strong>
       {detail && <span>{detail}</span>}
       {action}
@@ -119,7 +121,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           <span
             key={index}
             style={{
-              color: 'var(--color-primary, #2563eb)',
+              color: 'var(--ui-accent)',
               cursor: 'default',
             }}
           >

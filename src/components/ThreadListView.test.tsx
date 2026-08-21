@@ -59,6 +59,11 @@ describe('ThreadListView 虚拟化', () => {
     expect(cards[0].className).toContain('selected');
     expect(cards[0].className).toContain('is-unread');
     expect(cards[1].className).toContain('is-read');
+    const items = container.querySelectorAll('[role="listitem"]');
+    expect(container.querySelector('[role="list"]')?.getAttribute('aria-label')).toBe('会话列表');
+    expect(items[0].getAttribute('aria-current')).toBe('true');
+    expect(items[0].getAttribute('aria-posinset')).toBe('1');
+    expect(items[0].getAttribute('aria-setsize')).toBe('2');
 
     fireEvent.click(cards[0]);
     expect(onOpenThread).toHaveBeenCalledWith(threads[0]);

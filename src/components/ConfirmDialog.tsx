@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import useModalAccessibility from '../hooks/useModalAccessibility';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -31,73 +32,25 @@ export default function ConfirmDialog({
   const titleId = useId();
   const descId = useId();
 
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
-  // Sync open state changes
-  useEffect(() => {
-    if (open) {
-      previousActiveElementRef.current = document.activeElement as HTMLElement;
-      setPending(false);
-      setError(null);
-      // Let React render first then focus cancelRef (the safe default button)
-      const timer = setTimeout(() => {
-        cancelRef.current?.focus();
-      }, 30);
-      return () => clearTimeout(timer);
-    } else {
-      // Restore focus to original active element after closing
-      if (previousActiveElementRef.current) {
-        const target = previousActiveElementRef.current;
-        setTimeout(() => {
-          target.focus?.();
-        }, 30);
-      }
-    }
-  }, [open]);
-
-  // Tab cycle trap & Escape key listener
+  // A reused dialog must not expose the previous attempt's transient state.
   useEffect(() => {
     if (!open) return;
+    setPending(false);
+    setError(null);
+  }, [open]);
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        if (!pending) {
-          onCancel();
-        }
-        return;
-      }
-
-      if (event.key === 'Tab') {
-        const focusable = [closeRef.current, cancelRef.current, confirmRef.current].filter(
-          (el): el is HTMLButtonElement => el !== null && !el.disabled
-        );
-        if (focusable.length === 0) return;
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (event.shiftKey) {
-          // Backward tab
-          if (document.activeElement === first) {
-            last.focus();
-            event.preventDefault();
-          }
-        } else {
-          // Forward tab
-          if (document.activeElement === last) {
-            first.focus();
-            event.preventDefault();
-          }
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, pending, onCancel]);
+  useModalAccessibility({
+    open,
+    dialogRef,
+    backdropRef,
+    initialFocusRef: cancelRef,
+    onEscape: handleCancelClick,
+    escapeDisabled: pending,
+  });
 
   if (!open) return null;
 
@@ -120,6 +73,7 @@ export default function ConfirmDialog({
 
   return createPortal(
     <div
+      ref={backdropRef}
       className="dialog-backdrop"
       onMouseDown={(event) => {
         if (!pending && event.target === event.currentTarget) {
@@ -128,11 +82,14 @@ export default function ConfirmDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="dialog-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
+        aria-busy={pending || undefined}
+        tabIndex={-1}
       >
         <header>
           <span
@@ -146,7 +103,6 @@ export default function ConfirmDialog({
             <small>请仔细核对以下信息</small>
           </span>
           <button
-            ref={closeRef}
             className="dialog-card-close"
             type="button"
             title="关闭"
@@ -167,7 +123,7 @@ export default function ConfirmDialog({
         </p>
         
         {error && (
-          <div className="confirm-dialog-error">
+          <div className="confirm-dialog-error" role="alert">
             错误: {error}
           </div>
         )}
@@ -183,7 +139,6 @@ export default function ConfirmDialog({
             {cancelText}
           </button>
           <button
-            ref={confirmRef}
             className={`dialog-button ${danger ? 'dialog-button-danger' : 'dialog-button-primary'}`}
             type="button"
             disabled={pending}

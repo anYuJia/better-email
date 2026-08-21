@@ -1,13 +1,45 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WindowChrome, { detectDesktopPlatform } from './WindowChrome';
 import AccountLoginDialog from './AccountLoginDialog';
 import { emptyAccountCreateForm } from '../app/uiConfig';
+
+const tauriWindowMocks = vi.hoisted(() => {
+  const currentWindow = {
+    close: vi.fn(async () => undefined),
+    innerPosition: vi.fn(async () => ({ x: 120, y: 80 })),
+    isMaximized: vi.fn(async () => false),
+    maximize: vi.fn(async () => undefined),
+    minimize: vi.fn(async () => undefined),
+    setPosition: vi.fn(async () => undefined),
+    startDragging: vi.fn(async () => undefined),
+    toggleMaximize: vi.fn(async () => undefined),
+    unmaximize: vi.fn(async () => undefined),
+  };
+  return {
+    currentWindow,
+    getCurrentWindow: vi.fn(() => currentWindow),
+    moduleLoaded: vi.fn(),
+  };
+});
+
+vi.mock('@tauri-apps/api/window', () => {
+  tauriWindowMocks.moduleLoaded();
+  return {
+    getCurrentWindow: tauriWindowMocks.getCurrentWindow,
+    LogicalPosition: class LogicalPosition {
+      constructor(public x: number, public y: number) {}
+    },
+  };
+});
 
 describe('WindowChrome', () => {
   afterEach(() => {
     cleanup();
     document.body.className = '';
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    Reflect.deleteProperty(navigator, 'platform');
+    vi.clearAllMocks();
   });
 
   it('detects the web platform when no Tauri runtime is present', () => {
@@ -18,6 +50,50 @@ describe('WindowChrome', () => {
     const { container } = render(<WindowChrome />);
     expect(container.querySelector('.window-chrome')).toBeNull();
     expect(document.body.classList.contains('platform-web')).toBe(false);
+  });
+
+  it('loads and reuses the Tauri window API only after a desktop window interaction', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: 'Win32' });
+
+    const { container } = render(<WindowChrome />);
+
+    expect(container.querySelector('.window-chrome-windows')).not.toBeNull();
+    expect(document.body.classList.contains('platform-windows')).toBe(true);
+    expect(tauriWindowMocks.moduleLoaded).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '最小化窗口' }));
+    await waitFor(() => expect(tauriWindowMocks.currentWindow.minimize).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '最大化或还原窗口' }));
+    await waitFor(() => expect(tauriWindowMocks.currentWindow.toggleMaximize).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭窗口' }));
+    await waitFor(() => expect(tauriWindowMocks.currentWindow.close).toHaveBeenCalledTimes(1));
+
+    const dragRegion = container.querySelector<HTMLElement>('.window-drag-region');
+    expect(dragRegion).not.toBeNull();
+    fireEvent.pointerDown(dragRegion!, {
+      button: 0,
+      detail: 1,
+      pointerId: 7,
+      clientX: 10,
+      clientY: 10,
+      screenX: 40,
+      screenY: 40,
+    });
+    fireEvent.pointerMove(dragRegion!, {
+      buttons: 1,
+      pointerId: 7,
+      clientX: 15,
+      clientY: 10,
+      screenX: 45,
+      screenY: 40,
+    });
+    await waitFor(() => expect(tauriWindowMocks.currentWindow.startDragging).toHaveBeenCalledTimes(1));
+    fireEvent.mouseUp(window);
+
+    expect(tauriWindowMocks.moduleLoaded).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the real WindowChrome visible and clickable above the login gate', () => {

@@ -46,49 +46,48 @@ describe('useUnreadFocusSync 焦点订阅', () => {
     unlisten.mockClear();
   });
 
-  it('初次挂载订阅一次，并立即刷新一次当前 scope 的统计', () => {
+  it('初次挂载只订阅，首启统计由 loadMeta 单独负责', () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     renderFocus(refresh, 1);
 
     expect(onFocusChanged).toHaveBeenCalledTimes(1);
-    expect(refresh).toHaveBeenCalledTimes(1);
-    expect(refresh).toHaveBeenCalledWith(1);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('无关状态更新不会重新订阅，也不会触发额外 GetStats', async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     const { rerender } = renderFocus(refresh, 1);
     expect(onFocusChanged).toHaveBeenCalledTimes(1);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
 
     // 相同 scope、相同 refresh 引用：模拟任意状态文案/无关状态更新触发的重渲染。
     rerender({ scope: 1 });
     await flushAsync();
     expect(onFocusChanged).toHaveBeenCalledTimes(1);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
     expect(unlisten).not.toHaveBeenCalled();
   });
 
   it('窗口真正获得焦点时只触发一次 GetStats', () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     renderFocus(refresh, 1);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
 
     fireFocus(true);
-    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenLastCalledWith(1);
 
     fireFocus(true);
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
   it('窗口失焦时不触发任何刷新', () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     renderFocus(refresh, 1);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
 
     fireFocus(false);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
     expect(onFocusChanged).toHaveBeenCalledTimes(1);
   });
 
@@ -101,7 +100,11 @@ describe('useUnreadFocusSync 焦点订阅', () => {
     await flushAsync();
     expect(onFocusChanged).toHaveBeenCalledTimes(2);
     expect(unlisten).toHaveBeenCalledTimes(1);
-    expect(refresh).toHaveBeenLastCalledWith('all');
+    expect(refresh).not.toHaveBeenCalled();
+
+    fireFocus(true);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith('all');
   });
 
   it('卸载时正确取消订阅', async () => {

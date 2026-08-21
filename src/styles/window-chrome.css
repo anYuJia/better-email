@@ -126,6 +126,15 @@ body[data-image-preview-modal='1'] .window-chrome {
 }
 
 .window-control-close:hover {
-  color: #ffffff;
-  background: #d92d20;
+  color: var(--color-text-on-accent);
+  background: var(--ui-danger);
+}
+
+/* Light-theme title bar: translucent glass so the desktop breathes through
+ * the strip; the dark variant lives in dark-mode.css. */
+:root:not([data-theme="dark"]) .app-shell .window-chrome {
+  border-bottom: 1px solid oklch(0.9 0.006 var(--primitive-hue-neutral) / 0.68);
+  background: oklch(0.995 0.004 var(--primitive-hue-neutral) / 0.48);
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
+  backdrop-filter: blur(24px) saturate(1.18);
 }

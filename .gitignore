@@ -28,3 +28,6 @@ docs/
 !.env.example
 __pycache__/
 *.py[cod]
+
+# Local Rust build tuning (space optimization for debug targets)
+src-tauri/.cargo/

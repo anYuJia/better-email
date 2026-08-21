@@ -1,0 +1,37 @@
+/* GlobalTooltip component styles (from pass-message-list-final.css).
+ *
+ * This file owns the GlobalTooltip component styles; the dark theme
+ * variant lives in dark-mode.css. */
+.global-tooltip {
+  position: fixed;
+  z-index: var(--ui-z-tooltip, 10000);
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 6px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control, 8px);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-tooltip);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  pointer-events: none;
+  animation: var(--ui-animation-global-tooltip-in);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* Keyframes required by --ui-animation-global-tooltip-in (also from
+ * pass-message-list-final.css). */
+@keyframes global-tooltip-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

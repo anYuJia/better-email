@@ -5,11 +5,11 @@ import { formatDate } from '../mailUtils';
 import { calculateVisibleRange } from './messageListLayout';
 
 /**
- * 会话卡片行高 —— 与 `styles/2026/pass-thread-list.css` 中 `.thread-card`
- * 的 `height: 88px` 保持一致，虚拟计算高度必须等于实际渲染高度，
+ * 会话行高 —— 与 `styles/message-list.css` 中 `.thread-card` 的
+ * `height: 72px` 保持一致，虚拟计算高度必须等于实际渲染高度，
  * 否则滚动会跳动、选中/悬停会错位。
  */
-export const THREAD_ROW_HEIGHT = 88;
+export const THREAD_ROW_HEIGHT = 72;
 
 type ThreadListViewProps = {
   threads: ThreadSummary[];
@@ -108,7 +108,7 @@ export default function ThreadListView({
   }, [threads, visibleRange]);
 
   return (
-    <div className="thread-list" ref={listRef} onScroll={handleScroll}>
+    <div className="thread-list" ref={listRef} role="list" aria-label="会话列表" onScroll={handleScroll}>
       {threads.length > 0 && (
         <div
           className="thread-list-viewport-wrapper"
@@ -121,52 +121,59 @@ export default function ThreadListView({
           {visibleThreads.map(({ index, thread }) => {
             const hasUnread = thread.unread_count > 0;
             return (
-              <button
+              <div
                 key={thread.thread_key}
-                className={[
-                  'thread-card',
-                  activeThread?.thread_key === thread.thread_key ? 'selected' : '',
-                  hasUnread ? 'is-unread' : 'is-read',
-                ].filter(Boolean).join(' ')}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: THREAD_ROW_HEIGHT,
-                  transform: `translateY(${layout[index].top}px)`,
-                }}
-                onClick={() => onOpenThread(thread)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  onOpenThreadMenu(thread, event.clientX, event.clientY);
-                }}
+                role="listitem"
+                aria-current={activeThread?.thread_key === thread.thread_key ? 'true' : undefined}
+                aria-posinset={index + 1}
+                aria-setsize={threads.length}
               >
-                {hasUnread && <span className="thread-unread-dot" aria-label="未读" />}
-                <div className="thread-topline">
-                  <strong className="thread-subject" title={thread.subject || '无主题'}>
-                    {thread.subject || '(无主题)'}
-                  </strong>
-                  <time>{formatDate(thread.latest_at)}</time>
-                </div>
-                <p className="thread-participants" title={thread.participants}>{thread.participants}</p>
-                <div className="thread-meta">
-                  <span className="thread-count-badge">
-                    {thread.message_count} 封
-                  </span>
-                  {hasUnread && (
-                    <span className="thread-unread-badge">
-                      {thread.unread_count} 条未读
+                <button
+                  className={[
+                    'thread-card',
+                    activeThread?.thread_key === thread.thread_key ? 'selected' : '',
+                    hasUnread ? 'is-unread' : 'is-read',
+                  ].filter(Boolean).join(' ')}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: THREAD_ROW_HEIGHT,
+                    transform: `translateY(${layout[index].top}px)`,
+                  }}
+                  onClick={() => onOpenThread(thread)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    onOpenThreadMenu(thread, event.clientX, event.clientY);
+                  }}
+                >
+                  {hasUnread && <span className="thread-unread-dot" aria-label="未读" />}
+                  <div className="thread-topline">
+                    <strong className="thread-subject" title={thread.subject || '无主题'}>
+                      {thread.subject || '(无主题)'}
+                    </strong>
+                    <time>{formatDate(thread.latest_at)}</time>
+                  </div>
+                  <p className="thread-participants" title={thread.participants}>{thread.participants}</p>
+                  <div className="thread-meta">
+                    <span className="thread-count-badge">
+                      {thread.message_count} 封
                     </span>
-                  )}
-                  {thread.is_muted && (
-                    <em className="thread-muted-indicator">
-                      <VolumeX size={12} />
-                      静音
-                    </em>
-                  )}
-                </div>
-              </button>
+                    {hasUnread && (
+                      <span className="thread-unread-badge">
+                        {thread.unread_count} 条未读
+                      </span>
+                    )}
+                    {thread.is_muted && (
+                      <em className="thread-muted-indicator">
+                        <VolumeX size={12} />
+                        静音
+                      </em>
+                    )}
+                  </div>
+                </button>
+              </div>
             );
           })}
         </div>

@@ -22,12 +22,10 @@ describe('Avatar', () => {
   });
 
   describe('inferredAvatarCandidates', () => {
-    it('only infers avatars for known service domains to avoid generic placeholders', () => {
+    it('never turns sender identity into a third-party avatar request', () => {
       expect(inferredAvatarCandidates('daisy@example.com', 'Daisy Priya')).toEqual([]);
-      expect(inferredAvatarCandidates('pageupdates@facebookmail.com', 'Facebook 公共主页')).toEqual([
-        'https://unavatar.io/facebook.com?fallback=false',
-      ]);
-      expect(inferredAvatarCandidates('daisy@example.com', 'Daisy Priya').join('\n')).not.toContain('google.com/s2/favicons');
+      expect(inferredAvatarCandidates('notify@github.com', 'GitHub')).toEqual([]);
+      expect(inferredAvatarCandidates('pageupdates@facebookmail.com', 'Facebook 公共主页')).toEqual([]);
     });
   });
 
@@ -102,21 +100,20 @@ describe('Avatar', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('skips tiny placeholder images and falls back after inferred candidates fail', () => {
+  it('skips an explicitly provided tiny placeholder image', () => {
     render(
       <Avatar
         email="notify@github.com"
         name="GitHub"
+        src="https://example.com/tiny-placeholder.png"
         className="message-avatar avatar-tone-3"
       />,
     );
 
-    for (let index = 0; index < 2; index += 1) {
-      const img = screen.getByRole('img', { name: 'GitHub' }) as HTMLImageElement;
-      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 16 });
-      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 16 });
-      fireEvent.load(img);
-    }
+    const img = screen.getByRole('img', { name: 'GitHub' }) as HTMLImageElement;
+    Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 16 });
+    Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 16 });
+    fireEvent.load(img);
 
     expect(screen.getByText('G')).not.toBeNull();
     expect(screen.queryByRole('img')).toBeNull();

@@ -37,7 +37,7 @@ function injectLayerCss() {
   for (const file of [
     'components/first-run-onboarding.css',
     'components/settings/settings-pages.css',
-    'styles/2026/workspace-hierarchy.css',
+    'styles/reader.css',
   ]) {
     const style = document.createElement('style');
     style.setAttribute('data-layer-test', 'true');

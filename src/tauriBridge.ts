@@ -15,72 +15,100 @@ export const mockMode =
   || import.meta.env.VITE_SWIFTMAIL_UI_MOCK === '1'
   || !hasTauriRuntime;
 
-import {
-  mockInvoke,
-  mockLocalFileAssetUrl,
-  mockGetCurrentWindow,
-  mockIsPermissionGranted,
-  mockRequestPermission,
-  mockSendNotification
-} from './tauriBridge.mock';
+type MockBridgeModule = typeof import('./tauriBridge.mock');
+type ProdBridgeModule = typeof import('./tauriBridge.prod');
+
+let mockBridgeModule: Promise<MockBridgeModule> | null = null;
+let prodBridgeModule: Promise<ProdBridgeModule> | null = null;
+
+function loadMockBridge() {
+  mockBridgeModule ??= import('./tauriBridge.mock');
+  return mockBridgeModule;
+}
+
+function loadProdBridge() {
+  prodBridgeModule ??= import('./tauriBridge.prod');
+  return prodBridgeModule;
+}
 
 export function invoke<T>(command: string, args?: InvokeArgs): Promise<T> {
-  return mockMode ? mockInvoke<T>(command, args) : import('./tauriBridge.prod').then(({ prodInvoke }) => prodInvoke<T>(command, args));
+  return mockMode
+    ? loadMockBridge().then(({ mockInvoke }) => mockInvoke<T>(command, args))
+    : loadProdBridge().then(({ prodInvoke }) => prodInvoke<T>(command, args));
 }
 
 export async function localFileAssetUrl(localPath: string): Promise<string> {
   const normalizedPath = localPath.trim();
   if (!normalizedPath) return '';
   if (mockMode) {
+    const { mockLocalFileAssetUrl } = await loadMockBridge();
     return mockLocalFileAssetUrl(normalizedPath);
   }
-  const { prodLocalFileAssetUrl } = await import('./tauriBridge.prod');
+  const { prodLocalFileAssetUrl } = await loadProdBridge();
   return prodLocalFileAssetUrl(normalizedPath);
 }
 
 export function getCurrentWindow() {
-  if (mockMode) {
-    return mockGetCurrentWindow();
-  }
   return {
     setBadgeCount: async (count?: number) => {
-      const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
+      if (mockMode) {
+        const { mockGetCurrentWindow } = await loadMockBridge();
+        return mockGetCurrentWindow().setBadgeCount();
+      }
+      const { prodGetCurrentWindow } = await loadProdBridge();
       return prodGetCurrentWindow().setBadgeCount(count);
     },
     setBadgeLabel: async (label?: string) => {
-      const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
+      if (mockMode) {
+        const { mockGetCurrentWindow } = await loadMockBridge();
+        return mockGetCurrentWindow().setBadgeLabel();
+      }
+      const { prodGetCurrentWindow } = await loadProdBridge();
       return prodGetCurrentWindow().setBadgeLabel(label);
     },
     onDragDropEvent: async (handler: DesktopFileDropHandler) => {
-      const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
+      if (mockMode) {
+        const { mockGetCurrentWindow } = await loadMockBridge();
+        return mockGetCurrentWindow().onDragDropEvent();
+      }
+      const { prodGetCurrentWindow } = await loadProdBridge();
       return prodGetCurrentWindow().onDragDropEvent(handler);
     },
     onFocusChanged: async (handler: (focused: boolean) => void) => {
-      const { prodGetCurrentWindow } = await import('./tauriBridge.prod');
+      if (mockMode) {
+        const { mockGetCurrentWindow } = await loadMockBridge();
+        return mockGetCurrentWindow().onFocusChanged(handler);
+      }
+      const { prodGetCurrentWindow } = await loadProdBridge();
       return prodGetCurrentWindow().onFocusChanged(handler);
     },
   };
 }
 
 export function isPermissionGranted(): Promise<boolean> {
-  return mockMode ? mockIsPermissionGranted() : import('./tauriBridge.prod').then(({ prodIsPermissionGranted }) => prodIsPermissionGranted());
+  return mockMode
+    ? loadMockBridge().then(({ mockIsPermissionGranted }) => mockIsPermissionGranted())
+    : loadProdBridge().then(({ prodIsPermissionGranted }) => prodIsPermissionGranted());
 }
 
 export function requestPermission(): Promise<string> {
-  return mockMode ? mockRequestPermission() : import('./tauriBridge.prod').then(({ prodRequestPermission }) => prodRequestPermission());
+  return mockMode
+    ? loadMockBridge().then(({ mockRequestPermission }) => mockRequestPermission())
+    : loadProdBridge().then(({ prodRequestPermission }) => prodRequestPermission());
 }
 
 export function sendNotification(notification: { title: string; body?: string }) {
   if (mockMode) {
-    return mockSendNotification(notification);
+    void loadMockBridge().then(({ mockSendNotification }) => mockSendNotification(notification));
+    return;
   }
-  void import('./tauriBridge.prod').then(({ prodSendNotification }) => prodSendNotification(notification));
+  void loadProdBridge().then(({ prodSendNotification }) => prodSendNotification(notification));
 }
 
 export async function listen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> {
   if (mockMode) {
     return () => {};
   }
-  const { prodListen } = await import('./tauriBridge.prod');
+  const { prodListen } = await loadProdBridge();
   return prodListen<T>(event, handler);
 }

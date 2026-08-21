@@ -44,16 +44,16 @@ export default function AiServiceSettings() {
 
   return (
     <div className="settings-ai-page-stack">
-      {/* 模块一：AI 引擎核心状态 Hero Card */}
+      {/* 模块一：AI 服务状态 */}
       <SettingsSection
-        title="AI 智能引擎"
+        title="AI 服务"
         description={`可用功能：${AVAILABLE_FEATURES.join('、')}。`}
         badge={<span className="st-badge st-badge-info">{statusLabel}</span>}
         dataSection="ai"
       >
         <div className="ai-hero-card">
           <div className="ai-overview-row" aria-label="AI 服务状态">
-            <span className="ai-overview-icon" aria-hidden="true"><Sparkles size={18} /></span>
+            <span className="ai-overview-icon" aria-hidden="true"><Sparkles size={16} /></span>
             <span className="ai-overview-copy">
               <strong>可用功能：{AVAILABLE_FEATURES.join('、')}。</strong>
               <small>
@@ -66,8 +66,8 @@ export default function AiServiceSettings() {
 
           <div className="ai-hero-toggle-row">
             <SettingsSwitch
-              label="开启 AI 智能引擎"
-              description="启用智能翻译、一键摘要与邮件模板生成。已保存的配置将安全保留。"
+              label="启用 AI 服务"
+              description="启用翻译、摘要与模板生成功能。配置数据会安全保留。"
               checked={config.enabled}
               onChange={(checked) => patchConfig({ enabled: checked })}
             />
@@ -80,7 +80,7 @@ export default function AiServiceSettings() {
         {/* 模块二：LLM 模型推理服务配置 */}
         <SettingsSection
           title="模型推理服务 (LLM)"
-          description="用于处理应用内的邮件智能翻译、一键摘要与模板生成"
+          description="用于处理应用内的邮件翻译、摘要与模板生成"
           badge={
             <SettingsBadge tone={external ? 'info' : 'neutral'}>
               {external ? '外部 API 引擎' : '本地演示模式'}
@@ -93,7 +93,7 @@ export default function AiServiceSettings() {
               dense
               value={config.serviceType === 'mcp' ? 'http' : config.serviceType}
               options={[
-                { value: 'mock', label: '本地演示模式 (Mock) — 离线体验稳定示例，无外部请求' },
+                { value: 'mock', label: '本地演示模式 (Mock) — 离线示例，无外部请求' },
                 { value: 'http', label: 'OpenAI 兼容 API — 连接兼容 chat/completions 的外部 LLM 服务' },
               ]}
               onChange={(val) => patchConfig({ serviceType: val as AiServiceType })}

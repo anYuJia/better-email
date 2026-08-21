@@ -274,6 +274,10 @@ export default function MessageListView({
     () => new Set(selectedMessageIds),
     [selectedMessageIds],
   );
+  const messagePositionById = useMemo(
+    () => new Map(messages.map((message, index) => [message.id, index + 1])),
+    [messages],
+  );
   const selectedMessageIdsRef = React.useRef(selectedMessageIds);
   selectedMessageIdsRef.current = selectedMessageIds;
   const draggingMessageSet = useMemo(
@@ -320,7 +324,14 @@ export default function MessageListView({
   }, [visibleItems]);
 
   return (
-    <div className="message-list" ref={listRef} onScroll={handleListScroll}>
+    <div
+      className="message-list"
+      ref={listRef}
+      role="list"
+      aria-label="邮件列表"
+      aria-busy={Boolean(loadMoreStatus)}
+      onScroll={handleListScroll}
+    >
       {messages.length > 0 && (
         <div
           className="message-list-viewport-wrapper"
@@ -335,6 +346,8 @@ export default function MessageListView({
             if (item.type === 'header') {
               return (
                 <header
+                  role="separator"
+                  aria-label={`${item.label}，${item.count} 封`}
                   className={[
                     'message-date-header',
                     index > 0 ? 'message-date-header--separated' : '',
@@ -358,6 +371,10 @@ export default function MessageListView({
               return (
                 <div
                   className="message-list-item"
+                  role="listitem"
+                  aria-current={message.id === selectedId ? 'true' : undefined}
+                  aria-posinset={messagePositionById.get(message.id)}
+                  aria-setsize={messages.length}
                   style={style}
                   key={itemKey}
                   ref={(element) => {

@@ -1,41 +1,601 @@
-/* Compatibility-only message list overrides.
- * This file keeps legacy-compatible classes that are intentionally
- * expressed separately from the main 2026 message-list pipeline.
- */
-.bulk-toolbar {
-  min-height: 38px;
+/* ===========================================================================
+ * MESSAGE LIST — canonical stylesheet
+ *
+ * The inbox is a continuous information list, not a card feed.
+ * Rows are flat, divided by 1px lines, never rounded cards with gaps.
+ * Surfaces are opaque semantic planes; no persistent glass/shadow on rows.
+ *
+ * Section map:
+ *   1. Message list shell          (panel, list, footer)
+ *   2. Toolbar                    (search, scope, refresh)
+ *   3. Search suggestions         (autocomplete panel)
+ *   4. List control strip         (summary, mode toggle, filter, sort)
+ *   5. Compact menus              (shared dropdown base + scope/filter/sort)
+ *   6. Bulk toolbar               (multi-select actions)
+ *   7. Date group headers
+ *   8. Virtual list viewport
+ *   9. Message row                (geometry, leading, avatar, selection)
+ *  10. Row typography             (sender, subject, preview, timestamp)
+ *  11. Row metadata               (attachment, chips, star)
+ *  12. Row states                 (unread, hover, current, selected, new, drag)
+ *  13. Thread list                (same quiet list language)
+ *  14. Empty state
+ *  15. Avatar tones               (muted neutral palette)
+ *  16. Responsive / reduced motion
+ *
+ * Row-height contract: MESSAGE_ROW_HEIGHT / GROUP_HEADER_HEIGHT in
+ * components/messageListLayout.ts must equal the heights declared here.
+ * ========================================================================= */
+
+
+/* ---------------------------------------------------------------------------
+ * 1 · Message list shell
+ * ------------------------------------------------------------------------- */
+
+.message-list-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-inline: 0;
+  background: var(--ui-list);
+  box-shadow: var(--ui-box-shadow-none);
+  backdrop-filter: none;
+}
+
+.message-list,
+.thread-list {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--ui-list);
+}
+
+.message-list-viewport-wrapper,
+.thread-list-viewport-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.message-list-footer {
+  box-sizing: border-box;
+  height: 40px;
+  min-height: 36px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Legacy date-section containers (kept for non-virtual fallback). */
+.message-date-section {
+  display: grid;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 2 · Toolbar
+ *
+ * A tool bar, not a SaaS header. Opaque surface, 1px bottom border,
+ * no persistent blur/glass. Search is the primary utility control.
+ * ------------------------------------------------------------------------- */
+
+.toolbar {
+  position: relative;
+  z-index: 20;
+  min-height: 50px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-list);
+  backdrop-filter: none;
+}
+
+.search-cluster {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 10px;
-  border-bottom: 1px solid #edf0f3;
-  background: #fbfcfd;
-  overflow-x: auto;
 }
 
-.bulk-toolbar label {
+/* Search box — muted control surface, subtle accent focus ring. */
+.search-box {
+  position: relative;
+  overflow: visible;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+
+.search-box:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.search-box:focus-within {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-accent-soft-outline);
+}
+
+.search-box > svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+}
+
+.search-box input {
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  font-size: 13px;
+  line-height: 30px;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.search-box input:focus,
+.search-box input:focus-visible {
+  outline: none;
+}
+
+.search-box input::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+.search-clear-button {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+.search-clear-button:hover,
+.search-clear-button:focus-visible {
+  color: var(--ui-text-secondary);
+  background: var(--quiet-row-hover);
+  outline: none;
+}
+
+/* Refresh — icon-first control, not a primary CTA. */
+.refresh-text-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-sizing: border-box;
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-mid-color-background-border-opacity);
+  cursor: pointer;
+}
+
+.refresh-text-button:hover:not(:disabled) {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+}
+
+.refresh-text-button.refreshing {
+  color: var(--ui-accent);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-accent-soft);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.app-shell .refresh-text-button {
+  min-height: 34px;
+  height: 34px;
+}
+
+/* Search scope — compact dropdown, only the trigger is visible. */
+.search-scope-menu {
+  flex: 0 0 auto;
+}
+
+.search-scope-menu > summary {
+  min-width: 56px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.search-scope-menu > summary::after {
+  content: none;
+}
+
+.search-scope-menu[open] > summary,
+.search-scope-menu > summary:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.search-scope-menu > summary svg {
+  color: var(--ui-text-tertiary);
+}
+
+.app-shell .search-scope-menu > summary {
+  min-width: 60px;
+  min-height: 34px;
+  height: 34px;
+}
+
+.app-shell .search-scope-menu > summary svg {
+  color: var(--ui-text-tertiary);
+}
+
+.search-options-menu {
+  flex: 0 0 auto;
+}
+
+.search-options-menu > summary {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.search-options-menu > summary::after {
+  content: none;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 3 · Search suggestions
+ * ------------------------------------------------------------------------- */
+
+.search-suggestion-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  display: grid;
+  gap: 0;
+  padding: 3px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.search-suggestion-panel button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 35px;
+  padding: 5px 7px 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: transparent;
+  text-align: left;
+}
+
+.search-suggestion-panel button.active {
+  background: var(--quiet-row-selected);
+}
+
+.search-suggestion-panel button:hover,
+.search-suggestion-panel button:focus-visible {
+  background: var(--quiet-row-hover);
+  outline: none;
+}
+
+.search-suggestion-panel span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.search-suggestion-panel strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.search-suggestion-panel em {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.search-suggestion-title {
+  display: block;
+  padding: 5px 9px 2px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 4 · List control strip
+ *
+ * A quiet metadata row: view label · count, plus mode/filter/sort controls.
+ * Chips reduced to natural text where possible.
+ * ------------------------------------------------------------------------- */
+
+.list-control-strip {
+  min-height: 39px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-list);
+}
+
+.app-shell .list-control-strip {
+  min-height: 42px;
+  padding: 5px 12px;
+  gap: 9px;
+}
+
+.app-shell .toolbar,
+.app-shell .list-control-strip {
+  border-top: 0;
+  border-bottom-color: var(--ui-border);
+  background: var(--ui-list);
+}
+
+/* Summary: natural metadata, not three pills. */
+.list-summary {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.app-shell .list-summary {
+  gap: 7px;
+}
+
+.list-summary strong {
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .list-summary strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.list-summary span {
+  max-width: 100px;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .list-summary span {
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.list-summary em {
+  padding: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-summary .search-scope-indicator {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+/* Control group: mode toggle + filter + sort. */
+.list-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .list-control-actions {
+  gap: 1px;
+}
+
+.list-control-actions > button,
+.list-control-actions .compact-menu summary {
+  min-height: 29px;
+  padding-inline: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #54606c;
-  font-size: 12px;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.list-control-actions > button:hover,
+.list-control-actions .compact-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.list-control-actions > button.active,
+.list-control-actions .compact-menu summary.active {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.icon-button:hover {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 5 · Compact menus (shared dropdown base)
+ *
+ * Details-based menus used by scope, filter, sort, and bulk actions.
+ * The panel is a detached, rounded, shadowed popover — the one place
+ * where elevation and radius are appropriate.
+ * ------------------------------------------------------------------------- */
+
+.compact-menu {
+  position: relative;
+}
+
+.compact-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
 }
 
-.bulk-selection {
-  padding-right: 4px;
-  font-weight: 750;
+.compact-menu > summary::-webkit-details-marker {
+  display: none;
 }
 
-.bulk-toolbar button {
-  border: 1px solid #cfd6dd;
-  border-radius: 8px;
-  background: #fff;
-  color: #2f3a45;
-  min-height: 28px;
+.compact-menu > div {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+  z-index: 80;
+  display: grid;
+  gap: 1px;
+  min-width: max-content;
+  max-width: min(92vw, 320px);
+  max-height: 320px;
+  padding: 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.compact-menu > div button {
+  min-height: 32px;
   padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
-  white-space: nowrap;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.compact-menu > div button:hover {
+  background: var(--quiet-row-hover);
+}
+
+.compact-menu > div button.active {
+  background: var(--quiet-row-selected);
+}
+
+.compact-menu > div button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-section-title {
+  display: block;
+  padding: 6px 10px 2px;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
 .filter-menu > div {
@@ -43,45 +603,1037 @@
   width: 172px;
 }
 
-.message-list-footer button {
-  min-height: 32px;
-  border: 1px solid rgba(10, 132, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(10, 132, 255, 0.08);
-  color: #075ca8;
-  padding: 0 12px;
+.app-shell .compact-menu[open] {
+  position: relative;
+  z-index: 2400;
+}
+
+.app-shell .compact-menu[open] > div {
+  z-index: 2500;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 6 · Bulk toolbar
+ *
+ * Temporary multi-select state, swapped in-place (not floating).
+ * Opaque surface, 1px bottom border, no shadow-heavy card.
+ * ------------------------------------------------------------------------- */
+
+.bulk-toolbar {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
+  overflow-x: auto;
+}
+
+.bulk-toolbar.active {
+  background: var(--ui-surface-muted);
+}
+
+.bulk-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text-secondary);
   font-size: 12px;
-  font-weight: 760;
+  white-space: nowrap;
 }
 
-.message-list-footer button:hover {
-  border-color: rgba(10, 132, 255, 0.38);
-  background: rgba(10, 132, 255, 0.13);
+.bulk-selection {
+  padding-right: 4px;
+  font-weight: 600;
 }
 
-.empty-state, .empty-reader {
-  color: #7a8490;
+.bulk-toolbar button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.bulk-toolbar button:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .bulk-toolbar {
+  min-height: 40px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar button,
+.app-shell .bulk-toolbar .compact-menu summary {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar button:hover:not(:disabled),
+.app-shell .bulk-toolbar .compact-menu summary:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+/* Bulk more-menu expands upward since the strip sits below the list head. */
+.bulk-toolbar .bulk-more-menu > div {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 7 · Date group headers
+ *
+ * Quiet metadata, not a dashboard section heading: no uppercase,
+ * no large letter-spacing, no independent card.
+ * ------------------------------------------------------------------------- */
+
+.message-date-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-sizing: border-box;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-list);
+  backdrop-filter: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.message-date-header em {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.message-date-header.message-date-header--separated {
+  border-top: 1px solid var(--ui-border);
+}
+
+.message-date-section + .message-date-section {
+  border-top: 1px solid var(--ui-border);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 8 · Virtual list viewport
+ *
+ * The row height here is the single source of truth shared with
+ * messageListLayout.ts. Changing it requires syncing the TS constant.
+ * ------------------------------------------------------------------------- */
+
+.message-list-item {
+  box-sizing: border-box;
+  height: 64px;
+  padding: 0;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 9 · Message row
+ *
+ * A mail row is a continuous list line, not a rounded card.
+ * Default surface is transparent (the list surface shows through);
+ * rows are separated by a 1px inset bottom divider.
+ * ------------------------------------------------------------------------- */
+
+.message-card {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 6px 12px 6px 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--ui-border);
+  transition: var(--ui-transition-bg-color-standard);
+  width: 100%;
+  max-width: 100%;
+}
+
+.message-card > .message-topline,
+.message-card > .subject,
+.message-card > p {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Full-row click target sits above content, below selection controls. */
+.message-card-main {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.message-card-main:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -3px;
+}
+
+/* Selection controls share the leading slot so the left edge never shifts. */
+.message-leading {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.message-card:hover .message-leading,
+.message-card:has(.message-card-main:focus-visible) .message-leading,
+.message-card:has(.message-select input:checked) .message-leading {
+  opacity: 0;
+}
+
+/* Avatar — muted, flat, no ring/shadow/gradient. */
+.message-avatar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 1;
+  transform: none;
+  transition: var(--ui-transition-opacity-fast);
+}
+
+.message-avatar > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.message-avatar.avatar-initial {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Checkbox replaces the avatar slot on hover / selection — layout stays put. */
+.message-select {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 3;
+  opacity: 0;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+}
+
+.message-card:hover .message-select,
+.message-card:has(.message-card-main:focus-visible) .message-select,
+.message-card:has(.message-select input:checked) .message-select {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.message-card.is-current .message-select,
+.message-card.is-current:hover .message-select,
+.message-card.is-current:has(.message-card-main:focus-visible) .message-select {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.message-select input,
+.bulk-selection > input {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 3px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  cursor: pointer;
+}
+
+.message-select input::before,
+.bulk-selection > input::before {
+  width: 7px;
+  height: 4px;
+  border: solid var(--color-text-on-accent);
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+
+.message-select input:checked,
+.bulk-selection > input:checked {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-select input:checked::before,
+.bulk-selection > input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.message-select input:focus-visible,
+.bulk-selection > input:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* The current (reader-open) row keeps a real, clickable checkbox. */
+.app-shell .message-select {
+  left: 0;
+  right: auto;
+}
+
+.app-shell .message-select input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+  border-radius: 3px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-select input:checked {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-select input:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Reserve trailing gutter for the selection control. */
+.app-shell .message-card {
+  padding-right: 42px;
+}
+
+.app-shell .message-select {
+  left: auto;
+  right: 12px;
+  top: 50%;
+  z-index: 5;
+  display: grid;
+  opacity: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.app-shell .message-card:hover .message-select,
+.app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
+.app-shell .message-card:has(.message-select input:checked) .message-select,
+.app-shell .message-card.is-current .message-select {
+  display: grid;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Unread dot owns the leading slot until a selection control appears. */
+.message-unread-dot {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--ui-list);
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-list);
+  pointer-events: none;
+  transform: none;
+}
+
+.message-card:hover > .message-unread-dot,
+.message-card:has(.message-card-main:focus-visible) > .message-unread-dot,
+.message-card:has(.message-select input:checked) > .message-unread-dot {
+  opacity: 0;
+}
+
+.message-card:hover .message-unread-dot {
+  border-color: var(--quiet-row-hover);
+}
+
+.message-card.selected .message-unread-dot {
+  border-color: var(--quiet-row-selected);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 10 · Row typography
+ *
+ * Three stable lines: sender, subject, preview.
+ * Weights compressed to ~3 tiers: 400 (read body), 500 (read label),
+ * 600 (unread emphasis). Timestamps stay tertiary, never vivid.
+ * ------------------------------------------------------------------------- */
+
+.message-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 16px;
+  overflow: hidden;
+  margin-bottom: 1px;
+}
+
+.sender {
+  min-width: 0;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sender.unread {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.app-shell .sender:not(.unread) {
+  color: var(--ui-text-secondary);
+}
+
+.subject {
+  margin-top: 1px;
+  display: block;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject.unread {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.message-card p {
+  display: block;
+  margin: 2px 0 0;
+  width: 100%;
+  max-width: 100%;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.message-card time {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.app-shell .message-card time,
+.app-shell .message-card p {
+  color: var(--ui-text-tertiary);
+}
+
+/* Truncation contract — shared by sender/subject/preview. */
+.sender,
+.subject,
+.message-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 11 · Row metadata (attachment, labels, star)
+ *
+ * Attachment is metadata, not a chip: a paperclip + count, tertiary only.
+ * Labels are small text markers, not multi-colour pills.
+ * ------------------------------------------------------------------------- */
+
+.message-subject-line {
+  grid-column: 1;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+}
+
+.message-subject-line > .subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.message-attachment {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.message-card.is-current .message-attachment,
+.message-card:hover .message-attachment {
+  color: var(--ui-text-secondary);
+}
+
+.message-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.message-chips span {
+  min-width: 0;
+  max-width: 145px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 12 · Row states
+ *
+ * Each state is expressed minimally — never background + border + accent
+ * + bold + dot + shadow all at once.
+ *
+ * Unread:    font weight + small dot
+ * Hover:     very subtle neutral surface
+ * Current:   soft selection surface + slightly stronger text
+ * Selected:  checkbox + selection tint (distinguishable from current)
+ * New:       brief appear animation
+ * Dragging:  opacity only
+ * ------------------------------------------------------------------------- */
+
+/* Unread rows share the same surface as read rows. */
+.message-card.is-unread {
+  background: transparent;
+}
+
+.message-card:hover,
+.message-card.is-unread:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: inset 0 -1px 0 var(--ui-border);
+}
+
+.app-shell .message-card:hover,
+.app-shell .message-card.is-unread:hover {
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Current = reader-open row: soft selection surface, no blue rail. */
+.message-card.selected,
+.message-card.selected:hover,
+.message-card.is-unread.selected,
+.message-card.is-unread.selected:hover,
+.message-card.is-current {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-card.selected,
+.app-shell .message-card.selected:hover,
+.app-shell .message-card.is-unread.selected,
+.app-shell .message-card.is-unread.selected:hover,
+.app-shell .message-card.is-current {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Opening the reader focuses the full-row button; don't double-ring it. */
+.app-shell .message-card:is(.selected, .is-current) .message-card-main:focus-visible {
+  outline: none;
+}
+
+.message-card.selected {
+  border-color: transparent;
+}
+
+/* Multi-selected rows (checkbox checked but not the reader-open row): give
+ * them a quiet hover-level tint so the user can see which rows belong to the
+ * bulk selection. The reader-open (.is-current/.selected) row stays on the
+ * stronger --quiet-row-selected surface, so current vs multi-selected stays
+ * distinguishable at a glance. */
+.app-shell .message-card:has(.message-select input:checked):not(.is-current) {
+  background: var(--quiet-row-hover);
+}
+
+/* New message appear animation — brief, color only. */
+.message-card.is-new {
+  animation: var(--ui-animation-message-card-appear);
+}
+
+@keyframes message-card-appear {
+  from {
+    opacity: 0;
+    background: var(--ui-accent-soft);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Drag feedback is opacity only — no geometry change. */
+.message-card.dragging {
+  border-color: transparent;
+  opacity: 0.58;
+  box-shadow: var(--ui-box-shadow-inset-selected);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 13 · Thread list
+ *
+ * Same quiet, continuous-list language as mail rows. Slightly taller
+ * (it carries subject + participants + meta), but still a list line,
+ * not a raised card. No !important needed.
+ * ------------------------------------------------------------------------- */
+
+.thread-list {
+  padding: 0;
+  background: var(--ui-list);
+}
+
+.thread-card {
+  position: relative;
+  width: 100%;
+  height: 72px;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 30px;
+  display: grid;
+  gap: 3px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-text);
+  box-shadow: inset 0 -1px 0 var(--ui-border);
+  transition: var(--ui-transition-bg-color-standard);
+  text-align: left;
+  min-width: 0;
+}
+
+.thread-card:hover {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.thread-card.selected,
+.thread-card.selected:hover {
+  border-color: transparent;
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.thread-unread-dot {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.thread-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.thread-subject {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ui-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.thread-card.is-unread .thread-subject {
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.thread-card time {
+  flex-shrink: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.thread-card.is-unread time {
+  color: var(--ui-text-tertiary);
+  font-weight: 500;
+}
+
+.thread-participants {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ui-text-tertiary);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-card.is-unread .thread-participants {
+  color: var(--ui-text-secondary);
+  font-weight: 500;
+}
+
+.thread-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ui-text-tertiary);
+  margin-top: 1px;
+}
+
+.thread-count-badge {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
+  font-weight: 400;
+}
+
+.thread-unread-badge {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-accent);
+  background: transparent;
+  font-weight: 500;
+}
+
+.thread-muted-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 14 · Empty state
+ *
+ * Simple: icon, title, one line, necessary action. No giant illustration,
+ * no gradient blob, no floating card.
+ * ------------------------------------------------------------------------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  gap: 8px;
+  background: var(--ui-list);
+  color: var(--ui-text-secondary);
+}
+
+.empty-state,
+.empty-reader {
+  color: var(--ui-text-secondary);
   display: grid;
   place-items: center;
   height: 100%;
 }
 
+.empty-state-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  margin-bottom: 8px;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.mailbox-empty-state,
 .message-list .empty-state {
+  padding: 28px;
+  background: var(--ui-list);
+  color: var(--ui-text-secondary);
+  min-height: 280px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
   align-content: center;
   justify-items: center;
   gap: 10px;
-  padding: 28px;
   text-align: center;
 }
 
 .message-list .empty-state strong {
-  color: #26313f;
+  color: var(--ui-text);
   font-size: 14px;
+  font-weight: 600;
 }
 
 .message-list .empty-state span {
   max-width: 260px;
-  color: #7a8490;
+  color: var(--ui-text-tertiary);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.mailbox-empty-state strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mailbox-empty-state span {
+  max-width: 360px;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+}
+
+.message-list .empty-state button {
+  min-height: 32px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-list .empty-state button:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+}
+
+/* Load more affordance below the scan rail. */
+.btn-load-more {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--ui-transition-mid-color-background-border-opacity);
+}
+
+.btn-load-more:hover:not(:disabled) {
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
+}
+
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-list-footer button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.message-list-footer button:hover:not(:disabled) {
+  background: var(--quiet-row-hover);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 15 · Avatar tones
+ *
+ * Muted neutral tones for initials avatars — enough variation to scan a
+ * dense list, without turning the inbox into a contacts/social app.
+ * Remote/contact avatars render through .message-avatar > img above.
+ * ------------------------------------------------------------------------- */
+
+.avatar-tone-0 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.avatar-tone-1 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.avatar-tone-2 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.avatar-tone-3 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.avatar-tone-4 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.avatar-tone-5 {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * 16 · Responsive / reduced motion
+ * ------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .message-card,
+  .message-attachment {
+    transition: var(--ui-transition-none);
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-shell .refresh-text-button {
+    min-width: 34px;
+    width: 34px;
+    padding-inline: 0;
+  }
+
+  .app-shell .refresh-text-button span {
+    display: none;
+  }
 }

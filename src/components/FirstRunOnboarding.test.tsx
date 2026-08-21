@@ -102,8 +102,8 @@ describe('FirstRunOnboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
 
     // 默认值保持 10 秒
-    expect(screen.getByRole('button', { name: '撤销发送延迟' }).textContent).toContain('10 秒（推荐）');
-    fireEvent.click(screen.getByRole('button', { name: '撤销发送延迟' }));
+    expect(screen.getByRole('combobox', { name: '撤销发送延迟' }).textContent).toContain('10 秒（推荐）');
+    fireEvent.click(screen.getByRole('combobox', { name: '撤销发送延迟' }));
     fireEvent.click(screen.getByRole('option', { name: '30 秒' }));
 
     await waitFor(() => {
@@ -115,7 +115,7 @@ describe('FirstRunOnboarding', () => {
     renderOnboarding();
     fireEvent.click(screen.getByRole('button', { name: /下一步/ }));
 
-    fireEvent.click(screen.getByRole('button', { name: '撤销发送延迟' }));
+    fireEvent.click(screen.getByRole('combobox', { name: '撤销发送延迟' }));
     const listbox = screen.getByRole('listbox');
     expect((listbox as HTMLElement).style.zIndex).toBe('2550');
   });

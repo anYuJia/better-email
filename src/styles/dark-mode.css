@@ -1,0 +1,498 @@
+/*
+ * Dark mode overlay.
+ *
+ * The token layer (design-tokens.css) re-maps the semantic colours for
+ * <html data-theme="dark">, which covers everything built on the ui tokens.
+ * Legacy surface variables used by pre-token sheets already resolve in the
+ * token layer, so this sheet only re-themes concrete surfaces and controls
+ * that still use hardcoded light values.
+ *
+ * Composer dark mode lives in composer/composer.css (its own section 22).
+ * Context menu dark mode lives in context-menu.css.
+ * Reader dark mode lives in reader.css.
+ *
+ * This file covers: workspace glass, dialog backdrops, toast, snooze picker,
+ * account switcher, global tooltip, dropdowns, shortcut modal, legacy
+ * checkbox, and avatar-tone palette.
+ */
+
+:root[data-theme="dark"] body {
+  background: var(--ui-bg);
+}
+
+/* --- Dialogs / modals / popovers --- */
+
+:root[data-theme="dark"] .dialog-backdrop,
+:root[data-theme="dark"] .confirm-dialog-backdrop,
+:root[data-theme="dark"] .snooze-backdrop {
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.6);
+}
+
+:root[data-theme="dark"] .dialog-backdrop .dialog,
+:root[data-theme="dark"] .dialog,
+:root[data-theme="dark"] .dialog-card,
+:root[data-theme="dark"] .confirm-dialog,
+:root[data-theme="dark"] .snooze-picker,
+:root[data-theme="dark"] .snooze-picker-menu,
+:root[data-theme="dark"] .account-switcher-menu,
+:root[data-theme="dark"] .account-switcher-dropdown {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .dialog h2,
+:root[data-theme="dark"] .dialog h3,
+:root[data-theme="dark"] .confirm-dialog h2,
+:root[data-theme="dark"] .snooze-picker h2,
+:root[data-theme="dark"] .account-switcher-menu h3,
+:root[data-theme="dark"] .snooze-picker strong {
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .dialog p,
+:root[data-theme="dark"] .confirm-dialog p,
+:root[data-theme="dark"] .snooze-picker small,
+:root[data-theme="dark"] .account-switcher-menu small {
+  color: var(--ui-text-secondary);
+}
+
+/* --- Toast / snackbar --- */
+
+:root[data-theme="dark"] body .toast,
+:root[data-theme="dark"] .toast,
+:root[data-theme="dark"] .message-toast,
+:root[data-theme="dark"] .undo-snackbar,
+:root[data-theme="dark"] .undo-card {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .toast small,
+:root[data-theme="dark"] .undo-card small {
+  color: var(--ui-text-secondary);
+}
+
+/* --- Dropdown / picker --- */
+
+:root[data-theme="dark"] body .emoji-picker,
+:root[data-theme="dark"] .emoji-picker,
+:root[data-theme="dark"] .template-picker,
+:root[data-theme="dark"] .dropdown-panel,
+:root[data-theme="dark"] .custom-select-menu {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .dropdown-item:hover,
+:root[data-theme="dark"] .custom-select-menu li:hover,
+:root[data-theme="dark"] .template-picker li:hover {
+  background: var(--ui-accent-soft);
+}
+
+/* --- Snooze / account picker --- */
+
+:root[data-theme="dark"] .account-switcher-trigger,
+:root[data-theme="dark"] .account-row,
+:root[data-theme="dark"] .account-menu-row {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .snooze-picker button,
+:root[data-theme="dark"] .snooze-picker .snooze-option,
+:root[data-theme="dark"] .snooze-picker summary {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .snooze-picker button:hover {
+  background: var(--ui-accent-soft);
+}
+
+/* --- Image preview --- */
+
+:root[data-theme="dark"] .image-preview-overlay {
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.9);
+}
+
+/* --- Window chrome --- */
+
+:root[data-theme="dark"] .window-chrome {
+  background: var(--ui-surface-sidebar);
+  color: var(--ui-text);
+}
+
+/* --- Toolbar / list controls --- */
+
+:root[data-theme="dark"] .stats-strip {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .search-shortcuts button {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .search-shortcuts button:hover {
+  background: var(--ui-control-hover);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .compact-menu > div {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+/* --- Message list --- */
+
+:root[data-theme="dark"] .message-chips span {
+  color: var(--ui-text-tertiary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .message-list-footer {
+  background: var(--ui-list);
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .bulk-toolbar {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .bulk-toolbar.active {
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .bulk-toolbar button,
+:root[data-theme="dark"] .bulk-toolbar select,
+:root[data-theme="dark"] .bulk-toolbar .compact-menu summary {
+  background: transparent;
+  color: var(--ui-text-secondary);
+  border-color: transparent;
+}
+
+:root[data-theme="dark"] :is(.bulk-toolbar button:hover, .bulk-toolbar .compact-menu summary:hover) {
+  background: var(--ui-control-hover);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .empty-reader {
+  color: var(--ui-text-secondary);
+}
+
+/* --- Reader --- */
+
+:root[data-theme="dark"] .reader-actions {
+  border: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary) {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] :is(.body-text, .reader-html) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] .reader-warning-panel {
+  border-color: var(--ui-warning-border);
+  color: var(--ui-text-secondary);
+  background: var(--ui-warning-bg);
+}
+
+:root[data-theme="dark"] .reader-warning-badge {
+  border-color: transparent;
+  color: var(--ui-warning);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply textarea {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .quick-reply textarea::placeholder,
+:root[data-theme="dark"] .quick-reply > footer > span {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .quick-reply > footer button {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .quick-reply > footer button:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send {
+  color: var(--color-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .quick-reply > footer .quick-reply-send:disabled {
+  color: var(--ui-text-tertiary);
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+}
+
+/* --- Icon buttons (toolbar / reader / composer chrome) --- */
+
+:root[data-theme="dark"] .icon-button,
+:root[data-theme="dark"] .composer header button,
+:root[data-theme="dark"] .label-tools button,
+:root[data-theme="dark"] .attachments button,
+:root[data-theme="dark"] .composer-signature button,
+:root[data-theme="dark"] .composer-attachment-button,
+:root[data-theme="dark"] .rich-toolbar button,
+:root[data-theme="dark"] .composer-mini-actions button {
+  border-color: transparent;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .icon-button:hover,
+:root[data-theme="dark"] .composer header button:hover,
+:root[data-theme="dark"] .label-tools button:hover,
+:root[data-theme="dark"] .attachments button:hover,
+:root[data-theme="dark"] .composer-signature button:hover,
+:root[data-theme="dark"] .composer-attachment-button:hover,
+:root[data-theme="dark"] .rich-toolbar button:hover,
+:root[data-theme="dark"] .composer-mini-actions button:hover {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+/* --- Shortcut modal --- */
+
+:root[data-theme="dark"] .shortcut-modal {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .shortcut-modal header {
+  background: var(--ui-surface-muted);
+  border-bottom-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .shortcut-modal header button {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-theme="dark"] .shortcut-modal header button:hover {
+  background: var(--ui-control-hover);
+  color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .shortcut-group {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .shortcut-row {
+  border-top-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] kbd {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border-strong);
+  border-bottom-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* --- Legacy composer dark overrides (dialogs.css styles) --- */
+
+:root[data-theme="dark"] .composer input,
+:root[data-theme="dark"] .composer select {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .composer input:focus,
+:root[data-theme="dark"] .composer textarea:focus {
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer select:focus {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] .composer ::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer-advanced {
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer-advanced[open] summary {
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer-tool-card input,
+:root[data-theme="dark"] .composer-tool-card select {
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer-rich-toggle,
+:root[data-theme="dark"] .composer-signature,
+:root[data-theme="dark"] .composer-attachments,
+:root[data-theme="dark"] .composer-schedule {
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .recipient-suggestions button,
+:root[data-theme="dark"] .composer-attachment-chip {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+
+:root[data-theme="dark"] .raw-preview textarea {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+:root[data-theme="dark"] .composer-minimized {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+}
+
+:root[data-theme="dark"] input[type="checkbox"] {
+  background: var(--ui-surface-muted);
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+:root[data-theme="dark"] input[type="checkbox"]:checked {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .mailbox-grid div,
+:root[data-theme="dark"] .sync-schedule-card,
+:root[data-theme="dark"] .notification-account-grid > div {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+
+/* ---------------------------------------------------------------------
+ * Workspace reconciliation.
+ *
+ * Persistent workspace surfaces resolve entirely through the semantic
+ * --ui-* tokens re-mapped in design-tokens.css. Only the avatar-tone
+ * palette keeps distinct dark hues for list scannability.
+ * --------------------------------------------------------------------- */
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar) {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-0 {
+  color: oklch(0.80 0.045 250);
+  background: oklch(0.315 0.028 250);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-1 {
+  color: oklch(0.80 0.040 305);
+  background: oklch(0.312 0.026 305);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-2 {
+  color: oklch(0.80 0.040 152);
+  background: oklch(0.310 0.026 152);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-3 {
+  color: oklch(0.83 0.045 var(--primitive-hue-warning));
+  background: oklch(0.320 0.030 var(--primitive-hue-warning));
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-4 {
+  color: oklch(0.80 0.035 225);
+  background: oklch(0.312 0.022 225);
+}
+
+:root[data-theme="dark"] :is(.message-avatar, .reader-avatar).avatar-tone-5 {
+  color: oklch(0.80 0.040 15);
+  background: oklch(0.312 0.025 15);
+}
+
+:root[data-theme="dark"] .message-chips span,
+:root[data-theme="dark"] .message-attachment {
+  color: var(--ui-text-tertiary);
+  background: transparent;
+}
+
+/* --- Global tooltip / compact menu dark --- */
+
+:root[data-theme="dark"] :is(.global-tooltip, .compact-menu > div, .search-options-menu > div, .search-scope-menu > div) {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-tooltip);
+}
+
+/* --- Thread list --- */
+
+:root[data-theme="dark"] .thread-unread-dot {
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Dark workspace: the persistent panes stay opaque planes on the semantic
+ * neutral scale. Only the native window chrome strip keeps a translucent
+ * platform treatment. */
+
+:root[data-theme="dark"] .app-shell .window-chrome {
+  border-bottom: 1px solid oklch(0.43 0.016 var(--primitive-hue-neutral) / 0.64);
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.52);
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+  backdrop-filter: blur(24px) saturate(1.12);
+}

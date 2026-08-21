@@ -2,3 +2,118 @@
   .shortcut-grid { grid-template-columns: 1fr; }
   .shortcut-modal { width: calc(100vw - 28px); }
 }
+
+/* At 200% zoom a 960px desktop window exposes roughly 480 CSS pixels.
+ * Three persistent panes cannot reflow at that width. The 880px threshold
+ * also prevents a discontinuity where the reader would be narrower than its
+ * useful 360px measure, so the shell becomes a predictable
+ * folder -> list -> reader navigation stack. */
+.narrow-navigation-button,
+.narrow-reader-navigation {
+  display: none;
+}
+
+@media (max-width: 880px) {
+  .app-shell {
+    display: block;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-shell > .sidebar,
+  .app-shell > .message-list-panel,
+  .app-shell > .reader-panel {
+    display: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  .app-shell.narrow-view-sidebar > .sidebar,
+  .app-shell.narrow-view-list > .message-list-panel {
+    display: flex;
+  }
+
+  .app-shell.narrow-view-reader > .reader-panel {
+    display: block;
+  }
+
+  .app-shell .narrow-navigation-button {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 34px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-secondary);
+    background: var(--ui-surface);
+  }
+
+  .app-shell .narrow-navigation-button:hover,
+  .app-shell .narrow-navigation-button:focus-visible {
+    color: var(--ui-text);
+    border-color: var(--ui-border-strong);
+    background: var(--quiet-row-hover);
+  }
+
+  .app-shell .sidebar {
+    max-width: none;
+    padding-inline: 14px;
+  }
+
+  .app-shell .sidebar-narrow-close {
+    margin-inline-start: auto;
+  }
+
+  .app-shell .message-list-panel {
+    min-width: 0;
+  }
+
+  .app-shell .narrow-reader-navigation {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    min-height: 45px;
+    padding: 6px 12px;
+    align-items: center;
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--workspace-reader);
+  }
+
+  .app-shell.narrow-view-reader .narrow-reader-navigation {
+    display: flex;
+  }
+
+  .app-shell .narrow-reader-navigation button {
+    min-height: 32px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-secondary);
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .app-shell .narrow-reader-navigation button:hover,
+  .app-shell .narrow-reader-navigation button:focus-visible {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+  }
+
+  .app-shell .reader {
+    padding: 20px clamp(16px, 5vw, 28px) 44px;
+  }
+
+  .window-drag-region-side {
+    right: 58px;
+    width: auto;
+  }
+}

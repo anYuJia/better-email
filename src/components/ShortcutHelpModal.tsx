@@ -1,79 +1,33 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { shortcutGroups } from '../app/appConfig';
+import useModalAccessibility from '../hooks/useModalAccessibility';
 
 type ShortcutHelpModalProps = {
   open: boolean;
   onClose: () => void;
 };
 
-const FOCUSABLE_SELECTOR =
-  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-function focusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-  ).filter((element) => !element.hasAttribute('disabled'));
-}
-
 export default function ShortcutHelpModal({
   open,
   onClose,
 }: ShortcutHelpModalProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    // 打开时保存原焦点，并把焦点移到弹窗内第一个可操作元素。
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const dialog = dialogRef.current;
-    if (dialog) {
-      focusableElements(dialog)[0]?.focus();
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusables = focusableElements(dialog);
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      const isInside = active instanceof HTMLElement && dialog.contains(active);
-      if (event.shiftKey) {
-        if (active === first || !isInside) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !isInside) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      // 关闭后恢复到打开前的有效焦点元素（仍在文档中才恢复）。
-      const previous = previouslyFocusedRef.current;
-      previouslyFocusedRef.current = null;
-      if (previous && document.contains(previous)) {
-        previous.focus();
-      }
-    };
-  }, [open, onClose]);
+  useModalAccessibility({
+    open,
+    dialogRef,
+    backdropRef,
+    initialFocusRef: closeButtonRef,
+    onEscape: onClose,
+  });
 
   if (!open) return null;
 
   return (
     <div
+      ref={backdropRef}
       className="composer-backdrop shortcut-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -85,13 +39,14 @@ export default function ShortcutHelpModal({
         role="dialog"
         aria-modal="true"
         aria-label="快捷键帮助"
+        tabIndex={-1}
       >
         <header>
           <div>
             <strong>快捷键</strong>
             <span>高频邮件操作，不离开键盘。</span>
           </div>
-          <button type="button" onClick={onClose}>关闭</button>
+          <button ref={closeButtonRef} type="button" onClick={onClose}>关闭</button>
         </header>
         <div className="shortcut-grid">
           {shortcutGroups.map((group) => (

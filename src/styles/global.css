@@ -1,9 +1,32 @@
+/*
+ * Global layer (global.css)
+ *
+ * Owns document-level defaults and application-wide behaviours that are
+ * independent of any pane or component:
+ *  - typography, colour and box-sizing defaults,
+ *  - native selection behaviour scoped to copyable content,
+ *  - the slim scrollbar treatment applied to every scrollable surface,
+ *  - the error boundary card.
+ *
+ * Everything pane-specific lives in the owning sheet (sidebar.css,
+ * message-list.css, reader.css, dialogs.css, …).
+ */
+
 :root {
   color: var(--ui-text);
   background: var(--ui-bg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  font-family: var(--ui-font-sans);
   font-size: 14px;
   letter-spacing: -0.01em;
+}
+
+/* The app root follows the token background so panes can sit on translucent
+ * glass without exposing a white document edge behind them. */
+html,
+body,
+#root {
+  background: var(--ui-bg);
+  color: var(--ui-text);
 }
 
 * { box-sizing: border-box; }
@@ -11,45 +34,106 @@ body { margin: 0; overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
+/* Keep native WebView selection inside copyable content. Selecting across
+ * mailbox chrome paints every crossed grid/flex line box, including its
+ * whitespace, which makes an ordinary drag look like a broken page overlay. */
+.app-shell > :is(.sidebar, .pane-resizer, .message-list-panel, .reader-panel) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Keyboard focus always gets a visible ring, regardless of pane. More
+ * specific surfaces may refine it; this guarantees a baseline. */
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+/* Inputs remain editable, while only message content opts back into copying. */
+.app-shell > :is(.sidebar, .message-list-panel, .reader-panel) :is(
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  .body-text,
+  .reader-html,
+  .reader-translation-text
+) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* All scrollable surfaces use a narrow, low-contrast thumb. It becomes
+ * slightly stronger only while the user is actually hovering the surface. */
+.app-shell * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-text-tertiary) 28%, transparent) transparent;
+}
+
+.app-shell *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-shell *::-webkit-scrollbar-thumb {
+  min-height: 30px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text-tertiary) 24%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-thumb:hover,
+.app-shell :is(.sidebar, .message-list, .thread-list, .reader-panel, .reader, .label-menu-list):hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-text-tertiary) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.app-shell *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .app-error-boundary {
   min-height: 100vh;
   padding: 32px;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at top left, rgba(58, 166, 117, 0.16), transparent 32%),
-    #f5f6f8;
+  background: var(--ui-bg);
+  color: var(--ui-text);
 }
 
 .app-error-card {
   width: min(620px, 100%);
   padding: 28px;
-  border: 1px solid rgba(31, 41, 51, 0.12);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
-  color: #20242a;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-modal);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+  color: var(--ui-text);
 }
 
 .app-error-eyebrow {
   margin: 0 0 8px;
-  color: #3aa675;
-  font-size: 12px;
-  font-weight: 800;
+  color: var(--ui-accent);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .app-error-card h1 {
   margin: 0 0 12px;
-  font-size: clamp(24px, 4vw, 34px);
-  line-height: 1.1;
+  font-size: var(--ui-font-size-title);
+  line-height: 1.2;
 }
 
 .app-error-card p {
   margin: 0 0 16px;
-  color: #58616d;
-  line-height: 1.65;
+  color: var(--ui-text-secondary);
+  line-height: 1.6;
 }
 
 .app-error-card pre,
@@ -64,9 +148,10 @@ button { cursor: pointer; }
 .app-error-card pre {
   margin: 0 0 16px;
   padding: 12px;
-  border-radius: 12px;
-  background: #1f2933;
-  color: #f6f8fb;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
 }
 
 .app-error-card details {
@@ -75,16 +160,16 @@ button { cursor: pointer; }
 
 .app-error-card summary {
   cursor: pointer;
-  color: #3b4856;
-  font-weight: 700;
+  color: var(--ui-text-secondary);
+  font-weight: 600;
 }
 
 .app-error-card code {
   margin-top: 10px;
   padding: 12px;
-  border-radius: 10px;
-  background: #eef2f5;
-  color: #334155;
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
 }
 
 .app-error-actions {
@@ -94,17 +179,21 @@ button { cursor: pointer; }
 }
 
 .app-error-actions button {
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 16px;
   border: none;
-  border-radius: 10px;
-  background: #3aa675;
-  color: #fff;
-  font-weight: 800;
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  font-weight: 600;
+}
+
+.app-error-actions button:hover {
+  background: var(--ui-accent-hover);
 }
 
 .app-error-actions button.secondary {
-  border: 1px solid rgba(31, 41, 51, 0.16);
-  background: #fff;
-  color: #20242a;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text);
 }

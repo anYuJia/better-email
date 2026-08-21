@@ -72,6 +72,37 @@ describe('SettingsFrame dialog behavior', () => {
     document.body.removeChild(backgroundButton);
   });
 
+  it('removes inert before restoring focus to an opener inside the app shell', () => {
+    const renderShell = (open: boolean) => (
+      <div data-testid="focus-shell">
+        <button type="button">设置入口</button>
+        {open && (
+          <SettingsFrame
+            title="设置"
+            subtitle="work@example.com"
+            activeSection="notifications"
+            onNavigate={() => undefined}
+            onTestConnection={() => undefined}
+            onSave={() => undefined}
+            onClose={() => undefined}
+          >
+            <input placeholder="设置内输入框" />
+          </SettingsFrame>
+        )}
+      </div>
+    );
+    const { rerender } = render(renderShell(false));
+    const opener = screen.getByRole('button', { name: '设置入口' });
+    opener.focus();
+
+    rerender(renderShell(true));
+    expect(opener.closest('[inert]')).not.toBeNull();
+    rerender(renderShell(false));
+
+    expect(opener.closest('[inert]')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
   it('closes on Escape', () => {
     const onClose = vi.fn();
     renderFrame(onClose);

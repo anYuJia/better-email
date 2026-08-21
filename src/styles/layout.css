@@ -1,55 +1,141 @@
+/*
+ * App-shell layout layer (layout.css)
+ *
+ * Owns the desktop workspace geometry and the workspace sub-surface mapping:
+ *  - the three-pane grid (sidebar / message list / reader) and its dividers,
+ *  - the --workspace-* token resolution (opaque semantic surfaces by default;
+ *    the dark theme re-maps them in dark-mode.css),
+ *  - pane surface mapping only — component styling lives in the owning
+ *    sheets (sidebar.css, message-list.css, reader.css, …).
+ *
+ * The workspace is deliberately opaque and quiet: no backdrop-filter, no
+ * floating panes. Hierarchy comes from surface luminance, 1px dividers and
+ * spacing. The only translucent surface in the app is the native window
+ * chrome strip (window-chrome.css), which is platform chrome, not workspace.
+ */
+
 .app-shell {
+  --app-sidebar-width: var(--app-sidebar-width-preferred, 244px);
+  --app-list-width: var(--app-list-width-preferred, 388px);
   display: grid;
-  grid-template-columns: 236px 6px 386px 6px minmax(420px, 1fr);
+  grid-template-columns: var(--app-sidebar-width) 5px var(--app-list-width) 5px minmax(0, 1fr);
   height: 100vh;
   width: 100vw;
-  background: #f5f6f8;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-size: 13px;
 }
 
-.sidebar {
-  background: #1f2933;
-  color: #f6f8fb;
-  padding: 18px 14px;
+/* Pane surfaces: each pane is a flat plane of the workspace, distinguished
+ * by luminance only. The resizer columns stay transparent so the app canvas
+ * shows through the 1px divider lines. */
+.app-shell .sidebar {
+  background: var(--workspace-sidebar);
+}
+
+/* The list pane is a column of toolbar / bulk toolbar / virtual list; the
+ * flex chain is what bounds the virtual list's viewport height. */
+.message-list-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
-  overflow: hidden;
 }
 
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  display: block;
-  object-fit: contain;
-  border-radius: 8px;
-  user-select: none;
-  -webkit-user-drag: none;
+.app-shell .message-list-panel {
+  background: var(--workspace-list);
 }
-.brand strong { display: block; font-size: 16px; }
-.brand span { color: #b6c0ca; font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
-.compose-button, .settings-button {
-  height: 40px;
-  border: none;
-  border-radius: 8px;
-  background: #3aa675;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 700;
+.app-shell .reader-panel {
+  background: var(--workspace-reader);
 }
-.settings-button { margin-top: auto; background: rgba(255,255,255,0.12); }
-.layout-reset-button {
-  min-height: 32px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.10);
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
+
+.app-shell .toolbar,
+.app-shell .list-control-strip {
+  background: var(--workspace-toolbar);
 }
+
+/* Resizers ----------------------------------------------------------------
+ * Visual line: 1px, semantic border token. Hit target: the 5px grid gutter
+ * plus a 4px overhang on each side. Hover/drag lifts the line to the accent
+ * colour only — no glow, no shadow. */
+
+.pane-resizer {
+  width: 1px;
+  min-width: 1px;
+  background: var(--ui-border);
+  opacity: 1;
+}
+
+.pane-resizer:hover {
+  background: var(--ui-border-strong);
+  opacity: 1;
+}
+
+.app-shell .pane-resizer {
+  position: relative;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  z-index: 16;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+  cursor: col-resize;
+  touch-action: none;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .pane-resizer::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  border-radius: 0;
+  background: var(--ui-border);
+  box-shadow: var(--ui-box-shadow-none);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: var(--ui-transition-bg-box-shadow-fast);
+}
+
+.app-shell .pane-resizer::after {
+  position: absolute;
+  inset: 0 -4px;
+  background: transparent;
+  content: "";
+}
+
+.app-shell .pane-resizer:hover::before,
+.app-shell .pane-resizer:focus-visible::before,
+.pane-resizing .app-shell .pane-resizer::before {
+  background: var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+/* Compact shell (≤1180px): the grid collapses to a fixed three-column
+ * layout without resizable gutters. The resizer buttons must not occupy
+ * grid cells here — otherwise they steal a content column and push the
+ * reader onto a second row. Hide them so the three columns map cleanly
+ * to sidebar / message-list / reader. */
+@media (max-width: 1180px) {
+  .app-shell {
+    --app-sidebar-width: 200px;
+    --app-list-width: 320px;
+    grid-template-columns: var(--app-sidebar-width) var(--app-list-width) minmax(0, 1fr);
+  }
+
+  .app-shell .pane-resizer {
+    display: none;
+  }
+}
+
+/* Workspace sub-surface resolution ----------------------------------------
+ * Opaque by default (tokens in design-tokens.css); the dark theme re-maps
+ * them in dark-mode.css. No translucent glass values remain — panes are
+ * quiet planes, not glass panels. */

@@ -17,6 +17,9 @@ type ReaderBodyContentProps = {
   onAllowRemoteImagesOnce: () => void;
   onOpenLink: (href: string) => void;
   onComposeNew: (fields?: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string }) => void;
+  bodyFetchStatus?: 'loading' | 'error' | null;
+  bodyFetchError?: string | null;
+  onRetryBodyFetch?: () => void | Promise<void>;
 };
 
 export default function ReaderBodyContent({
@@ -32,11 +35,37 @@ export default function ReaderBodyContent({
   onAllowRemoteImagesOnce,
   onOpenLink,
   onComposeNew,
+  bodyFetchStatus = null,
+  bodyFetchError = null,
+  onRetryBodyFetch,
 }: ReaderBodyContentProps) {
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
+  if (bodyFetchStatus === 'loading') {
+    return <EmailReaderSkeleton />;
+  }
   if (!isBodyRenderReady) {
     return showPlaceholder ? <EmailReaderSkeleton /> : null;
+  }
+  if (bodyFetchStatus === 'error') {
+    return (
+      <EmptyMessageBody
+        role="alert"
+        title="无法加载邮件正文"
+        detail={`${bodyFetchError || '与邮件服务器的连接失败'}。请检查网络或账号连接后重试。`}
+        action={onRetryBodyFetch ? (
+          <button
+            type="button"
+            className="reader-warning-primary-action"
+            onClick={() => {
+              Promise.resolve(onRetryBodyFetch()).catch(() => undefined);
+            }}
+          >
+            重试拉取正文
+          </button>
+        ) : undefined}
+      />
+    );
   }
   if (hasRenderableHtml) {
     return (

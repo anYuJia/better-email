@@ -151,7 +151,7 @@ describe('ContactImportDialog error handling', () => {
 
   it('elevates each action dropdown above the contact-import portal', () => {
     renderDialog({ preview });
-    fireEvent.click(screen.getByRole('button', { name: 'A 导入操作' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'A 导入操作' }));
 
     const listbox = screen.getByRole('listbox');
     expect((listbox as HTMLElement).style.zIndex).toBe('2650');
@@ -160,7 +160,7 @@ describe('ContactImportDialog error handling', () => {
 
   it('keeps Tab and Shift+Tab inside the dialog and its owned body-portal menu', () => {
     renderDialog({ preview });
-    const trigger = screen.getByRole('button', { name: 'A 导入操作' });
+    const trigger = screen.getByRole('combobox', { name: 'A 导入操作' });
     fireEvent.click(trigger);
 
     const dialog = document.querySelector('.contact-import-dialog') as HTMLElement;
@@ -185,7 +185,7 @@ describe('ContactImportDialog error handling', () => {
 
   it('lets Escape close the owned menu without closing the import dialog', () => {
     const { onCancel } = renderDialog({ preview });
-    const trigger = screen.getByRole('button', { name: 'A 导入操作' });
+    const trigger = screen.getByRole('combobox', { name: 'A 导入操作' });
     fireEvent.click(trigger);
     const option = screen.getByRole('option', { name: '新增' });
     fireEvent.keyDown(option, { key: 'Escape' });
@@ -200,7 +200,7 @@ describe('ContactImportDialog error handling', () => {
     renderDialog({ preview, importing: true });
 
     expect(screen.getByRole('button', { name: '全部新增' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('button', { name: 'A 导入操作' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('combobox', { name: 'A 导入操作' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: '编辑 A' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: '正在导入…' })).toHaveProperty('disabled', true);
   });

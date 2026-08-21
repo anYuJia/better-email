@@ -1,0 +1,57 @@
+/*
+ * Deferred overlay layer (overlay.css)
+ *
+ * Owns the full-screen deferred surface shown while the app waits for the
+ * heavy mail/account bootstrapping work (DeferredSurface). Purely a
+ * transient layer: fixed, above the workspace, below dialogs.
+ *
+ * Z-index strategy (semantic token reference):
+ *   --z-sticky    20    toolbar / sticky headers
+ *   --z-popover   100   dropdowns, menus, autocomplete
+ *   --z-composer  1000  composer shell
+ *   --z-dialog     10000 modal backdrops
+ *   --z-tooltip    10000 global tooltips
+ *   --z-toast      10001 notification toasts
+ */
+
+.deferred-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: var(--ui-space-4);
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.5);
+}
+
+.deferred-surface {
+  min-width: 178px;
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+  font-size: 11px;
+  font-weight: 670;
+}
+
+.deferred-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid var(--ui-border-strong);
+  border-top-color: var(--ui-accent);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deferred-spinner {
+    border-color: var(--ui-accent);
+  }
+}

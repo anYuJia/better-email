@@ -39,6 +39,13 @@ async function openSuggestions(input: HTMLInputElement) {
 }
 
 describe('RecipientField keyboard', () => {
+  it('exposes the input as an owned list autocomplete combobox', () => {
+    renderField();
+    const input = screen.getByRole('combobox', { name: '收件人' });
+    expect(input.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('exposes ARIA combobox/listbox state while suggestions are open', async () => {
     renderField();
     const input = recipientInput();

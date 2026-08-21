@@ -1,6 +1,7 @@
 import {
   Archive,
   Clock,
+  ChevronDown,
   Forward,
   Languages,
   Loader2,
@@ -89,7 +90,9 @@ function ReaderToolbar({
 }: ReaderToolbarProps) {
   const isDraft = selected.folder_role === 'drafts';
   const isTrash = selected.folder_role === 'trash';
+  const replyMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
+  const replyMenu = useDetailsMenu(replyMenuRef);
   const moreMenu = useDetailsMenu(moreMenuRef);
   const movableFolders = useMemo(
     () => movableFoldersForMessage(folders, selected),
@@ -116,22 +119,21 @@ function ReaderToolbar({
               <Reply size={16} />
               <span>回复</span>
             </button>
-            <button
-              className="icon-only-action"
-              title="回复全部"
-              aria-label="回复全部"
-              onClick={() => onComposeFromMessage(selected, 'replyAll')}
-            >
-              <ReplyAll size={17} />
-            </button>
-            <button
-              className="icon-only-action"
-              title="转发"
-              aria-label="转发"
-              onClick={() => onComposeFromMessage(selected, 'forward')}
-            >
-              <Forward size={17} />
-            </button>
+            <details className="reader-reply-menu compact-menu" ref={replyMenuRef}>
+              <summary className="icon-only-summary reader-reply-menu-summary" title="更多回复方式" aria-label="更多回复方式">
+                <ChevronDown size={14} />
+              </summary>
+              <div onClick={() => replyMenu.closeMenu()}>
+                <button type="button" onClick={() => onComposeFromMessage(selected, 'replyAll')}>
+                  <ReplyAll size={16} />
+                  <span>回复全部</span>
+                </button>
+                <button type="button" onClick={() => onComposeFromMessage(selected, 'forward')}>
+                  <Forward size={16} />
+                  <span>转发</span>
+                </button>
+              </div>
+            </details>
           </div>
         )}
         <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">

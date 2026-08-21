@@ -93,7 +93,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 0;
   background: var(--ui-list);
   backdrop-filter: none;
 }
@@ -192,10 +192,10 @@
   min-width: 36px;
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
   font-size: 11.5px;
   font-weight: 500;
   white-space: nowrap;
@@ -237,14 +237,20 @@
   justify-content: center;
   gap: 4px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface);
+  background: var(--ui-surface-muted);
   font-size: 11.5px;
   font-weight: 500;
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
+}
+
+.search-scope-menu > summary:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
 .search-scope-menu > summary::after {
@@ -385,8 +391,15 @@
 .app-shell .toolbar,
 .app-shell .list-control-strip {
   border-top: 0;
-  border-bottom-color: var(--ui-border);
   background: var(--ui-list);
+}
+
+.app-shell .toolbar {
+  border-bottom: 0;
+}
+
+.app-shell .list-control-strip {
+  border-bottom-color: color-mix(in srgb, var(--ui-border) 68%, transparent);
 }
 
 /* Summary: natural metadata, not three pills. */
@@ -453,10 +466,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-surface-muted);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -723,7 +736,7 @@
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 72%, transparent);
 }
 
 .message-date-header em {
@@ -734,11 +747,11 @@
 }
 
 .message-date-header.message-date-header--separated {
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid color-mix(in srgb, var(--ui-border) 72%, transparent);
 }
 
 .message-date-section + .message-date-section {
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid color-mix(in srgb, var(--ui-border) 72%, transparent);
 }
 
 
@@ -781,6 +794,10 @@
   transition: var(--ui-transition-bg-color-standard);
   width: 100%;
   max-width: 100%;
+}
+
+.app-shell .message-card {
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ui-border) 48%, transparent);
 }
 
 .message-card > .message-topline,
@@ -1180,10 +1197,10 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 6px;
+  padding: 1px 0;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: 3px;
+  border: 0;
+  border-radius: 0;
   font-size: 11px;
   text-overflow: ellipsis;
   font-weight: 400;

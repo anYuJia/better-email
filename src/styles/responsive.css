@@ -4,7 +4,7 @@
 }
 
 /* At 200% zoom a 960px desktop window exposes roughly 480 CSS pixels.
- * Three persistent panes cannot reflow at that width. The 880px threshold
+ * Three persistent panes cannot reflow at that width. The 1040px threshold
  * also prevents a discontinuity where the reader would be narrower than its
  * useful 360px measure, so the shell becomes a predictable
  * folder -> list -> reader navigation stack. */
@@ -13,7 +13,7 @@
   display: none;
 }
 
-@media (max-width: 880px) {
+@media (max-width: 1040px) {
   .app-shell {
     display: block;
     width: 100%;

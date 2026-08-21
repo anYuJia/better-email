@@ -99,6 +99,7 @@
   background: var(--ui-border);
   box-shadow: var(--ui-box-shadow-none);
   content: "";
+  opacity: 0;
   pointer-events: none;
   transform: translateX(-50%);
   transition: var(--ui-transition-bg-box-shadow-fast);
@@ -116,6 +117,7 @@
 .pane-resizing .app-shell .pane-resizer::before {
   background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
+  opacity: 1;
 }
 
 /* Compact shell (≤1180px): the grid collapses to a fixed three-column

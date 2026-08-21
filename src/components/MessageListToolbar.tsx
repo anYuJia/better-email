@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ArrowDownUp,
   ChevronDown,
   Menu,
   RefreshCw,
@@ -98,11 +97,11 @@ export default function MessageListToolbar({
     [searchEntries, trimmedQuery],
   );
   const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
-  const filterMenuRef = React.useRef<HTMLDetailsElement>(null);
-  const sortMenuRef = React.useRef<HTMLDetailsElement>(null);
+  const viewMenuRef = React.useRef<HTMLDetailsElement>(null);
   const searchScopeMenu = useDetailsMenu(searchScopeMenuRef);
-  const filterMenu = useDetailsMenu(filterMenuRef);
-  const sortMenu = useDetailsMenu(sortMenuRef);
+  const viewMenu = useDetailsMenu(viewMenuRef);
+  const viewIsActive = filter !== 'all' || listSort !== 'newest';
+  const viewLabel = filter !== 'all' ? activeFilterLabel : listSort !== 'newest' ? activeSortLabel : '视图';
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
   const activeSearchSuggestion = activeSearchSuggestionIndex >= 0
     ? searchSuggestions[activeSearchSuggestionIndex]
@@ -305,12 +304,17 @@ export default function MessageListToolbar({
           >
             会话
           </button>
-          <details className="compact-menu filter-menu" ref={filterMenuRef}>
-            <summary className={filter !== 'all' ? 'active' : ''}>
+          <details className="compact-menu view-menu" ref={viewMenuRef}>
+            <summary
+              className={viewIsActive ? 'active' : ''}
+              title={`筛选：${activeFilterLabel}；排序：${activeSortLabel}`}
+              aria-label={`视图设置，当前筛选${activeFilterLabel}，排序${activeSortLabel}`}
+            >
               <SlidersHorizontal size={15} />
-              <span className="filter-label">{filter === 'all' ? '筛选' : activeFilterLabel}</span>
+              <span>{viewLabel}</span>
             </summary>
             <div>
+              <span className="menu-section-title">筛选</span>
               {filters.map((item) => (
                 <button
                   type="button"
@@ -320,20 +324,12 @@ export default function MessageListToolbar({
                   className={filter === item.id ? 'active' : ''}
                   onClick={() => {
                     onFilterChange(item.id);
-                    filterMenu.closeMenu();
+                    viewMenu.closeMenu();
                   }}
                 >
                   {item.label}
                 </button>
               ))}
-            </div>
-          </details>
-          <details className="compact-menu sort-menu" ref={sortMenuRef}>
-            <summary className={listSort !== 'newest' ? 'active' : ''}>
-              <ArrowDownUp size={15} />
-              <span className="sort-label">{activeSortLabel}</span>
-            </summary>
-            <div>
               <span className="menu-section-title">排序方式</span>
               {listSortOptions.map((item) => (
                 <button
@@ -344,7 +340,7 @@ export default function MessageListToolbar({
                   className={listSort === item.id ? 'active' : ''}
                   onClick={() => {
                     onSortChange(item.id);
-                    sortMenu.closeMenu();
+                    viewMenu.closeMenu();
                   }}
                 >
                   {item.label}

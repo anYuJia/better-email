@@ -436,7 +436,6 @@ if (activeThread && threadMessages.length > 0) {
           <span>{formatDate(selected.received_at)}</span>
           {accountScope === 'all' && <span>{selected.account_email}</span>}
           {selected.snoozed_until && <span>稍后到 {formatDate(selected.snoozed_until)}</span>}
-          {selected.has_attachments && <span>含附件</span>}
         </div>
 
         <ReaderLabelMenu

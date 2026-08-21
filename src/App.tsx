@@ -107,7 +107,7 @@ const ComposerCloseConfirmDialog = lazy(() => import('./components/ComposerClose
 const ConfirmationDialogs = lazy(() => import('./components/ConfirmationDialogs'));
 const UndoSnackbarStack = lazy(() => import('./components/UndoSnackbarStack'));
 const MessageToastStack = lazy(() => import('./components/MessageToastStack'));
-const NARROW_SHELL_MEDIA_QUERY = '(max-width: 880px)';
+const NARROW_SHELL_MEDIA_QUERY = '(max-width: 1040px)';
 
 import {
   buildMailboxListStateKey,

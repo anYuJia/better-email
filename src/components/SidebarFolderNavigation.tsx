@@ -366,8 +366,7 @@ export default function SidebarFolderNavigation({
 
   return (
     <>
-      <div className="sidebar-label">邮箱</div>
-      <nav className="folder-list primary-folder-list">
+      <nav className="folder-list primary-folder-list" aria-label="邮箱文件夹">
         <FolderItems folders={[...primaryFolders, ...moreFolders]} {...folderItemProps} />
       </nav>
 

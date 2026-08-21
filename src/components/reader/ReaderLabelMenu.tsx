@@ -51,7 +51,6 @@ export default function ReaderLabelMenu({
 
   return (
     <div className="label-tools">
-      {selectedLabels.length === 0 && <span className="label-empty">无标签</span>}
       {selectedLabels.map((labelName) => {
         const label = labels.find((item) => item.name === labelName);
         return (

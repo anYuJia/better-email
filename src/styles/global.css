@@ -20,6 +20,11 @@
   letter-spacing: -0.01em;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* The app root follows the token background so panes can sit on translucent
  * glass without exposing a white document edge behind them. */
 html,

@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### 1.0.39
+- MCP 服务链路补齐 Streamable HTTP/JSON-RPC 初始化、会话、SSE、工具回退与错误边界。
+- 修复 AI/MCP 服务配置、mock 网络边界、服务密钥绑定和 AI 请求结果契约。
+- 增加 AI/MCP 专项回归命令与 CI 检查，稳定 UI smoke 选择器和自动已读流程。
+
 ### 1.0.37
 - CSS 入口清理：删除未被任何样式入口引用的 `src/styles/2026/dialogs.css`、`src/styles/2026/global.css`、`src/styles/2026/layout.css`、`src/styles/2026/responsive.css`、`src/styles/2026/sidebar.css`、`src/styles/reader.css`，降低样式层级混乱和维护冗余。
 - 保持 settings/发送链路优化不变：延续 1.0.36 的附件进度联动与预览样式收口，并继续收紧发布版本号。

@@ -88,4 +88,10 @@ describe('MessageListToolbar search combobox', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(document.activeElement).toBe(input);
   });
+
+  it('exposes the current view filter menu selector used by the browser smoke flow', () => {
+    renderToolbar();
+    expect(document.querySelector('.view-menu')).not.toBeNull();
+    expect(document.querySelector('.filter-menu')).toBeNull();
+  });
 });

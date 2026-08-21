@@ -57,6 +57,8 @@ export function aiErrorMessage(error: AiRequestError): string {
       return '请先配置 AI 服务（设置 > AI 服务）。';
     case 'disabled':
       return 'AI 服务已关闭，请先在设置中开启。';
+    case 'mcp_disabled':
+      return 'MCP 服务未开启，请先在设置中启用 MCP 服务。';
     case 'privacy_not_acknowledged':
       return '首次发送邮件内容到外部 AI 服务前，请先在设置 > AI 服务中阅读并确认隐私说明。';
     case 'external':
@@ -69,7 +71,11 @@ export function checkAiConfig(config: AiServiceConfig, external: boolean): AiReq
     return config.enabled ? null : { kind: 'disabled' };
   }
   if (!config.enabled) return { kind: 'disabled' };
-  if (!config.endpoint.trim()) return { kind: 'not_configured' };
+  if (config.serviceType === 'mcp' && config.mcpEnabled !== true) {
+    return { kind: 'mcp_disabled' };
+  }
+  const endpoint = config.serviceType === 'mcp' ? config.mcpEndpoint ?? '' : config.endpoint;
+  if (!endpoint.trim()) return { kind: 'not_configured' };
   if (external && !config.privacyAcknowledged) {
     return { kind: 'privacy_not_acknowledged' };
   }
@@ -83,13 +89,14 @@ async function requestExternal(
   targetLanguage: string,
   config: AiServiceConfig,
 ): Promise<AiRequestResult> {
+  const isMcp = config.serviceType === 'mcp';
   const input = {
     operation,
     text: truncateInput(text),
     target_language: targetLanguage,
     prompt: truncateInput(prompt),
-    endpoint: config.endpoint.trim(),
-    api_key: config.apiKey,
+    endpoint: (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
+    api_key: isMcp ? config.mcpApiKey ?? '' : config.apiKey,
     model: config.defaultModel.trim() || 'gpt-4o-mini',
     timeout_seconds: config.timeoutSeconds,
     service_type: config.serviceType,
@@ -139,19 +146,24 @@ export function summarizeMessage(text: string, config?: AiServiceConfig): Promis
 
 export async function testAiConnection(config: AiServiceConfig): Promise<AiTestConnectionResult> {
   if (config.serviceType === 'mock') {
+    const mockGateError = checkAiConfig(config, false);
+    if (mockGateError) {
+      return { ok: false, message: aiErrorMessage(mockGateError), latencyMs: 0 };
+    }
     return { ok: true, message: '模拟 AI 服务连接正常（mock 模式不需要网络）。', latencyMs: 2 };
   }
   const gateError = checkAiConfig(config, false);
   if (gateError) {
     return { ok: false, message: aiErrorMessage(gateError), latencyMs: 0 };
   }
+  const isMcp = config.serviceType === 'mcp';
   try {
     const report = await invoke<{ ok: boolean; service_type: string; message: string; latency_ms: number }>(
-      'test_ai_connection',
+      IPC.TestAiConnection,
       {
         serviceType: config.serviceType,
-        endpoint: config.endpoint.trim(),
-        apiKey: config.apiKey,
+        endpoint: (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
+        apiKey: isMcp ? config.mcpApiKey ?? '' : config.apiKey,
         model: config.defaultModel.trim() || 'gpt-4o-mini',
         timeoutSeconds: config.timeoutSeconds,
       },

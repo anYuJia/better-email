@@ -55,5 +55,6 @@ export type AiRequestResult = {
 export type AiRequestError =
   | { kind: 'not_configured' }
   | { kind: 'disabled' }
+  | { kind: 'mcp_disabled' }
   | { kind: 'privacy_not_acknowledged' }
   | { kind: 'external'; message: string };

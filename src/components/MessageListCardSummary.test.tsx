@@ -89,6 +89,7 @@ describe('message list summary single-line rendering', () => {
     injectCascade();
     renderCard(messageWithLongPreview());
 
+    expect(document.querySelector('.message-card')?.getAttribute('data-message-id')).toBe('1');
     const preview = document.querySelector<HTMLParagraphElement>('.message-card p');
     expect(preview).not.toBeNull();
 

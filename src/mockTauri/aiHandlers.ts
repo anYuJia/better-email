@@ -26,7 +26,11 @@ function handleAiRequest(args?: InvokeArgs) {
     text?: string;
     target_language?: string;
     prompt?: string;
+    service_type?: string;
   };
+  if (input.service_type && input.service_type !== 'mock') {
+    throw new Error('当前为浏览器 mock 环境，不执行外部 AI/MCP 网络请求；请在 Tauri 桌面应用中运行。');
+  }
   const operation = input.operation ?? 'translate';
   const text = String(input.text ?? '');
   const prompt = String(input.prompt ?? '');
@@ -63,13 +67,26 @@ function handleAiChatRequest(args?: InvokeArgs) {
   };
 }
 
-export const handlers: Record<string, MockCommandHandler> = {
-  'ai_request': handleAiRequest,
-  'ai_chat_request': handleAiChatRequest,
-  'test_ai_connection': () => ({
+function handleTestAiConnection(args?: InvokeArgs) {
+  const serviceType = String(args?.serviceType ?? 'mock');
+  if (serviceType !== 'mock') {
+    return {
+      ok: false,
+      service_type: serviceType,
+      message: '当前为浏览器 mock 环境，不执行外部 AI/MCP 网络连接测试；请在 Tauri 桌面应用中测试。',
+      latency_ms: 0,
+    };
+  }
+  return {
     ok: true,
     service_type: 'mock',
     message: '模拟 AI 服务连接正常（mock 模式不需要网络）。',
     latency_ms: 2,
-  }),
+  };
+}
+
+export const handlers: Record<string, MockCommandHandler> = {
+  'ai_request': handleAiRequest,
+  'ai_chat_request': handleAiChatRequest,
+  'test_ai_connection': handleTestAiConnection,
 };

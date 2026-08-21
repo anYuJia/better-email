@@ -27,6 +27,29 @@ function mockAiSettingsReport() {
   };
 }
 
+function normalizedEndpoint(endpoint: string): string {
+  return endpoint.trim().replace(/\/+$/, '');
+}
+
+/** 与 Rust 后端保持一致：密钥只允许留在原服务类型和原端点上。 */
+export function resolveMockBoundSecretKey(
+  incoming: string,
+  clear: boolean,
+  existing: string,
+  serviceTypeChanged: boolean,
+  endpointChanged: boolean,
+): string {
+  if (clear) return '';
+  if (serviceTypeChanged) return incoming.trim();
+  if (!incoming.trim()) {
+    if (endpointChanged && existing.trim()) {
+      throw new Error('服务端点已更改，请重新输入 API Key 后再保存。');
+    }
+    return existing;
+  }
+  return incoming.trim();
+}
+
 // 应用全局「默认附件下载位置」：空字符串表示未自定义（使用系统默认）。
 const mockAppSettingsState = {
   default_download_dir: '',
@@ -52,25 +75,38 @@ export const handlers: Record<string, MockCommandHandler> = {
   'save_ai_settings': (args) => {
     const input = args?.input as Record<string, unknown> | undefined;
     if (!input) throw new Error('缺少 AI 设置输入。');
-    // 与 Rust 后端一致：空 api_key 保持现有，clear_*_api_key 显式删除。
-    const incomingKey = String(input.api_key ?? '');
-    const incomingMcpKey = String(input.mcp_api_key ?? '');
-    const api_key = input.clear_api_key === true
-      ? ''
-      : incomingKey || mockAiSettingsState.api_key;
-    const mcp_api_key = input.clear_mcp_api_key === true
-      ? ''
-      : incomingMcpKey || mockAiSettingsState.mcp_api_key;
+    const service_type = String(input.service_type ?? 'http').trim();
+    const endpoint = String(input.endpoint ?? '').trim();
+    const mcp_endpoint = String(input.mcp_endpoint ?? '').trim();
+    const serviceTypeChanged = service_type !== mockAiSettingsState.service_type;
+    const endpointChanged = normalizedEndpoint(endpoint)
+      !== normalizedEndpoint(mockAiSettingsState.endpoint);
+    const mcpEndpointChanged = normalizedEndpoint(mcp_endpoint)
+      !== normalizedEndpoint(mockAiSettingsState.mcp_endpoint);
+    const api_key = resolveMockBoundSecretKey(
+      String(input.api_key ?? ''),
+      input.clear_api_key === true,
+      mockAiSettingsState.api_key,
+      serviceTypeChanged,
+      endpointChanged,
+    );
+    const mcp_api_key = resolveMockBoundSecretKey(
+      String(input.mcp_api_key ?? ''),
+      input.clear_mcp_api_key === true,
+      mockAiSettingsState.mcp_api_key,
+      serviceTypeChanged,
+      mcpEndpointChanged,
+    );
     Object.assign(mockAiSettingsState, {
       enabled: Boolean(input.enabled),
-      service_type: String(input.service_type ?? 'http'),
-      endpoint: String(input.endpoint ?? ''),
+      service_type,
+      endpoint,
       api_key,
       model: String(input.model ?? 'gpt-4o-mini'),
       timeout_seconds: Number(input.timeout_seconds ?? 30),
       privacy_acknowledged: Boolean(input.privacy_acknowledged),
       mcp_enabled: Boolean(input.mcp_enabled),
-      mcp_endpoint: String(input.mcp_endpoint ?? ''),
+      mcp_endpoint,
       mcp_api_key,
     });
     return 'AI 服务设置已保存。';

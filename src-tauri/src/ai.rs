@@ -5,6 +5,7 @@ use std::time::Duration;
 const MAX_AI_CONTENT_CHARS: usize = 60_000;
 /// AI/MCP HTTP 响应读取上限：防止恶意服务端返回超大响应把应用内存打满。
 const MAX_AI_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
+const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
 
 #[derive(Debug, Deserialize)]
 pub struct AiChatRequest {
@@ -34,6 +35,7 @@ pub struct AiRequestInput {
 #[derive(Debug, Serialize)]
 pub struct AiRequestResult {
     pub operation: String,
+    pub service_type: String,
     pub content: String,
     pub truncated: bool,
     pub latency_ms: u64,
@@ -107,6 +109,7 @@ pub fn call_chat_completion(
     };
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
+        .http_status_as_error(false)
         .build()
         .new_agent();
     let mut request = agent.post(&url).header("Content-Type", "application/json");
@@ -121,6 +124,12 @@ pub fn call_chat_completion(
     let status = response.status();
     let raw_body =
         crate::http::read_response_capped(response.body_mut().as_reader(), MAX_AI_RESPONSE_BYTES)?;
+    if !status.is_success() {
+        let detail = json_error_message(&raw_body)
+            .map(|message| format!("：{message}"))
+            .unwrap_or_default();
+        return Err(format!("AI 服务返回 HTTP {status}{detail}"));
+    }
     let payload: OpenAiChatResponse = serde_json::from_str(&raw_body).map_err(|error| {
         if status.is_success() {
             format!("AI 服务响应解析失败：{error}")
@@ -290,58 +299,199 @@ pub fn run_ai_request(input: &AiRequestInput) -> Result<AiRequestResult, String>
     let content = raw.chars().take(MAX_AI_CONTENT_CHARS).collect::<String>();
     Ok(AiRequestResult {
         operation: input.operation.clone(),
+        service_type: input.service_type.clone(),
         content,
         truncated,
         latency_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
     })
 }
 
-fn json_rpc_call(
-    endpoint: &str,
-    api_key: &str,
-    method: &str,
-    params: serde_json::Value,
-    timeout_seconds: u64,
-) -> Result<serde_json::Value, String> {
-    let validated = validate_ai_endpoint(endpoint)?;
-    let url = validated.trim_end_matches('/').to_string();
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
-    });
-    let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
-        .build()
-        .new_agent();
-    let mut request = agent.post(&url).header("Content-Type", "application/json");
-    if !api_key.trim().is_empty() {
-        request = request.header("Authorization", format!("Bearer {}", api_key.trim()));
+/// MCP Streamable HTTP 客户端的最小实现。
+///
+/// MCP 的初始化不是普通的「发一个 JSON-RPC 请求」：服务端可能在响应中
+/// 分配 `Mcp-Session-Id`，客户端随后必须发送 `notifications/initialized`，
+/// 并把会话头带到后续请求。把这些状态放进客户端对象，避免每次 tools/call
+/// 都丢失协议上下文。
+struct McpClient {
+    endpoint: String,
+    api_key: String,
+    agent: ureq::Agent,
+    next_id: u64,
+    session_id: Option<String>,
+}
+
+impl McpClient {
+    fn new(endpoint: &str, api_key: &str, timeout_seconds: u64) -> Result<Self, String> {
+        let validated = validate_ai_endpoint(endpoint)?;
+        Ok(Self {
+            endpoint: validated.trim_end_matches('/').to_string(),
+            api_key: api_key.trim().to_string(),
+            agent: ureq::Agent::config_builder()
+                .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
+                .http_status_as_error(false)
+                .build()
+                .new_agent(),
+            next_id: 1,
+            session_id: None,
+        })
     }
-    let payload =
-        serde_json::to_vec(&body).map_err(|error| format!("MCP 请求序列化失败：{error}"))?;
-    let mut response = request
-        .send(payload)
-        .map_err(|error| format!("MCP 服务请求失败：{error}"))?;
-    let status = response.status();
-    let raw_body =
-        crate::http::read_response_capped(response.body_mut().as_reader(), MAX_AI_RESPONSE_BYTES)?;
-    let payload: serde_json::Value = serde_json::from_str(&raw_body).map_err(|error| {
-        if status.is_success() {
-            format!("MCP 服务响应解析失败：{error}")
-        } else {
-            format!("MCP 服务返回 HTTP {status}")
+
+    fn call(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let id = self.next_id;
+        self.next_id = self.next_id.saturating_add(1);
+        self.request(Some(id), method, params)
+    }
+
+    fn notify(&mut self, method: &str, params: serde_json::Value) -> Result<(), String> {
+        self.request(None, method, params).map(|_| ())
+    }
+
+    fn initialize(&mut self) -> Result<(), String> {
+        let payload = self.call(
+            "initialize",
+            serde_json::json!({
+                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": { "name": "better-email", "version": "1.0.0" },
+            }),
+        )?;
+        if payload.get("result").is_none() {
+            return Err("MCP 初始化响应缺少 result。".to_string());
         }
-    })?;
-    if let Some(error) = payload.get("error") {
-        let message = error
-            .get("message")
-            .and_then(|value| value.as_str())
-            .unwrap_or("未知错误");
-        return Err(format!("MCP 服务错误：{message}"));
+        self.notify("notifications/initialized", serde_json::json!({}))
     }
-    Ok(payload)
+
+    fn request(
+        &mut self,
+        id: Option<u64>,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let mut body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+        });
+        if let Some(id) = id {
+            body["id"] = serde_json::json!(id);
+        }
+
+        let mut request = self
+            .agent
+            .post(&self.endpoint)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", MCP_PROTOCOL_VERSION);
+        if let Some(session_id) = self.session_id.as_deref() {
+            request = request.header("Mcp-Session-Id", session_id);
+        }
+        if !self.api_key.is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", self.api_key));
+        }
+        let payload =
+            serde_json::to_vec(&body).map_err(|error| format!("MCP 请求序列化失败：{error}"))?;
+        let mut response = request
+            .send(payload)
+            .map_err(|error| format!("MCP 服务请求失败：{error}"))?;
+        let status = response.status();
+        let response_session_id = response
+            .headers()
+            .get("Mcp-Session-Id")
+            .and_then(|value| value.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned);
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        let raw_body = crate::http::read_response_capped(
+            response.body_mut().as_reader(),
+            MAX_AI_RESPONSE_BYTES,
+        )?;
+        if response_session_id.is_some() {
+            self.session_id = response_session_id;
+        }
+
+        if !status.is_success() {
+            let detail = json_error_message(&raw_body)
+                .map(|message| format!("：{message}"))
+                .unwrap_or_default();
+            return Err(format!("MCP 服务返回 HTTP {status}{detail}"));
+        }
+        // JSON-RPC notifications deliberately do not have a response body. A
+        // compliant Streamable HTTP server may return 202 or 204 here.
+        if id.is_none() {
+            return Ok(serde_json::Value::Null);
+        }
+        let payload = parse_json_rpc_body(&raw_body, content_type.as_deref())?;
+        let expected_id = id.expect("response id is present for a request");
+        if payload.get("id").and_then(|value| value.as_u64()) != Some(expected_id) {
+            return Err(format!("MCP 服务响应 id 不匹配（期望 {expected_id}）。"));
+        }
+        if payload.get("error").is_some() {
+            let message = json_error_message(&raw_body).unwrap_or_else(|| "未知错误".to_string());
+            return Err(format!("MCP 服务错误：{message}"));
+        }
+        Ok(payload)
+    }
+}
+
+fn json_error_message(raw_body: &str) -> Option<String> {
+    let payload = serde_json::from_str::<serde_json::Value>(raw_body).ok()?;
+    let error = payload.get("error")?;
+    let message = error
+        .get("message")
+        .and_then(|value| value.as_str())
+        .or_else(|| error.as_str())
+        .unwrap_or("未知错误");
+    let mut chars = message.chars();
+    let short = chars.by_ref().take(500).collect::<String>();
+    Some(if chars.next().is_some() {
+        format!("{short}…")
+    } else {
+        short
+    })
+}
+
+fn parse_json_rpc_body(
+    raw_body: &str,
+    content_type: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let is_event_stream = content_type
+        .and_then(|value| value.split(';').next())
+        .map(|value| value.trim().eq_ignore_ascii_case("text/event-stream"))
+        .unwrap_or(false);
+    if !is_event_stream {
+        return serde_json::from_str(raw_body)
+            .map_err(|error| format!("MCP 服务响应解析失败：{error}"));
+    }
+
+    let mut last_error = None;
+    for event in raw_body.split("\n\n") {
+        let data = event
+            .lines()
+            .filter_map(|line| line.strip_prefix("data:"))
+            .map(str::trim_start)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if data.is_empty() || data == "[DONE]" {
+            continue;
+        }
+        match serde_json::from_str(&data) {
+            Ok(payload) => return Ok(payload),
+            Err(error) => last_error = Some(error.to_string()),
+        }
+    }
+    Err(format!(
+        "MCP 服务 SSE 响应解析失败：{}",
+        last_error.unwrap_or_else(|| "未找到 data 事件".to_string())
+    ))
 }
 
 fn mcp_result_content(result: &serde_json::Value) -> Option<String> {
@@ -373,17 +523,8 @@ pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, Stri
     if endpoint.is_empty() {
         return Err("MCP 服务地址为空，请先在设置中配置。".to_string());
     }
-    json_rpc_call(
-        endpoint,
-        &input.api_key,
-        "initialize",
-        serde_json::json!({
-            "protocolVersion": "2025-03-26",
-            "capabilities": {},
-            "clientInfo": { "name": "better-email", "version": "1.0.0" },
-        }),
-        input.timeout_seconds.max(5),
-    )?;
+    let mut client = McpClient::new(endpoint, &input.api_key, input.timeout_seconds.max(5))?;
+    client.initialize()?;
     let tool_names: Vec<&str> = match input.operation.as_str() {
         "translate" => vec!["translate_message", "translate"],
         "generate_template" => vec!["generate_template"],
@@ -403,15 +544,24 @@ pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, Stri
     };
     let mut last_error = String::new();
     for tool_name in tool_names {
-        match json_rpc_call(
-            endpoint,
-            &input.api_key,
+        match client.call(
             "tools/call",
             serde_json::json!({ "name": tool_name, "arguments": arguments }),
-            input.timeout_seconds.max(5),
         ) {
             Ok(payload) => {
-                if let Some(content) = payload.get("result").and_then(mcp_result_content) {
+                let result = payload.get("result");
+                if result
+                    .and_then(|value| value.get("isError"))
+                    .and_then(|value| value.as_bool())
+                    == Some(true)
+                {
+                    let detail = result
+                        .and_then(mcp_result_content)
+                        .unwrap_or_else(|| "工具返回错误".to_string());
+                    last_error = format!("MCP 工具 {tool_name} 调用失败：{detail}");
+                    continue;
+                }
+                if let Some(content) = result.and_then(mcp_result_content) {
                     let truncated = content.chars().count() > MAX_AI_CONTENT_CHARS;
                     let content = content
                         .chars()
@@ -419,6 +569,7 @@ pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, Stri
                         .collect::<String>();
                     return Ok(AiRequestResult {
                         operation: input.operation.clone(),
+                        service_type: input.service_type.clone(),
                         content,
                         truncated,
                         latency_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
@@ -448,17 +599,8 @@ pub fn test_ai_connection(
     let started_at = std::time::Instant::now();
     match service_type {
         "mcp" => {
-            json_rpc_call(
-                endpoint,
-                api_key,
-                "initialize",
-                serde_json::json!({
-                    "protocolVersion": "2025-03-26",
-                    "capabilities": {},
-                    "clientInfo": { "name": "better-email", "version": "1.0.0" },
-                }),
-                timeout_seconds.max(5),
-            )?;
+            let mut client = McpClient::new(endpoint, api_key, timeout_seconds.max(5))?;
+            client.initialize()?;
             Ok(AiConnectionReport {
                 ok: true,
                 service_type: "mcp".to_string(),
@@ -493,9 +635,108 @@ pub fn test_ai_connection(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_ai_endpoint;
     use super::MAX_AI_RESPONSE_BYTES;
+    use super::{
+        call_chat_completion, run_mcp_tool_call, validate_ai_endpoint, AiChatCompletionInput,
+        AiRequestInput,
+    };
     use crate::http::read_response_capped;
+    use serde_json::Value;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread::JoinHandle;
+    use std::time::Duration;
+
+    type TestResponse = (u16, Vec<(&'static str, &'static str)>, String);
+    type CapturedRequest = (String, Value);
+
+    fn read_request(stream: &mut TcpStream) -> CapturedRequest {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("set request read timeout");
+        let mut bytes = Vec::new();
+        let mut buffer = [0_u8; 4096];
+        let mut header_end;
+        let mut content_length;
+        loop {
+            let read = stream.read(&mut buffer).expect("read request");
+            assert!(read > 0, "request ended before headers/body were complete");
+            bytes.extend_from_slice(&buffer[..read]);
+            if let Some(index) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                header_end = index;
+                let headers = String::from_utf8_lossy(&bytes[..index]).to_ascii_lowercase();
+                content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.strip_prefix("content-length:")?
+                            .trim()
+                            .parse::<usize>()
+                            .ok()
+                    })
+                    .unwrap_or(0);
+                if bytes.len() >= index + 4 + content_length {
+                    break;
+                }
+            }
+        }
+        let headers = String::from_utf8_lossy(&bytes[..header_end]).to_ascii_lowercase();
+        let body_start = header_end + 4;
+        let body_end = body_start + content_length;
+        let body = serde_json::from_slice(&bytes[body_start..body_end]).expect("JSON-RPC request");
+        (headers, body)
+    }
+
+    fn spawn_mcp_test_server(
+        responses: Vec<TestResponse>,
+    ) -> (String, JoinHandle<Vec<CapturedRequest>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind MCP test server");
+        let endpoint = format!(
+            "http://{}/mcp",
+            listener.local_addr().expect("server address")
+        );
+        let handle = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, response_headers, body) in responses {
+                let (mut stream, _) = listener.accept().expect("accept MCP request");
+                requests.push(read_request(&mut stream));
+                let reason = match status {
+                    200 => "OK",
+                    202 => "Accepted",
+                    204 => "No Content",
+                    500 => "Internal Server Error",
+                    _ => "Test Response",
+                };
+                let mut response = format!(
+                    "HTTP/1.1 {status} {reason}\r\nConnection: close\r\nContent-Length: {}\r\n",
+                    body.len()
+                );
+                for (name, value) in response_headers {
+                    response.push_str(&format!("{name}: {value}\r\n"));
+                }
+                response.push_str("\r\n");
+                response.push_str(&body);
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("write MCP response");
+            }
+            requests
+        });
+        (endpoint, handle)
+    }
+
+    fn mcp_input(endpoint: &str, operation: &str) -> AiRequestInput {
+        AiRequestInput {
+            operation: operation.to_string(),
+            text: "hello".to_string(),
+            target_language: "中文".to_string(),
+            prompt: String::new(),
+            endpoint: endpoint.to_string(),
+            api_key: "mcp-test-token".to_string(),
+            model: "ignored".to_string(),
+            timeout_seconds: 5,
+            service_type: "mcp".to_string(),
+        }
+    }
 
     #[test]
     fn https_endpoints_are_allowed() {
@@ -561,5 +802,150 @@ mod tests {
         let ftp = validate_ai_endpoint("ftp://example.com/v1");
         assert!(ftp.is_err());
         assert!(ftp.unwrap_err().contains("https:// 或 http://"));
+    }
+
+    #[test]
+    fn mcp_follows_initialize_notification_session_and_sse_response() {
+        let (endpoint, server) = spawn_mcp_test_server(vec![
+            (
+                200,
+                vec![
+                    ("Content-Type", "application/json"),
+                    ("Mcp-Session-Id", "session-123"),
+                ],
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": { "protocolVersion": "2025-03-26" }
+                })
+                .to_string(),
+            ),
+            (202, vec![], String::new()),
+            (
+                200,
+                vec![("Content-Type", "text/event-stream")],
+                format!(
+                    "event: message\ndata: {}\n\n",
+                    serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "result": { "content": [{ "type": "text", "text": "translated" }] }
+                    })
+                ),
+            ),
+        ]);
+        let result =
+            run_mcp_tool_call(&mcp_input(&endpoint, "translate")).expect("MCP tool call succeeds");
+        let requests = server.join().expect("MCP test server completes");
+
+        assert_eq!(result.content, "translated");
+        assert_eq!(result.service_type, "mcp");
+        assert_eq!(requests.len(), 3);
+        assert_eq!(requests[0].1["method"], "initialize");
+        assert!(requests[0].1.get("id").is_some());
+        assert!(!requests[0].0.contains("mcp-session-id:"));
+        assert!(requests[0]
+            .0
+            .contains("authorization: bearer mcp-test-token"));
+        assert!(requests[0]
+            .0
+            .contains("accept: application/json, text/event-stream"));
+        assert_eq!(requests[1].1["method"], "notifications/initialized");
+        assert!(requests[1].1.get("id").is_none());
+        assert!(requests[1].0.contains("mcp-session-id: session-123"));
+        assert_eq!(requests[2].1["method"], "tools/call");
+        assert_eq!(requests[2].1["params"]["name"], "translate_message");
+        assert!(requests[2].0.contains("mcp-session-id: session-123"));
+    }
+
+    #[test]
+    fn mcp_tool_errors_fall_back_to_the_next_supported_tool() {
+        let (endpoint, server) = spawn_mcp_test_server(vec![
+            (
+                200,
+                vec![("Content-Type", "application/json")],
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": { "protocolVersion": "2025-03-26" }
+                })
+                .to_string(),
+            ),
+            (204, vec![], String::new()),
+            (
+                200,
+                vec![("Content-Type", "application/json")],
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "result": {
+                        "isError": true,
+                        "content": [{ "type": "text", "text": "unknown tool" }]
+                    }
+                })
+                .to_string(),
+            ),
+            (
+                200,
+                vec![("Content-Type", "application/json")],
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "result": { "content": [{ "type": "text", "text": "fallback works" }] }
+                })
+                .to_string(),
+            ),
+        ]);
+        let result = run_mcp_tool_call(&mcp_input(&endpoint, "translate"))
+            .expect("fallback MCP tool call succeeds");
+        let requests = server.join().expect("MCP test server completes");
+
+        assert_eq!(result.content, "fallback works");
+        assert_eq!(requests.len(), 4);
+        assert_eq!(requests[2].1["params"]["name"], "translate_message");
+        assert_eq!(requests[3].1["params"]["name"], "translate");
+    }
+
+    #[test]
+    fn mcp_rejects_non_success_http_status_even_when_body_looks_valid() {
+        let (endpoint, server) = spawn_mcp_test_server(vec![(
+            500,
+            vec![("Content-Type", "application/json")],
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": { "protocolVersion": "2025-03-26" }
+            })
+            .to_string(),
+        )]);
+        let error = run_mcp_tool_call(&mcp_input(&endpoint, "translate"))
+            .expect_err("HTTP 500 must fail MCP initialization");
+        server.join().expect("MCP test server completes");
+        assert!(error.contains("HTTP 500"), "actual error: {error}");
+    }
+
+    #[test]
+    fn openai_compatible_service_rejects_non_success_http_status_even_when_body_looks_valid() {
+        let (endpoint, server) = spawn_mcp_test_server(vec![(
+            500,
+            vec![("Content-Type", "application/json")],
+            serde_json::json!({
+                "choices": [{ "message": { "content": "should not be accepted" } }]
+            })
+            .to_string(),
+        )]);
+        let error = call_chat_completion(
+            &endpoint,
+            "api-key",
+            "test-model",
+            &[AiChatCompletionInput {
+                role: "user".to_string(),
+                content: "ping".to_string(),
+            }],
+            5,
+        )
+        .expect_err("HTTP 500 must fail OpenAI-compatible request");
+        server.join().expect("AI test server completes");
+        assert!(error.contains("HTTP 500"), "actual error: {error}");
     }
 }

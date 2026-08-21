@@ -96,11 +96,14 @@ npm run tauri:build
 ```bash
 npm run lint
 npm test
+npm run test:services
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
+
+`npm run test:services` 是 AI/MCP 服务链路的快速回归入口：它覆盖前端配置与 mock 网络边界、IPC 命令契约、MCP JSON-RPC 初始化/会话/SSE/工具错误处理，以及 Rust 侧密钥绑定和请求门禁。测试使用本机临时 HTTP 服务，不会访问真实 AI/MCP 服务。
 
 ## 反馈与许可
 

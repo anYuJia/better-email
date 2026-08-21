@@ -132,16 +132,25 @@ async function removeDirWithRetry(path) {
   }
 }
 
-async function waitForHttp(target, timeoutMs = 15_000) {
+async function waitForHttp(target, timeoutMs = 15_000, expectedChild = null) {
   return withStep(`waitForHttp ${target}`, async () => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       assertGlobalTimeout(`waiting for ${target}`);
+      if (expectedChild && expectedChild.exitCode !== null) {
+        throw new Error(`Expected server process exited before ${target} became ready (code=${expectedChild.exitCode}, signal=${expectedChild.signalCode ?? 'none'})`);
+      }
+      let response;
       try {
-        const response = await fetch(target);
-        if (response.ok) return;
+        response = await fetch(target);
       } catch {
         // Server is still starting.
+      }
+      if (response?.ok) {
+        if (expectedChild && expectedChild.exitCode !== null) {
+          throw new Error(`Expected server process exited before ${target} became ready (code=${expectedChild.exitCode}, signal=${expectedChild.signalCode ?? 'none'})`);
+        }
+        return;
       }
       await sleep(200);
     }
@@ -1003,7 +1012,7 @@ async function main() {
   try {
     startWatchdog();
     setStep('main: start smoke flow');
-    await waitForHttp(url);
+    await waitForHttp(url, 15_000, vite);
     const chromePath = await findChrome();
     const debugPort = port + 1000;
     chrome = spawnLogged(chromePath, [
@@ -1141,17 +1150,18 @@ async function main() {
     await waitForExpression(cdp, "Number(document.querySelector('.folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0 && document.querySelector('.message-card.is-unread')");
     await evalInPage(
       cdp,
-      "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadSubject = card.querySelector('.subject')?.textContent.trim() || card.textContent.trim(); window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; const target = card.querySelector('.message-card-main') ?? card; target.click(); })()",
+      "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadMessageId = card.dataset.messageId; window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; const target = card.querySelector('.message-card-main') ?? card; target.click(); })()",
     );
     await waitForExpression(
       cdp,
-      "(() => { const subject = window.__autoReadSubject; const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(subject)); return card && document.querySelectorAll('.message-card').length === window.__autoReadCardCountBefore && card.classList.contains('is-read') && !card.querySelector('.message-unread-dot'); })()",
+      "(() => { const messageId = String(window.__autoReadMessageId || ''); const card = [...document.querySelectorAll('.message-card')].find((item) => item.dataset.messageId === messageId); return card && document.querySelectorAll('.message-card').length === window.__autoReadCardCountBefore && card.classList.contains('is-read') && !card.querySelector('.message-unread-dot'); })()",
       10_000,
     );
     await evalInPage(
       cdp,
       `(async () => {
-        const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(window.__autoReadSubject));
+        const messageId = String(window.__autoReadMessageId || '');
+        const card = [...document.querySelectorAll('.message-card')].find((item) => item.dataset.messageId === messageId);
         if (!card) throw new Error('Auto-read card not found for mark-unread');
         card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 }));
         for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -1164,9 +1174,9 @@ async function main() {
       })()`,
     );
     await waitForExpression(cdp, "Number(document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0");
-    await openDetails(cdp, '.filter-menu');
-    await clickButton(cdp, '未读', "document.querySelector('.filter-menu')");
-    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
+    await openDetails(cdp, '.view-menu');
+    await clickButton(cdp, '未读', "document.querySelector('.view-menu')");
+    await waitForExpression(cdp, "document.querySelector('.view-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (!folder || !badge || Number(badge.textContent) <= 0) throw new Error('Inbox unread folder target not found'); window.__folderUnreadBefore = Number(badge.textContent); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 180, button: 2 })); })()",
@@ -1174,9 +1184,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('全部标为已读')");
     await clickButton(cdp, '全部标为已读', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
-    await openDetails(cdp, '.filter-menu');
-    await clickButton(cdp, '全部', "document.querySelector('.filter-menu')");
-    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('筛选') && document.body.innerText.includes('已显示')");
+    await openDetails(cdp, '.view-menu');
+    await clickButton(cdp, '全部', "document.querySelector('.view-menu')");
+    await waitForExpression(cdp, "document.querySelector('.view-menu summary')?.textContent.includes('视图') && document.body.innerText.includes('已显示')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
@@ -2201,7 +2211,8 @@ async function main() {
     await captureScreenshot(cdp, 'attachment-download-retry');
     await clickButton(cdp, '重试', "document.querySelector('.attachments')");
     await waitForExpression(cdp, "document.body.innerText.includes('附件已从 64 KB 继续下载：security-checklist.pdf') && document.body.innerText.includes('打开')");
-    await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"转发\"]').click()");
+    await openDetails(cdp, '.reader-reply-menu');
+    await clickButton(cdp, '转发', "document.querySelector('.reader-reply-menu')");
     await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[placeholder=\"主题\"]')?.value === 'Fwd: 安全检查清单' && document.querySelector('.composer-attachment-list')?.innerText.includes('security-checklist.pdf') && document.querySelector('.status-line')?.textContent.includes('已带入 1 个附件')");
     await captureScreenshot(cdp, 'forward-with-source-attachment');
     await closeComposer(cdp);

@@ -53,6 +53,7 @@ export default React.memo(function MessageListCard({
         isDragging ? 'dragging' : '',
         isNew ? 'is-new' : '',
       ].filter(Boolean).join(' ')}
+      data-message-id={message.id}
       style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
       draggable
       onClick={() => onSelectMessage(message.id)}

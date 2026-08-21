@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import AiServiceSettings from './AiServiceSettings';
 import { aiServiceStorageKey } from '../../app/aiServiceConfig';
 
@@ -17,6 +17,28 @@ describe('AiServiceSettings', () => {
     render(<AiServiceSettings />);
     expect(screen.getByText(/模型推理服务 \(LLM\)/)).not.toBeNull();
     expect(screen.getByText(/MCP 服务 \(Model Context Protocol\)/)).not.toBeNull();
+  });
+
+  it('allows MCP to be selected as the active inference engine', () => {
+    seedConfig({
+      enabled: true,
+      serviceType: 'mcp',
+      mcpEnabled: true,
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      privacyAcknowledged: true,
+    });
+    render(<AiServiceSettings />);
+    expect(screen.getByRole('combobox').textContent).toContain('MCP 服务器');
+    expect(screen.getByDisplayValue('http://127.0.0.1:8080/mcp')).not.toBeNull();
+    expect(screen.getByText('Bearer 鉴权 Token')).not.toBeNull();
+    expect(screen.getByText(/当前已选择 MCP 服务器作为推理引擎/)).not.toBeNull();
+  });
+
+  it('offers MCP in the inference engine selector', () => {
+    seedConfig({ enabled: true, serviceType: 'http', endpoint: 'https://api.example.com/v1' });
+    render(<AiServiceSettings />);
+    fireEvent.click(screen.getByRole('combobox'));
+    expect(screen.getByRole('option', { name: /MCP 服务器/ })).not.toBeNull();
   });
 
   it('configures MCP as a client endpoint rather than a local gateway', () => {

@@ -33,7 +33,11 @@ export default function AiServiceSettings() {
     saveConfig,
     runTestConnection,
   } = useAiService({ setStatus: () => undefined });
+  const isMcp = config.serviceType === 'mcp';
   const external = config.serviceType !== 'mock';
+  const providerEndpoint = isMcp ? config.mcpEndpoint ?? '' : config.endpoint;
+  const providerApiKey = isMcp ? config.mcpApiKey ?? '' : config.apiKey;
+  const providerHasApiKey = isMcp ? config.hasMcpApiKey : config.hasApiKey;
   const statusLabel = !config.enabled
     ? '未启用'
     : config.serviceType === 'mock'
@@ -88,66 +92,83 @@ export default function AiServiceSettings() {
           }
           dataSection="ai-llm-provider"
         >
-          <SettingsField label="选择推理引擎来源" hint="按需选择本地离线演示模式或外部 OpenAI 兼容服务端点">
+          <SettingsField label="选择推理引擎来源" hint="按需选择本地离线演示模式、OpenAI 兼容 API 或 MCP 服务器">
             <CustomSelect
               dense
-              value={config.serviceType === 'mcp' ? 'http' : config.serviceType}
+              value={config.serviceType}
               options={[
                 { value: 'mock', label: '本地演示模式 (Mock) — 离线示例，无外部请求' },
                 { value: 'http', label: 'OpenAI 兼容 API — 连接兼容 chat/completions 的外部 LLM 服务' },
+                { value: 'mcp', label: 'MCP 服务器 — 通过 JSON-RPC 调用外部工具' },
               ]}
-              onChange={(val) => patchConfig({ serviceType: val as AiServiceType })}
+              onChange={(val) => {
+                const nextServiceType = val as AiServiceType;
+                patchConfig({
+                  serviceType: nextServiceType,
+                  ...(nextServiceType === 'mcp' ? { mcpEnabled: true } : {}),
+                });
+              }}
             />
           </SettingsField>
 
           {external && (
             <div className="st-field-grid" style={{ marginTop: '16px' }}>
-              <SettingsField label="API 服务端点">
+              <SettingsField label={isMcp ? 'MCP 服务端点' : 'API 服务端点'}>
                 <input
                   className="settings-text-input"
                   type="url"
-                  placeholder="https://api.example.com/v1"
-                  value={config.endpoint}
-                  onChange={(event) => patchConfig({ endpoint: event.target.value })}
+                  placeholder={isMcp ? 'http://127.0.0.1:8080/mcp' : 'https://api.example.com/v1'}
+                  value={providerEndpoint}
+                  onChange={(event) => patchConfig(isMcp
+                    ? { mcpEndpoint: event.target.value }
+                    : { endpoint: event.target.value })}
                 />
               </SettingsField>
 
-              <SettingsField label="API Key / Token">
+              <SettingsField label={isMcp ? 'Bearer 鉴权 Token' : 'API Key / Token'}>
                 <div className="settings-ai-key-row">
                   <input
                     className="settings-text-input"
                     type="password"
-                    placeholder={config.hasApiKey ? '已保存 Key，留空保持不变' : '输入 API Key'}
-                    value={config.apiKey}
-                    onChange={(event) => patchConfig({ apiKey: event.target.value })}
+                    placeholder={providerHasApiKey
+                      ? `已保存${isMcp ? ' Token' : ' Key'}，留空保持不变`
+                      : isMcp ? '输入访问 MCP 服务的 Token' : '输入 API Key'}
+                    value={providerApiKey}
+                    onChange={(event) => patchConfig(isMcp
+                      ? { mcpApiKey: event.target.value }
+                      : { apiKey: event.target.value })}
                     autoComplete="off"
                   />
-                  {config.hasApiKey && !config.apiKey ? (
+                  {providerHasApiKey && !providerApiKey ? (
                     <button
                       type="button"
                       className="settings-text-button"
-                      onClick={() => patchConfig({ clearApiKey: true, hasApiKey: false })}
+                      onClick={() => patchConfig(isMcp
+                        ? { clearMcpApiKey: true, hasMcpApiKey: false }
+                        : { clearApiKey: true, hasApiKey: false })}
                     >
-                      清除已保存 Key
+                      清除已保存{isMcp ? ' Token' : ' Key'}
                     </button>
                   ) : (
                     <span className="settings-ai-key-hint">
                       <KeyRound size={12} aria-hidden="true" />
-                      {config.hasApiKey ? '已保存 Key' : '未保存'}
+                      {providerHasApiKey ? `已保存${isMcp ? ' Token' : ' Key'}` : '未保存'}
                     </span>
                   )}
                 </div>
               </SettingsField>
 
-              <SettingsField label="默认模型名称">
-                <input
-                  className="settings-text-input"
-                  type="text"
-                  placeholder="gpt-4o-mini"
-                  value={config.defaultModel}
-                  onChange={(event) => patchConfig({ defaultModel: event.target.value })}
-                />
-              </SettingsField>
+              {!isMcp && (
+                <SettingsField label="默认模型名称">
+                  <input
+                    className="settings-text-input"
+                    type="text"
+                    placeholder="gpt-4o-mini"
+                    value={config.defaultModel}
+                    onChange={(event) => patchConfig({ defaultModel: event.target.value })}
+                  />
+                </SettingsField>
+              )}
 
               <SettingsField label="请求超时时间 (秒)">
                 <input
@@ -163,11 +184,11 @@ export default function AiServiceSettings() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <SettingsNotice tone="warning" title="隐私确认" icon={ShieldAlert}>
                   <p>
-                    开启翻译、模板生成或摘要后，邮件正文与提示词将被发送到上面配置的外部 AI 服务。
+                    开启翻译、模板生成或摘要后，邮件正文与提示词将被发送到上面配置的外部服务。
                     请在确认服务商数据处理政策后使用；Better Email 不会在你的设备之外保存这些内容。
                   </p>
                   <SettingsSwitch
-                    label="我已阅读并同意将邮件内容发送到外部 AI 服务"
+                    label={`我已阅读并同意将邮件内容发送到外部${isMcp ? ' MCP 服务' : ' AI 服务'}`}
                     description="未确认前，外部服务模式无法使用翻译、摘要与模板生成。"
                     checked={config.privacyAcknowledged}
                     onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
@@ -231,7 +252,7 @@ export default function AiServiceSettings() {
             onChange={(checked) => patchConfig({ mcpEnabled: checked })}
           />
 
-          {config.mcpEnabled && (
+          {config.mcpEnabled && !isMcp && (
             <div className="st-field-grid" style={{ marginTop: '12px' }}>
               <SettingsField label="MCP 服务端点">
                 <input
@@ -270,6 +291,11 @@ export default function AiServiceSettings() {
                 </div>
               </SettingsField>
             </div>
+          )}
+          {config.mcpEnabled && isMcp && (
+            <SettingsNotice tone="info" title="当前推理引擎" icon={PlugZap} style={{ marginTop: '12px' }}>
+              <p>当前已选择 MCP 服务器作为推理引擎；端点和 Token 请在上方模型推理服务区域配置。</p>
+            </SettingsNotice>
           )}
         </SettingsSection>
       </div>

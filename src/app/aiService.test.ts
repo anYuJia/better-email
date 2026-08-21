@@ -1,13 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   aiErrorMessage,
   checkAiConfig,
   generateTemplate,
   mockAiResult,
+  testAiConnection,
   translateMessage,
 } from './aiService';
 import { defaultAiServiceConfig } from './aiServiceConfig';
 import type { AiServiceConfig } from './types/ai';
+import { IPC } from '../ipc/commands';
+
+const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
+
+vi.mock('../tauriBridge', () => ({
+  invoke: invokeMock,
+  mockMode: true,
+}));
 
 describe('aiService', () => {
   it('mock translate returns stable deterministic result', async () => {
@@ -37,6 +46,86 @@ describe('aiService', () => {
   it('throws clear error when disabled', () => {
     const error = checkAiConfig({ ...defaultAiServiceConfig, enabled: false, serviceType: 'mock' }, false);
     expect(error?.kind).toBe('disabled');
+  });
+
+  it('does not report a disabled mock service as connected', async () => {
+    await expect(testAiConnection({
+      ...defaultAiServiceConfig,
+      enabled: false,
+      serviceType: 'mock',
+    })).resolves.toMatchObject({ ok: false, message: expect.stringContaining('已关闭') });
+  });
+
+  it('uses the MCP endpoint and reports a dedicated disabled error', () => {
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'mcp',
+      endpoint: 'https://wrong.example.com/v1',
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      mcpEnabled: false,
+    };
+    expect(checkAiConfig(config, true)).toMatchObject({ kind: 'mcp_disabled' });
+    expect(aiErrorMessage({ kind: 'mcp_disabled' })).toContain('MCP 服务未开启');
+    expect(checkAiConfig({ ...config, mcpEnabled: true }, true)).toMatchObject({
+      kind: 'privacy_not_acknowledged',
+    });
+  });
+
+  it('routes MCP operations to the MCP endpoint and token', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'translate',
+      content: '你好',
+      service_type: 'mcp',
+      truncated: false,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'mcp',
+      endpoint: 'https://wrong.example.com/v1',
+      apiKey: 'wrong-key',
+      mcpEnabled: true,
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      mcpApiKey: 'mcp-token',
+      privacyAcknowledged: true,
+    };
+
+    await expect(translateMessage('hello', '中文', config)).resolves.toMatchObject({
+      service_type: 'mcp',
+    });
+    expect(invokeMock).toHaveBeenCalledWith('ai_request', {
+      input: expect.objectContaining({
+        endpoint: 'http://127.0.0.1:8080/mcp',
+        api_key: 'mcp-token',
+        service_type: 'mcp',
+      }),
+    });
+  });
+
+  it('tests MCP connections with the MCP endpoint and token', async () => {
+    invokeMock.mockResolvedValueOnce({
+      ok: true,
+      service_type: 'mcp',
+      message: 'MCP 服务连接正常。',
+      latency_ms: 4,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'mcp',
+      mcpEnabled: true,
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      mcpApiKey: 'mcp-token',
+      privacyAcknowledged: true,
+    };
+
+    await expect(testAiConnection(config)).resolves.toMatchObject({ ok: true });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
+      serviceType: 'mcp',
+      endpoint: 'http://127.0.0.1:8080/mcp',
+      apiKey: 'mcp-token',
+    }));
   });
 
   it('requires privacy acknowledgment before external sends', () => {

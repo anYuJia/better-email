@@ -70,6 +70,9 @@ jobs:
       - name: IPC contract parity check
         run: npx vitest run src/ipc/ipcContract.test.ts
 
+      - name: AI/MCP service contract tests
+        run: npm run test:services
+
       - name: Frontend production build
         run: npm run build
 

@@ -1141,12 +1141,12 @@ async function main() {
     await waitForExpression(cdp, "Number(document.querySelector('.folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0 && document.querySelector('.message-card.is-unread')");
     await evalInPage(
       cdp,
-      "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadSubject = card.querySelector('.subject')?.textContent.trim() || card.textContent.trim(); window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; card.click(); })()",
+      "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadSubject = card.querySelector('.subject')?.textContent.trim() || card.textContent.trim(); window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; const target = card.querySelector('.message-card-main') ?? card; target.click(); })()",
     );
     await waitForExpression(
       cdp,
       "(() => { const subject = window.__autoReadSubject; const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(subject)); return card && document.querySelectorAll('.message-card').length === window.__autoReadCardCountBefore && card.classList.contains('is-read') && !card.querySelector('.message-unread-dot'); })()",
-      5_000,
+      10_000,
     );
     await evalInPage(
       cdp,

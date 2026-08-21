@@ -1798,9 +1798,19 @@
 
 .composer-header-actions button {
   min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 0 8px;
   border-radius: 7px;
   font-size: 10.5px;
+  line-height: 1;
+}
+
+.composer-header-actions button > svg {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .composer-primary-fields {

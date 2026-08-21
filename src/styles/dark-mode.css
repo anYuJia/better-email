@@ -145,7 +145,7 @@
 
 :root[data-theme="dark"] .compact-menu > div {
   background: var(--ui-surface);
-  border-color: var(--ui-border-strong);
+  border: 0;
   box-shadow: var(--ui-shadow-popover);
 }
 
@@ -212,7 +212,7 @@
 
 :root[data-theme="dark"] .reader-actions .primary-action {
   color: var(--ui-text);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {

@@ -221,7 +221,7 @@
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
-  background: var(--ui-surface-muted);
+  background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-weight: 650;
 }
@@ -229,7 +229,7 @@
 .app-shell .reader-actions .primary-action {
   min-width: 66px;
   color: var(--ui-text);
-  background: var(--workspace-control-active);
+  background: transparent;
   font-weight: 650;
 }
 
@@ -241,6 +241,10 @@
 .app-shell .reader-actions .primary-action:hover:not(:disabled) {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
+}
+
+.app-shell .reader-actions .compact-menu > div {
+  border: 0;
 }
 
 /* Delete: neutral by default, danger on hover. Not a permanent red hot-spot. */
@@ -380,12 +384,55 @@
 
 /* Secondary: email, recipients, 11.5–12px, tertiary */
 .reader-sender-copy > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ui-text-tertiary);
   font-size: 12px;
+}
+
+.reader-sender-email-line {
+  width: 100%;
+}
+
+.reader-sender-email-text,
+.reader-recipient-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-sender-email-text {
+  flex: 0 0 auto;
+}
+
+.reader-recipient-summary {
+  flex: 1 1 auto;
+}
+
+.reader-recipient-expand {
+  flex: 0 0 auto;
+  min-height: 22px;
+  padding: 0 3px;
+  border: 0;
+  color: var(--ui-accent);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.reader-recipient-expand:hover,
+.reader-recipient-expand:focus-visible {
+  color: var(--ui-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .app-shell .reader-sender-copy > span {
@@ -410,11 +457,60 @@
   cursor: pointer;
 }
 
+.app-shell .reader-recipient-expand {
+  min-height: 22px;
+  border: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
 .app-shell .reader-sender-email:hover,
 .app-shell .reader-sender-email:focus-visible {
   color: var(--ui-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.recipient-details-dialog {
+  width: min(520px, 100%);
+}
+
+.recipient-details-groups {
+  display: grid;
+  gap: 14px;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+}
+
+.recipient-details-group {
+  min-width: 0;
+}
+
+.recipient-details-group h3 {
+  margin: 0 0 6px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.recipient-details-group ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipient-details-group li {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 /* Avatar: 32–36px, subdued identity. No gradient, no ring, no shadow. */

@@ -20,7 +20,7 @@ use std::time::Duration;
 
 const HEADER_FETCH_LIMIT: usize = 25;
 const FLAG_RECONCILE_LIMIT: u32 = 50;
-const BODY_FETCH_QUERY_PRESERVE_SEEN: &str = "BODY.PEEK[]";
+const SINGLE_PART_TEXT_FETCH_QUERY: &str = "BODY.PEEK[TEXT]";
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
 const ATTACHMENT_RETRY_BASE_DELAY_MS: u64 = 150;
@@ -672,11 +672,15 @@ fn fetch_message_text_part(
 ) -> Result<Vec<u8>, MailError> {
     if path.is_empty() {
         let fetches = session
-            .uid_fetch(remote_uid.to_string(), BODY_FETCH_QUERY_PRESERVE_SEEN)
+            // BODY.PEEK[] returns the complete RFC822 message for a
+            // single-part message, including Received/DKIM/MIME headers.
+            // The empty bodystructure path represents the message text, so
+            // request TEXT explicitly and keep those headers out of the body.
+            .uid_fetch(remote_uid.to_string(), SINGLE_PART_TEXT_FETCH_QUERY)
             .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
         return fetches
             .iter()
-            .find_map(|fetch| fetch.body())
+            .find_map(|fetch| fetch.text())
             .map(|bytes| bytes.to_vec())
             .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()));
     }
@@ -2439,8 +2443,11 @@ mod tests {
 
     #[test]
     fn body_fetch_query_does_not_mark_message_seen() {
-        assert_eq!(BODY_FETCH_QUERY_PRESERVE_SEEN, "BODY.PEEK[]");
-        assert!(!BODY_FETCH_QUERY_PRESERVE_SEEN.contains("RFC822"));
+        // An empty bodystructure path is a single-part text body. Fetching
+        // BODY.PEEK[] here would return the entire raw message instead.
+        assert_eq!(SINGLE_PART_TEXT_FETCH_QUERY, "BODY.PEEK[TEXT]");
+        assert!(SINGLE_PART_TEXT_FETCH_QUERY.contains("PEEK"));
+        assert!(!SINGLE_PART_TEXT_FETCH_QUERY.contains("RFC822"));
     }
 
     #[test]

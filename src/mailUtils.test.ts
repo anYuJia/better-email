@@ -19,6 +19,7 @@ import {
   bodyLooksLikeHtml,
   htmlHasRenderableContent,
   htmlHasRemoteVisualContent,
+  isMessageBodyCorrupted,
   parseMailtoUrl,
   compareDomains,
 } from './mailUtils';
@@ -57,6 +58,21 @@ describe('mail UI utilities', () => {
     expect(formatBytes(42)).toBe('42 B');
     expect(formatBytes(1536)).toBe('2 KB');
     expect(formatBytes(2.5 * 1024 * 1024)).toBe('2.5 MB');
+  });
+
+  it('detects cached full RFC822 messages so the reader can refetch clean text', () => {
+    const rawMessage = [
+      'Received: from ucmail53.sendcloud.io (ucmail53.sendcloud.io [120.132.55.96])',
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset="UTF-8"',
+      'Content-Transfer-Encoding: quoted-printable',
+      '',
+      '<p>正文</p>',
+    ].join('\r\n');
+
+    expect(isMessageBodyCorrupted(rawMessage)).toBe(true);
+    expect(isMessageBodyCorrupted('Received: from a trusted sender\n正文内容')).toBe(false);
+    expect(isMessageBodyCorrupted('<p>Content-Type: text/html</p>')).toBe(false);
   });
 
   it('adds reply and forward prefixes only when needed', () => {

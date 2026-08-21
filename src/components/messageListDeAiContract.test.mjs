@@ -125,6 +125,14 @@ describe('message list de-AI contract — rows are flat lines, not cards', () =>
   });
 });
 
+describe('message list avatar behavior', () => {
+  it('keeps the sender avatar visible in the app shell when the trailing checkbox appears', () => {
+    const blocks = extractBlock(messageListCss, '.app-shell .message-card .message-leading');
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks[0]).toMatch(/opacity:\s*1/);
+  });
+});
+
 describe('message list de-AI contract — no persistent glass', () => {
   it('message-list-panel has no backdrop-filter blur', () => {
     const blocks = extractBlock(messageListCss, '.message-list-panel');

@@ -568,7 +568,7 @@
   padding: 5px;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid var(--ui-border-strong);
+  border: 0;
   border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
@@ -842,6 +842,12 @@
 .message-card:has(.message-card-main:focus-visible) .message-leading,
 .message-card:has(.message-select input:checked) .message-leading {
   opacity: 0;
+}
+
+/* The app shell moves the checkbox to the trailing gutter, so hovering or
+ * selecting a row no longer needs to replace the sender avatar. */
+.app-shell .message-card .message-leading {
+  opacity: 1;
 }
 
 /* Avatar — muted, flat, no ring/shadow/gradient. */

@@ -22,11 +22,36 @@ describe('Avatar', () => {
   });
 
   describe('inferredAvatarCandidates', () => {
-    it('never turns sender identity into a third-party avatar request', () => {
+    it('only infers avatars for allowlisted service domains', () => {
       expect(inferredAvatarCandidates('daisy@example.com', 'Daisy Priya')).toEqual([]);
-      expect(inferredAvatarCandidates('notify@github.com', 'GitHub')).toEqual([]);
-      expect(inferredAvatarCandidates('pageupdates@facebookmail.com', 'Facebook 公共主页')).toEqual([]);
+      expect(inferredAvatarCandidates('notify@github.com', 'GitHub')).toEqual([
+        'https://unavatar.io/github/GitHub',
+        'https://unavatar.io/github.com?fallback=false',
+      ]);
+      expect(inferredAvatarCandidates('pageupdates@facebookmail.com', 'Facebook 公共主页')).toEqual([
+        'https://unavatar.io/facebook.com?fallback=false',
+      ]);
     });
+
+    it('supports service domains that use a brand sender name', () => {
+      expect(inferredAvatarCandidates('noreply@gitee.com', 'Gitee')).toEqual([
+        'https://unavatar.io/gitee.com?fallback=false',
+      ]);
+    });
+  });
+
+  it('renders an inferred service avatar when no explicit source exists', () => {
+    render(
+      <Avatar
+        email="notify@github.com"
+        name="GitHub"
+        className="message-avatar avatar-tone-2"
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: 'GitHub' }).getAttribute('src')).toBe(
+      'https://unavatar.io/github/GitHub',
+    );
   });
 
   it('renders an explicit avatar src inside the fixed-size avatar shell', () => {

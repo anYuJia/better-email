@@ -80,7 +80,18 @@ export function formatBytes(value: number): string {
 
 export function isMessageBodyCorrupted(body: string): boolean {
   const trimmed = body.trim();
-  return trimmed.startsWith('--') && (trimmed.includes('Content-Type:') || trimmed.includes('content-type:'));
+  if (trimmed.startsWith('--') && (trimmed.includes('Content-Type:') || trimmed.includes('content-type:'))) {
+    return true;
+  }
+
+  // A previous IMAP fetch used BODY.PEEK[] for single-part messages. That
+  // stores the whole RFC822 message as the body, so recognize its strong MIME
+  // header signature and let the reader request a clean body again.
+  const startsWithHeader = /^(?:return-path|received|delivered-to|from|sender|date|subject|message-id|mime-version|content-type)\s*:/i.test(trimmed);
+  const hasContentType = /(?:^|\s)content-type\s*:/i.test(trimmed);
+  const hasTransferEncoding = /(?:^|\s)content-transfer-encoding\s*:/i.test(trimmed);
+  const hasMimeHeader = /(?:^|\s)(?:mime-version|message-id|received|dkim-signature|authentication-results)\s*:/i.test(trimmed);
+  return startsWithHeader && hasContentType && hasTransferEncoding && hasMimeHeader;
 }
 
 function decodeNumericEntity(code: number): string {

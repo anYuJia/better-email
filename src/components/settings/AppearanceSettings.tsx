@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Monitor, Moon, Sun } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import SettingsSection from './shared/SettingsSection';
 import type { ThemeMode } from '../../hooks/useThemeMode';
@@ -70,7 +70,7 @@ export default function AppearanceSettings({
   };
 
   return (
-    <SettingsSection title="外观" description="选择 Better Email 的界面外观，改动会立即生效。">
+    <SettingsSection className="settings-appearance-section" dataSection="appearance">
       <div className="settings-theme-preference">
         <div
           className="settings-theme-options"
@@ -95,14 +95,21 @@ export default function AppearanceSettings({
                 title={option.description}
                 onClick={() => onThemeModeChange(option.value)}
               >
-                <Icon aria-hidden="true" size={16} />
-                <span>{option.label}</span>
+                <span className="settings-theme-option-icon" aria-hidden="true">
+                  <Icon size={17} />
+                </span>
+                <span className="settings-theme-option-copy">
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+                <Check className="settings-theme-option-check" aria-hidden="true" size={17} />
               </button>
             );
           })}
         </div>
-        <p id="settings-theme-description" className="settings-theme-description">
-          {selectedOption.description}
+        <p id="settings-theme-description" className="settings-theme-description" aria-live="polite">
+          <Check aria-hidden="true" size={14} />
+          <span>当前使用“{selectedOption.label}”，更改已自动保存。</span>
         </p>
       </div>
     </SettingsSection>

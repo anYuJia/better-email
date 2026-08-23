@@ -20,11 +20,13 @@
 .account-login-dialog {
   width: min(408px, calc(100vw - 40px));
   overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-modal);
+  border: 0;
+  border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ui-border) 70%, transparent),
+    var(--ui-shadow-float);
 }
 
 /* ── Header ─────────────────────────────────────────────────────── */
@@ -175,15 +177,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface-muted);
+  padding: 9px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--ui-border);
 }
 
 .account-login-provider.ready {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+  background: transparent;
 }
 
 .account-login-provider > span {
@@ -201,7 +204,7 @@
 .account-login-provider small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -220,7 +223,7 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
   white-space: nowrap;
 }
 
@@ -251,7 +254,7 @@
 .account-login-error {
   margin: 0;
   padding: 8px 12px;
-  border: 1px solid var(--ui-danger);
+  border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
@@ -298,7 +301,7 @@
   border-top: 1px solid var(--ui-border);
   color: var(--ui-text-tertiary);
   background: var(--ui-surface-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* ── Responsive ────────────────────────────────────────────────── */

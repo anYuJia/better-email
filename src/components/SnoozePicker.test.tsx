@@ -52,10 +52,10 @@ describe('SnoozePicker modal focus management', () => {
 
   it('closes on Escape and restores focus to the previous element', async () => {
     const HarnessWithClose = () => {
-      const [open, setOpen] = useState(true);
+      const [open, setOpen] = useState(false);
       return (
         <div>
-          <button type="button" data-testid="anchor">锚点</button>
+          <button type="button" data-testid="anchor" onClick={() => setOpen(true)}>锚点</button>
           {open && (
             <SnoozePicker
               targetCount={1}
@@ -68,13 +68,31 @@ describe('SnoozePicker modal focus management', () => {
       );
     };
     render(<HarnessWithClose />);
-    await flushEffects();
     const anchor = document.querySelector('[data-testid="anchor"]') as HTMLElement;
     anchor.focus();
+    fireEvent.click(anchor);
+    await flushEffects();
     fireEvent.keyDown(backdrop(), { key: 'Escape' });
     await flushEffects();
     expect(document.querySelector('.snooze-dialog')).toBeNull();
     expect(document.activeElement).toBe(anchor);
+  });
+
+  it('consumes Escape before application shortcuts and keeps the underlying state intact', async () => {
+    const backgroundEscape = vi.fn();
+    window.addEventListener('keydown', backgroundEscape);
+    try {
+      render(<Harness />);
+      await flushEffects();
+      const firstPreset = dialog().querySelector('button') as HTMLElement;
+      fireEvent.keyDown(firstPreset, { key: 'Escape' });
+      await flushEffects();
+
+      expect(backgroundEscape).not.toHaveBeenCalled();
+      expect(document.querySelector('.snooze-dialog')).toBeNull();
+    } finally {
+      window.removeEventListener('keydown', backgroundEscape);
+    }
   });
 
   it('keeps focus inside the dialog when Tab would leave it', async () => {

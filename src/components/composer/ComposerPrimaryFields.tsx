@@ -277,7 +277,7 @@ export default function ComposerPrimaryFields({
     <div className="composer-primary-fields">
       <RecipientField
         label="收件人"
-        placeholder="收件人"
+        placeholder="姓名或邮箱地址"
         value={draft.to}
         contactSearchEntries={contactSearchEntries}
         onChange={(value) => onPatchDraft({ to: value })}
@@ -285,39 +285,41 @@ export default function ComposerPrimaryFields({
 
       <RecipientField
         label="抄送"
-        placeholder="抄送（可选）"
+        placeholder="添加抄送"
         value={draft.cc}
         contactSearchEntries={contactSearchEntries}
         onChange={(value) => onPatchDraft({ cc: value })}
       />
 
-      <label className="composer-field-row">
-        <span>主题</span>
+      <label className="composer-field-row composer-subject-field">
+        <span className="sr-only">主题</span>
         <input
+          aria-label="主题"
           value={draft.subject}
           onChange={(event) => onPatchDraft({ subject: event.target.value })}
-          placeholder="主题"
+          placeholder="添加主题"
         />
       </label>
 
-      <label
+      <section
         className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}${dropActive ? ' drop-active' : ''}`}
+        aria-label="邮件正文"
         onDrop={onAttachmentDrop}
         onDragEnter={onAttachmentDragEnter}
         onDragLeave={onAttachmentDragLeave}
         onDragOver={onAttachmentDragOver}
       >
-        <span className="sr-only">正文</span>
         {richComposer ? (
           <div
             ref={richBodyRef}
             className="composer-richtext-body"
             contentEditable
             suppressContentEditableWarning
-            data-placeholder="正文"
+            data-placeholder="开始写邮件…"
             role="textbox"
             aria-multiline="true"
-            aria-label="正文（富文本）"
+            aria-label="邮件正文（富文本）"
+            spellCheck
             onInput={handleRichBodyInput}
             onPaste={handleRichBodyPaste}
             onDrop={onAttachmentDrop}
@@ -327,6 +329,7 @@ export default function ComposerPrimaryFields({
           />
         ) : (
           <textarea
+            aria-label="邮件正文"
             value={editableBody}
             onDrop={onAttachmentDrop}
             onDragEnter={onAttachmentDragEnter}
@@ -342,7 +345,7 @@ export default function ComposerPrimaryFields({
                   : draft.html_body,
               });
             }}
-            placeholder="正文"
+            placeholder="开始写邮件…"
           />
         )}
         {regularAttachments.length > 0 && (
@@ -377,7 +380,7 @@ export default function ComposerPrimaryFields({
           </button>
         )}
         {originalQuote && <ComposerOriginalQuote originalQuote={originalQuote} />}
-      </label>
+      </section>
     </div>
   );
 }

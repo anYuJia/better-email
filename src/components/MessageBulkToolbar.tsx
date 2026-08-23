@@ -38,7 +38,7 @@ export default function MessageBulkToolbar({
   onToggleBulkLabel,
 }: MessageBulkToolbarProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const moreMenu = useDetailsMenu(moreMenuRef);
+  const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
   if (selectedMessageIds.length === 0) return null;
 
   const allVisibleSelected = visibleMessageCount > 0 && selectedMessageIds.length === visibleMessageCount;
@@ -55,9 +55,13 @@ export default function MessageBulkToolbar({
         <span>已选 {selectedMessageIds.length}</span>
       </label>
       <button type="button" className="bulk-primary-action" onClick={() => onRunBulkAction('archive')}>归档</button>
-      <details className="compact-menu bulk-more-menu" ref={moreMenuRef}>
-        <summary>
-          <MoreHorizontal size={15} />
+      <details
+        className="compact-menu bulk-more-menu"
+        ref={moreMenuRef}
+        data-floating-menu="true"
+      >
+        <summary aria-label={`更多批量操作，已选 ${selectedMessageIds.length} 封`}>
+          <MoreHorizontal size={15} aria-hidden="true" />
           操作
         </summary>
         <div>

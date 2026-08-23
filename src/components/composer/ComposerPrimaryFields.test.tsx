@@ -110,7 +110,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('uses the app-controlled contact menu instead of a native datalist', () => {
     const { container } = renderFields(draft());
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     expect(recipient.getAttribute('list')).toBeNull();
     expect(recipient.getAttribute('autocomplete')).toBe('off');
@@ -126,7 +126,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('only suggests contacts once the query matches, and commits on Enter', () => {
     const { onPatchDraft } = renderFields(draft());
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.focus(recipient);
     fireEvent.change(recipient, { target: { value: '225' } });
@@ -140,7 +140,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('navigates suggestions with arrow keys before committing', () => {
     const { onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'ArrowDown' });
@@ -158,7 +158,7 @@ describe('ComposerPrimaryFields', () => {
     }));
     const onPatchDraft = vi.fn();
     renderFields(draft(), true, onPatchDraft, contacts);
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.focus(recipient);
     fireEvent.change(recipient, { target: { value: 'wang' } });
@@ -186,7 +186,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('turns a committed recipient into a chip removable as a whole', () => {
     const { container, onPatchDraft } = renderFields(draft());
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'Enter' });
@@ -201,7 +201,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('removes the last chip with Backspace on an empty input', () => {
     const { container, onPatchDraft } = renderFields(draft());
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'Enter' });
@@ -212,7 +212,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('supports multiple recipients as separate chips', () => {
     const { container, onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'Enter' });
@@ -242,7 +242,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('commits a fully typed address as a chip on blur', () => {
     const { container, onPatchDraft } = renderFields(draft());
-    const recipient = screen.getByPlaceholderText('收件人');
+    const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'new@example.com' } });
     fireEvent.blur(recipient);
@@ -253,7 +253,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('offers contact suggestions in the cc field', () => {
     const { onPatchDraft } = renderFields(draft());
-    const cc = screen.getByPlaceholderText('抄送（可选）');
+    const cc = screen.getByRole('combobox', { name: '抄送' });
 
     fireEvent.focus(cc);
     expect(screen.queryByText('匹配联系人')).toBeNull();

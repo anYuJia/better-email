@@ -45,7 +45,7 @@
 
 .context-menu-heading span {
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .context-menu-items {
@@ -131,7 +131,7 @@
 
 .context-menu-copy small {
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -147,7 +147,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .context-menu-chevron {

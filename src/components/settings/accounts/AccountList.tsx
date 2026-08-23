@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Plus } from 'lucide-react';
+import { AtSign, Plus } from 'lucide-react';
 import type { Account } from '../../../app/types';
 import type { AccountDialogMode } from './accountSettingsShared';
 import { SettingsButton } from '../shared';
@@ -34,6 +34,9 @@ const AccountRow = memo(function AccountRow({
         className="settings-account-row-main"
         onClick={() => onOpen(account, 'config')}
       >
+        <span className="settings-account-row-icon" aria-hidden="true">
+          <AtSign size={16} />
+        </span>
         <span className="settings-account-row-copy">
           <strong>{account.display_name || account.email}</strong>
           <span>{account.email}</span>
@@ -45,7 +48,12 @@ const AccountRow = memo(function AccountRow({
       </span>
       <span className="settings-account-row-actions" aria-label="账号操作">
         <SettingsButton size="sm" onClick={() => onOpen(account, 'config')}>配置</SettingsButton>
-        <SettingsButton size="sm" variant="danger-secondary" onClick={() => onOpen(account, 'delete')}>
+        <SettingsButton
+          size="sm"
+          variant="ghost"
+          className="settings-account-delete-button"
+          onClick={() => onOpen(account, 'delete')}
+        >
           删除
         </SettingsButton>
       </span>

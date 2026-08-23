@@ -101,6 +101,10 @@
   color: var(--ui-text);
 }
 
+:root[data-theme="dark"] .account-switcher-trigger {
+  background: transparent;
+}
+
 :root[data-theme="dark"] .snooze-picker button,
 :root[data-theme="dark"] .snooze-picker .snooze-option,
 :root[data-theme="dark"] .snooze-picker summary {
@@ -211,13 +215,13 @@
 }
 
 :root[data-theme="dark"] .reader-actions .primary-action {
-  color: var(--ui-text);
+  color: var(--ui-accent);
   background: transparent;
 }
 
 :root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--ui-control-hover);
+  color: var(--ui-accent-hover);
+  background: var(--ui-accent-soft);
 }
 
 :root[data-theme="dark"] :is(.body-text, .reader-html) {
@@ -229,7 +233,7 @@
 :root[data-theme="dark"] .reader-warning-panel {
   border-color: var(--ui-warning-border);
   color: var(--ui-text-secondary);
-  background: var(--ui-warning-bg);
+  background: color-mix(in srgb, var(--ui-warning-bg) 56%, var(--ui-reader));
 }
 
 :root[data-theme="dark"] .reader-warning-badge {
@@ -243,9 +247,9 @@
 }
 
 :root[data-theme="dark"] .quick-reply textarea {
-  border-color: var(--ui-border);
+  border-color: transparent;
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
 }
 
 :root[data-theme="dark"] .quick-reply textarea::placeholder,
@@ -292,6 +296,11 @@
   color: var(--ui-text-secondary);
 }
 
+:root[data-theme="dark"] .message-list-panel .icon-button {
+  border-color: transparent;
+  background: transparent;
+}
+
 :root[data-theme="dark"] .icon-button:hover,
 :root[data-theme="dark"] .composer header button:hover,
 :root[data-theme="dark"] .label-tools button:hover,
@@ -309,27 +318,27 @@
 
 :root[data-theme="dark"] .shortcut-modal {
   background: var(--ui-surface);
-  border-color: var(--ui-border-strong);
+  border-color: transparent;
 }
 
 :root[data-theme="dark"] .shortcut-modal header {
-  background: var(--ui-surface-muted);
+  background: var(--ui-surface);
   border-bottom-color: var(--ui-border);
 }
 
 :root[data-theme="dark"] .shortcut-modal header button {
-  background: var(--ui-surface-muted);
-  border-color: var(--ui-border);
+  background: transparent;
+  border-color: transparent;
   color: var(--ui-text-secondary);
 }
 
 :root[data-theme="dark"] .shortcut-modal header button:hover {
   background: var(--ui-control-hover);
-  color: var(--ui-accent);
+  color: var(--ui-text);
 }
 
 :root[data-theme="dark"] .shortcut-group {
-  background: var(--ui-surface-muted);
+  background: transparent;
   border-color: var(--ui-border);
 }
 
@@ -342,7 +351,7 @@
   border-color: var(--ui-border-strong);
   border-bottom-color: var(--ui-border-strong);
   color: var(--ui-text);
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ui-border-strong) 62%, transparent);
 }
 
 /* --- Legacy composer dark overrides (dialogs.css styles) --- */
@@ -486,13 +495,11 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-/* Dark workspace: the persistent panes stay opaque planes on the semantic
- * neutral scale. Only the native window chrome strip keeps a translucent
- * platform treatment. */
+/* Dark workspace: persistent panes and chrome are opaque semantic planes. */
 
 :root[data-theme="dark"] .app-shell .window-chrome {
   border-bottom: 1px solid oklch(0.43 0.016 var(--primitive-hue-neutral) / 0.64);
-  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.52);
-  -webkit-backdrop-filter: blur(24px) saturate(1.12);
-  backdrop-filter: blur(24px) saturate(1.12);
+  background: var(--ui-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }

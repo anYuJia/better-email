@@ -5,13 +5,14 @@ import AppearanceSettings from './AppearanceSettings';
 describe('AppearanceSettings', () => {
   afterEach(cleanup);
 
-  it('renders a compact radio group with the selected mode description', () => {
+  it('renders a radio group with option descriptions and automatic-save status', () => {
     render(<AppearanceSettings themeMode="dark" onThemeModeChange={vi.fn()} />);
 
     const group = screen.getByRole('radiogroup', { name: '界面外观' });
     expect(group.querySelectorAll('[role="radio"]')).toHaveLength(3);
     expect(screen.getByRole('radio', { name: /^暗色：/ }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('始终使用深色的界面外观。')).toBeDefined();
+    expect(screen.getByText('当前使用“暗色”，更改已自动保存。')).toBeDefined();
   });
 
   it('changes the selection with arrow keys and moves focus to the next option', () => {

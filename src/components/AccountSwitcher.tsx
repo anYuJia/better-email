@@ -60,7 +60,9 @@ export default function AccountSwitcher({
   }
 
   function openMenuFromTrigger() {
-    const bounds = triggerRef.current?.getBoundingClientRect();
+    const trigger = triggerRef.current;
+    trigger?.focus({ preventScroll: true });
+    const bounds = trigger?.getBoundingClientRect();
     if (!bounds) return;
     openMenu(bounds.left, bounds.bottom + 6);
   }
@@ -121,9 +123,7 @@ export default function AccountSwitcher({
         aria-haspopup="menu"
         aria-expanded={Boolean(menu)}
         onPointerDown={(event) => {
-          // 只阻止默认行为(聚焦/选中文本),开关交给 onClick 统一处理,
-          // 避免 pointerdown 与 click 两个事件都切换导致“关掉又展开”。
-          event.preventDefault();
+          // 开关交给 onClick 统一处理，但保留按钮的标准聚焦行为。
           event.stopPropagation();
         }}
         onClick={(event) => {
@@ -138,6 +138,7 @@ export default function AccountSwitcher({
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          triggerRef.current?.focus({ preventScroll: true });
           openMenu(event.clientX, event.clientY);
         }}
       >

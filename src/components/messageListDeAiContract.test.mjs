@@ -369,14 +369,14 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(blocks[0]).toMatch(/background:\s*var\(--ui-list\)/);
   });
 
-  it('search-box height is 32-34px with small radius', () => {
+  it('search-box height is 36-40px with small radius', () => {
     const blocks = extractBlock(messageListCss, '.search-box');
     expect(blocks.length).toBeGreaterThan(0);
     const h = extractDecl(blocks[0], 'height');
     const r = extractDecl(blocks[0], 'border-radius');
     expect(h).not.toBeNull();
-    expect(h).toBeGreaterThanOrEqual(32);
-    expect(h).toBeLessThanOrEqual(34);
+    expect(h).toBeGreaterThanOrEqual(36);
+    expect(h).toBeLessThanOrEqual(40);
     expect(r).not.toBeNull();
     expect(r).toBeGreaterThanOrEqual(6);
     expect(r).toBeLessThanOrEqual(8);

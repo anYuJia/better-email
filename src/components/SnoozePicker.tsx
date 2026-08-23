@@ -44,41 +44,44 @@ export default function SnoozePicker({
   const modalRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<Element | null>(null);
 
-  // 打开时保存旧焦点并聚焦第一个选项；关闭时恢复旧焦点（触发元素可能已卸载）。
+  // 聚焦与背景隔离必须在同一个 effect 中按相反顺序恢复：
+  // 先解除 inert/aria-hidden，再把焦点还给触发元素。否则浏览器会
+  // 拒绝聚焦仍处于 inert 背景中的按钮，最终焦点落到 body。
   useEffect(() => {
     previouslyFocusedRef.current = document.activeElement;
     firstOptionRef.current?.focus();
-    return () => {
-      const previouslyFocused = previouslyFocusedRef.current;
-      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
-        try {
-          previouslyFocused.focus();
-        } catch {
-          // 忽略不可聚焦的恢复目标。
-        }
-      }
-    };
-  }, []);
-
-  // 背景 inert：把除本对话框外的 body 子元素设为 inert/aria-hidden，键盘与
-  // 读屏焦点无法逃逸。用 previouslyInert 记录原状态，只恢复本层设置的 inert，
-  // 不错误解除父层 modal 的 inert（支持嵌套 modal）。
-  useEffect(() => {
     const modal = modalRef.current;
     const container = modal?.parentElement;
     if (!modal || !container) return undefined;
     const siblings = Array.from(container.children).filter((element) => element !== modal);
-    const previouslyInert = new Map<Element, boolean>();
+    const previousBackgroundState = new Map<Element, {
+      inert: boolean;
+      ariaHidden: string | null;
+    }>();
     for (const sibling of siblings) {
-      previouslyInert.set(sibling, sibling.hasAttribute('inert'));
+      previousBackgroundState.set(sibling, {
+        inert: sibling.hasAttribute('inert'),
+        ariaHidden: sibling.getAttribute('aria-hidden'),
+      });
       sibling.setAttribute('inert', '');
       sibling.setAttribute('aria-hidden', 'true');
     }
     return () => {
       for (const sibling of siblings) {
-        if (previouslyInert.get(sibling)) continue;
-        sibling.removeAttribute('inert');
-        sibling.removeAttribute('aria-hidden');
+        const previousState = previousBackgroundState.get(sibling);
+        if (!previousState) continue;
+        if (previousState.inert) sibling.setAttribute('inert', '');
+        else sibling.removeAttribute('inert');
+        if (previousState.ariaHidden === null) sibling.removeAttribute('aria-hidden');
+        else sibling.setAttribute('aria-hidden', previousState.ariaHidden);
+      }
+      const previouslyFocused = previouslyFocusedRef.current;
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        try {
+          previouslyFocused.focus({ preventScroll: true });
+        } catch {
+          // 忽略不可聚焦的恢复目标。
+        }
       }
     };
   }, []);
@@ -121,11 +124,14 @@ export default function SnoozePicker({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape' && !submitting) {
         event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         onClose();
       }
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // 顶层对话框必须在应用级 Escape 快捷键之前消费事件。
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onClose, submitting]);
 
   async function confirm(date: Date) {

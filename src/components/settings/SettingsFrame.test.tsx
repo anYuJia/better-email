@@ -22,17 +22,33 @@ describe('SettingsFrame dialog behavior', () => {
     vi.restoreAllMocks();
   });
 
-  function renderFrame(onClose = () => undefined) {
+  function renderFrame({
+    onClose = () => undefined,
+    activeSection = 'notifications',
+    canSaveAndVerify = false,
+    isDirty = false,
+    onSave = () => undefined,
+    onTestConnection = () => undefined,
+  }: {
+    onClose?: () => void;
+    activeSection?: Parameters<typeof SettingsFrame>[0]['activeSection'];
+    canSaveAndVerify?: boolean;
+    isDirty?: boolean;
+    onSave?: () => void;
+    onTestConnection?: () => void;
+  } = {}) {
     const utils = render(
       <div data-testid="app-shell">
         <button type="button">后台按钮</button>
         <SettingsFrame
           title="设置"
           subtitle="work@example.com"
-          activeSection="notifications"
+          activeSection={activeSection}
           onNavigate={() => undefined}
-          onTestConnection={() => undefined}
-          onSave={() => undefined}
+          onTestConnection={onTestConnection}
+          onSave={onSave}
+          canSaveAndVerify={canSaveAndVerify}
+          isDirty={isDirty}
           onClose={onClose}
         >
           <input placeholder="设置内输入框" />
@@ -105,7 +121,7 @@ describe('SettingsFrame dialog behavior', () => {
 
   it('closes on Escape', () => {
     const onClose = vi.fn();
-    renderFrame(onClose);
+    renderFrame({ onClose });
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -127,9 +143,43 @@ describe('SettingsFrame dialog behavior', () => {
 
   it('closes when clicking the backdrop outside the modal', () => {
     const onClose = vi.fn();
-    const { container } = renderFrame(onClose);
+    const { container } = renderFrame({ onClose });
     const backdrop = container.querySelector('.settings-backdrop')!;
     fireEvent.mouseDown(backdrop, { target: backdrop });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a generic save action on auto-saving preference pages', () => {
+    renderFrame({ activeSection: 'appearance', canSaveAndVerify: true });
+    expect(screen.queryByRole('button', { name: '保存设置' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
+  });
+
+  it('shows save only for a dirty account editing section', () => {
+    const onSave = vi.fn();
+    renderFrame({
+      activeSection: 'providers',
+      canSaveAndVerify: true,
+      isDirty: true,
+      onSave,
+    });
+    const saveActions = screen.getAllByRole('button', { name: '保存账号设置' });
+    expect(saveActions).toHaveLength(1);
+    expect(document.querySelector('.settings-floating-unsaved-bar')).toBeNull();
+    fireEvent.click(saveActions[0]);
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '测试连接' })).toBeNull();
+  });
+
+  it('offers connection testing when the active connection page is clean', () => {
+    const onTestConnection = vi.fn();
+    renderFrame({
+      activeSection: 'sync',
+      canSaveAndVerify: true,
+      onTestConnection,
+    });
+    fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
+    expect(onTestConnection).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
   });
 });

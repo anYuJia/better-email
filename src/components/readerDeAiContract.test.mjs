@@ -327,7 +327,7 @@ describe('reader de-AI contract — toolbar is icon-first controls, not a glass 
     expect(hasNone).toBe(true);
   });
 
-  it('reader-actions buttons are 28-34px height', () => {
+  it('reader-actions buttons expose a 40px accessible pointer target', () => {
     const rules = findRules(readerCss, '.reader-actions button,');
     // Also check .reader-actions .reader-more-menu summary, .reader-actions select
     const allRules = findRules(readerCss, '.reader-actions');
@@ -337,8 +337,8 @@ describe('reader de-AI contract — toolbar is icon-first controls, not a glass 
     expect(buttonRules.length).toBeGreaterThan(0);
     const h = extractDecl(buttonRules[0].body, 'height');
     expect(h).not.toBeNull();
-    expect(h).toBeGreaterThanOrEqual(28);
-    expect(h).toBeLessThanOrEqual(34);
+    expect(h).toBeGreaterThanOrEqual(40);
+    expect(h).toBeLessThanOrEqual(40);
   });
 
   it('reader-actions has no gradient', () => {

@@ -81,7 +81,7 @@
 .account-switcher .account-switcher-copy > span {
   margin-top: 1px;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 520;
 }
 
@@ -150,7 +150,7 @@
 
 .account-switcher-menu .context-menu-copy small {
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .account-switcher-menu [data-context-item='add-account'] {

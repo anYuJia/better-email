@@ -25,7 +25,7 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
   padding: 0 10px 10px;
   overflow: hidden;
@@ -58,30 +58,34 @@
 
 .brand strong {
   color: var(--ui-text);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.015em;
   white-space: nowrap;
 }
 
 /* Compose -------------------------------------------------------------------
- * The one primary action in the rail: restrained accent fill, no gradient,
- * no shadow, no pill. */
+ * A first-class navigation action, but not a floating CTA card. It sits on
+ * the sidebar plane and gains a quiet tint only when the user engages it. */
 
 .compose-button {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 7px;
-  border: 1px solid var(--ui-accent);
-  border-radius: var(--ui-radius-control);
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent);
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
   font-weight: 600;
+  transition-property: color, background-color, border-color, scale;
+  transition-duration: var(--ui-motion-fast);
+  transition-timing-function: var(--ui-ease-standard);
 }
 
 .compose-button svg {
@@ -91,15 +95,15 @@
 }
 
 .compose-button:hover:not(:disabled) {
-  color: var(--color-text-on-accent);
-  border-color: var(--ui-accent-hover);
-  background: var(--ui-accent-hover);
+  color: var(--ui-accent-hover);
+  background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .compose-button:active:not(:disabled) {
-  background: var(--ui-accent-pressed);
-  border-color: var(--ui-accent-pressed);
+  color: var(--ui-accent-pressed);
+  background: var(--quiet-row-selected);
+  scale: 0.96;
 }
 
 .compose-button:disabled {
@@ -108,7 +112,8 @@
 
 .compose-button:focus-visible {
   outline: var(--ui-focus-outline);
-  outline-offset: 1px;
+  outline-offset: -2px;
+  box-shadow: var(--ui-focus-ring);
 }
 
 /* Section label -------------------------------------------------------------- */
@@ -117,12 +122,12 @@
   margin: 5px 0 1px;
   padding: 0 9px;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 560;
 }
 
 /* Folder navigation ----------------------------------------------------------
- * scanability first: flat 32px rows, icon + label + spacer + count. */
+ * scanability first: flat 36px rows, icon + label + spacer + count. */
 
 .folder-list {
   display: flex;
@@ -139,7 +144,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 32px;
+  min-height: 36px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
@@ -151,7 +156,7 @@
 .folder-main {
   flex: 1;
   min-width: 0;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 9px;
   display: flex;
   align-items: center;
@@ -178,8 +183,8 @@
 
 .folder-name svg {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   stroke-width: 1.7;
   color: currentColor;
 }
@@ -200,7 +205,7 @@
   color: var(--ui-text-tertiary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -350,7 +355,7 @@
 }
 
 .sidebar-tools > summary {
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 9px;
   display: flex;
   align-items: center;
@@ -498,7 +503,7 @@
 
 .sidebar-task-status {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .sidebar-task-progress {
@@ -538,7 +543,7 @@
 
 .settings-button {
   flex: 1 1 0;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 9px;
   display: inline-flex;
   align-items: center;
@@ -580,5 +585,9 @@
   .settings-button,
   .sidebar-tools > summary {
     transition: var(--ui-transition-none);
+  }
+
+  .compose-button:active:not(:disabled) {
+    scale: 1;
   }
 }

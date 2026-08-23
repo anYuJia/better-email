@@ -112,21 +112,21 @@
   overflow: visible;
   min-width: 0;
   flex: 1 1 auto;
-  height: 32px;
+  height: 36px;
   padding: 0 8px 0 10px;
   display: flex;
   align-items: center;
   gap: 7px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 82%, transparent);
   border-radius: 6px;
-  background: var(--ui-surface-muted);
+  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-list));
   color: var(--ui-text-secondary);
-  box-shadow: inset 0 0 0 1px var(--ui-border);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .search-box:hover {
   border-color: var(--ui-border-strong);
-  background: var(--ui-surface);
+  background: color-mix(in srgb, var(--ui-surface-muted) 84%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -145,10 +145,10 @@
 
 .search-box input {
   min-width: 0;
-  height: 30px;
+  height: 34px;
   border: 0;
   font-size: 13px;
-  line-height: 30px;
+  line-height: 34px;
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -190,13 +190,13 @@
   justify-content: center;
   gap: 6px;
   min-width: 36px;
-  height: 32px;
+  height: 36px;
   padding: 0 10px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  font-size: 11.5px;
+  background: transparent;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   box-sizing: border-box;
@@ -207,21 +207,19 @@
 
 .refresh-text-button:hover:not(:disabled) {
   color: var(--ui-text);
-  border-color: var(--ui-border-strong);
   background: var(--quiet-row-hover);
 }
 
 .refresh-text-button.refreshing {
   color: var(--ui-accent);
-  border-color: var(--ui-border-strong);
   background: var(--ui-accent-soft);
   cursor: not-allowed;
   opacity: 0.85;
 }
 
 .app-shell .refresh-text-button {
-  min-height: 34px;
-  height: 34px;
+  min-height: 36px;
+  height: 36px;
 }
 
 /* Search scope — compact dropdown, only the trigger is visible. */
@@ -231,24 +229,24 @@
 
 .search-scope-menu > summary {
   min-width: 56px;
-  height: 32px;
+  min-height: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding: 0 8px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  font-size: 11.5px;
+  background: transparent;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .search-scope-menu > summary:hover {
-  border-color: var(--ui-border-strong);
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
@@ -259,7 +257,6 @@
 
 .search-scope-menu[open] > summary,
 .search-scope-menu > summary:hover {
-  border-color: var(--ui-border-strong);
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
@@ -270,8 +267,8 @@
 
 .app-shell .search-scope-menu > summary {
   min-width: 60px;
-  min-height: 34px;
-  height: 34px;
+  min-height: 36px;
+  height: 36px;
 }
 
 .app-shell .search-scope-menu > summary svg {
@@ -351,7 +348,7 @@
 
 .search-suggestion-panel em {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   white-space: nowrap;
 }
@@ -360,7 +357,7 @@
   display: block;
   padding: 5px 9px 2px;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -433,7 +430,7 @@
   overflow: hidden;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -441,7 +438,7 @@
 
 .app-shell .list-summary span {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -450,7 +447,7 @@
   border-radius: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
@@ -479,14 +476,14 @@
 
 .list-control-actions > button,
 .list-control-actions .compact-menu summary {
-  min-height: 29px;
+  min-height: 36px;
   padding-inline: 8px;
   border: 0;
   border-radius: 6px;
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
@@ -504,26 +501,26 @@
 
 .list-control-actions > button.active,
 .list-control-actions .compact-menu summary.active {
-  color: var(--ui-text);
-  background: var(--quiet-row-selected);
-  box-shadow: var(--ui-box-shadow-none);
+  color: var(--ui-accent);
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--ui-accent);
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .icon-button:hover {
-  border-color: var(--ui-border);
+  border-color: transparent;
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
@@ -575,7 +572,7 @@
 }
 
 .compact-menu > div button {
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 10px;
   border: 0;
   border-radius: 6px;
@@ -607,7 +604,7 @@
   display: block;
   padding: 6px 10px 2px;
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -623,6 +620,23 @@
 
 .app-shell .compact-menu[open] > div {
   z-index: 2500;
+}
+
+/* Menus inside horizontally scrollable toolbars need a viewport-anchored
+ * panel. The hook writes clamped coordinates after native <details> opens;
+ * hiding the one-frame measuring state prevents an off-screen flash. */
+.compact-menu[data-floating-menu="true"] > div {
+  position: fixed;
+  top: var(--floating-menu-top, 0);
+  left: var(--floating-menu-left, 0);
+  right: auto;
+  bottom: auto;
+  max-height: min(320px, var(--floating-menu-max-height, 320px));
+  visibility: hidden;
+}
+
+.compact-menu[data-floating-menu="true"][data-menu-positioned="true"] > div {
+  visibility: visible;
 }
 
 
@@ -642,6 +656,7 @@
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-muted);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .bulk-toolbar.active {
@@ -663,7 +678,7 @@
 }
 
 .bulk-toolbar button {
-  min-height: 28px;
+  min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
@@ -673,6 +688,17 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow: var(--ui-box-shadow-none);
+}
+
+.bulk-toolbar .compact-menu > summary {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .bulk-toolbar button:hover:not(:disabled) {
@@ -706,8 +732,13 @@
 
 /* Bulk more-menu expands upward since the strip sits below the list head. */
 .bulk-toolbar .bulk-more-menu > div {
-  top: auto;
-  bottom: calc(100% + 4px);
+  top: calc(100% + 4px);
+  bottom: auto;
+}
+
+.bulk-toolbar .compact-menu[data-floating-menu="true"] > div {
+  top: var(--floating-menu-top, 0);
+  bottom: auto;
 }
 
 
@@ -732,7 +763,7 @@
   color: var(--ui-text-tertiary);
   background: var(--ui-list);
   backdrop-filter: none;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -741,7 +772,7 @@
 
 .message-date-header em {
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 400;
 }
@@ -840,6 +871,7 @@
 
 .message-card:hover .message-leading,
 .message-card:has(.message-card-main:focus-visible) .message-leading,
+.message-card:has(.message-select:focus-within) .message-leading,
 .message-card:has(.message-select input:checked) .message-leading {
   opacity: 0;
 }
@@ -907,6 +939,7 @@
 
 .message-card:hover .message-select,
 .message-card:has(.message-card-main:focus-visible) .message-select,
+.message-card:has(.message-select:focus-within) .message-select,
 .message-card:has(.message-select input:checked) .message-select {
   opacity: 1;
   pointer-events: auto;
@@ -1016,6 +1049,7 @@
 
 .app-shell .message-card:hover .message-select,
 .app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
+.app-shell .message-card:has(.message-select:focus-within) .message-select,
 .app-shell .message-card:has(.message-select input:checked) .message-select,
 .app-shell .message-card.is-current .message-select {
   display: grid;
@@ -1123,7 +1157,7 @@
   flex: 0 0 auto;
   color: var(--ui-text-tertiary);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -1175,7 +1209,7 @@
   border-radius: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
@@ -1207,7 +1241,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   font-weight: 400;
   line-height: 1;
@@ -1268,9 +1302,11 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-/* Opening the reader focuses the full-row button; don't double-ring it. */
+/* The current row still needs a visible keyboard focus indicator. Keeping
+ * it inset avoids changing row geometry or drawing a second outer border. */
 .app-shell .message-card:is(.selected, .is-current) .message-card-main:focus-visible {
-  outline: none;
+  outline: var(--ui-focus-outline);
+  outline-offset: -3px;
 }
 
 .message-card.selected {
@@ -1305,7 +1341,7 @@
 .message-card.dragging {
   border-color: transparent;
   opacity: 0.58;
-  box-shadow: var(--ui-box-shadow-inset-selected);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 
@@ -1392,7 +1428,7 @@
 .thread-card time {
   flex-shrink: 0;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
@@ -1422,7 +1458,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-text-tertiary);
   margin-top: 1px;
 }
@@ -1451,7 +1487,7 @@
   gap: 3px;
   margin-left: 4px;
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 400;
 }
@@ -1563,7 +1599,7 @@
   border-radius: var(--ui-radius-control);
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   text-decoration: none;
@@ -1647,6 +1683,14 @@
   .message-attachment {
     transition: var(--ui-transition-none);
   }
+}
+
+/* ThreadReaderList uses a semantic role button because a row may contain a
+ * recipient-details control. Give that non-native button the same inset
+ * focus treatment as message rows without changing reader geometry. */
+.thread-message:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -3px;
 }
 
 @media (max-width: 1180px) {

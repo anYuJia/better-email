@@ -133,7 +133,20 @@ function Sidebar({
   const activeTasks = backgroundTasks.filter(isVisibleTask);
 
   return (
-    <aside className="sidebar">
+    <aside
+      className="sidebar"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !onCloseNavigation || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (renamingFolderId !== null && event.target instanceof Element
+          && event.target.closest('.folder-rename')) {
+          onCancelRename();
+          return;
+        }
+        onCloseNavigation();
+      }}
+    >
       <div className="brand">
         <img
           className="brand-mark"

@@ -466,7 +466,9 @@
 /* --- Account list --- */
 .settings-modal .settings-account-list {
   display: grid;
-  gap: 3px;
+  gap: 0;
+  border-top: 1px solid var(--st-border);
+  border-bottom: 1px solid var(--st-border);
 }
 
 .settings-modal .settings-account-row {
@@ -474,23 +476,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  gap: 14px;
+  min-height: 60px;
+  padding: 8px 6px;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
   background: transparent;
   transition: var(--ui-transition-fast-color-background-border);
   position: relative;
-  overflow: hidden;
 }
 
 .settings-modal .settings-account-row:hover {
-  background: var(--st-surface-subtle);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-account-row.active {
   background: var(--st-surface-muted);
-  border-color: transparent;
 }
 
 .settings-modal .settings-account-row:first-child {
@@ -499,7 +501,8 @@
 
 .settings-modal .settings-account-row-main {
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding: 0;
@@ -510,11 +513,25 @@
   cursor: pointer;
 }
 
+.settings-modal .settings-account-row-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: var(--st-surface);
+  box-shadow: inset 0 0 0 1px var(--st-border);
+}
+
+.settings-modal .settings-account-row.active .settings-account-row-icon {
+  color: var(--st-accent);
+}
+
 .settings-modal .settings-account-row-copy {
   min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  display: grid;
+  gap: 2px;
 }
 
 .settings-modal .settings-account-row-copy strong,
@@ -527,13 +544,13 @@
 
 .settings-modal .settings-account-row-copy strong {
   color: var(--st-text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--st-font-size-body);
+  font-weight: 650;
 }
 
 .settings-modal .settings-account-row-copy span {
-  color: var(--st-text);
-  font-size: 12px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
 }
 
 .settings-modal .settings-account-row-meta {
@@ -566,6 +583,16 @@
   flex: 0 0 auto;
 }
 
+.settings-modal .settings-account-delete-button {
+  color: var(--st-text-tertiary);
+}
+
+.settings-modal .settings-account-delete-button:hover:not(:disabled),
+.settings-modal .settings-account-delete-button:focus-visible {
+  color: var(--st-danger);
+  background: var(--st-danger-soft);
+}
+
 /* --- Account dialogs --- */
 .settings-modal .settings-account-add-overlay {
   position: fixed;
@@ -594,6 +621,11 @@
   height: min(72vh, 700px);
   max-height: calc(100dvh - 32px);
   overflow: hidden;
+}
+
+.settings-modal .settings-account-manage-dialog[data-mode="delete"] {
+  height: auto;
+  max-height: min(620px, calc(100dvh - 48px));
 }
 
 .settings-modal .settings-account-manage-dialog > .settings-account-form-grid-wrapper {
@@ -1778,8 +1810,10 @@
 
 /* --- Account removal --- */
 .settings-modal .settings-account-danger {
-  border-color: var(--st-danger);
-  background: var(--st-danger-soft);
+  padding: 14px;
+  border: 1px solid color-mix(in oklch, var(--st-danger) 35%, var(--st-border));
+  border-radius: var(--st-radius-md);
+  background: color-mix(in oklch, var(--st-danger-soft) 65%, var(--st-surface));
 }
 
 .settings-modal .settings-account-danger-body {
@@ -4836,83 +4870,136 @@
 }
 
 /* =====================================================================
- * Appearance page: compact theme preference control.
+ * Appearance page: continuous desktop preference list.
  * ===================================================================== */
 
+.settings-modal .settings-appearance-section .st-section-body {
+  margin-top: 0;
+}
+
 .settings-modal .settings-theme-preference {
-  width: min(100%, 460px);
+  width: min(100%, 580px);
   display: grid;
-  gap: 9px;
+  gap: 12px;
 }
 
 .settings-modal .settings-theme-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-sm);
-  background: var(--st-surface-muted);
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .settings-modal .settings-theme-option {
   min-width: 0;
-  min-height: 36px;
-  display: inline-flex;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 20px;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 9px;
+  gap: 12px;
+  padding: 10px 14px;
   border: 0;
-  border-radius: 6px;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 580;
-  line-height: 1;
-  white-space: nowrap;
+  font-size: var(--st-font-size-body);
+  text-align: left;
   cursor: pointer;
-  transition: var(--ui-transition-color-bg-shadow-short);
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .settings-theme-option:first-child {
+  border-top: 0;
 }
 
 .settings-modal .settings-theme-option:hover {
   color: var(--st-text);
-  background: var(--st-surface-subtle);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-theme-option.active {
   color: var(--st-text);
-  background: var(--st-surface);
+  background: var(--st-surface-muted);
   box-shadow: none;
 }
 
-.settings-modal .settings-theme-option > svg {
-  flex: 0 0 auto;
-  color: currentColor;
+.settings-modal .settings-theme-option-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: var(--st-surface-muted);
 }
 
-.settings-modal .settings-theme-option.active > svg {
+.settings-modal .settings-theme-option.active .settings-theme-option-icon {
   color: var(--st-accent);
+  background: var(--st-surface);
 }
 
-.settings-modal .settings-theme-option > span {
+.settings-modal .settings-theme-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-theme-option-copy :is(strong, small) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.settings-modal .settings-theme-option-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-theme-option-copy small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.settings-modal .settings-theme-option-check {
+  color: var(--st-accent);
+  opacity: 0;
+}
+
+.settings-modal .settings-theme-option.active .settings-theme-option-check {
+  opacity: 1;
+}
+
 .settings-modal .settings-theme-description {
-  min-height: 19px;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   line-height: 1.5;
 }
 
+.settings-modal .settings-theme-description > svg {
+  flex: 0 0 auto;
+  color: var(--st-success);
+}
+
 @media (max-width: 480px) {
   .settings-modal .settings-theme-option {
-    gap: 5px;
-    padding-inline: 6px;
-    font-size: var(--st-font-size-aux);
+    min-height: 60px;
+    grid-template-columns: 30px minmax(0, 1fr) 18px;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .settings-modal .settings-theme-option-icon {
+    width: 30px;
+    height: 30px;
   }
 }

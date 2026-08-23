@@ -270,11 +270,14 @@ export default function MessageListToolbar({
           </details>
         </div>
         <button
+          type="button"
           className={isRefreshing ? 'refresh-text-button refreshing' : 'refresh-text-button'}
           disabled={isRefreshing}
+          aria-label={isRefreshing ? (refreshNotice || '正在获取新邮件') : (refreshNotice || '获取新邮件')}
+          aria-busy={isRefreshing}
           onClick={onRefresh}
         >
-          <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} style={{ flexShrink: 0 }} />
+          <RefreshCw aria-hidden="true" size={13} className={isRefreshing ? 'animate-spin' : ''} style={{ flexShrink: 0 }} />
           <span>
             {isRefreshing ? (refreshNotice || '正在获取...') : (refreshNotice || '获取新邮件')}
           </span>

@@ -1,19 +1,104 @@
-@media (max-width: 980px) {
-  .shortcut-grid { grid-template-columns: 1fr; }
-  .shortcut-modal { width: calc(100vw - 28px); }
-}
+/* Responsive shell --------------------------------------------------------
+ * 721–1040px keeps the two surfaces needed for triage together: list and
+ * reader. Folder navigation becomes a compact overlay drawer. At 720px and
+ * below, including a 960px window at 200% zoom, the existing single-surface
+ * navigation stack remains the predictable fallback. */
 
-/* At 200% zoom a 960px desktop window exposes roughly 480 CSS pixels.
- * Three persistent panes cannot reflow at that width. The 1040px threshold
- * also prevents a discontinuity where the reader would be narrower than its
- * useful 360px measure, so the shell becomes a predictable
- * folder -> list -> reader navigation stack. */
 .narrow-navigation-button,
 .narrow-reader-navigation {
   display: none;
 }
 
 @media (max-width: 1040px) {
+  .app-shell .narrow-navigation-button {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 36px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-secondary);
+    background: transparent;
+  }
+
+  .app-shell .narrow-navigation-button:hover,
+  .app-shell .narrow-navigation-button:focus-visible {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+  }
+
+  .app-shell .sidebar-narrow-close {
+    margin-inline-start: auto;
+  }
+}
+
+/* Compact desktop/tablet: preserve list context while reading. */
+@media (min-width: 721px) and (max-width: 1040px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: clamp(300px, 38vw, 360px) minmax(0, 1fr);
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-shell > .message-list-panel {
+    grid-column: 1;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    box-shadow: inset -1px 0 0 var(--ui-border);
+  }
+
+  .app-shell > .reader-panel {
+    grid-column: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+  }
+
+  .app-shell > .sidebar {
+    display: none;
+  }
+
+  .app-shell.narrow-view-sidebar > .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 90;
+    width: min(280px, calc(100vw - 44px));
+    height: 100dvh;
+    max-width: none;
+    display: flex;
+    padding-inline: 12px;
+    border-right: 1px solid var(--ui-border-strong);
+    background: var(--workspace-sidebar);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .app-shell .narrow-reader-navigation,
+  .app-shell.narrow-view-reader .narrow-reader-navigation {
+    display: none;
+  }
+
+  .app-shell .reader {
+    padding: 20px clamp(18px, 3vw, 30px) 44px;
+  }
+
+  /* There is no persistent sidebar brand row to extend the drag region into;
+   * leaving only the top strip avoids covering search and reader controls. */
+  .window-drag-region-side {
+    display: none;
+  }
+}
+
+/* Phone-size / 200%-zoom fallback: one surface at a time. */
+@media (max-width: 720px) {
   .app-shell {
     display: block;
     width: 100%;
@@ -38,35 +123,9 @@
     display: block;
   }
 
-  .app-shell .narrow-navigation-button {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    min-height: 34px;
-    padding: 0;
-    display: inline-grid;
-    place-items: center;
-    flex: 0 0 34px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-control);
-    color: var(--ui-text-secondary);
-    background: var(--ui-surface);
-  }
-
-  .app-shell .narrow-navigation-button:hover,
-  .app-shell .narrow-navigation-button:focus-visible {
-    color: var(--ui-text);
-    border-color: var(--ui-border-strong);
-    background: var(--quiet-row-hover);
-  }
-
   .app-shell .sidebar {
     max-width: none;
     padding-inline: 14px;
-  }
-
-  .app-shell .sidebar-narrow-close {
-    margin-inline-start: auto;
   }
 
   .app-shell .message-list-panel {
@@ -89,7 +148,7 @@
   }
 
   .app-shell .narrow-reader-navigation button {
-    min-height: 32px;
+    min-height: 36px;
     padding: 0 10px;
     display: inline-flex;
     align-items: center;

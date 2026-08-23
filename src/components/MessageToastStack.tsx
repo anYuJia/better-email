@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { AlertCircle, Check, Info, X } from 'lucide-react';
 import type { PendingSendUndo } from './UndoSnackbarStack';
 import { formatDate } from '../mailUtils';
 
-export type MessageToast = { id: number; text: string };
+export type MessageToast = {
+  id: number;
+  text: string;
+  tone?: 'success' | 'error' | 'info';
+};
 
 type RenderedToast = MessageToast & { leaving?: boolean };
 type RenderedUndo = PendingSendUndo & { leaving?: boolean };
@@ -125,8 +129,8 @@ export default function MessageToastStack({
         <span
           key={`message-toast-announcement-${toast.id}`}
           className="status-live-region"
-          role="status"
-          aria-live="polite"
+          role={toast.tone === 'error' ? 'alert' : 'status'}
+          aria-live={toast.tone === 'error' ? 'assertive' : 'polite'}
           aria-atomic="true"
         >
           {toast.text}
@@ -164,11 +168,17 @@ export default function MessageToastStack({
           {renderedToasts.map((toast) => (
             <div
               key={toast.id}
-              className={`message-toast${toast.leaving ? ' leaving' : ''}${
+              className={`message-toast toast-${toast.tone ?? 'success'}${toast.leaving ? ' leaving' : ''}${
                 renderedUndo?.leaving && !toast.leaving ? ' toast-delayed' : ''
               }`}
             >
-              <Check size={13} strokeWidth={2.5} aria-hidden="true" />
+              {toast.tone === 'error' ? (
+                <AlertCircle size={15} strokeWidth={2.2} aria-hidden="true" />
+              ) : toast.tone === 'info' ? (
+                <Info size={15} strokeWidth={2.2} aria-hidden="true" />
+              ) : (
+                <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+              )}
               <span>{toast.text}</span>
             </div>
           ))}

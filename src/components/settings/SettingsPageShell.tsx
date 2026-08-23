@@ -33,12 +33,14 @@ export default function SettingsPageShell({
       key={activeSection}
       className="settings-page"
       data-settings-page={activeSection}
+      data-settings-group={group.label}
       aria-labelledby={`settings-page-${activeSection}`}
+      aria-describedby={`settings-page-description-${activeSection}`}
     >
       <header className="settings-page-header">
         <div className="settings-page-heading">
-          <span className="settings-page-kicker">{group.label}</span>
-          <strong id={`settings-page-${activeSection}`}>{item.label}</strong>
+          <h2 id={`settings-page-${activeSection}`}>{item.label}</h2>
+          <p id={`settings-page-description-${activeSection}`}>{item.description}</p>
         </div>
       </header>
       <div className="settings-page-content">{children}</div>

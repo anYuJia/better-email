@@ -1,7 +1,8 @@
 /*
  * Custom window chrome for the frameless, transparent window.
- * The webview background is transparent so the desktop shows through the
- * top strip; the app shell supplies its own background below it.
+ * The webview root remains transparent for native window integration, while
+ * the title strip itself is an opaque semantic plane. This keeps the chrome
+ * stable over every pane without a decorative glass layer.
  *
  * The top edge is draggable (native startDragging with a setPosition
  * fallback); each pane reserves matching headroom so the drag strip never
@@ -130,11 +131,10 @@ body[data-image-preview-modal='1'] .window-chrome {
   background: var(--ui-danger);
 }
 
-/* Light-theme title bar: translucent glass so the desktop breathes through
- * the strip; the dark variant lives in dark-mode.css. */
+/* Light-theme title bar: quiet opaque chrome, separated by one hairline. */
 :root:not([data-theme="dark"]) .app-shell .window-chrome {
   border-bottom: 1px solid oklch(0.9 0.006 var(--primitive-hue-neutral) / 0.68);
-  background: oklch(0.995 0.004 var(--primitive-hue-neutral) / 0.48);
-  -webkit-backdrop-filter: blur(24px) saturate(1.18);
-  backdrop-filter: blur(24px) saturate(1.18);
+  background: var(--ui-bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }

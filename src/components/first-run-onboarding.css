@@ -19,11 +19,13 @@
 
 .first-run-onboarding {
   width: min(480px, calc(100vw - 40px));
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-modal);
+  border: 0;
+  border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ui-border) 70%, transparent),
+    var(--ui-shadow-float);
   overflow: hidden;
 }
 
@@ -105,7 +107,7 @@
   border-radius: 999px;
   color: var(--ui-text-tertiary);
   background: var(--ui-surface-muted);
-  font-size: 11px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .first-run-onboarding-body h2 {

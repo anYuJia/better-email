@@ -113,10 +113,12 @@ textarea:focus-visible {
 .app-error-card {
   width: min(620px, 100%);
   padding: 28px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-modal);
+  border: 0;
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ui-border) 70%, transparent),
+    var(--ui-shadow-float);
   color: var(--ui-text);
 }
 

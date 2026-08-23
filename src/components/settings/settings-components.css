@@ -27,7 +27,7 @@
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 6px 14px;
   padding: 0;
   position: static;
   color: var(--st-text);
@@ -38,7 +38,7 @@
 .settings-modal .st-section-heading {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .settings-modal .st-section-heading strong {
@@ -46,8 +46,8 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 600;
-  letter-spacing: 0;
+  font-weight: 650;
+  letter-spacing: -0.005em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -58,7 +58,7 @@
   font-size: var(--st-font-size-secondary);
   font-weight: 400;
   font-style: normal;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .settings-modal .st-section-meta {
@@ -74,7 +74,7 @@
   gap: 0;
   padding: 0;
   min-width: 0;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 /* ── Disclosure section (details/summary) ────────────────────────── */
@@ -112,8 +112,8 @@
 
 .settings-modal .st-subsection {
   display: grid;
-  gap: 10px;
-  padding-top: 16px;
+  gap: 12px;
+  padding-top: 20px;
   border-top: 1px solid var(--st-border);
 }
 
@@ -164,12 +164,12 @@
 
 .settings-modal .st-row {
   min-width: 0;
-  min-height: 44px;
+  min-height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 10px 0;
+  padding: 12px 0;
   border: 0;
   border-top: 1px solid var(--st-border);
   border-radius: 0;
@@ -184,13 +184,13 @@
 .settings-modal .st-row-copy {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .settings-modal .st-row-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 500;
+  font-weight: 550;
 }
 
 .settings-modal .st-row-copy small {
@@ -271,12 +271,12 @@
 
 .settings-modal .st-switch {
   min-width: 0;
-  min-height: 44px;
+  min-height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 10px 0;
+  padding: 12px 0;
   border: 0;
   border-top: 1px solid var(--st-border);
   border-radius: 0;
@@ -351,13 +351,13 @@
 .settings-modal .st-switch-copy {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .settings-modal .st-switch-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 500;
+  font-weight: 550;
 }
 
 .settings-modal .st-switch-copy small {
@@ -467,8 +467,8 @@
 }
 
 .settings-modal .st-btn-sm {
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 11px;
   font-size: var(--st-font-size-secondary);
 }
 
@@ -479,8 +479,8 @@
 }
 
 .settings-modal .st-btn-icon.st-btn-sm {
-  width: 30px;
-  min-width: 30px;
+  width: 32px;
+  min-width: 32px;
 }
 
 /* ── Actions row ────────────────────────────────────────────────── */

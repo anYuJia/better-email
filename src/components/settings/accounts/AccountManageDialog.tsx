@@ -69,6 +69,7 @@ export default function AccountManageDialog({
     >
       <section
         className="settings-account-add-dialog settings-account-manage-dialog"
+        data-mode={mode}
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-account-dialog-title"

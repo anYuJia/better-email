@@ -154,11 +154,10 @@ export default function ContextMenu({
     });
   }, [x, y]);
 
-  const initialFocusRef = useRef(false);
   useEffect(() => {
-    if (initialFocusRef.current) return;
-    initialFocusRef.current = true;
     // 记录打开菜单前的焦点（右键目标或触发按钮），关闭时按规则恢复。
+    // 不用“只执行一次”标记：React StrictMode 会先执行一次
+    // setup/cleanup 探测。如果跳过第二次 setup，菜单将保留在背景焦点。
     skipFocusRestoreRef.current = false;
     if (document.activeElement instanceof HTMLElement) {
       previousFocusRef.current = document.activeElement;
@@ -192,6 +191,8 @@ export default function ContextMenu({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         onClose();
         return;
       }
@@ -262,12 +263,13 @@ export default function ContextMenu({
     }
 
     document.addEventListener('pointerdown', handlePointerDown, true);
-    window.addEventListener('keydown', handleKeyDown);
+    // 菜单是当前顶层交互：在捕获阶段先于应用级快捷键处理 Escape。
+    window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };

@@ -83,4 +83,15 @@ describe('AccountSwitcher', () => {
     openMenu(trigger);
     expect(document.body.querySelector('.account-switcher-menu')).toBeNull();
   });
+
+  it('打开菜单时转移焦点，Escape 后还给触发按钮', () => {
+    renderSwitcher();
+    const trigger = screen.getByRole('button', { name: /统一邮箱/ });
+
+    openMenu(trigger);
+    expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: /统一邮箱/ }));
+
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+    expect(document.activeElement).toBe(trigger);
+  });
 });

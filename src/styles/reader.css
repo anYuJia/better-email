@@ -45,14 +45,14 @@
    while the header/toolbar can use the full pane width. */
 .reader {
   width: 100%;
-  max-width: 900px;
+  max-width: 880px;
   margin: 0 auto;
   padding: 22px clamp(24px, 4vw, 48px) 52px;
   overflow: visible;
 }
 
 .app-shell .reader {
-  max-width: 900px;
+  max-width: 880px;
   padding: 24px clamp(24px, 4vw, 48px) 52px;
 }
 
@@ -86,24 +86,24 @@
   max-width: 100%;
   margin: 0 0 8px;
   color: var(--ui-text);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.28;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
 .app-shell .reader-header h1 {
   margin-bottom: 8px;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.28;
 }
 
 .reader-header p {
   margin: 0;
   color: var(--ui-text-tertiary);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -144,32 +144,34 @@
   margin-inline-start: var(--ui-space-1);
 }
 
-/* Toolbar controls: 30–32px height, transparent default, neutral hover.
+/* Toolbar controls: 40px pointer targets, transparent default, neutral hover.
    No pill, no shadow, no gradient. */
 .reader-actions button,
 .reader-actions .reader-more-menu summary,
 .reader-actions .reader-reply-menu summary,
 .reader-actions select {
   width: auto;
-  min-width: 32px;
-  min-height: 32px;
-  height: 32px;
-  padding: 0 10px;
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 11.5px;
-  transition: var(--ui-transition-fast-color-background);
+  font-size: 12.5px;
+  transition-property: color, background-color, box-shadow, scale;
+  transition-duration: var(--ui-motion-fast);
+  transition-timing-function: var(--ui-ease-standard);
 }
 
 .app-shell .reader-actions button,
 .app-shell .reader-actions .reader-more-menu summary,
 .app-shell .reader-actions .reader-reply-menu summary,
 .app-shell .reader-actions select {
-  min-height: 30px;
-  height: 30px;
+  min-height: 40px;
+  height: 40px;
   border: 0;
   border-radius: 7px;
   color: var(--ui-text-secondary);
@@ -194,12 +196,12 @@
 }
 
 .reader-actions .icon-only-action {
-  width: 32px;
+  width: 40px;
   padding: 0;
 }
 
 .reader-actions .icon-only-summary {
-  width: 32px;
+  width: 40px;
   padding: 0;
 }
 
@@ -215,32 +217,38 @@
 /* Primary reply action: icon + text, quiet emphasis */
 .reader-actions .primary-action {
   width: auto;
-  min-width: 68px;
-  padding-left: 10px;
-  padding-right: 12px;
+  min-width: 76px;
+  padding-left: 12px;
+  padding-right: 14px;
   border: 0;
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
+  color: var(--ui-accent);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-weight: 650;
 }
 
 .app-shell .reader-actions .primary-action {
-  min-width: 66px;
-  color: var(--ui-text);
+  min-width: 76px;
+  color: var(--ui-accent);
   background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
   font-weight: 650;
 }
 
 .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
+  color: var(--ui-accent-hover);
+  background: var(--ui-accent-soft);
 }
 
 .app-shell .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
+  color: var(--ui-accent-hover);
+  background: var(--ui-accent-soft);
+}
+
+.reader-actions button:active:not(:disabled),
+.reader-actions summary:active {
+  scale: 0.96;
 }
 
 .app-shell .reader-actions .compact-menu > div {
@@ -256,8 +264,8 @@
 /* Translate action: same utility language as other toolbar controls */
 .reader-actions .reader-translate-action {
   width: auto;
-  min-width: 32px;
-  height: 32px;
+  min-width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -267,7 +275,7 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
 }
@@ -314,7 +322,7 @@
   max-width: 220px;
   padding: 7px 10px 9px;
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -372,13 +380,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ui-text);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 .app-shell .reader-sender-copy strong {
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -392,7 +400,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .reader-sender-email-line {
@@ -424,7 +432,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -437,7 +445,7 @@
 
 .app-shell .reader-sender-copy > span {
   color: var(--ui-text-tertiary);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 /* Sender email is actionable but doesn't look like a browser link */
@@ -489,7 +497,7 @@
 .recipient-details-group h3 {
   margin: 0 0 6px;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.02em;
 }
@@ -590,7 +598,7 @@
   border-radius: 0;
   color: var(--ui-text-tertiary);
   background: var(--ui-surface-muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .app-shell .reader-meta span,
@@ -619,7 +627,7 @@
   border: none;
   background: transparent;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: normal;
   box-shadow: var(--ui-box-shadow-none);
 }
@@ -665,8 +673,8 @@
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface);
-  font-size: 11px;
+  background: transparent;
+  font-size: 12px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
@@ -721,7 +729,7 @@
   padding: 0 6px;
   border: 1px solid var(--ui-border);
   border-radius: 5px;
-  font-size: 11.5px;
+  font-size: 12px;
   background: var(--ui-surface);
   color: var(--ui-text);
   width: 100%;
@@ -879,7 +887,7 @@
   padding: 0 4px;
   border: 1px solid var(--ui-accent);
   border-radius: 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   flex: 1;
   min-width: 0;
 }
@@ -890,9 +898,9 @@
 }
 
 .label-edit-actions button {
-  height: 22px;
+  height: 28px;
   padding: 0 6px;
-  font-size: 10px;
+  font-size: 12px;
   border-radius: 4px;
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);
@@ -907,7 +915,7 @@
 
 .label-menu-empty {
   padding: 12px 14px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-text-tertiary);
   text-align: center;
   white-space: normal;
@@ -940,7 +948,7 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -953,7 +961,7 @@
   border-top: 0;
   color: var(--ui-text);
   background: transparent;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.65;
 }
 
@@ -989,17 +997,19 @@
   font-size: 12px;
 }
 
-/* Quoted / original message block: muted left rule, secondary text. Not a
-   big grey rounded card. */
+/* Quoted / original message block: a continuous document section separated
+   by hairlines, not a nested card. */
 .original-message-block {
   display: grid;
   gap: 10px;
   margin-top: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 .original-message-block + .original-message-block {
@@ -1024,7 +1034,7 @@
 
 .original-message-block header small {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -1068,9 +1078,8 @@
 /* Dark mode for original-message-block and blockquote */
 :root[data-theme="dark"] .original-message-block {
   border-color: var(--ui-border);
-  border-left-color: var(--ui-border-strong);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .original-message-block header span {
@@ -1107,6 +1116,8 @@
    that would alter the email's visual intent. */
 .reader-html img:not([data-better-email-inline-cid]) {
   cursor: zoom-in;
+  outline: 1px solid var(--ui-image-outline);
+  outline-offset: -1px;
   transition: var(--ui-transition-box-shadow-opacity-fast);
 }
 
@@ -1114,20 +1125,21 @@
   box-shadow: var(--ui-shadow-popover);
 }
 
-/* Blockquote: muted left rule, secondary text. Respects email structure. */
+/* Blockquote: one neutral hairline preserves quoting without a boxed card. */
 .reader-html blockquote {
   margin: 14px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  padding: 4px 0 4px 12px;
+  border: 0;
+  border-inline-start: 1px solid var(--ui-border-strong);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .reader-html blockquote {
-  border-color: var(--ui-border);
+  border-inline-start-color: var(--ui-border-strong);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1142,7 +1154,7 @@
 }
 
 .attachment-section-header {
-  min-height: 28px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1160,28 +1172,28 @@
 
 .attachment-section-header strong {
   color: var(--ui-text);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 680;
 }
 
 .attachment-section-header small {
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 12px;
 }
 
 .attachment-section-header button {
-  min-height: 26px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 0 4px;
+  padding: 0 8px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 650;
   transition: var(--ui-transition-color-fast);
 }
@@ -1313,12 +1325,12 @@
   z-index: 1;
   display: inline-grid;
   min-width: 30px;
-  height: 18px;
+  height: 20px;
   place-items: center;
   border-radius: 4px;
   color: var(--color-text-on-accent);
   background: var(--attachment-accent);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1;
@@ -1352,13 +1364,13 @@
 .attachment-copy small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 11.5px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .attachments .attachment-copy small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ui-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -1465,7 +1477,7 @@
   flex: 1 0 100%;
   margin-left: 36px;
   color: var(--ui-danger);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 560;
   line-height: 1.45;
 }
@@ -1476,7 +1488,7 @@
   margin: -2px 0 2px;
   margin-left: 0;
   color: var(--ui-danger);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Inline image notice */
@@ -1487,11 +1499,13 @@
   align-items: center;
   gap: 10px;
   margin: 0 0 12px;
-  padding: 8px 9px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 .inline-image-notice-icon {
@@ -1514,26 +1528,26 @@
 
 .inline-image-notice-copy strong {
   color: var(--ui-text);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 680;
 }
 
 .inline-image-notice-copy small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .inline-image-notice button {
-  min-height: 29px;
+  min-height: 36px;
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 680;
 }
 
@@ -1553,20 +1567,23 @@
  * 8. Security banner
  * --------------------------------------------------------------------------- */
 
-/* Quiet security status: a note, not a big red alert card. */
+/* Quiet security status: a section in the reading flow. Top and bottom
+   hairlines communicate scope without enclosing the content in a large box. */
 .reader-warning-panel {
   max-width: 760px;
   margin: var(--ui-space-3) 0 var(--ui-space-4);
-  padding: var(--ui-space-3);
-  border: 1px solid var(--ui-warning-border);
-  border-radius: var(--ui-radius-sm);
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-warning-border);
+  border-bottom: 1px solid var(--ui-warning-border);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: var(--ui-warning-bg);
+  background: color-mix(in srgb, var(--ui-warning-bg) 58%, var(--ui-reader));
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .reader-warning-panel {
-  padding: 10px 12px;
+  padding: 10px 0;
   border-color: color-mix(in srgb, var(--ui-warning-border) 72%, transparent);
 }
 
@@ -1586,7 +1603,7 @@
 
 .reader-warning-badge {
   color: var(--ui-warning);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1607,16 +1624,16 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: var(--ui-space-3);
+  margin-top: var(--ui-space-2);
 }
 
 .reader-warning-primary-action,
 .reader-warning-secondary-action {
-  min-height: 28px;
+  min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 580;
   box-shadow: var(--ui-box-shadow-none);
   transition: var(--ui-transition-fast-color-background);
@@ -1699,7 +1716,7 @@
 
 .thread-message time {
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -1786,10 +1803,10 @@
   min-height: 86px;
   width: 100%;
   padding: 9px 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13.5px;
   line-height: 1.55;
@@ -1802,13 +1819,14 @@
 
 .quick-reply textarea:focus {
   border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: var(--ui-focus-ring);
 }
 
 .quick-reply textarea:focus-visible {
   border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-none);
-  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  outline: var(--ui-focus-outline);
+  outline-offset: 0;
 }
 
 .quick-reply > footer {
@@ -1825,7 +1843,7 @@
 .quick-reply > footer > span {
   min-width: 36px;
   color: var(--ui-text-tertiary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .quick-reply > footer > div {
@@ -1886,9 +1904,11 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-surface-muted);
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
   color: var(--ui-text-secondary);
   font-size: 12.5px;
 }
@@ -1919,8 +1939,10 @@
 }
 
 .reader-translation-content {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
   background: var(--ui-surface-muted);
   overflow: hidden;
 }
@@ -1949,7 +1971,7 @@
   border-radius: var(--ui-radius-sm);
   background: transparent;
   color: var(--ui-text-tertiary);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -2330,5 +2352,10 @@
   .empty-state,
   .empty-reader {
     animation: var(--ui-animation-none);
+  }
+
+  .reader-actions button:active:not(:disabled),
+  .reader-actions summary:active {
+    scale: 1;
   }
 }

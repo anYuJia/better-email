@@ -21,7 +21,7 @@ import type {
 import { formatDate } from '../mailUtils';
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
 import ConfirmDialog from './ConfirmDialog';
-import ComposerAdvancedTools from './composer/ComposerAdvancedTools';
+import ComposerAdvancedTools, { ComposerSenderContext } from './composer/ComposerAdvancedTools';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools from './composer/ComposerQuickTools';
 import useModalAccessibility from '../hooks/useModalAccessibility';
@@ -155,7 +155,9 @@ export default function ComposerWindow({
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
   const title = draft.subject.trim() || '新邮件';
+  const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
+  const draftAccount = accounts.find((entry) => entry.id === accountId) ?? null;
   const draftIdentities = identities.filter((identity) => identity.account_id === accountId);
   const draftIdentity =
     draftIdentities.find((identity) => identity.id === draft.identity_id)
@@ -316,8 +318,8 @@ export default function ComposerWindow({
       >
         <header onPointerDown={beginDrag}>
           <span className="composer-title-copy">
-            <strong>{title}</strong>
-            <small>{draft.to.trim() || '新建邮件'}</small>
+            <strong>{windowHeading}</strong>
+            {draft.to.trim() && <small>{`发给 ${draft.to}`}</small>}
           </span>
           <div className="composer-header-actions">
             <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
@@ -330,6 +332,14 @@ export default function ComposerWindow({
             </button>
           </div>
         </header>
+
+        <ComposerSenderContext
+          accounts={accounts}
+          identities={draftIdentities}
+          accountId={accountId}
+          identityId={draftIdentity?.id || 0}
+          onPatchDraft={patchDraft}
+        />
 
         {crossAccountRisks.length > 0 && (
           <div className="composer-risk-banner" role="alert">
@@ -364,7 +374,7 @@ export default function ComposerWindow({
         <ComposerQuickTools
           draft={draft}
           dropActive={dropActive}
-          signature={draftIdentity?.signature.trim() ?? ''}
+          signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
           onPatchDraft={patchDraft}
           onInsertSignature={onInsertSignature}
           onPickAttachments={onPickAttachments}
@@ -376,10 +386,6 @@ export default function ComposerWindow({
 
         <ComposerAdvancedTools
           draft={draft}
-          accounts={accounts}
-          identities={draftIdentities}
-          accountId={accountId}
-          identityId={draftIdentity?.id || 0}
           templates={templates}
           templateName={templateName}
           onPatchDraft={patchDraft}

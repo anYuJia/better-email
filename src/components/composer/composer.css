@@ -155,7 +155,7 @@
 }
 
 .composer-recipient-field .composer-field-row:focus-within {
-  box-shadow: inset 2px 0 0 var(--ui-accent);
+  box-shadow: inset 0 0 0 2px var(--color-focus);
 }
 
 .composer .composer-field-row input {
@@ -209,7 +209,7 @@
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--ui-font-size-aux);
   font-weight: 560;
 }
 
@@ -2229,4 +2229,913 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* 24. Composed desktop editor ============================================
+ *
+ * The final composer pass keeps the familiar density of a desktop mail
+ * client while restoring a visible hierarchy: sender context, recipients,
+ * subject, writing surface, tools, then send actions.
+ */
+
+.composer-backdrop {
+  padding: 16px;
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.28);
+}
+
+.composer {
+  width: min(820px, calc(100vw - 48px));
+  height: min(720px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-modal);
+  box-shadow: var(--ui-shadow-float);
+}
+
+.composer header {
+  min-height: 54px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.composer-title-copy {
+  gap: 2px;
+}
+
+.composer-title-copy strong {
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+
+.composer-title-copy small {
+  display: block;
+  max-width: 58ch;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 500;
+}
+
+.composer-header-actions {
+  gap: 4px;
+}
+
+.composer-header-actions button {
+  width: 32px;
+  min-width: 32px;
+  min-height: var(--ui-control-height-dense);
+  padding: 0;
+  border-radius: var(--ui-radius-sm);
+  font-size: 0;
+}
+
+/* Sender context is intentionally persistent in a multi-account product. */
+.composer-sender-context {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
+  padding: 7px 18px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.composer-sender-heading {
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 590;
+}
+
+.composer-sender-selectors {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.composer .composer-sender-context .composer-inline-select {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 600;
+}
+
+.composer .composer-sender-context .custom-select-menu,
+.composer .composer-sender-context .custom-select-summary {
+  min-width: 0;
+  width: 100%;
+}
+
+.composer .composer-sender-context .custom-select-summary {
+  min-height: var(--ui-control-height);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-box-shadow-none);
+  text-align: left;
+}
+
+.composer .composer-sender-context .custom-select-summary:hover,
+.composer .composer-sender-context .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+.composer .composer-sender-context .custom-select-summary > span,
+.composer .composer-sender-context .custom-select-summary strong,
+.composer .composer-sender-context .custom-select-summary small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer .composer-sender-context .custom-select-summary strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.composer .composer-sender-context .custom-select-summary small {
+  display: block;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-primary-fields {
+  min-height: 0;
+  background: var(--ui-surface);
+}
+
+.composer-field-row {
+  min-height: 44px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  margin: 0 18px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 590;
+  background: transparent;
+}
+
+.composer-field-row:focus-within,
+.composer-recipient-field .composer-field-row:focus-within {
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--ui-surface-muted) 68%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 52%, var(--ui-border));
+}
+
+.composer .composer-field-row input,
+.composer .composer-field-row input:hover,
+.composer .composer-field-row input:focus {
+  min-height: 42px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: none;
+  font-size: 13.5px;
+}
+
+.composer .composer-field-row input:focus {
+  background: transparent;
+}
+
+.composer .composer-recipient-editor {
+  min-height: 44px;
+  gap: 6px;
+  padding: 5px 0;
+}
+
+.composer .composer-recipient-editor input {
+  min-height: 32px;
+}
+
+.composer .composer-recipient-chip {
+  min-height: 28px;
+  padding: 2px 3px 2px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-accent-soft);
+  font-size: 12px;
+}
+
+.composer .composer-recipient-chip button {
+  width: 24px;
+  min-height: 24px;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.composer .recipient-suggestions {
+  left: 76px;
+  top: calc(100% + 4px);
+  width: min(420px, calc(100% - 94px));
+  max-height: 224px;
+}
+
+.composer .recipient-suggestions > span {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .recipient-suggestions button {
+  min-height: 38px;
+  padding: 6px 9px;
+}
+
+.composer .recipient-suggestions button strong {
+  font-size: 13px;
+}
+
+.composer .recipient-suggestions button small {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-subject-field {
+  min-height: 56px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.composer .composer-subject-field input,
+.composer .composer-subject-field input:hover,
+.composer .composer-subject-field input:focus {
+  min-height: 54px;
+  padding: 0 8px;
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.composer-body-field {
+  min-height: 0;
+  margin: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+}
+
+.composer .composer-body-field::after {
+  display: none;
+}
+
+.composer .composer-body-field:focus-within {
+  background: color-mix(in oklch, var(--ui-accent-soft) 16%, var(--ui-surface));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--ui-accent) 38%, var(--ui-border)),
+    inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 38%, var(--ui-border));
+}
+
+.composer .composer-body-field textarea,
+.composer .composer-body-field .composer-richtext-body {
+  min-height: 150px;
+  width: 100%;
+  padding: 22px 26px 28px;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.68;
+}
+
+.composer .composer-body-field textarea:hover,
+.composer .composer-body-field textarea:focus,
+.composer .composer-body-field .composer-richtext-body:focus {
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.composer .composer-body-field.has-original-quote textarea,
+.composer .composer-body-field.has-original-quote .composer-richtext-body {
+  min-height: 124px;
+  height: 124px;
+  flex-basis: 124px;
+  padding: 20px 26px 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.composer-original-quote {
+  margin: 10px 26px 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+}
+
+.composer .composer-body-attachments {
+  gap: 8px;
+  padding: 0 26px 18px;
+}
+
+.composer-attachment-tile {
+  width: min(236px, 100%);
+  min-height: 64px;
+  grid-template-columns: 42px minmax(0, 1fr) 28px;
+  gap: 9px;
+  padding: 8px 7px 8px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+}
+
+.composer-attachment-tile:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+.composer-attachment-filemark {
+  width: 40px;
+  height: 44px;
+  border-radius: var(--ui-radius-sm);
+}
+
+.composer-attachment-tile-copy strong {
+  font-size: 12.5px;
+}
+
+.composer-attachment-tile-copy small {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-attachment-tile button {
+  width: 28px;
+  min-height: 28px;
+}
+
+.composer-body-attachment-empty {
+  min-height: var(--ui-control-height);
+  margin: 0 26px 18px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--ui-radius-control);
+  font-size: 12px;
+}
+
+.composer-quick-tools {
+  border-top: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+.composer-quick-toolbar {
+  min-height: 48px;
+  gap: 8px;
+  padding: 6px 18px;
+}
+
+.composer .rich-toolbar {
+  gap: 2px;
+  padding-right: 7px;
+  border-right: 1px solid var(--ui-border);
+}
+
+.composer .rich-toolbar button {
+  width: 32px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+}
+
+.composer .composer-signature button,
+.composer .composer-attachment-button {
+  min-height: var(--ui-control-height-dense);
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  font-size: 12px;
+}
+
+.composer .composer-signature button:hover,
+.composer .composer-attachment-button:hover,
+.composer .rich-toolbar button:hover,
+.composer .rich-toolbar button:focus-visible {
+  border-color: var(--ui-border);
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.composer .composer-signature small,
+.composer .composer-attachment-controls > span {
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-attachments.drop-active {
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--ui-accent);
+}
+
+.composer-advanced {
+  border-top: 0;
+  background: var(--ui-surface);
+}
+
+.composer .composer-advanced summary {
+  min-height: 40px;
+  margin: 0 18px;
+  padding: 0 4px;
+  border-radius: 0;
+  font-size: 12px;
+}
+
+.composer .composer-advanced summary > strong {
+  font-size: 12px;
+}
+
+.composer .composer-advanced summary > span {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-advanced summary:hover,
+.composer .composer-advanced[open] summary {
+  color: var(--ui-text);
+  background: transparent;
+}
+
+.composer-advanced-panel {
+  max-height: min(220px, 28vh);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface-muted);
+}
+
+.composer .composer-delivery-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.composer .composer-delivery-controls .composer-inline-input,
+.composer .composer-delivery-controls .composer-schedule {
+  min-height: var(--ui-control-height);
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 7px;
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-delivery-controls input,
+.composer .composer-delivery-controls .custom-select-summary {
+  min-height: var(--ui-control-height);
+  padding: 0 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  font-size: 12px;
+}
+
+.composer .composer-delivery-controls input:hover,
+.composer .composer-delivery-controls input:focus,
+.composer .composer-delivery-controls .custom-select-summary:hover,
+.composer .composer-delivery-controls .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+.composer .composer-template-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.composer .composer-template-save {
+  grid-template-columns: minmax(0, 1fr) 78px;
+}
+
+.composer .composer-template-save button {
+  white-space: nowrap;
+}
+
+.composer .composer-template-list {
+  min-height: var(--ui-control-height);
+  max-height: var(--ui-control-height);
+}
+
+.composer .composer-template-list > small,
+.composer .composer-template-row button,
+.composer .composer-template-save button,
+.composer .composer-template-save input {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-template-row button,
+.composer .composer-template-save button,
+.composer .composer-template-save input {
+  min-height: var(--ui-control-height);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+
+.composer .composer-template-row button:hover,
+.composer .composer-template-save input:focus {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+.composer footer {
+  min-height: 64px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.composer-footer-actions {
+  gap: 6px;
+}
+
+.composer footer .dialog-button {
+  min-height: var(--ui-control-height);
+  padding-inline: 12px;
+  border-radius: var(--ui-radius-control);
+  font-size: 12px;
+}
+
+.composer footer .dialog-button-primary {
+  min-height: 40px;
+  padding-inline: 19px;
+}
+
+.composer-footer-status > span,
+.composer-send-progress-message,
+.composer-attachment-progress-message {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-risk-banner {
+  margin: 8px 18px 0;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-warning-border);
+  border-radius: var(--ui-radius-control);
+  font-size: 12.5px;
+}
+
+/* Explicit focus ownership: text fields use their containing row/body, while
+ * buttons and discrete controls retain an ordinary focus-visible outline. */
+.composer :is(button, summary, input, textarea, [contenteditable="true"]):focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.composer .composer-field-row input:focus-visible,
+.composer .composer-body-field textarea:focus-visible,
+.composer .composer-body-field [contenteditable="true"]:focus-visible {
+  outline: none;
+}
+
+.composer-field-row:has(input:focus-visible),
+.composer-body-field:has(textarea:focus-visible),
+.composer-body-field:has([contenteditable="true"]:focus-visible) {
+  outline: none;
+}
+
+.composer-field-row:has(input:focus-visible) {
+  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 62%, var(--ui-border));
+}
+
+/* A minimized composer must remain a complete, legible task surface. */
+.composer-minimized {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+}
+
+.composer-mini-main {
+  min-width: 0;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 0;
+  color: var(--ui-text);
+  background: transparent;
+  text-align: left;
+}
+
+.composer-mini-main > svg {
+  color: var(--ui-accent);
+}
+
+.composer-mini-main > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.composer-mini-main strong,
+.composer-mini-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-mini-main strong {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.composer-mini-main small {
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-mini-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.composer-mini-actions button {
+  min-height: var(--ui-control-height-dense);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer-mini-main:hover,
+.composer-mini-actions button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+/* Dark mode uses the same geometry and semantic surfaces. These selectors
+ * outrank legacy dark-mode composer overrides without hard-coded colours. */
+:root[data-theme="dark"] .composer {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+}
+
+:root[data-theme="dark"] .composer header,
+:root[data-theme="dark"] .composer-primary-fields,
+:root[data-theme="dark"] .composer .composer-body-field,
+:root[data-theme="dark"] .composer .composer-advanced,
+:root[data-theme="dark"] .composer footer {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context,
+:root[data-theme="dark"] .composer .composer-quick-tools,
+:root[data-theme="dark"] .composer .composer-advanced-panel {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-muted);
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context {
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-field-row {
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .composer-field-row:focus-within {
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--ui-surface-muted) 58%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 48%, var(--ui-border));
+}
+
+:root[data-theme="dark"] .composer .composer-field-row input,
+:root[data-theme="dark"] .composer .composer-field-row input:hover,
+:root[data-theme="dark"] .composer .composer-field-row input:focus,
+:root[data-theme="dark"] .composer .composer-body-field textarea,
+:root[data-theme="dark"] .composer .composer-body-field textarea:focus,
+:root[data-theme="dark"] .composer .composer-body-field .composer-richtext-body,
+:root[data-theme="dark"] .composer .composer-body-field .composer-richtext-body:focus {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .composer-body-field:focus-within {
+  background: color-mix(in oklch, var(--ui-accent-soft) 10%, var(--ui-surface));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--ui-accent) 34%, var(--ui-border)),
+    inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 34%, var(--ui-border));
+}
+
+:root[data-theme="dark"] .composer .composer-field-row:has(input:focus-visible) {
+  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 58%, var(--ui-border));
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary,
+:root[data-theme="dark"] .composer .composer-delivery-controls input,
+:root[data-theme="dark"] .composer .composer-template-row button,
+:root[data-theme="dark"] .composer .composer-template-save input {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary:hover,
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary[aria-expanded="true"],
+:root[data-theme="dark"] .composer .composer-delivery-controls input:focus,
+:root[data-theme="dark"] .composer .composer-template-row button:hover,
+:root[data-theme="dark"] .composer .composer-template-save input:focus {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
+}
+
+:root[data-theme="dark"] .composer-minimized,
+:root[data-theme="dark"] .composer-mini-main,
+:root[data-theme="dark"] .composer-mini-actions button {
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+@media (max-width: 880px) {
+  .composer-backdrop {
+    padding: 12px;
+  }
+
+  .composer {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px);
+  }
+}
+
+@media (max-width: 720px) {
+  .composer-backdrop {
+    padding: 8px;
+  }
+
+  .composer {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: var(--ui-radius-panel);
+  }
+
+  .composer header {
+    padding-inline: 12px;
+  }
+
+  .composer-sender-context {
+    padding-inline: 12px;
+  }
+
+  .composer-field-row,
+  .composer .composer-advanced summary {
+    margin-inline: 12px;
+  }
+
+  .composer .composer-body-field textarea,
+  .composer .composer-body-field .composer-richtext-body {
+    padding-inline: 18px;
+  }
+
+  .composer-quick-toolbar {
+    padding-inline: 12px;
+  }
+
+  .composer .composer-signature small,
+  .composer .composer-attachment-controls > span {
+    display: none;
+  }
+
+  .composer-advanced-panel {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 12px;
+  }
+
+  .composer footer {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .composer-header-actions button {
+    width: 32px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .composer-sender-selectors,
+  .composer .composer-delivery-controls,
+  .composer .composer-template-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .composer .composer-template-controls {
+    align-items: stretch;
+  }
+
+  .composer .composer-signature {
+    display: none;
+  }
+
+  .composer-footer-status {
+    display: none;
+  }
+
+  .composer footer {
+    justify-content: flex-end;
+  }
+
+  .composer footer .dialog-button-secondary {
+    padding-inline: 9px;
+  }
+}
+
+/* Sender selectors render in document.body, so their menu needs an explicit
+ * owner marker instead of relying on styles inherited from the composer. */
+.custom-select-dropdown[data-portal-owner="composer-sender"] {
+  max-height: min(280px, calc(100vh - 24px));
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+  isolation: isolate;
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  text-align: left;
+  cursor: pointer;
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button strong,
+.custom-select-dropdown[data-portal-owner="composer-sender"] button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button strong {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button small {
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button:hover,
+.custom-select-dropdown[data-portal-owner="composer-sender"] button.active {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+}
+
+.custom-select-dropdown[data-portal-owner="composer-sender"] button > svg {
+  flex: 0 0 auto;
+  color: var(--ui-accent);
 }

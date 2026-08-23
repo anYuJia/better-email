@@ -123,10 +123,19 @@ export default function ThreadListView({
             return (
               <div
                 key={thread.thread_key}
+                className="thread-list-item"
                 role="listitem"
                 aria-current={activeThread?.thread_key === thread.thread_key ? 'true' : undefined}
                 aria-posinset={index + 1}
                 aria-setsize={threads.length}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: THREAD_ROW_HEIGHT,
+                  transform: `translateY(${layout[index].top}px)`,
+                }}
               >
                 <button
                   className={[
@@ -134,14 +143,6 @@ export default function ThreadListView({
                     activeThread?.thread_key === thread.thread_key ? 'selected' : '',
                     hasUnread ? 'is-unread' : 'is-read',
                   ].filter(Boolean).join(' ')}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: THREAD_ROW_HEIGHT,
-                    transform: `translateY(${layout[index].top}px)`,
-                  }}
                   onClick={() => onOpenThread(thread)}
                   onContextMenu={(event) => {
                     event.preventDefault();

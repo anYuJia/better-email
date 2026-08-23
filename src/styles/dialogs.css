@@ -145,7 +145,7 @@
 
 .recipient-suggestions small {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* composer-from: only the layout properties (colors are in composer.css) */
@@ -185,7 +185,7 @@
 }
 
 .composer-attachment-chip em {
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
 }
 

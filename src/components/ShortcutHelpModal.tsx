@@ -14,6 +14,8 @@ export default function ShortcutHelpModal({
   const dialogRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const titleId = 'shortcut-help-title';
+  const descriptionId = 'shortcut-help-description';
 
   useModalAccessibility({
     open,
@@ -38,28 +40,38 @@ export default function ShortcutHelpModal({
         className="shortcut-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="快捷键帮助"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         tabIndex={-1}
       >
-        <header>
-          <div>
-            <strong>快捷键</strong>
-            <span>高频邮件操作，不离开键盘。</span>
+        <header className="shortcut-modal-header">
+          <div className="shortcut-title-copy">
+            <h2 id={titleId}>快捷键</h2>
+            <p id={descriptionId}>常用邮件操作，无需离开键盘</p>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={onClose}>关闭</button>
+          <button
+            ref={closeButtonRef}
+            className="shortcut-close-button"
+            type="button"
+            onClick={onClose}
+          >
+            关闭
+          </button>
         </header>
         <div className="shortcut-grid">
           {shortcutGroups.map((group) => (
-            <section className="shortcut-group" key={group.title}>
-              <strong>{group.title}</strong>
-              {group.items.map((item) => (
-                <div className="shortcut-row" key={`${group.title}-${item.label}`}>
-                  <span>{item.label}</span>
-                  <div>
-                    {item.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+            <section className="shortcut-group" key={group.title} aria-labelledby={`shortcut-group-${group.title}`}>
+              <h3 id={`shortcut-group-${group.title}`}>{group.title}</h3>
+              <div className="shortcut-list">
+                {group.items.map((item) => (
+                  <div className="shortcut-row" key={`${group.title}-${item.label}`}>
+                    <span>{item.label}</span>
+                    <div aria-label={item.keys.join(' 加 ')}>
+                      {item.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </section>
           ))}
         </div>

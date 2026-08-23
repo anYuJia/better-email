@@ -155,21 +155,6 @@ function ReaderToolbar({
               <Archive size={16} />
             </button>
           )}
-          {!isDraft && (
-            <button
-              className="icon-only-action"
-              aria-label={selected.is_read ? '标为未读' : '标为已读'}
-              title={selected.is_read ? '标为未读' : '标为已读'}
-              onClick={() => onToggleRead(selected)}
-            >
-              <Mail size={16} />
-            </button>
-          )}
-          {!isTrash && (
-            <button className="icon-only-action danger-action" aria-label="删除" title="删除" onClick={onMoveTrash}>
-              <Trash2 size={16} />
-            </button>
-          )}
         </div>
         <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
@@ -181,6 +166,17 @@ function ReaderToolbar({
               <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
             ) : canSnoozeRole(selected.folder_role) && (
               <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
+            )}
+            {!isDraft && (
+              <button onClick={() => onToggleRead(selected)}>
+                <Mail size={16} />
+                {selected.is_read ? '标为未读' : '标为已读'}
+              </button>
+            )}
+            {!isTrash && (
+              <button className="danger-menu-item" onClick={onMoveTrash}>
+                <Trash2 size={16} /> 删除
+              </button>
             )}
             <button onClick={onExportMessage}>导出 EML</button>
             {selected.remote_uid > 0 && !selected.body.trim() && (

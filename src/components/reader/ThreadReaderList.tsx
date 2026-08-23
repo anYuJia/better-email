@@ -101,22 +101,6 @@ function ThreadReaderList({
               <Reply size={16} />
               <span>回复</span>
             </button>
-            <button
-              className="icon-only-action"
-              title="回复全部"
-              aria-label="回复全部"
-              onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll')}
-            >
-              <ReplyAll size={17} />
-            </button>
-            <button
-              className="icon-only-action"
-              title="转发最新邮件"
-              aria-label="转发最新邮件"
-              onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
-            >
-              <Forward size={17} />
-            </button>
           </div>
           <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
             <button
@@ -136,33 +120,46 @@ function ThreadReaderList({
             >
               <Archive size={16} />
             </button>
-            <button
-              className="icon-only-action"
-              title={threadStates.allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-              aria-label={threadStates.allThreadRead ? '整个会话标为未读' : '整个会话标为已读'}
-              onClick={() => onRunThreadAction(threadStates.allThreadRead ? 'unread' : 'read')}
-            >
-              {threadStates.allThreadRead ? <Mail size={16} /> : <MailOpen size={16} />}
-            </button>
-            <button
-              className="icon-only-action danger-action"
-              title="将会话移到废纸篓"
-              aria-label="将会话移到废纸篓"
-              disabled={threadStates.threadTrashCount === 0}
-              onClick={() => onRunThreadAction('trash')}
-            >
-              <Trash2 size={16} />
-            </button>
           </div>
           <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
             <summary className="icon-only-summary" title="更多会话操作" aria-label="更多会话操作">
               <MoreHorizontal size={17} />
             </summary>
             <div onClick={() => moreMenu.closeMenu()}>
+              <span className="menu-section-title">回复</span>
+              <button
+                type="button"
+                disabled={!activeThreadSelected}
+                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll')}
+              >
+                <ReplyAll size={14} /> 回复全部
+              </button>
+              <button
+                type="button"
+                disabled={!activeThreadSelected}
+                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
+              >
+                <Forward size={14} /> 转发最新邮件
+              </button>
               <span className="menu-section-title">会话</span>
+              <button
+                type="button"
+                onClick={() => onRunThreadAction(threadStates.allThreadRead ? 'unread' : 'read')}
+              >
+                {threadStates.allThreadRead ? <Mail size={14} /> : <MailOpen size={14} />}
+                {threadStates.allThreadRead ? '标为未读' : '标为已读'}
+              </button>
               <button type="button" onClick={onToggleThreadMute}>
                 {activeThread.is_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}
                 {activeThread.is_muted ? '取消静音会话' : '静音会话'}
+              </button>
+              <button
+                type="button"
+                className="danger-menu-item"
+                disabled={threadStates.threadTrashCount === 0}
+                onClick={() => onRunThreadAction('trash')}
+              >
+                <Trash2 size={14} /> 移到废纸篓
               </button>
               <span className="menu-section-title">标签</span>
               {labels.map((label) => (
@@ -194,7 +191,17 @@ function ThreadReaderList({
           <section
             className={message.id === selectedId ? 'thread-message active' : 'thread-message'}
             key={message.id}
+            role="button"
+            tabIndex={0}
+            aria-current={message.id === selectedId ? 'true' : undefined}
+            aria-label={`查看会话中的邮件：${message.sender_name || message.sender_email}，${message.subject || '无主题'}，${formatDate(message.received_at)}`}
             onClick={() => onSelectMessage(message.id)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              onSelectMessage(message.id);
+            }}
           >
             <header>
               <SenderIdentity message={message} />

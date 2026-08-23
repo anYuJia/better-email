@@ -298,13 +298,20 @@ export default function App() {
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
   const messageToastIdRef = useRef(0);
-  const showMessageToast = useCallback((text: string) => {
+  const showMessageToast = useCallback((text: string, tone: MessageToast['tone'] = 'success') => {
     const id = ++messageToastIdRef.current;
-    setMessageToasts((current) => [...current, { id, text }]);
+    setMessageToasts((current) => [...current, { id, text, tone }]);
     window.setTimeout(() => {
       setMessageToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 3000);
+    }, tone === 'error' ? 5000 : 3000);
   }, []);
+  const lastVisualStatusRef = useRef(status);
+  useEffect(() => {
+    if (lastVisualStatusRef.current === status) return;
+    lastVisualStatusRef.current = status;
+    if (!/(?:^Error:|失败|错误|出错|无法|不能|被拒绝|超时|请先|尚未配置|不存在)/i.test(status)) return;
+    showMessageToast(status.replace(/^Error:\s*/i, ''), 'error');
+  }, [showMessageToast, status]);
   const {
     loadMeta,
     releaseDueSnoozedMessages,

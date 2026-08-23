@@ -10,6 +10,7 @@
 @import './styles/window-chrome.css';
 @import './styles/shared-motion.css';
 @import './styles/shared-dialogs.css';
+@import './styles/shortcut-help.css';
 
 /* Pane layers, oldest to newest — later sheets win ties */
 @import './styles/message-list.css';

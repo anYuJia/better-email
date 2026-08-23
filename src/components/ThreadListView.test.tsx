@@ -30,11 +30,16 @@ describe('ThreadListView 虚拟化', () => {
     );
 
     const cards = container.querySelectorAll<HTMLElement>('.thread-card');
+    const rows = container.querySelectorAll<HTMLElement>('.thread-list-item');
     expect(cards.length).toBeGreaterThan(0);
     expect(cards.length).toBeLessThan(30);
-    // 行高与虚拟计算常量一致，首行从顶部开始，避免滚动跳动。
-    expect(cards[0].style.transform).toBe('translateY(0px)');
-    expect(cards[0].style.height).toBe(`${THREAD_ROW_HEIGHT}px`);
+    // 虚拟位移属于非交互的 listitem。按钮本身受全局
+    // `transform: none !important` 约束，不能承担功能性布局位移。
+    expect(rows[0].style.transform).toBe('translateY(0px)');
+    expect(rows[1].style.transform).toBe(`translateY(${THREAD_ROW_HEIGHT}px)`);
+    expect(rows[0].style.height).toBe(`${THREAD_ROW_HEIGHT}px`);
+    expect(cards[0].style.transform).toBe('');
+    expect(cards[0].style.position).toBe('');
     // 外层包裹高度 = 全部会话行高之和。
     const wrapper = container.querySelector('.thread-list-viewport-wrapper') as HTMLElement;
     expect(wrapper.style.height).toBe(`${THREAD_ROW_HEIGHT * threads.length}px`);

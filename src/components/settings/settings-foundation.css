@@ -54,7 +54,7 @@
 .settings-modal .settings-page-content :is(input, select, textarea):focus {
   border-color: var(--st-focus-border);
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--st-focus-border) 18%, transparent);
 }
 
 .settings-modal .settings-page-content :is(input, select, textarea)[aria-invalid="true"] {
@@ -137,7 +137,7 @@
 
 .settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--st-focus-border);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .settings-modal :is(input, select, textarea):focus {

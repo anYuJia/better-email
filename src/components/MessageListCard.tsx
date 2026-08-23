@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
@@ -37,12 +37,25 @@ export default React.memo(function MessageListCard({
   onCloseMessageMenu,
   onSetDraggingMessageIds,
 }: MessageListCardProps) {
+  const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const cardLabel = [
     `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
     message.subject || '无主题',
     message.is_read ? '' : '，未读',
+    `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
+
+  // J/K and Arrow navigation update the current message outside this row.
+  // If keyboard focus was already in the list, follow that state change so
+  // the visible focus ring and the reader selection never diverge.
+  useEffect(() => {
+    if (!isCurrentMessage || !mainButtonRef.current) return;
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement) || !activeElement.closest('.message-list')) return;
+    if (activeElement === mainButtonRef.current) return;
+    mainButtonRef.current.focus({ preventScroll: true });
+  }, [isCurrentMessage]);
 
   return (
     <div
@@ -83,10 +96,19 @@ export default React.memo(function MessageListCard({
       }}
     >
       <button
+        ref={mainButtonRef}
         type="button"
         className="message-card-main"
         aria-label={cardLabel}
         aria-current={isCurrentMessage ? 'true' : undefined}
+        aria-keyshortcuts="Enter Space"
+        tabIndex={isCurrentMessage ? 0 : -1}
+        onKeyDown={(event) => {
+          if (event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleMessageSelection(message.id, !isSelected);
+        }}
         onClick={(event) => {
           event.stopPropagation();
           onSelectMessage(message.id);
@@ -105,6 +127,7 @@ export default React.memo(function MessageListCard({
           aria-label={`选择 ${message.subject || '无主题'}`}
           checked={isSelected}
           type="checkbox"
+          tabIndex={-1}
           onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
         />
       </label>

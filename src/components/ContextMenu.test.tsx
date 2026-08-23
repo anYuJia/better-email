@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 
 afterEach(() => {
@@ -25,6 +25,21 @@ function MenuHarness() {
 }
 
 describe('ContextMenu focus management', () => {
+  it('moves focus into the menu under React StrictMode', () => {
+    render(
+      <StrictMode>
+        <MenuHarness />
+      </StrictMode>,
+    );
+    const trigger = screen.getByRole('button', { name: '触发按钮' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: '打开' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('restores focus to the trigger button on Escape close', () => {
     render(<MenuHarness />);
     const trigger = screen.getByRole('button', { name: '触发按钮' });

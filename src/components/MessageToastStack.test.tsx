@@ -71,6 +71,20 @@ describe('MessageToastStack announcements and exit state', () => {
     expect(document.querySelector('.message-toast-stack')?.hasAttribute('role')).toBe(false);
   });
 
+  it('announces errors assertively and renders a severity-aware visual toast', () => {
+    render(
+      <MessageToastStack
+        toasts={[{ id: 3, text: '同步失败，请重试', tone: 'error' }]}
+        pendingSendUndo={null}
+        onUndoSend={() => undefined}
+        onDismissSend={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('alert').textContent).toBe('同步失败，请重试');
+    expect(document.querySelector('.message-toast.toast-error')).not.toBeNull();
+  });
+
   it('moves removed toasts into effect-driven exit state before unmounting them', () => {
     const { rerender } = render(
       <MessageToastStack

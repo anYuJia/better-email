@@ -23,7 +23,7 @@
   width: 100vw;
   background: var(--ui-bg);
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 /* Pane surfaces: each pane is a flat plane of the workspace, distinguished

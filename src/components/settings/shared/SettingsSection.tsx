@@ -11,8 +11,9 @@ type SettingsSectionProps = {
 };
 
 /**
- * Card-style settings section with an optional header row (title, description,
- * badge / actions). Replaces the legacy `.tool-panel` + `.tool-header` pair.
+ * Continuous preference section with an optional header row (title,
+ * description, badge / actions). It groups related settings without adding
+ * card chrome around every group.
  */
 export default function SettingsSection({
   title,

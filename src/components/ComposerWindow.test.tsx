@@ -53,6 +53,18 @@ function composer() {
 }
 
 describe('ComposerWindow focus lifecycle', () => {
+  it('keeps the sending account and identity visible outside advanced options', () => {
+    render(composer());
+
+    const account = screen.getByRole('combobox', { name: '发件账号' });
+    const identity = screen.getByRole('combobox', { name: '发件身份' });
+
+    expect(account.closest('.composer-sender-context')).not.toBeNull();
+    expect(identity.closest('.composer-sender-context')).not.toBeNull();
+    expect(account.closest('details')).toBeNull();
+    expect(screen.getByText('更多选项').closest('details')?.hasAttribute('open')).toBe(false);
+  });
+
   it('restores focus after the background is no longer inert', async () => {
     const shell = (open: boolean) => (
       <div data-testid="composer-shell">

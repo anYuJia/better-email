@@ -9,35 +9,37 @@
 }
 
 .snooze-dialog {
-  width: min(440px, calc(100vw - 32px));
+  width: min(380px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel, 14px);
+  border: 0;
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ui-border) 72%, transparent),
+    var(--ui-shadow-float);
 }
 
 .snooze-dialog > header {
-  min-height: 62px;
+  min-height: 54px;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 32px;
+  grid-template-columns: 24px minmax(0, 1fr) 36px;
   align-items: center;
   gap: 10px;
-  padding: 0 12px 0 16px;
+  padding: 0 10px 0 14px;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .snooze-dialog-icon {
-  width: 34px;
-  height: 34px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  border-radius: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
 }
 
 .snooze-dialog > header > span:nth-child(2) {
@@ -56,17 +58,17 @@
 .snooze-dialog > header strong {
   color: var(--ui-text);
   font-size: 14px;
-  font-weight: 710;
+  font-weight: 620;
 }
 
 .snooze-dialog > header small {
   color: var(--ui-text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .snooze-dialog > header button {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -83,44 +85,51 @@
 
 .snooze-preset-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 6px 8px;
 }
 
 .snooze-preset-grid > button {
   min-width: 0;
-  min-height: 74px;
+  min-height: 50px;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  align-content: center;
-  gap: 3px 9px;
-  padding: 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
+  background: transparent;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ui-border) 70%, transparent);
   text-align: left;
 }
 
-.snooze-preset-grid > button:hover,
+.snooze-preset-grid > button:last-child {
+  box-shadow: none;
+}
+
+.snooze-preset-grid > button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
 .snooze-preset-grid > button:focus-visible {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  outline: none;
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
 }
 
 .snooze-preset-grid > button > span {
-  width: 30px;
-  height: 30px;
-  grid-row: 1 / 3;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  border-radius: var(--ui-radius-control, 8px);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  border-radius: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
 }
 
 .snooze-preset-grid strong,
@@ -133,21 +142,22 @@
 
 .snooze-preset-grid strong {
   color: var(--ui-text);
-  font-size: 11.5px;
-  font-weight: 680;
+  font-size: 13px;
+  font-weight: 560;
 }
 
 .snooze-preset-grid small {
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .snooze-custom {
   display: grid;
   gap: 10px;
-  padding: 14px 16px 16px;
+  padding: 12px 16px 16px;
   border-top: 1px solid var(--ui-border);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 .snooze-custom > span {
@@ -157,12 +167,13 @@
 
 .snooze-custom > span strong {
   color: var(--ui-text);
-  font-size: 11.5px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .snooze-custom > span small {
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 12px;
 }
 
 .snooze-custom > div {
@@ -183,19 +194,19 @@
 
 .snooze-custom input:focus {
   border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-accent-soft-outline);
+  box-shadow: var(--ui-focus-ring);
   outline: none;
 }
 
 .snooze-custom button {
   min-height: 38px;
   padding: 0 14px;
-  border: 1px solid var(--ui-accent);
+  border: 0;
   border-radius: var(--ui-radius-control, 8px);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
-  font-size: 11px;
-  font-weight: 680;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .snooze-custom button:hover {
@@ -205,7 +216,7 @@
 .snooze-custom p {
   margin: -3px 0 0;
   color: var(--ui-danger);
-  font-size: 9.5px;
+  font-size: 12px;
 }
 
 @media (max-width: 520px) {
@@ -216,7 +227,7 @@
 
   .snooze-dialog {
     width: 100%;
-    border-radius: 14px;
+    border-radius: var(--ui-radius-panel);
   }
 
   .snooze-preset-grid {
@@ -229,7 +240,6 @@
 /* SnoozePicker is lazy-loaded, after the main dark-mode sheet. Keep every
  * local surface token-driven so the dialog cannot reintroduce light cards. */
 :root[data-theme="dark"] .snooze-dialog {
-  border-color: var(--ui-border-strong);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-float);
@@ -240,8 +250,8 @@
 }
 
 :root[data-theme="dark"] .snooze-dialog-icon {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text-secondary);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-dialog > header strong,
@@ -266,33 +276,30 @@
 }
 
 :root[data-theme="dark"] .snooze-preset-grid > button {
-  border-color: var(--ui-border);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-preset-grid > button:hover {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
 :root[data-theme="dark"] .snooze-preset-grid > button:focus-visible {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
   outline: var(--ui-focus-outline);
   outline-offset: 1px;
 }
 
 :root[data-theme="dark"] .snooze-preset-grid > button > span {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text-secondary);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-custom {
   border-top-color: var(--ui-border);
-  background: var(--ui-surface-muted);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-custom input {
@@ -303,11 +310,10 @@
 
 :root[data-theme="dark"] .snooze-custom input:focus {
   border-color: var(--ui-accent);
-  box-shadow: var(--ui-box-shadow-accent-soft-outline);
+  box-shadow: var(--ui-focus-ring);
 }
 
 :root[data-theme="dark"] .snooze-custom button {
-  border-color: var(--ui-accent);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
 }
@@ -317,10 +323,8 @@
 }
 
 :root[data-theme="dark"] .snooze-custom p {
-  border: 1px solid var(--ui-danger);
-  border-radius: var(--ui-radius-sm);
   color: var(--ui-danger);
-  background: var(--ui-danger-bg);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-preset-grid {

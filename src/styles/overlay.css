@@ -32,13 +32,15 @@
   justify-content: center;
   gap: 10px;
   padding: var(--ui-space-3) var(--ui-space-4);
-  border: 1px solid var(--ui-border-strong);
+  border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
-  font-size: 11px;
-  font-weight: 670;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ui-border) 70%, transparent),
+    var(--ui-shadow-float);
+  font-size: 12px;
+  font-weight: 620;
 }
 
 .deferred-spinner {

@@ -47,6 +47,10 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'auth',
 ]);
 
+const compactSettingsSections = new Set<SettingsSectionId>([
+  'appearance',
+]);
+
 export default function SettingsFrame({
   title,
   subtitle,
@@ -66,10 +70,17 @@ export default function SettingsFrame({
     item: activeItem,
     index: activeIndex,
   } = getSettingsNavigationContext(activeSection);
-  const hasConnectionActions = saveAndVerifySettingsSections.has(activeSection) && canSaveAndVerify;
-  const shouldShowConnectionSummary = hasConnectionActions
+  const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
+  const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
+  const shouldShowConnectionSummary = isAccountEditingSection
+    && canSaveAndVerify
     && Boolean(connectionSummary)
     && connectionSummary !== '尚未开始验证';
+  const headerAction = isAccountEditingSection && canSaveAndVerify && isDirty
+    ? 'save'
+    : canActOnConnection
+      ? 'test'
+      : null;
   const modalRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -108,33 +119,40 @@ export default function SettingsFrame({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="settings-modal" data-ui="settings-v2" role="dialog" aria-modal="true" aria-label={title} ref={modalRef}>
+      <section
+        className="settings-modal"
+        data-ui="settings-v2"
+        data-page-layout={compactSettingsSections.has(activeSection) ? 'compact' : 'standard'}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        ref={modalRef}
+      >
         <header className="settings-main-header">
           <div className="settings-title">
             <span className="settings-title-copy">
               <strong>{title}</strong>
               <small>
                 {subtitle}
-                {hasConnectionActions ? ' · ' + (isDirty ? '有未保存修改' : '已保存') : ''}
+                {isAccountEditingSection && isDirty ? ' · 有未保存修改' : ''}
               </small>
             </span>
           </div>
           <div className="settings-header-actions">
-            {hasConnectionActions ? (
-              isDirty ? (
-                <button
-                  type="button"
-                  className="settings-header-button primary"
-                  aria-label="保存账号设置"
-                  title="保存当前账号设置"
-                  disabled={isBusy}
-                  onClick={onSave}
-                >
-                  {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <Save size={15} />}
-                  <span>{isBusy ? '保存中' : '保存修改'}</span>
-                </button>
-              ) : null
-            ) : connectionSettingsSections.has(activeSection) ? (
+            {headerAction === 'save' && (
+              <button
+                type="button"
+                className="settings-header-button primary"
+                aria-label="保存账号设置"
+                title="保存当前账号设置"
+                disabled={isBusy}
+                onClick={onSave}
+              >
+                {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <Save size={15} />}
+                <span>{isBusy ? '保存中' : '保存修改'}</span>
+              </button>
+            )}
+            {headerAction === 'test' && (
               <button
                 type="button"
                 className="settings-header-button secondary"
@@ -144,18 +162,6 @@ export default function SettingsFrame({
               >
                 <FlaskConical size={15} />
                 <span>测试连接</span>
-              </button>
-            ) : activeSection === 'about' ? null : (
-              <button
-                type="button"
-                className="settings-header-button primary"
-                aria-label="保存设置"
-                title="保存当前账号设置"
-                disabled={isBusy}
-                onClick={onSave}
-              >
-                <Save size={15} />
-                <span>保存</span>
               </button>
             )}
             <button
@@ -196,25 +202,6 @@ export default function SettingsFrame({
             </SettingsPageShell>
           </div>
         </div>
-        {isDirty && (
-          <div className="settings-floating-unsaved-bar" role="status" aria-live="polite">
-            <span className="settings-floating-unsaved-info">
-              <span className="settings-floating-unsaved-dot" />
-              当前存在未保存的设置更改
-            </span>
-            <div className="settings-floating-unsaved-actions">
-              <button
-                type="button"
-                className="st-btn st-btn-primary st-btn-sm"
-                disabled={isBusy}
-                onClick={onSave}
-              >
-                {isBusy ? <LoaderCircle className="settings-action-spinner" size={13} /> : <Save size={13} />}
-                <span>{isBusy ? '保存中...' : '保存修改'}</span>
-              </button>
-            </div>
-          </div>
-        )}
       </section>
     </div>
   );

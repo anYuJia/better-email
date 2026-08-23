@@ -29,6 +29,7 @@ export default function ComposerQuickTools({
   onAttachmentDragOver,
 }: ComposerQuickToolsProps) {
   const richHtml = draft.html_body || plainTextToRichHtml(draft.body);
+  const regularAttachmentCount = draft.attachments.filter((attachment) => !attachment.is_inline).length;
 
   return (
     <section className="composer-quick-tools" aria-label="写信常用工具">
@@ -70,13 +71,15 @@ export default function ComposerQuickTools({
         </div>
 
         <div className="composer-signature">
-          <button type="button" onClick={onInsertSignature} title={signature || '当前发件身份未设置签名'}>
+          <button
+            type="button"
+            onClick={onInsertSignature}
+            disabled={!signature}
+            title={signature || '当前发件身份未设置签名'}
+          >
             <FileSignature size={15} />
             插入签名
           </button>
-          <small title={signature || '当前发件身份未设置签名'}>
-            {signature || '未设置签名'}
-          </small>
         </div>
 
         <div
@@ -87,15 +90,15 @@ export default function ComposerQuickTools({
           onDragOver={onAttachmentDragOver}
         >
           <div className="composer-attachment-controls">
-            <button type="button" className="composer-attachment-button" onClick={onPickAttachments}>
+            <button
+              type="button"
+              className="composer-attachment-button"
+              onClick={onPickAttachments}
+            >
               <Paperclip size={15} />
               添加附件
             </button>
-            <span>
-              {draft.attachments.some((attachment) => !attachment.is_inline)
-                ? `已添加 ${draft.attachments.filter((attachment) => !attachment.is_inline).length} 个附件`
-                : '拖入文件，或点击添加附件'}
-            </span>
+            {regularAttachmentCount > 0 && <span>{`已添加 ${regularAttachmentCount} 个附件`}</span>}
           </div>
         </div>
       </div>

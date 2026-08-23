@@ -155,7 +155,8 @@
 }
 
 .composer-recipient-field .composer-field-row:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus);
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 -1px 0 var(--color-focus);
 }
 
 .composer .composer-field-row input {
@@ -366,7 +367,9 @@
 }
 
 .composer .composer-body-field:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus);
+  box-shadow:
+    inset 0 1px 0 var(--color-focus),
+    inset 0 -1px 0 var(--color-focus);
 }
 
 .composer .composer-body-field:focus-within::after {
@@ -436,7 +439,7 @@
 
 .composer-original-quote header small {
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -1332,15 +1335,6 @@
     max-height: calc(100vh - 20px);
   }
 
-  .composer .composer-quick-toolbar {
-    flex-wrap: wrap;
-    overflow: visible;
-  }
-
-  .composer .composer-attachments {
-    flex-basis: 100%;
-  }
-
   .composer-advanced-panel {
     grid-template-columns: 1fr;
   }
@@ -1403,7 +1397,7 @@
 :root[data-theme="dark"] .composer-recipient-field .composer-field-row:focus-within {
   border-bottom-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
+  box-shadow: inset 0 -1px 0 var(--color-focus);
 }
 
 :root[data-theme="dark"] .composer .composer-field-row input,

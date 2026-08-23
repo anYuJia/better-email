@@ -125,7 +125,7 @@
 /* --- Window chrome --- */
 
 :root[data-theme="dark"] .window-chrome {
-  background: var(--ui-surface-sidebar);
+  background: var(--ui-sidebar);
   color: var(--ui-text);
 }
 

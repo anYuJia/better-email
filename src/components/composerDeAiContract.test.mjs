@@ -119,6 +119,26 @@ describe('composer de-AI contract — recipient chips are small, not pills', () 
   });
 });
 
+describe('composer focus contract — quiet hairlines, not large rectangles', () => {
+  it('recipient and body focus states do not draw a 2px inset rectangle', () => {
+    const focusRules = parseRules(composerCss).filter((rule) => (
+      rule.selector.includes(':focus-within')
+    ));
+    for (const rule of focusRules) {
+      expect(rule.body).not.toMatch(/inset\s+0\s+0\s+0\s+2px/);
+    }
+  });
+});
+
+describe('composer readability contract — visible copy is at least 12px', () => {
+  it('the read-only original-quote label is not microcopy', () => {
+    const rule = findRules(composerCss, '.composer-original-quote header small')
+      .find((candidate) => candidate.selector === '.composer-original-quote header small');
+    expect(rule).toBeDefined();
+    expect(extractDecl(rule.body, 'font-size')).toBeGreaterThanOrEqual(12);
+  });
+});
+
 describe('composer de-AI contract — send button is accent, not flashy', () => {
   it('send button has no gradient', () => {
     const rules = findRules(sharedDialogsCss, '.dialog-button-primary');

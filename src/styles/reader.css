@@ -861,7 +861,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 12px;
   padding: 0;
 }
 
@@ -2211,7 +2211,7 @@
   }
 }
 
-/* Image context menu (popover: shadow + blur allowed) */
+/* Image context menu: the opaque popover surface already owns elevation. */
 .reader-image-context-menu {
   position: fixed;
   z-index: 110;
@@ -2221,7 +2221,6 @@
   border-radius: var(--ui-radius-control);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
-  backdrop-filter: blur(14px);
 }
 
 .reader-image-context-menu button {

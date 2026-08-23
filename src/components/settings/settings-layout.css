@@ -27,6 +27,7 @@
 /* ── Modal ──────────────────────────────────────────────────────── */
 
 .settings-modal {
+  position: relative;
   width: min(920px, calc(100vw - 40px));
   height: min(700px, calc(100dvh - 40px));
   max-height: calc(100dvh - 40px);

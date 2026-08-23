@@ -280,6 +280,9 @@ export default function useMailboxSearchController({
     setSearchScope('folder');
     setActiveThread(null);
     setThreadMessages([]);
+    // The clear button unmounts as soon as the query/filter state resets.
+    // Move focus first so keyboard users do not fall back to document.body.
+    searchInputRef.current?.focus({ preventScroll: true });
     await loaders.loadMessagesWithVisibleFallback(
       folderId,
       '',

@@ -69,6 +69,7 @@
   --st-control-height-mobile: var(--ui-control-height-touch);
   --st-focus-ring: none;
   --st-focus-border: var(--color-focus);
+  --st-focus-outline: var(--ui-focus-outline);
 
   /* Layout constants */
   --st-sidebar-width: 216px;

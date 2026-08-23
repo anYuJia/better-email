@@ -47,8 +47,8 @@ export default function useMailboxLoadMore({
 
   const loadMoreMessages = useCallback(async () => {
     const loaders = loadersRef.current;
-    if (!loaders) return;
-    if (loadingMoreRef.current) return;
+    if (!loaders) return messages;
+    if (loadingMoreRef.current) return messages;
     loadingMoreRef.current = true;
     // 捕获发起时的 mailbox 世代：加载更多期间用户导航到别的视图时，
     // 慢响应不得把旧文件夹的追加结果写回新视图。
@@ -88,9 +88,9 @@ export default function useMailboxLoadMore({
         setStatus('正在从服务器同步历史邮件...');
         setLoadMoreStatus('正在从服务器拉取历史邮件...');
         const run = await loaders.syncImapHistoryPage(targetMailbox.account_id);
-        if (startedRefreshId !== mailboxRefreshRef.current) return;
+        if (startedRefreshId !== mailboxRefreshRef.current) return nextMessages;
         const meta = await loaders.loadMeta(folderId, accountScope, { mode: 'mailbox' });
-        if (startedRefreshId !== mailboxRefreshRef.current) return;
+        if (startedRefreshId !== mailboxRefreshRef.current) return nextMessages;
         const refreshedMessages = await loaders.loadMessagesWithVisibleFallback(
           meta.folderId,
           query,
@@ -103,8 +103,10 @@ export default function useMailboxLoadMore({
           false,
         );
         setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
+        return refreshedMessages;
       } else {
         setStatus(`已加载 ${nextMessages.length} 封邮件`);
+        return nextMessages;
       }
     } finally {
       loadingMoreRef.current = false;

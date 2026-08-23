@@ -46,7 +46,7 @@ type MessageListViewProps = {
   onSetDraggingMessageIds: (messageIds: number[]) => void;
   onClearSearchAndFilter: () => void;
   onRefresh: () => void;
-  onLoadMore: () => void;
+  onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
 };
 
@@ -74,6 +74,7 @@ export default function MessageListView({
   loadMoreStatus,
 }: MessageListViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const footerRef = useRef<HTMLDivElement | null>(null);
   const restoredViewKeyRef = useRef<string | null>(null);
   const latestScrollTopRef = useRef(initialScrollTop);
   const scrollSaveTimerRef = useRef<number | null>(null);
@@ -87,6 +88,10 @@ export default function MessageListView({
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
   const itemNodeRefs = useRef<Map<string, HTMLElement | null>>(new Map());
+  const [loadMoreFocusRequest, setLoadMoreFocusRequest] = useState<{
+    listStateKey: string;
+    previousMessageIds: ReadonlySet<number>;
+  } | null>(null);
 
   const newIds = useMemo(() => {
     const set = new Set<number>();
@@ -230,11 +235,6 @@ export default function MessageListView({
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
 
-    const triggerThreshold = 1000;
-    if (hasMoreMessages && !loadMoreStatus && totalHeight - (nextScrollTop + viewportHeight) < triggerThreshold) {
-      onLoadMore();
-    }
-
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
     }
@@ -305,6 +305,19 @@ export default function MessageListView({
     return items;
   }, [flatItems, layout, visibleRange]);
 
+  const loadMoreFocusTarget = useMemo(() => {
+    if (!loadMoreFocusRequest || loadMoreFocusRequest.listStateKey !== listStateKey) {
+      return null;
+    }
+    return messages.find(
+      (message) => !loadMoreFocusRequest.previousMessageIds.has(message.id),
+    ) ?? null;
+  }, [listStateKey, loadMoreFocusRequest, messages]);
+
+  const handleLoadMoreFocusClaimed = React.useCallback(() => {
+    setLoadMoreFocusRequest(null);
+  }, []);
+
   useLayoutEffect(() => {
     let hasUpdate = false;
     for (const { item } of visibleItems) {
@@ -323,6 +336,45 @@ export default function MessageListView({
     }
   }, [visibleItems]);
 
+  useLayoutEffect(() => {
+    const request = loadMoreFocusRequest;
+    if (!request) return;
+    if (request.listStateKey !== listStateKey) {
+      setLoadMoreFocusRequest(null);
+      return;
+    }
+
+    if (!loadMoreFocusTarget) {
+      // Keep the request alive across partial/concurrent renders. The target
+      // is resolved by message identity when the transitioned rows commit.
+      return;
+    }
+
+    const targetItemIndex = flatItems.findIndex(
+      (item) => item.type === 'message' && item.message.id === loadMoreFocusTarget.id,
+    );
+    const targetIsMounted = visibleItems.some(
+      ({ item }) => item.type === 'message' && item.message.id === loadMoreFocusTarget.id,
+    );
+    if (targetItemIndex < 0 || targetIsMounted) return;
+
+    const listElement = listRef.current;
+    if (!listElement) return;
+    const nextScrollTop = Math.max(0, layout[targetItemIndex]?.top ?? 0);
+    listElement.scrollTop = nextScrollTop;
+    latestScrollTopRef.current = nextScrollTop;
+    setScrollTop(nextScrollTop);
+    setVisibleRange(calculateVisibleRange(layout, nextScrollTop, viewportHeight));
+  }, [
+    flatItems,
+    layout,
+    listStateKey,
+    loadMoreFocusRequest,
+    loadMoreFocusTarget,
+    viewportHeight,
+    visibleItems,
+  ]);
+
   return (
     <div
       className="message-list"
@@ -330,6 +382,7 @@ export default function MessageListView({
       role="list"
       aria-label="邮件列表"
       aria-busy={Boolean(loadMoreStatus)}
+      tabIndex={-1}
       onScroll={handleListScroll}
     >
       {messages.length > 0 && (
@@ -391,6 +444,7 @@ export default function MessageListView({
                     isSelected={selectedMessageSet.has(message.id)}
                     isDragging={draggingMessageSet.has(message.id)}
                     isNew={newIds.has(message.id)}
+                    claimFocus={loadMoreFocusTarget?.id === message.id}
                     hasBulkSelection={selectedMessageIds.length > 1}
                     selectedMessageIdsRef={selectedMessageIdsRef}
                     onSelectMessage={onSelectMessage}
@@ -399,13 +453,16 @@ export default function MessageListView({
                     onOpenMessageMenu={onOpenMessageMenu}
                     onCloseMessageMenu={onCloseMessageMenu}
                     onSetDraggingMessageIds={onSetDraggingMessageIds}
+                    onFocusClaimed={handleLoadMoreFocusClaimed}
                   />
                 </div>
               );
             }
           })}
           <div
+            ref={footerRef}
             className="message-list-footer"
+            tabIndex={-1}
             style={{
               position: 'absolute',
               bottom: 0,
@@ -415,7 +472,7 @@ export default function MessageListView({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '11px',
+              fontSize: '12px',
             }}
           >
             <span>
@@ -430,7 +487,27 @@ export default function MessageListView({
                       disabled={Boolean(loadMoreStatus)}
                       aria-busy={Boolean(loadMoreStatus)}
                       onClick={() => {
-                        if (!loadMoreStatus) onLoadMore();
+                        if (loadMoreStatus) return;
+                        const request = {
+                          listStateKey,
+                          previousMessageIds: new Set(messages.map((message) => message.id)),
+                        };
+                        setLoadMoreFocusRequest(request);
+                        const settleWithoutNewRows = () => {
+                          footerRef.current?.focus({ preventScroll: true });
+                          setLoadMoreFocusRequest((current) => (
+                            current === request ? null : current
+                          ));
+                        };
+                        void onLoadMore().then(
+                          (loadedMessages) => {
+                            const hasNewRows = loadedMessages.some(
+                              (message) => !request.previousMessageIds.has(message.id),
+                            );
+                            if (!hasNewRows) settleWithoutNewRows();
+                          },
+                          settleWithoutNewRows,
+                        );
                       }}
                     >
                       加载更多

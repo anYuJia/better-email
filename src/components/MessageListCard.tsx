@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
@@ -12,6 +12,7 @@ type MessageListCardProps = {
   isSelected: boolean;
   isDragging: boolean;
   isNew: boolean;
+  claimFocus?: boolean;
   hasBulkSelection: boolean;
   selectedMessageIdsRef: React.MutableRefObject<number[]>;
   onSelectMessage: (messageId: number) => void;
@@ -20,6 +21,7 @@ type MessageListCardProps = {
   onOpenMessageMenu: (message: MessageSummary, x: number, y: number, bulk: boolean) => void;
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
+  onFocusClaimed?: () => void;
 };
 
 export default React.memo(function MessageListCard({
@@ -28,6 +30,7 @@ export default React.memo(function MessageListCard({
   isSelected,
   isDragging,
   isNew,
+  claimFocus = false,
   hasBulkSelection,
   selectedMessageIdsRef,
   onSelectMessage,
@@ -36,6 +39,7 @@ export default React.memo(function MessageListCard({
   onOpenMessageMenu,
   onCloseMessageMenu,
   onSetDraggingMessageIds,
+  onFocusClaimed,
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const preview = useMemo(() => mailboxListPreview(message), [message]);
@@ -45,6 +49,16 @@ export default React.memo(function MessageListCard({
     message.is_read ? '' : '，未读',
     `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
+
+  function openMessageMenuAt(x: number, y: number) {
+    const selectedMessageIds = selectedMessageIdsRef.current;
+    const useBulkContext = isSelected && hasBulkSelection;
+    if (!useBulkContext && selectedMessageIds.length > 0 && !isSelected) {
+      onToggleAllVisible(false);
+    }
+    onSelectMessage(message.id);
+    onOpenMessageMenu(message, x, y, useBulkContext);
+  }
 
   // J/K and Arrow navigation update the current message outside this row.
   // If keyboard focus was already in the list, follow that state change so
@@ -56,6 +70,19 @@ export default React.memo(function MessageListCard({
     if (activeElement === mainButtonRef.current) return;
     mainButtonRef.current.focus({ preventScroll: true });
   }, [isCurrentMessage]);
+
+  // A newly virtualized row claims focus only after its real button has been
+  // committed. This avoids timing guesses in the parent list while keeping
+  // the handoff synchronous with the row becoming interactive.
+  useLayoutEffect(() => {
+    const trigger = mainButtonRef.current;
+    if (!claimFocus || !trigger) return;
+    trigger.focus({ preventScroll: true });
+    if (typeof trigger.scrollIntoView === 'function') {
+      trigger.scrollIntoView({ block: 'nearest' });
+    }
+    onFocusClaimed?.();
+  }, [claimFocus, onFocusClaimed]);
 
   return (
     <div
@@ -86,13 +113,7 @@ export default React.memo(function MessageListCard({
       onDragEnd={() => onSetDraggingMessageIds([])}
       onContextMenu={(event) => {
         event.preventDefault();
-        const selectedMessageIds = selectedMessageIdsRef.current;
-        const useBulkContext = isSelected && hasBulkSelection;
-        if (!useBulkContext && selectedMessageIds.length > 0 && !isSelected) {
-          onToggleAllVisible(false);
-        }
-        onSelectMessage(message.id);
-        onOpenMessageMenu(message, event.clientX, event.clientY, useBulkContext);
+        openMessageMenuAt(event.clientX, event.clientY);
       }}
     >
       <button
@@ -101,9 +122,19 @@ export default React.memo(function MessageListCard({
         className="message-card-main"
         aria-label={cardLabel}
         aria-current={isCurrentMessage ? 'true' : undefined}
-        aria-keyshortcuts="Enter Space"
+        aria-keyshortcuts="Enter Space Shift+F10"
         tabIndex={isCurrentMessage ? 0 : -1}
         onKeyDown={(event) => {
+          if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
+            event.preventDefault();
+            event.stopPropagation();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            openMessageMenuAt(
+              bounds.left + Math.min(bounds.width / 2, 220),
+              bounds.top + bounds.height / 2,
+            );
+            return;
+          }
           if (event.key !== ' ') return;
           event.preventDefault();
           event.stopPropagation();

@@ -1,4 +1,6 @@
 import { Eye, EyeOff, Plus, X } from 'lucide-react';
+import { useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import ProviderPresetGrid from '../ProviderPresetGrid';
@@ -9,6 +11,7 @@ import {
 } from './accountSettingsShared';
 import { CustomSelect } from './CustomSelect';
 import { SettingsButton } from '../shared';
+import useModalAccessibility from '../../../hooks/useModalAccessibility';
 
 type AddAccountDialogProps = {
   form: AccountCreateInput;
@@ -69,8 +72,22 @@ export default function AddAccountDialog({
   onProtocolChange,
   onApplyPreset,
 }: AddAccountDialogProps) {
-  return (
+  const titleId = useId();
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  useModalAccessibility({
+    dialogRef,
+    backdropRef,
+    initialFocusRef: emailInputRef,
+    onEscape: onClose,
+    escapeDisabled: submitting,
+  });
+
+  const content = (
     <div
+      ref={backdropRef}
       className="settings-account-add-overlay"
       role="presentation"
       onMouseDown={(event) => {
@@ -78,14 +95,16 @@ export default function AddAccountDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="settings-account-add-dialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="settings-add-account-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
       >
         <header>
           <span>
-            <strong id="settings-add-account-title">添加邮箱</strong>
+            <strong id={titleId}>添加邮箱</strong>
             <small>输入邮箱和授权码</small>
           </span>
           <button type="button" aria-label="关闭" onClick={onClose}>
@@ -97,7 +116,7 @@ export default function AddAccountDialog({
           <label>
             邮箱地址
             <input
-              autoFocus
+              ref={emailInputRef}
               value={form.email}
               onChange={(event) => onEmailChange(event.target.value)}
               placeholder="name@example.com"
@@ -264,4 +283,9 @@ export default function AddAccountDialog({
       </section>
     </div>
   );
+
+  const settingsModal = typeof document === 'undefined'
+    ? null
+    : document.querySelector<HTMLElement>('.settings-modal');
+  return settingsModal ? createPortal(content, settingsModal) : content;
 }

@@ -595,7 +595,7 @@
 
 /* --- Account dialogs --- */
 .settings-modal .settings-account-add-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 300;
   display: flex;
@@ -805,22 +805,25 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
+  margin: 0 16px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .settings-modal .settings-account-history-attachments {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 16px 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
+  margin: 0 16px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
   color: var(--st-text);
-  background: var(--st-surface-subtle);
+  background: transparent;
   cursor: pointer;
 }
 
@@ -838,7 +841,7 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--st-border-strong);
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--st-surface);
   box-shadow: none;
   cursor: pointer;
@@ -892,7 +895,6 @@
 }
 
 .settings-modal .settings-account-auto-match[data-ready="true"] {
-  border-color: var(--st-success);
   background: var(--st-success-soft);
 }
 
@@ -1629,7 +1631,7 @@
 }
 
 .settings-cache-confirm-backdrop > .settings-cache-confirm > header small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--st-text-secondary);
 }
 
@@ -3597,7 +3599,7 @@
   border-radius: 999px;
   color: var(--st-info);
   background: var(--st-info-soft);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 560;
   vertical-align: 1px;
 }
@@ -3638,7 +3640,7 @@
   border-radius: 999px;
   color: var(--st-text-secondary);
   background: var(--st-surface-subtle);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 540;
   text-overflow: ellipsis;
   white-space: nowrap;

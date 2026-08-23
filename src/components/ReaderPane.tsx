@@ -72,7 +72,7 @@ export type ReaderPaneProps = {
   onSelectMessage: (messageId: number) => void;
   readTriggerKey: number;
   onComposeNew: (fields?: ComposeNewFields) => void;
-  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
+  onComposeFromMessage: (message: Message, mode: ComposeMode, prefillBody?: string) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
   onToggleThreadLabel: (label: Label) => void;

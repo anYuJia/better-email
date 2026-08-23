@@ -16,6 +16,8 @@ import { IPC } from '../ipc/commands';
 
 type SelectedMessageActionOptions = {
   selected: MessageSummary | null;
+  /** 当前列表的可见顺序，用于操作后把阅读器移动到原位置附近。 */
+  messages: MessageSummary[];
   folders: Folder[];
   labels: Label[];
   folderId: number | null;
@@ -43,6 +45,7 @@ type SelectedMessageActionOptions = {
 
 export default function useSelectedMessageActions({
   selected,
+  messages,
   folders,
   labels,
   folderId,
@@ -63,16 +66,33 @@ export default function useSelectedMessageActions({
   selectedRef.current = selected;
 
   return React.useMemo(() => {
+    async function refreshSourceAndSelectNeighbor(messageId: number) {
+      const previousIndex = messages.findIndex((message) => message.id === messageId);
+      await loadMeta(folderId);
+      const refreshedMessages = await loadMessages(folderId);
+      const messageStillVisible = refreshedMessages.some((message) => message.id === messageId);
+
+      if (messageStillVisible) {
+        // 全局搜索等统一视图可能仍包含已移动邮件；保留当前阅读上下文。
+        setSelectedId(messageId);
+        return;
+      }
+
+      clearSelectedDetailIf(messageId);
+      // 删除中间项后，同一索引就是原列表的下一项；删除末项时自然回退到前一项。
+      // 线程内邮件不一定存在于顶层 messages，此时退回刷新后第一封可见邮件。
+      const fallbackIndex = previousIndex >= 0
+        ? Math.min(previousIndex, refreshedMessages.length - 1)
+        : 0;
+      setSelectedId(refreshedMessages[fallbackIndex]?.id ?? null);
+    }
+
     async function moveSelected(role: FolderRole) {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
       const report = await invoke<RemoteActionReport>(IPC.MoveMessageToRole, { messageId: selected.id, role });
-      // 移动后目标文件夹会继续展示该邮件，更新 metadata；body 保持原样
       patchSelectedDetailMetadata(selected.id, { folder_role: role });
-      const targetFolderId = visibleFolderIdForRole(role, selected.account_id) ?? folderId;
-      await loadMeta(targetFolderId);
-      await loadMessages(targetFolderId);
-      setSelectedId(selected.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus(report.message);
       queueUndoAction(role === 'trash' ? '删除' : role === 'archive' ? '归档' : `移动到 ${role}`, undoSnapshots);
     }
@@ -82,9 +102,7 @@ export default function useSelectedMessageActions({
       const undoSnapshots = snapshotMessages([selected]);
       const report = await invoke<RemoteActionReport>(IPC.MoveMessageToRole, { messageId: selected.id, role: folder.role });
       patchSelectedDetailMetadata(selected.id, { folder_id: folder.id, folder_role: folder.role });
-      await loadMeta(folder.id);
-      await loadMessages(folder.id);
-      setSelectedId(selected.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus(`已移动到 ${folder.name}`);
       queueUndoAction(`移动到 ${folder.name}`, undoSnapshots, report.message);
     }
@@ -94,10 +112,7 @@ export default function useSelectedMessageActions({
       const undoSnapshots = snapshotMessages([selected]);
       await invoke(IPC.MoveMessageToRole, { messageId: selected.id, role: 'spam' });
       patchSelectedDetailMetadata(selected.id, { folder_role: 'spam' });
-      const spamFolderId = visibleFolderIdForRole('spam', selected.account_id) ?? folderId;
-      await loadMeta(spamFolderId);
-      await loadMessages(spamFolderId);
-      setSelectedId(selected.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus('已标为垃圾邮件');
       queueUndoAction('标为垃圾邮件', undoSnapshots);
     }
@@ -114,10 +129,7 @@ export default function useSelectedMessageActions({
         labels: result.restored.labels,
         snoozed_until: result.restored.snoozed_until,
       });
-      const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
-      await loadMeta(inboxFolderId);
-      await loadMessages(inboxFolderId);
-      setSelectedId(result.restored.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus('已移回收件箱，并标记为不是垃圾邮件');
       queueUndoAction('不是垃圾邮件', undoSnapshots, result.remote.message);
     }
@@ -134,21 +146,14 @@ export default function useSelectedMessageActions({
         labels: result.restored.labels,
         snoozed_until: result.restored.snoozed_until,
       });
-      const inboxFolderId = visibleFolderIdForRole('inbox', result.restored.account_id) ?? folderId;
-      await loadMeta(inboxFolderId);
-      await loadMessages(inboxFolderId);
-      setSelectedId(result.restored.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus(result.remote.message);
       queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
     }
 
     async function permanentlyDeleteMessageConfirmed(message: MessageSummary) {
       const report = await invoke<RemoteActionReport>(IPC.DeleteMessagePermanently, { messageId: message.id });
-      clearSelectedDetailIf(message.id);
-      if (selected?.id === message.id) {
-        setSelectedId(null);
-      }
-      await refreshAll();
+      await refreshSourceAndSelectNeighbor(message.id);
       setStatus(report.message);
     }
 
@@ -162,10 +167,7 @@ export default function useSelectedMessageActions({
         is_read: updated.is_read,
         snoozed_until: updated.snoozed_until,
       });
-      const inboxFolderId = visibleFolderIdForRole('inbox', updated.account_id) ?? folderId;
-      await loadMeta(inboxFolderId);
-      await loadMessages(inboxFolderId);
-      setSelectedId(updated.id);
+      await refreshSourceAndSelectNeighbor(selected.id);
       setStatus('已取消稍后处理');
       queueUndoAction('取消稍后处理', undoSnapshots);
     }
@@ -209,6 +211,7 @@ export default function useSelectedMessageActions({
     };
   }, [
     selected,
+    messages,
     folders,
     labels,
     folderId,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Save } from 'lucide-react';
 import type { Account, IncomingProtocol } from '../../../app/types';
 import AccountRemovalPanel from '../AccountRemovalPanel';
@@ -10,6 +11,7 @@ import {
 } from './accountSettingsShared';
 import { CustomSelect } from './CustomSelect';
 import { SettingsButton, SettingsSwitch } from '../shared';
+import useModalAccessibility from '../../../hooks/useModalAccessibility';
 
 type AccountManageDialogProps = {
   mode: AccountDialogMode;
@@ -44,6 +46,16 @@ export default function AccountManageDialog({
 }: AccountManageDialogProps) {
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState('');
+  const titleId = React.useId();
+  const backdropRef = React.useRef<HTMLDivElement>(null);
+  const dialogRef = React.useRef<HTMLElement>(null);
+
+  useModalAccessibility({
+    dialogRef,
+    backdropRef,
+    onEscape: onClose,
+    escapeDisabled: submitting,
+  });
 
   async function handleSave() {
     if (!onSaveAccountSettings) return;
@@ -59,8 +71,9 @@ export default function AccountManageDialog({
     }
   }
 
-  return (
+  const content = (
     <div
+      ref={backdropRef}
       className="settings-account-add-overlay"
       role="presentation"
       onMouseDown={(event) => {
@@ -68,15 +81,17 @@ export default function AccountManageDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="settings-account-add-dialog settings-account-manage-dialog"
         data-mode={mode}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="settings-account-dialog-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
       >
         <header>
           <span>
-            <strong id="settings-account-dialog-title">{accountDialogTitle(mode)}</strong>
+            <strong id={titleId}>{accountDialogTitle(mode)}</strong>
             <small>{account.email}</small>
           </span>
           <button type="button" aria-label="关闭" onClick={onClose}>
@@ -206,4 +221,9 @@ export default function AccountManageDialog({
       </section>
     </div>
   );
+
+  const settingsModal = typeof document === 'undefined'
+    ? null
+    : document.querySelector<HTMLElement>('.settings-modal');
+  return settingsModal ? createPortal(content, settingsModal) : content;
 }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cloneElement } from 'react';
 import { emptyDraft } from '../app/composerConfig';
 import ComposerWindow from './ComposerWindow';
 
@@ -85,5 +86,20 @@ describe('ComposerWindow focus lifecycle', () => {
       expect(opener.closest('[inert]')).toBeNull();
       expect(document.activeElement).toBe(opener);
     });
+  });
+
+  it('describes local autosave as a recovery snapshot, not a saved draft', () => {
+    const draft = { ...emptyDraft, subject: '待处理邮件' };
+    render(cloneElement(composer(), {
+      draft,
+      autosave: {
+        draft,
+        isRichComposer: false,
+        saved_at: '2026-08-23T13:17:00.000Z',
+      },
+    }));
+
+    expect(screen.getByText(/已备份恢复点/)).not.toBeNull();
+    expect(screen.queryByText(/自动保存/)).toBeNull();
   });
 });

@@ -966,6 +966,7 @@ export default function App() {
     toggleLabel,
   } = useSelectedMessageActions({
     selected,
+    messages,
     folders,
     labels,
     folderId,
@@ -1247,7 +1248,10 @@ export default function App() {
   }, [toggleThreadMuted, setStatus]);
 
   const handleLoadMore = useCallback(() => {
-    loadMoreMessages().catch((error) => setStatus(String(error)));
+    return loadMoreMessages().catch((error) => {
+      setStatus(String(error));
+      return [];
+    });
   }, [loadMoreMessages, setStatus]);
 
   const handleOpenHttpsLink = useCallback((href: string) => {

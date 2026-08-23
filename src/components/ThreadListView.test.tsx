@@ -74,6 +74,20 @@ describe('ThreadListView 虚拟化', () => {
     expect(onOpenThread).toHaveBeenCalledWith(threads[0]);
     fireEvent.contextMenu(cards[1], { clientX: 10, clientY: 20 });
     expect(onOpenThreadMenu).toHaveBeenCalledWith(threads[1], 10, 20);
+
+    vi.spyOn(cards[0], 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      top: 200,
+      width: 320,
+      height: 72,
+      right: 420,
+      bottom: 272,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    });
+    fireEvent.keyDown(cards[0], { key: 'F10', shiftKey: true });
+    expect(onOpenThreadMenu).toHaveBeenLastCalledWith(threads[0], 260, 236);
   });
 
   it('空态保留', () => {

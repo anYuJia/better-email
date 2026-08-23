@@ -33,7 +33,7 @@
   letter-spacing: 0;
 }
 
-.settings-modal .settings-page-content :is(input, select, textarea) {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea) {
   min-height: var(--st-control-height);
   padding: 0 12px;
   border: 1px solid var(--st-border);
@@ -46,28 +46,28 @@
   transition: var(--ui-transition-short-bg-border-box-shadow);
 }
 
-.settings-modal .settings-page-content :is(input, select, textarea):hover {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):hover {
   border-color: var(--st-border-strong);
   background-color: var(--st-surface);
 }
 
-.settings-modal .settings-page-content :is(input, select, textarea):focus {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):focus {
   border-color: var(--st-focus-border);
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--st-focus-border) 18%, transparent);
 }
 
-.settings-modal .settings-page-content :is(input, select, textarea)[aria-invalid="true"] {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea)[aria-invalid="true"] {
   border-color: var(--st-danger);
 }
 
-.settings-modal .settings-page-content :is(input, select, textarea):disabled {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):disabled {
   color: var(--st-text-tertiary);
   background-color: var(--st-surface-muted);
   cursor: not-allowed;
 }
 
-.settings-modal .settings-page-content textarea {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) textarea {
   min-height: 92px;
   padding: 10px 12px;
   resize: none;
@@ -75,7 +75,7 @@
   line-height: 1.55;
 }
 
-.settings-modal .settings-page-content select {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) select {
   appearance: none;
   padding-right: 30px;
   background-image: none;
@@ -83,7 +83,7 @@
 }
 
 /* Native select chevron via inline SVG that uses currentColor */
-.settings-modal .settings-page-content select:not([multiple]):not([size]) {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) select:not([multiple]):not([size]) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='currentColor' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
   background-position: right 12px center;
   background-size: 10px 6px;
@@ -95,7 +95,7 @@
 
 /* ── Buttons (base) ─────────────────────────────────────────────── */
 
-.settings-modal .settings-page-content button {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) button {
   min-height: var(--st-control-height);
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
@@ -107,24 +107,24 @@
 }
 
 /* CustomSelect keeps its own border; do not collapse it to transparent. */
-.settings-modal .settings-page-content .custom-select-summary {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary {
   border: 1px solid var(--st-border);
   border-radius: var(--st-radius-sm);
   background: var(--st-surface);
   color: var(--st-text);
 }
 
-.settings-modal .settings-page-content .custom-select-summary:hover {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:hover {
   border-color: var(--st-border-strong);
 }
 
-.settings-modal .settings-page-content .custom-select-summary[aria-expanded="true"] {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary[aria-expanded="true"] {
   border-color: var(--st-focus-border);
   background: var(--st-surface-subtle);
   box-shadow: none;
 }
 
-.settings-modal .settings-page-content .custom-select-summary:disabled {
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:disabled {
   opacity: 0.55;
 }
 
@@ -146,7 +146,7 @@
 
 /* ── Motion ─────────────────────────────────────────────────────── */
 
-.settings-modal .settings-page-content button,
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) button,
 .settings-modal .settings-nav button,
 .settings-modal .settings-header-actions button {
   transition: var(--ui-transition-fast-color-background-border);
@@ -155,8 +155,8 @@
 /* ── Mobile touch targets ───────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  .settings-modal .settings-page-content :is(input, select, textarea),
-  .settings-modal .settings-page-content button {
+  .settings-modal :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea),
+  .settings-modal :is(.settings-page-content, .settings-account-add-dialog) button {
     min-height: var(--st-control-height-mobile);
   }
 }

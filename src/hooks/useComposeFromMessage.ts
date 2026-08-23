@@ -29,7 +29,11 @@ export default function useComposeFromMessage({
   openComposer,
   setStatus,
 }: ComposeFromMessageOptions) {
-  const composeFromMessage = useCallback(async (message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward') => {
+  const composeFromMessage = useCallback(async (
+    message: MessageSummary,
+    mode: 'reply' | 'replyAll' | 'forward',
+    prefillBody = '',
+  ) => {
     let fullMessage: Message;
     if ('body' in message && typeof (message as Message).body === 'string') {
       fullMessage = message as Message;
@@ -64,6 +68,8 @@ export default function useComposeFromMessage({
         };
       }
     }
+    const quotedBody = quoteMessage(fullMessage);
+    const replyLead = mode === 'forward' ? '' : prefillBody.trimEnd();
     openComposer({
       draft_id: 0,
       account_id: fullMessage.account_id,
@@ -72,7 +78,7 @@ export default function useComposeFromMessage({
       cc: includeOriginalRecipients,
       bcc: '',
       subject: prefixedSubject(fullMessage.subject, mode === 'forward' ? 'Fwd' : 'Re'),
-      body: quoteMessage(fullMessage),
+      body: replyLead ? `${replyLead}\n\n${quotedBody}` : quotedBody,
       html_body: '',
       send_at: '',
       attachments: mode === 'forward' ? forwardPlan.attachments : [],
@@ -80,11 +86,13 @@ export default function useComposeFromMessage({
       references: threading?.references ?? '',
     });
     setStatus(
-      mode === 'forward'
-        ? forwardAttachmentStatus(forwardPlan)
-        : mode === 'replyAll'
-          ? '已创建回复全部草稿'
-          : '已创建回复草稿',
+      replyLead
+        ? '已将快速回复带入写信窗口，原快速回复仍保留'
+        : mode === 'forward'
+          ? forwardAttachmentStatus(forwardPlan)
+          : mode === 'replyAll'
+            ? '已创建回复全部草稿'
+            : '已创建回复草稿',
     );
   }, [account, openComposer, setStatus]);
 

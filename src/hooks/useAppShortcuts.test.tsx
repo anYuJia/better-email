@@ -110,4 +110,16 @@ describe('useAppShortcuts text selection boundary', () => {
     expect(options.composeNew).not.toHaveBeenCalled();
     delete document.body.dataset.imagePreviewModal;
   });
+
+  it('does not move the underlying message selection while the conversation list owns arrow keys', () => {
+    const options = makeOptions();
+    options.listMode = 'threads';
+    options.selectedId = 1;
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    fireEvent.keyDown(window, { key: 'j' });
+
+    expect(options.setSelectedId).not.toHaveBeenCalled();
+  });
 });

@@ -163,12 +163,12 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         composeNew();
         return;
       }
-      if (key === 'j' || key === 'arrowdown') {
+      if (listMode === 'messages' && (key === 'j' || key === 'arrowdown')) {
         event.preventDefault();
         selectRelativeMessage(1);
         return;
       }
-      if (key === 'k' || key === 'arrowup') {
+      if (listMode === 'messages' && (key === 'k' || key === 'arrowup')) {
         event.preventDefault();
         selectRelativeMessage(-1);
         return;

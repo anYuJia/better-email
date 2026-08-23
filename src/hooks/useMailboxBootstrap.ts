@@ -100,13 +100,34 @@ export default function useMailboxBootstrap({
       return;
     }
     const restoredLimit = loadMailboxMessageLimit(mailboxListStateKey);
+    const refreshId = mailboxRefreshRef.current;
+    let active = true;
     loadMessages(
       folderId,
       appliedQuery,
       filter,
       accountScope,
-      mailboxRefreshRef.current,
+      refreshId,
       restoredLimit,
-    ).catch((error) => setStatus(String(error)));
+    )
+      .then((nextMessages) => {
+        // Loading more can leave a count announcement in the global live
+        // region. Once navigation commits a different folder/filter/sort,
+        // replace that stale message with the result for the current view.
+        if (!active || refreshId !== mailboxRefreshRef.current) return;
+        setStatus(
+          nextMessages.length > 0
+            ? `当前列表已显示 ${nextMessages.length} 封邮件`
+            : '当前文件夹暂无邮件',
+        );
+      })
+      .catch((error) => {
+        if (active && refreshId === mailboxRefreshRef.current) {
+          setStatus(String(error));
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [folderId, filter, listSort]);
 }

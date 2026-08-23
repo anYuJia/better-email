@@ -80,7 +80,7 @@ export type MessageListPaneProps = {
   onToggleThreadMute: (thread: ThreadSummary, messages: MessageSummary[]) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
-  onLoadMore: () => void;
+  onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
   isRefreshing?: boolean;
   refreshNotice?: string | null;

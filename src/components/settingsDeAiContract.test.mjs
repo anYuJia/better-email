@@ -191,6 +191,42 @@ describe('settings de-AI contract — --st-shadow-card is none', () => {
   });
 });
 
+describe('settings accessibility contract — focus tokens resolve', () => {
+  it('--st-focus-outline aliases the shared semantic focus outline', () => {
+    expect(settingsTokensCss).toMatch(
+      /--st-focus-outline:\s*var\(--ui-focus-outline\)/,
+    );
+  });
+
+  it('the history attachment choice keeps the standard checkbox shape', () => {
+    const rules = findRules(settingsPagesCss, '.settings-account-history-attachments > input');
+    const checkboxRule = rules.find((rule) => (
+      rule.selector === '.settings-modal .settings-account-history-attachments > input'
+    ));
+    expect(checkboxRule).toBeDefined();
+    expect(checkboxRule.body).not.toMatch(/border-radius:\s*50%/);
+  });
+});
+
+describe('settings readability contract — visible copy is at least 12px', () => {
+  const readableSelectors = [
+    '.settings-cache-confirm-backdrop > .settings-cache-confirm > header small',
+    '.contact-import-identity.edited strong::after',
+    '.contact-alias-chips span',
+  ];
+
+  for (const selector of readableSelectors) {
+    it(`${selector} is not microcopy`, () => {
+      const rule = findRules(settingsPagesCss, selector)
+        .find((candidate) => candidate.selector === selector);
+      expect(rule).toBeDefined();
+      const match = rule.body.match(/font-size:\s*(\d+)px/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match[1], 10)).toBeGreaterThanOrEqual(12);
+    });
+  }
+});
+
 describe('onboarding de-AI contract — no gradient hero or persistent blur', () => {
   it('onboarding CSS has no gradient declarations', () => {
     expect(onboardingCss).not.toMatch(/gradient/);

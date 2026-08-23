@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { messagePageSize } from '../app/appConfig';
+import type { MessageSummary } from '../app/types';
 import useMailboxBootstrap from './useMailboxBootstrap';
 
 type BootstrapProps = {
@@ -27,7 +28,7 @@ function renderBootstrap({
   const navigationScopeClaimRef: { current: number | 'all' | null } = { current: null };
   const skipNextFolderEffectLoadRef = { current: false };
   const refreshMailbox = vi.fn(async () => 101);
-  const loadMessages = vi.fn(async () => []);
+  const loadMessages = vi.fn(async (): Promise<MessageSummary[]> => []);
   const setAccountScope = vi.fn();
   const setStatus = vi.fn();
   const wrapper = strict ? StrictMode : undefined;
@@ -115,6 +116,96 @@ describe('useMailboxBootstrap', () => {
       4,
       messagePageSize,
     );
+  });
+
+  it('replaces a stale load-more announcement after an empty folder loads', async () => {
+    const {
+      rerender,
+      loadMessages,
+      mailboxRefreshRef,
+      setStatus,
+    } = renderBootstrap();
+    mailboxRefreshRef.current = 4;
+
+    // Consume the bootstrap-owned folder update first.
+    rerender({
+      accountScope: 'all',
+      folderId: 101,
+      filter: 'all',
+      listSort: 'newest',
+    });
+    setStatus('已加载 50 封邮件');
+    loadMessages.mockResolvedValueOnce([]);
+
+    rerender({
+      accountScope: 'all',
+      folderId: 202,
+      filter: 'all',
+      listSort: 'newest',
+    });
+    await act(async () => undefined);
+
+    expect(loadMessages).toHaveBeenLastCalledWith(
+      202,
+      'invoice',
+      'all',
+      'all',
+      4,
+      messagePageSize,
+    );
+    expect(setStatus).toHaveBeenLastCalledWith('当前文件夹暂无邮件');
+  });
+
+  it('does not let a slower previous folder overwrite the current status', async () => {
+    let resolveSlowFolder: ((messages: MessageSummary[]) => void) | undefined;
+    let resolveCurrentFolder: ((messages: MessageSummary[]) => void) | undefined;
+    const {
+      rerender,
+      loadMessages,
+      mailboxRefreshRef,
+      setStatus,
+    } = renderBootstrap();
+    mailboxRefreshRef.current = 4;
+
+    // Consume the bootstrap-owned folder update, then control two explicit
+    // folder loads that share the same mailbox generation.
+    rerender({
+      accountScope: 'all',
+      folderId: 101,
+      filter: 'all',
+      listSort: 'newest',
+    });
+    loadMessages
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveSlowFolder = resolve;
+      }))
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveCurrentFolder = resolve;
+      }));
+
+    rerender({
+      accountScope: 'all',
+      folderId: 202,
+      filter: 'all',
+      listSort: 'newest',
+    });
+    rerender({
+      accountScope: 'all',
+      folderId: 303,
+      filter: 'all',
+      listSort: 'newest',
+    });
+
+    await act(async () => {
+      resolveCurrentFolder?.([]);
+    });
+    expect(setStatus).toHaveBeenLastCalledWith('当前文件夹暂无邮件');
+
+    await act(async () => {
+      resolveSlowFolder?.([{} as MessageSummary]);
+    });
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenLastCalledWith('当前文件夹暂无邮件');
   });
 
   it('releases the bootstrap claim when a new scope resolves to the current folder', async () => {

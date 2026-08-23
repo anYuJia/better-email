@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SettingsFrame from './SettingsFrame';
 
 describe('SettingsFrame dialog behavior', () => {
@@ -124,6 +124,21 @@ describe('SettingsFrame dialog behavior', () => {
     renderFrame({ onClose });
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the mobile page menu own the first Escape', async () => {
+    const onClose = vi.fn();
+    renderFrame({ onClose });
+
+    const picker = screen.getByRole('button', { name: '切换设置页面' });
+    fireEvent.click(picker);
+    expect(screen.getByRole('menu', { name: '设置页面' })).not.toBeNull();
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.queryByRole('menu', { name: '设置页面' })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(picker));
   });
 
   it('keeps Tab focus inside the dialog', () => {

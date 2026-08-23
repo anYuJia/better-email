@@ -93,7 +93,20 @@ export default function SettingsFrame({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape') {
+        const settingsDialog = modalRef.current;
+        const startedInNestedDialog = settingsDialog !== null
+          && event.composedPath().some((target) => (
+            target instanceof HTMLElement
+            && target !== settingsDialog
+            && target.matches('[aria-modal="true"]')
+          ));
+        // Nested account/confirmation dialogs own the first Escape. Inspect
+        // the immutable event path instead of the live DOM: their close
+        // handler may unmount the nested dialog before this window listener
+        // runs, which must not make the same keypress close Settings too.
+        if (startedInNestedDialog) return;
         event.preventDefault();
         onClose();
         return;

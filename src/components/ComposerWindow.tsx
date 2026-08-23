@@ -441,7 +441,7 @@ export default function ComposerWindow({
             )}
             <span>
               {status}
-              {autosave && !isDraftEmpty(draft) ? ` · 自动保存 ${formatDate(autosave.saved_at)}` : ''}
+              {autosave && !isDraftEmpty(draft) ? ` · 已备份恢复点 ${formatDate(autosave.saved_at)}` : ''}
             </span>
           </div>
           <div className="composer-footer-actions">

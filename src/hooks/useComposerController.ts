@@ -68,7 +68,6 @@ export default function useComposerController({
   sendUndoDelaySeconds,
   setOutbox,
   setPendingSendUndo,
-  setSelectedId,
   setStatus,
   showToast,
   loadMeta,
@@ -192,13 +191,11 @@ export default function useComposerController({
     sendUndoDelaySeconds,
     setOutbox,
     setPendingSendUndo,
-    setSelectedId,
     setStatus,
     showToast,
     draftInputForCurrentAccount,
     threadingForDraft,
     clearComposerAutosave,
-    closeComposer,
     forceCloseComposer,
     focusMailboxRole,
     refreshAll,
@@ -219,7 +216,7 @@ export default function useComposerController({
       setDraft(nextDraft);
     } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
       setDraft(composerAutosave.draft);
-      setStatus(`已恢复自动保存草稿：${formatDate(composerAutosave.saved_at)}`);
+      setStatus(`已从恢复点还原邮件：${formatDate(composerAutosave.saved_at)}`);
     }
     setComposerMinimized(false);
     setComposerOpen(true);
@@ -232,8 +229,12 @@ export default function useComposerController({
     openComposer,
     setStatus,
   });
-  const composeFromMessage = useCallback(async (message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward') => {
-    await rawComposeFromMessage(message, mode);
+  const composeFromMessage = useCallback(async (
+    message: MessageSummary,
+    mode: 'reply' | 'replyAll' | 'forward',
+    prefillBody = '',
+  ) => {
+    await rawComposeFromMessage(message, mode, prefillBody);
     setComposerContextAccountId(message.account_id);
     setSendRiskConfirm(null);
   }, [rawComposeFromMessage]);

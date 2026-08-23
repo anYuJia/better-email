@@ -80,6 +80,16 @@ function NestedModalHarness() {
 }
 
 describe('ComposerCloseConfirmDialog modal accessibility', () => {
+  it('distinguishes the recovery snapshot from a saved draft', () => {
+    render(<Harness />);
+    openDialog();
+
+    expect(screen.getByText('当前邮件尚未保存到草稿箱')).not.toBeNull();
+    expect(screen.getByText('要保留这封邮件吗？')).not.toBeNull();
+    expect(screen.getByText(/恢复点只用于意外关闭后的恢复/)).not.toBeNull();
+    expect(screen.getByRole('button', { name: '舍弃邮件' })).not.toBeNull();
+  });
+
   it('focuses the safe action, isolates the background, and restores focus on close', () => {
     const onClose = vi.fn();
     render(<Harness onClose={onClose} />);
@@ -158,7 +168,7 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     backgroundButton.setAttribute('inert', '');
     openDialog();
 
-    fireEvent.click(screen.getByRole('button', { name: '舍弃草稿' }));
+    fireEvent.click(screen.getByRole('button', { name: '舍弃邮件' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(backgroundButton.hasAttribute('inert')).toBe(false);

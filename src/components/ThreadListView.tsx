@@ -143,10 +143,22 @@ export default function ThreadListView({
                     activeThread?.thread_key === thread.thread_key ? 'selected' : '',
                     hasUnread ? 'is-unread' : 'is-read',
                   ].filter(Boolean).join(' ')}
+                  aria-keyshortcuts="Enter Shift+F10"
                   onClick={() => onOpenThread(thread)}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     onOpenThreadMenu(thread, event.clientX, event.clientY);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu')) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    onOpenThreadMenu(
+                      thread,
+                      bounds.left + Math.min(bounds.width / 2, 220),
+                      bounds.top + bounds.height / 2,
+                    );
                   }}
                 >
                   {hasUnread && <span className="thread-unread-dot" aria-label="未读" />}

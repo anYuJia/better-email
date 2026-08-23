@@ -141,6 +141,7 @@ export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
 }: SettingsNavigationProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLButtonElement>(null);
   const ActiveIcon = activeItem.icon;
 
   useEffect(() => {
@@ -153,20 +154,28 @@ export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
     }
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      // The page picker is a nested transient layer. It owns the first
+      // Escape, so the SettingsFrame window listener must not also close the
+      // entire settings workspace in the same key press.
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      queueMicrotask(() => pickerRef.current?.focus({ preventScroll: true }));
     }
 
     document.addEventListener('pointerdown', closeOnOutsidePointer);
-    window.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('keydown', closeOnEscape);
     return () => {
       document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      window.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('keydown', closeOnEscape);
     };
   }, [open]);
 
   return (
     <div className="settings-mobile-toolbar" ref={containerRef}>
       <button
+        ref={pickerRef}
         type="button"
         className="settings-page-picker"
         aria-label="切换设置页面"

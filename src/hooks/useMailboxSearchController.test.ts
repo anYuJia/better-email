@@ -239,11 +239,13 @@ describe('useMailboxSearchController', () => {
 
   it('clearSearchAndFilter resets query filter and scope before reloading', async () => {
     const { result, loadMessagesWithVisibleFallback, setStatus } = renderController();
+    const searchInput = { focus: vi.fn() } as unknown as HTMLInputElement;
     act(() => {
       result.current.setQuery('invoice');
       result.current.setFilter('unread');
       result.current.setSearchScope('all');
       result.current.setListMode('threads');
+      result.current.searchInputRef.current = searchInput;
     });
     await act(async () => {
       await result.current.clearSearchAndFilter();
@@ -256,6 +258,7 @@ describe('useMailboxSearchController', () => {
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
       101, '', 'all', 'all', 3, folders, messagePageSize, 'folder', true,
     );
+    expect(searchInput.focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(setStatus).toHaveBeenCalledWith('已清空搜索和筛选');
   });
 
@@ -278,7 +281,7 @@ describe('useMailboxSearchController', () => {
     loadMessagesWithVisibleFallback.mockImplementation(() => new Promise((resolve) => {
       resolveFirst = resolve;
     }));
-    let first: Promise<void> | null = null;
+    let first: Promise<MessageSummary[]> | null = null;
     act(() => {
       first = result.current.loadMoreMessages();
     });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
 import MessageListView from './MessageListView';
 import {
@@ -74,6 +74,7 @@ describe('MessageListView theme-safe separators', () => {
     expect(footer.style.color).toBe('');
     expect(footer.style.borderTop).toBe('');
     expect(footer.style.background).toBe('');
+    expect(footer.style.fontSize).toBe('12px');
   });
 
   it('keeps the current reader row checkbox available for bulk selection', () => {
@@ -166,5 +167,270 @@ describe('MessageListView theme-safe separators', () => {
       `translateY(${2 * GROUP_HEADER_HEIGHT + MESSAGE_ROW_HEIGHT}px)`,
     );
     expect(rows[1].style.height).toBe(`${MESSAGE_ROW_HEIGHT}px`);
+  });
+
+  it('opens the row context menu beside the focused message with Shift+F10', () => {
+    const onOpenMessageMenu = vi.fn();
+    const onSelectMessage = vi.fn();
+    const { container } = render(
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages: [message] }]}
+        messages={[message]}
+        query=""
+        filter="all"
+        selectedId={message.id}
+        hasMoreMessages={false}
+        listStateKey="keyboard-menu"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={onSelectMessage}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={onOpenMessageMenu}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const trigger = container.querySelector<HTMLButtonElement>('.message-card-main')!;
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      top: 200,
+      width: 320,
+      height: 80,
+      right: 420,
+      bottom: 280,
+      x: 100,
+      y: 200,
+      toJSON: () => ({}),
+    });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'F10', shiftKey: true });
+
+    expect(onSelectMessage).toHaveBeenCalledWith(message.id);
+    expect(onOpenMessageMenu).toHaveBeenCalledWith(message, 260, 240, false);
+  });
+
+  it('moves focus from the removed load-more button to the first appended message', async () => {
+    const nextMessage = { ...message, id: 2, remote_uid: 2, subject: 'Newly appended' };
+    const onLoadMore = vi.fn(async () => [message, nextMessage]);
+    const sharedProps = {
+      query: '',
+      filter: 'all' as const,
+      selectedId: message.id,
+      listStateKey: 'load-more-focus',
+      initialScrollTop: 0,
+      selectedMessageIds: [] as number[],
+      draggingMessageIds: [] as number[],
+      onScrollTopChange: vi.fn(),
+      onSelectMessage: vi.fn(),
+      onToggleMessageSelection: vi.fn(),
+      onToggleAllVisible: vi.fn(),
+      onOpenMessageMenu: vi.fn(),
+      onCloseMessageMenu: vi.fn(),
+      onSetDraggingMessageIds: vi.fn(),
+      onClearSearchAndFilter: vi.fn(),
+      onRefresh: vi.fn(),
+      onLoadMore,
+    };
+    const { rerender } = render(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'today', label: '今天', messages: [message] }]}
+        messages={[message]}
+        hasMoreMessages
+        loadMoreStatus={null}
+      />,
+    );
+
+    const loadMoreButton = screen.getByRole('button', { name: '加载更多' });
+    loadMoreButton.focus();
+    fireEvent.click(loadMoreButton);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'today', label: '今天', messages: [message, nextMessage] }]}
+        messages={[message, nextMessage]}
+        hasMoreMessages={false}
+        loadMoreStatus={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: /Newly appended/ }),
+      );
+    });
+    expect(screen.queryByRole('button', { name: '加载更多' })).toBeNull();
+  });
+
+  it('mounts and focuses the first appended row when virtualization had it offscreen', async () => {
+    const initialMessages = Array.from({ length: 40 }, (_, index) => ({
+      ...message,
+      id: index + 1,
+      remote_uid: index + 1,
+      subject: `Message ${index + 1}`,
+    }));
+    const allMessages = Array.from({ length: 50 }, (_, index) => ({
+      ...message,
+      id: index + 1,
+      remote_uid: index + 1,
+      subject: `Message ${index + 1}`,
+    }));
+    const onLoadMore = vi.fn(async () => allMessages);
+    const sharedProps = {
+      query: '',
+      filter: 'all' as const,
+      selectedId: message.id,
+      listStateKey: 'virtual-load-more-focus',
+      initialScrollTop: 0,
+      selectedMessageIds: [] as number[],
+      draggingMessageIds: [] as number[],
+      onScrollTopChange: vi.fn(),
+      onSelectMessage: vi.fn(),
+      onToggleMessageSelection: vi.fn(),
+      onToggleAllVisible: vi.fn(),
+      onOpenMessageMenu: vi.fn(),
+      onCloseMessageMenu: vi.fn(),
+      onSetDraggingMessageIds: vi.fn(),
+      onClearSearchAndFilter: vi.fn(),
+      onRefresh: vi.fn(),
+      onLoadMore,
+    };
+    const { rerender } = render(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'earlier', label: '更早', messages: initialMessages }]}
+        messages={initialMessages}
+        hasMoreMessages
+        loadMoreStatus={null}
+      />,
+    );
+
+    const list = screen.getByRole('list', { name: '邮件列表' });
+    fireEvent.scroll(list, { target: { scrollTop: 1800 } });
+    expect(onLoadMore).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    // The async loader can clear its busy status one render before the
+    // transitioned 50-row list commits. That intermediate render must not
+    // consume the pending focus request as a false "no rows appended" case.
+    rerender(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'earlier', label: '更早', messages: initialMessages }]}
+        messages={initialMessages}
+        hasMoreMessages
+        loadMoreStatus="正在加载"
+      />,
+    );
+    rerender(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'earlier', label: '更早', messages: initialMessages }]}
+        messages={initialMessages}
+        hasMoreMessages={false}
+        loadMoreStatus={null}
+      />,
+    );
+    rerender(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'earlier', label: '更早', messages: allMessages }]}
+        messages={allMessages}
+        hasMoreMessages={false}
+        loadMoreStatus={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: /Message 41/ }),
+      );
+    });
+  });
+
+  it('clears the pending focus request and focuses the footer when no row is appended', async () => {
+    const futureMessage = { ...message, id: 2, remote_uid: 2, subject: 'Later arrival' };
+    const sharedProps = {
+      groups: [{ id: 'today', label: '今天', messages: [message] }],
+      messages: [message],
+      query: '',
+      filter: 'all' as const,
+      selectedId: message.id,
+      hasMoreMessages: true,
+      listStateKey: 'load-more-no-new',
+      initialScrollTop: 0,
+      selectedMessageIds: [] as number[],
+      draggingMessageIds: [] as number[],
+      onScrollTopChange: vi.fn(),
+      onSelectMessage: vi.fn(),
+      onToggleMessageSelection: vi.fn(),
+      onToggleAllVisible: vi.fn(),
+      onOpenMessageMenu: vi.fn(),
+      onCloseMessageMenu: vi.fn(),
+      onSetDraggingMessageIds: vi.fn(),
+      onClearSearchAndFilter: vi.fn(),
+      onRefresh: vi.fn(),
+      onLoadMore: vi.fn(async () => [message]),
+      loadMoreStatus: null,
+    };
+    const { container, rerender } = render(<MessageListView {...sharedProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    const footer = container.querySelector<HTMLElement>('.message-list-footer')!;
+    await waitFor(() => expect(document.activeElement).toBe(footer));
+
+    rerender(
+      <MessageListView
+        {...sharedProps}
+        groups={[{ id: 'today', label: '今天', messages: [message, futureMessage] }]}
+        messages={[message, futureMessage]}
+        hasMoreMessages={false}
+      />,
+    );
+    expect(document.activeElement).toBe(footer);
+  });
+
+  it('clears the pending focus request and focuses the footer after a load error', async () => {
+    const { container } = render(
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages: [message] }]}
+        messages={[message]}
+        query=""
+        filter="all"
+        selectedId={message.id}
+        hasMoreMessages
+        listStateKey="load-more-error"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn(async (): Promise<MessageSummary[]> => {
+          throw new Error('offline');
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        container.querySelector('.message-list-footer'),
+      );
+    });
   });
 });

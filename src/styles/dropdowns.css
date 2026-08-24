@@ -2,7 +2,10 @@
  * Shared dropdown (CustomSelect) — used in the settings workspace and the
  * composer. The option menu renders in a body portal with fixed positioning,
  * so these rules are intentionally global, not scoped to a dialog.
- * Visual language: 40px trigger, bordered rounded box, chevron, focus ring.
+ * Visual language: compact trigger, quiet hairline, and a restrained
+ * transient menu. The menu is intentionally fully styled here because it is
+ * rendered in document.body and therefore cannot inherit a settings or
+ * composer surface.
  */
 
 .custom-select-menu {
@@ -12,7 +15,7 @@
 }
 
 .custom-select-summary {
-  min-height: var(--ui-control-height, 40px);
+  min-height: var(--ui-control-height);
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16px;
@@ -24,7 +27,7 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 14px;
+  font-size: var(--ui-font-size-body);
   text-align: left;
   cursor: pointer;
   transition: var(--ui-transition-fast-border-shadow);
@@ -38,7 +41,7 @@
 
 .custom-select-summary strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--ui-font-size-body);
   font-weight: 540;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -47,7 +50,7 @@
 .custom-select-summary small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
   font-weight: 460;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -57,20 +60,105 @@
   color: var(--ui-text-tertiary);
 }
 
-.custom-select-summary > svg {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-  font-weight: 460;
+.custom-select-summary.dense {
+  min-height: var(--ui-control-height-dense);
+  padding-inline: 10px;
 }
 
-.custom-select-dropdown button:hover {
-  color: var(--ui-text);
+.custom-select-summary:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.custom-select-summary:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Opening a menu is a state, not a reason to paint a thick accent rectangle.
+ * Keyboard focus remains visible through :focus-visible above. */
+.custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
   background: var(--ui-surface-muted);
 }
 
+.custom-select-summary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.custom-select-dropdown {
+  /* CustomSelect supplies the final layer inline for modal callers. */
+  z-index: 1000;
+  display: grid;
+  gap: 2px;
+  min-width: min(240px, calc(100vw - 24px));
+  max-width: min(560px, calc(100vw - 24px));
+  max-height: min(280px, calc(100vh - 24px));
+  padding: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.custom-select-dropdown button {
+  width: 100%;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font: inherit;
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--ui-transition-fast-color-background);
+}
+
+.custom-select-dropdown button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.custom-select-dropdown button strong,
+.custom-select-dropdown button small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.custom-select-dropdown button strong {
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 540;
+}
+
+.custom-select-dropdown button small {
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 460;
+}
+
+.custom-select-dropdown button > svg {
+  justify-self: end;
+  color: var(--ui-accent);
+}
+
+.custom-select-dropdown button:hover,
 .custom-select-dropdown button.active {
   color: var(--ui-text);
-  background: var(--quiet-row-selected);
+  background: var(--ui-surface-muted);
 }
 
 .custom-select-dropdown button:disabled {
@@ -78,13 +166,23 @@
   cursor: not-allowed;
 }
 
+.custom-select-dropdown.dense button {
+  min-height: var(--ui-control-height-dense);
+  padding-block: 4px;
+  font-size: var(--ui-font-size-aux);
+}
+
+.custom-select-dropdown.dense button strong {
+  font-size: var(--ui-font-size-aux);
+}
+
 @media (max-width: 640px) {
   .custom-select-summary {
-    min-height: 44px;
+    min-height: var(--ui-control-height-touch);
   }
 
   .custom-select-dropdown button {
-    min-height: 44px;
+    min-height: var(--ui-control-height-touch);
   }
 }
 

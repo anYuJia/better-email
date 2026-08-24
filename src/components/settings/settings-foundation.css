@@ -119,7 +119,7 @@
 }
 
 .settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary[aria-expanded="true"] {
-  border-color: var(--st-focus-border);
+  border-color: var(--st-border-strong);
   background: var(--st-surface-subtle);
   box-shadow: none;
 }
@@ -136,8 +136,9 @@
 /* ── Focus visibility ───────────────────────────────────────────── */
 
 .settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--st-focus-border);
+  outline: var(--st-focus-outline);
   outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
 }
 
 .settings-modal :is(input, select, textarea):focus {

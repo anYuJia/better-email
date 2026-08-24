@@ -382,6 +382,20 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(r).toBeLessThanOrEqual(8);
   });
 
+  it('list controls have breathing room and use a surface selected state', () => {
+    const strip = extractBlock(messageListCss, '.list-control-strip');
+    expect(strip.length).toBeGreaterThan(0);
+    expect(extractDecl(strip[0], 'min-height')).toBeGreaterThanOrEqual(52);
+
+    const activeStart = messageListCss.indexOf('.list-control-actions > button.active,');
+    expect(activeStart).toBeGreaterThanOrEqual(0);
+    const activeEnd = messageListCss.indexOf('}', activeStart);
+    const activeRule = messageListCss.slice(activeStart, activeEnd);
+    expect(activeRule).toMatch(/background:\s*var\(--quiet-row-selected\)/);
+    expect(activeRule).toMatch(/box-shadow:\s*var\(--ui-box-shadow-none\)/);
+    expect(activeRule).not.toMatch(/inset\s+0\s+-1px/);
+  });
+
   it('refresh button is icon-first (not a primary gradient CTA)', () => {
     const blocks = extractBlock(messageListCss, '.refresh-text-button');
     expect(blocks.length).toBeGreaterThan(0);

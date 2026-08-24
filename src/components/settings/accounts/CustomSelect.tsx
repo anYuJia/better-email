@@ -49,9 +49,14 @@ type MenuPlacement = {
   top: number;
   left: number;
   width: number;
+  maxHeight: number;
 };
 
 const TYPEAHEAD_RESET_MS = 700;
+const MENU_GAP = 4;
+const VIEWPORT_GUTTER = 12;
+const MENU_MAX_WIDTH = 560;
+const MENU_MAX_HEIGHT = 280;
 
 /**
  * Shared dropdown control used across the settings workspace and the
@@ -249,10 +254,43 @@ export function CustomSelect({
       const trigger = triggerRef.current;
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
+      const viewportWidth = Math.max(window.innerWidth, VIEWPORT_GUTTER * 2);
+      const viewportHeight = Math.max(window.innerHeight, VIEWPORT_GUTTER * 2);
+      const availableWidth = Math.max(viewportWidth - VIEWPORT_GUTTER * 2, 1);
+      const width = Math.min(
+        Math.max(rect.width, 240),
+        MENU_MAX_WIDTH,
+        availableWidth,
+      );
+      const left = Math.min(
+        Math.max(rect.left, VIEWPORT_GUTTER),
+        Math.max(VIEWPORT_GUTTER, viewportWidth - width - VIEWPORT_GUTTER),
+      );
+      const rowHeight = dense ? 34 : 42;
+      const estimatedHeight = Math.min(
+        MENU_MAX_HEIGHT,
+        Math.max(120, options.length * rowHeight + 8),
+      );
+      const spaceBelow = Math.max(0, viewportHeight - rect.bottom - VIEWPORT_GUTTER);
+      const spaceAbove = Math.max(0, rect.top - VIEWPORT_GUTTER);
+      const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+      const availableHeight = opensAbove ? spaceAbove : spaceBelow;
+      const maxHeight = Math.max(
+        120,
+        Math.min(MENU_MAX_HEIGHT, availableHeight - MENU_GAP),
+      );
+      const bottomTop = rect.bottom + MENU_GAP;
+      const top = opensAbove
+        ? Math.max(VIEWPORT_GUTTER, rect.top - maxHeight - MENU_GAP)
+        : Math.min(
+          bottomTop,
+          Math.max(VIEWPORT_GUTTER, viewportHeight - VIEWPORT_GUTTER - maxHeight),
+        );
       setPlacement({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
+        top,
+        left,
+        width,
+        maxHeight,
       });
     };
     measure();
@@ -262,7 +300,7 @@ export function CustomSelect({
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [open]);
+  }, [dense, open, options.length]);
 
   useEffect(() => {
     if (disabled && open) {
@@ -326,6 +364,7 @@ export function CustomSelect({
             top: placement.top,
             left: placement.left,
             width: placement.width,
+            maxHeight: placement.maxHeight,
             zIndex: portalZIndex,
           }}
         >

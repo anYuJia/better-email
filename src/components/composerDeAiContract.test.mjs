@@ -128,6 +128,34 @@ describe('composer focus contract — quiet hairlines, not large rectangles', ()
       expect(rule.body).not.toMatch(/inset\s+0\s+0\s+0\s+2px/);
     }
   });
+
+  it('field focus stays stable and does not reintroduce a blinking bottom line', () => {
+    const fieldFocus = findRules(composerCss, '.composer-field-row:focus-within')
+      .filter((rule) => rule.selector === '.composer-field-row:focus-within')
+      .at(-1);
+    expect(fieldFocus).toBeDefined();
+    expect(fieldFocus.body).toMatch(/box-shadow:\s*none/);
+    expect(fieldFocus.body).not.toMatch(/inset\s+0\s+-1px/);
+
+    const keyboardFocus = findRules(composerCss, '.composer-field-row:has(input:focus-visible)')
+      .filter((rule) => rule.selector === '.composer-field-row:has(input:focus-visible)')
+      .at(-1);
+    expect(keyboardFocus).toBeDefined();
+    expect(keyboardFocus.body).toMatch(/outline:\s*none/);
+    expect(keyboardFocus.body).toMatch(/box-shadow:\s*none/);
+    expect(keyboardFocus.body).not.toMatch(/inset\s+0\s+-1px/);
+  });
+});
+
+describe('composer sender context — metadata, not nested cards', () => {
+  it('keeps idle sender selectors flat and lets state provide the affordance', () => {
+    const summaryRule = findRules(composerCss, '.composer .composer-sender-context .custom-select-summary')
+      .filter((rule) => rule.selector === '.composer .composer-sender-context .custom-select-summary')
+      .at(-1);
+    expect(summaryRule).toBeDefined();
+    expect(summaryRule.body).toMatch(/border-color:\s*transparent/);
+    expect(summaryRule.body).toMatch(/background:\s*transparent/);
+  });
 });
 
 describe('composer readability contract — visible copy is at least 12px', () => {
@@ -235,6 +263,21 @@ describe('composer de-AI contract — dropdowns use tokens without fallbacks', (
     // Match patterns like var(--token, #hex) — the fallback is the second arg
     const fallbackPattern = /var\([^,]+,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))\)/;
     expect(dropdownsCss).not.toMatch(fallbackPattern);
+  });
+
+  it('keeps the portalled menu and its rows fully styled', () => {
+    const menuRule = findRules(dropdownsCss, '.custom-select-dropdown')
+      .find((rule) => rule.selector === '.custom-select-dropdown');
+    const rowRule = findRules(dropdownsCss, '.custom-select-dropdown button')
+      .find((rule) => rule.selector === '.custom-select-dropdown button');
+    expect(menuRule).toBeDefined();
+    expect(rowRule).toBeDefined();
+    expect(menuRule.body).toMatch(/display:\s*grid/);
+    expect(menuRule.body).toMatch(/max-height:/);
+    expect(menuRule.body).toMatch(/overflow-y:\s*auto/);
+    expect(rowRule.body).toMatch(/min-height:/);
+    expect(rowRule.body).toMatch(/font-size:\s*var\(--ui-font-size-secondary\)/);
+    expect(rowRule.body).toMatch(/border:\s*1px solid transparent/);
   });
 });
 

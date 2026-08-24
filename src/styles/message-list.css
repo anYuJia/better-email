@@ -88,11 +88,11 @@
 .toolbar {
   position: relative;
   z-index: 20;
-  min-height: 50px;
-  padding: 8px 10px;
+  min-height: 62px;
+  padding: 11px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   border-bottom: 0;
   background: var(--ui-list);
   backdrop-filter: none;
@@ -103,7 +103,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* Search box — muted control surface, subtle accent focus ring. */
@@ -112,7 +112,7 @@
   overflow: visible;
   min-width: 0;
   flex: 1 1 auto;
-  height: 36px;
+  height: 40px;
   padding: 0 8px 0 10px;
   display: flex;
   align-items: center;
@@ -145,10 +145,10 @@
 
 .search-box input {
   min-width: 0;
-  height: 34px;
+  height: 38px;
   border: 0;
   font-size: 13px;
-  line-height: 34px;
+  line-height: 38px;
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -189,9 +189,9 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 10px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 11px;
   border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
@@ -218,8 +218,8 @@
 }
 
 .app-shell .refresh-text-button {
-  min-height: 36px;
-  height: 36px;
+  min-height: 40px;
+  height: 40px;
 }
 
 /* Search scope — compact dropdown, only the trigger is visible. */
@@ -229,8 +229,8 @@
 
 .search-scope-menu > summary {
   min-width: 56px;
-  min-height: 36px;
-  height: 36px;
+  min-height: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -266,9 +266,9 @@
 }
 
 .app-shell .search-scope-menu > summary {
-  min-width: 60px;
-  min-height: 36px;
-  height: 36px;
+  min-width: 64px;
+  min-height: 40px;
+  height: 40px;
 }
 
 .app-shell .search-scope-menu > summary svg {
@@ -370,19 +370,19 @@
  * ------------------------------------------------------------------------- */
 
 .list-control-strip {
-  min-height: 39px;
-  padding: 5px 10px;
+  min-height: 52px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-list);
 }
 
 .app-shell .list-control-strip {
-  min-height: 42px;
-  padding: 5px 12px;
-  gap: 9px;
+  min-height: 54px;
+  padding: 8px 14px;
+  gap: 14px;
 }
 
 .app-shell .toolbar,
@@ -404,11 +404,11 @@
   min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: 7px;
+  gap: 9px;
 }
 
 .app-shell .list-summary {
-  gap: 7px;
+  gap: 9px;
 }
 
 .list-summary strong {
@@ -462,7 +462,7 @@
 .list-control-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -471,13 +471,13 @@
 }
 
 .app-shell .list-control-actions {
-  gap: 1px;
+  gap: 6px;
 }
 
 .list-control-actions > button,
 .list-control-actions .compact-menu summary {
-  min-height: 36px;
-  padding-inline: 8px;
+  min-height: 40px;
+  padding-inline: 12px;
   border: 0;
   border-radius: 6px;
   color: var(--ui-text-secondary);
@@ -502,8 +502,9 @@
 .list-control-actions > button.active,
 .list-control-actions .compact-menu summary.active {
   color: var(--ui-accent);
-  background: transparent;
-  box-shadow: inset 0 -1px 0 var(--ui-accent);
+  background: var(--quiet-row-selected);
+  box-shadow: var(--ui-box-shadow-none);
+  font-weight: 600;
 }
 
 .icon-button {
@@ -1695,8 +1696,8 @@
 
 @media (max-width: 1180px) {
   .app-shell .refresh-text-button {
-    min-width: 34px;
-    width: 34px;
+    min-width: 40px;
+    width: 40px;
     padding-inline: 0;
   }
 

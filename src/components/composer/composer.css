@@ -2384,13 +2384,14 @@
   font-size: 12px;
   font-weight: 590;
   background: transparent;
+  transition: none;
 }
 
 .composer-field-row:focus-within,
 .composer-recipient-field .composer-field-row:focus-within {
   border-radius: 4px;
   background: color-mix(in oklch, var(--ui-surface-muted) 68%, transparent);
-  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 52%, var(--ui-border));
+  box-shadow: none;
 }
 
 .composer .composer-field-row input,
@@ -2804,7 +2805,10 @@
 }
 
 .composer-field-row:has(input:focus-visible) {
-  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 62%, var(--ui-border));
+  /* Keep the row quiet while typing. The muted surface in :focus-within
+   * still communicates focus without boxing in the whole recipient line. */
+  outline: none;
+  box-shadow: none;
 }
 
 /* A minimized composer must remain a complete, legible task surface. */
@@ -2924,7 +2928,7 @@
 :root[data-theme="dark"] .composer .composer-field-row:focus-within {
   border-radius: 4px;
   background: color-mix(in oklch, var(--ui-surface-muted) 58%, transparent);
-  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 48%, var(--ui-border));
+  box-shadow: none;
 }
 
 :root[data-theme="dark"] .composer .composer-field-row input,
@@ -2945,7 +2949,8 @@
 }
 
 :root[data-theme="dark"] .composer .composer-field-row:has(input:focus-visible) {
-  box-shadow: inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 58%, var(--ui-border));
+  outline: none;
+  box-shadow: none;
 }
 
 :root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary,
@@ -3132,4 +3137,114 @@
 .custom-select-dropdown[data-portal-owner="composer-sender"] button > svg {
   flex: 0 0 auto;
   color: var(--ui-accent);
+}
+
+/* The editor is one continuous writing surface. Keep structural dividers
+ * available for orientation, but let the surfaces and spacing do most of the
+ * grouping instead of repeating high-contrast rules between every row. */
+.composer {
+  --composer-divider: color-mix(in oklch, var(--ui-border) 52%, var(--ui-surface));
+  --composer-divider-soft: color-mix(in oklch, var(--ui-border) 38%, var(--ui-surface));
+}
+
+.composer > header,
+.composer .composer-sender-context,
+.composer .composer-field-row,
+.composer .composer-body-field,
+.composer .composer-quick-tools,
+.composer .composer-advanced-panel,
+.composer footer {
+  border-color: var(--composer-divider);
+}
+
+.composer .composer-quick-tools,
+.composer .composer-advanced-panel,
+.composer footer {
+  border-top-color: var(--composer-divider-soft);
+  border-bottom-color: var(--composer-divider-soft);
+}
+
+.composer .rich-toolbar,
+.composer .composer-template-controls {
+  border-color: var(--composer-divider-soft);
+}
+
+.composer .composer-body-field.has-original-quote textarea,
+.composer .composer-body-field.has-original-quote .composer-richtext-body {
+  border-bottom-color: var(--composer-divider-soft);
+}
+
+:root[data-theme="dark"] .composer {
+  --composer-divider: color-mix(in oklch, var(--ui-border) 58%, var(--ui-surface));
+  --composer-divider-soft: color-mix(in oklch, var(--ui-border) 44%, var(--ui-surface));
+}
+
+/* Sender context is metadata, not a second form inside the editor. Keep the
+ * two choices easy to scan, but let the writing surface stay continuous. */
+.composer .composer-sender-context {
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 12px;
+  padding-block: 6px;
+  border-bottom-color: var(--composer-divider-soft);
+  background: color-mix(in oklch, var(--ui-surface-muted) 30%, var(--ui-surface));
+}
+
+.composer .composer-sender-heading {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 620;
+  letter-spacing: 0.01em;
+}
+
+.composer .composer-sender-selectors {
+  gap: 18px;
+}
+
+.composer .composer-sender-context .composer-inline-select {
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 7px;
+  font-size: var(--ui-font-size-aux);
+  font-weight: 560;
+}
+
+.composer .composer-sender-context .custom-select-summary {
+  min-height: 38px;
+  padding: 2px 4px;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  transition: var(--ui-transition-fast-color-background);
+}
+
+.composer .composer-sender-context .custom-select-summary:hover {
+  border-color: transparent;
+  background: color-mix(in oklch, var(--ui-control-hover) 72%, transparent);
+}
+
+.composer .composer-sender-context .custom-select-summary[aria-expanded="true"] {
+  border-color: transparent;
+  background: color-mix(in oklch, var(--ui-accent-soft) 20%, var(--ui-surface));
+}
+
+.composer .composer-sender-context .custom-select-summary > svg {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context {
+  background: color-mix(in oklch, var(--ui-surface-muted) 24%, var(--ui-surface));
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary,
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary:hover {
+  background: color-mix(in oklch, var(--ui-control-hover) 78%, transparent);
+}
+
+:root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary[aria-expanded="true"] {
+  border-color: transparent;
+  background: color-mix(in oklch, var(--ui-accent-soft) 20%, var(--ui-surface));
 }

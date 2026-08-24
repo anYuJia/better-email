@@ -47,7 +47,7 @@ export default function ShortcutHelpModal({
         <header className="shortcut-modal-header">
           <div className="shortcut-title-copy">
             <h2 id={titleId}>快捷键</h2>
-            <p id={descriptionId}>常用邮件操作，无需离开键盘</p>
+            <p id={descriptionId}>高频邮件操作，无需离开键盘</p>
           </div>
           <button
             ref={closeButtonRef}

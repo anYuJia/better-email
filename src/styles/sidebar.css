@@ -25,9 +25,9 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
-  padding: 0 10px 10px;
+  padding: 0 12px 12px;
   overflow: hidden;
   color: var(--ui-text-secondary);
   font-size: 13px;
@@ -41,7 +41,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 40px;
+  min-height: 48px;
   padding: 0 6px 2px;
 }
 
@@ -69,17 +69,17 @@
  * the sidebar plane and gains a quiet tint only when the user engages it. */
 
 .compose-button {
-  min-height: 36px;
+  min-height: 40px;
   margin: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 7px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
-  background: transparent;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--ui-radius-control);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
   font-weight: 600;
@@ -95,14 +95,14 @@
 }
 
 .compose-button:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .compose-button:active:not(:disabled) {
-  color: var(--ui-accent-pressed);
-  background: var(--quiet-row-selected);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-pressed);
   scale: 0.96;
 }
 
@@ -132,7 +132,7 @@
 .folder-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 /* The mock-mode tools section hangs off the folder navigation. */
@@ -144,7 +144,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 36px;
+  min-height: 38px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
@@ -156,7 +156,7 @@
 .folder-main {
   flex: 1;
   min-width: 0;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 9px;
   display: flex;
   align-items: center;
@@ -222,7 +222,7 @@
 
 .folder.active,
 .folder.active:hover {
-  color: var(--ui-text);
+  color: var(--ui-accent);
   background: var(--quiet-row-selected);
 }
 
@@ -232,7 +232,7 @@
 }
 
 .folder.active .badge {
-  color: var(--ui-text);
+  color: var(--ui-accent);
   font-weight: 700;
 }
 

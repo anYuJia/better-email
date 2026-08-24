@@ -10,11 +10,10 @@
   color-scheme: light;
 
   /* Primitive palette: cool neutral workspace, gently warm reading paper.
-     The blue is intentionally familiar and dependable rather than decorative:
-     it is reserved for primary actions, selection and keyboard focus. */
+     The green is reserved for primary actions, selection and keyboard focus. */
   --primitive-hue-neutral: 255;
   --primitive-hue-paper: 90;
-  --primitive-hue-accent: 255;
+  --primitive-hue-accent: 156;
   --primitive-hue-success: 152;
   --primitive-hue-warning: 78;
   --primitive-hue-danger: 29;
@@ -32,19 +31,19 @@
   --color-text-primary: oklch(0.235 0.017 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.445 0.015 var(--primitive-hue-neutral));
   /* Small metadata must remain readable on every persistent and selected
-     surface. This resolves to at least 4.5:1 even on the blue selection tint. */
+     surface. */
   --color-text-tertiary: oklch(0.505 0.012 var(--primitive-hue-neutral));
   --color-text-on-accent: oklch(0.985 0.004 var(--primitive-hue-neutral));
 
   --color-border-subtle: oklch(0.885 0.007 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.8 0.011 var(--primitive-hue-neutral));
-  /* The default blue (#0068d5-equivalent) keeps white labels above AA
-     contrast while avoiding a noisy, overly saturated workspace. */
-  --color-focus: oklch(0.55 0.18 var(--primitive-hue-accent));
-  --color-accent: oklch(0.53 0.19 var(--primitive-hue-accent));
-  --color-accent-hover: oklch(0.55 0.18 var(--primitive-hue-accent));
-  --color-accent-pressed: oklch(0.50 0.17 var(--primitive-hue-accent));
-  --color-accent-soft: oklch(0.955 0.018 var(--primitive-hue-accent));
+  /* Better Email green: close to #0F9F63 while keeping white labels readable
+     on primary controls. */
+  --color-focus: oklch(0.52 0.15 var(--primitive-hue-accent));
+  --color-accent: oklch(0.50 0.15 var(--primitive-hue-accent));
+  --color-accent-hover: oklch(0.53 0.15 var(--primitive-hue-accent));
+  --color-accent-pressed: oklch(0.46 0.14 var(--primitive-hue-accent));
+  --color-accent-soft: oklch(0.955 0.028 var(--primitive-hue-accent));
   --color-success: oklch(0.5 0.13 var(--primitive-hue-success));
   --color-success-soft: oklch(0.95 0.035 var(--primitive-hue-success));
   --color-warning: oklch(0.52 0.12 var(--primitive-hue-warning));

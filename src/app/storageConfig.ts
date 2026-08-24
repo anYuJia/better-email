@@ -33,7 +33,7 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
   [listSortStorageKey]: 'swiftmail.listSort.v1',
 };
 
-export const defaultAppLayout: AppLayout = { sidebar: 244, list: 388 };
+export const defaultAppLayout: AppLayout = { sidebar: 236, list: 388 };
 export const filterModes: FilterMode[] = ['all', 'unread', 'starred', 'attachments'];
 export const listSortModes: ListSort[] = ['newest', 'oldest', 'sender', 'subject'];
 export const listSortOptions: { id: ListSort; label: string }[] = [

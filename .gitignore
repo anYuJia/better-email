@@ -10,6 +10,7 @@ src-tauri/target/
 .agent/
 .gemini/
 design-system/
+design-reference/
 
 # Browser, test, and visual QA output
 .playwright-cli/
@@ -20,6 +21,7 @@ test-results/
 
 # Internal reports belong outside the product repository
 docs/
+docs/design/reference/
 /论文/
 
 # Local secrets and interpreter caches

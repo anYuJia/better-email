@@ -1,8 +1,17 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
 import { filters, listSortOptions } from '../app/appConfig';
-import type { FilterMode, ListMode, ListSort } from '../app/types';
+import type {
+  FilterMode,
+  Folder,
+  Label,
+  ListMode,
+  ListSort,
+  MessageSummary,
+} from '../app/types';
 import CompactDropdown from './CompactDropdown';
+import MessageBulkToolbar from './MessageBulkToolbar';
+import type { BulkMessageAction } from './messageContextMenu';
 
 type MessageListToolbarProps = {
   filter: FilterMode;
@@ -15,6 +24,16 @@ type MessageListToolbarProps = {
   onShowThreads: () => void;
   onFilterChange: (filter: FilterMode) => void;
   onSortChange: (sort: ListSort) => void;
+  visibleMessageCount: number;
+  selectedMessageIds: number[];
+  selectedMessages: MessageSummary[];
+  folders: Folder[];
+  labels: Label[];
+  onToggleAllVisible: (checked: boolean) => void;
+  onRunBulkAction: (action: BulkMessageAction) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
+  onMoveBulkToFolder: (folder: Folder) => void;
+  onToggleBulkLabel: (label: Label) => void;
   onOpenNavigation?: () => void;
 };
 
@@ -35,19 +54,35 @@ function MessageListToolbar({
   onShowThreads,
   onFilterChange,
   onSortChange,
+  visibleMessageCount,
+  selectedMessageIds,
+  selectedMessages,
+  folders,
+  labels,
+  onToggleAllVisible,
+  onRunBulkAction,
+  onRequestSnooze,
+  onMoveBulkToFolder,
+  onToggleBulkLabel,
   onOpenNavigation,
 }: MessageListToolbarProps) {
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
+  const isSelectionMode = listMode === 'messages' && selectedMessageIds.length > 0;
 
   return (
-    <header className="list-control-strip" aria-label="邮件列表控制">
+    <header
+      className="list-control-strip"
+      aria-label="邮件列表控制"
+      data-toolbar-height="96"
+      data-toolbar-mode={isSelectionMode ? 'selection' : 'normal'}
+    >
       <div className="list-summary-row">
         <div className="list-summary">
           <strong>{currentViewLabel}</strong>
           <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
         </div>
       </div>
-      <div className="list-control-row">
+      <div className={`list-control-row${isSelectionMode ? ' is-selection-mode' : ''}`}>
         {onOpenNavigation && (
           <button
             type="button"
@@ -59,42 +94,58 @@ function MessageListToolbar({
             <Menu size={18} aria-hidden="true" />
           </button>
         )}
-        <div className="list-control-actions" aria-label="邮件显示模式">
-          <button
-            type="button"
-            className={listMode === 'messages' ? 'active' : ''}
-            aria-pressed={listMode === 'messages'}
-            onClick={onShowMessages}
-          >
-            邮件
-          </button>
-          <button
-            type="button"
-            className={listMode === 'threads' ? 'active' : ''}
-            aria-pressed={listMode === 'threads'}
-            onClick={onShowThreads}
-          >
-            会话
-          </button>
-          <CompactDropdown
-            className="filter-menu"
-            label="筛选"
-            currentLabel={activeFilterLabel}
-            ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
-            value={filter}
-            options={filters}
-            onChange={onFilterChange}
+        {isSelectionMode ? (
+          <MessageBulkToolbar
+            inline
+            visibleMessageCount={visibleMessageCount}
+            selectedMessageIds={selectedMessageIds}
+            selectedMessages={selectedMessages}
+            folders={folders}
+            labels={labels}
+            onToggleAllVisible={onToggleAllVisible}
+            onRunBulkAction={onRunBulkAction}
+            onRequestSnooze={onRequestSnooze}
+            onMoveBulkToFolder={onMoveBulkToFolder}
+            onToggleBulkLabel={onToggleBulkLabel}
           />
-          <CompactDropdown
-            className="sort-menu"
-            label="排序"
-            currentLabel={sortTriggerLabel(listSort)}
-            ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}
-            value={listSort}
-            options={listSortOptions}
-            onChange={onSortChange}
-          />
-        </div>
+        ) : (
+          <div className="list-control-actions" aria-label="邮件显示模式">
+            <button
+              type="button"
+              className={listMode === 'messages' ? 'active' : ''}
+              aria-pressed={listMode === 'messages'}
+              onClick={onShowMessages}
+            >
+              邮件
+            </button>
+            <button
+              type="button"
+              className={listMode === 'threads' ? 'active' : ''}
+              aria-pressed={listMode === 'threads'}
+              onClick={onShowThreads}
+            >
+              会话
+            </button>
+            <CompactDropdown
+              className="filter-menu"
+              label="筛选"
+              currentLabel={activeFilterLabel}
+              ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
+              value={filter}
+              options={filters}
+              onChange={onFilterChange}
+            />
+            <CompactDropdown
+              className="sort-menu"
+              label="排序"
+              currentLabel={sortTriggerLabel(listSort)}
+              ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}
+              value={listSort}
+              options={listSortOptions}
+              onChange={onSortChange}
+            />
+          </div>
+        )}
       </div>
     </header>
   );

@@ -13,6 +13,7 @@ type MessageListCardProps = {
   isDragging: boolean;
   isNew: boolean;
   claimFocus?: boolean;
+  isSelectionMode?: boolean;
   hasBulkSelection: boolean;
   selectedMessageIdsRef: React.MutableRefObject<number[]>;
   onSelectMessage: (messageId: number) => void;
@@ -31,6 +32,7 @@ export default React.memo(function MessageListCard({
   isDragging,
   isNew,
   claimFocus = false,
+  isSelectionMode = false,
   hasBulkSelection,
   selectedMessageIdsRef,
   onSelectMessage,
@@ -43,6 +45,24 @@ export default React.memo(function MessageListCard({
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const preview = useMemo(() => mailboxListPreview(message), [message]);
+  const metadataLabelState = useMemo(() => {
+    const normalizedIdentity = new Set([
+      message.sender_name,
+      message.sender_email,
+      message.account_email,
+      message.subject,
+    ].map((value) => value.trim().toLocaleLowerCase()).filter(Boolean));
+    const labels = message.labels
+      .filter((label) => {
+        const normalizedLabel = label.trim().toLocaleLowerCase();
+        return normalizedLabel.length > 0 && !normalizedIdentity.has(normalizedLabel);
+      });
+    return {
+      labels: labels.slice(0, 2),
+      overflow: Math.max(0, labels.length - 2),
+    };
+  }, [message.account_email, message.labels, message.sender_email, message.sender_name, message.subject]);
+  const metadataLabels = metadataLabelState.labels;
   const cardLabel = [
     `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
     message.subject || '无主题',
@@ -90,6 +110,8 @@ export default React.memo(function MessageListCard({
         'message-card',
         message.is_read ? 'is-read' : 'is-unread',
         isCurrentMessage ? 'selected is-current' : '',
+        isSelected ? 'is-selected' : '',
+        isSelectionMode ? 'is-selection-mode' : '',
         isDragging ? 'dragging' : '',
         isNew ? 'is-new' : '',
       ].filter(Boolean).join(' ')}
@@ -158,7 +180,7 @@ export default React.memo(function MessageListCard({
           aria-label={`选择 ${message.subject || '无主题'}`}
           checked={isSelected}
           type="checkbox"
-          tabIndex={-1}
+          tabIndex={isSelectionMode ? 0 : -1}
           onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
         />
       </label>
@@ -178,14 +200,16 @@ export default React.memo(function MessageListCard({
         )}
       </div>
       {preview && <p title={preview}>{preview}</p>}
-      <div className="message-chips">
-        {message.labels.slice(0, 2).map((label) => <span key={label} title={label}>{label}</span>)}
-        {message.labels.length > 2 && (
-          <span title={message.labels.slice(2).join(', ')}>
-            +{message.labels.length - 2}
-          </span>
-        )}
-      </div>
+      {!preview && metadataLabels.length > 0 && (
+        <div className="message-chips" aria-label="邮件元数据">
+          {metadataLabels.map((label) => <span key={label} title={label}>{label}</span>)}
+          {metadataLabelState.overflow > 0 && (
+            <span title={message.labels.join(', ')}>
+              +{metadataLabelState.overflow}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 });

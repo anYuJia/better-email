@@ -810,7 +810,7 @@
 
 .message-list-item {
   box-sizing: border-box;
-  height: 88px;
+  height: 76px;
   padding: 0;
 }
 
@@ -830,7 +830,7 @@
   min-height: 0;
   overflow: hidden;
   margin: 0;
-  padding: 8px 16px 8px 84px;
+  padding: 7px 16px 7px 84px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   border: 0;
@@ -847,7 +847,7 @@
 .app-shell .message-card.is-current::before {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 3px;
+  width: 2px;
   background: var(--ui-accent);
   content: "";
   pointer-events: none;
@@ -967,14 +967,8 @@
 .message-card:hover .message-select,
 .message-card:has(.message-card-main:focus-visible) .message-select,
 .message-card:has(.message-select:focus-within) .message-select,
-.message-card:has(.message-select input:checked) .message-select {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.message-card.is-current .message-select,
-.message-card.is-current:hover .message-select,
-.message-card.is-current:has(.message-card-main:focus-visible) .message-select {
+.message-card:has(.message-select input:checked) .message-select,
+.message-card.is-selection-mode .message-select {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1001,9 +995,10 @@
 
 .message-select input::before,
 .bulk-selection > input::before {
+  content: "";
   width: 7px;
   height: 4px;
-  border: solid var(--color-text-on-accent);
+  border: solid var(--ui-accent);
   border-width: 0 0 2px 2px;
   transform: translateY(-1px) rotate(-45deg) scale(0);
   transform-origin: center;
@@ -1012,7 +1007,7 @@
 .message-select input:checked,
 .bulk-selection > input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-accent);
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1048,7 +1043,7 @@
 
 .app-shell .message-select input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-accent);
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1078,7 +1073,7 @@
 .app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
 .app-shell .message-card:has(.message-select:focus-within) .message-select,
 .app-shell .message-card:has(.message-select input:checked) .message-select,
-.app-shell .message-card.is-current .message-select {
+.app-shell .message-card.is-selection-mode .message-select {
   display: grid;
   opacity: 1;
   pointer-events: auto;
@@ -1125,18 +1120,18 @@
 
 .message-topline {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
   min-height: 18px;
   overflow: hidden;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .sender {
   min-width: 0;
   color: var(--ui-text-secondary);
-  font-size: 14px;
+  font-size: var(--ui-font-size-body);
   line-height: 1.25;
   font-weight: 500;
   overflow: hidden;
@@ -1154,12 +1149,12 @@
 }
 
 .subject {
-  margin-top: 1px;
+  margin-top: 0;
   display: block;
   color: var(--ui-text);
-  font-size: 14px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 400;
-  line-height: 1.25;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1172,19 +1167,19 @@
 
 .message-card p {
   display: block;
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   width: 100%;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.25;
 }
 
 .message-card time {
   flex: 0 0 auto;
   color: var(--ui-text-tertiary);
   font-variant-numeric: tabular-nums;
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-aux);
   font-weight: 400;
 }
 
@@ -1216,8 +1211,8 @@
   max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 1px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .message-subject-line > .subject {
@@ -1252,7 +1247,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 3px;
+  margin-top: 2px;
   flex-wrap: wrap;
   overflow: hidden;
   white-space: nowrap;
@@ -1268,7 +1263,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
   text-overflow: ellipsis;
   font-weight: 400;
   line-height: 1;
@@ -1315,7 +1310,7 @@
 .message-card.is-unread.selected:hover,
 .message-card.is-current {
   border-color: transparent;
-  background: var(--quiet-row-selected);
+  background: color-mix(in srgb, var(--quiet-row-selected) 68%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1325,7 +1320,7 @@
 .app-shell .message-card.is-unread.selected:hover,
 .app-shell .message-card.is-current {
   border-color: transparent;
-  background: var(--quiet-row-selected);
+  background: color-mix(in srgb, var(--quiet-row-selected) 68%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1345,8 +1340,11 @@
  * bulk selection. The reader-open (.is-current/.selected) row stays on the
  * stronger --quiet-row-selected surface, so current vs multi-selected stays
  * distinguishable at a glance. */
+.app-shell .message-card.is-selected:not(.is-current),
+.app-shell .message-card.is-selected:not(.is-current):hover,
 .app-shell .message-card:has(.message-select input:checked):not(.is-current) {
-  background: var(--quiet-row-hover);
+  background: color-mix(in srgb, var(--quiet-row-selected) 42%, var(--ui-list));
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* New message appear animation — brief, color only. */
@@ -1743,7 +1741,12 @@
 .app-shell .list-control-strip {
   position: relative;
   z-index: 20;
+  box-sizing: border-box;
+  flex: 0 0 96px;
+  width: 100%;
+  height: 96px;
   min-height: 96px;
+  max-height: 96px;
   padding: 13px 14px 10px;
   display: flex;
   flex-direction: column;
@@ -1836,9 +1839,10 @@
 
 .app-shell .list-control-actions > button:not(.narrow-navigation-button).active {
   color: var(--ui-accent);
-  background: var(--quiet-row-selected);
+  background: transparent;
   border-bottom: 0;
   font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
 }
 
 .compact-dropdown {
@@ -1965,6 +1969,74 @@
   color: var(--ui-accent);
 }
 
+/* Selection mode occupies the same second row as the ordinary list controls.
+ * Keeping this root in the row prevents the list, group header, reader and
+ * saved scroll position from moving when the first checkbox is selected. */
+.app-shell .bulk-toolbar-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar-inline .bulk-selection {
+  flex: 0 0 auto;
+  min-height: 32px;
+  height: 32px;
+  gap: 6px;
+  padding: 0 8px;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app-shell .bulk-toolbar-inline button,
+.app-shell .bulk-toolbar-inline .compact-menu > summary {
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 550;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .bulk-toolbar-inline button:hover:not(:disabled),
+.app-shell .bulk-toolbar-inline button:focus-visible,
+.app-shell .bulk-toolbar-inline .compact-menu > summary:hover,
+.app-shell .bulk-toolbar-inline .compact-menu > summary:focus-visible,
+.app-shell .bulk-toolbar-inline .compact-menu[open] > summary {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  outline: none;
+}
+
+.app-shell .bulk-toolbar-inline .bulk-delete-action:hover:not(:disabled),
+.app-shell .bulk-toolbar-inline .bulk-delete-action:focus-visible {
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+.app-shell .bulk-toolbar-inline .bulk-more-menu {
+  flex: 0 0 auto;
+}
+
+.app-shell .bulk-toolbar-inline .bulk-more-menu summary {
+  gap: 4px;
+}
+
 @media (max-width: 1180px) {
   .app-shell .list-control-actions {
     gap: 1px;
@@ -1998,5 +2070,51 @@
 
   .compact-dropdown.filter-menu {
     margin-left: 0;
+  }
+
+  /* Keep the approved touch rhythm unchanged while desktop rows use the
+   * denser 76px contract. MessageListView supplies the matching inline row
+   * height to the virtual layout. */
+  .message-list-item {
+    height: 88px;
+  }
+
+  .message-card {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .message-topline {
+    align-items: center;
+    margin-bottom: 3px;
+  }
+
+  .subject {
+    margin-top: 1px;
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .message-card p {
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .message-card time {
+    font-size: 12.5px;
+  }
+
+  .message-subject-line {
+    gap: 8px;
+    margin-top: 1px;
+  }
+
+  .message-chips {
+    margin-top: 3px;
+  }
+
+  .message-chips span {
+    font-size: 12px;
   }
 }

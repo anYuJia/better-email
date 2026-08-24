@@ -117,6 +117,41 @@ describe('MessageListView theme-safe separators', () => {
     expect(onToggleMessageSelection).toHaveBeenCalledWith(message.id, true);
   });
 
+  it('keeps the same list top and scrollTop when selection mode is toggled', () => {
+    const renderList = (selectedMessageIds: number[]) => (
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages: [message] }]}
+        messages={[message]}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages={false}
+        listStateKey="selection-stability"
+        initialScrollTop={0}
+        selectedMessageIds={selectedMessageIds}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />
+    );
+
+    const view = render(renderList([]));
+    const list = view.container.querySelector('[role="list"]') as HTMLDivElement;
+    list.scrollTop = 136;
+    view.rerender(renderList([message.id]));
+
+    expect(view.container.querySelector('[role="list"]')).toBe(list);
+    expect(list.scrollTop).toBe(136);
+  });
+
   it('虚拟布局行高与单一事实来源常量完全一致', () => {
     const messages = [message, { ...message, id: 2, remote_uid: 2 }];
     const { container } = render(

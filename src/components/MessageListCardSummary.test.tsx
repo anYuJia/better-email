@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,19 +48,27 @@ function messageWithLongPreview(overrides: Partial<MessageSummary> = {}): Messag
   };
 }
 
-function renderCard(message: MessageSummary) {
+function renderCard(
+  message: MessageSummary,
+  options: {
+    isSelected?: boolean;
+    isSelectionMode?: boolean;
+    onToggleMessageSelection?: (messageId: number, checked: boolean) => void;
+  } = {},
+) {
   return render(
     <div style={{ width: 340 }}>
       <MessageListCard
         message={message}
         isCurrentMessage={false}
-        isSelected={false}
+        isSelected={options.isSelected ?? false}
         isDragging={false}
         isNew={false}
+        isSelectionMode={options.isSelectionMode ?? false}
         hasBulkSelection={false}
         selectedMessageIdsRef={{ current: [] }}
         onSelectMessage={() => undefined}
-        onToggleMessageSelection={() => undefined}
+        onToggleMessageSelection={options.onToggleMessageSelection ?? (() => undefined)}
         onToggleAllVisible={() => undefined}
         onOpenMessageMenu={() => undefined}
         onCloseMessageMenu={() => undefined}
@@ -127,5 +135,42 @@ describe('message list summary single-line rendering', () => {
 
     // 无正文时摘要不渲染（不出现占位空行）。
     expect(preview).toBeNull();
+  });
+
+  it('keeps the row hierarchy free of repeated sender or subject metadata', () => {
+    const { container } = renderCard(messageWithLongPreview({
+      sender_name: 'Gitee',
+      subject: '项目通知',
+      snippet: '',
+      labels: ['Gitee', '项目通知', '团队'],
+    }));
+
+    expect(container.querySelector('.message-card .sender')?.textContent).toBe('Gitee');
+    expect(container.querySelector('.message-card .subject')?.textContent).toBe('项目通知');
+    expect(container.querySelector('.message-card .message-chips')?.textContent).toBe('团队');
+    expect(container.querySelector('.message-card .message-chips')?.textContent).not.toContain('Gitee');
+    expect(container.querySelector('.message-card .message-chips')?.textContent).not.toContain('项目通知');
+  });
+
+  it('reveals a standard checkbox in selection mode without shifting row content', () => {
+    const onToggleMessageSelection = vi.fn();
+    const { container } = renderCard(messageWithLongPreview(), {
+      isSelectionMode: true,
+      isSelected: true,
+      onToggleMessageSelection,
+    });
+    const card = container.querySelector('.message-card')!;
+    const checkbox = container.querySelector<HTMLInputElement>('.message-select input')!;
+    const main = container.querySelector<HTMLButtonElement>('.message-card-main')!;
+
+    expect(card.classList.contains('is-selection-mode')).toBe(true);
+    expect(card.classList.contains('is-selected')).toBe(true);
+    expect(checkbox.tabIndex).toBe(0);
+    expect(checkbox.checked).toBe(true);
+    fireEvent.click(checkbox);
+    expect(onToggleMessageSelection).toHaveBeenCalledWith(1, false);
+
+    fireEvent.keyDown(main, { key: ' ' });
+    expect(onToggleMessageSelection).toHaveBeenCalledWith(1, false);
   });
 });

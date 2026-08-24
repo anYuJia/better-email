@@ -23,6 +23,7 @@ type MessageBulkToolbarProps = {
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
+  inline?: boolean;
 };
 
 export default function MessageBulkToolbar({
@@ -36,6 +37,7 @@ export default function MessageBulkToolbar({
   onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
+  inline = false,
 }: MessageBulkToolbarProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
@@ -45,28 +47,46 @@ export default function MessageBulkToolbar({
   const snoozableSelectedMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
 
   return (
-    <div className="bulk-toolbar active">
-      <label className="bulk-selection">
+    <div className={`bulk-toolbar active${inline ? ' bulk-toolbar-inline' : ''}`}>
+      <label className="bulk-selection" title="选择或取消选择当前列表中的邮件">
         <input
           type="checkbox"
+          aria-label="选择当前列表中的全部邮件"
           checked={allVisibleSelected}
           onChange={(event) => onToggleAllVisible(event.target.checked)}
         />
         <span>已选 {selectedMessageIds.length}</span>
       </label>
-      <button type="button" className="bulk-primary-action" onClick={() => onRunBulkAction('archive')}>归档</button>
+      <button
+        type="button"
+        className="bulk-primary-action"
+        aria-label="归档选中的邮件"
+        onClick={() => onRunBulkAction('archive')}
+      >
+        归档
+      </button>
+      <button
+        type="button"
+        className="bulk-delete-action"
+        aria-label="删除选中的邮件"
+        onClick={() => onRunBulkAction('trash')}
+      >
+        删除
+      </button>
       <details
         className="compact-menu bulk-more-menu"
         ref={moreMenuRef}
         data-floating-menu="true"
       >
-        <summary aria-label={`更多批量操作，已选 ${selectedMessageIds.length} 封`}>
+        <summary
+          role="button"
+          aria-label={`更多批量操作，已选 ${selectedMessageIds.length} 封`}
+        >
           <MoreHorizontal size={15} aria-hidden="true" />
-          操作
+          更多
         </summary>
         <div>
           <button type="button" onClick={() => { onRunBulkAction('star'); moreMenu.closeMenu(); }}>星标</button>
-          <button type="button" onClick={() => { onRunBulkAction('trash'); moreMenu.closeMenu(); }}>删除</button>
           <button type="button" onClick={() => { onRunBulkAction('read'); moreMenu.closeMenu(); }}>标为已读</button>
           <button type="button" onClick={() => { onRunBulkAction('unread'); moreMenu.closeMenu(); }}>标为未读</button>
           <button

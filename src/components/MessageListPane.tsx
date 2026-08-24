@@ -17,7 +17,6 @@ import type {
 } from '../app/types';
 import { messageDateGroup } from '../mailUtils';
 import ContextMenu from './ContextMenu';
-import MessageBulkToolbar from './MessageBulkToolbar';
 import MessageListToolbar from './MessageListToolbar';
 import MessageListView from './MessageListView';
 import ThreadListView from './ThreadListView';
@@ -286,21 +285,17 @@ function MessageListPane({
         onShowThreads={onShowThreads}
         onFilterChange={onFilterChange}
         onSortChange={onSortChange}
+        visibleMessageCount={messages.length}
+        selectedMessageIds={selectedMessageIds}
+        selectedMessages={selectedMessages}
+        folders={folders}
+        labels={labels}
+        onToggleAllVisible={onToggleAllVisible}
+        onRunBulkAction={onRunBulkAction}
+        onRequestSnooze={onRequestSnooze}
+        onMoveBulkToFolder={onMoveBulkToFolder}
+        onToggleBulkLabel={onToggleBulkLabel}
       />
-      {listMode === 'messages' && (
-        <MessageBulkToolbar
-          visibleMessageCount={messages.length}
-          selectedMessageIds={selectedMessageIds}
-          selectedMessages={selectedMessages}
-          folders={folders}
-          labels={labels}
-          onToggleAllVisible={onToggleAllVisible}
-          onRunBulkAction={onRunBulkAction}
-          onRequestSnooze={onRequestSnooze}
-          onMoveBulkToFolder={onMoveBulkToFolder}
-          onToggleBulkLabel={onToggleBulkLabel}
-        />
-      )}
       {listMode === 'threads' ? (
         <ThreadListView
           threads={threads}

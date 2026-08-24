@@ -8,6 +8,7 @@ import MessageListCard from './MessageListCard';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
+  MOBILE_MESSAGE_ROW_HEIGHT,
   MESSAGE_ROW_HEIGHT,
   calculateVisibleRange,
 } from './messageListLayout';
@@ -84,6 +85,9 @@ export default function MessageListView({
   const newMessageExceededRef = useRef(false);
 
   const [viewportHeight, setViewportHeight] = useState(600);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 720,
+  );
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
@@ -92,6 +96,15 @@ export default function MessageListView({
     listStateKey: string;
     previousMessageIds: ReadonlySet<number>;
   } | null>(null);
+  const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+
+  useEffect(() => {
+    const handleViewportResize = () => {
+      setIsMobileViewport(window.innerWidth <= 720);
+    };
+    window.addEventListener('resize', handleViewportResize);
+    return () => window.removeEventListener('resize', handleViewportResize);
+  }, []);
 
   const newIds = useMemo(() => {
     const set = new Set<number>();
@@ -119,7 +132,7 @@ export default function MessageListView({
     itemHeightCacheRef.current.clear();
     itemNodeRefs.current.clear();
     setHeightCacheVersion((current) => current + 1);
-  }, [groups, listStateKey]);
+  }, [groups, listStateKey, messageRowHeight]);
 
   useEffect(() => () => {
     if (scrollSaveTimerRef.current !== null) {
@@ -150,7 +163,7 @@ export default function MessageListView({
       const cachedHeight = itemHeightCacheRef.current.get(item.key);
       return cachedHeight && cachedHeight > 0
         ? cachedHeight
-        : item.type === 'message' ? MESSAGE_ROW_HEIGHT : GROUP_HEADER_HEIGHT;
+        : item.type === 'message' ? messageRowHeight : GROUP_HEADER_HEIGHT;
     };
     const layout: { top: number; height: number }[] = [];
     let currentTop = 0;
@@ -160,7 +173,7 @@ export default function MessageListView({
       currentTop += height;
     }
     return { layout, totalHeight: currentTop };
-  }, [flatItems, heightCacheVersion]);
+  }, [flatItems, heightCacheVersion, messageRowHeight]);
 
   const [visibleRange, setVisibleRange] = useState(() =>
     calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight)
@@ -445,6 +458,7 @@ export default function MessageListView({
                     isDragging={draggingMessageSet.has(message.id)}
                     isNew={newIds.has(message.id)}
                     claimFocus={loadMoreFocusTarget?.id === message.id}
+                    isSelectionMode={selectedMessageIds.length > 0}
                     hasBulkSelection={selectedMessageIds.length > 1}
                     selectedMessageIdsRef={selectedMessageIdsRef}
                     onSelectMessage={onSelectMessage}

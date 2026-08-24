@@ -176,6 +176,11 @@
   background: var(--ui-surface-muted);
 }
 
+:root[data-theme="dark"] .app-shell .bulk-toolbar-inline,
+:root[data-theme="dark"] .app-shell .bulk-toolbar-inline.active {
+  background: transparent;
+}
+
 :root[data-theme="dark"] .bulk-toolbar button,
 :root[data-theme="dark"] .bulk-toolbar select,
 :root[data-theme="dark"] .bulk-toolbar .compact-menu summary {
@@ -422,6 +427,12 @@
 
 :root[data-theme="dark"] input[type="checkbox"]:checked {
   background: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+
+:root[data-theme="dark"] .app-shell .message-select input:checked,
+:root[data-theme="dark"] .app-shell .bulk-selection > input:checked {
+  background: var(--ui-surface);
   border-color: var(--ui-accent);
 }
 

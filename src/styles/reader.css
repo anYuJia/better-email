@@ -356,6 +356,24 @@
   }
 }
 
+/* Desktop-only density pass: keep the reader controls and content intact,
+ * while reducing the empty vertical air above the subject and between the
+ * action strip and the message header. Mobile reader rhythm remains native. */
+@media (min-width: 721px) {
+  .app-shell .reader {
+    padding-top: 18px;
+  }
+
+  .app-shell .reader-header {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .app-shell .reader-actions {
+    gap: 4px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * 3. Sender identity
  * --------------------------------------------------------------------------- */

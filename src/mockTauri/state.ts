@@ -688,6 +688,7 @@ export function listThreads(args?: InvokeArgs) {
         message_count: items.length,
         unread_count: items.filter((message) => !message.is_read).length,
         latest_at: latestMessage?.received_at ?? now,
+        latest_preview: latestMessage?.snippet ?? '',
         participants: [...new Set(items.map((message) => message.sender_name))].join(', '),
         is_muted: items.some((message) => (
           mutedThreadScopes.has(mutedThreadScopeKey(message.account_id, thread_key))

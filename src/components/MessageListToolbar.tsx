@@ -110,40 +110,44 @@ function MessageListToolbar({
           />
         ) : (
           <div className="list-control-actions" aria-label="邮件显示模式">
-            <button
-              type="button"
-              className={listMode === 'messages' ? 'active' : ''}
-              aria-pressed={listMode === 'messages'}
-              onClick={onShowMessages}
-            >
-              邮件
-            </button>
-            <button
-              type="button"
-              className={listMode === 'threads' ? 'active' : ''}
-              aria-pressed={listMode === 'threads'}
-              onClick={onShowThreads}
-            >
-              会话
-            </button>
-            <CompactDropdown
-              className="filter-menu"
-              label="筛选"
-              currentLabel={activeFilterLabel}
-              ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
-              value={filter}
-              options={filters}
-              onChange={onFilterChange}
-            />
-            <CompactDropdown
-              className="sort-menu"
-              label="排序"
-              currentLabel={sortTriggerLabel(listSort)}
-              ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}
-              value={listSort}
-              options={listSortOptions}
-              onChange={onSortChange}
-            />
+            <div className="list-control-tabs" role="group" aria-label="邮件列表模式">
+              <button
+                type="button"
+                className={listMode === 'messages' ? 'active' : ''}
+                aria-pressed={listMode === 'messages'}
+                onClick={onShowMessages}
+              >
+                邮件
+              </button>
+              <button
+                type="button"
+                className={listMode === 'threads' ? 'active' : ''}
+                aria-pressed={listMode === 'threads'}
+                onClick={onShowThreads}
+              >
+                会话
+              </button>
+            </div>
+            <div className="list-control-menus" role="group" aria-label="邮件筛选和排序">
+              <CompactDropdown
+                className="filter-menu"
+                label="筛选"
+                currentLabel={activeFilterLabel}
+                ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
+                value={filter}
+                options={filters}
+                onChange={onFilterChange}
+              />
+              <CompactDropdown
+                className="sort-menu"
+                label="排序"
+                currentLabel={sortTriggerLabel(listSort)}
+                ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}
+                value={listSort}
+                options={listSortOptions}
+                onChange={onSortChange}
+              />
+            </div>
           </div>
         )}
       </div>

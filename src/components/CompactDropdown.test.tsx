@@ -70,4 +70,21 @@ describe('CompactDropdown', () => {
     fireEvent.keyDown(screen.getByRole('menuitemradio', { name: '未读' }), { key: 'Escape' });
     expect(document.activeElement).toBe(updatedTrigger);
   });
+
+  it('supports ArrowUp and Space selection while keeping Tab available', () => {
+    render(<StatefulDropdown />);
+    const trigger = screen.getByRole('button', { name: '筛选邮件，当前：全部' });
+
+    fireEvent.keyDown(trigger, { key: 'ArrowUp' });
+    const starred = screen.getByRole('menuitemradio', { name: '星标' });
+    expect(document.activeElement).toBe(starred);
+    fireEvent.keyDown(starred, { key: ' ' });
+    expect(screen.getByRole('button', { name: '筛选邮件，当前：星标' })).toBeDefined();
+    expect(document.querySelector('details')?.hasAttribute('open')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: '筛选邮件，当前：星标' }));
+    const active = screen.getByRole('menuitemradio', { name: '星标' });
+    fireEvent.keyDown(active, { key: 'Tab' });
+    expect(document.querySelector('details')?.hasAttribute('open')).toBe(false);
+  });
 });

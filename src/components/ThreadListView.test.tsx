@@ -12,12 +12,58 @@ function thread(index: number): ThreadSummary {
     message_count: index + 1,
     unread_count: index % 3 === 0 ? 2 : 0,
     latest_at: '2026-08-09T08:00:00.000Z',
+    latest_preview: `Latest preview ${index}`,
     participants: `a${index}@example.com`,
     is_muted: false,
   };
 }
 
 describe('ThreadListView 虚拟化', () => {
+  it('keeps the conversation hierarchy and only shows counts above one', () => {
+    const single = { ...thread(0), message_count: 1 };
+    const multiple = { ...thread(1), message_count: 3 };
+    const { container } = render(
+      <ThreadListView
+        threads={[single, multiple]}
+        activeThread={null}
+        onOpenThread={vi.fn()}
+        onOpenThreadMenu={vi.fn()}
+      />,
+    );
+
+    const cards = container.querySelectorAll<HTMLElement>('.thread-card');
+    expect(cards[0].querySelector('.thread-topline .thread-sender')?.textContent).toBe('a0@example.com');
+    expect(cards[0].querySelector('.thread-topline time')).not.toBeNull();
+    expect(cards[0].querySelector('.thread-subject')?.textContent).toBe('Subject 0');
+    expect(cards[0].querySelector('.thread-count-badge')).toBeNull();
+    expect(cards[0].querySelector('.thread-preview')?.textContent).toBe('Latest preview 0');
+
+    expect(cards[1].querySelector('.thread-count-badge')?.textContent).toBe('3 封');
+    expect(cards[1].querySelector('.thread-preview')?.textContent).toBe('Latest preview 1');
+  });
+
+  it('does not turn count-only or duplicate metadata into a conversation preview', () => {
+    const { container } = render(
+      <ThreadListView
+        threads={[{
+          ...thread(4),
+          message_count: 1,
+          unread_count: 0,
+          latest_preview: '1 封',
+          subject: 'Subject 4',
+        }]}
+        activeThread={null}
+        onOpenThread={vi.fn()}
+        onOpenThreadMenu={vi.fn()}
+      />,
+    );
+
+    const card = container.querySelector<HTMLElement>('.thread-card')!;
+    expect(card.querySelector('.thread-count-badge')).toBeNull();
+    expect(card.querySelector('.thread-preview')).toBeNull();
+    expect(card.textContent).not.toContain('1 封');
+  });
+
   it('大量会话时只渲染可视区及 overscan，而不是完整数组', () => {
     const threads = Array.from({ length: 300 }, (_, index) => thread(index));
     const { container } = render(

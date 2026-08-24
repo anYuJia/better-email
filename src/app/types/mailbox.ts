@@ -49,6 +49,7 @@ export type ThreadSummary = {
   message_count: number;
   unread_count: number;
   latest_at: string;
+  latest_preview?: string;
   participants: string;
   is_muted: boolean;
 };
@@ -58,4 +59,3 @@ export type AppLayout = {
   sidebar: number;
   list: number;
 };
-

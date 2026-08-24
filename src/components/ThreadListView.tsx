@@ -11,6 +11,29 @@ import { calculateVisibleRange } from './messageListLayout';
  */
 export const THREAD_ROW_HEIGHT = 72;
 
+function normalizedThreadText(value: string | undefined): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function threadPreview(thread: ThreadSummary): string {
+  const candidate = thread.latest_preview?.trim() ?? '';
+  const normalizedCandidate = normalizedThreadText(candidate);
+  const isCountOnly = /^\d+\s*封(?:邮件)?$/.test(candidate);
+  const repeatsSubject = normalizedCandidate.length > 0
+    && normalizedCandidate === normalizedThreadText(thread.subject);
+  const repeatsSender = normalizedCandidate.length > 0
+    && normalizedCandidate === normalizedThreadText(thread.participants);
+
+  if (candidate && !isCountOnly && !repeatsSubject && !repeatsSender) {
+    return candidate;
+  }
+
+  // A missing body snippet should still expose useful state without
+  // manufacturing a duplicate subject or bringing back count-only metadata.
+  if (thread.unread_count > 0) return `${thread.unread_count} 条未读`;
+  return '';
+}
+
 type ThreadListViewProps = {
   threads: ThreadSummary[];
   activeThread: ThreadSummary | null;
@@ -120,6 +143,9 @@ export default function ThreadListView({
         >
           {visibleThreads.map(({ index, thread }) => {
             const hasUnread = thread.unread_count > 0;
+            const sender = thread.participants.trim() || '未知发件人';
+            const subject = thread.subject || '(无主题)';
+            const preview = threadPreview(thread);
             return (
               <div
                 key={thread.thread_key}
@@ -163,28 +189,28 @@ export default function ThreadListView({
                 >
                   {hasUnread && <span className="thread-unread-dot" aria-label="未读" />}
                   <div className="thread-topline">
-                    <strong className="thread-subject" title={thread.subject || '无主题'}>
-                      {thread.subject || '(无主题)'}
-                    </strong>
+                    <span className={hasUnread ? 'thread-sender is-unread' : 'thread-sender'} title={sender}>
+                      {sender}
+                    </span>
                     <time>{formatDate(thread.latest_at)}</time>
                   </div>
-                  <p className="thread-participants" title={thread.participants}>{thread.participants}</p>
-                  <div className="thread-meta">
-                    <span className="thread-count-badge">
-                      {thread.message_count} 封
-                    </span>
-                    {hasUnread && (
-                      <span className="thread-unread-badge">
-                        {thread.unread_count} 条未读
+                  <div className="thread-subject-line">
+                    <strong className={hasUnread ? 'thread-subject is-unread' : 'thread-subject'} title={subject}>
+                      {subject}
+                    </strong>
+                    {thread.message_count > 1 && (
+                      <span className="thread-count-badge" aria-label={`${thread.message_count} 封邮件`}>
+                        {thread.message_count} 封
                       </span>
                     )}
                     {thread.is_muted && (
-                      <em className="thread-muted-indicator">
-                        <VolumeX size={12} />
+                      <span className="thread-muted-indicator" title="已静音" aria-label="已静音">
+                        <VolumeX size={12} aria-hidden="true" />
                         静音
-                      </em>
+                      </span>
                     )}
                   </div>
+                  {preview && <p className="thread-preview" title={preview}>{preview}</p>}
                 </button>
               </div>
             );

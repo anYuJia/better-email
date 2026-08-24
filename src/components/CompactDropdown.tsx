@@ -91,6 +91,12 @@ export default function CompactDropdown<Value extends string>({
     if (event.key === 'Escape') {
       event.preventDefault();
       closeMenu();
+      return;
+    }
+    if (event.key === 'Tab') {
+      // Let the browser move focus normally, but do not leave a closed-over
+      // menu item in the tab order after the user tabs away.
+      closeMenu();
     }
   };
 
@@ -120,7 +126,7 @@ export default function CompactDropdown<Value extends string>({
       >
         <span className="compact-dropdown-label">{label}</span>
         <strong>{currentLabel}</strong>
-        <ChevronDown size={15} aria-hidden="true" />
+        <ChevronDown size={14} aria-hidden="true" />
       </summary>
       <div role="menu" aria-label={`${label}选项`}>
         {options.map((option, index) => {

@@ -1305,7 +1305,7 @@ impl MailStore {
                 "
                 WITH scoped_messages AS (
                     SELECT m.id, m.account_id, m.thread_key, m.subject, m.sender_name,
-                           m.received_at, m.is_read
+                           m.snippet, m.received_at, m.is_read
                     FROM messages m
                     JOIN accounts a ON a.id = m.account_id
                     JOIN folders f ON f.id = m.folder_id
@@ -1325,6 +1325,16 @@ impl MailStore {
                        COUNT(*) AS message_count,
                        SUM(CASE WHEN scoped.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
                        MAX(scoped.received_at) AS latest_at,
+                       COALESCE(
+                           (
+                               SELECT latest.snippet
+                               FROM scoped_messages latest
+                               WHERE latest.thread_key = scoped.thread_key
+                               ORDER BY latest.received_at DESC, latest.id DESC
+                               LIMIT 1
+                           ),
+                           ''
+                       ) AS latest_preview,
                        GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants,
                        MAX(
                            CASE WHEN EXISTS (
@@ -1351,8 +1361,9 @@ impl MailStore {
                         message_count: row.get(2)?,
                         unread_count: row.get(3)?,
                         latest_at: row.get(4)?,
-                        participants: decode_thread_participants(&row.get::<_, String>(5)?),
-                        is_muted: row.get::<_, i64>(6)? != 0,
+                        latest_preview: row.get(5)?,
+                        participants: decode_thread_participants(&row.get::<_, String>(6)?),
+                        is_muted: row.get::<_, i64>(7)? != 0,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;

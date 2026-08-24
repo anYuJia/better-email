@@ -808,6 +808,7 @@ pub struct ThreadSummary {
     pub message_count: i64,
     pub unread_count: i64,
     pub latest_at: String,
+    pub latest_preview: String,
     pub participants: String,
     pub is_muted: bool,
 }

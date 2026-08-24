@@ -115,6 +115,48 @@ describe('GlobalSearch search combobox', () => {
 });
 
 describe('Inbox toolbar selection mode', () => {
+  it('keeps tabs separate from the labeled filter and sort triggers', () => {
+    const onFilterChange = vi.fn();
+    const onSortChange = vi.fn();
+    const view = render(
+      <MessageListToolbar
+        filter="all"
+        listMode="messages"
+        listSort="newest"
+        currentViewLabel="收件箱"
+        visibleListSummary="40 封"
+        messageListSummary="40 封 · 8 未读"
+        onShowMessages={vi.fn()}
+        onShowThreads={vi.fn()}
+        onFilterChange={onFilterChange}
+        onSortChange={onSortChange}
+        visibleMessageCount={40}
+        selectedMessageIds={[]}
+        selectedMessages={[]}
+        folders={[]}
+        labels={[]}
+        onToggleAllVisible={vi.fn()}
+        onRunBulkAction={vi.fn()}
+        onRequestSnooze={vi.fn()}
+        onMoveBulkToFolder={vi.fn()}
+        onToggleBulkLabel={vi.fn()}
+      />,
+    );
+
+    expect(view.container.querySelector('.list-control-tabs')).not.toBeNull();
+    expect(view.container.querySelector('.list-control-menus')).not.toBeNull();
+    expect(view.getByRole('button', { name: '筛选邮件，当前：全部' })).toBeDefined();
+    expect(view.getByRole('button', { name: '邮件排序，当前：时间' })).toBeDefined();
+
+    fireEvent.click(view.getByRole('button', { name: '筛选邮件，当前：全部' }));
+    fireEvent.click(view.getByRole('menuitemradio', { name: '未读' }));
+    expect(onFilterChange).toHaveBeenCalledWith('unread');
+
+    fireEvent.click(view.getByRole('button', { name: '邮件排序，当前：时间' }));
+    fireEvent.click(view.getByRole('menuitemradio', { name: '最早优先' }));
+    expect(onSortChange).toHaveBeenCalledWith('oldest');
+  });
+
   it('replaces the second control row in place without adding a toolbar row', () => {
     const view = renderToolbar();
     const strip = view.container.querySelector('.list-control-strip');

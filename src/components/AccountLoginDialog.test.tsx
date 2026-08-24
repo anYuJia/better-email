@@ -51,11 +51,15 @@ describe('AccountLoginDialog', () => {
 
     fireEvent.change(screen.getByLabelText('邮箱地址'), { target: { value: 'ada@qq.com' } });
     fireEvent.click(screen.getByRole('button', { name: '服务器设置' }));
-    fireEvent.change(screen.getByLabelText('收信协议'), { target: { value: 'pop3' } });
-    fireEvent.change(screen.getByLabelText('登录方式'), { target: { value: 'oauth2' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '收信协议' }));
+    fireEvent.click(screen.getByRole('option', { name: 'POP3' }));
+    fireEvent.click(screen.getByRole('combobox', { name: '登录方式' }));
+    fireEvent.click(screen.getByRole('option', { name: 'OAuth2 Token' }));
 
     expect(screen.getByLabelText('收信服务器')).toHaveProperty('value', 'pop.qq.com:995');
     expect(screen.getByLabelText('OAuth2 Token')).not.toBeNull();
+    expect(screen.queryAllByRole('combobox')).toHaveLength(2);
+    expect(document.querySelectorAll('select')).toHaveLength(0);
   });
 
   it('keeps keyboard focus inside the login dialog', () => {

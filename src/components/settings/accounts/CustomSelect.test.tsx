@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { CustomSelect } from './CustomSelect';
+import { CustomSelect, customSelectPortalLayers } from './CustomSelect';
 
 describe('CustomSelect', () => {
   afterEach(() => {
@@ -276,5 +276,9 @@ describe('CustomSelect', () => {
     const listbox = screen.getByRole('listbox');
     expect(listbox.getAttribute('data-portal-layer')).toBe('2650');
     expect((listbox as HTMLElement).style.zIndex).toBe('2650');
+  });
+
+  it('exposes the login gate portal layer above the login backdrop', () => {
+    expect(customSelectPortalLayers.accountLogin).toBeGreaterThan(2000);
   });
 });

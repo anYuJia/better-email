@@ -13,6 +13,10 @@ import {
   accountFormForEmail,
   accountFormForIncomingProtocol,
 } from './settings/accounts/accountSetupForm';
+import {
+  CustomSelect,
+  customSelectPortalLayers,
+} from './settings/accounts/CustomSelect';
 import './account-login-dialog.css';
 
 type AccountLoginDialogProps = {
@@ -26,6 +30,16 @@ function errorMessage(error: unknown) {
     .replace(/^Error:\s*/i, '')
     .trim() || '登录失败，请检查邮箱和授权码。';
 }
+
+const incomingProtocolOptions = [
+  { value: 'imap', label: 'IMAP' },
+  { value: 'pop3', label: 'POP3' },
+] as const;
+
+const authTypeOptions = [
+  { value: 'password', label: '密码 / 授权码' },
+  { value: 'oauth2', label: 'OAuth2 Token' },
+] as const;
 
 export default function AccountLoginDialog({
   form,
@@ -247,29 +261,31 @@ export default function AccountLoginDialog({
             <div className="account-login-manual-settings">
               <label className="account-login-field">
                 <span>收信协议</span>
-                <select
+                <CustomSelect
+                  className="account-login-select"
+                  ariaLabel="收信协议"
                   value={form.incoming_protocol}
-                  onChange={(event) => onFormChange(accountFormForIncomingProtocol(
+                  options={incomingProtocolOptions}
+                  portalZIndex={customSelectPortalLayers.accountLogin}
+                  onChange={(value) => onFormChange(accountFormForIncomingProtocol(
                     form,
-                    event.target.value as IncomingProtocol,
+                    value as IncomingProtocol,
                   ))}
-                >
-                  <option value="imap">IMAP</option>
-                  <option value="pop3">POP3</option>
-                </select>
+                />
               </label>
               <label className="account-login-field">
                 <span>登录方式</span>
-                <select
+                <CustomSelect
+                  className="account-login-select"
+                  ariaLabel="登录方式"
                   value={form.auth_type}
-                  onChange={(event) => onFormChange({
+                  options={authTypeOptions}
+                  portalZIndex={customSelectPortalLayers.accountLogin}
+                  onChange={(value) => onFormChange({
                     ...form,
-                    auth_type: event.target.value as AccountCreateInput['auth_type'],
+                    auth_type: value as AccountCreateInput['auth_type'],
                   })}
-                >
-                  <option value="password">密码 / 授权码</option>
-                  <option value="oauth2">OAuth2 Token</option>
-                </select>
+                />
               </label>
               <label className="account-login-field">
                 <span>收信服务器</span>

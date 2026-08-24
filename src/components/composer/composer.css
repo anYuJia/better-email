@@ -3134,6 +3134,13 @@
   background: var(--ui-accent-soft);
 }
 
+.custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"],
+.custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"]:hover,
+.custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"].active {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
 .custom-select-dropdown[data-portal-owner="composer-sender"] button > svg {
   flex: 0 0 auto;
   color: var(--ui-accent);

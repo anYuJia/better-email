@@ -84,7 +84,6 @@
 }
 
 .account-login-field > input,
-.account-login-field > select,
 .account-login-input-wrap {
   min-width: 0;
   min-height: var(--ui-control-height);
@@ -101,12 +100,6 @@
   font-size: var(--ui-font-size-secondary);
 }
 
-.account-login-field > select {
-  width: 100%;
-  padding: 0 10px;
-  font-size: var(--ui-font-size-secondary);
-}
-
 .account-login-input-wrap {
   display: flex;
   align-items: center;
@@ -116,8 +109,7 @@
 }
 
 .account-login-input-wrap:focus-within,
-.account-login-field > input:focus,
-.account-login-field > select:focus {
+.account-login-field > input:focus {
   border-color: var(--color-focus);
   outline: none;
   box-shadow: none;

@@ -161,6 +161,13 @@
   background: var(--ui-surface-muted);
 }
 
+.custom-select-dropdown button[aria-selected="true"],
+.custom-select-dropdown button[aria-selected="true"]:hover,
+.custom-select-dropdown button[aria-selected="true"].active {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
 .custom-select-dropdown button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

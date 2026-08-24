@@ -41,6 +41,7 @@ type CustomSelectProps = {
 /** Shared portal layers used by CustomSelect consumers that live in modals. */
 export const customSelectPortalLayers = {
   default: 1000,
+  accountLogin: 2050,
   onboarding: 2550,
   contactImport: 2650,
 } as const;

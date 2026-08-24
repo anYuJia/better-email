@@ -96,7 +96,7 @@
 
 .app-shell .reader-header h1 {
   margin-bottom: 10px;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   line-height: 1.28;
 }
@@ -1638,6 +1638,28 @@
   margin: 0 0 0 auto;
 }
 
+.reader-warning-more > summary {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.reader-warning-more > summary:hover,
+.reader-warning-more[open] > summary {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.reader-warning-more > div {
+  right: 0;
+  min-width: 150px;
+}
+
 .reader-warning-primary-action,
 .reader-warning-secondary-action {
   min-height: 30px;
@@ -1762,15 +1784,19 @@
 .quick-reply {
   max-width: none;
   margin-top: 18px;
-  padding: 12px 0 0;
+  padding: 12px 16px 10px;
   display: grid;
   gap: 10px;
   overflow: visible;
-  border: 0;
-  border-top: 1px solid var(--ui-border);
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
+}
+
+.quick-reply:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-focus-ring);
 }
 
 .quick-reply > header {
@@ -1813,11 +1839,11 @@
 .quick-reply textarea {
   min-height: 68px;
   width: 100%;
-  padding: 9px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-sm);
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
   color: var(--ui-text);
-  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
+  background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13.5px;
   line-height: 1.55;
@@ -1829,15 +1855,13 @@
 }
 
 .quick-reply textarea:focus {
-  border-color: var(--ui-accent);
-  box-shadow: var(--ui-focus-ring);
+  outline: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .quick-reply textarea:focus-visible {
-  border-color: var(--ui-accent);
-  box-shadow: var(--ui-focus-ring);
-  outline: var(--ui-focus-outline);
-  outline-offset: 0;
+  outline: none;
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .quick-reply > footer {

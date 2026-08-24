@@ -810,7 +810,7 @@
 
 .message-list-item {
   box-sizing: border-box;
-  height: 64px;
+  height: 88px;
   padding: 0;
 }
 
@@ -830,7 +830,7 @@
   min-height: 0;
   overflow: hidden;
   margin: 0;
-  padding: 6px 12px 6px 58px;
+  padding: 8px 16px 8px 84px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   border: 0;
@@ -841,6 +841,7 @@
   transition: var(--ui-transition-bg-color-standard);
   width: 100%;
   max-width: 100%;
+  align-content: center;
 }
 
 .app-shell .message-card.is-current::before {
@@ -887,10 +888,10 @@
 /* Selection controls share the leading slot so the left edge never shifts. */
 .message-leading {
   position: absolute;
-  left: 13px;
+  left: 24px;
   top: 50%;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   transform: translateY(-50%);
   pointer-events: none;
 }
@@ -913,19 +914,19 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  min-height: 30px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  flex: 0 0 30px;
+  flex: 0 0 36px;
   overflow: hidden;
   border-radius: 50%;
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   opacity: 1;
@@ -958,8 +959,8 @@
   transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   pointer-events: none;
 }
 
@@ -1059,12 +1060,12 @@
 
 /* Reserve trailing gutter for the selection control. */
 .app-shell .message-card {
-  padding-right: 42px;
+  padding-right: 48px;
 }
 
 .app-shell .message-select {
   left: auto;
-  right: 12px;
+  right: 16px;
   top: 50%;
   z-index: 5;
   display: grid;
@@ -1086,8 +1087,8 @@
 /* Unread dot owns the leading slot until a selection control appears. */
 .message-unread-dot {
   position: absolute;
-  left: 10px;
-  top: 10px;
+  left: 20px;
+  top: 16px;
   z-index: 4;
   width: 6px;
   height: 6px;
@@ -1127,16 +1128,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 16px;
+  min-height: 18px;
   overflow: hidden;
-  margin-bottom: 1px;
+  margin-bottom: 3px;
 }
 
 .sender {
   min-width: 0;
   color: var(--ui-text-secondary);
-  font-size: 13.5px;
-  line-height: 1.2;
+  font-size: 14px;
+  line-height: 1.25;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1156,9 +1157,9 @@
   margin-top: 1px;
   display: block;
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 1.2;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1171,19 +1172,19 @@
 
 .message-card p {
   display: block;
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   width: 100%;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: 12.5px;
-  line-height: 1.3;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .message-card time {
   flex: 0 0 auto;
   color: var(--ui-text-tertiary);
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 400;
 }
 

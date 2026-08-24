@@ -243,22 +243,22 @@ describe('reader de-AI contract — quick reply is a quiet inline entry', () => 
     expect(hasNone).toBe(true);
   });
 
-  it('quick-reply has transparent background', () => {
+  it('quick-reply uses the raised surface token', () => {
     const rules = findRules(readerCss, '.quick-reply');
     expect(rules.length).toBeGreaterThan(0);
-    const hasTransparent = rules.some((r) =>
-      r.body.match(/background:\s*transparent/),
+    const hasRaisedSurface = rules.some((r) =>
+      r.body.match(/background:\s*var\(--ui-surface\)/),
     );
-    expect(hasTransparent).toBe(true);
+    expect(hasRaisedSurface).toBe(true);
   });
 
-  it('quick-reply has border-top, not a full border card', () => {
+  it('quick-reply has a subtle full border', () => {
     const rules = findRules(readerCss, '.quick-reply');
     expect(rules.length).toBeGreaterThan(0);
-    const hasBorderTop = rules.some((r) =>
-      r.body.match(/border-top:\s*1px/),
+    const hasFullBorder = rules.some((r) =>
+      r.body.match(/border:\s*1px\s+solid\s+var\(--ui-border\)/),
     );
-    expect(hasBorderTop).toBe(true);
+    expect(hasFullBorder).toBe(true);
   });
 });
 

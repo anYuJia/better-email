@@ -99,7 +99,7 @@
   background: var(--ui-border);
   box-shadow: var(--ui-box-shadow-none);
   content: "";
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
   transform: translateX(-50%);
   transition: var(--ui-transition-bg-box-shadow-fast);

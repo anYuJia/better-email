@@ -212,7 +212,7 @@ describe('message list de-AI contract — CSS/TS row-height chain', () => {
     expect(cssHeight).not.toBeNull();
     expect(tsHeight).not.toBeNull();
     expect(cssHeight).toBe(tsHeight);
-    expect(cssHeight).toBe(64);
+    expect(cssHeight).toBe(88);
   });
 
   it('message-date-header CSS height === GROUP_HEADER_HEIGHT TS constant', () => {

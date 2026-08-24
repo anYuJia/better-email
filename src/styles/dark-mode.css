@@ -243,13 +243,14 @@
 }
 
 :root[data-theme="dark"] .quick-reply {
-  background: transparent;
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
 }
 
 :root[data-theme="dark"] .quick-reply textarea {
   border-color: transparent;
   color: var(--ui-text);
-  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
+  background: transparent;
 }
 
 :root[data-theme="dark"] .quick-reply textarea::placeholder,

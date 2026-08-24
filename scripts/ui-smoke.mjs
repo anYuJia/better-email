@@ -1122,7 +1122,7 @@ async function main() {
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length < 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
     await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
-    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示本封图片')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('信任发件人')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接')) && document.body.innerText.includes('网页链接已隐藏，查看后可确认目标地址。')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示图片')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('信任发件人')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接')) && document.body.innerText.includes('网页链接已隐藏，查看后可确认目标地址。')");
     await clickButton(cdp, '查看链接', "document.querySelector('.reader-warning-panel')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('隐藏链接'))");
     const checks = [true, true, true];
@@ -2315,7 +2315,7 @@ async function main() {
     await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
-    await waitForExpression(cdp, "document.body.innerText.includes('外部邮箱已拦截') && ![...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示本封图片')) && ![...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接'))");
+    await waitForExpression(cdp, "document.body.innerText.includes('外部邮箱已拦截') && ![...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示图片')) && ![...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接'))");
 
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");

@@ -1,468 +1,1314 @@
-# Better Email UI/UX Specification
+# Better Email UI/UX Design Specification
 
-Status: final desktop workspace doctrine, Phase 1.1.
+Version: 1.0
+Status: Product UI source of truth
 
-This document is the repository source of truth for Better Email visual and interaction decisions. The local visual probes in `docs/design/reference/` are evidence, not a license to copy pixels mechanically. When a reference image conflicts with product behavior, accessibility, or the rules below, preserve the product rule and record the difference.
+---
 
-## 1. Design philosophy
+# 1. Product design philosophy
 
-Better Email is a local-first, multi-account desktop mail client for people who process email continuously. The interface should feel like a mature desktop tool: calm, dense, explicit, and fast.
+Better Email is a professional productivity email client.
 
-The governing principles are:
+The interface should make users feel:
 
-1. **Mail first.** Sender, subject, body, attachments, and the next safe action outrank decorative chrome.
-2. **Context stays visible.** Account scope, folder, selection, sync state, and security state must be easy to identify.
-3. **Familiar and precise.** Use established desktop-mail patterns and standard controls. Do not reinvent navigation for novelty.
-4. **Quiet density.** Organize density with typography, rhythm, separators, and semantic surfaces instead of stacked cards.
-5. **Trust through clarity.** High-risk actions, remote content, credentials, and cross-account operations need direct language and visible consequences.
-6. **Performance is design.** First paint, list scrolling, reader navigation, resize, and compose interactions must remain stable before adding effects.
+**简洁 · 高效 · 专注 · 稳定 · 专业**
 
-The product register is **product**, not brand campaign. Visual personality comes from restraint, green action states, cool neutral workspace planes, and careful text hierarchy.
+The design should resemble a mature desktop productivity application rather than a web dashboard.
 
-## 2. Source of truth and change protocol
+The interface exists to support:
 
-Use this order when making a UI decision:
+* scanning mail quickly
+* reading without distraction
+* composing efficiently
+* handling multiple accounts
+* processing large volumes of email
+* switching between desktop and mobile without relearning the product
 
-1. This specification.
-2. The relevant token, primitive, or shared component already in the repository.
-3. The matching reference image in `docs/design/reference/`.
-4. Existing accessibility and behavior contracts in tests.
+The UI should disappear behind the task.
 
-Before editing a UI surface:
+---
 
-- Read this document and the relevant reference image.
-- Inspect the owning component and its stylesheet.
-- Prefer changing a shared token or owner stylesheet over adding an override file.
-- Preserve DOM semantics, keyboard behavior, test selectors, and current product actions unless the task explicitly changes them.
-- For a substantial change, capture real browser screenshots at the affected viewport sizes, compare the same data and selected item, and record meaningful deltas.
-- Never add a screenshot, local design probe, temporary debug log, or browser artifact to the repository.
+# 2. Core design principles
 
-The files in `docs/design/reference/` are local ignored visual references. They are not product assets and must not be renamed, edited, force-added, or committed.
+## 2.1 Content first
 
-## 3. Green color system
+Email content always has higher visual priority than application chrome.
 
-The canonical accent is the Better Email green family. Components consume semantic `--ui-*` tokens, which resolve through `src/design-tokens.css`. Raw colors must not be scattered through component CSS.
+Avoid making navigation, toolbars, borders, cards, or decorative elements visually louder than the message itself.
 
-### Accent roles
+## 2.2 Calm density
 
-| Role | Token | Use |
-| --- | --- | --- |
-| Accent | `--ui-accent` | Primary action, current navigation, current mail indicator, selected text emphasis |
-| Accent hover | `--ui-accent-hover` | Hover and pointer-over state |
-| Accent pressed | `--ui-accent-pressed` | Active/pressed state |
-| Accent soft | `--ui-accent-soft` | Quiet tint for selected or contextual surfaces |
-| Focus | `--color-focus` / `--ui-focus-outline` | Keyboard focus, never a decorative glow |
-| Text on accent | `--color-text-on-accent` | Text and icons on filled green controls |
+Better Email is information-dense, but not visually crowded.
 
-The current primitive accent hue is 156. The light theme accent is close to Better Email green `#0F9F63`, represented in OKLCH tokens so the family can remain consistent across themes. Green is deliberate and limited: it carries action and current-state meaning, not every piece of decoration.
+Density should come from good alignment and hierarchy, not smaller text everywhere.
 
-Rules:
+## 2.3 Progressive disclosure
 
-- Filled green is reserved for the primary Compose action and similarly high-value actions.
-- Current navigation may use green text, a quiet green-tinted surface, or a thin leading indicator.
-- Do not use green as the sole signal for success, unread state, or risk. Pair it with text, iconography, or structure.
-- Do not invent a second accent family for a component.
-- Do not use CSS filters to recolor the official brand asset.
+Do not permanently expose every capability.
 
-## 4. Neutral and surface system
+Frequently used actions are immediately visible.
 
-The workspace uses cool neutral planes with a subtly warm reading surface. The reader is quieter than the list, not a floating card.
+Secondary actions appear in:
 
-Canonical semantic surfaces:
+* contextual menus
+* overflow menus
+* secondary screens
+* expandable advanced sections
 
-- `--ui-bg`: application canvas and gaps.
-- `--ui-sidebar`: navigation plane.
-- `--ui-list`: inbox/list plane.
-- `--ui-reader`: reading plane.
-- `--ui-surface`: raised control or transient surface.
-- `--ui-surface-muted`: muted control group or quiet background.
-- `--ui-control-bg` and `--ui-control-hover`: controls and hover state.
-- `--ui-border` and `--ui-border-strong`: 1px separators and stronger boundaries.
+## 2.4 One semantic action, one visual language
 
-Persistent panes are opaque. Do not use `backdrop-filter`, decorative translucency, or glass treatment in the workspace. Elevation is reserved for transient menus, dialogs, tooltips, and other surfaces that genuinely float above the workspace.
+The same action must use the same:
 
-## 5. Semantic colors
+* icon
+* name
+* size
+* color semantics
+* interaction feedback
 
-Use semantic roles rather than literal hues:
+throughout the application.
 
-- **Success:** `--ui-success` and `--ui-success-bg` for completed sync, saved state, and safe confirmation.
-- **Warning:** `--ui-warning`, `--ui-warning-bg`, and `--ui-warning-border` for remote images, hidden links, and caution states.
-- **Danger:** `--ui-danger`, `--ui-danger-hover`, and `--ui-danger-bg` for irreversible deletion or destructive operations.
-- **Accent:** current state and primary action, not generic decoration.
-- **Neutral:** ordinary metadata, dividers, empty states, and secondary actions.
+## 2.5 Native interaction
 
-Every semantic color state must retain enough contrast in both themes. A status cannot be conveyed by color alone.
+Desktop should feel like a professional desktop client.
 
-## 6. Typography
+Mobile should feel like a native touch application.
 
-The default stack is `--ui-font-sans`: Apple system fonts, Segoe UI, then system sans-serif. Use the system stack rather than adding a web font for a desktop utility.
+Neither platform should look like a scaled version of the other.
 
-Base rules:
+---
 
-- Body text: 14px with approximately 1.45 line height.
-- Secondary labels and sender metadata: 13px.
-- Auxiliary metadata, counts, timestamps, and compact controls: 12px to 13px.
-- Reader subject: approximately 20px, weight 600. It is important but not a hero.
-- Application title and major section title: use weight and spacing before increasing size.
-- Use tabular numerals for counts, dates, and progress values where alignment matters.
-- Keep body copy at approximately 65 to 75 characters per line when the content is prose.
-- Allow long subjects, addresses, and Chinese/English mixtures to wrap or ellipsize without changing pane geometry.
-- Do not use all caps as the primary hierarchy mechanism.
+# 3. Brand and color system
 
-Hierarchy comes from size, weight, contrast, and spacing. Adjacent levels should be visibly distinct, but the interface must not become poster-like.
+## Primary accent
 
-## 7. Spacing and density
+Use a restrained professional green.
 
-The base rhythm is 4px, with common steps of 4, 8, 12, 16, 20, 24, 32, and 40px. Components should consume `--ui-space-*` or component-level semantic spacing derived from it.
+Recommended base:
 
-Control tiers:
+* Primary: `#0F9F63`
+* Primary hover: `#0B8A55`
+* Primary pressed: `#08764A`
+* Primary subtle: `#EAF7F0`
+* Primary faint: `#F4FBF7`
 
-- Dense control: 32px when space is constrained and the target is not isolated.
-- Default control: 36px.
-- Comfortable control: 40px for primary actions and isolated pointer actions.
-- Touch target: 44px where mobile or touch interaction requires it.
+The exact existing implementation token takes priority if already established.
 
-Density rules:
+Green is reserved for:
 
-- Preserve a usable target even when the visual content is compact.
-- Use one clear grouping boundary instead of multiple nested containers.
-- Do not compress controls below their semantic target merely to show one more row.
-- First content should appear early: toolbars and filters must earn their vertical space.
-- Repeated rows should share a stable rhythm. Variation belongs to hierarchy, not arbitrary padding.
+* primary action
+* selected navigation
+* active state
+* success
+* verified/trusted indicators
+* focus emphasis where appropriate
 
-## 8. Radius and shadows
+Do not paint large areas green unnecessarily.
 
-Radius tokens:
+---
 
-- `--ui-radius-sm`: compact rows and small controls.
-- `--ui-radius-control`: ordinary controls.
-- `--ui-radius-panel`: panels that need a distinct edge.
-- `--ui-radius-modal`: modal surfaces.
-- `--ui-radius-pill`: true pills only, such as compact status or badge shapes.
+# 4. Neutral colors
 
-Use the smallest radius that communicates grouping. A mailbox row is not a pill. A persistent workspace pane is not a card.
+Light mode:
 
-Shadow rules:
+* App background: `#FFFFFF`
+* Secondary background: `#FAFBFC`
+* Tertiary background: `#F6F7F8`
+* Primary text: `#111827`
+* Secondary text: `#667085`
+* Tertiary text: `#98A2B3`
+* Divider: `#E7E9ED`
+* Strong divider: `#D9DDE3`
 
-- Persistent Sidebar, list, and Reader planes use no shadow.
-- Popover/menu surfaces may use `--ui-shadow-popover`.
-- Dialogs may use `--ui-shadow-float`.
-- Tooltips may use `--ui-shadow-tooltip`.
-- Do not add shadows to every row, selected state, or warning strip.
+Dark mode should preserve the same hierarchy rather than simply invert colors.
 
-## 9. Icons
+Dark mode:
 
-Use the existing icon library and shared icon sizing. Icons are compact explanations, not illustrations.
+* Background around `#111315`
+* Surface around `#171A1D`
+* Elevated surface around `#1C2024`
+* Primary text around `#F3F4F6`
+* Secondary text around `#A7AFB9`
+* Divider around `#292E34`
 
-- Keep stroke weight and optical size consistent within a control group.
-- Align icons to the text baseline or control center, not the bounding box alone.
-- Every icon-only button needs an accessible name and a visible focus state.
-- Do not use emoji as functional iconography.
-- Do not create a new icon when an existing shared primitive communicates the same action.
-- A destructive icon needs a text label, tooltip, or confirmation context when its meaning is not unambiguous.
+Accent hue must remain consistent between light and dark themes.
 
-## 10. Desktop shell
+---
 
-### Ordinary mail workspace
+# 5. Semantic colors
 
-Desktop ordinary mail is a three-pane workspace:
+Use colors semantically.
 
-1. **Sidebar:** account scope, Compose, folders, tools, settings/shortcut footer.
-2. **Inbox/Mail List:** search, scope, list controls, grouped mail rows.
-3. **Reader:** mail actions, subject, identity metadata, labels, attachments, security state, body, and Quick Reply.
+Success:
 
-The default desktop geometry is flexible rather than pixel-locked:
+* green
 
-- Sidebar preferred width: approximately 236px.
-- List preferred width: approximately 388px.
-- Reader receives remaining width.
-- Dividers are 1px visual lines with a larger invisible resize hit target.
-- At compact widths the shell may collapse resizers and use a list/reader arrangement.
-- At phone widths it becomes a single-surface full-screen navigation flow.
+Warning:
 
-Persistent panes remain flat, opaque, and independently scrollable. The Reader must not feel like a floating document card.
+* amber/orange
 
-### Window chrome
+Error / destructive:
 
-Native window chrome is platform chrome. It may use its own drag behavior and transient treatment, but it must not visually turn the mail workspace into glass.
+* red
 
-## 11. Sidebar
+Information:
 
-The Sidebar is navigation, not a dashboard.
+* blue
 
-- Brand mark and product name are compact and aligned to the top rhythm.
-- Account scope is visible before folder navigation.
-- Compose is the primary filled green control, approximately 40px high, with a clear text label.
-- Folder rows are approximately 36 to 40px high, flat, and easy to scan.
-- Current folder uses green semantic emphasis plus a quiet selected tint. Do not use a large pill or floating card.
-- Folder counts align to the trailing edge and use tabular numerals.
-- Icons share an optical size and baseline.
-- Section labels are quiet, not competing with folder names.
-- The footer contains settings and shortcut actions and remains reachable without pushing mail navigation out of view.
-- Hover and focus states alter color/surface, not layout or scale.
-- The current brand asset must be reused. If a green official variant is unavailable, record the difference rather than filtering or redrawing the mark.
+Neutral:
 
-## 12. Inbox header and controls
+* gray
 
-The Inbox top region contains search, scope, refresh, list summary, mail/thread mode, and view controls.
+Labels may use additional colors but must remain low saturation.
 
-- Search is the dominant control and should retain enough width for a natural query.
-- Scope is compact but explicitly named, for example folder, current account, or all accounts.
-- Refresh is icon-compact visually but keeps an accessible name and tooltip.
-- The list summary is informative without becoming a large header block.
-- Mail, thread, and view controls use quiet text and underline/border emphasis for the active choice, not large colored pills.
-- Keep the combined toolbar and control strip close to the current compact desktop target, approximately 112px in the current implementation. Re-evaluate by first-row position, not by a number alone.
-- Do not remove a target-size affordance solely to gain vertical density.
+Never use arbitrary colors only for decoration.
 
-## 13. Mail rows
+---
 
-Rows are the primary scanning surface. A standard desktop row is approximately 64px in the current product because it balances sender, subject, preview, timestamp, star, attachment, unread, and selection controls.
+# 6. Typography
 
-Each row should maintain:
+Use the platform-appropriate system font stack unless the project already defines another approved font.
 
-- A subdued avatar or sender mark, approximately 30px in the current desktop implementation.
-- A small unread dot, approximately 6px, paired with sender/weight changes so it is not color-only.
-- Sender and timestamp on one stable baseline.
-- Subject and attachment/star affordances on a clear second line.
-- One-line preview with ellipsis where the list is dense.
-- A quiet separator between rows.
-- A quiet selected tint and a thin green leading indicator for the current mail.
-- A clear checkbox target that does not compete with the row's open action.
+Recommended hierarchy:
 
-Keep stars and attachment counts legible but subordinate. Avoid nested row cards, hover elevation, or dramatic selection fills. If a reference displays more rows, investigate row height, header height, line height, and group spacing together before shrinking type.
+## Desktop
 
-## 14. Reader
+Page title:
 
-The Reader is a reading surface, not a card inside another card.
+* 22–24px
+* weight 600–650
+
+Section title:
+
+* 16–18px
+* weight 600
+
+Mail sender:
+
+* 14–15px
+* weight 500 / 600 unread
+
+Mail subject:
+
+* 13.5–14.5px
+* weight 500 / 600 unread
+
+Preview:
+
+* 12.5–13.5px
+* regular
+
+Reader title:
+
+* 20–24px
+* weight 600
+
+Reader body:
+
+* 14.5–15px
+* line-height approximately 1.55–1.65
+
+Metadata:
+
+* 12–13px
+
+## Mobile
+
+Large page title:
+
+* approximately 28–32px
+
+Navigation title:
+
+* approximately 17–20px
+
+Mail sender:
+
+* approximately 16px
+
+Subject:
+
+* approximately 15px
+
+Preview:
+
+* approximately 13–14px
+
+Reader body:
+
+* approximately 16–17px
+* comfortable line-height
+
+Do not use tiny typography to create artificial information density.
+
+---
+
+# 7. Spacing system
+
+Use a consistent spacing scale.
+
+Preferred scale:
+
+* 4
+* 8
+* 12
+* 16
+* 20
+* 24
+* 32
+* 40
+* 48
+
+Avoid arbitrary values unless technically required.
+
+Common usage:
+
+* icon/text gap: 8px
+* compact control inner gap: 8px
+* row side padding: 12–16px
+* desktop section spacing: 20–24px
+* mobile screen padding: 16–20px
+* large content separation: 24–32px
+
+---
+
+# 8. Radius
+
+Better Email is not a heavily rounded product.
+
+Recommended:
+
+* inline control: 6px
+* input: 6–8px
+* button: 6–8px
+* popover: 10px
+* modal / floating composer: 10–12px
+* grouped mobile setting section: 12–14px
+
+Normal email rows should not look like standalone floating cards.
+
+Do not use exaggerated 16–24px radii throughout the interface.
+
+---
+
+# 9. Shadows
+
+Default workspace surfaces:
+
+**no shadow**
+
+Use shadows only when representing elevation:
+
+* popover
+* dropdown
+* floating composer
+* modal
+* transient overlay
+
+Shadow should be subtle.
+
+Do not use shadow to separate ordinary page sections.
+
+Use dividers and hierarchy instead.
+
+---
+
+# 10. Icon system
+
+Icons must share:
+
+* one icon family
+* consistent stroke character
+* consistent visual size
+
+Desktop visible glyph:
+
+approximately 16–18px.
+
+Touch target may remain 32–40px.
+
+Mobile visible icon:
+
+approximately 20–24px.
+
+Touch target:
+
+minimum approximately 44px.
+
+Do not mix filled, outlined, cartoon, and platform-specific icon styles arbitrarily.
+
+Use filled icons only for clear selected/active semantics when the icon system supports it.
+
+---
+
+# 11. Desktop application architecture
+
+Normal desktop mail view uses a three-pane structure.
+
+## Pane A — Mail navigation
+
+Recommended width:
+
+`220–244px`
+
+Contains:
+
+* Better Email branding
+* Compose
+* Inbox
+* Starred
+* Sent
+* Draft
+* Snoozed
+* Archive
+* Spam
+* Trash
+* folders
+* smart folders
+* labels
+* account entry / app utilities
+
+Visual behavior:
+
+* flat navigation rows
+* low contrast default state
+* subtle green selection surface
+* selected item uses green icon/text emphasis
+* counts aligned on the trailing edge
+
+Do not wrap each navigation item in a card.
+
+## Pane B — Mail list
+
+Recommended width:
+
+approximately `360–410px`
+
+Resizable where supported.
+
+## Pane C — Reader
+
+Fluid width.
+
+Reader should receive the largest available width.
+
+If reader width becomes too narrow, change layout mode instead of endlessly compressing content.
+
+---
+
+# 12. Desktop inbox header
+
+Keep the mail list header compact.
+
+Preferred structure:
+
+Title / mail count
+
+Search
+
+Tabs / filters
+
+Sort or view controls
+
+Avoid stacking multiple permanent 50–60px toolbars.
+
+Important goal:
+
+Users should see the first mail quickly.
+
+---
+
+# 13. Desktop message list
+
+Default density should be comfortable but efficient.
+
+Recommended default row:
+
+approximately 60–68px.
+
+Alternative user density options may include:
+
+* compact
+* standard
+* comfortable
+
+Each row should prioritize:
+
+1. Sender
+2. Time
+3. Subject
+4. Preview
+5. Essential status metadata
+
+Optional metadata appears only when relevant.
+
+Avoid permanently showing:
+
+* multiple labels
+* attachment text
+* star
+* checkbox
+* badges
+* indicators
+* multiple action icons
+
+all at once.
+
+## Unread state
+
+Use restrained signals.
+
+Recommended:
+
+* small unread dot
+* sender/subject weight increase
+
+Do not simultaneously exaggerate:
+
+* background
+* text weight
+* border
+* dot
+* badge
+
+unless specifically necessary.
+
+## Selected state
+
+Selected mail:
+
+* very subtle green-tinted surface
+* thin green leading indicator if needed
+
+Avoid saturated green fills.
+
+## Checkbox
+
+Checkbox can appear:
+
+* on hover
+* after entering multi-select
+* when keyboard selection mode requires it
+
+Do not permanently sacrifice avatar space for a checkbox.
+
+---
+
+# 14. Desktop reader
+
+Reader exists for calm reading.
+
+## Header
 
 Order:
 
-1. Mail action toolbar.
-2. Subject.
-3. Sender identity and recipient metadata.
-4. Date and labels.
-5. Attachments.
-6. Security or blocked-content context.
-7. Mail body.
-8. Quick Reply.
+1. subject
+2. minimal status / label
+3. sender identity
+4. recipient information
+5. time
+6. essential actions
 
-Rules:
+Permanent primary reader actions should be limited.
 
-- Actions appear before the subject and remain reachable without scrolling through the body.
-- The subject is prominent but compact, approximately 20px at desktop.
-- Sender identity is visually clear but not oversized.
-- Body content begins as early as the context requires. Warnings and attachments should be compact, direct, and inline.
-- Body prose has a readable measure and should not stretch across the entire monitor.
-- HTML email content may retain its own content surface, but application chrome must not wrap it in nested decorative cards.
-- Remote-image and hidden-link warnings explain the reason and offer explicit actions.
-- Attachments expose file type, name, size, download state, and actions.
-- Reader scroll position must not be reset by unrelated list or theme changes.
+Recommended:
 
-## 15. Quick Reply
+* Reply
+* Archive
+* Snooze
+* More
 
-Quick Reply is a continuation of the Reader, not a floating composer card.
+Other operations may move into overflow.
 
-- Show the recipient context in the header.
-- Use a compact textarea with a visible label or placeholder.
-- Keep character count and send actions in a quiet footer.
-- The primary send action uses the existing semantic action token.
-- Disabled, empty, sending, sent, and error states must be explicit.
-- Preserve the draft after a failed send.
-- The expanded composer remains available for users who need the full writing surface.
+## Content width
 
-## 16. Composer
+Reader pane can be wide.
 
-The Composer is outside the Phase 1.1 visual scope, but its governing rules are fixed:
+Actual plain-text reading measure should remain approximately:
 
-- It is a focused writing surface with clear account and identity context.
-- Recipient, subject, body, attachments, send, save, and close actions keep standard mail semantics.
-- Do not introduce gradients, glass, excessive cards, or a new color language.
-- Send failures preserve user input and explain the next action.
-- Modal focus, escape behavior, and keyboard traversal must remain correct.
+`680–760px`
 
-## 17. Desktop Settings, mandatory separation rule
+HTML mail may use its original layout when required.
 
-### Mandatory Settings Rule
+## Reader body
 
-Desktop Settings is an application-level independent interface.
+Avoid wrapping normal mail content inside decorative cards.
 
-When Settings is open, it must not show:
+The email body itself is the primary surface.
 
-- Better Email mail navigation Sidebar.
-- Write new mail button.
-- Inbox.
-- Starred mail.
-- Sent mail.
-- Drafts.
-- Folders.
-- Labels.
-- Message list.
-- Reader pane.
+---
 
-Settings may show only:
+# 15. Security and translation UI
 
-- App-level or Settings chrome.
-- Settings navigation.
-- Settings content.
+Security information should be contextual.
 
-Settings must have an independent page frame, heading, navigation state, content area, loading state, error state, and close/back affordance. It must not be implemented as a mail workspace with the Sidebar hidden by accident. The application-level shell must be testable by absence assertions for mail-only selectors.
+Do not permanently display large security banners for normal mail.
 
-Desktop Settings is outside the current Phase 1.1 redesign scope, but this rule is permanent for all future work.
+Use a compact status row when:
 
-## 18. Secondary Settings pages
+* sender is verified
+* images were blocked
+* phishing risk exists
+* remote content requires permission
 
-Secondary Settings pages preserve the same application-level frame:
+Translation should appear contextually when another language is detected.
 
-- Navigation remains stable while page content changes.
-- The active Settings section is indicated by text, surface, and semantic state.
-- Page headers explain purpose without repeating the navigation label multiple times.
-- Forms use shared controls, clear grouping, inline validation, and explicit save state.
-- Long settings pages scroll inside the Settings content region without exposing Inbox or Reader behind them.
-- Empty, loading, error, and permission states use the same frame and do not silently fall back to mail content.
+Example:
 
-## 19. Mobile Inbox
+`检测到英文 · 翻译`
 
-Mobile is a native full-screen navigation mode, not a scaled desktop grid.
+rather than occupying permanent toolbar space.
 
-- Show one primary surface at a time.
-- Provide an explicit path between navigation, list, and Reader.
-- Keep the top bar reachable and use touch targets of at least 44px where practical.
-- Search, folder scope, selection, and bulk actions remain discoverable without relying on hover.
-- Mail rows may be denser in width but must preserve sender, subject, timestamp, unread, and selection semantics.
-- Do not keep a hidden three-pane Sidebar or Reader consuming layout space.
+---
 
-## 20. Mobile Reader
+# 16. Quick Reply
 
-- Reader opens as a full-screen surface with a clear back/navigation affordance.
-- Actions remain reachable at the top or through a clearly labeled action surface.
-- Subject, sender, security state, attachments, body, and Quick Reply preserve the desktop reading order.
-- Body measure follows the viewport and never forces horizontal scrolling for ordinary mail.
-- Remote content warnings remain inline and actionable.
-- Long addresses and subjects wrap safely.
+Quick Reply is intentionally simple.
 
-## 21. Mobile Composer
+Preferred layout:
 
-- Composer is full-screen and keyboard-aware.
-- The sending account and identity remain visible.
-- Recipient entry, subject, body, attachments, save, send, and close actions retain standard semantics.
-- The keyboard must not hide the active field or send action.
-- Drafts and failures preserve input.
+* lightweight editor
+* optional attachment button
+* expand to full composer
+* send
 
-## 22. Mobile Settings
+Avoid unnecessary permanent UI such as:
 
-Mobile Settings is also application-level and full-screen. It must not reveal Sidebar, Inbox, message list, or Reader behind its pages. Navigation may use a native push/list pattern, but it must preserve the Settings-only content rule and provide a clear back path.
+* character count
+* clear button
+* advanced formatting toolbar
+* template picker
+* scheduling controls
 
-## 23. Responsive behavior
+Those belong in the full composer.
 
-Breakpoints express interaction changes, not arbitrary device labels:
+---
 
-- Wide desktop: three panes with resizable Sidebar, list, and Reader.
-- Compact desktop/tablet: keep list and Reader together, move folder navigation to an explicit drawer or overlay.
-- Phone and 200% zoom fallback: one surface at a time, with explicit navigation.
+# 17. Desktop Composer
 
-At every breakpoint:
+Desktop composer is a non-modal productivity window.
 
-- No horizontal overflow for ordinary content.
-- Controls remain keyboard and pointer reachable.
-- Long text does not break the shell.
-- Focus remains visible.
-- Reader and list scroll independently where both are visible.
-- The Settings-only shell remains independent of mail layout.
+This rule is important.
 
-## 24. Dark mode
+Users must be able to:
 
-Dark mode remaps semantic surfaces and keeps the same hierarchy. It is not a simple inversion and must not be optimized only for the light reference.
+* read another mail
+* switch conversations
+* copy information
+* browse folders
+* return to the draft
 
-Check every dark surface for:
+while the composer remains open.
 
-- Green that is saturated enough to identify actions but not luminous or abrasive.
-- Selected rows that remain distinguishable through surface and text, not only green.
-- Dividers that are visible but quiet.
-- Correct primary, secondary, and tertiary text hierarchy.
-- Quick Reply that stays attached to the Reader instead of becoming a floating card.
-- Unread dot that remains visible without looking like a notification beacon.
-- Hover and focus states that remain visible.
+Therefore desktop composer should NOT normally:
 
-## 25. Accessibility
+* block the entire application
+* add a dark full-screen backdrop
+* make the mail workspace inert
 
-WCAG 2.2 AA is the release baseline.
+Recommended default:
 
-- Every interactive control is keyboard reachable in logical order.
-- Every icon-only control has an accessible name.
-- `:focus-visible` is visible and does not rely only on color.
-- Selection, unread, warning, success, and error states use text, structure, or icon support in addition to color.
-- Use real buttons, links, headings, lists, regions, dialogs, and form labels.
-- Keep screen-reader-only labels in the accessibility tree. Visual clipping is acceptable only when the accessible name remains available.
-- Focus traps return focus to the trigger after modal close.
-- Modal backgrounds must not remain `inert` or `aria-hidden` after unmount.
-- Search shortcut, selected-mail keyboard traversal, Reader actions, Quick Reply, and modal controls need keyboard coverage.
-- Respect `prefers-reduced-motion` and avoid layout movement for status feedback.
-- Test with long Chinese and English labels, long addresses, text zoom, and minimum supported window size.
+* floating bottom-right or centered-right window
+* approximately 640–720px wide
+* approximately 520–640px high
+* draggable
+* minimizable
+* expandable
+* autosaved
 
-## 26. Loading, error, and empty states
+## Composer hierarchy
 
-Loading states preserve the surrounding frame and explain what is being loaded. Do not replace the whole workspace with unexplained blank space when a local region can remain stable.
+Primary:
 
-Error states must:
+* From
+* To
+* Subject
+* Body
+* Attachments
+* Send
 
-- Name the failed operation.
-- Preserve user input and safe context.
-- Offer a retry or recovery action when one exists.
-- Avoid raw stack traces in user-facing copy.
-- Keep destructive or remote failures explicit.
+Secondary:
 
-Empty states must:
+* Cc / Bcc
+* formatting
+* signature
+* templates
+* schedule send
 
-- Say what is empty.
-- Explain the next useful action.
-- Avoid decorative illustration as the only information.
+Advanced:
 
-## 27. Anti-pattern blacklist
+* delivery options
+* encryption
+* advanced headers
+* AI writing tools
 
-Never introduce:
+Use progressive disclosure.
 
-- Gradients used as decoration or text fill.
-- Glassmorphism or persistent backdrop blur.
-- Excessive floating cards or nested cards.
-- Pill-shaped navigation or controls where a flat row is clearer.
-- Giant corner radii.
-- Persistent workspace shadows and glow effects.
-- Colored side stripes wider than 1px as the primary state mechanism.
-- Hero metrics, dashboard tiles, or decorative illustrations in the mail workflow.
-- Emoji as functional icons.
-- A second ad hoc color system.
-- A desktop layout shrunk onto mobile.
-- Mail Sidebar or Reader left behind Settings.
-- Hidden or disabled assertions used to make visual or UI smoke tests pass.
+---
 
-## 28. Visual regression rules
+# 18. Desktop Settings architecture
 
-Every substantial UI change must produce real browser evidence using the same fixture data and selected mail where comparison matters.
+## Critical rule
 
-Required desktop probes for the ordinary mail workspace:
+Settings is a separate application-level surface.
 
-- 1440×900 light.
-- 1280×800 light.
-- 1280×800 dark.
+When desktop Settings opens, the normal mail workspace is replaced.
 
-Record at least:
+Do not show the normal mail navigation/sidebar beside Settings.
 
-- Sidebar, list, and Reader widths.
-- Search/header and list-control heights.
-- Compose height and navigation row height.
-- Average mail-row height.
-- Avatar and unread-dot diameter.
-- Reader subject size and body measure.
+In Settings:
 
-Report `Reference`, `Actual`, and `Delta`. A 2 to 6px difference may be reasonable when caused by font rendering or an intentional target-size rule, but an unexplained difference is not a pass.
+NO Inbox navigation.
 
-Visual checks must include:
+NO folders.
 
-- No horizontal overflow.
-- First visible mail position.
-- Same selected row and Reader message.
-- Light and dark semantic state.
-- Keyboard focus and modal cleanup.
-- Accessibility names for visually compact controls.
+NO mail list.
 
-Screenshots and browser logs belong in ignored QA output only. Do not commit them or the local reference images.
+NO reader.
+
+NO Compose button belonging to the mailbox workspace.
+
+Settings should feel like opening a dedicated preference workspace, similar to a mature desktop application.
+
+---
+
+# 19. Desktop Settings — root screen
+
+Recommended structure:
+
+Left side:
+
+Settings navigation only.
+
+Examples:
+
+* Overview
+* Account & Mailboxes
+* Appearance & Layout
+* Writing
+* Reading
+* Notifications
+* Shortcuts
+* Rules & Automation
+* Security & Privacy
+* Storage & Attachments
+* Integrations
+* Advanced
+* About
+
+Main area:
+
+content of the selected category.
+
+Top-level Settings should not become an oversized dashboard full of decorative cards.
+
+Prefer clear rows, groups and panels.
+
+---
+
+# 20. Desktop Settings navigation
+
+Recommended width:
+
+approximately `220–250px`.
+
+Selected item:
+
+* subtle green background
+* green icon / text
+* no heavy border
+
+Settings sidebar remains dedicated to Settings until Settings closes.
+
+A visible exit/back action should return to the mail workspace.
+
+---
+
+# 21. Settings secondary pages
+
+Settings follows:
+
+**Settings → category → detailed controls**
+
+Do not show all possible options on one screen.
+
+Example:
+
+Settings
+
+→ Appearance & Layout
+
+Then display:
+
+* Theme
+* Accent color
+* Density
+* Font size
+* Reading pane position
+* Preview lines
+* Avatar visibility
+* Unread indicator
+* Reduce motion
+
+This is preferable to showing every setting on the Settings root.
+
+---
+
+# 22. Settings control design
+
+Setting row layout:
+
+Left:
+
+* setting name
+* short explanation if necessary
+
+Right:
+
+* switch
+* segmented control
+* select
+* button
+* disclosure arrow
+
+Avoid:
+
+* giant controls
+* large promotional cards
+* excessive icons
+* nested boxes around every individual setting
+
+Use section dividers and grouped rows.
+
+---
+
+# 23. Mobile navigation architecture
+
+Mobile is a full-screen stack.
+
+Primary bottom navigation should remain consistent throughout main-level application screens.
+
+Recommended destinations:
+
+* Mail
+* Starred / relevant primary area
+* Compose
+* Contacts or another approved primary product area
+* Settings
+
+Compose may use the central emphasized action.
+
+Do not arbitrarily change bottom navigation between screens.
+
+---
+
+# 24. Mobile Inbox
+
+Recommended structure:
+
+Page title
+
+Unread count
+
+Search
+
+Filter
+
+Category tabs
+
+Mail list
+
+Bottom navigation
+
+Mail row hierarchy:
+
+* avatar
+* unread indicator
+* sender
+* time
+* subject
+* preview
+* trailing relevant state
+
+Rows should be full-width with subtle separators.
+
+Avoid mobile card stacks for each mail.
+
+---
+
+# 25. Mobile Reader
+
+Reader opens as a dedicated screen.
+
+Top:
+
+* back
+* archive
+* delete
+* snooze
+* more
+
+Then:
+
+* subject
+* sender
+* recipient details
+* time
+* security/context information if relevant
+* body
+
+Bottom:
+
+* reply
+* forward
+* more
+
+or a compact reply surface depending on the context.
+
+Email body should receive most of the screen.
+
+---
+
+# 26. Mobile Composer
+
+Composer is full-screen.
+
+Top:
+
+* close/back
+* title
+* contextual overflow
+
+Fields:
+
+* recipient
+* Cc/Bcc when expanded
+* subject
+
+Then body.
+
+Attachments appear near body end.
+
+Formatting and advanced functions live in a bottom toolbar or secondary sheet.
+
+Primary Send action remains obvious.
+
+Do not reproduce a desktop floating window on mobile.
+
+---
+
+# 27. Mobile Settings root
+
+Settings root uses a native hierarchical settings pattern.
+
+Structure:
+
+Title
+
+Account summary
+
+Grouped setting categories
+
+Examples:
+
+Preferences:
+
+* Account & Mailboxes
+* Appearance & Layout
+* Writing
+* Notifications
+
+Security & Data:
+
+* Security & Privacy
+* Storage & Attachments
+* Advanced
+
+Support:
+
+* Help & Feedback
+* About Better Email
+
+The root screen displays categories, not all setting controls.
+
+---
+
+# 28. Mobile Settings secondary pages
+
+Selecting a Settings category opens a new full-screen page.
+
+Example:
+
+`设置 → 外观与布局`
+
+Header:
+
+`< 设置      外观与布局`
+
+Content contains only Appearance settings.
+
+The main Settings list is no longer visible.
+
+Do not create a side-by-side desktop-style settings layout on mobile.
+
+---
+
+# 29. Form controls
+
+Use native-feeling controls.
+
+Switch:
+
+binary state.
+
+Segmented control:
+
+2–4 mutually exclusive short options.
+
+Dropdown/select:
+
+larger option sets.
+
+Radio:
+
+rare; use only where visually clearer than segmented control.
+
+Checkbox:
+
+independent multiple selections.
+
+Do not use a switch for an action.
+
+Do not use pill buttons for ordinary settings rows.
+
+---
+
+# 30. Buttons
+
+Primary button:
+
+green fill.
+
+Secondary:
+
+neutral surface / outline.
+
+Destructive:
+
+red text or restrained destructive outline.
+
+Avoid multiple primary buttons in the same visual group.
+
+Typical heights:
+
+Desktop:
+32–36px
+
+Mobile:
+44–48px touch area
+
+---
+
+# 31. Empty states
+
+Empty states should explain:
+
+* what happened
+* what the user can do next
+
+Do not create oversized illustrations unless they add real value.
+
+Example:
+
+`暂无邮件`
+
+`新邮件会显示在这里。`
+
+Optional action:
+`刷新`
+
+---
+
+# 32. Loading state
+
+Prefer skeleton loading for list/content surfaces.
+
+Do not replace the entire application with a spinner when the existing shell can remain usable.
+
+Synchronizing email should not unnecessarily block reading already downloaded mail.
+
+---
+
+# 33. Error / offline state
+
+Offline and synchronization errors should preserve access to cached content when possible.
+
+Use a compact persistent banner/status indicator rather than disruptive modal dialogs for recoverable errors.
+
+Errors must communicate:
+
+* what failed
+* whether data is safe
+* what the user can do
+
+---
+
+# 34. Destructive actions
+
+Actions such as:
+
+* delete account
+* clear local data
+* delete mailbox
+* permanently delete messages
+
+must use explicit destructive semantics.
+
+Use red only here.
+
+Confirmation should clearly state impact.
+
+Do not use generic:
+
+`确定？`
+
+Use concrete text:
+
+`永久删除账户`
+
+---
+
+# 35. Motion
+
+Motion should communicate state change, not decorate the interface.
+
+Recommended durations:
+
+* micro feedback: ~120ms
+* normal UI transition: ~180ms
+* panel transition: ~240ms
+
+Respect reduced-motion accessibility preferences.
+
+Avoid:
+
+* springy card animations
+* exaggerated scale
+* large parallax
+* animated gradients
+* unnecessary fade sequences
+
+---
+
+# 36. Accessibility
+
+Must support:
+
+* keyboard navigation on desktop
+* visible focus
+* screen reader semantics where supported
+* sufficient contrast
+* readable font scaling
+* reduced motion
+* touch-friendly mobile controls
+
+Never remove focus outlines without supplying an accessible replacement.
+
+---
+
+# 37. Copywriting
+
+Use concise interface text.
+
+Avoid technical jargon unless the page is explicitly advanced/developer-facing.
+
+Chinese labels should sound like native product copy rather than translated English.
+
+Prefer:
+
+`稍后处理`
+
+over awkward technical terminology.
+
+Descriptions should usually fit within one concise sentence.
+
+---
+
+# 38. Cross-platform visual consistency
+
+Desktop and mobile are the same product.
+
+The following must remain identical in meaning:
+
+* accent hue
+* status semantics
+* icon meaning
+* terminology
+* account identity
+* unread semantics
+* mail state
+* destructive semantics
+
+Layouts may differ by platform.
+
+Interaction model may differ by platform.
+
+Visual identity must not.
+
+---
+
+# 39. Component reuse
+
+Before creating a new UI primitive, search for an existing implementation.
+
+Prefer shared primitives for:
+
+* Button
+* IconButton
+* Input
+* Search
+* NavigationRow
+* MailRow
+* Avatar
+* Badge
+* Toggle
+* SegmentedControl
+* Select
+* Menu
+* Tooltip
+* Modal
+* Popover
+* EmptyState
+* ErrorState
+* Skeleton
+* SettingRow
+* SectionHeader
+
+One-off copies are discouraged.
+
+---
+
+# 40. CSS / styling rule
+
+Do not solve systemic design problems with page-specific overrides.
+
+Avoid accumulating:
+
+* duplicate selectors
+* unnecessary `!important`
+* multiple competing style layers
+* arbitrary hardcoded colors
+* arbitrary spacing
+* duplicate responsive logic
+
+Fix the owning primitive/token/component whenever possible.
+
+---
+
+# 41. Visual regression rule
+
+For substantial UI work, compare the finished implementation against the approved reference visuals.
+
+At minimum inspect:
+
+Desktop:
+
+* inbox
+* reader
+* composer
+* settings root
+* settings secondary screen
+
+Mobile:
+
+* inbox
+* reader
+* composer
+* settings root
+* settings secondary screen
+
+Do not validate only one viewport.
+
+---
+
+# 42. Design anti-pattern blacklist
+
+Do NOT introduce:
+
+* dashboardification of ordinary settings
+* glassmorphism
+* gradients as decoration
+* excessive card nesting
+* pill-everything UI
+* huge corner radius
+* strong box shadows
+* neon colors
+* oversized empty whitespace
+* icon inconsistency
+* duplicate navigation
+* unnecessary modal dialogs
+* desktop UI shrunk onto mobile
+* mobile UI stretched onto desktop
+* giant SaaS-style hero panels
+* promotional visual noise inside productivity workflows
+
+---
+
+# 43. Final quality bar
+
+A finished Better Email screen should pass these questions:
+
+1. Is the primary task obvious within one second?
+2. Is the content visually stronger than the chrome?
+3. Is anything visible that the user does not currently need?
+4. Does this use existing product components?
+5. Does this look like the same application as the Inbox?
+6. Does it remain coherent in dark mode?
+7. Is the mobile version truly designed for touch?
+8. Are keyboard and focus states correct?
+9. Is the layout stable with long text?
+10. Could removing something make the screen better?
+
+If the answer to #10 is yes, prefer simplification.
+
+---
+
+# 44. Reference implementation rule
+
+Approved screenshots stored under:
+
+`docs/design/reference/`
+
+are visual references, not pixel-perfect templates.
+
+They define:
+
+* hierarchy
+* density
+* component character
+* visual language
+* navigation model
+* overall polish
+
+When a screenshot conflicts with real usability, accessibility, platform behavior, or existing functionality, preserve the product behavior and apply the design language rather than blindly copying pixels.
+
+---
+
+# 45. Product identity summary
+
+Better Email should feel:
+
+**Professional without being corporate.**
+
+**Minimal without being empty.**
+
+**Dense without being crowded.**
+
+**Modern without chasing trends.**
+
+**Powerful without exposing every feature at once.**
+
+**Native without blindly copying the operating system.**
+
+The final visual principle is:
+
+> 邮件是主角，界面退到背景。

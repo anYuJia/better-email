@@ -73,35 +73,32 @@ export default function ReaderSecurityBanner({
       {showLinkAction && <p>{readerSecurityCopy.linksHidden}</p>}
       {showActionRow && (
         <div className="reader-warning-action-row">
-          {showLinkAction && (
-            <button
-              type="button"
-              className="reader-warning-primary-action"
-              onClick={onLinkAction}
-            >
-              {linkActionLabel}
-            </button>
-          )}
           {showImageAction && (
             <button
               type="button"
               className="reader-warning-primary-action"
               onClick={onAllowRemoteImagesOnce}
             >
-              显示本封图片
+              显示图片
             </button>
           )}
-          {showImageAction && !selectedSenderTrusted && (
-            <>
-              <button type="button" className="reader-warning-secondary-action" onClick={onTrustSender}>
-                信任发件人
-              </button>
-              {selectedSenderDomain.trim() && (
-                <button type="button" className="reader-warning-secondary-action" onClick={onTrustDomain}>
-                  信任 {selectedSenderDomain}
-                </button>
-              )}
-            </>
+          {(showLinkAction || (showImageAction && !selectedSenderTrusted)) && (
+            <details className="reader-warning-more compact-menu">
+              <summary>更多</summary>
+              <div>
+                {showLinkAction && (
+                  <button type="button" onClick={onLinkAction}>{linkActionLabel}</button>
+                )}
+                {showImageAction && !selectedSenderTrusted && (
+                  <>
+                    <button type="button" onClick={onTrustSender}>信任发件人</button>
+                    {selectedSenderDomain.trim() && (
+                      <button type="button" onClick={onTrustDomain}>信任 {selectedSenderDomain}</button>
+                    )}
+                  </>
+                )}
+              </div>
+            </details>
           )}
         </div>
       )}

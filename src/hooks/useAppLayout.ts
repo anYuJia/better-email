@@ -9,18 +9,16 @@ import {
 import type { AppLayout } from '../app/types';
 import {
   appLayoutStorageKey,
+  appLayoutBounds,
   clampNumber,
-  defaultAppLayout,
+  getDefaultAppLayout,
   legacyAppLayoutStorageKey,
   loadAppLayout,
 } from '../app/appConfig';
 
 type ResizablePane = 'sidebar' | 'list';
 
-export const APP_LAYOUT_BOUNDS = {
-  sidebar: { min: 228, max: 320 },
-  list: { min: 340, max: 500 },
-} as const;
+export const APP_LAYOUT_BOUNDS = appLayoutBounds;
 
 type LayoutResize = {
   pane: ResizablePane;
@@ -80,9 +78,10 @@ export default function useAppLayout() {
   }, []);
 
   const resetAppLayoutPane = useCallback((pane: ResizablePane) => {
+    const responsiveDefault = getDefaultAppLayout();
     setAppLayout((current) => ({
       ...current,
-      [pane]: defaultAppLayout[pane],
+      [pane]: responsiveDefault[pane],
     }));
   }, []);
 
@@ -178,7 +177,7 @@ export default function useAppLayout() {
   }, [finishResize]);
 
   const resetAppLayout = useCallback(() => {
-    setAppLayout(defaultAppLayout);
+    setAppLayout(getDefaultAppLayout());
   }, []);
 
   return {

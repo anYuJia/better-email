@@ -11,7 +11,7 @@
 
   /* Primitive palette: cool neutral workspace, gently warm reading paper.
      The green is reserved for primary actions, selection and keyboard focus. */
-  --primitive-hue-neutral: 255;
+  --primitive-hue-neutral: 145;
   --primitive-hue-paper: 90;
   --primitive-hue-accent: 156;
   --primitive-hue-success: 152;
@@ -19,14 +19,14 @@
   --primitive-hue-danger: 29;
 
   /* Semantic colour roles */
-  --color-canvas: oklch(0.962 0.006 var(--primitive-hue-neutral));
-  --color-surface-sidebar: oklch(0.945 0.008 var(--primitive-hue-neutral));
-  --color-surface-list: oklch(0.979 0.004 var(--primitive-hue-neutral));
-  --color-surface-reader: oklch(0.992 0.003 var(--primitive-hue-paper));
-  --color-surface-raised: oklch(0.996 0.003 var(--primitive-hue-paper));
-  --color-surface-muted: oklch(0.955 0.006 var(--primitive-hue-neutral));
+  --color-canvas: oklch(0.985 0.003 var(--primitive-hue-neutral));
+  --color-surface-sidebar: oklch(0.982 0.004 var(--primitive-hue-neutral));
+  --color-surface-list: oklch(0.995 0.002 var(--primitive-hue-neutral));
+  --color-surface-reader: oklch(0.998 0.001 var(--primitive-hue-paper));
+  --color-surface-raised: oklch(0.999 0.001 var(--primitive-hue-paper));
+  --color-surface-muted: oklch(0.968 0.004 var(--primitive-hue-neutral));
   --color-surface-hover: oklch(0.952 0.007 var(--primitive-hue-accent));
-  --color-surface-selected: oklch(0.932 0.016 var(--primitive-hue-accent));
+  --color-surface-selected: oklch(0.965 0.018 var(--primitive-hue-accent));
 
   --color-text-primary: oklch(0.235 0.017 var(--primitive-hue-neutral));
   --color-text-secondary: oklch(0.445 0.015 var(--primitive-hue-neutral));
@@ -35,8 +35,8 @@
   --color-text-tertiary: oklch(0.505 0.012 var(--primitive-hue-neutral));
   --color-text-on-accent: oklch(0.985 0.004 var(--primitive-hue-neutral));
 
-  --color-border-subtle: oklch(0.885 0.007 var(--primitive-hue-neutral));
-  --color-border-strong: oklch(0.8 0.011 var(--primitive-hue-neutral));
+  --color-border-subtle: oklch(0.925 0.006 var(--primitive-hue-neutral));
+  --color-border-strong: oklch(0.86 0.009 var(--primitive-hue-neutral));
   /* Better Email green: close to #0F9F63 while keeping white labels readable
      on primary controls. */
   --color-focus: oklch(0.52 0.15 var(--primitive-hue-accent));
@@ -295,12 +295,12 @@
   /* Keep the persistent panes clearly ordered without splitting the dark
      workspace into a cool shell and a brown reader. Paper is expressed by
      luminance and typography here, not a visibly different hue. */
-  --color-canvas: oklch(0.192 0.012 var(--primitive-hue-neutral));
-  --color-surface-sidebar: oklch(0.216 0.014 var(--primitive-hue-neutral));
-  --color-surface-list: oklch(0.238 0.012 var(--primitive-hue-neutral));
+  --color-canvas: oklch(0.192 0.01 var(--primitive-hue-neutral));
+  --color-surface-sidebar: oklch(0.216 0.012 var(--primitive-hue-neutral));
+  --color-surface-list: oklch(0.238 0.01 var(--primitive-hue-neutral));
   --color-surface-reader: oklch(0.252 0.007 var(--primitive-hue-neutral));
-  --color-surface-raised: oklch(0.278 0.012 var(--primitive-hue-neutral));
-  --color-surface-muted: oklch(0.300 0.012 var(--primitive-hue-neutral));
+  --color-surface-raised: oklch(0.278 0.01 var(--primitive-hue-neutral));
+  --color-surface-muted: oklch(0.300 0.01 var(--primitive-hue-neutral));
   --color-surface-hover: oklch(0.304 0.014 var(--primitive-hue-accent));
   --color-surface-selected: oklch(0.326 0.025 var(--primitive-hue-accent));
 

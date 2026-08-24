@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
-import MessageListToolbar from './MessageListToolbar';
+import GlobalSearch from './GlobalSearch';
 
 afterEach(cleanup);
 
@@ -30,45 +30,36 @@ const message: MessageSummary = {
   remote_uid: 1,
 };
 
-function renderToolbar() {
+function renderSearch() {
   const onQueryChange = vi.fn();
   const onApplySearchShortcut = vi.fn();
   const view = render(
-    <MessageListToolbar
+    <GlobalSearch
       searchInputRef={{ current: null }}
       query="Security"
       appliedQuery=""
       searchScope="folder"
       filter="all"
-      listMode="messages"
-      listSort="newest"
-      currentViewLabel="收件箱"
-      visibleListSummary="1 封"
-      messageListSummary="1 封"
       messages={[message]}
+      shortcutLabel="⌘K"
       onSearchSubmit={vi.fn()}
       onQueryChange={onQueryChange}
       onSearchScopeChange={vi.fn()}
       onClearSearchAndFilter={vi.fn()}
       onApplySearchShortcut={onApplySearchShortcut}
-      onRefresh={vi.fn()}
-      onShowMessages={vi.fn()}
-      onShowThreads={vi.fn()}
-      onFilterChange={vi.fn()}
-      onSortChange={vi.fn()}
     />,
   );
   return { ...view, onQueryChange, onApplySearchShortcut };
 }
 
-describe('MessageListToolbar search combobox', () => {
+describe('GlobalSearch search combobox', () => {
   it('owns its suggestion list and accepts the active option with the keyboard', () => {
-    const { onApplySearchShortcut } = renderToolbar();
+    const { onApplySearchShortcut } = renderSearch();
     const input = screen.getByRole('combobox', { name: '搜索主题、发件人、正文' });
 
     expect(input.getAttribute('aria-expanded')).toBe('false');
     act(() => input.focus());
-    const listbox = screen.getByRole('listbox', { name: '搜索范围选项' });
+    const listbox = screen.getByRole('listbox', { name: '搜索建议' });
     expect(input.getAttribute('aria-expanded')).toBe('true');
     expect(input.getAttribute('aria-controls')).toBe(listbox.id);
 
@@ -80,7 +71,7 @@ describe('MessageListToolbar search combobox', () => {
   });
 
   it('closes suggestions with Escape without moving focus', () => {
-    renderToolbar();
+    renderSearch();
     const input = screen.getByRole('combobox', { name: '搜索主题、发件人、正文' });
     act(() => input.focus());
     expect(screen.getByRole('listbox')).toBeDefined();
@@ -89,9 +80,8 @@ describe('MessageListToolbar search combobox', () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it('exposes the current view filter menu selector used by the browser smoke flow', () => {
-    renderToolbar();
-    expect(document.querySelector('.view-menu')).not.toBeNull();
-    expect(document.querySelector('.filter-menu')).toBeNull();
+  it('keeps the list header free of the legacy view menu', () => {
+    renderSearch();
+    expect(document.querySelector('.view-menu')).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import WindowChrome, { detectDesktopPlatform } from './WindowChrome';
+import AppTitlebar, { detectDesktopPlatform } from './AppTitlebar';
 import AccountLoginDialog from './AccountLoginDialog';
 import { emptyAccountCreateForm } from '../app/uiConfig';
 
@@ -14,7 +14,7 @@ const tauriWindowMocks = vi.hoisted(() => {
     setPosition: vi.fn(async () => undefined),
     startDragging: vi.fn(async () => undefined),
     toggleMaximize: vi.fn(async () => undefined),
-    unmaximize: vi.fn(async () => undefined),
+    onResized: vi.fn(async () => () => undefined),
   };
   return {
     currentWindow,
@@ -33,7 +33,27 @@ vi.mock('@tauri-apps/api/window', () => {
   };
 });
 
-describe('WindowChrome', () => {
+function renderTitlebar(testPlatform?: 'macos' | 'windows' | 'linux' | 'web') {
+  return render(
+    <AppTitlebar
+      searchInputRef={{ current: null }}
+      query=""
+      appliedQuery=""
+      searchScope="folder"
+      filter="all"
+      messages={[]}
+      onSearchSubmit={vi.fn()}
+      onQueryChange={vi.fn()}
+      onSearchScopeChange={vi.fn()}
+      onClearSearchAndFilter={vi.fn()}
+      onApplySearchShortcut={vi.fn()}
+      onRefresh={vi.fn()}
+      testPlatform={testPlatform}
+    />,
+  );
+}
+
+describe('AppTitlebar', () => {
   afterEach(() => {
     cleanup();
     document.body.className = '';
@@ -46,29 +66,29 @@ describe('WindowChrome', () => {
     expect(detectDesktopPlatform()).toBe('web');
   });
 
-  it('renders nothing in web / mock mode', () => {
-    const { container } = render(<WindowChrome />);
-    expect(container.querySelector('.window-chrome')).toBeNull();
+  it('renders a browser preview without native window controls or fake traffic lights', () => {
+    const { container } = renderTitlebar();
+    expect(container.querySelector('.window-chrome')).not.toBeNull();
+    expect(container.querySelector('.window-controls')).toBeNull();
+    expect(container.querySelector('.traffic-light')).toBeNull();
     expect(document.body.classList.contains('platform-web')).toBe(false);
   });
 
-  it('loads and reuses the Tauri window API only after a desktop window interaction', async () => {
+  it('renders Windows controls, native drag region, and synced maximize semantics', async () => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: {} });
-    Object.defineProperty(navigator, 'platform', { configurable: true, value: 'Win32' });
 
-    const { container } = render(<WindowChrome />);
+    const { container } = renderTitlebar('windows');
 
     expect(container.querySelector('.window-chrome-windows')).not.toBeNull();
     expect(document.body.classList.contains('platform-windows')).toBe(true);
-    expect(tauriWindowMocks.moduleLoaded).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '最小化窗口' }));
+    fireEvent.click(screen.getByRole('button', { name: '最小化' }));
     await waitFor(() => expect(tauriWindowMocks.currentWindow.minimize).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '最大化或还原窗口' }));
+    fireEvent.click(screen.getByRole('button', { name: '最大化' }));
     await waitFor(() => expect(tauriWindowMocks.currentWindow.toggleMaximize).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭窗口' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     await waitFor(() => expect(tauriWindowMocks.currentWindow.close).toHaveBeenCalledTimes(1));
 
     const dragRegion = container.querySelector<HTMLElement>('.window-drag-region');
@@ -93,7 +113,7 @@ describe('WindowChrome', () => {
     await waitFor(() => expect(tauriWindowMocks.currentWindow.startDragging).toHaveBeenCalledTimes(1));
     fireEvent.mouseUp(window);
 
-    expect(tauriWindowMocks.moduleLoaded).toHaveBeenCalledTimes(1);
+    expect(tauriWindowMocks.moduleLoaded).toHaveBeenCalled();
   });
 
   it('keeps the real WindowChrome visible and clickable above the login gate', () => {

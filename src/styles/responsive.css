@@ -100,7 +100,9 @@
 /* Phone-size / 200%-zoom fallback: one surface at a time. */
 @media (max-width: 720px) {
   .app-shell {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--app-titlebar-height) minmax(0, 1fr);
     width: 100%;
     height: 100dvh;
     overflow: hidden;
@@ -109,6 +111,8 @@
   .app-shell > .sidebar,
   .app-shell > .message-list-panel,
   .app-shell > .reader-panel {
+    grid-column: 1;
+    grid-row: 2;
     display: none;
     width: 100%;
     height: 100%;

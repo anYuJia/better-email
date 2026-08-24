@@ -101,12 +101,18 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         closeOverlays();
         return;
       }
-      if (editable) return;
-
       const hasBlockingOverlay = isSettingsOpen
         || isShortcutsOpen
         || (isComposerOpen && !isComposerMinimized);
       if (hasBlockingOverlay) return;
+
+      if (commandModifier && !event.shiftKey && key === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      if (editable) return;
 
       if (key === 'escape' && document.querySelector('.context-menu')) {
         return;

@@ -129,6 +129,7 @@ export const IPC = {
   VerifyAccountCredentials: 'verify_account_credentials',
   VerifyAccountCredentialsWithSecret: 'verify_account_credentials_with_secret',
   WaitForOauth2Callback: 'wait_for_oauth2_callback',
+  GetPlatform: 'get_platform',
   WindowChromeReady: 'window_chrome_ready',
   SaveAiSettings: 'save_ai_settings',
   LoadAiSettings: 'load_ai_settings',

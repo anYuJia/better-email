@@ -1731,3 +1731,272 @@
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 17 · Integrated mailbox header
+ *
+ * Search and refresh now belong to the application titlebar. The mailbox
+ * header therefore stays within two compact rows: folder identity, then list
+ * mode plus independent filter and sort controls.
+ * ------------------------------------------------------------------------- */
+
+.app-shell .list-control-strip {
+  position: relative;
+  z-index: 20;
+  min-height: 96px;
+  padding: 13px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  overflow: visible;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--workspace-toolbar);
+}
+
+.list-summary-row,
+.list-control-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.list-summary-row {
+  min-height: 30px;
+  justify-content: space-between;
+}
+
+.app-shell .list-summary {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.app-shell .list-summary strong {
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .list-summary span {
+  max-width: none;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.list-control-row {
+  flex: 0 0 auto;
+  min-height: 34px;
+  gap: 6px;
+}
+
+.list-control-row > .narrow-navigation-button {
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: none;
+  place-items: center;
+}
+
+.app-shell .list-control-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  overflow: visible;
+}
+
+.app-shell .list-control-actions > button:not(.narrow-navigation-button) {
+  min-height: 32px;
+  height: 32px;
+  padding-inline: 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.app-shell .list-control-actions > button:not(.narrow-navigation-button):hover,
+.app-shell .list-control-actions > button:not(.narrow-navigation-button):focus-visible {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-shell .list-control-actions > button:not(.narrow-navigation-button).active {
+  color: var(--ui-accent);
+  background: var(--quiet-row-selected);
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.compact-dropdown {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.compact-dropdown.filter-menu {
+  margin-left: auto;
+}
+
+.compact-dropdown > summary {
+  min-height: 32px;
+  height: 32px;
+  max-width: 100%;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  white-space: nowrap;
+  list-style: none;
+  cursor: pointer;
+}
+
+.compact-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.compact-dropdown > summary::after {
+  content: none;
+}
+
+.compact-dropdown > summary:hover,
+.compact-dropdown[open] > summary {
+  border-color: var(--ui-border);
+  background: var(--quiet-row-hover);
+}
+
+.compact-dropdown > summary:focus-visible {
+  border-color: var(--ui-accent);
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.compact-dropdown-label {
+  color: var(--ui-text-secondary);
+  font-weight: 500;
+}
+
+.compact-dropdown > summary strong {
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.compact-dropdown > summary svg {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+}
+
+.compact-dropdown > div {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 2500;
+  min-width: 170px;
+  max-width: min(92vw, 260px);
+  padding: 5px;
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.compact-dropdown.sort-menu > div {
+  right: 0;
+  left: auto;
+}
+
+.compact-dropdown > div button {
+  min-height: 34px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.compact-dropdown > div button:hover,
+.compact-dropdown > div button:focus-visible,
+.compact-dropdown > div button.active {
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
+  outline: none;
+}
+
+.compact-dropdown > div button:focus-visible {
+  box-shadow: var(--ui-focus-ring);
+}
+
+.compact-dropdown-check {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--ui-accent);
+}
+
+@media (max-width: 1180px) {
+  .app-shell .list-control-actions {
+    gap: 1px;
+  }
+
+  .app-shell .list-control-actions > button:not(.narrow-navigation-button) {
+    padding-inline: 7px;
+  }
+
+  .compact-dropdown > summary {
+    padding-inline: 6px;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 1040px) {
+  .list-control-row > .narrow-navigation-button {
+    display: grid;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell .list-control-strip {
+    min-height: 96px;
+    padding-inline: 12px;
+  }
+
+  .app-shell .list-control-actions {
+    flex-wrap: wrap;
+  }
+
+  .compact-dropdown.filter-menu {
+    margin-left: 0;
+  }
+}

@@ -111,6 +111,18 @@ describe('useAppShortcuts text selection boundary', () => {
     delete document.body.dataset.imagePreviewModal;
   });
 
+  it('focuses the global search input with the command shortcut', () => {
+    const options = makeOptions();
+    const input = document.createElement('input');
+    document.body.append(input);
+    options.searchInputRef = { current: input };
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+    expect(document.activeElement).toBe(input);
+  });
+
   it('does not move the underlying message selection while the conversation list owns arrow keys', () => {
     const options = makeOptions();
     options.listMode = 'threads';

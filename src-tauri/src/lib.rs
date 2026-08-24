@@ -128,11 +128,34 @@ fn set_tray_unread_count(
     Ok(())
 }
 
-/// Hide the native window chrome on platforms that do not get the macOS
-/// overlay title bar from tauri.conf.json. Called once the webview is ready.
+/// Return the native platform to the frontend without relying on browser
+/// user-agent heuristics. This is intentionally compile-time selected so the
+/// Windows titlebar path cannot accidentally be rendered on macOS.
+#[tauri::command]
+fn get_platform() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        return "macos".to_string();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return "windows".to_string();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return "linux".to_string();
+    }
+    #[allow(unreachable_code)]
+    "web".to_string()
+}
+
+/// Hide the native window chrome only on Windows, where the application owns
+/// the titlebar controls. macOS keeps native decorations so its traffic lights
+/// and native window behaviour remain intact; Linux keeps its default chrome.
+/// Called once the webview is ready.
 #[tauri::command]
 fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     {
         if let Some(window) = app.get_webview_window("main") {
             window
@@ -140,7 +163,7 @@ fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
                 .map_err(|error| format!("无法隐藏系统标题栏：{error}"))?;
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(not(target_os = "windows"))]
     let _ = &app;
     Ok(())
 }
@@ -299,6 +322,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             set_tray_unread_count,
+            get_platform,
             window_chrome_ready,
             commands::list_accounts,
             commands::get_account,

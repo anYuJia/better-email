@@ -80,6 +80,15 @@
   --ui-control-height-touch: 44px;
   --ui-control-padding-inline: 10px;
 
+  /* Integrated native titlebar geometry. The app shell owns this row, so
+     panes do not need scattered top-padding compensation. */
+  --app-titlebar-height: 54px;
+  --titlebar-border: var(--color-border-subtle);
+  --global-search-width: clamp(320px, 38vw, 560px);
+  --titlebar-macos-controls-width: 82px;
+  --titlebar-macos-safe-left: var(--titlebar-macos-controls-width);
+  --window-control-width: 46px;
+
   /* Radius scale: small (controls, rows), control-sized affordances, panels,
      modals; 999px is reserved for true pills (badges, status, segmented chips). */
   --ui-radius-sm: 5px;

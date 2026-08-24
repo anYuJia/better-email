@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import Sidebar from './components/Sidebar';
-import WindowChrome from './components/WindowChrome';
+import AppTitlebar from './components/AppTitlebar';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
 import GlobalTooltip from './components/GlobalTooltip';
@@ -1380,7 +1380,22 @@ export default function App() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
-      <WindowChrome />
+      <AppTitlebar
+        searchInputRef={searchInputRef}
+        query={queryDraft}
+        appliedQuery={appliedQuery}
+        searchScope={searchScope}
+        filter={filter}
+        messages={messages}
+        onSearchSubmit={runSearch}
+        onQueryChange={handleQueryChange}
+        onSearchScopeChange={handleSearchScopeChange}
+        onClearSearchAndFilter={handleClearSearchAndFilter}
+        onApplySearchShortcut={handleApplySearchShortcut}
+        isRefreshing={isRefreshing || isBackgroundSyncRunning}
+        refreshNotice={refreshNotice}
+        onRefresh={handleRefresh}
+      />
       <Sidebar
         accountScope={accountScope}
         accounts={accounts}
@@ -1465,12 +1480,7 @@ export default function App() {
 
       <AppErrorBoundary>
         <MessageListPane
-          searchInputRef={searchInputRef}
-          queryDraft={queryDraft}
           appliedQuery={appliedQuery}
-          searchScope={searchScope}
-          isRefreshing={isRefreshing || isBackgroundSyncRunning}
-          refreshNotice={refreshNotice}
           onOpenNavigation={showNarrowSidebar}
           filter={filter}
           listMode={listMode}
@@ -1489,11 +1499,7 @@ export default function App() {
           listStateKey={mailboxListStateKey}
           initialScrollTop={mailboxListScrollTop}
           onScrollTopChange={handleMailboxListScrollTopChange}
-          onSearchSubmit={runSearch}
-          onQueryChange={handleQueryChange}
-          onSearchScopeChange={handleSearchScopeChange}
           onClearSearchAndFilter={handleClearSearchAndFilter}
-          onApplySearchShortcut={handleApplySearchShortcut}
           onRefresh={handleRefresh}
           onShowMessages={handleShowMessages}
           onShowThreads={handleShowThreads}

@@ -13,7 +13,6 @@ import type {
   ListMode,
   ListSort,
   MessageSummary,
-  SearchScope,
   ThreadSummary,
 } from '../app/types';
 import { messageDateGroup } from '../mailUtils';
@@ -33,10 +32,7 @@ import {
 export type { BulkMessageAction, MessageContextAction } from './messageContextMenu';
 
 export type MessageListPaneProps = {
-  searchInputRef: React.Ref<HTMLInputElement>;
-  queryDraft: string;
   appliedQuery: string;
-  searchScope: SearchScope;
   filter: FilterMode;
   listMode: ListMode;
   listSort: ListSort;
@@ -54,11 +50,7 @@ export type MessageListPaneProps = {
   listStateKey: string;
   initialScrollTop: number;
   onScrollTopChange: (scrollTop: number) => void;
-  onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-  onQueryChange: (value: string) => void;
-  onSearchScopeChange: (scope: SearchScope) => void;
   onClearSearchAndFilter: () => void;
-  onApplySearchShortcut: (query: string) => void;
   onRefresh: () => void;
   onShowMessages: () => void;
   onShowThreads: () => void;
@@ -82,16 +74,11 @@ export type MessageListPaneProps = {
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
-  isRefreshing?: boolean;
-  refreshNotice?: string | null;
   onOpenNavigation?: () => void;
 };
 
 function MessageListPane({
-  searchInputRef,
-  queryDraft,
   appliedQuery,
-  searchScope,
   filter,
   listMode,
   listSort,
@@ -109,11 +96,7 @@ function MessageListPane({
   listStateKey,
   initialScrollTop,
   onScrollTopChange,
-  onSearchSubmit,
-  onQueryChange,
-  onSearchScopeChange,
   onClearSearchAndFilter,
-  onApplySearchShortcut,
   onRefresh,
   onShowMessages,
   onShowThreads,
@@ -137,8 +120,6 @@ function MessageListPane({
   onToggleMessageSelection,
   onLoadMore,
   loadMoreStatus,
-  isRefreshing = false,
-  refreshNotice = null,
   onOpenNavigation,
 }: MessageListPaneProps) {
   const [messageMenu, setMessageMenu] = React.useState<{
@@ -295,29 +276,16 @@ function MessageListPane({
     <section className="message-list-panel">
       <MessageListToolbar
         onOpenNavigation={onOpenNavigation}
-        searchInputRef={searchInputRef}
-        query={queryDraft}
-        appliedQuery={appliedQuery}
-        searchScope={searchScope}
         filter={filter}
         listMode={listMode}
         listSort={listSort}
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}
         messageListSummary={messageListSummary}
-        messages={messages}
-        onSearchSubmit={onSearchSubmit}
-        onQueryChange={onQueryChange}
-        onSearchScopeChange={onSearchScopeChange}
-        onClearSearchAndFilter={onClearSearchAndFilter}
-        onApplySearchShortcut={onApplySearchShortcut}
-        onRefresh={onRefresh}
         onShowMessages={onShowMessages}
         onShowThreads={onShowThreads}
         onFilterChange={onFilterChange}
         onSortChange={onSortChange}
-        isRefreshing={isRefreshing}
-        refreshNotice={refreshNotice}
       />
       {listMode === 'messages' && (
         <MessageBulkToolbar

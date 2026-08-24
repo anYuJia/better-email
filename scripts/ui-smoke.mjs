@@ -1237,9 +1237,13 @@ async function main() {
       })()`,
     );
     await waitForExpression(cdp, "Number(document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0");
-    await openDetails(cdp, '.view-menu');
-    await clickButton(cdp, '未读', "document.querySelector('.view-menu')");
-    await waitForExpression(cdp, "document.querySelector('.view-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
+    await evalInPage(cdp, "(() => { if (document.querySelectorAll('.global-search-box input').length !== 1 || document.querySelector('.message-list-panel .search-box')) throw new Error('Global search must render exactly once in the titlebar'); })()");
+    await openDetails(cdp, '.filter-menu');
+    await clickButton(cdp, '未读', "document.querySelector('.filter-menu')");
+    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
+    await openDetails(cdp, '.sort-menu');
+    await clickButton(cdp, '最早优先', "document.querySelector('.sort-menu')");
+    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('时间') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最早优先')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (!folder || !badge || Number(badge.textContent) <= 0) throw new Error('Inbox unread folder target not found'); window.__folderUnreadBefore = Number(badge.textContent); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 180, button: 2 })); })()",
@@ -1247,9 +1251,12 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.innerText.includes('全部标为已读')");
     await clickButton(cdp, '全部标为已读', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes(`已将 ${window.__folderUnreadBefore} 封邮件标为已读`) && !document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"] .badge')");
-    await openDetails(cdp, '.view-menu');
-    await clickButton(cdp, '全部', "document.querySelector('.view-menu')");
-    await waitForExpression(cdp, "document.querySelector('.view-menu summary')?.textContent.includes('视图') && document.body.innerText.includes('已显示')");
+    await openDetails(cdp, '.filter-menu');
+    await clickButton(cdp, '全部', "document.querySelector('.filter-menu')");
+    await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('全部') && !document.querySelector('.view-menu') && document.body.innerText.includes('已显示')");
+    await openDetails(cdp, '.sort-menu');
+    await clickButton(cdp, '最新优先', "document.querySelector('.sort-menu')");
+    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('时间') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最新优先')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
@@ -1288,14 +1295,14 @@ async function main() {
     await openDetails(cdp, '.search-scope-menu');
     await waitForExpression(cdp, "document.querySelector('.search-scope-menu[open]') && document.querySelector('.search-scope-menu').innerText.includes('当前文件夹') && document.querySelector('.search-scope-menu').innerText.includes('当前账号') && document.querySelector('.search-scope-menu').innerText.includes('全部账号')");
     await clickButton(cdp, '当前账号', "document.querySelector('.search-scope-menu')");
-    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Current account archive search sample')) && document.querySelector('.search-scope-indicator')?.textContent.includes('当前账号')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Current account archive search sample')) && document.querySelector('.search-scope-menu summary')?.textContent.includes('账号')");
     await openDetails(cdp, '.search-scope-menu');
     await clickButton(cdp, '全部账号', "document.querySelector('.search-scope-menu')");
     await fillInput(cdp, '.search-box input', 'Global account search sample');
     await evalInPage(cdp, "document.querySelector('.search-box').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));");
-    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Global account search sample')) && document.querySelector('.search-scope-indicator')?.textContent.includes('全部账号')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Global account search sample')) && document.querySelector('.search-scope-menu summary')?.textContent.includes('全部')");
     await evalInPage(cdp, "document.querySelector('.search-clear-button').click()");
-    await waitForExpression(cdp, "document.querySelector('.search-box input').value === '' && !document.querySelector('.search-scope-indicator') && document.querySelector('.search-scope-menu summary')?.textContent.includes('文件夹')");
+    await waitForExpression(cdp, "document.querySelector('.search-box input').value === '' && document.querySelector('.search-scope-menu summary')?.textContent.includes('文件夹')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-actions button[aria-label=\"取消星标\"]')");
     await evalInPage(cdp, "document.querySelector('.reader-actions button[aria-label=\"取消星标\"]').click()");

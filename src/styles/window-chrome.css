@@ -1,140 +1,377 @@
 /*
- * Custom window chrome for the frameless, transparent window.
- * The webview root remains transparent for native window integration, while
- * the title strip itself is an opaque semantic plane. This keeps the chrome
- * stable over every pane without a decorative glass layer.
+ * Integrated native titlebar
  *
- * The top edge is draggable (native startDragging with a setPosition
- * fallback); each pane reserves matching headroom so the drag strip never
- * covers interactive content:
- * - macOS: 32px (traffic lights + drag strip, full width)
- * - Windows/Linux: 36px (drag strip + custom window controls; the strip
- *   stops short of the controls)
- * Double-clicking the strip toggles maximize/restore.
+ * The titlebar is a real app-shell row, not a fixed overlay compensated by
+ * pane padding. macOS keeps Tauri's native traffic lights through the
+ * Overlay titleBarStyle; Windows owns only the custom control buttons after
+ * Rust removes the native decorations. Empty drag surfaces are separate from
+ * every interactive child.
  */
 
 html,
 body {
-  background: transparent;
+  background: var(--ui-bg);
 }
 
-/* Top drag strip: sits above the app content, below dialogs/overlays. */
 .window-chrome {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 36px;
+  position: relative;
   z-index: 100;
+  width: 100%;
+  height: var(--app-titlebar-height);
+  min-height: var(--app-titlebar-height);
+  overflow: visible;
   user-select: none;
   -webkit-user-select: none;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--titlebar-border);
 }
 
-/* 登录遮罩（z 2000）与首次引导（z 2500）期间，窗口控制栏必须保持可见：
- * Windows/Linux 的关闭按钮始终可点，且 Escape 无法绕过必须登录状态。 */
+/* Login, onboarding and image preview keep window controls above the gate. */
 body:has(.account-login-gate) .window-chrome,
 body:has(.first-run-onboarding-backdrop) .window-chrome,
 body[data-image-preview-modal='1'] .window-chrome {
   z-index: 3000;
 }
 
-.window-drag-region {
-  position: absolute;
-  inset: 0;
-  /* macOS 的原生标题栏在可拖动区域保持普通箭头。grab 手势会让整条
-   * 标题栏像可拖拽内容，既突兀也会干扰用户判断控件状态。 */
-  cursor: default;
+.app-titlebar-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) var(--global-search-width) minmax(180px, 1fr);
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
 }
 
-.window-drag-region:active {
-  cursor: grabbing;
+.titlebar-left,
+.titlebar-center,
+.titlebar-right {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
 }
 
-/* On Windows/Linux the strip must stop short of the custom window controls
- * (3 x 30px buttons + gaps + right offset), so it never covers them. */
-.window-chrome-windows .window-drag-region,
-.window-chrome-linux .window-drag-region {
-  right: 104px;
-}
-
-/* The sidebar brand row below the strip is also dead space; let it drag the
- * window too. Width follows the resizable sidebar via --app-sidebar-width. */
-.window-drag-region-side {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: var(--app-sidebar-width, 240px);
-  height: 40px;
-  cursor: default;
-}
-
-.window-drag-region-side:active {
-  cursor: grabbing;
-}
-
-/* macOS: the strip also hosts the traffic lights at the top-left. */
-.window-chrome-macos {
-  height: 32px;
-}
-
-/* Headroom for the drag strip across all panes. */
-.platform-macos .sidebar,
-.platform-macos .message-list-panel,
-.platform-macos .reader-panel {
-  padding-top: 32px;
-}
-
-.platform-windows .sidebar,
-.platform-windows .message-list-panel,
-.platform-windows .reader-panel,
-.platform-linux .sidebar,
-.platform-linux .message-list-panel,
-.platform-linux .reader-panel {
-  padding-top: 36px;
-}
-
-/* Keep the sidebar footer pinned so it never collapses when panes shrink. */
-.sidebar-footer {
-  flex-shrink: 0;
-}
-
-/* Window controls for frameless Windows/Linux builds. */
-.window-controls {
-  position: absolute;
-  top: 5px;
-  right: 8px;
+.titlebar-left,
+.titlebar-right {
   display: flex;
   align-items: center;
-  gap: 2px;
 }
 
-.window-control {
-  width: 30px;
-  height: 26px;
+.titlebar-left {
+  padding-inline: 12px 14px;
+}
+
+.app-titlebar-macos .titlebar-left {
+  padding-left: var(--titlebar-macos-safe-left);
+}
+
+.titlebar-right {
+  justify-content: flex-end;
+  gap: 2px;
+  padding-right: 4px;
+  overflow: hidden;
+}
+
+.titlebar-brand {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.titlebar-brand img {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: block;
+  border-radius: 6px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Drag surfaces are siblings of controls rather than ancestors of them. */
+.titlebar-drag-region {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: default;
+  touch-action: none;
+}
+
+.titlebar-drag-region:active {
+  cursor: grabbing;
+}
+
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+/* Global search is the only search input in the mail workspace. */
+.app-titlebar .global-search-box {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  width: 100%;
+  max-width: var(--global-search-width);
+  height: 38px;
+  min-height: 38px;
+  padding: 0 5px 0 11px;
+  gap: 6px;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 82%, transparent);
+  border-radius: 8px;
+  color: var(--ui-text-secondary);
+  background: color-mix(in srgb, var(--ui-surface-muted) 78%, var(--ui-bg));
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-titlebar .global-search-box:hover {
+  border-color: var(--ui-border-strong);
+  background: color-mix(in srgb, var(--ui-surface-muted) 88%, var(--ui-bg));
+}
+
+.app-titlebar .global-search-box:focus-within {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.app-titlebar .global-search-box > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+}
+
+.app-titlebar .global-search-box input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 2px;
+  border: 0;
+  color: var(--ui-text);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+  font-size: 13px;
+  line-height: 36px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.app-titlebar .global-search-box input:focus,
+.app-titlebar .global-search-box input:focus-visible {
+  outline: none;
+}
+
+.app-titlebar .global-search-box input::placeholder {
+  color: var(--ui-text-tertiary);
+}
+
+.app-titlebar .global-search-box .search-clear-button {
+  position: static;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
   display: grid;
   place-items: center;
+}
+
+.app-titlebar .global-search-box .search-scope-menu {
+  position: static;
+  flex: 0 0 auto;
+}
+
+.app-titlebar .global-search-box .search-scope-menu > summary {
+  min-width: 54px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-left: 1px solid var(--ui-border);
+  border-radius: 0 var(--ui-radius-control) var(--ui-radius-control) 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app-titlebar .global-search-box .search-scope-menu > summary:hover,
+.app-titlebar .global-search-box .search-scope-menu[open] > summary {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.app-titlebar .global-search-box .search-scope-menu > summary::after {
+  content: none;
+}
+
+.global-search-shortcut {
+  display: inline-flex;
+  align-items: center;
+  min-width: 42px;
+  justify-content: flex-end;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.global-search-shortcut kbd {
+  font: inherit;
+}
+
+.titlebar-refresh {
+  position: relative;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  flex: 0 0 34px;
   padding: 0;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 6px;
-  color: var(--ui-text-secondary, #4e5966);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.window-control:hover {
-  color: var(--ui-text, #1d232b);
-  background: rgba(17, 24, 39, 0.07);
+.titlebar-refresh:hover:not(:disabled),
+.titlebar-refresh:focus-visible {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
-.window-control-close:hover {
+.titlebar-refresh.refreshing {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.titlebar-sync-status {
+  position: relative;
+  z-index: 2;
+  max-width: 124px;
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Windows controls occupy the entire titlebar height like native hit areas. */
+.window-controls {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  margin-left: 4px;
+}
+
+.window-control {
+  width: var(--window-control-width);
+  height: 100%;
+  min-height: var(--app-titlebar-height);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.window-control:hover,
+.window-control:focus-visible {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  outline-offset: -3px;
+}
+
+.window-control-close:hover,
+.window-control-close:focus-visible {
   color: var(--color-text-on-accent);
   background: var(--ui-danger);
 }
 
-/* Light-theme title bar: quiet opaque chrome, separated by one hairline. */
-:root:not([data-theme="dark"]) .app-shell .window-chrome {
-  border-bottom: 1px solid oklch(0.9 0.006 var(--primitive-hue-neutral) / 0.68);
-  background: var(--ui-bg);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+/* Legacy selector kept as a compatibility hook for overlay stacking rules. */
+.window-drag-region-side {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .app-titlebar-grid {
+    grid-template-columns: minmax(140px, 1fr) clamp(300px, 40vw, 440px) minmax(140px, 1fr);
+  }
+
+  .global-search-shortcut {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .window-chrome {
+    height: var(--app-titlebar-height);
+    min-height: var(--app-titlebar-height);
+  }
+
+  .app-titlebar-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .titlebar-left {
+    display: none;
+  }
+
+  .titlebar-center {
+    grid-column: 1;
+    padding-inline: 12px 52px;
+  }
+
+  .app-titlebar .global-search-box {
+    max-width: none;
+  }
+
+  .titlebar-right {
+    position: absolute;
+    inset: 0 4px 0 auto;
+    z-index: 4;
+    width: 38px;
+    display: flex;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .titlebar-right-drag {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window-control,
+  .titlebar-refresh,
+  .app-titlebar .global-search-box {
+    transition: none;
+  }
 }

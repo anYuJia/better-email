@@ -64,6 +64,19 @@
   white-space: nowrap;
 }
 
+/* Desktop application identity lives in the integrated titlebar. Keep the
+ * existing brand row for the narrow navigation drawer, where it remains a
+ * useful local exit/context cue. */
+@media (min-width: 1041px) {
+  .app-shell > .sidebar {
+    padding-top: 16px;
+  }
+
+  .app-shell > .sidebar .brand {
+    display: none;
+  }
+}
+
 /* Compose -------------------------------------------------------------------
  * A first-class navigation action, but not a floating CTA card. It sits on
  * the sidebar plane and gains a quiet tint only when the user engages it. */

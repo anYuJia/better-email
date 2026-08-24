@@ -35,7 +35,7 @@ describe('accountConnectionSettings pure functions', () => {
     is_default: true,
   };
 
-  it('snapshot extracts the nine connection fields', () => {
+  it('snapshot extracts the shared account settings fields', () => {
     const snapshot = accountConnectionSettingsSnapshot(baseAccount);
     expect(snapshot).toEqual({
       display_name: 'Test User',
@@ -46,6 +46,9 @@ describe('accountConnectionSettings pure functions', () => {
       auth_type: 'oauth2',
       sync_mode: 'push',
       remote_images_allowed: true,
+      block_external_mailboxes: false,
+      intercept_https_links: true,
+      warn_external_senders: false,
       signature: '--\nTest',
     });
   });
@@ -78,6 +81,13 @@ describe('accountConnectionSettings pure functions', () => {
     const a = { ...baseAccount, imap_host: 'imap.gmail.com:993' };
     const b = { ...baseAccount, imap_host: 'imap.example.com:993' };
     expect(accountConnectionSettingsEqual(a, b)).toBe(false);
+  });
+
+  it('is dirty when a privacy setting changes', () => {
+    expect(isAccountConnectionDirty(
+      baseAccount,
+      { ...baseAccount, block_external_mailboxes: true },
+    )).toBe(true);
   });
 
   it('equal returns false when any other connection field differs', () => {

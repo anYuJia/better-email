@@ -1,6 +1,6 @@
 import type { Account } from './types';
 
-/** Fields that participate in connection settings dirty detection. */
+/** Fields that participate in the shared account-settings dirty detection. */
 export type AccountConnectionSettingsSnapshot = {
   display_name: string;
   provider: string;
@@ -10,6 +10,9 @@ export type AccountConnectionSettingsSnapshot = {
   auth_type: string;
   sync_mode: string;
   remote_images_allowed: boolean;
+  block_external_mailboxes: boolean;
+  intercept_https_links: boolean;
+  warn_external_senders: boolean;
   signature: string;
 };
 
@@ -25,6 +28,9 @@ export function accountConnectionSettingsSnapshot(
     auth_type: account.auth_type ?? 'password',
     sync_mode: account.sync_mode ?? 'manual',
     remote_images_allowed: Boolean(account.remote_images_allowed),
+    block_external_mailboxes: Boolean(account.block_external_mailboxes),
+    intercept_https_links: account.intercept_https_links !== false,
+    warn_external_senders: Boolean(account.warn_external_senders),
     signature: account.signature ?? '',
   };
 }
@@ -46,6 +52,9 @@ export function accountConnectionSettingsEqual(
     && a.auth_type === b.auth_type
     && a.sync_mode === b.sync_mode
     && a.remote_images_allowed === b.remote_images_allowed
+    && a.block_external_mailboxes === b.block_external_mailboxes
+    && a.intercept_https_links === b.intercept_https_links
+    && a.warn_external_senders === b.warn_external_senders
     && a.signature === b.signature
   );
 }

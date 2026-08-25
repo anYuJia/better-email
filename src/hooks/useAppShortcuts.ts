@@ -22,7 +22,7 @@ type UseAppShortcutsOptions = {
   clearSelection: () => void;
   setStatus: (status: string) => void;
   restoreUndoAction: () => Promise<void>;
-  toggleAllVisibleMessages: (checked: boolean) => void;
+  toggleAllVisibleMessages: (checked: boolean) => void | Promise<number | null>;
   openShortcuts: () => void;
   composeNew: () => void;
   setSelectedId: (messageId: number) => void;
@@ -140,8 +140,17 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         && !hasActiveTextSelection()
       ) {
         event.preventDefault();
-        toggleAllVisibleMessages(true);
-        setStatus(`已选择当前列表 ${messages.length} 封邮件`);
+        const selectionResult = toggleAllVisibleMessages(true);
+        if (selectionResult && typeof selectionResult.then === 'function') {
+          setStatus('正在选择当前列表中的全部邮件');
+          void selectionResult.then((count) => {
+            if (typeof count === 'number') {
+              setStatus(`已选择当前列表 ${count} 封邮件`);
+            }
+          });
+        } else {
+          setStatus(`已选择当前列表 ${messages.length} 封邮件`);
+        }
         return;
       }
 

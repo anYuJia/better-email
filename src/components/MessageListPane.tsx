@@ -31,6 +31,7 @@ import {
 export type { BulkMessageAction, MessageContextAction } from './messageContextMenu';
 
 export type MessageListPaneProps = {
+  mobile?: boolean;
   appliedQuery: string;
   filter: FilterMode;
   listMode: ListMode;
@@ -66,6 +67,7 @@ export type MessageListPaneProps = {
   onToggleMessageLabel: (message: MessageSummary, label: Label) => void;
   onComposeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
   onOpenThread: (thread: ThreadSummary) => Promise<MessageSummary[]>;
+  onLoadThreadMessages?: (thread: ThreadSummary) => Promise<MessageSummary[]>;
   onRunThreadAction: (thread: ThreadSummary, messages: MessageSummary[], action: BulkMessageAction) => void;
   onMoveThreadToFolder: (thread: ThreadSummary, messages: MessageSummary[], folder: Folder) => void;
   onToggleThreadLabel: (thread: ThreadSummary, messages: MessageSummary[], label: Label) => void;
@@ -78,6 +80,7 @@ export type MessageListPaneProps = {
 };
 
 function MessageListPane({
+  mobile = false,
   appliedQuery,
   filter,
   listMode,
@@ -113,6 +116,7 @@ function MessageListPane({
   onToggleMessageLabel,
   onComposeFromMessage,
   onOpenThread,
+  onLoadThreadMessages,
   onRunThreadAction,
   onMoveThreadToFolder,
   onToggleThreadLabel,
@@ -144,10 +148,13 @@ function MessageListPane({
 
   const handleOpenThreadMenu = React.useCallback((thread: ThreadSummary, x: number, y: number) => {
     setThreadMenu(null);
-    void onOpenThread(thread).then((nextMessages) => {
+    const loadMessages = mobile && onLoadThreadMessages
+      ? onLoadThreadMessages(thread)
+      : onOpenThread(thread);
+    void loadMessages.then((nextMessages) => {
       setThreadMenu({ x, y, thread, messages: nextMessages });
     });
-  }, [onOpenThread]);
+  }, [mobile, onLoadThreadMessages, onOpenThread]);
 
   const handleOpenMessageMenu = React.useCallback((message: MessageSummary, x: number, y: number, bulk: boolean) => {
     setMessageMenu({ x, y, message, bulk });
@@ -274,31 +281,33 @@ function MessageListPane({
   }, [activeSortLabel, listSort, messages]);
 
   return (
-    <section className="message-list-panel">
-      <MessageListToolbar
-        onOpenNavigation={onOpenNavigation}
-        filter={filter}
-        listMode={listMode}
-        listSort={listSort}
-        currentViewLabel={currentViewLabel}
-        visibleListSummary={visibleListSummary}
-        messageListSummary={messageListSummary}
-        onShowMessages={onShowMessages}
-        onShowThreads={onShowThreads}
-        onFilterChange={onFilterChange}
-        onSortChange={onSortChange}
-        visibleMessageCount={messages.length}
-        selectedMessageIds={selectedMessageIds}
-        selectedMessages={selectedMessages}
-        folders={folders}
-        labels={labels}
-        onToggleAllVisible={onToggleAllVisible}
-        onRunBulkAction={onRunBulkAction}
-        onRequestSnooze={onRequestSnooze}
-        onMoveBulkToFolder={onMoveBulkToFolder}
-        onToggleBulkLabel={onToggleBulkLabel}
-        isSelectingAll={isSelectingAll}
-      />
+    <section className={`message-list-panel${mobile ? ' mobile-message-list-panel' : ''}`}>
+      {!mobile && (
+        <MessageListToolbar
+          onOpenNavigation={onOpenNavigation}
+          filter={filter}
+          listMode={listMode}
+          listSort={listSort}
+          currentViewLabel={currentViewLabel}
+          visibleListSummary={visibleListSummary}
+          messageListSummary={messageListSummary}
+          onShowMessages={onShowMessages}
+          onShowThreads={onShowThreads}
+          onFilterChange={onFilterChange}
+          onSortChange={onSortChange}
+          visibleMessageCount={messages.length}
+          selectedMessageIds={selectedMessageIds}
+          selectedMessages={selectedMessages}
+          folders={folders}
+          labels={labels}
+          onToggleAllVisible={onToggleAllVisible}
+          onRunBulkAction={onRunBulkAction}
+          onRequestSnooze={onRequestSnooze}
+          onMoveBulkToFolder={onMoveBulkToFolder}
+          onToggleBulkLabel={onToggleBulkLabel}
+          isSelectingAll={isSelectingAll}
+        />
+      )}
       {listMode === 'threads' ? (
         <ThreadListView
           threads={threads}
@@ -308,6 +317,7 @@ function MessageListPane({
         />
       ) : (
         <MessageListView
+          mobile={mobile}
           groups={groupedMessages}
           messages={messages}
           query={appliedQuery}

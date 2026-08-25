@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { Paperclip } from 'lucide-react';
+import { MoreHorizontal, Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../app/types';
 import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
@@ -7,6 +7,7 @@ import { senderAvatarTone } from '../app/messageDetailUtils';
 import Avatar from './Avatar';
 
 type MessageListCardProps = {
+  mobile?: boolean;
   message: MessageSummary;
   isCurrentMessage: boolean;
   isSelected: boolean;
@@ -26,6 +27,7 @@ type MessageListCardProps = {
 };
 
 export default React.memo(function MessageListCard({
+  mobile = false,
   message,
   isCurrentMessage,
   isSelected,
@@ -76,7 +78,10 @@ export default React.memo(function MessageListCard({
     if (!useBulkContext && selectedMessageIds.length > 0 && !isSelected) {
       onToggleAllVisible(false);
     }
-    onSelectMessage(message.id);
+    // On mobile the row action menu is an in-place action surface. Selecting
+    // the row here would immediately push the reader screen and unmount the
+    // menu before the user can choose archive, snooze, move, or delete.
+    if (!mobile) onSelectMessage(message.id);
     onOpenMessageMenu(message, x, y, useBulkContext);
   }
 
@@ -167,6 +172,21 @@ export default React.memo(function MessageListCard({
           onSelectMessage(message.id);
         }}
       />
+      {mobile && (
+        <button
+          type="button"
+          className="message-mobile-menu-button"
+          aria-label={`打开邮件操作：${message.subject || '无主题'}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            openMessageMenuAt(bounds.left, bounds.bottom + 4);
+          }}
+        >
+          <MoreHorizontal size={20} aria-hidden="true" />
+        </button>
+      )}
       {!message.is_read && <span className="message-unread-dot" aria-hidden="true" />}
       <span className="message-leading" aria-hidden="true">
         <Avatar

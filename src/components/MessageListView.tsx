@@ -32,6 +32,7 @@ type FlatListItem =
   | { type: 'message'; key: string; message: MessageSummary };
 
 type MessageListViewProps = {
+  mobile?: boolean;
   groups: MessageGroup[];
   messages: MessageSummary[];
   query: string;
@@ -56,6 +57,7 @@ type MessageListViewProps = {
 };
 
 export default function MessageListView({
+  mobile = false,
   groups,
   messages,
   query,
@@ -91,7 +93,7 @@ export default function MessageListView({
 
   const [viewportHeight, setViewportHeight] = useState(600);
   const [isMobileViewport, setIsMobileViewport] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth <= 720,
+    () => mobile || (typeof window !== 'undefined' && window.innerWidth <= 720),
   );
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
@@ -104,6 +106,10 @@ export default function MessageListView({
     previousMessageIds: ReadonlySet<number>;
   } | null>(null);
   const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+
+  useEffect(() => {
+    setIsMobileViewport(mobile || window.innerWidth <= 720);
+  }, [mobile]);
 
   const updateScrollbarThumb = useCallback((scrollTopOverride?: number) => {
     const listElement = listRef.current;
@@ -515,6 +521,7 @@ export default function MessageListView({
                   }}
                 >
                   <MessageListCard
+                    mobile={mobile}
                     message={message}
                     isCurrentMessage={message.id === selectedId}
                     isSelected={selectedMessageSet.has(message.id)}

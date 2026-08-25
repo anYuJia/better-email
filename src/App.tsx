@@ -11,6 +11,10 @@ import Sidebar from './components/Sidebar';
 import AppTitlebar from './components/AppTitlebar';
 import MessageListPane, { type MessageContextAction, type BulkMessageAction } from './components/MessageListPane';
 import ReaderPane from './components/ReaderPane';
+import MobileInboxHeader from './components/mobile/MobileInboxHeader';
+import MobileBottomNav from './components/mobile/MobileBottomNav';
+import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
+import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
@@ -155,6 +159,12 @@ export default function App() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
+  const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>('web');
+  const [isViewportMobile, setIsViewportMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
+  );
+  const [mobileScreen, setMobileScreen] = useState<'mail' | 'reader' | 'mailbox' | 'settings'>('mail');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const themeMode = useThemeMode();
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
@@ -174,6 +184,108 @@ export default function App() {
   // 登录遮罩或首次引导期间，应用整体进入门禁状态：
   // 快捷键、托盘命令、写邮件、切换账号、设置都不能穿透。
   const isModalGateActive = isAccountLoginActive || Boolean(pendingOnboardingAccount);
+  const isMobileApp = isViewportMobile || nativePlatform === 'android' || nativePlatform === 'ios';
+
+  useEffect(() => {
+    let active = true;
+    invoke<string>(IPC.GetPlatform)
+      .then((platform) => {
+        if (!active) return;
+        if (platform === 'android' || platform === 'ios') {
+          setNativePlatform(platform);
+        } else if (platform === 'macos' || platform === 'windows' || platform === 'linux') {
+          setNativePlatform('desktop');
+        }
+      })
+      .catch(() => {
+        // Browser preview and component tests do not expose the native command.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia('(max-width: 720px)');
+    const update = () => setIsViewportMobile(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileApp) return undefined;
+    const current = window.history.state?.betterEmailScreen;
+    if (!current) {
+      window.history.replaceState(
+        { ...(window.history.state ?? {}), betterEmailScreen: 'mail' },
+        '',
+      );
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const next = event.state?.betterEmailScreen;
+      const nextScreen = next === 'reader' || next === 'mailbox' || next === 'settings'
+        ? next
+        : 'mail';
+      setMobileScreen(nextScreen);
+      setMobileSearchOpen(Boolean(event.state?.betterEmailSearch));
+      if (nextScreen === 'settings' && typeof event.state?.betterEmailSettingsSection === 'string') {
+        setActiveSettingsSection(event.state.betterEmailSettingsSection as SettingsSectionId);
+        setSettingsOpen(true);
+      } else {
+        setSettingsOpen(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isMobileApp]);
+
+  const navigateMobileScreen = useCallback((nextScreen: 'mail' | 'reader' | 'mailbox' | 'settings') => {
+    setMobileScreen(nextScreen);
+    setMobileSearchOpen(false);
+    if (!isMobileApp) return;
+    if (window.history.state?.betterEmailScreen === nextScreen) return;
+    const { betterEmailSettingsSection: _settingsSection, ...baseState } = window.history.state ?? {};
+    window.history.pushState(
+      { ...baseState, betterEmailScreen: nextScreen },
+      '',
+    );
+  }, [isMobileApp]);
+
+  const backMobileScreen = useCallback(() => {
+    setMobileSearchOpen(false);
+    if (isMobileApp && window.history.state?.betterEmailScreen !== 'mail') {
+      window.history.back();
+      return;
+    }
+    setMobileScreen('mail');
+  }, [isMobileApp]);
+
+  const openMobileSearch = useCallback(() => {
+    setMobileSearchOpen(true);
+    if (!isMobileApp || window.history.state?.betterEmailSearch) return;
+    window.history.pushState(
+      { ...(window.history.state ?? {}), betterEmailSearch: true },
+      '',
+    );
+  }, [isMobileApp]);
+
+  const closeMobileSearch = useCallback(() => {
+    if (isMobileApp && window.history.state?.betterEmailSearch) {
+      window.history.back();
+      return;
+    }
+    setMobileSearchOpen(false);
+  }, [isMobileApp]);
+
+  useEffect(() => {
+    if (isMobileApp && isSettingsOpen && mobileScreen !== 'settings') {
+      setMobileScreen('settings');
+    }
+  }, [isMobileApp, isSettingsOpen, mobileScreen]);
+
   const mailboxRefreshRef = useRef(0);
   const searchLoadersRef = useRef<MailboxSearchLoaders | null>(null);
   const {
@@ -593,6 +705,42 @@ export default function App() {
     setThreadMessages,
     navigationScopeClaimRef,
   });
+
+  const openMobileSettings = useCallback(() => {
+    if (isMobileApp) {
+      navigateMobileScreen('settings');
+      return;
+    }
+    openSettingsHome();
+  }, [isMobileApp, navigateMobileScreen, openSettingsHome]);
+
+  const openMobileSettingsSection = useCallback((section: SettingsSectionId) => {
+    if (isMobileApp && window.history.state?.betterEmailSettingsSection !== section) {
+      const { betterEmailSearch: _search, ...baseState } = window.history.state ?? {};
+      window.history.pushState(
+        {
+          ...baseState,
+          betterEmailScreen: 'settings',
+          betterEmailSettingsSection: section,
+        },
+        '',
+      );
+    }
+    setActiveSettingsSection(section);
+    setSettingsOpen(true);
+    loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
+  }, [accountScope, folderId, isMobileApp, loadMeta, setStatus]);
+
+  const closeSettingsSurface = useCallback(() => {
+    resetSaveAndVerifyReport();
+    if (isMobileApp && window.history.state?.betterEmailSettingsSection) {
+      window.history.back();
+      return;
+    }
+    setSettingsOpen(false);
+    if (isMobileApp) setMobileScreen('settings');
+  }, [isMobileApp, resetSaveAndVerifyReport]);
+
   function prepareProviderWriteValidation() {
     const validationDraft = createValidationDraft();
     if (!validationDraft) return;
@@ -860,24 +1008,27 @@ export default function App() {
     });
   }, []);
 
-  const toggleAllVisibleMessages = useCallback((checked: boolean) => {
+  const toggleAllVisibleMessages = useCallback(async (checked: boolean): Promise<number | null> => {
     const requestId = selectAllRequestRef.current + 1;
     selectAllRequestRef.current = requestId;
     if (!checked) {
       setSelectedMessageIds([]);
       setIsSelectingAllMessages(false);
-      return;
+      return null;
     }
 
     const refreshId = mailboxRefreshRef.current;
     setIsSelectingAllMessages(true);
-    void loadAllMessages()
+    return loadAllMessages()
       .then((allMessages) => {
-        if (requestId !== selectAllRequestRef.current || refreshId !== mailboxRefreshRef.current) return;
-        setSelectedMessageIds([...new Set(allMessages.map((message) => message.id))]);
+        if (requestId !== selectAllRequestRef.current || refreshId !== mailboxRefreshRef.current) return null;
+        const selectedIds = [...new Set(allMessages.map((message) => message.id))];
+        setSelectedMessageIds(selectedIds);
+        return selectedIds.length;
       })
       .catch((error) => {
         if (requestId === selectAllRequestRef.current) setStatus(String(error));
+        return null;
       })
       .finally(() => {
         if (requestId === selectAllRequestRef.current) setIsSelectingAllMessages(false);
@@ -1347,26 +1498,36 @@ export default function App() {
   }, []);
 
   const showNarrowSidebar = useCallback(() => {
+    if (isMobileApp) {
+      navigateMobileScreen('mailbox');
+      return;
+    }
     setNarrowView('sidebar');
     focusNarrowNavigationControl('[data-narrow-sidebar-close]');
-  }, [focusNarrowNavigationControl]);
+  }, [focusNarrowNavigationControl, isMobileApp, navigateMobileScreen]);
 
   const showNarrowList = useCallback(() => {
+    if (isMobileApp) {
+      backMobileScreen();
+      return;
+    }
     setNarrowView('list');
     focusNarrowNavigationControl('[data-narrow-sidebar-open]');
-  }, [focusNarrowNavigationControl]);
+  }, [backMobileScreen, focusNarrowNavigationControl, isMobileApp]);
 
   const showMessageInNarrowReader = useCallback((messageId: number) => {
+    if (isMobileApp) navigateMobileScreen('reader');
     setNarrowView('reader');
     selectMessageForReading(messageId);
     focusNarrowNavigationControl('[data-narrow-reader-back]');
-  }, [focusNarrowNavigationControl, selectMessageForReading]);
+  }, [focusNarrowNavigationControl, isMobileApp, navigateMobileScreen, selectMessageForReading]);
 
   const showThreadInNarrowReader = useCallback((thread: ThreadSummary) => {
+    if (isMobileApp) navigateMobileScreen('reader');
     setNarrowView('reader');
     focusNarrowNavigationControl('[data-narrow-reader-back]');
     return openThread(thread);
-  }, [focusNarrowNavigationControl, openThread]);
+  }, [focusNarrowNavigationControl, isMobileApp, navigateMobileScreen, openThread]);
 
   const handlePaneResizerKeyDown = useCallback((
     pane: keyof typeof APP_LAYOUT_BOUNDS,
@@ -1393,9 +1554,127 @@ export default function App() {
     || confirmPermanentlyDelete,
   );
 
+  const messageListContent = (
+    <AppErrorBoundary>
+      <MessageListPane
+        mobile={isMobileApp}
+        appliedQuery={appliedQuery}
+        onOpenNavigation={isMobileApp ? undefined : showNarrowSidebar}
+        filter={filter}
+        listMode={listMode}
+        listSort={listSort}
+        selectedMessageIds={selectedMessageIds}
+        folders={folders}
+        labels={labels}
+        threads={threads}
+        activeThread={activeThread}
+        messages={messages}
+        selectedId={selectedId}
+        hasMoreMessages={hasMoreMessages}
+        currentViewLabel={currentViewLabel}
+        visibleListSummary={visibleListSummary}
+        messageListSummary={messageListSummary}
+        listStateKey={mailboxListStateKey}
+        initialScrollTop={mailboxListScrollTop}
+        onScrollTopChange={handleMailboxListScrollTopChange}
+        onClearSearchAndFilter={handleClearSearchAndFilter}
+        onRefresh={handleRefresh}
+        onShowMessages={handleShowMessages}
+        onShowThreads={handleShowThreads}
+        onFilterChange={setFilter}
+        onSortChange={setListSort}
+        onToggleAllVisible={toggleAllVisibleMessages}
+        isSelectingAll={isSelectingAllMessages}
+        onRunBulkAction={runBulkAction}
+        onRequestSnooze={requestSnooze}
+        onMoveBulkToFolder={handleMoveBulkToFolder}
+        onToggleBulkLabel={handleToggleBulkLabel}
+        onRunMessageAction={handleRunMessageAction}
+        onMoveMessageToFolder={handleMoveMessageToFolder}
+        onToggleMessageLabel={handleToggleMessageLabel}
+        onComposeFromMessage={composeFromMessage}
+        onOpenThread={showThreadInNarrowReader}
+        onLoadThreadMessages={(thread) => openThread(thread, false)}
+        onRunThreadAction={handleRunThreadAction}
+        onMoveThreadToFolder={handleMoveThreadToFolder}
+        onToggleThreadLabel={handleToggleThreadLabel}
+        onToggleThreadMute={handleToggleThreadMute}
+        onSelectMessage={showMessageInNarrowReader}
+        onToggleMessageSelection={toggleMessageSelection}
+        onLoadMore={handleLoadMore}
+        loadMoreStatus={loadMoreStatus}
+      />
+    </AppErrorBoundary>
+  );
+
+  const readerContent = (
+    <AppErrorBoundary>
+      <ReaderPane
+        activeThread={activeThread}
+        threadMessages={threadMessages}
+        activeThreadSelected={activeThreadSelected}
+        selected={readerSelectedDetail}
+        selectedId={readerDisplayedId}
+        activeSelectedId={selectedId}
+        attachmentsLoaded={attachmentsLoaded}
+        readTriggerKey={readerSelectionRevision}
+        accountScope={accountScope}
+        folders={folders}
+        labels={labels}
+        attachments={attachments}
+        selectedSenderTrusted={selectedSenderTrusted}
+        selectedSenderDomain={selectedSenderDomain}
+        selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
+        selectedSenderIsExternal={selectedSenderIsExternal}
+        selectedExternalBlocked={selectedExternalBlocked}
+        selectedWarnExternalSender={selectedWarnExternalSender}
+        selectedInterceptsHttps={selectedInterceptsHttps}
+        onOpenHttpsLink={handleOpenHttpsLink}
+        quickReplyBody={quickReplyBody}
+        onSelectMessage={selectMessageForReading}
+        onComposeNew={handleComposeNew}
+        onComposeFromMessage={composeFromMessage}
+        onRunThreadAction={handleRunActiveThreadAction}
+        onMoveThreadToFolder={handleMoveActiveThreadToFolder}
+        onToggleThreadLabel={handleToggleActiveThreadLabel}
+        onToggleThreadMute={handleToggleActiveThreadMute}
+        onToggleStar={toggleStar}
+        onEditDraft={editDraftMessage}
+        onRestoreFromTrash={restoreSelectedFromTrash}
+        onMoveArchive={handleMoveArchive}
+        onMoveTrash={handleMoveTrash}
+        onToggleRead={toggleRead}
+        onReadComplete={markMessageReadAfterReading}
+        onUnsnooze={unsnoozeSelected}
+        onSnooze={snoozeSelected}
+        onExportMessage={exportSelectedMessage}
+        onFetchBody={fetchSelectedBody}
+        bodyFetchState={bodyFetchState}
+        onMarkNotSpam={markSelectedNotSpam}
+        onMarkAsSpam={markSelectedAsSpam}
+        onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
+        onTrustRemoteImages={trustRemoteImagesForSelected}
+        onBlockSender={blockSelectedSender}
+        onPermanentlyDelete={handlePermanentlyDelete}
+        onEmptyTrash={emptyCurrentTrash}
+        onMoveToFolder={handleMoveToFolder}
+        onToggleLabel={toggleLabel}
+        onCreateLabel={handleCreateLabel}
+        onUpdateLabel={handleUpdateLabel}
+        onDeleteLabel={handleDeleteLabel}
+        onOpenAttachment={openAttachment}
+        onDownloadAttachment={downloadAttachment}
+        onSaveAttachmentAs={saveAttachmentAs}
+        onQuickReplyChange={setQuickReplyBody}
+        onSendQuickReply={sendQuickReply}
+        onBackToList={showNarrowList}
+      />
+    </AppErrorBoundary>
+  );
+
   return (
     <main
-      className={`app-shell narrow-view-${narrowView}`}
+      className={`app-shell narrow-view-${narrowView}${isMobileApp ? ' is-mobile-app' : ''}`}
       style={{
         '--app-sidebar-width-preferred': `${appLayout.sidebar}px`,
         '--app-list-width-preferred': `${appLayout.list}px`,
@@ -1407,7 +1686,81 @@ export default function App() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
-      <AppTitlebar
+      {isMobileApp ? (
+        <div className={`mobile-app-surface mobile-screen-${mobileScreen}`}>
+          {mobileScreen === 'mail' && (
+            <>
+              <MobileInboxHeader
+                currentViewLabel={currentViewLabel}
+                visibleListSummary={visibleListSummary}
+                query={queryDraft}
+                filter={filter}
+                listMode={listMode}
+                isRefreshing={isRefreshing || isBackgroundSyncRunning}
+                refreshNotice={refreshNotice}
+                onOpenMailbox={showNarrowSidebar}
+                onOpenSearch={openMobileSearch}
+                onCloseSearch={closeMobileSearch}
+                onRefresh={handleRefresh}
+                onSearchSubmit={runSearch}
+                onQueryChange={handleQueryChange}
+                onClearSearchAndFilter={handleClearSearchAndFilter}
+                onFilterChange={setFilter}
+                onShowMessages={handleShowMessages}
+                onShowThreads={handleShowThreads}
+                searchOpen={mobileSearchOpen}
+              />
+              {messageListContent}
+              <MobileBottomNav
+                filter={filter}
+                onOpenMail={() => {
+                  handleShowMessages();
+                  setFilter('all');
+                  navigateMobileScreen('mail');
+                }}
+                onOpenStarred={() => {
+                  handleShowMessages();
+                  setFilter('starred');
+                  navigateMobileScreen('mail');
+                }}
+                onCompose={() => handleComposeNew(undefined)}
+                onOpenSettings={openMobileSettings}
+              />
+            </>
+          )}
+          {mobileScreen === 'reader' && (
+            <div className="mobile-reader-surface">
+              {readerContent}
+            </div>
+          )}
+          {mobileScreen === 'mailbox' && (
+            <MobileMailboxSheet
+              accountScope={accountScope}
+              accounts={accounts}
+              folders={folders}
+              folderId={folderId}
+              onClose={backMobileScreen}
+              onAccountScopeChange={changeAccountScope}
+              onSelectFolder={selectFolder}
+              onSetDefaultAccount={(accountId) => {
+                setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
+              }}
+              onCompose={() => handleComposeNew(undefined)}
+              onOpenSettings={openMobileSettings}
+            />
+          )}
+          {mobileScreen === 'settings' && !isSettingsOpen && (
+            <MobileSettingsRoot
+              account={account}
+              accounts={accounts}
+              onBack={backMobileScreen}
+              onOpenSection={openMobileSettingsSection}
+            />
+          )}
+        </div>
+      ) : (
+        <>
+          <AppTitlebar
         searchInputRef={searchInputRef}
         query={queryDraft}
         appliedQuery={appliedQuery}
@@ -1485,7 +1838,7 @@ export default function App() {
         onDeleteFolder={(folder) => { deleteCustomFolder(folder); }}
         onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
         onEmptyTrash={() => { emptyCurrentTrash(); }}
-        onOpenSettings={openSettingsHome}
+        onOpenSettings={openMobileSettings}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onCloseNavigation={showNarrowList}
       />
@@ -1507,54 +1860,7 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('sidebar', event)}
       />
 
-      <AppErrorBoundary>
-        <MessageListPane
-          appliedQuery={appliedQuery}
-          onOpenNavigation={showNarrowSidebar}
-          filter={filter}
-          listMode={listMode}
-          listSort={listSort}
-          selectedMessageIds={selectedMessageIds}
-          folders={folders}
-          labels={labels}
-          threads={threads}
-          activeThread={activeThread}
-          messages={messages}
-          selectedId={selectedId}
-          hasMoreMessages={hasMoreMessages}
-          currentViewLabel={currentViewLabel}
-          visibleListSummary={visibleListSummary}
-          messageListSummary={messageListSummary}
-          listStateKey={mailboxListStateKey}
-          initialScrollTop={mailboxListScrollTop}
-          onScrollTopChange={handleMailboxListScrollTopChange}
-          onClearSearchAndFilter={handleClearSearchAndFilter}
-          onRefresh={handleRefresh}
-          onShowMessages={handleShowMessages}
-          onShowThreads={handleShowThreads}
-          onFilterChange={setFilter}
-          onSortChange={setListSort}
-          onToggleAllVisible={toggleAllVisibleMessages}
-          isSelectingAll={isSelectingAllMessages}
-          onRunBulkAction={runBulkAction}
-          onRequestSnooze={requestSnooze}
-          onMoveBulkToFolder={handleMoveBulkToFolder}
-          onToggleBulkLabel={handleToggleBulkLabel}
-          onRunMessageAction={handleRunMessageAction}
-          onMoveMessageToFolder={handleMoveMessageToFolder}
-          onToggleMessageLabel={handleToggleMessageLabel}
-          onComposeFromMessage={composeFromMessage}
-          onOpenThread={showThreadInNarrowReader}
-          onRunThreadAction={handleRunThreadAction}
-          onMoveThreadToFolder={handleMoveThreadToFolder}
-          onToggleThreadLabel={handleToggleThreadLabel}
-          onToggleThreadMute={handleToggleThreadMute}
-          onSelectMessage={showMessageInNarrowReader}
-          onToggleMessageSelection={toggleMessageSelection}
-          onLoadMore={handleLoadMore}
-          loadMoreStatus={loadMoreStatus}
-        />
-      </AppErrorBoundary>
+      {messageListContent}
 
       <button
         className="pane-resizer list-resizer"
@@ -1573,68 +1879,9 @@ export default function App() {
         onMouseDown={(event) => beginLayoutMouseResize('list', event)}
       />
 
-      <AppErrorBoundary>
-        <ReaderPane
-          activeThread={activeThread}
-          threadMessages={threadMessages}
-          activeThreadSelected={activeThreadSelected}
-          selected={readerSelectedDetail}
-          selectedId={readerDisplayedId}
-          activeSelectedId={selectedId}
-          attachmentsLoaded={attachmentsLoaded}
-          readTriggerKey={readerSelectionRevision}
-          accountScope={accountScope}
-          folders={folders}
-          labels={labels}
-          attachments={attachments}
-          selectedSenderTrusted={selectedSenderTrusted}
-          selectedSenderDomain={selectedSenderDomain}
-          selectedHasRemoteImageWarning={selectedHasRemoteImageWarning}
-          selectedSenderIsExternal={selectedSenderIsExternal}
-          selectedExternalBlocked={selectedExternalBlocked}
-          selectedWarnExternalSender={selectedWarnExternalSender}
-          selectedInterceptsHttps={selectedInterceptsHttps}
-          onOpenHttpsLink={handleOpenHttpsLink}
-          quickReplyBody={quickReplyBody}
-          onSelectMessage={selectMessageForReading}
-          onComposeNew={handleComposeNew}
-          onComposeFromMessage={composeFromMessage}
-          onRunThreadAction={handleRunActiveThreadAction}
-          onMoveThreadToFolder={handleMoveActiveThreadToFolder}
-          onToggleThreadLabel={handleToggleActiveThreadLabel}
-          onToggleThreadMute={handleToggleActiveThreadMute}
-          onToggleStar={toggleStar}
-          onEditDraft={editDraftMessage}
-          onRestoreFromTrash={restoreSelectedFromTrash}
-          onMoveArchive={handleMoveArchive}
-          onMoveTrash={handleMoveTrash}
-          onToggleRead={toggleRead}
-          onReadComplete={markMessageReadAfterReading}
-          onUnsnooze={unsnoozeSelected}
-          onSnooze={snoozeSelected}
-          onExportMessage={exportSelectedMessage}
-          onFetchBody={fetchSelectedBody}
-          bodyFetchState={bodyFetchState}
-          onMarkNotSpam={markSelectedNotSpam}
-          onMarkAsSpam={markSelectedAsSpam}
-          onAllowRemoteImagesOnce={handleAllowRemoteImagesOnce}
-          onTrustRemoteImages={trustRemoteImagesForSelected}
-          onBlockSender={blockSelectedSender}
-          onPermanentlyDelete={handlePermanentlyDelete}
-          onEmptyTrash={emptyCurrentTrash}
-          onMoveToFolder={handleMoveToFolder}
-          onToggleLabel={toggleLabel}
-          onCreateLabel={handleCreateLabel}
-          onUpdateLabel={handleUpdateLabel}
-          onDeleteLabel={handleDeleteLabel}
-          onOpenAttachment={openAttachment}
-          onDownloadAttachment={downloadAttachment}
-          onSaveAttachmentAs={saveAttachmentAs}
-          onQuickReplyChange={setQuickReplyBody}
-          onSendQuickReply={sendQuickReply}
-          onBackToList={showNarrowList}
-        />
-      </AppErrorBoundary>
+      {readerContent}
+        </>
+      )}
 
       {!isAccountLoginActive && isComposerOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
@@ -1707,8 +1954,7 @@ export default function App() {
             primaryLabel="返回主视图"
             secondaryLabel="刷新应用"
             onPrimaryAction={() => {
-              resetSaveAndVerifyReport();
-              setSettingsOpen(false);
+              closeSettingsSurface();
             }}
           >
             <SettingsOverlay
@@ -1779,10 +2025,7 @@ export default function App() {
             providerWritebackValidationProgress={providerWritebackValidationProgress}
             setStatus={setStatus}
             onNavigate={scrollSettingsSection}
-            onClose={() => {
-              resetSaveAndVerifyReport();
-              setSettingsOpen(false);
-            }}
+            onClose={closeSettingsSurface}
             onTestConnection={() => {
               if (!accountForm) {
                 setStatus('请先添加邮箱账号');

@@ -964,28 +964,30 @@ async function selectValue(cdp, selector, value, index = 0) {
 
 async function fillComposerBody(cdp, value) {
   return withStep(`fillComposerBody ${shortText(value)}`, async () => {
+    const richReady = await evalInPage(
+      cdp,
+      "(() => { const rich = document.querySelector('.composer-richtext-body'); if (!rich) return false; rich.focus(); rich.innerHTML = ''; return true; })()",
+    );
+    if (richReady) {
+      // Input.insertText dispatches the same editable input path without
+      // relying on the deprecated document.execCommand API, which can hang
+      // Chrome's Runtime.evaluate on long-running smoke sessions.
+      await cdp.send('Input.insertText', { text: value });
+      await sleep(100);
+      return;
+    }
     await evalInPage(
       cdp,
       `(() => {
-        const rich = document.querySelector('.composer-richtext-body');
-        if (rich) {
-          rich.focus();
-          rich.innerHTML = '';
-          document.execCommand('insertText', false, ${JSON.stringify(value)});
-          return new Promise((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(resolve));
-          });
-        }
         const plain = document.querySelector('.composer textarea[placeholder="正文"]');
         if (!plain) throw new Error('Composer body field not found');
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
         setter.call(plain, ${JSON.stringify(value)});
         plain.dispatchEvent(new Event('input', { bubbles: true }));
-        return new Promise((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        });
+        return true;
       })()`,
     );
+    await sleep(100);
   });
 }
 
@@ -1482,9 +1484,10 @@ async function main() {
 
     await evalInPage(
       cdp,
-      "(() => { const footerText = document.querySelector('.message-list-footer')?.textContent || ''; const match = footerText.match(/已显示 (\\d+) 封/); window.__bulkShortcutCount = match ? Number(match[1]) : 50; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
+      "(() => { const footerText = document.querySelector('.message-list-footer')?.textContent || ''; const match = footerText.match(/已显示 (\\d+) 封/); window.__bulkShortcutVisibleCount = match ? Number(match[1]) : 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.bulk-selection span')?.innerText === `已选 ${window.__bulkShortcutCount}`");
+    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; const match = status.match(/已选择当前列表 (\\d+) 封邮件/); const selected = document.querySelector('.bulk-selection span')?.innerText || ''; return Boolean(match) && selected === `已选 ${match[1]}` && Number(match[1]) >= (window.__bulkShortcutVisibleCount || 0); })()");
+    await evalInPage(cdp, "(() => { const match = (document.querySelector('.status-line')?.innerText || '').match(/已选择当前列表 (\\d+) 封邮件/); if (!match) throw new Error('Keyboard select-all count not found'); window.__bulkShortcutCount = Number(match[1]); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; return !document.querySelector('.bulk-toolbar') && status.includes(`${window.__bulkShortcutCount} 封邮件`) && (status.includes('已批量添加星标') || status.includes('已批量取消星标')); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true }))");
@@ -2236,15 +2239,13 @@ async function main() {
       cdp,
       "(() => { const calls = window.__betterEmailMockInvocations || []; const call = [...calls].reverse().find((entry) => entry.command === 'queue_outbox_message' && entry.args?.input?.subject === 'Re: 安全检查清单'); return call?.args?.threading?.in_reply_to === '<mock-1-1@better-email.local>' && call.args.threading.references === '<mock-1-1@better-email.local>'; })()",
     );
-    await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '稍后处理', "document.querySelector('.reader-more-menu')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-message-actions button[aria-label=\"稍后处理\"]'); if (!button) throw new Error('Reader snooze action not found'); button.click(); })()");
     await waitForExpression(cdp, "document.querySelector('.snooze-dialog') && document.querySelectorAll('[data-snooze-preset]').length === 4 && document.querySelector('input[aria-label=\"自定义稍后处理时间\"]')");
     await evalInPage(cdp, "document.querySelector('[data-snooze-preset=\"tomorrow\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.snooze-dialog') && document.body.innerText.includes('已稍后处理到')");
     await clickButton(cdp, '稍后处理', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.body.innerText.includes('稍后到')");
-    await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '取消稍后', "document.querySelector('.reader-more-menu')");
+    await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-message-actions button[aria-label=\"取消稍后处理\"]'); if (!button) throw new Error('Reader unsnooze action not found'); button.click(); })()");
     await waitForExpression(cdp, "document.body.innerText.includes('已取消稍后处理') && document.body.innerText.includes('安全检查清单')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2 && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单'))");
@@ -2270,6 +2271,10 @@ async function main() {
       "document.querySelector('.reader-html')?.shadowRoot?.querySelector('img[src=\"/inline-image-preview.svg\"]')",
       10_000,
     );
+    await evalInPage(
+      cdp,
+      "document.querySelector('.reader-html')?.shadowRoot?.querySelector('img[src=\"/inline-image-preview.svg\"]')?.scrollIntoView({ block: 'center', inline: 'nearest' })",
+    );
     await waitForExpression(
       cdp,
       "(() => { const host = document.querySelector('.reader-html'); const image = host?.shadowRoot?.querySelector('img[src=\"/inline-image-preview.svg\"]'); const attachmentText = document.querySelector('.attachments')?.innerText || ''; return image?.complete && image.naturalWidth > 0 && document.querySelectorAll('.attachments > div').length === 1 && attachmentText.includes('security-checklist.pdf') && !attachmentText.includes('better-email-inline-logo'); })()",
@@ -2281,8 +2286,8 @@ async function main() {
     await captureScreenshot(cdp, 'attachment-download-retry');
     await clickButton(cdp, '重试', "document.querySelector('.attachments')");
     await waitForExpression(cdp, "document.body.innerText.includes('附件已从 64 KB 继续下载：security-checklist.pdf') && document.body.innerText.includes('打开')");
-    await openDetails(cdp, '.reader-reply-menu');
-    await clickButton(cdp, '转发', "document.querySelector('.reader-reply-menu')");
+    await openDetails(cdp, '.reader-more-menu');
+    await clickButton(cdp, '转发', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[aria-label=\"主题\"]')?.value === 'Fwd: 安全检查清单' && document.querySelector('.composer-attachment-list')?.innerText.includes('security-checklist.pdf') && document.querySelector('.status-line')?.textContent.includes('已带入 1 个附件')");
     await captureScreenshot(cdp, 'forward-with-source-attachment');
     await closeComposer(cdp);

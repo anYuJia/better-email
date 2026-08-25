@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type React from 'react';
 import {
+  ArrowLeft,
   FlaskConical,
   LoaderCircle,
   Save,
@@ -186,7 +187,8 @@ export default function SettingsFrame({
               data-no-tooltip
               onClick={onClose}
             >
-              <X size={16} />
+              <ArrowLeft className="settings-mobile-back-icon" size={18} aria-hidden="true" />
+              <X className="settings-desktop-close-icon" size={16} aria-hidden="true" />
             </button>
           </div>
         </header>

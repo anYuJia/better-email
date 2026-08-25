@@ -11,7 +11,11 @@ import type {
   ImapMailboxState,
 } from '../app/types';
 import { invoke } from '../tauriBridge';
-import { buildMailboxListStateKey, loadMailboxMessageLimit } from '../app/mailboxListState';
+import {
+  buildMailboxListStateKey,
+  loadMailboxMessageLimit,
+  saveMailboxListState,
+} from '../app/mailboxListState';
 import { buildMailboxRequests, checkHistoryIncomplete, mailboxFlowLog, mailboxFlowWarn } from './mailboxDataRequests';
 import type {
   LoadMetaOptions,
@@ -221,10 +225,19 @@ export default function useMailboxData({
       imapMailboxes
     );
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
+    // Persist the expanded page before the row transition commits.  A user
+    // can invoke a bulk action immediately after loading more; its refresh
+    // callback may still come from the previous render, so it must be able to
+    // read the latest limit without waiting for the effects pass.
+    saveMailboxListState(stateKey, { limit: effectiveLimit });
+    // Keep the pagination cursor observable before the lower-priority row
+    // transition commits.  Bulk actions can be triggered immediately after
+    // "加载更多" resolves; refreshes must retain the expanded limit instead
+    // of falling back to the original page size in that narrow window.
+    setMessageLimit(effectiveLimit);
+    setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
     startTransition(() => {
       setThreads(nextIncludeThreads ? nextThreads : []);
-      setMessageLimit(effectiveLimit);
-      setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
       setMessages(visibleMessages);
       setSelectedMessageIds((current) =>
         current.filter((id) => visibleMessageIds.has(id)),

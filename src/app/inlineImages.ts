@@ -16,9 +16,9 @@ function hasHtmlAttribute(tag: string, attributeName: string) {
   return new RegExp(`\\b${attributeName}\\s*=`, 'i').test(tag);
 }
 
-function addInlineImageRenderHints(tag: string) {
+function addInlineImageRenderHints(tag: string, defaultLoading: 'eager' | 'lazy' = 'lazy') {
   const attributes: string[] = [];
-  if (!hasHtmlAttribute(tag, 'loading')) attributes.push('loading="lazy"');
+  if (!hasHtmlAttribute(tag, 'loading')) attributes.push(`loading="${defaultLoading}"`);
   if (!hasHtmlAttribute(tag, 'decoding')) attributes.push('decoding="async"');
   if (attributes.length === 0) return tag;
   return tag.replace(/^<img\b/i, (match) => `${match} ${attributes.join(' ')}`);
@@ -127,7 +127,7 @@ export function resolveCidInlineImages(
     return addInlineImageRenderHints(imageTag.replace(
       sourceMatch[0],
       `src="${escapeAttribute(assetUrl)}" data-better-email-attachment-id="${attachment.id}"`,
-    ));
+    ), 'eager');
   });
 
   return {

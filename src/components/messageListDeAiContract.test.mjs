@@ -203,6 +203,21 @@ describe('message list de-AI contract — date headers are quiet metadata', () =
   });
 });
 
+describe('message list layering contract', () => {
+  it('keeps the scrollbar thumb above sticky date-group headers', () => {
+    const scrollbarBlocks = extractBlock(messageListCss, '.message-list-scrollbar-thumb');
+    const dateHeaderBlocks = extractBlock(messageListCss, '.message-date-header');
+    expect(scrollbarBlocks.length).toBeGreaterThan(0);
+    expect(dateHeaderBlocks.length).toBeGreaterThan(0);
+
+    const scrollbarZIndex = extractDecl(scrollbarBlocks[0], 'z-index');
+    const dateHeaderZIndex = extractDecl(dateHeaderBlocks[0], 'z-index');
+    expect(scrollbarZIndex).not.toBeNull();
+    expect(dateHeaderZIndex).not.toBeNull();
+    expect(scrollbarZIndex).toBeGreaterThan(dateHeaderZIndex);
+  });
+});
+
 describe('message list de-AI contract — CSS/TS row-height chain', () => {
   it('message-list-item CSS height === MESSAGE_ROW_HEIGHT TS constant', () => {
     const cssBlocks = extractBlock(messageListCss, '.message-list-item');

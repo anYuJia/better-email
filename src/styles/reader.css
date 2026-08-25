@@ -2371,7 +2371,7 @@
 }
 
 .app-shell .empty-reader {
-  padding: 40px;
+  padding: 28px;
 }
 
 .empty-reader-card {
@@ -2383,11 +2383,16 @@
 }
 
 .app-shell .empty-reader-card {
-  max-width: 340px;
+  width: min(100%, 360px);
+  max-width: 360px;
   padding: 0;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
+  text-align: center;
 }
 
 .empty-reader-card strong {
@@ -2399,7 +2404,8 @@
 .app-shell .empty-reader-card strong {
   color: var(--ui-text);
   font-size: 14px;
-  font-weight: 680;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .empty-reader-card span {
@@ -2409,25 +2415,34 @@
 }
 
 .app-shell .empty-reader-card span {
+  max-width: 260px;
   color: var(--ui-text-tertiary);
+  line-height: 1.55;
 }
 
 .app-shell .empty-reader-card .empty-state-mark {
-  width: 46px;
-  height: 46px;
-  margin-bottom: 3px;
-  border-radius: var(--ui-radius-panel);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0;
+  border-radius: 50%;
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .empty-reader-compose {
-  min-height: 34px;
-  border-color: var(--ui-border);
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-control);
   color: var(--ui-text);
-  background: var(--workspace-control-active);
+  background: var(--ui-surface);
+  font-size: 12px;
+  font-weight: 500;
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -2435,6 +2450,21 @@
   border-color: var(--ui-border-strong);
   color: var(--ui-text);
   background: var(--workspace-control);
+}
+
+@media (max-width: 720px) {
+  .app-shell .empty-reader {
+    padding: 24px 16px;
+  }
+
+  .app-shell .empty-reader-card {
+    width: min(100%, 320px);
+  }
+
+  .app-shell .empty-reader-compose {
+    min-height: 44px;
+    padding-inline: 16px;
+  }
 }
 
 /* Reader body fade-in (empty states only; body must not re-fade on switch) */

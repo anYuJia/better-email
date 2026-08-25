@@ -377,11 +377,11 @@ if (activeThread && threadMessages.length > 0) {
         <NarrowReaderNavigation onBack={onBackToList} />
         <div className="empty-reader">
           <div className="empty-reader-card">
-            <div className="empty-state-mark">
-              <Mail size={24} />
+            <div className="empty-state-mark" aria-hidden="true">
+              <Mail size={22} />
             </div>
             <strong>选择一封邮件开始阅读</strong>
-            <span>常用动作会保持可见，整理与安全选项按需展开。</span>
+            <span>从左侧列表选择一封邮件，内容会显示在这里。</span>
             <button type="button" className="empty-reader-compose" onClick={() => onComposeNew()}>
               <MailPlus size={15} />
               新邮件

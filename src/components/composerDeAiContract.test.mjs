@@ -233,6 +233,46 @@ describe('composer de-AI contract — no press scale animation in motion system'
   });
 });
 
+describe('composer motion contract — hover feedback is immediate', () => {
+  it('disables transitions for composer controls and the portalled sender menu', () => {
+    const selectors = [
+      '.composer button',
+      '.composer summary',
+      '.composer input',
+      '.composer select',
+      '.composer textarea',
+      '.composer .composer-field-row',
+      '.composer .composer-body-field',
+      '.composer .composer-attachments',
+      '.composer .composer-advanced-chevron',
+      '.custom-select-dropdown[data-portal-owner="composer-sender"] button',
+    ];
+
+    for (const selector of selectors) {
+      const rule = parseRules(composerCss)
+        .filter((candidate) => candidate.selector === selector)
+        .at(-1);
+      expect(rule, `missing motion reset for ${selector}`).toBeDefined();
+      expect(rule.body).toMatch(/transition:\s*none/);
+    }
+  });
+
+  it('keeps the progress fill as the only functional composer transition', () => {
+    const transitionRules = parseRules(composerCss).filter((rule) => (
+      /\btransition\s*:/.test(rule.body)
+    ));
+    const progressRules = transitionRules.filter((rule) => rule.selector.includes('progress-fill'));
+    expect(progressRules.length).toBeGreaterThan(0);
+
+    transitionRules
+      .filter((rule) => !rule.selector.includes('progress-fill'))
+      .forEach((rule) => {
+        expect(rule.body, `unexpected animated composer rule: ${rule.selector}`)
+          .toMatch(/transition:\s*none/);
+      });
+  });
+});
+
 describe('composer de-AI contract — context-menu has no blur', () => {
   it('context-menu.css has no backdrop-filter blur', () => {
     expect(contextMenuCss).not.toMatch(/backdrop-filter:\s*blur/);

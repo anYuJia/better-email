@@ -109,7 +109,7 @@
   box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
   font-weight: 560;
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer-header-actions button:hover {
@@ -137,7 +137,7 @@
   color: var(--ui-text-tertiary);
   font-size: 11px;
   font-weight: 560;
-  transition: var(--ui-transition-bg-short);
+  transition: none;
 }
 
 .composer-field-row:focus-within {
@@ -234,7 +234,7 @@
   background: var(--ui-control-hover);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 0;
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer .composer-recipient-chip button:hover {
@@ -284,7 +284,7 @@
   background: transparent;
   text-align: left;
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer .recipient-suggestions button:hover {
@@ -541,7 +541,7 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer-attachment-tile:hover {
@@ -675,7 +675,7 @@
   color: var(--ui-danger);
   background: transparent;
   font-size: 0;
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer-attachment-tile button:hover {
@@ -717,7 +717,7 @@
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer .rich-toolbar button:hover,
@@ -779,7 +779,7 @@
   font-size: 10.5px;
   font-weight: 560;
   cursor: pointer;
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer-quick-tools .checkbox-row:hover {
@@ -838,7 +838,7 @@
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   white-space: nowrap;
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer .composer-signature button:hover,
@@ -864,7 +864,7 @@
   flex: 1 1 auto;
   align-items: center;
   overflow: hidden;
-  transition: var(--ui-transition-bg-box-shadow-short);
+  transition: none;
 }
 
 .composer .composer-attachments.drop-active {
@@ -904,7 +904,7 @@
   background: transparent;
   font-size: 11px;
   font-weight: 600;
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer .composer-advanced summary:hover,
@@ -932,7 +932,7 @@
 .composer .composer-advanced-chevron {
   flex: 0 0 auto;
   color: var(--ui-text-tertiary);
-  transition: var(--ui-transition-transform-short);
+  transition: none;
 }
 
 .composer .composer-advanced[open] .composer-advanced-chevron {
@@ -1024,7 +1024,7 @@
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 10.5px;
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer .composer-delivery-controls input:hover,
@@ -1050,7 +1050,7 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer .composer-delivery-controls .custom-select-summary > span {
@@ -1125,7 +1125,7 @@
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 10px;
-  transition: var(--ui-transition-fast-color-background-border);
+  transition: none;
 }
 
 .composer .composer-template-row button:first-child {
@@ -1819,7 +1819,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: none;
 }
 
 .composer-field-row:focus-within {
@@ -2482,8 +2482,7 @@
   margin: 0;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard),
-    box-shadow var(--ui-motion-fast) var(--ui-ease-standard);
+  transition: none;
 }
 
 .composer .composer-body-field::after {
@@ -3220,7 +3219,7 @@
   border-color: transparent;
   border-radius: 6px;
   background: transparent;
-  transition: var(--ui-transition-fast-color-background);
+  transition: none;
 }
 
 .composer .composer-sender-context .custom-select-summary:hover {
@@ -3254,4 +3253,18 @@
 :root[data-theme="dark"] .composer .composer-sender-context .custom-select-summary[aria-expanded="true"] {
   border-color: transparent;
   background: color-mix(in oklch, var(--ui-accent-soft) 20%, var(--ui-surface));
+}
+
+/* Composer hover feedback is immediate: no breathing, fading, or hover glide. */
+.composer button,
+.composer summary,
+.composer input,
+.composer select,
+.composer textarea,
+.composer .composer-field-row,
+.composer .composer-body-field,
+.composer .composer-attachments,
+.composer .composer-advanced-chevron,
+.custom-select-dropdown[data-portal-owner="composer-sender"] button {
+  transition: none;
 }

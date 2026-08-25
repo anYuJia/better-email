@@ -71,7 +71,8 @@
   position: absolute;
   top: 0;
   right: 3px;
-  z-index: 2;
+  /* Keep the overlay visible while sticky date-group headers pass beneath it. */
+  z-index: 6;
   width: 6px;
   min-height: 0;
   border: 0;

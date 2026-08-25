@@ -160,6 +160,24 @@ describe('reader de-AI contract — reader is an opaque pane, not a floating car
   });
 });
 
+describe('reader empty state contract', () => {
+  it('uses a centered vertical composition instead of an inline text run', () => {
+    const rules = findRules(readerCss, '.app-shell .empty-reader-card');
+    const cardRule = rules.find((rule) => rule.selector === '.app-shell .empty-reader-card');
+    expect(cardRule).toBeDefined();
+    expect(cardRule.body).toMatch(/display:\s*grid/);
+    expect(cardRule.body).toMatch(/justify-items:\s*center/);
+    expect(cardRule.body).toMatch(/text-align:\s*center/);
+  });
+
+  it('keeps the empty reader icon in the same quiet neutral language as the inbox', () => {
+    const rules = findRules(readerCss, '.app-shell .empty-reader-card .empty-state-mark');
+    expect(rules.length).toBeGreaterThan(0);
+    expect(rules[0].body).toMatch(/border-radius:\s*50%/);
+    expect(rules[0].body).toMatch(/background:\s*var\(--ui-surface-muted\)/);
+  });
+});
+
 describe('reader de-AI contract — subject is a heading, not a hero', () => {
   it('subject h1 font-size is 18-20px (not hero-sized)', () => {
     const rules = findRules(readerCss, '.reader-header h1');

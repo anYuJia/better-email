@@ -36,6 +36,16 @@
   }
 }
 
+/* Keep the workspace planes visibly separated while compact desktop widths
+ * hide the draggable gutters. At phone width only one plane is shown, so
+ * there is no separator to draw. */
+@media (min-width: 721px) and (max-width: 1180px) {
+  .app-shell > .sidebar,
+  .app-shell > .message-list-panel {
+    border-right: 1px solid var(--ui-border);
+  }
+}
+
 /* Compact desktop/tablet: preserve list context while reading. */
 @media (min-width: 721px) and (max-width: 1040px) {
   .app-shell {

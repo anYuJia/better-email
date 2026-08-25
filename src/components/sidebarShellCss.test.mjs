@@ -15,6 +15,7 @@ function rulesOnly(css) {
 }
 
 const layoutCss = rulesOnly(readCss('src/styles/layout.css'));
+const responsiveCss = rulesOnly(readCss('src/styles/responsive.css'));
 const sidebarCss = rulesOnly(readCss('src/styles/sidebar.css'));
 const darkModeCss = rulesOnly(readCss('src/styles/dark-mode.css'));
 const windowChromeCss = rulesOnly(readCss('src/styles/window-chrome.css'));
@@ -56,6 +57,13 @@ describe('app shell de-AI contract', () => {
     expect(layoutCss).toMatch(/\.app-shell \.pane-resizer::before\s*\{[^}]*width:\s*1px/);
     expect(layoutCss).toMatch(/\.app-shell \.pane-resizer::after\s*\{[^}]*inset:\s*0 -4px/);
     expect(layoutCss).toMatch(/\.app-shell \.pane-resizer\s*\{[^}]*cursor:\s*col-resize/);
+  });
+
+  it('keeps compact desktop pane separators visible after gutters are hidden', () => {
+    expect(responsiveCss).toMatch(/@media\s*\(min-width:\s*721px\)\s*and\s*\(max-width:\s*1180px\)/);
+    expect(responsiveCss).toMatch(
+      /\.app-shell > \.sidebar,\s*\.app-shell > \.message-list-panel\s*\{[^}]*border-right:\s*1px solid var\(--ui-border\)/,
+    );
   });
 });
 

@@ -135,10 +135,10 @@
 }
 
 /* Compact shell (≤1180px): the grid collapses to a fixed three-column
- * layout without resizable gutters. The resizer buttons must not occupy
+ * layout without draggable gutters. The resizer buttons must not occupy
  * grid cells here — otherwise they steal a content column and push the
- * reader onto a second row. Hide them so the three columns map cleanly
- * to sidebar / message-list / reader. */
+ * reader onto a second row. Responsive pane borders keep the planes
+ * visibly separated after the gutters are removed. */
 @media (max-width: 1180px) {
   .app-shell {
     --app-sidebar-width: 200px;

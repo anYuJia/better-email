@@ -15,6 +15,7 @@ function composer() {
       identities={[]}
       fallbackAccountId={0}
       contacts={[]}
+      onAddContact={vi.fn()}
       templates={[]}
       templateName=""
       richComposer={false}

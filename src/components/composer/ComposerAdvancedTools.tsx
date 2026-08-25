@@ -6,6 +6,7 @@ import type {
   MailIdentity,
 } from '../../app/types';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
+import ComposerSchedulePicker from './ComposerSchedulePicker';
 
 type ComposerAdvancedToolsProps = {
   draft: DraftInput;
@@ -153,18 +154,16 @@ export default function ComposerAdvancedTools({
               placeholder="输入姓名或邮箱地址"
             />
           </label>
-          <label className="composer-schedule">
+          <div className="composer-schedule">
             <span>
               <Clock3 size={13} />
               定时
             </span>
-            <input
-              type="datetime-local"
-              aria-label="定时发送时间"
+            <ComposerSchedulePicker
               value={draft.send_at}
-              onChange={(event) => onPatchDraft({ send_at: event.target.value })}
+              onChange={(value) => onPatchDraft({ send_at: value })}
             />
-          </label>
+          </div>
         </section>
 
         <section className="composer-template-controls" aria-label="邮件模板">

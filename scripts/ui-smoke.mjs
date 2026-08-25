@@ -1121,6 +1121,23 @@ async function main() {
     await waitForExpression(cdp, "(() => { const shell = document.querySelector('.app-shell'); if (!shell) return false; const style = getComputedStyle(shell); return style.getPropertyValue('--app-sidebar-width').trim() === '244px' && style.getPropertyValue('--app-list-width').trim() === '388px'; })()");
 
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length <= 40 && document.querySelectorAll('.message-card').length > 5 && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 430,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 430 && document.querySelector('.app-shell.is-mobile-app .mobile-message-list-panel')");
+    await waitForExpression(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); return list && list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY === 'auto' && getComputedStyle(list).touchAction === 'pan-y'; })()");
+    await evalInPage(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); if (!list) throw new Error('Mobile message list not found'); list.scrollTop = Math.min(240, list.scrollHeight - list.clientHeight); list.dispatchEvent(new Event('scroll', { bubbles: true })); })()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel .message-list')?.scrollTop > 0");
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 1440 && !document.querySelector('.app-shell.is-mobile-app')");
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length < 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
     await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
@@ -1373,7 +1390,22 @@ async function main() {
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Draft Flow' && document.body.innerText.includes('已从恢复点还原邮件')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
+    await waitForExpression(cdp, "document.querySelector('.composer.has-contacts-panel .composer-contacts-panel') && document.querySelector('.composer-contacts-search input')");
+    await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel')");
+    await fillInput(cdp, '.composer-contacts-search input', 'nobody@example.com');
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-empty')?.innerText.includes('没有找到匹配联系人')");
+    await evalInPage(cdp, "document.querySelector('.composer-contacts-search button[aria-label=\"清除联系人搜索\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-search input')?.value === ''");
     await openDetails(cdp, '.composer-advanced');
+    await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-trigger')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer input[type=\"datetime-local\"]')");
+    await clickButton(cdp, '今天', "document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-trigger.is-set') && document.querySelector('.composer-schedule-picker-popover')");
+    await clickButton(cdp, '清除定时', "document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "!document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer-schedule-picker-trigger.is-set')");
     await fillInput(cdp, '.composer-template-save input[placeholder=\"模板名称\"]', 'Smoke 模板');
     await clickButton(cdp, '保存当前', "document.querySelector('.composer-template-save')");
     await waitForExpression(cdp, "document.body.innerText.includes('模板已保存：Smoke 模板')");
@@ -2191,7 +2223,7 @@ async function main() {
     await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
     await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Undo Send');
     await fillComposerBody(cdp, '撤销发送路径验证');
-    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-footer-actions .dialog-button-primary').click()");
     await waitForExpression(cdp, "document.querySelector('.message-toast-undo')?.innerText.includes('秒后发送') && document.querySelector('.message-toast-undo')?.innerText.includes('Smoke Undo Send')");
     await clickButton(cdp, '撤回发送', "document.querySelector('.message-toast-undo')");
     await waitForExpression(cdp, "!document.querySelector('.message-toast-undo') && document.body.innerText.includes('已撤回发送：Smoke Undo Send')");
@@ -2203,7 +2235,7 @@ async function main() {
     await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
     await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Auto Send');
     await fillComposerBody(cdp, '延迟发送到期路径验证');
-    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-footer-actions .dialog-button-primary').click()");
     await waitForExpression(cdp, "document.querySelector('.message-toast-undo')?.innerText.includes('Smoke Auto Send')");
     await waitForExpression(cdp, "!document.querySelector('.message-toast-undo') && document.body.innerText.includes('SMTP 发件箱发送完成')", 12_000);
     await closeComposer(cdp);
@@ -2355,7 +2387,7 @@ async function main() {
     await openDetails(cdp, '.composer-advanced');
     await pickCustomSelect(cdp, '.composer .custom-select-summary[aria-label="发件账号"]', 'design@better-email.local');
     await waitForExpression(cdp, "document.querySelector('.composer-risk-banner')?.innerText.includes('正在回复其他账号的邮件')");
-    await clickButton(cdp, '发送', "document.querySelector('.composer')");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-footer-actions .dialog-button-primary').click()");
     await waitForExpression(cdp, "document.querySelector('.dialog-card')?.innerText.includes('跨邮箱发送风险')");
     await clickButton(cdp, '返回修改', "document.querySelector('.dialog-card')");
     await waitForExpression(cdp, "!document.querySelector('.dialog-card') && document.querySelector('.composer')");
@@ -2421,8 +2453,11 @@ async function main() {
         'sidebar contact search stays removed',
         'contact settings edit opens',
         'contact command palette compose works',
+        'mobile message list has a touch-scrolling owner',
         'recipient autocomplete works',
         'composer advanced tools stay folded by default',
+        'composer contacts rail opens and searches empty state',
+        'composer schedule picker replaces native datetime control',
         'composer autosave restores after reload',
         'composer templates save and insert',
         'composer attachment chips work',

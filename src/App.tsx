@@ -913,6 +913,7 @@ export default function App() {
     handleComposerAttachmentDragEnter,
     handleComposerAttachmentDragLeave,
     removeDraftAttachment,
+    addContactToDraft,
     composeFromMessage,
     editDraftMessage,
     saveDraft,
@@ -1893,6 +1894,8 @@ export default function App() {
               identities={identities}
               fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
               contacts={managedContacts}
+              onAddContact={addContactToDraft}
+              onOpenContactsSettings={() => openMobileSettingsSection('contacts')}
               templates={composeTemplates}
               templateName={templateName}
               richComposer={isRichComposer}

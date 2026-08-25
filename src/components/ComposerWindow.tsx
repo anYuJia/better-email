@@ -6,6 +6,7 @@ import {
   Minus,
   Save,
   Send,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { isDraftEmpty } from '../app/appConfig';
@@ -22,6 +23,7 @@ import { formatDate } from '../mailUtils';
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
 import ConfirmDialog from './ConfirmDialog';
 import ComposerAdvancedTools, { ComposerSenderContext } from './composer/ComposerAdvancedTools';
+import ComposerContactsPanel, { type ComposerRecipientField } from './composer/ComposerContactsPanel';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools from './composer/ComposerQuickTools';
 import useModalAccessibility from '../hooks/useModalAccessibility';
@@ -70,6 +72,8 @@ export type ComposerWindowProps = {
   identities: MailIdentity[];
   fallbackAccountId: number;
   contacts: Contact[];
+  onAddContact: (contact: Contact, field: ComposerRecipientField) => void;
+  onOpenContactsSettings?: () => void;
   templates: ComposeTemplate[];
   templateName: string;
   richComposer: boolean;
@@ -113,6 +117,8 @@ export default function ComposerWindow({
   identities,
   fallbackAccountId,
   contacts,
+  onAddContact,
+  onOpenContactsSettings,
   templates,
   templateName,
   richComposer,
@@ -154,6 +160,9 @@ export default function ComposerWindow({
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
+  const [contactsOpen, setContactsOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth > 720,
+  );
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -200,6 +209,10 @@ export default function ComposerWindow({
     const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
     (firstField ?? panel)?.focus({ preventScroll: true });
   }, [minimized]);
+
+  useEffect(() => {
+    setPosition((current) => clampComposerPosition(panelRef.current, current));
+  }, [contactsOpen]);
 
   useEffect(() => {
     if (minimized) return undefined;
@@ -309,7 +322,7 @@ export default function ComposerWindow({
     >
       <section
         ref={panelRef}
-        className="composer"
+        className={`composer${contactsOpen ? ' has-contacts-panel' : ''}`}
         style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerMove={moveDrag}
@@ -322,6 +335,17 @@ export default function ComposerWindow({
             {draft.to.trim() && <small>{`发给 ${draft.to}`}</small>}
           </span>
           <div className="composer-header-actions">
+            <button
+              type="button"
+              className="composer-contact-toggle"
+              aria-label={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+              aria-expanded={contactsOpen}
+              title={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+              onClick={() => setContactsOpen((current) => !current)}
+            >
+              <UsersRound size={15} />
+              联系人
+            </button>
             <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
               <Minus size={15} />
               最小化
@@ -333,6 +357,8 @@ export default function ComposerWindow({
           </div>
         </header>
 
+        <div className={`composer-workspace${contactsOpen ? ' has-contacts' : ''}`}>
+          <div className="composer-editor-pane">
         <ComposerSenderContext
           accounts={accounts}
           identities={draftIdentities}
@@ -458,6 +484,18 @@ export default function ComposerWindow({
             </button>
           </div>
         </footer>
+          </div>
+
+          {contactsOpen && (
+            <ComposerContactsPanel
+              contacts={contacts}
+              draft={draft}
+              onAddContact={onAddContact}
+              onClose={() => setContactsOpen(false)}
+              onOpenContactsSettings={onOpenContactsSettings}
+            />
+          )}
+        </div>
       </section>
 
       <ConfirmDialog

@@ -283,6 +283,7 @@
   .mobile-app-surface .mobile-message-list-panel .message-list,
   .mobile-app-surface .mobile-message-list-panel .thread-list {
     padding-bottom: 8px;
+    touch-action: pan-y;
   }
 
   .mobile-app-surface .message-card,
@@ -597,6 +598,9 @@
   .mobile-reader-surface > .reader-panel {
     overflow: auto;
     background: var(--workspace-reader);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
   }
 
   .mobile-app-surface .narrow-reader-navigation {

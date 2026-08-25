@@ -230,9 +230,13 @@ jobs:
         shell: bash
         run: |
           NDK_PATH="${{ steps.setup_ndk.outputs['ndk-path'] }}"
+          TOOLCHAIN_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
           echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$TOOLCHAIN_BIN/llvm-ar" >> "$GITHUB_ENV"
+          echo "RANLIB_aarch64_linux_android=$TOOLCHAIN_BIN/llvm-ranlib" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_BIN" >> "$GITHUB_PATH"
 
       - name: Install frontend dependencies
         run: npm ci

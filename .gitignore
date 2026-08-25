@@ -4,6 +4,9 @@ tmp-ui-qa/
 .tmp-ui-qa-phase13/
 release-assets/
 src-tauri/target/
+src-tauri/gen/android/keystore.properties
+src-tauri/gen/android/*.keystore
+src-tauri/gen/android/*.jks
 *.log
 .DS_Store
 

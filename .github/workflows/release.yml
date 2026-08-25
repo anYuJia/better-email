@@ -23,6 +23,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   ANDROID_NDK_VERSION: r26b
+  ANDROID_BUILD_TOOLS_VERSION: '36.0.0'
 
 jobs:
   validate:
@@ -217,7 +218,7 @@ jobs:
           sdkmanager \
             "platform-tools" \
             "platforms;android-36" \
-            "build-tools;36.0.0"
+            "build-tools;${ANDROID_BUILD_TOOLS_VERSION}"
 
       - name: Setup Android NDK
         id: setup_ndk
@@ -241,26 +242,48 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Require Android signing secrets
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEY_BASE64 ANDROID_KEY_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name GitHub secret is required for Android release signing"
+              exit 1
+            fi
+          done
+
       - name: Initialize Android project
         run: npm run tauri -- android init --ci --skip-targets-install
+
+      - name: Generate Android app icons
+        # android init creates Tauri's sample icon. Generate the mobile icon
+        # set after init so the release APK uses the Better Email artwork.
+        run: npm run tauri -- icon src-tauri/icons/icon.png
 
       - name: Build Android artifacts
         run: npm run tauri -- android build --ci --target aarch64 --apk --aab
 
-      - name: Prepare Android release assets
-        shell: bash
+      - name: Sign and prepare Android release assets
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           VERSION="$(node -p "require('./package.json').version")"
-          APK="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
-          AAB="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' -print -quit)"
-          test -n "$APK" && test -f "$APK"
-          test -n "$AAB" && test -f "$AAB"
-          mkdir -p release-assets
-          cp "$APK" "release-assets/Better_Email_${VERSION}_android_arm64.apk"
-          cp "$AAB" "release-assets/Better_Email_${VERSION}_android_arm64.aab"
+          node scripts/prepare-android-artifacts.mjs \
+            --outputs="src-tauri/gen/android/app/build/outputs" \
+            --output="release-assets" \
+            --version="$VERSION"
 
-      - name: Upload Android release assets
+      - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-${{ github.sha }}

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 tmp-ui-qa/
+.tmp-ui-qa-phase13/
 release-assets/
 src-tauri/target/
 *.log

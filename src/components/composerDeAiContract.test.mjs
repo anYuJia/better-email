@@ -271,6 +271,22 @@ describe('composer motion contract — hover feedback is immediate', () => {
           .toMatch(/transition:\s*none/);
       });
   });
+
+  it('keeps recipient input geometry stable while hovering or focusing', () => {
+    const stableSelectors = [
+      '.composer .composer-recipient-editor input',
+      '.composer .composer-recipient-editor input:hover',
+      '.composer .composer-recipient-editor input:focus',
+    ];
+
+    for (const selector of stableSelectors) {
+      const rule = parseRules(composerCss)
+        .filter((candidate) => candidate.selector === selector)
+        .at(-1);
+      expect(rule, `missing stable recipient input rule for ${selector}`).toBeDefined();
+      expect(rule.body).toMatch(/min-height:\s*32px/);
+    }
+  });
 });
 
 describe('composer de-AI contract — context-menu has no blur', () => {

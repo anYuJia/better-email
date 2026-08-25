@@ -2421,6 +2421,15 @@
   min-height: 32px;
 }
 
+/* Recipient inputs share a wrapping editor with the chips. Keep that editor
+ * at one geometry in every pointer/focus state; the generic field rule above
+ * must not make a recipient row jump from 32px to 42px on hover. */
+.composer .composer-recipient-editor input,
+.composer .composer-recipient-editor input:hover,
+.composer .composer-recipient-editor input:focus {
+  min-height: 32px;
+}
+
 .composer .composer-recipient-chip {
   min-height: 28px;
   padding: 2px 3px 2px 9px;

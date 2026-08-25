@@ -1407,6 +1407,42 @@ async function main() {
 
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('新邮件') && (document.querySelector('.composer textarea') || document.querySelector('.composer-richtext-body'))");
+    const recipientHoverBaseline = await evalInPage(cdp, `(() => {
+      const rows = [...document.querySelectorAll('.composer .composer-recipient-field .composer-field-row')];
+      return rows.map((row) => {
+        const input = row.querySelector('input');
+        const rect = row.getBoundingClientRect();
+        const inputRect = input?.getBoundingClientRect();
+        return {
+          label: row.querySelector('span')?.textContent?.trim(),
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          height: rect.height,
+          inputHeight: inputRect?.height,
+        };
+      });
+    })()`);
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 10 });
+    for (const row of recipientHoverBaseline ?? []) {
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: row.x, y: row.y });
+      await sleep(40);
+      const hovered = await evalInPage(cdp, `(() => {
+        const row = [...document.querySelectorAll('.composer .composer-recipient-field .composer-field-row')]
+          .find((item) => item.querySelector('span')?.textContent?.trim() === ${JSON.stringify(row.label)});
+        if (!row) return null;
+        const input = row.querySelector('input');
+        const rect = row.getBoundingClientRect();
+        const inputRect = input?.getBoundingClientRect();
+        return {
+          height: rect.height,
+          inputHeight: inputRect?.height,
+          hovered: row.matches(':hover'),
+        };
+      })()`);
+      if (!hovered?.hovered || hovered.height !== row.height || hovered.inputHeight !== row.inputHeight) {
+        throw new Error(`Recipient row geometry changed on hover: ${JSON.stringify({ before: row, after: hovered })}`);
+      }
+    }
     await clickButton(cdp, '最小化', "document.querySelector('.composer header')");
     await waitForExpression(cdp, "document.querySelector('.composer-minimized') && document.body.innerText.includes('展开')");
     await clickButton(cdp, '展开', "document.querySelector('.composer-minimized')");
@@ -2495,6 +2531,7 @@ async function main() {
         'mobile reader owns a touch-scrolling surface',
         'mobile settings root and section navigation return through browser history',
         'recipient autocomplete works',
+        'recipient rows keep hover geometry',
         'composer advanced tools stay folded by default',
         'composer contacts rail opens and searches empty state',
         'composer schedule picker replaces native datetime control',

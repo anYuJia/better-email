@@ -3266,18 +3266,18 @@
 .composer textarea,
 .composer [contenteditable="true"],
 .custom-select-dropdown[data-portal-owner="composer-sender"] button {
-  transition: none !important;
-  transform: none !important;
-  translate: none !important;
-  rotate: none !important;
-  scale: 1 !important;
+  transition: none;
+  transform: none;
+  translate: none;
+  rotate: none;
+  scale: 1;
 }
 
 .composer .composer-field-row,
 .composer .composer-body-field,
 .composer .composer-attachments,
 .composer .composer-advanced-chevron {
-  transition: none !important;
+  transition: none;
 }
 
 /* App-owned schedule picker ---------------------------------------------- */
@@ -3356,13 +3356,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.composer-schedule-picker-popover button,
-.composer-schedule-picker-popover select {
-  transition: none !important;
-  transform: none !important;
-  translate: none !important;
-  rotate: none !important;
-  scale: 1 !important;
+.composer-schedule-picker-popover button {
+  transition: none;
+  transform: none;
+  translate: none;
+  rotate: none;
+  scale: 1;
 }
 
 .composer-schedule-picker-header {
@@ -3512,7 +3511,7 @@
 .composer-schedule-picker-today:focus-visible,
 .composer-schedule-picker-monthbar button:focus-visible,
 .composer-schedule-picker-footer button:focus-visible,
-.composer-schedule-picker-time-fields select:focus-visible {
+.composer-schedule-time-select button:focus-visible {
   outline: var(--ui-focus-outline);
   outline-offset: 1px;
 }
@@ -3547,9 +3546,16 @@
   gap: 4px;
 }
 
-.composer-schedule-picker-time-fields select {
+.composer-schedule-time-select {
+  position: relative;
+}
+
+.composer-schedule-time-select > button {
   min-width: 50px;
   min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 6px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
@@ -3557,6 +3563,46 @@
   background: var(--ui-surface);
   font-size: 12px;
   text-align: center;
+}
+
+.composer-schedule-time-select > button[aria-expanded="true"] {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer-schedule-time-options {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 2;
+  width: 64px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+  overscroll-behavior: contain;
+}
+
+.composer-schedule-time-options button {
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-schedule-time-options button:hover,
+.composer-schedule-time-options button[aria-selected="true"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
 .composer-schedule-picker-time-fields b {
@@ -3783,7 +3829,7 @@
 .composer-contacts-tabs button span {
   min-width: 16px;
   padding: 1px 4px;
-  border-radius: 999px;
+  border-radius: var(--ui-radius-pill);
   color: var(--ui-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
   font-size: 9px;
@@ -3928,19 +3974,19 @@
   display: grid;
   place-items: center;
   border-radius: 11px;
-  color: white;
+  color: var(--color-text-on-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 24%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-text-on-accent) 24%, transparent);
 }
 
-.composer-contact-avatar.tone-blue { background: #4b8ed8; }
-.composer-contact-avatar.tone-green { background: #5baf72; }
-.composer-contact-avatar.tone-orange { background: #e58a3b; }
-.composer-contact-avatar.tone-purple { background: #8a70c9; }
-.composer-contact-avatar.tone-teal { background: #3caaa0; }
-.composer-contact-avatar.tone-rose { background: #d36d89; }
+.composer-contact-avatar.tone-blue { background: var(--ui-accent); }
+.composer-contact-avatar.tone-green { background: var(--ui-success); }
+.composer-contact-avatar.tone-orange { background: var(--ui-warning); }
+.composer-contact-avatar.tone-purple { background: color-mix(in oklch, var(--ui-accent) 56%, var(--ui-danger)); }
+.composer-contact-avatar.tone-teal { background: color-mix(in oklch, var(--ui-accent) 70%, var(--ui-success)); }
+.composer-contact-avatar.tone-rose { background: color-mix(in oklch, var(--ui-danger) 70%, var(--ui-accent)); }
 
 .composer-contact-copy {
   min-width: 0;

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -88,6 +88,85 @@ function buildCalendarDays(month: Date) {
 function displayValue(date: Date | null) {
   if (!date) return '选择发送时间';
   return `${date.getMonth() + 1}月${date.getDate()}日 · ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+type TimeSelectProps = {
+  ariaLabel: string;
+  value: number;
+  options: number[];
+  onChange: (value: number) => void;
+};
+
+function TimeSelect({ ariaLabel, value, options, onChange }: TimeSelectProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listboxId = useId();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [open]);
+
+  return (
+    <div className="composer-schedule-time-select" ref={rootRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-controls={listboxId}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' && !open) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {pad(value)}
+      </button>
+      {open && (
+        <div id={listboxId} className="composer-schedule-time-options" role="listbox" aria-label={ariaLabel}>
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+                triggerRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              {pad(option)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ComposerSchedulePicker({
@@ -286,25 +365,19 @@ export default function ComposerSchedulePicker({
           发送时间
         </span>
         <div className="composer-schedule-picker-time-fields">
-          <select
-            aria-label="小时"
+          <TimeSelect
+            ariaLabel="小时"
             value={time.hour}
-            onChange={(event) => updateTime('hour', event.target.value)}
-          >
-            {Array.from({ length: 24 }, (_, hour) => (
-              <option key={hour} value={hour}>{pad(hour)}</option>
-            ))}
-          </select>
+            options={Array.from({ length: 24 }, (_, hour) => hour)}
+            onChange={(hour) => updateTime('hour', String(hour))}
+          />
           <b>:</b>
-          <select
-            aria-label="分钟"
+          <TimeSelect
+            ariaLabel="分钟"
             value={time.minute}
-            onChange={(event) => updateTime('minute', event.target.value)}
-          >
-            {Array.from({ length: 60 }, (_, minute) => (
-              <option key={minute} value={minute}>{pad(minute)}</option>
-            ))}
-          </select>
+            options={Array.from({ length: 60 }, (_, minute) => minute)}
+            onChange={(minute) => updateTime('minute', String(minute))}
+          />
         </div>
       </div>
 

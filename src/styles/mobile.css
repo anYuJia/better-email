@@ -750,7 +750,14 @@
     font-size: 12px;
   }
 
-  .app-shell.is-mobile-app .composer-header-actions button:first-child {
+  .app-shell.is-mobile-app .composer-header-actions .composer-contact-toggle {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-shell.is-mobile-app .composer-header-actions .composer-contact-toggle > span {
     display: none;
   }
 

@@ -344,7 +344,7 @@ export default function ComposerWindow({
               onClick={() => setContactsOpen((current) => !current)}
             >
               <UsersRound size={15} />
-              联系人
+              <span>联系人</span>
             </button>
             <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
               <Minus size={15} />

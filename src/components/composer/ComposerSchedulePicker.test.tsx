@@ -35,8 +35,10 @@ describe('ComposerSchedulePicker', () => {
     render(<ControlledPicker initialValue="2026-08-25T12:30" />);
 
     fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
-    fireEvent.change(screen.getByRole('combobox', { name: '小时' }), { target: { value: '15' } });
-    fireEvent.change(screen.getByRole('combobox', { name: '分钟' }), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '小时' }));
+    fireEvent.click(screen.getByRole('option', { name: '15' }));
+    fireEvent.click(screen.getByRole('combobox', { name: '分钟' }));
+    fireEvent.click(screen.getByRole('option', { name: '45' }));
 
     expect(screen.getByRole('button', { name: '定时发送时间' }).textContent).toContain('8月25日 · 15:45');
   });

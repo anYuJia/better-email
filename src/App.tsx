@@ -1451,6 +1451,18 @@ export default function App() {
     setStatus('已打开新邮件');
   }, [account, accounts, openComposer, setStatus]);
 
+  const openComposerContactsSettings = useCallback(() => {
+    const openContactsSettings = () => openMobileSettingsSection('contacts');
+    if (isDraftEmpty(draft)) {
+      forceCloseComposer();
+      openContactsSettings();
+      return;
+    }
+    saveDraft()
+      .then(openContactsSettings)
+      .catch((error) => setStatus(String(error)));
+  }, [draft, forceCloseComposer, openMobileSettingsSection, saveDraft, setStatus]);
+
   const handleRunActiveThreadAction = useCallback((action: BulkMessageAction) => {
     if (!activeThread) return;
     runThreadAction(activeThread, threadMessages, action).catch((error) => setStatus(String(error)));
@@ -1743,9 +1755,6 @@ export default function App() {
               onClose={backMobileScreen}
               onAccountScopeChange={changeAccountScope}
               onSelectFolder={selectFolder}
-              onSetDefaultAccount={(accountId) => {
-                setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
-              }}
               onCompose={() => handleComposeNew(undefined)}
               onOpenSettings={openMobileSettings}
             />
@@ -1895,7 +1904,7 @@ export default function App() {
               fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
               contacts={managedContacts}
               onAddContact={addContactToDraft}
-              onOpenContactsSettings={() => openMobileSettingsSection('contacts')}
+              onOpenContactsSettings={openComposerContactsSettings}
               templates={composeTemplates}
               templateName={templateName}
               richComposer={isRichComposer}

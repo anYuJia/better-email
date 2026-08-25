@@ -1131,6 +1131,22 @@ async function main() {
     await waitForExpression(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); return list && list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY === 'auto' && getComputedStyle(list).touchAction === 'pan-y'; })()");
     await evalInPage(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); if (!list) throw new Error('Mobile message list not found'); list.scrollTop = Math.min(240, list.scrollHeight - list.clientHeight); list.dispatchEvent(new Event('scroll', { bubbles: true })); })()");
     await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel .message-list')?.scrollTop > 0");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-header .mobile-header-icon[aria-label=\"打开邮箱导航\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-mailbox-sheet')");
+    await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-mailbox-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
+    await evalInPage(cdp, "document.querySelector('.mobile-mailbox-footer button')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer') && !document.querySelector('.mobile-mailbox-sheet')");
+    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
+    await waitForExpression(cdp, "(() => { const panel = document.querySelector('.composer-contacts-panel'); return panel && getComputedStyle(panel).display !== 'none'; })()");
+    await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel')");
+    await closeComposer(cdp);
+    await evalInPage(cdp, "document.querySelector('.mobile-message-list-panel .message-card-main')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-reader-surface > .reader-panel')");
+    await waitForExpression(cdp, "(() => { const panel = document.querySelector('.mobile-reader-surface > .reader-panel'); return panel && getComputedStyle(panel).overflowY === 'auto' && getComputedStyle(panel).touchAction === 'pan-y'; })()");
+    await evalInPage(cdp, "document.querySelector('[data-narrow-reader-back]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel') && !document.querySelector('.mobile-reader-surface')");
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
       height: 980,
@@ -2454,6 +2470,8 @@ async function main() {
         'contact settings edit opens',
         'contact command palette compose works',
         'mobile message list has a touch-scrolling owner',
+        'mobile mailbox sheet closes before compose and exposes contact picker',
+        'mobile reader owns a touch-scrolling surface',
         'recipient autocomplete works',
         'composer advanced tools stay folded by default',
         'composer contacts rail opens and searches empty state',

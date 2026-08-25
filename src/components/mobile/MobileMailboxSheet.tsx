@@ -17,7 +17,6 @@ type MobileMailboxSheetProps = {
   onClose: () => void;
   onAccountScopeChange: (value: string) => void;
   onSelectFolder: (folderId: number) => void;
-  onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
   onOpenSettings: () => void;
 };
@@ -43,7 +42,6 @@ export default function MobileMailboxSheet({
   onClose,
   onAccountScopeChange,
   onSelectFolder,
-  onSetDefaultAccount,
   onCompose,
   onOpenSettings,
 }: MobileMailboxSheetProps) {
@@ -91,7 +89,6 @@ export default function MobileMailboxSheet({
                 key={account.id}
                 onClick={() => {
                   onAccountScopeChange(String(account.id));
-                  onSetDefaultAccount(account.id);
                   onClose();
                 }}
               >
@@ -138,7 +135,13 @@ export default function MobileMailboxSheet({
         </div>
 
         <footer className="mobile-mailbox-footer">
-          <button type="button" onClick={onCompose}>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onCompose();
+            }}
+          >
             <Edit3 size={19} aria-hidden="true" />
             写邮件
           </button>

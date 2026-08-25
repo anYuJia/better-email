@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneElement } from 'react';
 import { emptyDraft } from '../app/composerConfig';
 import ComposerWindow from './ComposerWindow';
@@ -55,6 +55,20 @@ function composer() {
 }
 
 describe('ComposerWindow focus lifecycle', () => {
+  it('keeps the contact picker reachable on a phone-sized viewport', () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    try {
+      render(composer());
+
+      expect(screen.queryByRole('complementary', { name: '联系人' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '打开联系人面板' }));
+      expect(screen.getByRole('complementary', { name: '联系人' })).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+    }
+  });
+
   it('keeps the sending account and identity visible outside advanced options', () => {
     render(composer());
 

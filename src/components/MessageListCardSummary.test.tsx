@@ -53,11 +53,12 @@ function renderCard(
   options: {
     isSelected?: boolean;
     isSelectionMode?: boolean;
+    appShell?: boolean;
     onToggleMessageSelection?: (messageId: number, checked: boolean) => void;
   } = {},
 ) {
   return render(
-    <div style={{ width: 340 }}>
+    <div className={options.appShell ? 'app-shell' : undefined} style={{ width: 340 }}>
       <MessageListCard
         message={message}
         isCurrentMessage={false}
@@ -152,14 +153,17 @@ describe('message list summary single-line rendering', () => {
     expect(container.querySelector('.message-card .message-chips')?.textContent).not.toContain('项目通知');
   });
 
-  it('reveals a standard checkbox in selection mode without shifting row content', () => {
+  it('reveals a circular upper-left checkbox in selection mode without shifting row content', () => {
     const onToggleMessageSelection = vi.fn();
+    injectCascade();
     const { container } = renderCard(messageWithLongPreview(), {
       isSelectionMode: true,
       isSelected: true,
+      appShell: true,
       onToggleMessageSelection,
     });
     const card = container.querySelector('.message-card')!;
+    const selection = container.querySelector<HTMLElement>('.message-select')!;
     const checkbox = container.querySelector<HTMLInputElement>('.message-select input')!;
     const main = container.querySelector<HTMLButtonElement>('.message-card-main')!;
 
@@ -167,6 +171,11 @@ describe('message list summary single-line rendering', () => {
     expect(card.classList.contains('is-selected')).toBe(true);
     expect(checkbox.tabIndex).toBe(0);
     expect(checkbox.checked).toBe(true);
+    expect(getComputedStyle(selection).left).toBe('0px');
+    expect(getComputedStyle(selection).top).toBe('0px');
+    expect(getComputedStyle(selection).width).toBe('40px');
+    expect(getComputedStyle(selection).height).toBe('40px');
+    expect(getComputedStyle(checkbox).borderRadius).toBe('50%');
     fireEvent.click(checkbox);
     expect(onToggleMessageSelection).toHaveBeenCalledWith(1, false);
 

@@ -994,18 +994,19 @@
   user-select: none;
 }
 
-/* Checkbox replaces the avatar slot on hover / selection — layout stays put. */
+/* Keep the selection control at the message row component's upper-left corner
+ * without changing the message content column or row height. */
 .message-select {
   position: absolute;
   left: 0;
-  top: 50%;
+  top: 0;
   z-index: 3;
   opacity: 0;
-  transform: translateY(-50%);
+  transform: none;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   pointer-events: none;
 }
 
@@ -1032,7 +1033,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 3px;
+  border-radius: 50%;
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
@@ -1068,12 +1069,6 @@
   box-shadow: var(--ui-focus-ring);
 }
 
-/* The current (reader-open) row keeps a real, clickable checkbox. */
-.app-shell .message-select {
-  left: 0;
-  right: auto;
-}
-
 .app-shell .message-select input {
   width: 16px;
   height: 16px;
@@ -1081,7 +1076,7 @@
   min-height: 16px;
   max-width: 16px;
   max-height: 16px;
-  border-radius: 3px;
+  border-radius: 50%;
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
@@ -1098,19 +1093,20 @@
   box-shadow: var(--ui-focus-ring);
 }
 
-/* Reserve trailing gutter for the selection control. */
+/* Keep the message content aligned to the list edge; selection is no longer
+ * reserved in a trailing gutter. */
 .app-shell .message-card {
-  padding-right: 48px;
+  padding-right: 16px;
 }
 
 .app-shell .message-select {
-  left: auto;
-  right: 16px;
-  top: 50%;
+  left: 0;
+  right: auto;
+  top: 0;
   z-index: 5;
   display: grid;
   opacity: 0;
-  transform: translateY(-50%);
+  transform: none;
   pointer-events: none;
 }
 

@@ -98,47 +98,49 @@ fn dirs_app_data_dir() -> Option<std::path::PathBuf> {
     }
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 fn set_tray_unread_count(
     unread_count: u64,
-    #[cfg(desktop)] state: tauri::State<'_, TrayState>,
+    state: tauri::State<'_, TrayState>,
 ) -> Result<(), String> {
-    #[cfg(desktop)]
-    {
-        if let Some(ref item) = *state.unread_item.lock().unwrap() {
-            let text = if unread_count == 0 {
-                "没有未读邮件".to_string()
-            } else {
-                format!("未读邮件：{}", unread_count)
-            };
-            let _ = item.set_text(text);
-        }
+    if let Some(ref item) = *state.unread_item.lock().unwrap() {
+        let text = if unread_count == 0 {
+            "没有未读邮件".to_string()
+        } else {
+            format!("未读邮件：{}", unread_count)
+        };
+        let _ = item.set_text(text);
+    }
 
-        if let Some(ref tray) = *state.tray.lock().unwrap() {
-            let tooltip = if unread_count == 0 {
-                "Better Email".to_string()
-            } else {
-                format!("Better Email · {} 未读", unread_count)
-            };
-            let _ = tray.set_tooltip(Some(tooltip));
+    if let Some(ref tray) = *state.tray.lock().unwrap() {
+        let tooltip = if unread_count == 0 {
+            "Better Email".to_string()
+        } else {
+            format!("Better Email · {} 未读", unread_count)
+        };
+        let _ = tray.set_tooltip(Some(tooltip));
 
-            #[cfg(target_os = "macos")]
-            {
-                let title = if unread_count == 0 {
-                    "".to_string()
-                } else if unread_count > 99 {
-                    "99+".to_string()
-                } else {
-                    unread_count.to_string()
-                };
-                let _ = tray.set_title(Some(title));
-            }
+        #[cfg(target_os = "macos")]
+        {
+            let title = if unread_count == 0 {
+                "".to_string()
+            } else if unread_count > 99 {
+                "99+".to_string()
+            } else {
+                unread_count.to_string()
+            };
+            let _ = tray.set_title(Some(title));
         }
     }
 
-    #[cfg(not(desktop))]
-    let _ = unread_count;
+    Ok(())
+}
 
+#[cfg(not(desktop))]
+#[tauri::command]
+fn set_tray_unread_count(_unread_count: u64) -> Result<(), String> {
+    // 移动端没有系统托盘；保留同名命令以兼容前端调用。
     Ok(())
 }
 

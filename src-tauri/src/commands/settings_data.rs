@@ -150,6 +150,7 @@ pub fn get_app_settings(store: State<'_, MailStore>) -> MailResult<AppSettingsRe
 
 /// 弹出原生文件夹选择器，让用户设置「默认附件下载位置」。
 /// 取消选择时不修改设置；选择不可写或危险位置时不保存并返回可操作错误。
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn set_download_dir(
     app: AppHandle,
@@ -175,6 +176,16 @@ pub async fn set_download_dir(
     Ok(DownloadDirSetResult {
         settings: app_settings_report(&store)?,
         cancelled: false,
+    })
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub async fn set_download_dir(store: State<'_, MailStore>) -> MailResult<DownloadDirSetResult> {
+    // Android/iOS 没有可用的文件夹选择器；保持命令可调用并报告未选择。
+    Ok(DownloadDirSetResult {
+        settings: app_settings_report(&store)?,
+        cancelled: true,
     })
 }
 

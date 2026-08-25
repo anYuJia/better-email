@@ -747,7 +747,8 @@
     min-width: 44px;
     min-height: 44px;
     padding: 0 9px;
-    font-size: 12px;
+    font-size: 0;
+    white-space: nowrap;
   }
 
   .app-shell.is-mobile-app .composer-header-actions .composer-contact-toggle {

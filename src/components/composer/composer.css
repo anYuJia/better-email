@@ -2234,7 +2234,7 @@
 
 .composer-backdrop {
   padding: 16px;
-  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.28);
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.14);
 }
 
 .composer {
@@ -2282,6 +2282,21 @@
   padding: 0;
   border-radius: var(--ui-radius-sm);
   font-size: 0;
+}
+
+.composer-header-actions .composer-contact-toggle {
+  width: auto;
+  min-width: 0;
+  gap: 6px;
+  padding-inline: 8px;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.composer-header-actions .composer-contact-toggle > svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* Sender context is intentionally persistent in a multi-account product. */
@@ -2390,7 +2405,8 @@
 .composer-field-row:focus-within,
 .composer-recipient-field .composer-field-row:focus-within {
   border-radius: 4px;
-  background: color-mix(in oklch, var(--ui-surface-muted) 68%, transparent);
+  border-bottom-color: color-mix(in oklch, var(--ui-accent) 34%, var(--composer-divider));
+  background: color-mix(in oklch, var(--ui-surface-muted) 24%, transparent);
   box-shadow: none;
 }
 
@@ -2472,18 +2488,33 @@
 }
 
 .composer-subject-field {
-  min-height: 56px;
-  grid-template-columns: minmax(0, 1fr);
+  min-height: 48px;
+  grid-template-columns: 58px minmax(0, 1fr);
 }
 
 .composer .composer-subject-field input,
 .composer .composer-subject-field input:hover,
 .composer .composer-subject-field input:focus {
-  min-height: 54px;
+  min-height: 46px;
   padding: 0 8px;
-  font-size: 17px;
-  font-weight: 620;
-  letter-spacing: -0.015em;
+  font-size: 15.5px;
+  font-weight: 520;
+  letter-spacing: -0.01em;
+}
+
+.composer .composer-subject-field > .sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 590;
+  line-height: 1;
 }
 
 .composer-body-field {
@@ -2499,10 +2530,8 @@
 }
 
 .composer .composer-body-field:focus-within {
-  background: color-mix(in oklch, var(--ui-accent-soft) 16%, var(--ui-surface));
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklch, var(--ui-accent) 38%, var(--ui-border)),
-    inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 38%, var(--ui-border));
+  background: var(--ui-surface);
+  box-shadow: none;
 }
 
 .composer .composer-body-field textarea,
@@ -2593,7 +2622,7 @@
 .composer-quick-tools {
   border-top: 0;
   border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface-muted);
+  background: color-mix(in oklch, var(--ui-surface-muted) 58%, var(--ui-surface));
 }
 
 .composer-quick-toolbar {
@@ -2670,7 +2699,7 @@
 .composer .composer-advanced summary:hover,
 .composer .composer-advanced[open] summary {
   color: var(--ui-text);
-  background: transparent;
+  background: var(--ui-control-hover);
 }
 
 .composer-advanced-panel {
@@ -2757,8 +2786,8 @@
 }
 
 .composer footer {
-  min-height: 64px;
-  padding: 10px 18px;
+  min-height: 60px;
+  padding: 8px 18px;
   border-top: 1px solid var(--ui-border);
   background: var(--ui-surface);
 }
@@ -2768,15 +2797,40 @@
 }
 
 .composer footer .dialog-button {
-  min-height: var(--ui-control-height);
-  padding-inline: 12px;
+  min-height: 34px;
+  padding-inline: 9px;
+  border-color: transparent;
   border-radius: var(--ui-radius-control);
-  font-size: 12px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 560;
 }
 
 .composer footer .dialog-button-primary {
   min-height: 40px;
-  padding-inline: 19px;
+  min-width: 88px;
+  padding-inline: 18px;
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+.composer footer .dialog-button-secondary:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.composer footer .dialog-button-primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
+}
+
+.composer footer .dialog-button-primary:active:not(:disabled) {
+  border-color: var(--ui-accent-pressed);
+  background: var(--ui-accent-pressed);
 }
 
 .composer-footer-status > span,
@@ -2950,10 +3004,8 @@
 }
 
 :root[data-theme="dark"] .composer .composer-body-field:focus-within {
-  background: color-mix(in oklch, var(--ui-accent-soft) 10%, var(--ui-surface));
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklch, var(--ui-accent) 34%, var(--ui-border)),
-    inset 0 -1px 0 color-mix(in oklch, var(--ui-accent) 34%, var(--ui-border));
+  background: var(--ui-surface);
+  box-shadow: none;
 }
 
 :root[data-theme="dark"] .composer .composer-field-row:has(input:focus-visible) {
@@ -3718,7 +3770,7 @@
   flex-direction: column;
   border-left: 1px solid var(--composer-divider);
   color: var(--ui-text);
-  background: color-mix(in oklch, var(--ui-surface-muted) 48%, var(--ui-surface));
+  background: color-mix(in oklch, var(--ui-surface-muted) 34%, var(--ui-surface));
 }
 
 .composer-contacts-header {
@@ -3832,7 +3884,7 @@
 .composer-contacts-tabs button:hover,
 .composer-contacts-tabs button.is-active {
   color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
 }
 
 .composer-contacts-tabs button span {
@@ -3939,9 +3991,9 @@
 
 .composer-contacts-target button:hover,
 .composer-contacts-target button.is-active {
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  box-shadow: 0 1px 2px color-mix(in oklch, var(--ui-border-strong) 22%, transparent);
+  color: var(--ui-accent);
+  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .composer-contacts-list {
@@ -3969,7 +4021,7 @@
 }
 
 .composer-contact-row:hover {
-  border-color: var(--ui-border);
+  border-color: transparent;
   background: color-mix(in oklch, var(--ui-surface) 72%, transparent);
 }
 
@@ -3983,19 +4035,42 @@
   display: grid;
   place-items: center;
   border-radius: 11px;
-  color: var(--color-text-on-accent);
+  color: var(--ui-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-text-on-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ui-accent) 16%, transparent);
 }
 
-.composer-contact-avatar.tone-blue { background: var(--ui-accent); }
-.composer-contact-avatar.tone-green { background: var(--ui-success); }
-.composer-contact-avatar.tone-orange { background: var(--ui-warning); }
-.composer-contact-avatar.tone-purple { background: color-mix(in oklch, var(--ui-accent) 56%, var(--ui-danger)); }
-.composer-contact-avatar.tone-teal { background: color-mix(in oklch, var(--ui-accent) 70%, var(--ui-success)); }
-.composer-contact-avatar.tone-rose { background: color-mix(in oklch, var(--ui-danger) 70%, var(--ui-accent)); }
+.composer-contact-avatar.tone-blue {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer-contact-avatar.tone-green {
+  color: var(--ui-success);
+  background: var(--ui-success-bg);
+}
+
+.composer-contact-avatar.tone-orange {
+  color: var(--ui-warning);
+  background: var(--ui-warning-bg);
+}
+
+.composer-contact-avatar.tone-purple {
+  color: color-mix(in oklch, var(--ui-accent) 56%, var(--ui-danger));
+  background: color-mix(in oklch, var(--ui-accent-soft) 58%, var(--ui-danger-bg));
+}
+
+.composer-contact-avatar.tone-teal {
+  color: color-mix(in oklch, var(--ui-accent) 70%, var(--ui-success));
+  background: color-mix(in oklch, var(--ui-accent-soft) 68%, var(--ui-success-bg));
+}
+
+.composer-contact-avatar.tone-rose {
+  color: color-mix(in oklch, var(--ui-danger) 70%, var(--ui-accent));
+  background: color-mix(in oklch, var(--ui-danger-bg) 72%, var(--ui-accent-soft));
+}
 
 .composer-contact-copy {
   min-width: 0;
@@ -4139,12 +4214,12 @@
  * at the top of a large blank panel. */
 .composer .composer-contact-toggle[aria-expanded="true"] {
   color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
 }
 
 .composer .composer-contact-toggle[aria-expanded="true"]:hover {
   color: var(--ui-accent-hover);
-  background: color-mix(in oklch, var(--ui-accent-soft) 78%, var(--ui-control-hover));
+  background: color-mix(in oklch, var(--ui-accent-soft) 82%, var(--ui-control-hover));
 }
 
 .composer .composer-contacts-heading small,
@@ -4169,7 +4244,7 @@
 .composer .composer-contacts-target button:hover,
 .composer .composer-contacts-target button.is-active {
   color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
   box-shadow: none;
 }
 

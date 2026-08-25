@@ -56,6 +56,7 @@ export type MessageListPaneProps = {
   onFilterChange: (filter: FilterMode) => void;
   onSortChange: (sort: ListSort) => void;
   onToggleAllVisible: (checked: boolean) => void;
+  isSelectingAll?: boolean;
   onRunBulkAction: (action: BulkMessageAction) => void;
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
@@ -102,6 +103,7 @@ function MessageListPane({
   onFilterChange,
   onSortChange,
   onToggleAllVisible,
+  isSelectingAll,
   onRunBulkAction,
   onRequestSnooze,
   onMoveBulkToFolder,
@@ -295,6 +297,7 @@ function MessageListPane({
         onRequestSnooze={onRequestSnooze}
         onMoveBulkToFolder={onMoveBulkToFolder}
         onToggleBulkLabel={onToggleBulkLabel}
+        isSelectingAll={isSelectingAll}
       />
       {listMode === 'threads' ? (
         <ThreadListView

@@ -44,6 +44,15 @@
   backdrop-filter: none;
 }
 
+.message-list-shell {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ui-list);
+}
+
 .message-list,
 .thread-list {
   min-width: 0;
@@ -51,6 +60,33 @@
   max-width: 100%;
   overflow-x: hidden;
   background: var(--ui-list);
+}
+
+.message-list-shell > .message-list {
+  width: 100%;
+  height: 100%;
+}
+
+.message-list-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  z-index: 2;
+  width: 6px;
+  min-height: 0;
+  border: 0;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-scrollbar-thumb-hover);
+  box-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard), visibility var(--ui-motion-fast) var(--ui-ease-standard);
+}
+
+.message-list-scrollbar-thumb.is-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .message-list-viewport-wrapper,
@@ -906,6 +942,15 @@
 /* The app shell moves the checkbox to the trailing gutter, so hovering or
  * selecting a row no longer needs to replace the sender avatar. */
 .app-shell .message-card .message-leading {
+  opacity: 1;
+}
+
+.app-shell .message-card:has(.message-select input:checked) .message-leading {
+  opacity: 1;
+}
+
+.app-shell .message-card:has(.message-card-main:focus-visible) .message-leading,
+.app-shell .message-card:has(.message-select:focus-within) .message-leading {
   opacity: 1;
 }
 

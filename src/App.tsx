@@ -49,6 +49,7 @@ import useSingleMessageActions from './hooks/useSingleMessageActions';
 import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
 import useThemeMode from './hooks/useThemeMode';
+import useAutoHideScrollbars from './hooks/useAutoHideScrollbars';
 import {
   type NotificationPolicy,
 } from './mailUtils';
@@ -154,6 +155,7 @@ export default function App() {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
   const themeMode = useThemeMode();
+  useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
@@ -192,6 +194,7 @@ export default function App() {
     hasMoreMessages,
     setHasMoreMessages,
     loadMoreStatus,
+    loadAllMessages,
     searchInputRef,
     runSearch,
     loadMoreMessages,
@@ -218,6 +221,8 @@ export default function App() {
     setThreadMessages,
     setStatus,
   });
+  const [isSelectingAllMessages, setIsSelectingAllMessages] = useState(false);
+  const selectAllRequestRef = useRef(0);
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -857,8 +862,28 @@ export default function App() {
   }, []);
 
   const toggleAllVisibleMessages = useCallback((checked: boolean) => {
-    setSelectedMessageIds(checked ? messages.map((message) => message.id) : []);
-  }, [messages]);
+    const requestId = selectAllRequestRef.current + 1;
+    selectAllRequestRef.current = requestId;
+    if (!checked) {
+      setSelectedMessageIds([]);
+      setIsSelectingAllMessages(false);
+      return;
+    }
+
+    const refreshId = mailboxRefreshRef.current;
+    setIsSelectingAllMessages(true);
+    void loadAllMessages()
+      .then((allMessages) => {
+        if (requestId !== selectAllRequestRef.current || refreshId !== mailboxRefreshRef.current) return;
+        setSelectedMessageIds([...new Set(allMessages.map((message) => message.id))]);
+      })
+      .catch((error) => {
+        if (requestId === selectAllRequestRef.current) setStatus(String(error));
+      })
+      .finally(() => {
+        if (requestId === selectAllRequestRef.current) setIsSelectingAllMessages(false);
+      });
+  }, [loadAllMessages, mailboxRefreshRef, setStatus]);
 
   function snapshotMessages(items: MessageSummary[]): UndoMessageSnapshot[] {
     return items.map((message) => ({
@@ -1511,6 +1536,7 @@ export default function App() {
           onFilterChange={setFilter}
           onSortChange={setListSort}
           onToggleAllVisible={toggleAllVisibleMessages}
+          isSelectingAll={isSelectingAllMessages}
           onRunBulkAction={runBulkAction}
           onRequestSnooze={requestSnooze}
           onMoveBulkToFolder={handleMoveBulkToFolder}

@@ -5,7 +5,7 @@
  * independent of any pane or component:
  *  - typography, colour and box-sizing defaults,
  *  - native selection behaviour scoped to copyable content,
- *  - the slim scrollbar treatment applied to every scrollable surface,
+ *  - the auto-hidden scrollbar treatment applied to every scrollable surface,
  *  - the error boundary card.
  *
  * Everything pane-specific lives in the owning sheet (sidebar.css,
@@ -71,34 +71,68 @@ textarea:focus-visible {
   user-select: text;
 }
 
-/* All scrollable surfaces use a narrow, low-contrast thumb. It becomes
- * slightly stronger only while the user is actually hovering the surface. */
-.app-shell * {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ui-text-tertiary) 28%, transparent) transparent;
+/* Native tracks are disabled globally. A small fixed-position thumb overlay is
+ * created by useAutoHideScrollbars while a surface is being scrolled, so the
+ * indicator sits on top of the list instead of creating a second column. */
+body,
+body * {
+  scrollbar-width: none !important;
+  scrollbar-color: transparent transparent !important;
 }
 
-.app-shell *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+body *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.app-shell *::-webkit-scrollbar-thumb {
+body *::-webkit-scrollbar-thumb {
+  display: none !important;
   min-height: 30px;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ui-text-tertiary) 24%, transparent);
+  background: transparent !important;
   background-clip: padding-box;
+  box-shadow: none;
 }
 
-.app-shell *::-webkit-scrollbar-thumb:hover,
-.app-shell :is(.sidebar, .message-list, .thread-list, .reader-panel, .reader, .label-menu-list):hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ui-text-tertiary) 42%, transparent);
-  background-clip: padding-box;
+body *::-webkit-scrollbar-track,
+body *::-webkit-scrollbar-track-piece,
+body *::-webkit-scrollbar-track-piece:start,
+body *::-webkit-scrollbar-track-piece:end,
+body *::-webkit-scrollbar-corner,
+body *::-webkit-scrollbar-button,
+body *::-webkit-resizer {
+  display: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
 }
 
-.app-shell *::-webkit-scrollbar-track {
-  background: transparent;
+.auto-scrollbar-thumb {
+  position: fixed;
+  z-index: 3200;
+  display: block;
+  pointer-events: none;
+  border: 0;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-scrollbar-thumb);
+  box-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--ui-motion-fast) var(--ui-ease-standard), visibility var(--ui-motion-fast) var(--ui-ease-standard);
+}
+
+.auto-scrollbar-thumb--visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .app-error-boundary {

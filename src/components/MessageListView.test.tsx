@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
 import MessageListView from './MessageListView';
 import {
@@ -33,7 +33,10 @@ const message: MessageSummary = {
   remote_uid: 1,
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('MessageListView theme-safe separators', () => {
   it('uses CSS classes rather than inline light colors for group and footer separators', () => {
@@ -150,6 +153,55 @@ describe('MessageListView theme-safe separators', () => {
 
     expect(view.container.querySelector('[role="list"]')).toBe(list);
     expect(list.scrollTop).toBe(136);
+  });
+
+  it('shows the overlay thumb during list scrolling without adding a track column', () => {
+    vi.useFakeTimers();
+    const messages = Array.from({ length: 8 }, (_, index) => ({
+      ...message,
+      id: index + 1,
+      remote_uid: index + 1,
+    }));
+    const { container } = render(
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages }]}
+        messages={messages}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages={false}
+        listStateKey="scrollbar-overlay"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+    const list = container.querySelector('[role="list"]') as HTMLDivElement;
+    Object.defineProperties(list, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 736 },
+    });
+    list.scrollTop = 120;
+    fireEvent.scroll(list);
+
+    const thumb = container.querySelector('.message-list-scrollbar-thumb') as HTMLElement;
+    expect(thumb.classList.contains('is-visible')).toBe(true);
+    expect(thumb.style.width).toBe('6px');
+    expect(thumb.style.height).not.toBe('0px');
+    expect(container.querySelector('.message-list-scrollbar-track')).toBeNull();
+
+    act(() => vi.advanceTimersByTime(1200));
+    expect(thumb.classList.contains('is-visible')).toBe(false);
   });
 
   it('虚拟布局行高与单一事实来源常量完全一致', () => {

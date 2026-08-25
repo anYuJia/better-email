@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import type {
   FilterMode,
@@ -16,6 +16,10 @@ import {
 const SCROLL_SAVE_DEBOUNCE_MS = 220;
 const NEW_MESSAGE_ANIMATION_LIMIT = 5;
 const NEW_MESSAGE_ABSORB_DELAY_MS = 800;
+const SCROLLBAR_HIDE_DELAY_MS = 1200;
+const SCROLLBAR_SIZE_PX = 6;
+const SCROLLBAR_INSET_PX = 3;
+const SCROLLBAR_MIN_LENGTH_PX = 32;
 
 type MessageGroup = {
   id: string;
@@ -79,6 +83,7 @@ export default function MessageListView({
   const restoredViewKeyRef = useRef<string | null>(null);
   const latestScrollTopRef = useRef(initialScrollTop);
   const scrollSaveTimerRef = useRef<number | null>(null);
+  const scrollbarHideTimerRef = useRef<number | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const listStateKeyRef = useRef<string | null>(null);
   const baselineMessageIdsRef = useRef<Set<number>>(new Set());
@@ -90,6 +95,8 @@ export default function MessageListView({
   );
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
+  const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
+  const [scrollbarThumb, setScrollbarThumb] = useState({ top: 0, height: 0 });
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
   const itemNodeRefs = useRef<Map<string, HTMLElement | null>>(new Map());
   const [loadMoreFocusRequest, setLoadMoreFocusRequest] = useState<{
@@ -97,6 +104,50 @@ export default function MessageListView({
     previousMessageIds: ReadonlySet<number>;
   } | null>(null);
   const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+
+  const updateScrollbarThumb = useCallback((scrollTopOverride?: number) => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+    const viewportLength = listElement.clientHeight;
+    const contentLength = listElement.scrollHeight;
+    const scrollRange = contentLength - viewportLength;
+    if (viewportLength <= 0 || scrollRange <= 0) {
+      setScrollbarThumb({ top: 0, height: 0 });
+      return;
+    }
+
+    const thumbHeight = Math.min(
+      viewportLength - SCROLLBAR_INSET_PX * 2,
+      Math.max(
+        SCROLLBAR_MIN_LENGTH_PX,
+        Math.round((viewportLength * viewportLength) / contentLength),
+      ),
+    );
+    const thumbTravel = Math.max(
+      0,
+      viewportLength - thumbHeight - SCROLLBAR_INSET_PX * 2,
+    );
+    const scrollRatio = Math.min(
+      1,
+      Math.max(0, (scrollTopOverride ?? listElement.scrollTop) / scrollRange),
+    );
+    setScrollbarThumb({
+      top: SCROLLBAR_INSET_PX + Math.round(thumbTravel * scrollRatio),
+      height: Math.round(thumbHeight),
+    });
+  }, []);
+
+  const revealScrollbar = useCallback((scrollTop: number) => {
+    updateScrollbarThumb(scrollTop);
+    setIsScrollbarVisible(true);
+    if (scrollbarHideTimerRef.current !== null) {
+      window.clearTimeout(scrollbarHideTimerRef.current);
+    }
+    scrollbarHideTimerRef.current = window.setTimeout(() => {
+      scrollbarHideTimerRef.current = null;
+      setIsScrollbarVisible(false);
+    }, SCROLLBAR_HIDE_DELAY_MS);
+  }, [updateScrollbarThumb]);
 
   useEffect(() => {
     const handleViewportResize = () => {
@@ -137,6 +188,9 @@ export default function MessageListView({
   useEffect(() => () => {
     if (scrollSaveTimerRef.current !== null) {
       window.clearTimeout(scrollSaveTimerRef.current);
+    }
+    if (scrollbarHideTimerRef.current !== null) {
+      window.clearTimeout(scrollbarHideTimerRef.current);
     }
     onScrollTopChange(latestScrollTopRef.current);
   }, [listStateKey, onScrollTopChange]);
@@ -232,21 +286,24 @@ export default function MessageListView({
     const listElement = listRef.current;
     if (!listElement) return;
     setViewportHeight(listElement.clientHeight);
+    updateScrollbarThumb();
 
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           setViewportHeight(entry.target.clientHeight);
+          updateScrollbarThumb();
         }
       });
       observer.observe(listElement);
       return () => observer.disconnect();
     }
-  }, []);
+  }, [updateScrollbarThumb]);
 
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
+    revealScrollbar(nextScrollTop);
 
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -282,6 +339,10 @@ export default function MessageListView({
       }
     };
   }, []);
+
+  useLayoutEffect(() => {
+    updateScrollbarThumb();
+  }, [layout, updateScrollbarThumb]);
 
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
@@ -389,15 +450,17 @@ export default function MessageListView({
   ]);
 
   return (
-    <div
-      className="message-list"
-      ref={listRef}
-      role="list"
-      aria-label="邮件列表"
-      aria-busy={Boolean(loadMoreStatus)}
-      tabIndex={-1}
-      onScroll={handleListScroll}
-    >
+    <div className="message-list-shell">
+      <div
+        className="message-list"
+        ref={listRef}
+        role="list"
+        aria-label="邮件列表"
+        aria-busy={Boolean(loadMoreStatus)}
+        tabIndex={-1}
+        data-local-scrollbar="true"
+        onScroll={handleListScroll}
+      >
       {messages.length > 0 && (
         <div
           className="message-list-viewport-wrapper"
@@ -559,6 +622,17 @@ export default function MessageListView({
           </div>
         </div>
       )}
+      </div>
+      <div
+        className={`message-list-scrollbar-thumb${isScrollbarVisible && scrollbarThumb.height > 0 ? ' is-visible' : ''}`}
+        aria-hidden="true"
+        role="presentation"
+        style={{
+          width: `${SCROLLBAR_SIZE_PX}px`,
+          height: `${scrollbarThumb.height}px`,
+          transform: `translateY(${scrollbarThumb.top}px)`,
+        }}
+      />
     </div>
   );
 }

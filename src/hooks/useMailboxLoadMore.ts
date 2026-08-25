@@ -11,6 +11,11 @@ import type {
 } from '../app/types';
 import type { MailboxSearchLoaders } from './useMailboxSearchController';
 
+// The native list command clamps a request to 200 rows. This is large enough
+// to make “全选” cover the complete local result set without rendering a
+// second selection model for unloaded rows.
+const SELECT_ALL_MESSAGE_LIMIT = 200;
+
 type UseMailboxLoadMoreOptions = {
   account: Account | null;
   accountScope: AccountScope;
@@ -128,6 +133,42 @@ export default function useMailboxLoadMore({
     setStatus,
   ]);
 
+  const loadAllMessages = useCallback(async () => {
+    const loaders = loadersRef.current;
+    if (!loaders) return messages;
+    if (loadingMoreRef.current) return messages;
+    loadingMoreRef.current = true;
+    const startedRefreshId = mailboxRefreshRef.current;
+    setLoadMoreStatus('正在读取全部邮件...');
+    try {
+      return await loaders.loadMessagesWithVisibleFallback(
+        folderId,
+        query,
+        filter,
+        accountScope,
+        startedRefreshId,
+        folders,
+        Math.max(messageLimit, SELECT_ALL_MESSAGE_LIMIT),
+        searchScope,
+        false,
+      );
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadMoreStatus(null);
+    }
+  }, [
+    loadersRef,
+    messageLimit,
+    folderId,
+    query,
+    filter,
+    accountScope,
+    mailboxRefreshRef,
+    folders,
+    searchScope,
+    messages,
+  ]);
+
   return {
     messageLimit,
     setMessageLimit,
@@ -135,5 +176,6 @@ export default function useMailboxLoadMore({
     setHasMoreMessages,
     loadMoreStatus,
     loadMoreMessages,
+    loadAllMessages,
   };
 }

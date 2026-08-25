@@ -23,6 +23,7 @@ type MessageBulkToolbarProps = {
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
+  isSelectingAll?: boolean;
   inline?: boolean;
 };
 
@@ -37,6 +38,7 @@ export default function MessageBulkToolbar({
   onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
+  isSelectingAll = false,
   inline = false,
 }: MessageBulkToolbarProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
@@ -48,14 +50,15 @@ export default function MessageBulkToolbar({
 
   return (
     <div className={`bulk-toolbar active${inline ? ' bulk-toolbar-inline' : ''}`}>
-      <label className="bulk-selection" title="选择或取消选择当前列表中的邮件">
+      <label className="bulk-selection" title="选择或取消选择当前筛选结果中的全部邮件">
         <input
           type="checkbox"
-          aria-label="选择当前列表中的全部邮件"
+          aria-label={isSelectingAll ? '正在选择全部邮件' : '选择当前列表中的全部邮件'}
           checked={allVisibleSelected}
+          disabled={isSelectingAll}
           onChange={(event) => onToggleAllVisible(event.target.checked)}
         />
-        <span>已选 {selectedMessageIds.length}</span>
+        <span>{isSelectingAll ? '正在选择…' : `已选 ${selectedMessageIds.length}`}</span>
       </label>
       <button
         type="button"

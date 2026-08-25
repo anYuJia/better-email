@@ -275,6 +275,23 @@ describe('useMailboxSearchController', () => {
     expect(result.current.loadMoreStatus).toBeNull();
   });
 
+  it('loadAllMessages requests the complete local result set for bulk selection', async () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    loadMessagesWithVisibleFallback.mockResolvedValue([
+      { id: 1 } as MessageSummary,
+      { id: 2 } as MessageSummary,
+    ]);
+
+    await act(async () => {
+      await result.current.loadAllMessages();
+    });
+
+    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
+      101, '', 'all', 'all', 1, folders, 200, 'folder', false,
+    );
+    expect(result.current.loadMoreStatus).toBeNull();
+  });
+
   it('loadMoreMessages ignores concurrent invocations', async () => {
     const { result, loadMessagesWithVisibleFallback } = renderController();
     let resolveFirst: ((value: MessageSummary[]) => void) | null = null;

@@ -34,6 +34,7 @@ type MessageListToolbarProps = {
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
+  isSelectingAll?: boolean;
   onOpenNavigation?: () => void;
 };
 
@@ -64,6 +65,7 @@ function MessageListToolbar({
   onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
+  isSelectingAll,
   onOpenNavigation,
 }: MessageListToolbarProps) {
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
@@ -107,6 +109,7 @@ function MessageListToolbar({
             onRequestSnooze={onRequestSnooze}
             onMoveBulkToFolder={onMoveBulkToFolder}
             onToggleBulkLabel={onToggleBulkLabel}
+            isSelectingAll={isSelectingAll}
           />
         ) : (
           <div className="list-control-actions" aria-label="邮件显示模式">

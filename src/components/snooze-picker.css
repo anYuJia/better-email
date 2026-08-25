@@ -326,17 +326,3 @@
   color: var(--ui-danger);
   background: transparent;
 }
-
-:root[data-theme="dark"] .snooze-preset-grid {
-  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
-}
-
-:root[data-theme="dark"] .snooze-preset-grid::-webkit-scrollbar-thumb {
-  background: var(--ui-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-:root[data-theme="dark"] .snooze-preset-grid::-webkit-scrollbar-thumb:hover {
-  background: var(--ui-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}

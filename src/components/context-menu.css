@@ -259,20 +259,3 @@
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
 }
-
-:root[data-theme="dark"] .context-menu,
-:root[data-theme="dark"] .context-submenu {
-  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
-}
-
-:root[data-theme="dark"] :is(.context-menu, .context-submenu)::-webkit-scrollbar-thumb,
-:root[data-theme="dark"] :is(.context-menu, .context-submenu) ::-webkit-scrollbar-thumb {
-  background: var(--ui-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-:root[data-theme="dark"] :is(.context-menu, .context-submenu)::-webkit-scrollbar-thumb:hover,
-:root[data-theme="dark"] :is(.context-menu, .context-submenu) ::-webkit-scrollbar-thumb:hover {
-  background: var(--ui-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}

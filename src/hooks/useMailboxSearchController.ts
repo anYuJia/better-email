@@ -150,6 +150,7 @@ export default function useMailboxSearchController({
     setHasMoreMessages,
     loadMoreStatus,
     loadMoreMessages,
+    loadAllMessages,
   } = useMailboxLoadMore({
     account,
     accountScope,
@@ -442,6 +443,7 @@ export default function useMailboxSearchController({
     applySearchShortcut,
     clearSearchAndFilter,
     loadMoreMessages,
+    loadAllMessages,
     runSavedSearch,
     saveCurrentSearch,
     deleteSavedSearch,

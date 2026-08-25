@@ -313,8 +313,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--st-border-strong) transparent;
 }
 
 .settings-nav-section {
@@ -465,8 +463,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--st-border-strong) transparent;
   animation: var(--ui-animation-settings-page-enter);
 }
 

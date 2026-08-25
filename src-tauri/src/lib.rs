@@ -17,14 +17,22 @@ mod vcard;
 
 use db::MailStore;
 pub use provider_probe::{list_provider_probe_accounts, run_provider_probe};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::Emitter;
 use tauri::Manager;
+
+#[cfg(desktop)]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(desktop)]
+use std::sync::Mutex;
+#[cfg(desktop)]
+use tauri::menu::{Menu, MenuItem};
+#[cfg(desktop)]
+use tauri::tray::TrayIconBuilder;
+#[cfg(desktop)]
+use tauri::Emitter;
+#[cfg(desktop)]
 use tauri::Wry;
 
+#[cfg(desktop)]
 pub struct TrayState {
     pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
     pub unread_item: Mutex<Option<MenuItem<Wry>>>,
@@ -93,37 +101,43 @@ fn dirs_app_data_dir() -> Option<std::path::PathBuf> {
 #[tauri::command]
 fn set_tray_unread_count(
     unread_count: u64,
-    state: tauri::State<'_, TrayState>,
+    #[cfg(desktop)] state: tauri::State<'_, TrayState>,
 ) -> Result<(), String> {
-    if let Some(ref item) = *state.unread_item.lock().unwrap() {
-        let text = if unread_count == 0 {
-            "没有未读邮件".to_string()
-        } else {
-            format!("未读邮件：{}", unread_count)
-        };
-        let _ = item.set_text(text);
-    }
-
-    if let Some(ref tray) = *state.tray.lock().unwrap() {
-        let tooltip = if unread_count == 0 {
-            "Better Email".to_string()
-        } else {
-            format!("Better Email · {} 未读", unread_count)
-        };
-        let _ = tray.set_tooltip(Some(tooltip));
-
-        #[cfg(target_os = "macos")]
-        {
-            let title = if unread_count == 0 {
-                "".to_string()
-            } else if unread_count > 99 {
-                "99+".to_string()
+    #[cfg(desktop)]
+    {
+        if let Some(ref item) = *state.unread_item.lock().unwrap() {
+            let text = if unread_count == 0 {
+                "没有未读邮件".to_string()
             } else {
-                unread_count.to_string()
+                format!("未读邮件：{}", unread_count)
             };
-            let _ = tray.set_title(Some(title));
+            let _ = item.set_text(text);
+        }
+
+        if let Some(ref tray) = *state.tray.lock().unwrap() {
+            let tooltip = if unread_count == 0 {
+                "Better Email".to_string()
+            } else {
+                format!("Better Email · {} 未读", unread_count)
+            };
+            let _ = tray.set_tooltip(Some(tooltip));
+
+            #[cfg(target_os = "macos")]
+            {
+                let title = if unread_count == 0 {
+                    "".to_string()
+                } else if unread_count > 99 {
+                    "99+".to_string()
+                } else {
+                    unread_count.to_string()
+                };
+                let _ = tray.set_title(Some(title));
+            }
         }
     }
+
+    #[cfg(not(desktop))]
+    let _ = unread_count;
 
     Ok(())
 }
@@ -144,6 +158,10 @@ fn get_platform() -> String {
     #[cfg(target_os = "linux")]
     {
         return "linux".to_string();
+    }
+    #[cfg(target_os = "android")]
+    {
+        return "android".to_string();
     }
     #[allow(unreachable_code)]
     "web".to_string()
@@ -168,6 +186,7 @@ fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(desktop)]
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let unread_item = MenuItem::with_id(
         app,
@@ -297,6 +316,7 @@ pub fn run() {
             app.manage(store);
             // 主窗口图标与 bundle.icon 使用同一份 v4 源资源：
             // 无边框/透明窗口在 Windows 任务栏、Alt+Tab 需要显式设置图标。
+            #[cfg(desktop)]
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(icon) =
                     tauri::image::Image::from_bytes(include_bytes!("../icons/v4/icon.png"))
@@ -304,12 +324,14 @@ pub fn run() {
                     let _ = window.set_icon(icon);
                 }
             }
+            #[cfg(desktop)]
             if let Err(e) = setup_tray(app) {
                 crate::logging::log_line(format!("Failed to setup tray: {:?}", e));
             }
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let app_handle = window.app_handle();
                 if let Some(state) = app_handle.try_state::<TrayState>() {
@@ -319,6 +341,8 @@ pub fn run() {
                     }
                 }
             }
+            #[cfg(not(desktop))]
+            let _ = (window, event);
         })
         .invoke_handler(tauri::generate_handler![
             set_tray_unread_count,

@@ -1,0 +1,98 @@
+name: Android
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  ANDROID_NDK_VERSION: r26b
+
+jobs:
+  build:
+    name: Build Android APK and AAB
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Setup Android NDK
+        id: setup_ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+          add-to-path: true
+
+      - name: Export Android NDK paths
+        shell: bash
+        run: |
+          NDK_PATH="${{ steps.setup_ndk.outputs['ndk-path'] }}"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Initialize Android project
+        run: npm run tauri -- android init --ci --skip-targets-install
+
+      - name: Build Android artifacts
+        run: npm run tauri -- android build --ci --target aarch64 --apk --aab
+
+      - name: List Android artifacts
+        shell: bash
+        run: |
+          find src-tauri/gen/android/app/build/outputs \
+            -type f \( -name '*.apk' -o -name '*.aab' \) -print
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: better-email-android-${{ github.sha }}
+          path: |
+            src-tauri/gen/android/app/build/outputs/**/*.apk
+            src-tauri/gen/android/app/build/outputs/**/*.aab
+          if-no-files-found: error
+          retention-days: 7

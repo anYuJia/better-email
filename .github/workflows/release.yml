@@ -22,6 +22,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  ANDROID_NDK_VERSION: r26b
 
 jobs:
   validate:
@@ -174,9 +175,97 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
 
+  build-android:
+    name: Build Android (APK and AAB)
+    needs: validate
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Setup Android NDK
+        id: setup_ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+          add-to-path: true
+
+      - name: Export Android NDK paths
+        shell: bash
+        run: |
+          NDK_PATH="${{ steps.setup_ndk.outputs['ndk-path'] }}"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Initialize Android project
+        run: npm run tauri -- android init --ci --skip-targets-install
+
+      - name: Build Android artifacts
+        run: npm run tauri -- android build --ci --target aarch64 --apk --aab
+
+      - name: Prepare Android release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          APK="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+          AAB="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' -print -quit)"
+          test -n "$APK" && test -f "$APK"
+          test -n "$AAB" && test -f "$AAB"
+          mkdir -p release-assets
+          cp "$APK" "release-assets/Better_Email_${VERSION}_android_arm64.apk"
+          cp "$AAB" "release-assets/Better_Email_${VERSION}_android_arm64.aab"
+
+      - name: Upload Android release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.sha }}
+          path: release-assets/*
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, build-android]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -221,12 +310,19 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.meta.outputs.version }}"
           TAG="${{ steps.meta.outputs.tag }}"
+          ANDROID_DIR="dist/android-${{ github.sha }}"
+          ANDROID_APK="$ANDROID_DIR/Better_Email_${VERSION}_android_arm64.apk"
+          ANDROID_AAB="$ANDROID_DIR/Better_Email_${VERSION}_android_arm64.aab"
+          test -f "$ANDROID_APK"
+          test -f "$ANDROID_AAB"
           BODY=$(cat <<EOF
           ## Better Email $TAG
 
           ### 安装包（Installers）
           - macOS (Apple Silicon)：\`Better_Email_${VERSION}_mac_arm.dmg\`
           - Windows (x64)：\`Better_Email_${VERSION}_windows_x64.msi\`
+          - Android (ARM64 APK)：\`Better_Email_${VERSION}_android_arm64.apk\`
+          - Android (ARM64 AAB)：\`Better_Email_${VERSION}_android_arm64.aab\`
 
           ### 更新载荷（Updater payloads，签名文件与文件一一对应）
           - macOS：\`Better_Email_${VERSION}_mac_arm.app.tar.gz\` + \`.sig\` — Tauri updater 不支持 DMG 作为 macOS 更新载荷，此归档是自动更新必需的有效载荷，请勿当作安装包使用。
@@ -245,5 +341,7 @@ jobs:
             "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.app.tar.gz.sig" \
             "dist/installers-windows-latest/Better_Email_${VERSION}_windows_x64.msi" \
             "dist/installers-windows-latest/Better_Email_${VERSION}_windows_x64.msi.sig" \
+            "$ANDROID_APK" \
+            "$ANDROID_AAB" \
             "dist/latest.json" \
             --clobber

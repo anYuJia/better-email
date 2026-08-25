@@ -94,6 +94,7 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { buildMailboxContextKey } from './app/mailboxContext';
+import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
 import './ui-2026.css';
 
@@ -635,9 +636,7 @@ export default function App() {
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
     : `${messages.length} 封`;
   const visibleListSummary = hasMoreMessages ? `${messages.length}+ 封` : `${messages.length} 封`;
-  const titlebarViewSummary = listMode === 'messages'
-    ? `${stats?.total_messages ?? messages.length} 封`
-    : `${threads.length} 个会话`;
+  const titlebarViewSummary = buildTitlebarViewSummary(listMode, stats, threads.length);
   const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
   const mailboxListScrollTop = useMemo(
     () => Math.max(0, loadMailboxListStates()[mailboxListStateKey]?.scrollTop ?? 0),

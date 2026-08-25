@@ -115,8 +115,10 @@
   padding: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
+  gap: 4px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  min-height: 40px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -127,17 +129,19 @@
 }
 
 .app-shell .reader-actions {
-  gap: 6px;
+  gap: 4px;
+  row-gap: 4px;
 }
 
 .reader-action-group {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  min-height: 40px;
 }
 
 .app-shell .reader-action-group {
-  gap: 1px;
+  gap: 4px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -145,7 +149,15 @@
 }
 
 .reader-message-actions {
-  margin-inline-start: var(--ui-space-1);
+  margin-inline-start: var(--ui-space-2);
+  padding-inline-start: var(--ui-space-2);
+  border-inline-start: 1px solid var(--ui-border);
+}
+
+.app-shell .reader-message-actions {
+  margin-inline-start: var(--ui-space-2);
+  padding-inline-start: var(--ui-space-2);
+  border-inline-start: 1px solid var(--ui-border);
 }
 
 /* Toolbar controls: 40px pointer targets, transparent default, neutral hover.
@@ -159,12 +171,18 @@
   min-height: 40px;
   height: 40px;
   padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
   transition-property: color, background-color, box-shadow, scale;
   transition-duration: var(--ui-motion-fast);
   transition-timing-function: var(--ui-ease-standard);
@@ -222,12 +240,11 @@
 .reader-actions .primary-action {
   width: auto;
   min-width: 76px;
-  padding-left: 12px;
-  padding-right: 14px;
+  padding-inline: 13px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-accent);
-  background: transparent;
+  background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
   font-weight: 650;
 }
@@ -235,7 +252,7 @@
 .app-shell .reader-actions .primary-action {
   min-width: 76px;
   color: var(--ui-accent);
-  background: transparent;
+  background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
   font-weight: 650;
 }
@@ -248,6 +265,11 @@
 .app-shell .reader-actions .primary-action:hover:not(:disabled) {
   color: var(--ui-accent-hover);
   background: var(--ui-accent-soft);
+}
+
+.reader-actions button > svg,
+.reader-actions summary > svg {
+  flex: 0 0 auto;
 }
 
 .reader-actions button:active:not(:disabled),
@@ -351,11 +373,12 @@
 
 @media (max-width: 1180px) {
   .reader-action-group {
-    gap: 1px;
+    gap: 4px;
   }
 
   .reader-message-actions {
-    margin-inline-start: 2px;
+    margin-inline-start: 8px;
+    padding-inline-start: 8px;
   }
 
   .app-shell .reader {
@@ -378,6 +401,34 @@
 
   .app-shell .reader-actions {
     gap: 4px;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell .reader-actions {
+    align-items: center;
+    gap: 2px;
+    row-gap: 4px;
+  }
+
+  .app-shell .reader-action-group {
+    gap: 2px;
+  }
+
+  .app-shell .reader-message-actions {
+    margin-inline-start: 6px;
+    padding-inline-start: 6px;
+  }
+
+  .app-shell .reader-actions .primary-action {
+    min-width: 72px;
+    padding-inline: 11px;
+  }
+
+  .app-shell .reader-translate-action {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
   }
 }
 

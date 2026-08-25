@@ -1,7 +1,6 @@
 import {
   Archive,
   Clock,
-  ChevronDown,
   Forward,
   Languages,
   Loader2,
@@ -90,9 +89,7 @@ function ReaderToolbar({
 }: ReaderToolbarProps) {
   const isDraft = selected.folder_role === 'drafts';
   const isTrash = selected.folder_role === 'trash';
-  const replyMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const replyMenu = useDetailsMenu(replyMenuRef);
   const moreMenu = useDetailsMenu(moreMenuRef);
   const movableFolders = useMemo(
     () => movableFoldersForMessage(folders, selected),
@@ -119,21 +116,6 @@ function ReaderToolbar({
               <Reply size={16} />
               <span>回复</span>
             </button>
-            <details className="reader-reply-menu compact-menu" ref={replyMenuRef}>
-              <summary className="icon-only-summary reader-reply-menu-summary" title="更多回复方式" aria-label="更多回复方式">
-                <ChevronDown size={14} />
-              </summary>
-              <div onClick={() => replyMenu.closeMenu()}>
-                <button type="button" onClick={() => onComposeFromMessage(selected, 'replyAll')}>
-                  <ReplyAll size={16} />
-                  <span>回复全部</span>
-                </button>
-                <button type="button" onClick={() => onComposeFromMessage(selected, 'forward')}>
-                  <Forward size={16} />
-                  <span>转发</span>
-                </button>
-              </div>
-            </details>
           </div>
         )}
         <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
@@ -155,18 +137,60 @@ function ReaderToolbar({
               <Archive size={16} />
             </button>
           )}
+          {selected.folder_role === 'snoozed' ? (
+            <button
+              className="icon-only-action"
+              aria-label="取消稍后处理"
+              title="取消稍后处理"
+              onClick={onUnsnooze}
+            >
+              <Clock size={16} />
+            </button>
+          ) : canSnoozeRole(selected.folder_role) && (
+            <button
+              className="icon-only-action"
+              aria-label="稍后处理"
+              title="稍后处理"
+              onClick={onSnooze}
+            >
+              <Clock size={16} />
+            </button>
+          )}
         </div>
+        {!isDraft && needsTranslation && (
+          <button
+            type="button"
+            className={`reader-translate-action${translationActive ? ' active' : ''}`}
+            title="检测到外语邮件，点击翻译为中文"
+            aria-label={translationActive ? '显示原文' : '翻译为中文'}
+            onClick={translationCompleted ? onToggleTranslation : onTranslateMessage}
+            disabled={translationLoading}
+          >
+            {translationLoading ? (
+              <Loader2 size={15} className="reader-translation-spinner" />
+            ) : (
+              <Languages size={15} />
+            )}
+            <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
+          </button>
+        )}
         <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
             <MoreHorizontal size={17} />
           </summary>
           <div onClick={() => moreMenu.closeMenu()}>
-            <span className="menu-section-title">整理</span>
-            {selected.folder_role === 'snoozed' ? (
-              <button onClick={onUnsnooze}><Clock size={16} /> 取消稍后</button>
-            ) : canSnoozeRole(selected.folder_role) && (
-              <button onClick={onSnooze}><Clock size={16} /> 稍后处理</button>
+            {!isDraft && (
+              <>
+                <span className="menu-section-title">回复</span>
+                <button onClick={() => onComposeFromMessage(selected, 'replyAll')}>
+                  <ReplyAll size={16} /> 回复全部
+                </button>
+                <button onClick={() => onComposeFromMessage(selected, 'forward')}>
+                  <Forward size={16} /> 转发
+                </button>
+              </>
             )}
+            <span className="menu-section-title">整理</span>
             {!isDraft && (
               <button onClick={() => onToggleRead(selected)}>
                 <Mail size={16} />
@@ -220,23 +244,6 @@ function ReaderToolbar({
             ))}
           </div>
         </details>
-        {!isDraft && needsTranslation && (
-          <button
-            type="button"
-            className={`reader-translate-action${translationActive ? ' active' : ''}`}
-            title="检测到外语邮件，点击翻译为中文"
-            aria-label={translationActive ? '显示原文' : '翻译为中文'}
-            onClick={translationCompleted ? onToggleTranslation : onTranslateMessage}
-            disabled={translationLoading}
-          >
-            {translationLoading ? (
-              <Loader2 size={15} className="reader-translation-spinner" />
-            ) : (
-              <Languages size={15} />
-            )}
-            <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
-          </button>
-        )}
       </div>
     </header>
   );

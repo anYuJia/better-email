@@ -62,7 +62,9 @@ describe('ComposerWindow focus lifecycle', () => {
       render(composer());
 
       expect(screen.queryByRole('complementary', { name: '联系人' })).toBeNull();
-      fireEvent.click(screen.getByRole('button', { name: '打开联系人面板' }));
+      const contactToggle = screen.getByRole('button', { name: '打开联系人面板' });
+      expect(contactToggle.getAttribute('aria-controls')).toBe('composer-contacts-panel');
+      fireEvent.click(contactToggle);
       expect(screen.getByRole('complementary', { name: '联系人' })).not.toBeNull();
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });

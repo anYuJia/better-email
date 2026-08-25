@@ -4132,6 +4132,88 @@
   cursor: default;
 }
 
+/* Contacts rail polish ----------------------------------------------------
+ * The rail is a task surface, not a decorative sidebar: selected targets
+ * need to read as selected, focus belongs to the whole search control, and
+ * an empty address book should use the available space instead of floating
+ * at the top of a large blank panel. */
+.composer .composer-contact-toggle[aria-expanded="true"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer .composer-contact-toggle[aria-expanded="true"]:hover {
+  color: var(--ui-accent-hover);
+  background: color-mix(in oklch, var(--ui-accent-soft) 78%, var(--ui-control-hover));
+}
+
+.composer .composer-contacts-heading small,
+.composer .composer-contacts-search input,
+.composer .composer-contacts-target > span,
+.composer .composer-contacts-target button,
+.composer .composer-contact-copy small,
+.composer .composer-contacts-footer button,
+.composer .composer-contacts-empty small {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-contacts-tabs button {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-contacts-target button {
+  min-height: 28px;
+  padding-inline: 9px;
+}
+
+.composer .composer-contacts-target button:hover,
+.composer .composer-contacts-target button.is-active {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: none;
+}
+
+.composer .composer-contact-copy strong {
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.25;
+}
+
+.composer .composer-contact-copy small {
+  line-height: 1.25;
+}
+
+.composer .composer-contact-favorite {
+  font-size: 10px;
+}
+
+.composer .composer-contact-add {
+  font-size: var(--ui-font-size-aux);
+}
+
+.composer .composer-contacts-empty strong {
+  font-size: var(--ui-font-size-secondary);
+}
+
+.composer .composer-contacts-list:has(> .composer-contacts-empty) {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.composer .composer-contacts-list:has(> .composer-contacts-empty) .composer-contacts-empty {
+  flex: 1 1 auto;
+}
+
+.composer .composer-contacts-search:focus-within {
+  border-color: var(--ui-accent);
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+.composer .composer-contacts-search input:focus-visible {
+  outline: none;
+}
+
 .composer-contacts-panel button:focus-visible,
 .composer-contacts-search input:focus-visible {
   outline: var(--ui-focus-outline);

@@ -102,4 +102,24 @@ describe('ComposerContactsPanel', () => {
     expect(screen.getByText('没有找到匹配联系人')).not.toBeNull();
     expect(screen.getByText('试试搜索其他姓名或邮箱')).not.toBeNull();
   });
+
+  it('keeps the empty address-book state actionable', () => {
+    const onOpenContactsSettings = vi.fn();
+    render(
+      <ComposerContactsPanel
+        contacts={[]}
+        draft={emptyDraft}
+        onAddContact={vi.fn()}
+        onClose={vi.fn()}
+        onOpenContactsSettings={onOpenContactsSettings}
+      />,
+    );
+
+    expect(screen.getByRole('complementary', { name: '联系人' }).id).toBe('composer-contacts-panel');
+    expect(screen.getByText('还没有联系人', { selector: '.composer-contacts-empty strong' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '收件人' }).getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: '管理联系人' }));
+    expect(onOpenContactsSettings).toHaveBeenCalledTimes(1);
+  });
 });

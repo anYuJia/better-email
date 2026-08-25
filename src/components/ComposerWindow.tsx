@@ -340,6 +340,7 @@ export default function ComposerWindow({
               className="composer-contact-toggle"
               aria-label={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
               aria-expanded={contactsOpen}
+              aria-controls="composer-contacts-panel"
               title={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
               onClick={() => setContactsOpen((current) => !current)}
             >

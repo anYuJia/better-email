@@ -126,7 +126,7 @@ export default function ComposerContactsPanel({
   );
 
   return (
-    <aside className="composer-contacts-panel" aria-label="联系人">
+    <aside id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人">
       <div className="composer-contacts-header">
         <div className="composer-contacts-heading">
           <span className="composer-contacts-heading-icon" aria-hidden="true">

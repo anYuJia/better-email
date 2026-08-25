@@ -1463,6 +1463,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Draft Flow' && document.body.innerText.includes('已从恢复点还原邮件')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
     await waitForExpression(cdp, "document.querySelector('.composer.has-contacts-panel .composer-contacts-panel') && document.querySelector('.composer-contacts-search input')");
+    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-expanded=\"true\"][aria-controls=\"composer-contacts-panel\"]') && document.querySelector('.composer-contacts-target button[aria-pressed=\"true\"]')");
     await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
     await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
@@ -2534,6 +2535,7 @@ async function main() {
         'recipient rows keep hover geometry',
         'composer advanced tools stay folded by default',
         'composer contacts rail opens and searches empty state',
+        'composer contact rail exposes active state and target semantics',
         'composer schedule picker replaces native datetime control',
         'composer autosave restores after reload',
         'composer templates save and insert',

@@ -43,6 +43,8 @@ async function resolveDesktopPlatform(): Promise<DesktopPlatform> {
 }
 
 type AppTitlebarProps = Omit<GlobalSearchProps, 'shortcutLabel'> & {
+  currentViewLabel?: string;
+  viewSummary?: string;
   isRefreshing?: boolean;
   refreshNotice?: string | null;
   onRefresh: () => void;
@@ -117,6 +119,8 @@ export default function AppTitlebar({
   onSearchScopeChange,
   onClearSearchAndFilter,
   onApplySearchShortcut,
+  currentViewLabel,
+  viewSummary,
   isRefreshing = false,
   refreshNotice = null,
   onRefresh,
@@ -220,6 +224,15 @@ export default function AppTitlebar({
             />
             <span>Better Email</span>
           </div>
+          {currentViewLabel && (
+            <div
+              className="titlebar-context"
+              title={viewSummary ? `${currentViewLabel} · ${viewSummary}` : currentViewLabel}
+            >
+              <span className="titlebar-context-label">{currentViewLabel}</span>
+              {viewSummary && <span className="titlebar-context-count">{viewSummary}</span>}
+            </div>
+          )}
         </div>
 
         <div className="titlebar-center">

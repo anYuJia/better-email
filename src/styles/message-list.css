@@ -1709,7 +1709,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .message-card,
-  .message-attachment {
+  .message-attachment,
+  .app-shell .list-control-tabs::after {
     transition: var(--ui-transition-none);
   }
 }
@@ -1746,16 +1747,16 @@
   position: relative;
   z-index: 20;
   box-sizing: border-box;
-  flex: 0 0 96px;
+  flex: 0 0 52px;
   width: 100%;
-  height: 96px;
-  min-height: 96px;
-  max-height: 96px;
-  padding: 13px 14px 10px;
+  height: 52px;
+  min-height: 52px;
+  max-height: 52px;
+  padding: 6px 14px;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 7px;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
   overflow: visible;
   border-bottom: 1px solid var(--ui-border);
   background: var(--workspace-toolbar);
@@ -1768,7 +1769,8 @@
   align-items: center;
 }
 
-.list-summary-row {
+.app-shell .list-summary-row {
+  display: none;
   min-height: 30px;
   justify-content: space-between;
 }
@@ -1795,7 +1797,8 @@
 }
 
 .list-control-row {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  width: 100%;
   min-height: 34px;
   gap: 6px;
 }
@@ -1832,6 +1835,29 @@
 
 .app-shell .list-control-tabs {
   flex: 0 0 auto;
+  --list-tab-gap: 6px;
+  --list-tab-indicator-width: 64px;
+  position: relative;
+  gap: var(--list-tab-gap);
+  padding-bottom: 3px;
+}
+
+.app-shell .list-control-tabs::after {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--list-tab-indicator-width);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ui-accent);
+  content: "";
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform var(--ui-motion-normal) var(--ui-ease-emphasized);
+}
+
+.app-shell .list-control-tabs[data-active-mode="threads"]::after {
+  transform: translateX(calc(var(--list-tab-indicator-width) + var(--list-tab-gap)));
 }
 
 .app-shell .list-control-menus {
@@ -1839,6 +1865,9 @@
 }
 
 .app-shell .list-control-tabs > button {
+  flex: 0 0 var(--list-tab-indicator-width);
+  width: var(--list-tab-indicator-width);
+  min-width: var(--list-tab-indicator-width);
   min-height: 32px;
   height: 32px;
   padding-inline: 8px;
@@ -1862,7 +1891,7 @@
   background: transparent;
   border-bottom: 0;
   font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--ui-accent);
+  box-shadow: var(--ui-box-shadow-none);
 }
 
 .compact-dropdown {
@@ -2067,9 +2096,12 @@
 
 @media (max-width: 1180px) {
   .app-shell .list-control-actions,
-  .app-shell .list-control-tabs,
   .app-shell .list-control-menus {
     gap: 4px;
+  }
+
+  .app-shell .list-control-tabs {
+    --list-tab-gap: 4px;
   }
 
   .app-shell .list-control-tabs > button {
@@ -2090,8 +2122,23 @@
 
 @media (max-width: 720px) {
   .app-shell .list-control-strip {
+    flex: 0 0 96px;
+    height: 96px;
     min-height: 96px;
-    padding-inline: 12px;
+    max-height: 96px;
+    padding: 13px 12px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+  }
+
+  .app-shell .list-summary-row {
+    display: flex;
+  }
+
+  .app-shell .list-control-row {
+    flex: 0 0 auto;
+    width: auto;
   }
 
   .app-shell .list-control-actions {

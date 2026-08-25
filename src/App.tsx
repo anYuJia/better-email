@@ -1392,6 +1392,8 @@ export default function App() {
         onSearchScopeChange={handleSearchScopeChange}
         onClearSearchAndFilter={handleClearSearchAndFilter}
         onApplySearchShortcut={handleApplySearchShortcut}
+        currentViewLabel={currentViewLabel}
+        viewSummary={listMode === 'messages' ? visibleListSummary : messageListSummary}
         isRefreshing={isRefreshing || isBackgroundSyncRunning}
         refreshNotice={refreshNotice}
         onRefresh={handleRefresh}

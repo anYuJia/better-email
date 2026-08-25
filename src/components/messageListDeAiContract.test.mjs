@@ -382,7 +382,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(r).toBeLessThanOrEqual(8);
   });
 
-  it('list controls have breathing room and use a surface selected state', () => {
+  it('list controls have breathing room and keep the shared tab indicator animated', () => {
     const strip = extractBlock(messageListCss, '.list-control-strip');
     expect(strip.length).toBeGreaterThan(0);
     expect(extractDecl(strip[0], 'min-height')).toBeGreaterThanOrEqual(52);
@@ -393,7 +393,23 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     const activeRule = messageListCss.slice(activeStart, activeEnd);
     expect(activeRule).toMatch(/background:\s*var\(--quiet-row-selected\)/);
     expect(activeRule).toMatch(/box-shadow:\s*var\(--ui-box-shadow-none\)/);
-    expect(activeRule).not.toMatch(/inset\s+0\s+-1px/);
+    const tabs = extractBlock(messageListCss, '.app-shell .list-control-tabs::after');
+    expect(tabs.length).toBeGreaterThan(0);
+    const indicator = tabs.find((block) => block.includes('width:'));
+    expect(indicator).toBeDefined();
+    expect(indicator).toMatch(/width:\s*var\(--list-tab-indicator-width\)/);
+    expect(indicator).toMatch(/height:\s*3px/);
+    expect(indicator).toMatch(/transform:\s*translateX\(0\)/);
+    expect(indicator).toMatch(/transition:\s*transform/);
+
+    const threadsIndicator = extractBlock(
+      messageListCss,
+      '.app-shell .list-control-tabs[data-active-mode="threads"]::after',
+    );
+    expect(threadsIndicator.length).toBeGreaterThan(0);
+    expect(threadsIndicator[0]).toMatch(
+      /transform:\s*translateX\(calc\(var\(--list-tab-indicator-width\) \+ var\(--list-tab-gap\)\)\)/,
+    );
   });
 
   it('refresh button is icon-first (not a primary gradient CTA)', () => {

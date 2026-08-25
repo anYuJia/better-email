@@ -144,6 +144,7 @@ describe('Inbox toolbar selection mode', () => {
     );
 
     expect(view.container.querySelector('.list-control-tabs')).not.toBeNull();
+    expect(view.container.querySelector('.list-control-tabs')?.getAttribute('data-active-mode')).toBe('messages');
     expect(view.container.querySelector('.list-control-menus')).not.toBeNull();
     expect(view.getByRole('button', { name: '筛选邮件，当前：全部' })).toBeDefined();
     expect(view.getByRole('button', { name: '邮件排序，当前：时间' })).toBeDefined();
@@ -163,7 +164,7 @@ describe('Inbox toolbar selection mode', () => {
     const row = view.container.querySelector('.list-control-row');
 
     expect(strip?.getAttribute('data-toolbar-mode')).toBe('normal');
-    expect(strip?.getAttribute('data-toolbar-height')).toBe('96');
+    expect(strip?.getAttribute('data-toolbar-height')).toBe('52');
     expect(row?.querySelector('.list-control-actions')).not.toBeNull();
     expect(row?.querySelector('.bulk-toolbar')).toBeNull();
 
@@ -195,7 +196,7 @@ describe('Inbox toolbar selection mode', () => {
     const selectedStrip = view.container.querySelector('.list-control-strip');
     expect(selectedStrip).toBe(strip);
     expect(selectedStrip?.getAttribute('data-toolbar-mode')).toBe('selection');
-    expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('96');
+    expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('52');
     expect(view.container.querySelector('.list-control-row')?.querySelector('.bulk-toolbar')).not.toBeNull();
     expect(view.container.querySelector('.list-control-row')?.querySelector('.list-control-actions')).toBeNull();
     expect(screen.getByRole('button', { name: '归档选中的邮件' })).toBeDefined();

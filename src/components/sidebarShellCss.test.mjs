@@ -132,4 +132,16 @@ describe('window chrome contract', () => {
     expect(layoutCss).not.toMatch(/backdrop-filter:\s*blur\(/);
     expect(darkModeCss.replace(/\.window-chrome[\s\S]*?\}/g, '')).not.toMatch(/backdrop-filter:\s*blur\(/);
   });
+
+  it('keeps the titlebar identity anchored while narrow desktop widths yield the count first', () => {
+    expect(windowChromeCss).toMatch(
+      /\.titlebar-brand\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(windowChromeCss).toMatch(
+      /\.titlebar-brand > span\s*\{[\s\S]*?text-overflow:\s*ellipsis;/,
+    );
+    expect(windowChromeCss).toMatch(
+      /@media \(max-width: 820px\)[\s\S]*?\.titlebar-context-count\s*\{[\s\S]*?display:\s*none;/,
+    );
+  });
 });

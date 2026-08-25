@@ -33,7 +33,11 @@ vi.mock('@tauri-apps/api/window', () => {
   };
 });
 
-function renderTitlebar(testPlatform?: 'macos' | 'windows' | 'linux' | 'web') {
+function renderTitlebar(
+  testPlatform?: 'macos' | 'windows' | 'linux' | 'web',
+  currentViewLabel?: string,
+  viewSummary?: string,
+) {
   return render(
     <AppTitlebar
       searchInputRef={{ current: null }}
@@ -47,6 +51,8 @@ function renderTitlebar(testPlatform?: 'macos' | 'windows' | 'linux' | 'web') {
       onSearchScopeChange={vi.fn()}
       onClearSearchAndFilter={vi.fn()}
       onApplySearchShortcut={vi.fn()}
+      currentViewLabel={currentViewLabel}
+      viewSummary={viewSummary}
       onRefresh={vi.fn()}
       testPlatform={testPlatform}
     />,
@@ -64,6 +70,16 @@ describe('AppTitlebar', () => {
 
   it('detects the web platform when no Tauri runtime is present', () => {
     expect(detectDesktopPlatform()).toBe('web');
+  });
+
+  it('keeps the current view and result count together beside search', () => {
+    const { container } = renderTitlebar(undefined, '统一收件箱', '40+ 封');
+    const context = container.querySelector('.titlebar-context');
+
+    expect(context).not.toBeNull();
+    expect(context?.querySelector('.titlebar-context-label')?.textContent).toBe('统一收件箱');
+    expect(context?.querySelector('.titlebar-context-count')?.textContent).toBe('40+ 封');
+    expect(context?.parentElement?.classList.contains('titlebar-left')).toBe(true);
   });
 
   it('renders a browser preview without native window controls or fake traffic lights', () => {

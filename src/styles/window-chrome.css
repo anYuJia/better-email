@@ -59,6 +59,7 @@ body[data-image-preview-modal='1'] .window-chrome {
 }
 
 .titlebar-left {
+  overflow: hidden;
   padding-inline: 12px 14px;
 }
 
@@ -76,16 +77,62 @@ body[data-image-preview-modal='1'] .window-chrome {
 .titlebar-brand {
   position: relative;
   z-index: 2;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
   color: var(--ui-text);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.015em;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.titlebar-brand > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-context {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 240px;
+  min-width: 0;
+  max-width: 240px;
+  margin-left: 16px;
+  padding-left: 16px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  border-left: 1px solid var(--titlebar-border);
+  pointer-events: none;
+}
+
+.titlebar-context-label,
+.titlebar-context-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-context-label {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.titlebar-context-count {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .titlebar-brand img {
@@ -326,6 +373,15 @@ body[data-image-preview-modal='1'] .window-chrome {
   }
 
   .global-search-shortcut {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  /* Keep the current mailbox identity readable until the mobile titlebar
+   * takes over. The secondary count yields first, so the identity does not
+   * drift into the search column as the window narrows. */
+  .titlebar-context-count {
     display: none;
   }
 }

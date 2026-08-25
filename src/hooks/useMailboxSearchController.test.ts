@@ -262,6 +262,19 @@ describe('useMailboxSearchController', () => {
     expect(setStatus).toHaveBeenCalledWith('已清空搜索和筛选');
   });
 
+  it('clearSearchAndFilter can reload a target filter as a message list', async () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    await act(async () => {
+      act(() => result.current.setQuery('invoice'));
+      await result.current.clearSearchAndFilter('starred', false);
+    });
+    expect(result.current.appliedQuery).toBe('');
+    expect(result.current.filter).toBe('starred');
+    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
+      101, '', 'starred', 'all', 2, folders, messagePageSize, 'folder', false,
+    );
+  });
+
   it('loadMoreMessages grows the limit and reports the visible count', async () => {
     const { result, loadMessagesWithVisibleFallback, setStatus } = renderController();
     loadMessagesWithVisibleFallback.mockResolvedValue([{ id: 1 } as MessageSummary]);

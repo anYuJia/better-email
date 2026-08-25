@@ -246,16 +246,23 @@ export default function App() {
     setMobileScreen(nextScreen);
     setMobileSearchOpen(false);
     if (!isMobileApp) return;
-    if (window.history.state?.betterEmailScreen === nextScreen) return;
-    const { betterEmailSettingsSection: _settingsSection, ...baseState } = window.history.state ?? {};
-    window.history.pushState(
-      { ...baseState, betterEmailScreen: nextScreen },
-      '',
-    );
+    const currentState = window.history.state ?? {};
+    const { betterEmailSettingsSection: _settingsSection, betterEmailSearch: _search, ...baseState } = currentState;
+    if (currentState.betterEmailScreen === nextScreen) {
+      if (currentState.betterEmailSearch) {
+        window.history.replaceState({ ...baseState, betterEmailScreen: nextScreen }, '');
+      }
+      return;
+    }
+    window.history.pushState({ ...baseState, betterEmailScreen: nextScreen }, '');
   }, [isMobileApp]);
 
   const backMobileScreen = useCallback(() => {
     setMobileSearchOpen(false);
+    if (isMobileApp && window.history.state?.betterEmailSearch) {
+      window.history.back();
+      return;
+    }
     if (isMobileApp && window.history.state?.betterEmailScreen !== 'mail') {
       window.history.back();
       return;
@@ -318,6 +325,7 @@ export default function App() {
     handleQueryChange,
     handleSearchScopeChange,
     handleClearSearchAndFilter,
+    handleClearSearchForFilter,
     handleApplySearchShortcut,
     handleShowMessages,
     handleShowThreads,
@@ -1727,13 +1735,13 @@ export default function App() {
               <MobileBottomNav
                 filter={filter}
                 onOpenMail={() => {
+                  handleClearSearchForFilter('all', false);
                   handleShowMessages();
-                  setFilter('all');
                   navigateMobileScreen('mail');
                 }}
                 onOpenStarred={() => {
+                  handleClearSearchForFilter('starred', false);
                   handleShowMessages();
-                  setFilter('starred');
                   navigateMobileScreen('mail');
                 }}
                 onCompose={() => handleComposeNew(undefined)}

@@ -1131,6 +1131,17 @@ async function main() {
     await waitForExpression(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); return list && list.scrollHeight > list.clientHeight && getComputedStyle(list).overflowY === 'auto' && getComputedStyle(list).touchAction === 'pan-y'; })()");
     await evalInPage(cdp, "(() => { const list = document.querySelector('.mobile-message-list-panel .message-list'); if (!list) throw new Error('Mobile message list not found'); list.scrollTop = Math.min(240, list.scrollHeight - list.clientHeight); list.dispatchEvent(new Event('scroll', { bubbles: true })); })()");
     await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel .message-list')?.scrollTop > 0");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-actions .mobile-header-icon[aria-label=\"搜索邮件\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-inbox-header--search') && window.history.state?.betterEmailSearch");
+    await fillInput(cdp, '.mobile-search-form input[aria-label="搜索邮件"]', 'invoice');
+    await evalInPage(cdp, "document.querySelector('.mobile-search-form')?.requestSubmit()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-search-form input[aria-label=\"搜索邮件\"]')?.value === 'invoice'");
+    await clickButton(cdp, '邮件', "document.querySelector('.mobile-bottom-nav')");
+    await waitForExpression(cdp, "!document.querySelector('.mobile-inbox-header--search') && !window.history.state?.betterEmailSearch");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-actions .mobile-header-icon[aria-label=\"搜索邮件\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-inbox-header--search input[aria-label=\"搜索邮件\"]')?.value === ''");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-header--search .mobile-header-icon[aria-label=\"关闭搜索\"]')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.mobile-inbox-header--search')");
     await evalInPage(cdp, "document.querySelector('.mobile-inbox-header .mobile-header-icon[aria-label=\"打开邮箱导航\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-mailbox-sheet')");
     await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-mailbox-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
@@ -1147,6 +1158,15 @@ async function main() {
     await waitForExpression(cdp, "(() => { const panel = document.querySelector('.mobile-reader-surface > .reader-panel'); return panel && getComputedStyle(panel).overflowY === 'auto' && getComputedStyle(panel).touchAction === 'pan-y'; })()");
     await evalInPage(cdp, "document.querySelector('[data-narrow-reader-back]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel') && !document.querySelector('.mobile-reader-surface')");
+    await clickButton(cdp, '设置', "document.querySelector('.mobile-bottom-nav')");
+    await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && window.history.state?.betterEmailScreen === 'settings' && !document.querySelector('.settings-modal')");
+    await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-settings-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
+    await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.textContent.includes('联系人'))?.click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-v2\"]') && document.querySelector('.settings-page[data-settings-page=\"contacts\"]') && window.history.state?.betterEmailSettingsSection === 'contacts'");
+    await evalInPage(cdp, "document.querySelector('.settings-close-button[aria-label=\"关闭设置\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && !document.querySelector('.settings-modal') && window.history.state?.betterEmailScreen === 'settings' && !window.history.state?.betterEmailSettingsSection");
+    await evalInPage(cdp, "document.querySelector('.mobile-settings-header .mobile-header-icon[aria-label=\"返回邮箱\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel') && window.history.state?.betterEmailScreen === 'mail'");
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
       height: 980,
@@ -2470,8 +2490,10 @@ async function main() {
         'contact settings edit opens',
         'contact command palette compose works',
         'mobile message list has a touch-scrolling owner',
+        'mobile search dismissal clears its browser history state',
         'mobile mailbox sheet closes before compose and exposes contact picker',
         'mobile reader owns a touch-scrolling surface',
+        'mobile settings root and section navigation return through browser history',
         'recipient autocomplete works',
         'composer advanced tools stay folded by default',
         'composer contacts rail opens and searches empty state',

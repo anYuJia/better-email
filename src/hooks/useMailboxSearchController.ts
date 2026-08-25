@@ -273,11 +273,14 @@ export default function useMailboxSearchController({
     setStatus,
   ]);
 
-  const clearSearchAndFilter = useCallback(async () => {
+  const clearSearchAndFilter = useCallback(async (
+    nextFilter: FilterMode = 'all',
+    nextIncludeThreads = listMode === 'threads',
+  ) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
     applyQuery('');
-    setFilter('all');
+    setFilter(nextFilter);
     setSearchScope('folder');
     setActiveThread(null);
     setThreadMessages([]);
@@ -287,13 +290,13 @@ export default function useMailboxSearchController({
     await loaders.loadMessagesWithVisibleFallback(
       folderId,
       '',
-      'all',
+      nextFilter,
       accountScope,
       nextSearchRefreshId(),
       folders,
       messagePageSize,
       'folder',
-      listMode === 'threads',
+      nextIncludeThreads,
     );
     setStatus('已清空搜索和筛选');
   }, [
@@ -363,6 +366,13 @@ export default function useMailboxSearchController({
 
   const handleClearSearchAndFilter = useCallback(() => {
     clearSearchAndFilter().catch((error) => setStatus(String(error)));
+  }, [clearSearchAndFilter, setStatus]);
+
+  const handleClearSearchForFilter = useCallback((
+    nextFilter: FilterMode,
+    nextIncludeThreads = false,
+  ) => {
+    clearSearchAndFilter(nextFilter, nextIncludeThreads).catch((error) => setStatus(String(error)));
   }, [clearSearchAndFilter, setStatus]);
 
   const handleApplySearchShortcut = useCallback((nextQuery: string) => {
@@ -451,6 +461,7 @@ export default function useMailboxSearchController({
     handleQueryChange,
     handleSearchScopeChange,
     handleClearSearchAndFilter,
+    handleClearSearchForFilter,
     handleApplySearchShortcut,
     handleShowMessages,
     handleShowThreads,

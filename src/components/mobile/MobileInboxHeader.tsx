@@ -162,7 +162,7 @@ export default function MobileInboxHeader({
             type="button"
             className={filter === 'attachments' ? 'active' : ''}
             aria-label={`更多筛选，当前：${activeFilter.label}`}
-            aria-expanded={filter === 'attachments' || showListModeMenu}
+            aria-expanded={showListModeMenu}
             onClick={() => setShowListModeMenu((current) => !current)}
           >
             <SlidersHorizontal size={16} aria-hidden="true" />

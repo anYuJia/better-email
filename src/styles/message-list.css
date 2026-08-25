@@ -1985,6 +1985,14 @@
   left: auto;
 }
 
+/* Filter choices are short labels. Keep this menu compact without changing
+ * the existing sort/time menu sizing. */
+.compact-dropdown.filter-menu > div {
+  width: max-content;
+  min-width: 96px;
+  max-width: min(200px, calc(100vw - 24px));
+}
+
 .compact-dropdown > div button {
   min-height: 33px;
   padding: 0 8px;

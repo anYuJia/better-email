@@ -1,5 +1,13 @@
 # Better Email — Project Instructions
 
+## Git 提交规范
+
+每次提交必须使用严格的 `feat:中文` 格式：
+
+* 提交信息必须以 `feat:` 开头。
+* `feat:` 后直接填写中文描述，不添加空格。
+* 示例：`feat:修复邮件切换动画`
+
 ## UI/UX source of truth
 
 All UI/UX implementation must follow:

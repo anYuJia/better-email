@@ -135,6 +135,7 @@ function MessageListToolbar({
               >
                 会话
               </button>
+              <span className="list-control-tab-indicator" aria-hidden="true" />
             </div>
             <div className="list-control-menus" role="group" aria-label="邮件筛选和排序">
               <CompactDropdown

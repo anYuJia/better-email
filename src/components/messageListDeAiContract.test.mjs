@@ -408,7 +408,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     const activeRule = messageListCss.slice(activeStart, activeEnd);
     expect(activeRule).toMatch(/background:\s*var\(--quiet-row-selected\)/);
     expect(activeRule).toMatch(/box-shadow:\s*var\(--ui-box-shadow-none\)/);
-    const tabs = extractBlock(messageListCss, '.app-shell .list-control-tabs::after');
+    const tabs = extractBlock(messageListCss, '.app-shell .list-control-tab-indicator');
     expect(tabs.length).toBeGreaterThan(0);
     const indicator = tabs.find((block) => block.includes('width:'));
     expect(indicator).toBeDefined();
@@ -419,7 +419,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
 
     const threadsIndicator = extractBlock(
       messageListCss,
-      '.app-shell .list-control-tabs[data-active-mode="threads"]::after',
+      '.app-shell .list-control-tabs[data-active-mode="threads"] .list-control-tab-indicator',
     );
     expect(threadsIndicator.length).toBeGreaterThan(0);
     expect(threadsIndicator[0]).toMatch(

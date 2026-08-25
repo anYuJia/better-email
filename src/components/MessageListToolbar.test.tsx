@@ -144,6 +144,7 @@ describe('Inbox toolbar selection mode', () => {
     );
 
     expect(view.container.querySelector('.list-control-tabs')).not.toBeNull();
+    expect(view.container.querySelector('.list-control-tab-indicator')).not.toBeNull();
     expect(view.container.querySelector('.list-control-tabs')?.getAttribute('data-active-mode')).toBe('messages');
     expect(view.container.querySelector('.list-control-menus')).not.toBeNull();
     expect(view.getByRole('button', { name: '筛选邮件，当前：全部' })).toBeDefined();

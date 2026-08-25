@@ -1752,7 +1752,7 @@
 @media (prefers-reduced-motion: reduce) {
   .message-card,
   .message-attachment,
-  .app-shell .list-control-tabs::after {
+  .app-shell .list-control-tab-indicator {
     transition: var(--ui-transition-none);
   }
 }
@@ -1884,7 +1884,7 @@
   padding-bottom: 3px;
 }
 
-.app-shell .list-control-tabs::after {
+.app-shell .list-control-tab-indicator {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -1892,13 +1892,13 @@
   height: 3px;
   border-radius: 2px;
   background: var(--ui-accent);
-  content: "";
   pointer-events: none;
   transform: translateX(0);
   transition: transform var(--ui-motion-normal) var(--ui-ease-emphasized);
+  will-change: transform;
 }
 
-.app-shell .list-control-tabs[data-active-mode="threads"]::after {
+.app-shell .list-control-tabs[data-active-mode="threads"] .list-control-tab-indicator {
   transform: translateX(calc(var(--list-tab-indicator-width) + var(--list-tab-gap)));
 }
 

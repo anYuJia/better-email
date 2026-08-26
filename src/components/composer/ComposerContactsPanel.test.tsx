@@ -62,7 +62,6 @@ function renderPanel(draft = emptyDraft) {
       contacts={[ada, grace, lin, newcomer]}
       draft={draft}
       activeRecipientField="to"
-      onRecipientFieldChange={vi.fn()}
       onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
       onClose={vi.fn()}
     />,
@@ -70,15 +69,13 @@ function renderPanel(draft = emptyDraft) {
 }
 
 describe('ComposerContactsPanel', () => {
-  it('searches contacts and adds the selected contact to the chosen recipient field', () => {
+  it('searches contacts and adds a contact from its row action', () => {
     const onAddContacts = vi.fn(() => ({ addedIds: [grace.id], skippedIds: [] }));
-    const onRecipientFieldChange = vi.fn();
-    const view = render(
+    render(
       <ComposerContactsPanel
         contacts={[ada, grace, lin, newcomer]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={onRecipientFieldChange}
         onAddContacts={onAddContacts}
         onClose={vi.fn()}
       />,
@@ -90,23 +87,26 @@ describe('ComposerContactsPanel', () => {
     expect(screen.getByText('Grace Hopper')).not.toBeNull();
     expect(screen.queryByText('Ada Lovelace')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '选择 Grace Hopper' }));
-    fireEvent.click(screen.getByRole('button', { name: '选择添加目标' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '抄送' }));
-    expect(onRecipientFieldChange).toHaveBeenCalledWith('cc');
+    const row = screen.getByRole('listitem', { name: 'Grace Hopper，按回车添加到收件人' });
+    fireEvent.mouseEnter(row);
+    fireEvent.click(screen.getByRole('button', { name: '添加 Grace Hopper 到收件人' }));
 
-    view.rerender(
+    expect(onAddContacts).toHaveBeenCalledWith([grace], 'to');
+  });
+
+  it('uses the currently focused recipient field as the row action target', () => {
+    const onAddContacts = vi.fn(() => ({ addedIds: [grace.id], skippedIds: [] }));
+    render(
       <ComposerContactsPanel
         contacts={[ada, grace, lin, newcomer]}
         draft={emptyDraft}
         activeRecipientField="cc"
-        onRecipientFieldChange={onRecipientFieldChange}
         onAddContacts={onAddContacts}
         onClose={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '添加到抄送' }));
 
+    fireEvent.click(screen.getByRole('button', { name: '添加 Grace Hopper 到抄送' }));
     expect(onAddContacts).toHaveBeenCalledWith([grace], 'cc');
   });
 
@@ -117,9 +117,9 @@ describe('ComposerContactsPanel', () => {
     expect(screen.getAllByRole('listitem')[0].getAttribute('data-contact-id')).toBe('1');
     expect(screen.queryByText('New Contact')).toBeNull();
 
-    const added = screen.getByRole('button', { name: 'Ada Lovelace已添加到收件人' });
-    expect(added).toHaveProperty('disabled', true);
-    expect(screen.queryByRole('button', { name: '添加 Grace Hopper' })).toBeNull();
+    const added = screen.getByText('已添加', { selector: '.composer-contact-add' });
+    expect(added.classList.contains('is-added')).toBe(true);
+    expect(screen.getByRole('button', { name: '添加 Grace Hopper 到收件人' })).not.toBeNull();
   });
 
   it('shows a useful empty state when the search has no match', () => {
@@ -139,7 +139,6 @@ describe('ComposerContactsPanel', () => {
         contacts={[emailOnly]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={vi.fn()}
         onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
       />,
@@ -155,7 +154,6 @@ describe('ComposerContactsPanel', () => {
         contacts={[{ ...emailOnly, name: emailOnly.email }]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={vi.fn()}
         onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
       />,
@@ -172,7 +170,6 @@ describe('ComposerContactsPanel', () => {
         contacts={[numericContact]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={vi.fn()}
         onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
       />,
@@ -188,7 +185,6 @@ describe('ComposerContactsPanel', () => {
         contacts={[]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={vi.fn()}
         onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
         onOpenContactsSettings={onOpenContactsSettings}
@@ -197,7 +193,7 @@ describe('ComposerContactsPanel', () => {
 
     expect(screen.getByRole('complementary', { name: '联系人' }).id).toBe('composer-contacts-panel');
     expect(screen.getByText('还没有联系人', { selector: '.composer-contacts-empty strong' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '添加到收件人' })).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: '添加到收件人' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '管理联系人' }));
     expect(onOpenContactsSettings).toHaveBeenCalledTimes(1);
@@ -209,7 +205,6 @@ describe('ComposerContactsPanel', () => {
         contacts={[]}
         draft={emptyDraft}
         activeRecipientField="to"
-        onRecipientFieldChange={vi.fn()}
         onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
         showClose={false}

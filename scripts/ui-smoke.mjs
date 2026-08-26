@@ -1192,11 +1192,12 @@ async function composeLayoutSnapshot(cdp) {
       bodyHeight: field('.composer-body-field'),
       footerHeight: footer?.height ?? null,
       contactsRowHeight: field('.composer-contact-row'),
-      contactsFooterHeight: field('.composer-contacts-footer'),
+      contactsFooterHeight: field('.composer-contacts-footer') ?? 0,
       scheduleWidth: schedule?.width ?? null,
       sendWidth: send?.width ?? null,
       noHorizontalScroll,
       noFooterOverlap,
+      noContactSelectionUI: !document.querySelector('.composer-contacts-footer, .composer-contact-select, .composer-contact-batch, .composer-contact-target-menu'),
       compactSchedule: isVisible('.composer-schedule-label-compact'),
       compactSend: isVisible('.composer-send-label-compact'),
       fullSchedule: isVisible('.composer-schedule-label-full'),
@@ -1263,16 +1264,15 @@ async function captureComposeReferenceFixture(cdp) {
 
     const compactSnapshot = await composeLayoutSnapshot(cdp);
     console.log(`[ui-smoke] compose-reference-1188 geometry ${JSON.stringify(compactSnapshot)}`);
-    if (!compactSnapshot.noHorizontalScroll || !compactSnapshot.noFooterOverlap || !compactSnapshot.connectedPanes || compactSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || compactSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || compactSnapshot.gap < -1 || compactSnapshot.gap > 1 || compactSnapshot.footerHeight > 68 || !compactSnapshot.compactSchedule || !compactSnapshot.compactSend || compactSnapshot.fullSchedule || compactSnapshot.fullSend) {
+    if (!compactSnapshot.noHorizontalScroll || !compactSnapshot.noFooterOverlap || !compactSnapshot.connectedPanes || !compactSnapshot.noContactSelectionUI || compactSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || compactSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || compactSnapshot.gap < -1 || compactSnapshot.gap > 1 || compactSnapshot.footerHeight > 68 || !compactSnapshot.compactSchedule || !compactSnapshot.compactSend || compactSnapshot.fullSchedule || compactSnapshot.fullSend) {
       throw new Error(`1188 compose geometry contract failed: ${JSON.stringify(compactSnapshot)}`);
     }
     await captureScreenshot(cdp, 'compose-reference-state-1188');
 
-    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.composer-contact-row')].find((item) => !item.classList.contains('is-added')); row?.click(); })()");
-    await waitForExpression(cdp, "document.querySelector('.composer-contact-row.is-selected')");
-    await captureScreenshot(cdp, 'compose-reference-contact-selected');
-    await evalInPage(cdp, "document.querySelector('.composer-contact-row.is-selected')?.click()");
-    await waitForExpression(cdp, "!document.querySelector('.composer-contact-row.is-selected')");
+    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.composer-contact-row')].find((item) => !item.classList.contains('is-added')); const action = row?.querySelector('.composer-contact-add:not(.is-added)'); if (!action) throw new Error('Contact row add action not found'); action.click(); })()");
+    await waitForExpression(cdp, "document.querySelectorAll('.composer-contact-row.is-added').length >= 2");
+    await waitForExpression(cdp, "!document.querySelector('.composer-contact-select, .composer-contact-batch, .composer-contact-target-menu, .composer-contacts-footer')");
+    await captureScreenshot(cdp, 'compose-reference-contact-added');
 
     await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.focus()");
     await waitForExpression(cdp, "getComputedStyle(document.querySelector('.composer input[role=\"combobox\"]')).outlineStyle === 'none'");
@@ -1283,7 +1283,7 @@ async function captureComposeReferenceFixture(cdp) {
     await sleep(120);
     const wideSnapshot = await composeLayoutSnapshot(cdp);
     console.log(`[ui-smoke] compose-reference-1583 geometry ${JSON.stringify(wideSnapshot)}`);
-    if (!wideSnapshot.noHorizontalScroll || !wideSnapshot.noFooterOverlap || !wideSnapshot.connectedPanes || wideSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || wideSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || wideSnapshot.gap < -1 || wideSnapshot.gap > 1 || wideSnapshot.footerHeight > 68 || !wideSnapshot.fullSchedule || !wideSnapshot.fullSend || wideSnapshot.compactSchedule || wideSnapshot.compactSend) {
+    if (!wideSnapshot.noHorizontalScroll || !wideSnapshot.noFooterOverlap || !wideSnapshot.connectedPanes || !wideSnapshot.noContactSelectionUI || wideSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || wideSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || wideSnapshot.gap < -1 || wideSnapshot.gap > 1 || wideSnapshot.footerHeight > 68 || !wideSnapshot.fullSchedule || !wideSnapshot.fullSend || wideSnapshot.compactSchedule || wideSnapshot.compactSend) {
       throw new Error(`1583 compose geometry contract failed: ${JSON.stringify(wideSnapshot)}`);
     }
 
@@ -1746,10 +1746,11 @@ async function main() {
         bodyHeight: body?.height,
         footerHeight: footer?.height,
         contactsRowHeight: rows[0]?.getBoundingClientRect().height,
-        contactsFooterHeight: contactsFooter?.height,
+        contactsFooterHeight: contactsFooter?.height ?? 0,
         sendWidth: send?.width,
         noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth,
         panesDoNotOverlap: Boolean(editor && contacts && editor.right <= contacts.left),
+        noContactSelectionUI: !document.querySelector('.composer-contacts-footer, .composer-contact-select, .composer-contact-batch, .composer-contact-target-menu'),
         hasContactRows: Boolean(rows.length && list && lastRow),
         hasContactEmptyState: Boolean(document.querySelector('.composer-contacts-empty')),
         oneBottomOperationRow: document.querySelectorAll('.composer footer').length === 1
@@ -1770,12 +1771,12 @@ async function main() {
           && within(toolbar?.height, 0, 50)
           && (body?.height ?? 0) >= 220
           && (!rows.length || (rows[0].getBoundingClientRect().height <= 70))
-          && (contactsFooter?.height ?? 999) <= 68
+          && (contactsFooter?.height ?? 0) <= 68
           && (send?.width ?? 999) <= 220,
         ),
       };
     })()`);
-    if (!composeGeometry?.ranges || !composeGeometry.noHorizontalScroll || !composeGeometry.panesDoNotOverlap || !composeGeometry.oneBottomOperationRow || !composeGeometry.noStandaloneScheduleStatus || !composeGeometry.oneWindowControlSet || (!composeGeometry.hasContactRows && !composeGeometry.hasContactEmptyState)) {
+    if (!composeGeometry?.ranges || !composeGeometry.noHorizontalScroll || !composeGeometry.panesDoNotOverlap || !composeGeometry.noContactSelectionUI || !composeGeometry.oneBottomOperationRow || !composeGeometry.noStandaloneScheduleStatus || !composeGeometry.oneWindowControlSet || (!composeGeometry.hasContactRows && !composeGeometry.hasContactEmptyState)) {
       throw new Error(`Compose geometry contract failed: ${JSON.stringify(composeGeometry)}`);
     }
     if (composeGeometry.hasContactRows) {
@@ -1812,7 +1813,7 @@ async function main() {
     await clickButton(cdp, '抄送', "document.querySelector('.composer-recipient-field')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-recipient-field .composer-field-row')].some((row) => row.querySelector('span')?.textContent?.trim() === '抄送')");
     await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.composer-recipient-field .composer-field-row')].find((item) => item.querySelector('span')?.textContent?.trim() === '抄送'); row?.querySelector('input')?.focus(); })()");
-    await waitForExpression(cdp, "document.querySelector('.composer-contacts-footer button')?.textContent.includes('添加到抄送')");
+    await waitForExpression(cdp, "document.querySelector('.composer-contact-add:not(.is-added)')?.getAttribute('aria-label')?.includes('到抄送')");
     await captureScreenshot(cdp, 'compose-final-polish-cc-target');
     await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-send-menu')");

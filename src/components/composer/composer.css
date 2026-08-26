@@ -1979,48 +1979,6 @@
   background: var(--ui-control-hover);
 }
 
-.composer-contacts-target {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.composer-contacts-target > span {
-  color: var(--ui-text-tertiary);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.composer-contacts-target > div {
-  min-width: 0;
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 6px;
-  background: color-mix(in oklch, var(--ui-surface) 74%, var(--ui-surface-muted));
-}
-
-.composer-contacts-target button {
-  min-height: 24px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 4px;
-  color: var(--ui-text-tertiary);
-  background: transparent;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.composer-contacts-target button:hover,
-.composer-contacts-target button.is-active {
-  color: var(--ui-accent);
-  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
-  box-shadow: var(--ui-box-shadow-none);
-}
-
 .composer-contacts-list {
   min-height: 0;
   display: grid;
@@ -2134,35 +2092,6 @@
   font-weight: 650;
 }
 
-.composer-contact-add {
-  min-width: 42px;
-  min-height: 27px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 7px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
-  background: var(--ui-surface);
-  font-size: 10px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.composer-contact-add:hover:not(:disabled) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.composer-contact-add:disabled {
-  border-color: transparent;
-  color: var(--ui-text-tertiary);
-  background: transparent;
-  cursor: default;
-}
-
 .composer-contacts-empty {
   min-height: 190px;
   display: grid;
@@ -2199,43 +2128,9 @@
   line-height: 1.5;
 }
 
-.composer-contacts-footer {
-  flex: 0 0 auto;
-  padding: 9px 12px 11px;
-  border-top: 1px solid var(--composer-divider-soft);
-}
-
-.composer-contacts-footer button {
-  width: 100%;
-  min-height: 31px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 5px;
-  border: 0;
-  color: var(--ui-accent);
-  background: transparent;
-  font-size: 10.5px;
-  font-weight: 650;
-  text-align: left;
-}
-
-.composer-contacts-footer button svg:last-child {
-  margin-left: auto;
-}
-
-.composer-contacts-footer button:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
-}
-
-.composer-contacts-footer button:disabled {
-  color: var(--ui-text-tertiary);
-  cursor: default;
-}
-
 /* Contacts rail polish ----------------------------------------------------
- * The rail is a task surface, not a decorative sidebar: selected targets
- * need to read as selected, focus belongs to the whole search control, and
+ * The rail is a task surface, not a decorative sidebar: row actions
+ * appear progressively, focus belongs to the whole search control, and
  * an empty address book should use the available space instead of floating
  * at the top of a large blank panel. */
 .composer .composer-contact-toggle[aria-expanded="true"] {
@@ -2250,28 +2145,13 @@
 
 .composer .composer-contacts-heading small,
 .composer .composer-contacts-search input,
-.composer .composer-contacts-target > span,
-.composer .composer-contacts-target button,
 .composer .composer-contact-copy small,
-.composer .composer-contacts-footer button,
 .composer .composer-contacts-empty small {
   font-size: var(--ui-font-size-aux);
 }
 
 .composer .composer-contacts-tabs button {
   font-size: var(--ui-font-size-aux);
-}
-
-.composer .composer-contacts-target button {
-  min-height: 28px;
-  padding-inline: 9px;
-}
-
-.composer .composer-contacts-target button:hover,
-.composer .composer-contacts-target button.is-active {
-  color: var(--ui-accent);
-  background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
-  box-shadow: none;
 }
 
 .composer .composer-contact-copy strong {
@@ -3319,17 +3199,17 @@
 
 .composer-send-split {
   position: relative;
-  min-width: 196px;
+  min-width: 168px;
   min-height: 42px;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(0, 1fr) 34px;
   border-radius: var(--ui-radius-panel);
   background: var(--ui-accent);
 }
 
 .composer-send-split:has(.composer-send-label-full) {
-  min-width: 220px;
+  min-width: 208px;
 }
 
 .composer-send-primary,
@@ -3578,8 +3458,9 @@
   min-width: 0;
   min-height: var(--compose-contact-row-height);
   flex: 0 0 var(--compose-contact-row-height);
+  position: relative;
   display: grid;
-  grid-template-columns: 20px 36px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding: 0;
@@ -3594,26 +3475,9 @@
   background: var(--ui-control-hover);
 }
 
-.composer-contact-row.is-selected {
-  background: var(--ui-accent-soft);
-}
-
-.composer-contact-select {
-  width: 20px;
-  height: 20px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 1.5px solid var(--ui-border-strong);
-  border-radius: 50%;
-  color: var(--color-text-on-accent);
-  background: transparent;
-}
-
-.composer-contact-select.is-selected,
-.composer-contact-select:disabled:has(svg) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
+.composer-contact-row:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
 }
 
 .composer-contact-avatar {
@@ -3651,23 +3515,53 @@
   font-size: 12px;
 }
 
-.composer-contact-status-spacer {
-  width: 48px;
-  height: 32px;
-}
-
 .composer-contact-add {
-  min-height: 32px;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  min-width: 48px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 0 2px;
-  border: 0;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-accent);
-  background: transparent;
-  font-size: 12px;
+  background: var(--ui-surface);
+  font-size: var(--ui-font-size-aux);
   font-weight: 650;
   white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: none;
+}
+
+.composer-contact-row:hover .composer-contact-add:not(.is-added),
+.composer-contact-row:focus-within .composer-contact-add:not(.is-added),
+.composer-contact-add:not(.is-added):focus-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.composer-contact-add:hover:not(:disabled),
+.composer-contact-add:focus-visible {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer-contact-add.is-added {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
 }
 
 .composer-contacts-empty {
@@ -3679,99 +3573,6 @@
   padding: 24px 16px;
   color: var(--ui-text-tertiary);
   text-align: center;
-}
-
-.composer-contacts-footer {
-  position: relative;
-  min-height: var(--compose-footer-height);
-  flex: 0 0 var(--compose-footer-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--compose-space-3);
-  padding: 0 var(--compose-space-5);
-  border-top: 1px solid var(--compose-divider);
-  background: var(--ui-surface);
-}
-
-.composer-contacts-footer > span {
-  color: var(--ui-text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.composer-contacts-footer > span strong {
-  color: var(--ui-accent);
-}
-
-.composer-contact-batch {
-  position: relative;
-  min-height: 40px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
-  border-radius: 8px;
-  background: var(--ui-accent);
-}
-
-.composer-contact-batch > button {
-  min-height: 40px;
-  padding: 0 11px;
-  border: 0;
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent);
-  font-size: 13px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.composer-contact-batch > button:last-of-type {
-  padding: 0;
-  border-left: 1px solid color-mix(in oklch, var(--color-text-on-accent) 30%, transparent);
-}
-
-.composer-contact-batch > button:hover:not(:disabled) {
-  background: var(--ui-accent-hover);
-}
-
-.composer-contact-batch:has(> button:first-child:disabled),
-.composer-contact-batch:has(> button:first-child:disabled) > button {
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-}
-
-.composer-contact-batch:has(> button:first-child:disabled) {
-  border: 1px solid var(--ui-border);
-}
-
-.composer-contact-batch > button:disabled {
-  cursor: not-allowed;
-  opacity: 1;
-}
-
-.composer-contact-target-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  z-index: 120;
-  width: 150px;
-  display: grid;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 9px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
-}
-
-.composer-contact-target-menu button {
-  min-height: 36px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--ui-text);
-  background: transparent;
-  font-size: 13px;
-  text-align: left;
 }
 
 .composer :is(button, summary, input, textarea, select, [contenteditable="true"]):focus-visible {
@@ -3839,8 +3640,7 @@
 
   .composer-contacts-header,
   .composer-contacts-toolbar,
-  .composer-contacts-list,
-  .composer-contacts-footer {
+  .composer-contacts-list {
     padding-inline: 16px;
   }
 }

@@ -710,7 +710,6 @@ export default function ComposerWindow({
               contacts={contacts}
               draft={draft}
               activeRecipientField={activeRecipientField}
-              onRecipientFieldChange={setActiveRecipientField}
               onAddContacts={onAddContacts}
               onClose={() => setContactsOpen(false)}
               showClose={isNarrowContactsViewport}

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Check,
+  Plus,
   Search,
   Settings2,
   UserRound,
@@ -20,7 +21,6 @@ type ComposerContactsPanelProps = {
   contacts: Contact[];
   draft: DraftInput;
   activeRecipientField: ComposerRecipientField;
-  onRecipientFieldChange: (field: ComposerRecipientField) => void;
   onAddContacts: (contacts: Contact[], field: ComposerRecipientField) => AddContactsResult;
   onClose: () => void;
   showClose?: boolean;
@@ -98,7 +98,6 @@ export default function ComposerContactsPanel({
   contacts,
   draft,
   activeRecipientField,
-  onRecipientFieldChange,
   onAddContacts,
   onClose,
   showClose = true,
@@ -106,11 +105,6 @@ export default function ComposerContactsPanel({
 }: ComposerContactsPanelProps) {
   const [view, setView] = useState<ContactView>('recent');
   const [query, setQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
-  const [targetMenuOpen, setTargetMenuOpen] = useState(false);
-  const targetRootRef = useRef<HTMLDivElement | null>(null);
-  const targetMenuRef = useRef<HTMLDivElement | null>(null);
-  const targetToggleRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleContacts = useMemo(() => {
     const candidates = view === 'frequent'
@@ -130,79 +124,9 @@ export default function ComposerContactsPanel({
     [contacts],
   );
 
-  useEffect(() => {
-    setSelectedIds((current) => {
-      const next = new Set(
-        [...current].filter((id) => {
-          const contact = contacts.find((entry) => entry.id === id);
-          return Boolean(contact && !addedField(contact, draft));
-        }),
-      );
-      if (next.size === current.size && [...next].every((id) => current.has(id))) return current;
-      return next;
-    });
-  }, [contacts, draft]);
-
-  const selectedContacts = useMemo(
-    () => contacts.filter((contact) => selectedIds.has(contact.id) && !addedField(contact, draft)),
-    [contacts, draft, selectedIds],
-  );
-
-  useEffect(() => {
-    if (!targetMenuOpen) return undefined;
-    targetMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
-    function closeOnPointerDown(event: PointerEvent) {
-      if (event.target instanceof Node && targetRootRef.current?.contains(event.target)) return;
-      setTargetMenuOpen(false);
-      targetToggleRef.current?.focus({ preventScroll: true });
-    }
-    function closeOnKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setTargetMenuOpen(false);
-        targetToggleRef.current?.focus({ preventScroll: true });
-        return;
-      }
-      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-      const items = Array.from(targetMenuRef.current?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-      if (items.length === 0) return;
-      event.preventDefault();
-      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-      if (event.key === 'Home' || event.key === 'End') {
-        (event.key === 'Home' ? items[0] : items[items.length - 1]).focus({ preventScroll: true });
-        return;
-      }
-      const delta = event.key === 'ArrowDown' ? 1 : -1;
-      items[(currentIndex + delta + items.length) % items.length].focus({ preventScroll: true });
-    }
-    document.addEventListener('pointerdown', closeOnPointerDown, true);
-    document.addEventListener('keydown', closeOnKeyDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnPointerDown, true);
-      document.removeEventListener('keydown', closeOnKeyDown, true);
-    };
-  }, [targetMenuOpen]);
-
-  function closeTargetMenu() {
-    setTargetMenuOpen(false);
-    queueMicrotask(() => targetToggleRef.current?.focus({ preventScroll: true }));
-  }
-
-  function toggleSelected(contact: Contact) {
+  function addContact(contact: Contact) {
     if (addedField(contact, draft)) return;
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(contact.id)) next.delete(contact.id);
-      else next.add(contact.id);
-      return next;
-    });
-  }
-
-  function addSelected() {
-    if (selectedContacts.length === 0) return;
-    const result = onAddContacts(selectedContacts, activeRecipientField);
-    setSelectedIds((current) => new Set([...current].filter((id) => !result.addedIds.includes(id))));
-    closeTargetMenu();
+    onAddContacts([contact], activeRecipientField);
   }
 
   const targetLabel = RECIPIENT_FIELDS.find((field) => field.value === activeRecipientField)?.label ?? '收件人';
@@ -278,36 +202,22 @@ export default function ComposerContactsPanel({
           const name = contactDisplayName(contact);
           const hasName = Boolean(contact.name.trim() && normalized(contact.name) !== normalized(contact.email));
           const addedTo = addedField(contact, draft);
-          const selected = selectedIds.has(contact.id) && !addedTo;
           const avatarLabel = contactAvatarLabel(contact);
           return (
             <article
-              className={`composer-contact-row${selected ? ' is-selected' : ''}${addedTo ? ' is-added' : ''}`}
+              className={`composer-contact-row${addedTo ? ' is-added' : ''}`}
               key={contact.id}
               data-contact-id={contact.id}
               role="listitem"
               tabIndex={addedTo ? -1 : 0}
-              onClick={() => toggleSelected(contact)}
+              aria-label={addedTo ? `${name}已添加到${targetLabel}` : `${name}，按回车添加到${targetLabel}`}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  toggleSelected(contact);
+                  addContact(contact);
                 }
               }}
             >
-              <button
-                type="button"
-                className={`composer-contact-select${selected ? ' is-selected' : ''}`}
-                aria-label={addedTo ? `${name}已添加到${addedTo === 'to' ? '收件人' : addedTo === 'cc' ? '抄送' : '密送'}` : selected ? `取消选择 ${name}` : `选择 ${name}`}
-                aria-pressed={selected}
-                disabled={Boolean(addedTo)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleSelected(contact);
-                }}
-              >
-                {selected || addedTo ? <Check size={15} aria-hidden="true" /> : null}
-              </button>
               <span className={`composer-contact-avatar tone-${avatarTone(contact)}`} aria-hidden="true">
                 {avatarLabel ?? <UserRound size={17} />}
               </span>
@@ -316,10 +226,23 @@ export default function ComposerContactsPanel({
                 {hasName && <small title={contact.email}>{contact.email}</small>}
               </span>
               {addedTo ? (
-                <span className="composer-contact-add is-added" aria-label={`${name}已添加到${addedTo === 'to' ? '收件人' : addedTo === 'cc' ? '抄送' : '密送'}`}>
+                <span className="composer-contact-add is-added">
                   <Check size={13} aria-hidden="true" />已添加
                 </span>
-              ) : <span className="composer-contact-status-spacer" aria-hidden="true" />}
+              ) : (
+                <button
+                  type="button"
+                  className="composer-contact-add"
+                  aria-label={`添加 ${name} 到${targetLabel}`}
+                  tabIndex={-1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    addContact(contact);
+                  }}
+                >
+                  <Plus size={13} aria-hidden="true" />添加
+                </button>
+              )}
             </article>
           );
         })}
@@ -334,43 +257,6 @@ export default function ComposerContactsPanel({
         )}
       </div>
 
-      <div className="composer-contacts-footer">
-        <span>
-          已选择 <strong>{selectedContacts.length}</strong> 位联系人
-        </span>
-        <div className="composer-contact-batch" ref={targetRootRef}>
-          <button type="button" disabled={selectedContacts.length === 0} onClick={addSelected}>
-            添加到{targetLabel}
-          </button>
-          <button
-            type="button"
-            ref={targetToggleRef}
-            aria-label="选择添加目标"
-            aria-expanded={targetMenuOpen}
-            onClick={() => setTargetMenuOpen((current) => !current)}
-          >
-            <span aria-hidden="true">⌄</span>
-          </button>
-          {targetMenuOpen && (
-            <div ref={targetMenuRef} className="composer-contact-target-menu" role="menu" aria-label="添加到">
-              {RECIPIENT_FIELDS.map((field) => (
-                <button
-                  key={field.value}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={activeRecipientField === field.value}
-                  onClick={() => {
-                    onRecipientFieldChange(field.value);
-                    closeTargetMenu();
-                  }}
-                >
-                  {field.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
     </aside>
   );
 }

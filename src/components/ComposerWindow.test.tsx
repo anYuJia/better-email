@@ -117,4 +117,49 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(screen.getByText(/已自动保存/)).not.toBeNull();
     expect(screen.queryByText(/已备份恢复点/)).toBeNull();
   });
+
+  it('keeps window actions global and does not duplicate them in the contacts rail', () => {
+    render(composer());
+
+    const contactsPanel = screen.getByRole('complementary', { name: '联系人' });
+    expect(contactsPanel.querySelector('[aria-label="最小化写信窗口"]')).toBeNull();
+    expect(contactsPanel.querySelector('[aria-label="关闭写信窗口"]')).toBeNull();
+    expect(screen.getAllByRole('button', { name: '关闭联系人面板' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: '最小化写信窗口' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '关闭写信窗口' })).not.toBeNull();
+  });
+
+  it('keeps immediate send, scheduled send, and outbox actions semantically distinct', () => {
+    const onSendDraft = vi.fn();
+    const onQueueDraft = vi.fn();
+    const { rerender } = render(cloneElement(composer(), { onSendDraft, onQueueDraft }));
+
+    expect(screen.queryByRole('status', { name: /定时/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    expect(onSendDraft).toHaveBeenCalledTimes(1);
+    expect(onQueueDraft).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '发送选项' }));
+    expect(screen.getByRole('menuitem', { name: '发件箱' })).not.toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: '发件箱' }));
+    expect(onQueueDraft).toHaveBeenCalledTimes(1);
+
+    const scheduledDraft = { ...emptyDraft, send_at: '2026-08-28T09:00' };
+    rerender(cloneElement(composer(), { draft: scheduledDraft, onSendDraft, onQueueDraft }));
+    const scheduledButton = screen.getByRole('button', { name: /定时发送 ·/ });
+    fireEvent.click(scheduledButton);
+    expect(onQueueDraft).toHaveBeenCalledTimes(2);
+    expect(onSendDraft).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/将于 8月28日 09:00 发送/)).not.toBeNull();
+  });
+
+  it('opens the schedule picker from the send menu without reserving a status block', () => {
+    render(composer());
+
+    fireEvent.click(screen.getByRole('button', { name: '发送选项' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '定时发送…' }));
+
+    expect(screen.getByRole('dialog', { name: '选择定时发送时间' })).not.toBeNull();
+    expect(document.querySelector('.composer-schedule-status')).toBeNull();
+  });
 });

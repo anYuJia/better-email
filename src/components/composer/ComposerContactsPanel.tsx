@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react';
 import {
   Check,
   ChevronDown,
-  Minus,
   Search,
   Settings2,
   UserRound,
-  UsersRound,
   X,
 } from 'lucide-react';
 import type { Contact, DraftInput } from '../../app/types';
@@ -18,8 +16,6 @@ type ComposerContactsPanelProps = {
   draft: DraftInput;
   onAddContact: (contact: Contact, field: ComposerRecipientField) => void;
   onClose: () => void;
-  onMinimize?: () => void;
-  onCloseWindow?: () => void;
   onOpenContactsSettings?: () => void;
 };
 
@@ -39,6 +35,11 @@ function normalized(value: string) {
 
 function contactName(contact: Contact) {
   return contact.name.trim() || contact.email.trim();
+}
+
+function contactSecondary(contact: Contact, name: string) {
+  const email = contact.email.trim();
+  return name.toLowerCase() === email.toLowerCase() ? '邮箱地址' : email;
 }
 
 function contactSearchText(contact: Contact) {
@@ -101,8 +102,6 @@ export default function ComposerContactsPanel({
   draft,
   onAddContact,
   onClose,
-  onMinimize,
-  onCloseWindow,
   onOpenContactsSettings,
 }: ComposerContactsPanelProps) {
   const [view, setView] = useState<ContactView>('recent');
@@ -153,6 +152,9 @@ export default function ComposerContactsPanel({
   }
 
   const targetLabel = RECIPIENT_FIELDS.find((field) => field.value === recipientField)?.label ?? '收件人';
+  const addedLabel = (field: ComposerRecipientField) => field === 'to'
+    ? '已添加'
+    : `已加入${field === 'cc' ? '抄送' : '密送'}`;
   const emptyTitle = view === 'groups'
     ? '暂无联系人群组'
     : query
@@ -166,30 +168,6 @@ export default function ComposerContactsPanel({
 
   return (
     <aside id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人">
-      <div className="composer-contacts-windowbar">
-        <button
-          type="button"
-          className="composer-contact-toggle"
-          aria-label="关闭联系人面板"
-          aria-expanded="true"
-          aria-controls="composer-contacts-panel"
-          onClick={onClose}
-        >
-          <UsersRound size={17} aria-hidden="true" />
-          <span>联系人</span>
-        </button>
-        <div className="composer-contacts-window-actions composer-header-actions">
-          {onMinimize ? (
-            <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
-              <Minus size={17} aria-hidden="true" />
-            </button>
-          ) : null}
-          <button type="button" onClick={onCloseWindow ?? onClose} aria-label="关闭写信窗口">
-            <X size={17} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
       <div className="composer-contacts-header">
         <strong>联系人</strong>
         <div className="composer-contacts-heading-actions">
@@ -298,20 +276,19 @@ export default function ComposerContactsPanel({
               </span>
               <span className="composer-contact-copy">
                 <strong title={name}>{name}</strong>
-                <small title={contact.email}>{contact.email}</small>
+                <small title={contactSecondary(contact, name)}>{contactSecondary(contact, name)}</small>
               </span>
-              <button
-                type="button"
-                className="composer-contact-add"
-                disabled={Boolean(addedTo)}
-                aria-label={addedTo ? `${name}已添加` : `添加 ${name}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!addedTo) onAddContact(contact, recipientField);
-                }}
-              >
-                {addedTo ? <><Check size={13} aria-hidden="true" />已添加</> : '添加'}
-              </button>
+              {addedTo ? (
+                <button
+                  type="button"
+                  className="composer-contact-add"
+                  disabled
+                  aria-label={`${name}${addedLabel(addedTo)}`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Check size={13} aria-hidden="true" />{addedLabel(addedTo)}
+                </button>
+              ) : <span className="composer-contact-status-spacer" aria-hidden="true" />}
             </article>
           );
         })}

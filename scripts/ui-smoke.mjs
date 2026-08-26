@@ -1474,6 +1474,65 @@ async function main() {
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
     await waitForExpression(cdp, "document.querySelector('.composer.has-contacts-panel .composer-contacts-panel') && document.querySelector('.composer-contacts-search input')");
     await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-expanded=\"true\"][aria-controls=\"composer-contacts-panel\"]') && document.querySelector('.composer-contacts-tabs [role=\"tab\"][aria-selected=\"true\"]')");
+    const composeGeometry = await evalInPage(cdp, `(() => {
+      const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+      const editor = rect('.composer-editor-pane');
+      const contacts = rect('.composer-contacts-panel');
+      const sender = rect('.composer-sender-context');
+      const recipient = rect('.composer-recipient-field .composer-field-row');
+      const subject = rect('.composer-subject-field');
+      const toolbar = rect('.composer-rich-toolbar');
+      const body = rect('.composer-body-field');
+      const footer = rect('.composer footer');
+      const send = rect('.composer-send-split');
+      const contactsFooter = rect('.composer-contacts-footer');
+      const rows = [...document.querySelectorAll('.composer-contact-row')];
+      const list = rect('.composer-contacts-list');
+      const lastRow = rows.at(-1)?.getBoundingClientRect() ?? null;
+      const within = (value, min, max) => value != null && value >= min && value <= max;
+      return {
+        rightPanelWidth: contacts?.width,
+        senderHeight: sender?.height,
+        recipientHeight: recipient?.height,
+        subjectHeight: subject?.height,
+        toolbarHeight: toolbar?.height,
+        bodyHeight: body?.height,
+        footerHeight: footer?.height,
+        contactsRowHeight: rows[0]?.getBoundingClientRect().height,
+        contactsFooterHeight: contactsFooter?.height,
+        sendWidth: send?.width,
+        noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth,
+        panesDoNotOverlap: Boolean(editor && contacts && editor.right <= contacts.left),
+        hasContactRows: Boolean(rows.length && list && lastRow),
+        hasContactEmptyState: Boolean(document.querySelector('.composer-contacts-empty')),
+        oneBottomOperationRow: document.querySelectorAll('.composer footer').length === 1
+          && document.querySelectorAll('.composer footer .composer-quick-tools').length === 1
+          && document.querySelectorAll('.composer > .composer-quick-tools').length === 0,
+        noStandaloneScheduleStatus: !document.querySelector('.composer-schedule-status'),
+        oneWindowControlSet: document.querySelectorAll('.composer header button[aria-label="最小化写信窗口"]').length === 1
+          && document.querySelectorAll('.composer header button[aria-label="关闭写信窗口"]').length === 1
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="最小化写信窗口"]').length === 0
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0,
+        ranges: Boolean(
+          within(contacts?.width, 390, 420)
+          && within(sender?.height, 0, 60)
+          && within(recipient?.height, 0, 68)
+          && within(subject?.height, 0, 60)
+          && within(toolbar?.height, 0, 50)
+          && (body?.height ?? 0) >= 430
+          && (!rows.length || (rows[0].getBoundingClientRect().height <= 70))
+          && (contactsFooter?.height ?? 999) <= 68
+          && (send?.width ?? 999) <= 220,
+        ),
+      };
+    })()`);
+    if (!composeGeometry?.ranges || !composeGeometry.noHorizontalScroll || !composeGeometry.panesDoNotOverlap || !composeGeometry.oneBottomOperationRow || !composeGeometry.noStandaloneScheduleStatus || !composeGeometry.oneWindowControlSet || (!composeGeometry.hasContactRows && !composeGeometry.hasContactEmptyState)) {
+      throw new Error(`Compose geometry contract failed: ${JSON.stringify(composeGeometry)}`);
+    }
+    if (composeGeometry.hasContactRows) {
+      await evalInPage(cdp, "(() => { const list = document.querySelector('.composer-contacts-list'); if (list) list.scrollTop = list.scrollHeight; return true; })()");
+      await waitForExpression(cdp, "(() => { const list = document.querySelector('.composer-contacts-list')?.getBoundingClientRect(); const rows = [...document.querySelectorAll('.composer-contact-row')]; const last = rows.at(-1)?.getBoundingClientRect(); return Boolean(list && last && last.bottom <= list.bottom + 1); })()");
+    }
     await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
     await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
@@ -1486,8 +1545,8 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-trigger')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer input[type=\"datetime-local\"]')");
     await clickButton(cdp, '今天', "document.querySelector('.composer-schedule-picker-popover')");
-    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-trigger.is-set') && document.querySelector('.composer-schedule-picker-popover')");
-    await clickButton(cdp, '清除定时', "document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-trigger.is-set') && !document.querySelector('.composer-schedule-picker-popover')");
+    await evalInPage(cdp, "document.querySelector('.composer-schedule-clear')?.click()");
     await waitForExpression(cdp, "!document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer-schedule-picker-trigger.is-set')");
     await fillInput(cdp, '.composer-template-save input[placeholder=\"模板名称\"]', 'Smoke 模板');
     await clickButton(cdp, '保存当前', "document.querySelector('.composer-template-save')");

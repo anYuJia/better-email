@@ -7,6 +7,7 @@ type ComposerSchedulePickerProps = {
   onChange: (value: string) => void;
   openRequest?: number;
   triggerLabel?: string;
+  className?: string;
 };
 
 type TimeParts = {
@@ -176,6 +177,7 @@ export default function ComposerSchedulePicker({
   onChange,
   openRequest,
   triggerLabel,
+  className = '',
 }: ComposerSchedulePickerProps) {
   const initialDateRef = useRef(parseDateTimeLocal(value) ?? roundScheduleSeed());
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -428,7 +430,7 @@ export default function ComposerSchedulePicker({
   ) : null;
 
   return (
-    <span className="composer-schedule-picker">
+    <span className={`composer-schedule-picker${className ? ` ${className}` : ''}`}>
       <button
         ref={triggerRef}
         type="button"

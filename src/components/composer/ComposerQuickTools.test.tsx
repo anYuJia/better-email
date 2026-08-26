@@ -28,7 +28,6 @@ describe('ComposerQuickTools', () => {
         draft={draft}
         dropActive={false}
         signature=""
-        onPatchDraft={vi.fn()}
         onInsertSignature={vi.fn()}
         onPickAttachments={vi.fn()}
         onAttachmentDrop={vi.fn()}

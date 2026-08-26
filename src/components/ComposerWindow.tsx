@@ -404,27 +404,26 @@ export default function ComposerWindow({
                   {autosaveLabel}
                 </span>
               </span>
-              {!contactsOpen && (
-                <div className="composer-header-actions">
-                  <button
-                    type="button"
-                    className="composer-contact-toggle"
-                    aria-label="打开联系人面板"
-                    aria-expanded={false}
-                    aria-controls="composer-contacts-panel"
-                    onClick={() => setContactsOpen(true)}
-                  >
-                    <UsersRound size={17} aria-hidden="true" />
-                    <span>联系人</span>
-                  </button>
-                  <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
-                    <Minus size={17} aria-hidden="true" />
-                  </button>
-                  <button type="button" onClick={onClose} aria-label="关闭写信窗口">
-                    <X size={17} aria-hidden="true" />
-                  </button>
-                </div>
-              )}
+              <div className="composer-header-actions">
+                <button
+                  type="button"
+                  className="composer-contact-toggle"
+                  aria-label={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+                  aria-expanded={contactsOpen}
+                  aria-controls="composer-contacts-panel"
+                  title={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+                  onClick={() => setContactsOpen((current) => !current)}
+                >
+                  <UsersRound size={17} aria-hidden="true" />
+                  <span>联系人</span>
+                </button>
+                <button type="button" onClick={onMinimize} aria-label="最小化写信窗口" title="最小化写信窗口">
+                  <Minus size={17} aria-hidden="true" />
+                </button>
+                <button type="button" onClick={onClose} aria-label="关闭写信窗口" title="关闭写信窗口">
+                  <X size={17} aria-hidden="true" />
+                </button>
+              </div>
             </header>
 
             <ComposerSenderContext
@@ -457,7 +456,7 @@ export default function ComposerWindow({
               bccOpen={bccOpen}
               onToggleCc={() => setCcOpen((current) => !current)}
               onToggleBcc={() => setBccOpen((current) => !current)}
-              formattingToolbar={formattingOpen ? <ComposerRichToolbar onPickAttachments={onPickAttachments} /> : null}
+              formattingToolbar={formattingOpen ? <ComposerRichToolbar /> : null}
               onPatchDraft={patchDraft}
               onPickAttachments={onPickAttachments}
               onRemoveAttachment={onRemoveAttachment}
@@ -468,24 +467,6 @@ export default function ComposerWindow({
               onAttachmentPaste={onAttachmentPaste}
               buildInlineImageAttachments={buildInlineImageAttachments}
               onInlineImagesAdded={onInlineImagesAdded}
-            />
-
-            <ComposerQuickTools
-              draft={draft}
-              dropActive={dropActive}
-              signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
-              onPatchDraft={patchDraft}
-              onInsertSignature={onInsertSignature}
-              onPickAttachments={onPickAttachments}
-              onAttachmentDrop={onAttachmentDrop}
-              onAttachmentDragEnter={onAttachmentDragEnter}
-              onAttachmentDragLeave={onAttachmentDragLeave}
-              onAttachmentDragOver={onAttachmentDragOver}
-              onToggleFormatting={() => setFormattingOpen((current) => !current)}
-              onOpenTemplates={() => setAdvancedOpen(true)}
-              onOpenMore={() => setAdvancedOpen(true)}
-              formattingExpanded={formattingOpen}
-              hideRichToolbar
             />
 
             <ComposerAdvancedTools
@@ -543,14 +524,30 @@ export default function ComposerWindow({
                 )}
               </div>
               <div className="composer-footer-main">
-                <div className="composer-schedule-status">
-                  <ComposerSchedulePicker
-                    value={draft.send_at}
-                    onChange={(value) => patchDraft({ send_at: value })}
-                    openRequest={scheduleOpenRequest}
-                    triggerLabel={draft.send_at ? `将于 ${formatScheduleLabel(draft.send_at)} 发送` : '定时发送'}
-                  />
-                  {draft.send_at.trim() && (
+                <ComposerQuickTools
+                  draft={draft}
+                  dropActive={dropActive}
+                  signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
+                  onInsertSignature={onInsertSignature}
+                  onPickAttachments={onPickAttachments}
+                  onAttachmentDrop={onAttachmentDrop}
+                  onAttachmentDragEnter={onAttachmentDragEnter}
+                  onAttachmentDragLeave={onAttachmentDragLeave}
+                  onAttachmentDragOver={onAttachmentDragOver}
+                  onToggleFormatting={() => setFormattingOpen((current) => !current)}
+                  onOpenTemplates={() => setAdvancedOpen(true)}
+                  onOpenMore={() => setAdvancedOpen(true)}
+                  formattingExpanded={formattingOpen}
+                  hideRichToolbar
+                />
+                {draft.send_at.trim() ? (
+                  <div className="composer-schedule-status">
+                    <ComposerSchedulePicker
+                      value={draft.send_at}
+                      onChange={(value) => patchDraft({ send_at: value })}
+                      openRequest={scheduleOpenRequest}
+                      triggerLabel={`将于 ${formatScheduleLabel(draft.send_at)} 发送`}
+                    />
                     <button
                       type="button"
                       className="composer-schedule-clear"
@@ -559,8 +556,16 @@ export default function ComposerWindow({
                     >
                       <X size={15} aria-hidden="true" />
                     </button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <ComposerSchedulePicker
+                    value={draft.send_at}
+                    onChange={(value) => patchDraft({ send_at: value })}
+                    openRequest={scheduleOpenRequest}
+                    className="is-menu-anchor"
+                    triggerLabel="定时发送"
+                  />
+                )}
                 <div className="composer-send-split">
                   <button
                     type="button"
@@ -606,8 +611,6 @@ export default function ComposerWindow({
               draft={draft}
               onAddContact={onAddContact}
               onClose={() => setContactsOpen(false)}
-              onMinimize={onMinimize}
-              onCloseWindow={onClose}
               onOpenContactsSettings={onOpenContactsSettings}
             />
           )}

@@ -46,6 +46,16 @@ const newcomer: Contact = {
   last_seen_at: '2026-08-25T11:00:00+08:00',
 };
 
+const emailOnly: Contact = {
+  id: 5,
+  name: '',
+  email: 'noreply@example.com',
+  aliases: [],
+  vip: false,
+  message_count: 0,
+  last_seen_at: '2026-08-25T09:00:00+08:00',
+};
+
 function renderPanel(draft = emptyDraft) {
   return render(
     <ComposerContactsPanel
@@ -92,6 +102,7 @@ describe('ComposerContactsPanel', () => {
 
     const added = screen.getByRole('button', { name: 'Ada Lovelace已添加' });
     expect(added).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: '添加 Grace Hopper' })).toBeNull();
   });
 
   it('shows a useful empty state when the search has no match', () => {
@@ -103,6 +114,20 @@ describe('ComposerContactsPanel', () => {
 
     expect(screen.getByText('没有找到匹配联系人')).not.toBeNull();
     expect(screen.getByText('试试搜索其他姓名或邮箱')).not.toBeNull();
+  });
+
+  it('does not repeat an email-only contact address in the secondary line', () => {
+    render(
+      <ComposerContactsPanel
+        contacts={[emailOnly]}
+        draft={emptyDraft}
+        onAddContact={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('noreply@example.com')).not.toBeNull();
+    expect(screen.getByText('邮箱地址', { selector: '.composer-contact-copy small' })).not.toBeNull();
   });
 
   it('keeps the empty address-book state actionable', () => {

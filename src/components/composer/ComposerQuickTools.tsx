@@ -35,10 +35,6 @@ const FONT_SIZE_OPTIONS = [
   { value: '5', label: '20' },
 ];
 
-type ComposerRichToolbarProps = {
-  onPickAttachments?: () => void;
-};
-
 function runEditorCommand(command: string, value?: string) {
   const editor = document.querySelector<HTMLElement>('.composer-richtext-body');
   if (!editor) return;
@@ -63,7 +59,7 @@ function toolbarButton(
   );
 }
 
-export function ComposerRichToolbar({ onPickAttachments }: ComposerRichToolbarProps) {
+export function ComposerRichToolbar() {
   const [fontValue, setFontValue] = useState('');
   const [fontSizeValue, setFontSizeValue] = useState('');
 
@@ -123,9 +119,6 @@ export function ComposerRichToolbar({ onPickAttachments }: ComposerRichToolbarPr
           if (url?.trim()) runEditorCommand('createLink', url.trim());
         })}
         {toolbarButton('清除格式', <X size={17} />, () => runEditorCommand('removeFormat'))}
-        {onPickAttachments
-          ? toolbarButton('添加附件', <Paperclip size={17} />, onPickAttachments)
-          : null}
       </div>
     </div>
   );
@@ -135,7 +128,6 @@ type ComposerQuickToolsProps = {
   draft: DraftInput;
   dropActive: boolean;
   signature: string;
-  onPatchDraft: (patch: Partial<DraftInput>) => void;
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onAttachmentDrop: React.DragEventHandler<HTMLElement>;
@@ -169,7 +161,7 @@ export default function ComposerQuickTools({
 
   return (
     <section className="composer-quick-tools" aria-label="写信常用工具">
-      {!hideRichToolbar && <ComposerRichToolbar onPickAttachments={onPickAttachments} />}
+      {!hideRichToolbar && <ComposerRichToolbar />}
 
       <div
         className={`composer-attachments${dropActive ? ' drop-active' : ''}`}
@@ -180,31 +172,33 @@ export default function ComposerQuickTools({
       >
         <div className="composer-quick-toolbar">
           <div className="composer-footer-tool-group" aria-label="写信工具">
-            <button type="button" onClick={onPickAttachments}>
+            <button type="button" aria-label="添加附件" title="添加附件" onClick={onPickAttachments}>
               <Paperclip size={17} />
               附件
               {regularAttachmentCount > 0 && <small>{regularAttachmentCount}</small>}
             </button>
             <button
               type="button"
+              aria-label="格式"
+              title="格式"
               aria-pressed={formattingExpanded}
               onClick={onToggleFormatting}
             >
               <span className="composer-format-glyph" aria-hidden="true">A</span>
               格式
             </button>
-            <button type="button" onClick={onInsertSignature} disabled={!signature} title={signature || '当前发件身份未设置签名'}>
+            <button type="button" aria-label="插入签名" onClick={onInsertSignature} disabled={!signature} title={signature || '当前发件身份未设置签名'}>
               <FileSignature size={17} />
               签名
             </button>
             {onOpenTemplates ? (
-              <button type="button" onClick={onOpenTemplates}>
+              <button type="button" aria-label="插入模板" title="插入模板" onClick={onOpenTemplates}>
                 <FileText size={17} />
                 模板
               </button>
             ) : null}
             {onOpenMore ? (
-              <button type="button" onClick={onOpenMore}>
+              <button type="button" aria-label="更多写信工具" title="更多写信工具" onClick={onOpenMore}>
                 <span className="composer-more-glyph" aria-hidden="true">•••</span>
                 更多
               </button>

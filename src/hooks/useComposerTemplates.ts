@@ -87,12 +87,16 @@ export default function useComposerTemplates({
   }, [draft, setDraft, setRichComposer, setStatus]);
 
   const saveDraftAsTemplate = useCallback(() => {
+    const name = templateName.trim();
+    if (!name) {
+      setStatus('请输入模板名称');
+      return;
+    }
     const hasContent = draft.subject.trim() || draft.body.trim() || draft.html_body.trim();
     if (!hasContent) {
       setStatus('请先填写主题或正文后再保存模板');
       return;
     }
-    const name = templateName.trim() || draft.subject.trim() || '未命名模板';
     const nextTemplate = saveTemplate({
       id: crypto.randomUUID(),
       name,

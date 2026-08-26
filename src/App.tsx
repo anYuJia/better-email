@@ -921,7 +921,7 @@ export default function App() {
     handleComposerAttachmentDragEnter,
     handleComposerAttachmentDragLeave,
     removeDraftAttachment,
-    addContactToDraft,
+    addContactsToDraft,
     composeFromMessage,
     editDraftMessage,
     saveDraft,
@@ -1911,7 +1911,7 @@ export default function App() {
               identities={identities}
               fallbackAccountId={account?.id ?? accounts[0]?.id ?? 0}
               contacts={managedContacts}
-              onAddContact={addContactToDraft}
+              onAddContacts={addContactsToDraft}
               onOpenContactsSettings={openComposerContactsSettings}
               templates={composeTemplates}
               templateName={templateName}

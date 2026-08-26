@@ -244,7 +244,7 @@ describe('composer motion contract — hover feedback is immediate', () => {
       '.composer .composer-field-row',
       '.composer .composer-body-field',
       '.composer .composer-attachments',
-      '.composer .composer-advanced-chevron',
+      '.composer .composer-rich-toolbar',
       '.custom-select-dropdown[data-portal-owner="composer-sender"] button',
     ];
 

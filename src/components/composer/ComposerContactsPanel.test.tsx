@@ -61,7 +61,9 @@ function renderPanel(draft = emptyDraft) {
     <ComposerContactsPanel
       contacts={[ada, grace, lin, newcomer]}
       draft={draft}
-      onAddContact={vi.fn()}
+      activeRecipientField="to"
+      onRecipientFieldChange={vi.fn()}
+      onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
       onClose={vi.fn()}
     />,
   );
@@ -69,12 +71,15 @@ function renderPanel(draft = emptyDraft) {
 
 describe('ComposerContactsPanel', () => {
   it('searches contacts and adds the selected contact to the chosen recipient field', () => {
-    const onAddContact = vi.fn();
-    render(
+    const onAddContacts = vi.fn(() => ({ addedIds: [grace.id], skippedIds: [] }));
+    const onRecipientFieldChange = vi.fn();
+    const view = render(
       <ComposerContactsPanel
         contacts={[ada, grace, lin, newcomer]}
         draft={emptyDraft}
-        onAddContact={onAddContact}
+        activeRecipientField="to"
+        onRecipientFieldChange={onRecipientFieldChange}
+        onAddContacts={onAddContacts}
         onClose={vi.fn()}
       />,
     );
@@ -88,9 +93,21 @@ describe('ComposerContactsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '选择 Grace Hopper' }));
     fireEvent.click(screen.getByRole('button', { name: '选择添加目标' }));
     fireEvent.click(screen.getByRole('menuitemradio', { name: '抄送' }));
+    expect(onRecipientFieldChange).toHaveBeenCalledWith('cc');
+
+    view.rerender(
+      <ComposerContactsPanel
+        contacts={[ada, grace, lin, newcomer]}
+        draft={emptyDraft}
+        activeRecipientField="cc"
+        onRecipientFieldChange={onRecipientFieldChange}
+        onAddContacts={onAddContacts}
+        onClose={vi.fn()}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: '添加到抄送' }));
 
-    expect(onAddContact).toHaveBeenCalledWith(grace, 'cc');
+    expect(onAddContacts).toHaveBeenCalledWith([grace], 'cc');
   });
 
   it('switches to frequent contacts and marks recipients already in the draft', () => {
@@ -100,7 +117,7 @@ describe('ComposerContactsPanel', () => {
     expect(screen.getAllByRole('listitem')[0].getAttribute('data-contact-id')).toBe('1');
     expect(screen.queryByText('New Contact')).toBeNull();
 
-    const added = screen.getByRole('button', { name: 'Ada Lovelace已添加' });
+    const added = screen.getByRole('button', { name: 'Ada Lovelace已添加到收件人' });
     expect(added).toHaveProperty('disabled', true);
     expect(screen.queryByRole('button', { name: '添加 Grace Hopper' })).toBeNull();
   });
@@ -121,13 +138,15 @@ describe('ComposerContactsPanel', () => {
       <ComposerContactsPanel
         contacts={[emailOnly]}
         draft={emptyDraft}
-        onAddContact={vi.fn()}
+        activeRecipientField="to"
+        onRecipientFieldChange={vi.fn()}
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
       />,
     );
 
     expect(screen.getByText('noreply@example.com')).not.toBeNull();
-    expect(screen.getByText('邮箱地址', { selector: '.composer-contact-copy small' })).not.toBeNull();
+    expect(screen.queryByText('邮箱地址', { selector: '.composer-contact-copy small' })).toBeNull();
   });
 
   it('keeps the empty address-book state actionable', () => {
@@ -136,7 +155,9 @@ describe('ComposerContactsPanel', () => {
       <ComposerContactsPanel
         contacts={[]}
         draft={emptyDraft}
-        onAddContact={vi.fn()}
+        activeRecipientField="to"
+        onRecipientFieldChange={vi.fn()}
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
         onClose={vi.fn()}
         onOpenContactsSettings={onOpenContactsSettings}
       />,
@@ -148,5 +169,12 @@ describe('ComposerContactsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理联系人' }));
     expect(onOpenContactsSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not expose a group tab when the contact backend has no group data', () => {
+    renderPanel();
+
+    expect(screen.queryByRole('tab', { name: '群组' })).toBeNull();
+    expect(screen.getByPlaceholderText('搜索姓名或邮箱')).not.toBeNull();
   });
 });

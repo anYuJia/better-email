@@ -270,6 +270,7 @@ describe('ComposerPrimaryFields', () => {
     const cc = recipientInput(container, 1);
     expect(cc.value).toBe('');
     fireEvent.change(cc, { target: { value: 'design@example.com' } });
+    fireEvent.keyDown(cc, { key: 'Enter' });
     expect(onPatchDraft).toHaveBeenCalledWith({ cc: 'team@example.com, design@example.com' });
 
     const rows = Array.from(container.querySelectorAll('.composer-field-row'));

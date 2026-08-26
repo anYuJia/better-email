@@ -3,38 +3,67 @@ import type React from 'react';
 import { X } from 'lucide-react';
 import type { ContactSearchEntry } from './contactSuggestions';
 import { matchingContacts } from './contactSuggestions';
+import {
+  parseRecipientInput,
+  parseRecipientToken,
+  recipientErrorMessage,
+  type ParsedRecipientToken,
+} from './recipientAddresses';
 
 type RecipientFieldProps = {
   label: string;
   placeholder: string;
   value: string;
   contactSearchEntries: ContactSearchEntry[];
+  blockedEmails?: string[];
   onChange: (value: string) => void;
+  onFocus?: () => void;
   actions?: React.ReactNode;
 };
 
 const suggestionLimit = 4;
-const emailPattern = /^[^\s@;,:]+@[^\s@;,:]+\.[^\s@;,:]+$/;
-
-function parseParts(value: string) {
-  return value.split(/[;,]/).map((part) => part.trim()).filter(Boolean);
-}
 
 function initialParse(value: string) {
-  if (!value.trim()) return { chips: [] as string[], query: '' };
-  const parts = parseParts(value);
-  const last = parts[parts.length - 1];
-  if (emailPattern.test(last)) {
-    return { chips: parts, query: '' };
-  }
-  return { chips: parts.slice(0, -1), query: last };
+  const parsed = parseRecipientInput(value);
+  const lastToken = parsed.tokens[parsed.tokens.length - 1];
+  const hasTrailingSeparator = /[,，;；\n\t]\s*$/.test(value);
+  const query = lastToken && !lastToken.valid && !hasTrailingSeparator ? lastToken.raw : '';
+  return {
+    chips: parsed.valid.map((token) => token.email),
+    query,
+    validationMessage: recipientErrorMessage(parsed.invalid.length, parsed.duplicates.length),
+  };
 }
 
-function deriveValue(chips: string[], query: string) {
-  const parts = [...chips];
-  const trimmed = query.trim();
-  if (trimmed) parts.push(trimmed);
-  return parts.join(', ');
+function deriveValue(chips: string[]) {
+  return chips.join(', ');
+}
+
+function contactForEmail(entries: ContactSearchEntry[], email: string) {
+  const normalizedEmail = email.toLowerCase();
+  return entries.find((candidate) => (
+    candidate.contact.email.toLowerCase() === normalizedEmail
+    || candidate.contact.aliases.some((alias) => alias.toLowerCase() === normalizedEmail)
+  ))?.contact;
+}
+
+function appendUnique(
+  currentChips: string[],
+  tokens: ParsedRecipientToken[],
+  blockedEmails: Set<string>,
+) {
+  const next = [...currentChips];
+  const seen = new Set(next.map((chip) => chip.toLowerCase()));
+  const duplicates: ParsedRecipientToken[] = [];
+  for (const token of tokens) {
+    if (!token.valid || seen.has(token.normalized) || blockedEmails.has(token.normalized)) {
+      if (token.valid) duplicates.push(token);
+      continue;
+    }
+    seen.add(token.normalized);
+    next.push(token.email);
+  }
+  return { next, duplicates };
 }
 
 export default function RecipientField({
@@ -42,21 +71,28 @@ export default function RecipientField({
   placeholder,
   value,
   contactSearchEntries,
+  blockedEmails = [],
   onChange,
+  onFocus,
   actions,
 }: RecipientFieldProps) {
-  const [chips, setChips] = useState<string[]>(() => initialParse(value).chips);
-  const [query, setQuery] = useState<string>(() => initialParse(value).query);
+  const initial = useMemo(() => initialParse(value), [value]);
+  const [chips, setChips] = useState<string[]>(initial.chips);
+  const [query, setQuery] = useState(initial.query);
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const [validationMessage, setValidationMessage] = useState(initial.validationMessage);
   const suggestionListId = useId();
+  const errorId = useId();
   const lastValueRef = useRef(value);
-  // Chip actions can run between controlled parent updates. Keep the latest
-  // local state in refs so a click always removes exactly one chip.
   const chipsRef = useRef(chips);
   const queryRef = useRef(query);
   const inputRef = useRef<HTMLInputElement>(null);
+  const blockedEmailSet = useMemo(
+    () => new Set(blockedEmails.map((email) => email.trim().toLowerCase()).filter(Boolean)),
+    [blockedEmails],
+  );
 
   chipsRef.current = chips;
   queryRef.current = query;
@@ -74,68 +110,74 @@ export default function RecipientField({
   useEffect(() => {
     if (value === lastValueRef.current) return;
     lastValueRef.current = value;
-    const { chips: nextChips, query: nextQuery } = initialParse(value);
-    chipsRef.current = nextChips;
-    queryRef.current = nextQuery;
-    setChips(nextChips);
-    setQuery(nextQuery);
+    const next = initialParse(value);
+    chipsRef.current = next.chips;
+    queryRef.current = next.query;
+    setChips(next.chips);
+    setQuery(next.query);
+    setValidationMessage(next.validationMessage);
     setHighlight(0);
   }, [value]);
 
-  function emit(nextChips: string[], nextQuery: string) {
-    const next = deriveValue(nextChips, nextQuery);
+  function emit(nextChips: string[]) {
+    const next = deriveValue(nextChips);
     lastValueRef.current = next;
     onChange(next);
   }
 
-  function commitEmail(email: string) {
-    const normalized = email.trim().toLowerCase();
-    const currentChips = chipsRef.current;
-    const nextChips = currentChips.some((chip) => chip.toLowerCase() === normalized)
-      ? currentChips
-      : [...currentChips, email.trim()];
-    chipsRef.current = nextChips;
+  function commitTokens(tokens: ParsedRecipientToken[]) {
+    const validTokens = tokens.filter((token) => token.valid);
+    const invalidCount = tokens.length - validTokens.length;
+    const { next, duplicates } = appendUnique(chipsRef.current, validTokens, blockedEmailSet);
+    chipsRef.current = next;
     queryRef.current = '';
-    setChips(nextChips);
+    setChips(next);
     setQuery('');
-    emit(nextChips, '');
+    setValidationMessage(recipientErrorMessage(invalidCount, duplicates.length));
+    emit(next);
     setHighlight(0);
+  }
+
+  function commitEmail(raw: string) {
+    const token = parseRecipientToken(raw);
+    if (!token.valid) {
+      setValidationMessage('地址格式不正确，已跳过');
+      setQuery('');
+      queryRef.current = '';
+      return;
+    }
+    commitTokens([token]);
   }
 
   function removeChip(index: number) {
     const currentChips = chipsRef.current;
     if (index < 0 || index >= currentChips.length) return;
-    const nextChips = currentChips.filter((_, chipIndex) => chipIndex !== index);
-    chipsRef.current = nextChips;
-    setChips(nextChips);
-    emit(nextChips, queryRef.current);
+    const next = currentChips.filter((_, chipIndex) => chipIndex !== index);
+    chipsRef.current = next;
+    setChips(next);
+    emit(next);
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     setSuggestionsDismissed(false);
     const raw = event.target.value;
-    const parts = raw.split(/[;,]/);
+    const parts = raw.split(/[,，;；\n\t]/);
     if (parts.length > 1) {
       const committed = parts.slice(0, -1).map((part) => part.trim()).filter(Boolean);
-      const nextChips = [...chipsRef.current, ...committed];
-      const nextQuery = parts[parts.length - 1];
-      chipsRef.current = nextChips;
+      commitTokens(committed.map(parseRecipientToken));
+      const nextQuery = parts[parts.length - 1] ?? '';
       queryRef.current = nextQuery;
-      setChips(nextChips);
       setQuery(nextQuery);
-      emit(nextChips, nextQuery);
     } else {
       queryRef.current = raw;
       setQuery(raw);
-      emit(chipsRef.current, raw);
+      if (!raw.trim()) setValidationMessage('');
     }
     setHighlight(0);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matches.length > 0) {
-      // Tab/Shift+Tab 按正常文档顺序离开字段（blur 时会提交悬空的合法邮箱），
-      // 不得被建议循环困住。Arrow/Enter/Escape 只操作建议本身。
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setHighlight((current) => (current + 1) % matches.length);
@@ -152,7 +194,6 @@ export default function RecipientField({
         return;
       }
       if (event.key === 'Escape') {
-        // 关闭建议但保持焦点在输入框，用户可继续输入或按 Tab 离开。
         event.preventDefault();
         setHighlight(0);
         setSuggestionsDismissed(true);
@@ -160,8 +201,8 @@ export default function RecipientField({
       }
     }
     if (event.key === 'Enter') {
-      const trimmed = query.trim();
-      if (emailPattern.test(trimmed)) {
+      const trimmed = queryRef.current.trim();
+      if (trimmed) {
         event.preventDefault();
         commitEmail(trimmed);
       }
@@ -174,18 +215,13 @@ export default function RecipientField({
   }
 
   function handleBlur() {
-    const trimmed = query.trim();
-    if (emailPattern.test(trimmed)) {
-      commitEmail(trimmed);
-    }
+    const trimmed = queryRef.current.trim();
+    if (trimmed) commitEmail(trimmed);
     setFocused(false);
   }
 
   function chipDisplayName(email: string) {
-    const entry = contactSearchEntries.find(
-      (candidate) => candidate.contact.email.toLowerCase() === email.toLowerCase(),
-    );
-    return entry?.contact.name ?? email;
+    return contactForEmail(contactSearchEntries, email)?.name || email;
   }
 
   return (
@@ -200,9 +236,6 @@ export default function RecipientField({
                 type="button"
                 aria-label={`移除 ${chip}`}
                 onMouseDown={(event) => {
-                  // This button lives inside a label. Prevent the label's
-                  // default activation so the input value and focus stay
-                  // stable while removing exactly one chip.
                   event.preventDefault();
                   event.stopPropagation();
                 }}
@@ -225,11 +258,13 @@ export default function RecipientField({
             aria-controls={menuOpen ? suggestionListId : undefined}
             aria-expanded={menuOpen}
             aria-activedescendant={activeSuggestionId}
+            aria-describedby={validationMessage ? errorId : undefined}
             value={query}
             placeholder={chips.length === 0 ? placeholder : ''}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => {
+              onFocus?.();
               setFocused(true);
               setHighlight(0);
               setSuggestionsDismissed(false);
@@ -257,10 +292,15 @@ export default function RecipientField({
               onClick={() => commitEmail(contact.email)}
             >
               <strong>{contact.name || contact.email}</strong>
-              <small>{contact.email}</small>
+              {contact.name && <small>{contact.email}</small>}
             </button>
           ))}
         </div>
+      )}
+      {validationMessage && (
+        <p className="composer-recipient-error" id={errorId} role="status">
+          {validationMessage}
+        </p>
       )}
     </div>
   );

@@ -293,8 +293,6 @@
 :root[data-theme="dark"] .composer header button,
 :root[data-theme="dark"] .label-tools button,
 :root[data-theme="dark"] .attachments button,
-:root[data-theme="dark"] .composer-signature button,
-:root[data-theme="dark"] .composer-attachment-button,
 :root[data-theme="dark"] .rich-toolbar button,
 :root[data-theme="dark"] .composer-mini-actions button {
   border-color: transparent;
@@ -311,8 +309,6 @@
 :root[data-theme="dark"] .composer header button:hover,
 :root[data-theme="dark"] .label-tools button:hover,
 :root[data-theme="dark"] .attachments button:hover,
-:root[data-theme="dark"] .composer-signature button:hover,
-:root[data-theme="dark"] .composer-attachment-button:hover,
 :root[data-theme="dark"] .rich-toolbar button:hover,
 :root[data-theme="dark"] .composer-mini-actions button:hover {
   border-color: transparent;
@@ -358,55 +354,6 @@
   border-bottom-color: var(--ui-border-strong);
   color: var(--ui-text);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--ui-border-strong) 62%, transparent);
-}
-
-/* --- Legacy composer dark overrides (dialogs.css styles) --- */
-
-:root[data-theme="dark"] .composer input,
-:root[data-theme="dark"] .composer select {
-  background: var(--ui-surface-muted);
-  color: var(--ui-text);
-  border-color: var(--ui-border);
-}
-
-:root[data-theme="dark"] .composer input:focus,
-:root[data-theme="dark"] .composer textarea:focus {
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .composer select:focus {
-  background: var(--ui-surface);
-  border-color: var(--ui-border-strong);
-}
-
-:root[data-theme="dark"] .composer ::placeholder {
-  color: var(--ui-text-tertiary);
-}
-
-:root[data-theme="dark"] .composer-advanced {
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] .composer-advanced[open] summary {
-  background: var(--ui-control-hover);
-}
-
-:root[data-theme="dark"] .composer-tool-card input,
-:root[data-theme="dark"] .composer-tool-card select {
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .composer-rich-toggle,
-:root[data-theme="dark"] .composer-signature,
-:root[data-theme="dark"] .composer-attachments,
-:root[data-theme="dark"] .composer-schedule {
-  background: var(--ui-surface-muted);
-}
-
-:root[data-theme="dark"] .recipient-suggestions button,
-:root[data-theme="dark"] .composer-attachment-chip {
-  background: var(--ui-surface);
-  border-color: var(--ui-border);
 }
 
 :root[data-theme="dark"] .raw-preview textarea {

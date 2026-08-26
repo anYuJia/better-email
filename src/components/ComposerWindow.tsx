@@ -5,7 +5,7 @@ import {
   ChevronDown,
   Mail,
   Maximize2,
-  Minus,
+  PanelBottomClose,
   Send,
   UsersRound,
   X,
@@ -22,8 +22,8 @@ import type {
 } from '../app/types';
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
 import ConfirmDialog from './ConfirmDialog';
-import ComposerAdvancedTools, { ComposerSenderContext } from './composer/ComposerAdvancedTools';
-import ComposerContactsPanel, { type ComposerRecipientField } from './composer/ComposerContactsPanel';
+import ComposerAdvancedTools, { ComposerSenderContext, type ComposerPopoverMode } from './composer/ComposerAdvancedTools';
+import ComposerContactsPanel, { type AddContactsResult, type ComposerRecipientField } from './composer/ComposerContactsPanel';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuickTools';
 import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
@@ -88,7 +88,7 @@ export type ComposerWindowProps = {
   identities: MailIdentity[];
   fallbackAccountId: number;
   contacts: Contact[];
-  onAddContact: (contact: Contact, field: ComposerRecipientField) => void;
+  onAddContacts: (contacts: Contact[], field: ComposerRecipientField) => AddContactsResult;
   onOpenContactsSettings?: () => void;
   templates: ComposeTemplate[];
   templateName: string;
@@ -133,7 +133,7 @@ export default function ComposerWindow({
   identities,
   fallbackAccountId,
   contacts,
-  onAddContact,
+  onAddContacts,
   onOpenContactsSettings,
   templates,
   templateName,
@@ -174,6 +174,10 @@ export default function ComposerWindow({
   const dragRef = useRef<ComposerDragState | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
+  const scheduleAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const templateButtonRef = useRef<HTMLButtonElement | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sendMenuItemRefs = useRef<HTMLButtonElement[]>([]);
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
   const [contactsOpen, setContactsOpen] = useState(
@@ -181,10 +185,12 @@ export default function ComposerWindow({
   );
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
+  const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
   const [formattingOpen, setFormattingOpen] = useState(true);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [popoverMode, setPopoverMode] = useState<ComposerPopoverMode>(null);
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
+  const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -205,6 +211,22 @@ export default function ComposerWindow({
 
   function patchDraft(patch: Partial<DraftInput>) {
     onDraftChange((current) => ({ ...current, ...patch }));
+  }
+
+  function closePopover() {
+    const opener = popoverMode === 'templates' ? templateButtonRef : moreButtonRef;
+    setPopoverMode(null);
+    queueMicrotask(() => opener.current?.focus({ preventScroll: true }));
+  }
+
+  function toggleComposerPopover(mode: Exclude<ComposerPopoverMode, null>) {
+    setSendMenuOpen(false);
+    setPopoverMode((current) => current === mode ? null : mode);
+  }
+
+  function closeSendMenu() {
+    setSendMenuOpen(false);
+    queueMicrotask(() => scheduleAnchorRef.current?.focus({ preventScroll: true }));
   }
 
   useEffect(() => {
@@ -246,19 +268,35 @@ export default function ComposerWindow({
   useEffect(() => {
     if (draft.cc.trim()) setCcOpen(true);
     if (draft.bcc.trim()) setBccOpen(true);
-  }, [draft.bcc, draft.cc]);
+    if (!draft.send_at.trim()) setScheduleClearConfirmOpen(false);
+  }, [draft.bcc, draft.cc, draft.send_at]);
 
   useEffect(() => {
     if (!sendMenuOpen) return undefined;
+    sendMenuItemRefs.current[0]?.focus({ preventScroll: true });
     function closeOnPointerDown(event: PointerEvent) {
       const target = event.target;
       if (target instanceof Element && target.closest('.composer-send-split')) return;
-      setSendMenuOpen(false);
+      closeSendMenu();
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeSendMenu();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+      const items = sendMenuItemRefs.current.filter(Boolean);
+      if (items.length === 0) return;
       event.preventDefault();
-      setSendMenuOpen(false);
+      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+      if (event.key === 'Home' || event.key === 'End') {
+        (event.key === 'Home' ? items[0] : items[items.length - 1]).focus({ preventScroll: true });
+        return;
+      }
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      items[(currentIndex + delta + items.length) % items.length].focus({ preventScroll: true });
     }
     document.addEventListener('pointerdown', closeOnPointerDown, true);
     document.addEventListener('keydown', closeOnEscape, true);
@@ -408,17 +446,18 @@ export default function ComposerWindow({
                 <button
                   type="button"
                   className="composer-contact-toggle"
-                  aria-label={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+                  aria-label="切换联系人面板"
                   aria-expanded={contactsOpen}
+                  aria-pressed={contactsOpen}
                   aria-controls="composer-contacts-panel"
-                  title={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
+                  title="切换联系人面板"
                   onClick={() => setContactsOpen((current) => !current)}
                 >
                   <UsersRound size={17} aria-hidden="true" />
                   <span>联系人</span>
                 </button>
-                <button type="button" onClick={onMinimize} aria-label="最小化写信窗口" title="最小化写信窗口">
-                  <Minus size={17} aria-hidden="true" />
+                <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
+                  <PanelBottomClose size={17} aria-hidden="true" />
                 </button>
                 <button type="button" onClick={onClose} aria-label="关闭写信窗口" title="关闭写信窗口">
                   <X size={17} aria-hidden="true" />
@@ -456,7 +495,8 @@ export default function ComposerWindow({
               bccOpen={bccOpen}
               onToggleCc={() => setCcOpen((current) => !current)}
               onToggleBcc={() => setBccOpen((current) => !current)}
-              formattingToolbar={formattingOpen ? <ComposerRichToolbar /> : null}
+              onRecipientFieldFocus={setActiveRecipientField}
+              formattingToolbar={formattingOpen ? (editorRef) => <ComposerRichToolbar editorRef={editorRef} /> : undefined}
               onPatchDraft={patchDraft}
               onPickAttachments={onPickAttachments}
               onRemoveAttachment={onRemoveAttachment}
@@ -470,11 +510,11 @@ export default function ComposerWindow({
             />
 
             <ComposerAdvancedTools
-              draft={draft}
+              mode={popoverMode}
+              anchorRef={popoverMode === 'templates' ? templateButtonRef : moreButtonRef}
               templates={templates}
               templateName={templateName}
-              open={advancedOpen}
-              onOpenChange={setAdvancedOpen}
+              onClose={closePopover}
               onApplyTemplate={onApplyTemplate}
               onDeleteTemplate={onDeleteTemplate}
               onTemplateNameChange={onTemplateNameChange}
@@ -535,8 +575,10 @@ export default function ComposerWindow({
                   onAttachmentDragLeave={onAttachmentDragLeave}
                   onAttachmentDragOver={onAttachmentDragOver}
                   onToggleFormatting={() => setFormattingOpen((current) => !current)}
-                  onOpenTemplates={() => setAdvancedOpen(true)}
-                  onOpenMore={() => setAdvancedOpen(true)}
+                  onOpenTemplates={() => toggleComposerPopover('templates')}
+                  onOpenMore={() => toggleComposerPopover('more')}
+                  templateButtonRef={templateButtonRef}
+                  moreButtonRef={moreButtonRef}
                   formattingExpanded={formattingOpen}
                   hideRichToolbar
                 />
@@ -552,18 +594,34 @@ export default function ComposerWindow({
                       type="button"
                       className="composer-schedule-clear"
                       aria-label="取消定时发送"
-                      onClick={() => patchDraft({ send_at: '' })}
+                      onClick={() => setScheduleClearConfirmOpen(true)}
                     >
                       <X size={15} aria-hidden="true" />
                     </button>
+                    {scheduleClearConfirmOpen && (
+                      <div className="composer-schedule-clear-confirm" role="alertdialog" aria-label="取消定时发送确认">
+                        <span>取消定时发送？</span>
+                        <button type="button" onClick={() => setScheduleClearConfirmOpen(false)}>保留定时</button>
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => {
+                            patchDraft({ send_at: '' });
+                            setScheduleClearConfirmOpen(false);
+                          }}
+                        >
+                          确认取消
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <ComposerSchedulePicker
                     value={draft.send_at}
                     onChange={(value) => patchDraft({ send_at: value })}
                     openRequest={scheduleOpenRequest}
-                    className="is-menu-anchor"
-                    triggerLabel="定时发送"
+                    anchorRef={scheduleAnchorRef}
+                    showTrigger={false}
                   />
                 )}
                 <div className="composer-send-split">
@@ -579,6 +637,7 @@ export default function ComposerWindow({
                   <button
                     type="button"
                     className="composer-send-menu-trigger"
+                    ref={scheduleAnchorRef}
                     aria-label="发送选项"
                     aria-expanded={sendMenuOpen}
                     aria-haspopup="menu"
@@ -589,13 +648,13 @@ export default function ComposerWindow({
                   </button>
                   {sendMenuOpen && (
                     <div className="composer-send-menu" role="menu" aria-label="发送选项">
-                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); onSendDraft(); }}>
+                      <button ref={(element) => { if (element) sendMenuItemRefs.current[0] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); onSendDraft(); }}>
                         立即发送
                       </button>
-                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); onQueueDraft(); }}>
+                      <button ref={(element) => { if (element) sendMenuItemRefs.current[1] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); onQueueDraft(); }}>
                         发件箱
                       </button>
-                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); setScheduleOpenRequest((current) => current + 1); }}>
+                      <button ref={(element) => { if (element) sendMenuItemRefs.current[2] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); setScheduleOpenRequest((current) => current + 1); }}>
                         定时发送…
                       </button>
                     </div>
@@ -609,7 +668,9 @@ export default function ComposerWindow({
             <ComposerContactsPanel
               contacts={contacts}
               draft={draft}
-              onAddContact={onAddContact}
+              activeRecipientField={activeRecipientField}
+              onRecipientFieldChange={setActiveRecipientField}
+              onAddContacts={onAddContacts}
               onClose={() => setContactsOpen(false)}
               onOpenContactsSettings={onOpenContactsSettings}
             />

@@ -93,7 +93,6 @@ export default function useAppGlobalEffects({
     const dropdownSelector = [
       'details.compact-menu',
       'details.sidebar-disclosure',
-      'details.composer-advanced',
       'details.settings-rule-advanced',
     ].join(',');
 

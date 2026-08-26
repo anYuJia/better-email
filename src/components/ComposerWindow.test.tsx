@@ -15,7 +15,7 @@ function composer() {
       identities={[]}
       fallbackAccountId={0}
       contacts={[]}
-      onAddContact={vi.fn()}
+      onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
       templates={[]}
       templateName=""
       richComposer={false}
@@ -62,8 +62,9 @@ describe('ComposerWindow focus lifecycle', () => {
       render(composer());
 
       expect(screen.queryByRole('complementary', { name: '联系人' })).toBeNull();
-      const contactToggle = screen.getByRole('button', { name: '打开联系人面板' });
+      const contactToggle = screen.getByRole('button', { name: '切换联系人面板' });
       expect(contactToggle.getAttribute('aria-controls')).toBe('composer-contacts-panel');
+      expect(contactToggle.getAttribute('aria-pressed')).toBe('false');
       fireEvent.click(contactToggle);
       expect(screen.getByRole('complementary', { name: '联系人' })).not.toBeNull();
     } finally {
@@ -78,7 +79,7 @@ describe('ComposerWindow focus lifecycle', () => {
 
     expect(sender.closest('.composer-sender-context')).not.toBeNull();
     expect(sender.closest('details')).toBeNull();
-    expect(screen.getByRole('dialog').querySelector('.composer-advanced')?.hasAttribute('open')).toBe(false);
+    expect(screen.getByRole('dialog').querySelector('.composer-advanced')).toBeNull();
   });
 
   it('restores focus after the background is no longer inert', async () => {
@@ -122,10 +123,10 @@ describe('ComposerWindow focus lifecycle', () => {
     render(composer());
 
     const contactsPanel = screen.getByRole('complementary', { name: '联系人' });
-    expect(contactsPanel.querySelector('[aria-label="最小化写信窗口"]')).toBeNull();
+    expect(contactsPanel.querySelector('[aria-label="收起写信"]')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="关闭写信窗口"]')).toBeNull();
-    expect(screen.getAllByRole('button', { name: '关闭联系人面板' })).toHaveLength(2);
-    expect(screen.getByRole('button', { name: '最小化写信窗口' })).not.toBeNull();
+    expect(screen.getAllByRole('button', { name: '关闭联系人面板' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '收起写信' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '关闭写信窗口' })).not.toBeNull();
   });
 

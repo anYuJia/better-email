@@ -1,4 +1,6 @@
-import { ChevronDown, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, FileText, Save, Trash2, X } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -7,12 +9,14 @@ import type {
 } from '../../app/types';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
 
+export type ComposerPopoverMode = 'templates' | 'more' | null;
+
 type ComposerAdvancedToolsProps = {
-  draft: DraftInput;
+  mode: ComposerPopoverMode;
+  anchorRef?: RefObject<HTMLElement | null>;
   templates: ComposeTemplate[];
   templateName: string;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  onClose: () => void;
   onApplyTemplate: (template: ComposeTemplate) => void;
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
@@ -74,11 +78,8 @@ export function ComposerSenderContext({
             const [kind, rawId] = nextValue.split(':');
             const nextId = Number(rawId);
             if (!Number.isFinite(nextId)) return;
-            if (kind === 'account') {
-              onPatchDraft({ account_id: nextId, identity_id: 0 });
-            } else if (kind === 'identity') {
-              onPatchDraft({ identity_id: nextId });
-            }
+            if (kind === 'account') onPatchDraft({ account_id: nextId, identity_id: 0 });
+            else if (kind === 'identity') onPatchDraft({ identity_id: nextId });
           }}
         />
       </div>
@@ -86,67 +87,216 @@ export function ComposerSenderContext({
   );
 }
 
+function clampPosition(anchor: HTMLElement | null, popover: HTMLElement | null) {
+  if (!anchor || !popover) return null;
+  const anchorRect = anchor.getBoundingClientRect();
+  const popoverRect = popover.getBoundingClientRect();
+  const margin = 12;
+  const gap = 8;
+  const left = Math.min(
+    Math.max(margin, anchorRect.left),
+    Math.max(margin, window.innerWidth - popoverRect.width - margin),
+  );
+  const below = anchorRect.bottom + gap;
+  const above = anchorRect.top - popoverRect.height - gap;
+  const top = below + popoverRect.height <= window.innerHeight - margin
+    ? below
+    : above >= margin
+      ? above
+      : Math.min(Math.max(margin, below), Math.max(margin, window.innerHeight - popoverRect.height - margin));
+  return { top, left };
+}
+
 export default function ComposerAdvancedTools({
-  draft,
+  mode,
+  anchorRef,
   templates,
   templateName,
-  open,
-  onOpenChange,
+  onClose,
   onApplyTemplate,
   onDeleteTemplate,
   onTemplateNameChange,
   onSaveTemplate,
   onSaveDraft,
 }: ComposerAdvancedToolsProps) {
-  void draft;
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const firstActionRef = useRef<HTMLButtonElement | null>(null);
+  const saveEntryRef = useRef<HTMLButtonElement | null>(null);
+  const templateNameRef = useRef<HTMLInputElement | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const menuItemsRef = useRef<HTMLButtonElement[]>([]);
 
-  return (
-    <details
-      className="composer-advanced"
-      open={open}
-      onToggle={(event) => onOpenChange?.(event.currentTarget.open)}
+  useLayoutEffect(() => {
+    if (!mode) return undefined;
+    const update = () => setPosition(clampPosition(anchorRef?.current ?? null, popoverRef.current));
+    update();
+    window.addEventListener('resize', update);
+    document.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      document.removeEventListener('scroll', update, true);
+    };
+  }, [anchorRef, mode, saveDialogOpen, templates.length]);
+
+  useEffect(() => {
+    if (!mode) return undefined;
+    const focusTarget = saveDialogOpen
+      ? templateNameRef.current
+      : firstActionRef.current ?? saveEntryRef.current;
+    focusTarget?.focus({ preventScroll: true });
+    function closeOnPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Node && (popoverRef.current?.contains(target) || anchorRef?.current?.contains(target))) return;
+      onClose();
+    }
+    function closeOnKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (saveDialogOpen) setSaveDialogOpen(false);
+        else onClose();
+        return;
+      }
+      if (saveDialogOpen || (mode !== 'more' && mode !== 'templates')) return;
+      const items = menuItemsRef.current.filter(Boolean);
+      if (items.length === 0) return;
+      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+      if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        (event.key === 'Home' ? items[0] : items[items.length - 1])?.focus();
+        return;
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        items[(currentIndex + delta + items.length) % items.length]?.focus();
+      }
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown, true);
+    document.addEventListener('keydown', closeOnKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerDown, true);
+      document.removeEventListener('keydown', closeOnKeyDown, true);
+    };
+  }, [anchorRef, mode, onClose, saveDialogOpen]);
+
+  useEffect(() => {
+    if (mode) return;
+    setSaveDialogOpen(false);
+  }, [mode]);
+
+  if (!mode) return null;
+
+  const templateItems = templates.slice().sort((left, right) => (
+    Date.parse(right.updated_at) - Date.parse(left.updated_at)
+  )).slice(0, 6);
+
+  const popover = (
+    <div
+      ref={popoverRef}
+      className={`composer-advanced-popover composer-${mode}-popover`}
+      style={{ top: position?.top ?? -10000, left: position?.left ?? -10000 }}
+      role={mode === 'more' ? 'menu' : 'dialog'}
+      aria-label={mode === 'more' ? '更多写信工具' : '邮件模板'}
     >
-      <summary>
-        <SlidersHorizontal size={15} aria-hidden="true" />
-        <strong>更多</strong>
-        <span>模板与低频操作</span>
-        <ChevronDown className="composer-advanced-chevron" size={14} aria-hidden="true" />
-      </summary>
-      <div className="composer-advanced-panel">
-        <section className="composer-template-controls" aria-label="邮件模板">
-          <div className="composer-template-list">
-            {templates.length === 0 && <small>暂无模板</small>}
-            {templates.slice(0, 6).map((template) => (
-              <span className="composer-template-row" key={template.id}>
-                <button type="button" onClick={() => onApplyTemplate(template)}>
-                  <Wand2 size={13} />
-                  {template.name}
-                </button>
+      <header>
+        <strong>{mode === 'more' ? '更多' : '模板'}</strong>
+        <button type="button" aria-label="关闭浮层" title="关闭" onClick={onClose}><X size={15} /></button>
+      </header>
+
+      {mode === 'templates' ? (
+        <>
+          {templateItems.length === 0 ? (
+            <div className="composer-template-empty">
+              <FileText size={17} aria-hidden="true" />
+              <span>暂无模板</span>
+              <small>保存一封常用邮件，之后可以快速套用。</small>
+            </div>
+          ) : (
+            <div className="composer-template-list" role="menu" aria-label="最近使用模板">
+              {templateItems.map((template, index) => (
+                <div className="composer-template-row" key={template.id}>
+                  <button
+                    ref={(element) => {
+                      if (element) menuItemsRef.current[index] = element;
+                      if (index === 0) firstActionRef.current = element;
+                    }}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onApplyTemplate(template);
+                      onClose();
+                    }}
+                  >
+                    <FileText size={14} aria-hidden="true" />
+                    <span>{template.name}</span>
+                  </button>
+                  <button type="button" aria-label={`删除模板 ${template.name}`} title={`删除模板 ${template.name}`} onClick={() => onDeleteTemplate(template)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button ref={saveEntryRef} type="button" className="composer-template-save-entry" onClick={() => setSaveDialogOpen(true)}>
+            <Save size={14} aria-hidden="true" />保存为模板…
+          </button>
+          {saveDialogOpen && (
+            <div className="composer-template-save-dialog" role="dialog" aria-label="保存为模板">
+              <strong>保存为模板</strong>
+              <label>
+                <span>模板名称</span>
+                <input
+                  ref={templateNameRef}
+                  aria-label="模板名称"
+                  value={templateName}
+                  onChange={(event) => onTemplateNameChange(event.target.value)}
+                  placeholder="例如：项目周报"
+                />
+              </label>
+              <footer>
+                <button type="button" onClick={() => setSaveDialogOpen(false)}>取消</button>
                 <button
                   type="button"
-                  aria-label={`删除模板 ${template.name}`}
-                  onClick={() => onDeleteTemplate(template)}
+                  className="is-primary"
+                  disabled={!templateName.trim()}
+                  onClick={() => {
+                    onSaveTemplate();
+                    setSaveDialogOpen(false);
+                    onClose();
+                  }}
                 >
-                  <Trash2 size={12} />
+                  <Check size={13} aria-hidden="true" />保存
                 </button>
-              </span>
-            ))}
-          </div>
-          <div className="composer-template-save">
-            <input
-              value={templateName}
-              onChange={(event) => onTemplateNameChange(event.target.value)}
-              placeholder="模板名称"
-            />
-            <button type="button" onClick={onSaveTemplate}>保存当前</button>
-          </div>
+              </footer>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="composer-more-menu" role="menu">
           {onSaveDraft ? (
-            <button type="button" className="composer-template-save-draft" onClick={onSaveDraft}>
-              保存草稿
+            <button
+              ref={(element) => {
+                if (element) menuItemsRef.current[0] = element;
+                firstActionRef.current = element;
+              }}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onSaveDraft();
+                onClose();
+              }}
+            >
+              <Save size={14} aria-hidden="true" />保存草稿
             </button>
-          ) : null}
-        </section>
-      </div>
-    </details>
+          ) : (
+            <span className="composer-more-empty">暂无其他写信工具</span>
+          )}
+        </div>
+      )}
+    </div>
   );
+
+  return createPortal(popover, document.body);
 }

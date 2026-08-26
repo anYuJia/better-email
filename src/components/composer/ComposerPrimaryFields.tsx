@@ -14,6 +14,9 @@ import {
 import { normalizeContentId } from '../../app/inlineImages';
 import { localFileAssetUrl } from '../../tauriBridge';
 import { logError } from '../../app/logger';
+import type { ComposerRecipientField } from './ComposerContactsPanel';
+import { canonicalRecipientEmails } from './recipientAddresses';
+import { syncRichTextEmptyState } from './richTextCommands';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -24,7 +27,8 @@ type ComposerPrimaryFieldsProps = {
   bccOpen?: boolean;
   onToggleCc?: () => void;
   onToggleBcc?: () => void;
-  formattingToolbar?: React.ReactNode;
+  onRecipientFieldFocus?: (field: ComposerRecipientField) => void;
+  formattingToolbar?: (editorRef: React.RefObject<HTMLDivElement | null>) => React.ReactNode;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
@@ -92,6 +96,7 @@ export default function ComposerPrimaryFields({
   bccOpen = false,
   onToggleCc,
   onToggleBcc,
+  onRecipientFieldFocus,
   formattingToolbar,
   onPatchDraft,
   onPickAttachments,
@@ -123,6 +128,11 @@ export default function ComposerPrimaryFields({
     () => draft.attachments.filter((attachment) => !attachment.is_inline),
     [draft.attachments],
   );
+  const blockedRecipientEmails = useMemo(() => ({
+    to: [...canonicalRecipientEmails(draft.cc, draft.bcc)],
+    cc: [...canonicalRecipientEmails(draft.to, draft.bcc)],
+    bcc: [...canonicalRecipientEmails(draft.to, draft.cc)],
+  }), [draft.bcc, draft.cc, draft.to]);
 
   useEffect(() => {
     if (!richComposer) return;
@@ -133,6 +143,7 @@ export default function ComposerPrimaryFields({
     if (editor.innerHTML !== nextHtml) {
       editor.innerHTML = nextHtml;
     }
+    syncRichTextEmptyState(editor);
   }, [draft.html_body, editableBody, richComposer]);
 
   useEffect(() => {
@@ -182,23 +193,25 @@ export default function ComposerPrimaryFields({
       });
     }
     const html = nextHtml ?? editor.innerHTML;
+    const empty = syncRichTextEmptyState(editor);
+    const persistedHtml = empty ? '' : html;
     const nextBody = joinEditableBody(nextTextContent ?? editor.textContent ?? '', originalQuote);
     if (
       syncedBodyRef.current.body === nextBody &&
-      syncedBodyRef.current.html === html
+      syncedBodyRef.current.html === persistedHtml
     ) {
       return;
     }
     syncedBodyRef.current = {
       body: nextBody,
-      html,
+      html: persistedHtml,
     };
     for (const { img, cid } of hydratedImages) {
       const assetUrl = hydrated.get(cid);
       if (assetUrl) img.setAttribute('src', assetUrl);
     }
     onPatchDraft({
-      html_body: html,
+      html_body: persistedHtml,
       body: nextBody,
     });
   }, [onPatchDraft, originalQuote]);
@@ -290,7 +303,9 @@ export default function ComposerPrimaryFields({
         placeholder="姓名或邮箱地址"
         value={draft.to}
         contactSearchEntries={contactSearchEntries}
+        blockedEmails={blockedRecipientEmails.to}
         onChange={(value) => onPatchDraft({ to: value })}
+        onFocus={() => onRecipientFieldFocus?.('to')}
         actions={(
           <>
             <button
@@ -319,7 +334,9 @@ export default function ComposerPrimaryFields({
           placeholder="姓名或邮箱"
           value={draft.cc}
           contactSearchEntries={contactSearchEntries}
+          blockedEmails={blockedRecipientEmails.cc}
           onChange={(value) => onPatchDraft({ cc: value })}
+          onFocus={() => onRecipientFieldFocus?.('cc')}
         />
       )}
 
@@ -329,7 +346,9 @@ export default function ComposerPrimaryFields({
           placeholder="姓名或邮箱"
           value={draft.bcc}
           contactSearchEntries={contactSearchEntries}
+          blockedEmails={blockedRecipientEmails.bcc}
           onChange={(value) => onPatchDraft({ bcc: value })}
+          onFocus={() => onRecipientFieldFocus?.('bcc')}
         />
       )}
 
@@ -343,7 +362,7 @@ export default function ComposerPrimaryFields({
         />
       </label>
 
-      {formattingToolbar}
+      {formattingToolbar?.(richBodyRef)}
 
       <section
         className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}${dropActive ? ' drop-active' : ''}`}

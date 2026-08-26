@@ -32,6 +32,7 @@ import useComposeFromMessage from './useComposeFromMessage';
 import useComposerSend from './useComposerSend';
 import useComposerTemplates from './useComposerTemplates';
 import useComposerAttachments from './useComposerAttachments';
+import { canonicalRecipientEmails, parseRecipientInput, parseRecipientToken } from '../components/composer/recipientAddresses';
 
 
 type LoadMetaResult = {
@@ -416,19 +417,36 @@ export default function useComposerController({
     setStatus('已移除附件');
   }
 
-  function addContactToDraft(contact: Contact, field: 'to' | 'cc' | 'bcc' = 'to') {
-    const existing = draft[field]
-      .split(/[;,]/)
-      .map((recipient) => recipient.trim())
-      .filter(Boolean);
-    const contactAddresses = [contact.email, ...(contact.aliases ?? [])].map((item) => item.trim().toLowerCase()).filter(Boolean);
-    if (existing.some((recipient) => contactAddresses.includes(recipient.toLowerCase()))) {
-      setStatus(`联系人已在${field === 'to' ? '收件人' : field === 'cc' ? '抄送' : '密送'}中：${contact.email}`);
-      return;
+  function addContactsToDraft(contactsToAdd: Contact[], field: 'to' | 'cc' | 'bcc' = 'to') {
+    const addedIds: number[] = [];
+    const skippedIds: number[] = [];
+    const fieldLabel = field === 'to' ? '收件人' : field === 'cc' ? '抄送' : '密送';
+    const used = canonicalRecipientEmails(draft.to, draft.cc, draft.bcc);
+    const currentFieldTokens = parseRecipientInput(draft[field]).valid.map((token) => token.email);
+    for (const contact of contactsToAdd) {
+      const primary = parseRecipientToken(contact.email);
+      const aliases = [contact.email, ...(contact.aliases ?? [])]
+        .map((address) => address.trim().toLowerCase())
+        .filter(Boolean);
+      if (!primary.valid || aliases.some((address) => used.has(address))) {
+        skippedIds.push(contact.id);
+        continue;
+      }
+      used.add(primary.normalized);
+      for (const alias of aliases) used.add(alias);
+      currentFieldTokens.push(primary.email);
+      addedIds.push(contact.id);
     }
-    const nextRecipients = [...existing, contact.email].join(', ');
-    setDraft((current) => ({ ...current, [field]: nextRecipients }));
-    setStatus(`已添加联系人：${contact.name || contact.email}`);
+    if (addedIds.length > 0) {
+      const nextValue = currentFieldTokens.join(', ');
+      setDraft((current) => ({ ...current, [field]: nextValue }));
+    }
+    if (addedIds.length > 0) {
+      setStatus(`已添加 ${addedIds.length} 位联系人到${fieldLabel}`);
+    } else if (skippedIds.length > 0) {
+      setStatus(`联系人已在其他收件字段中，未重复添加`);
+    }
+    return { addedIds, skippedIds };
   }
 
   return {
@@ -474,7 +492,7 @@ export default function useComposerController({
     handleComposerAttachmentDragEnter,
     handleComposerAttachmentDragLeave,
     removeDraftAttachment,
-    addContactToDraft,
+    addContactsToDraft,
     composeFromMessage,
     editDraftMessage,
     saveDraft,

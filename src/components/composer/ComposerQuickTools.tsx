@@ -1,9 +1,10 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlignCenter,
   AlignLeft,
   Bold,
+  Eraser,
   FileSignature,
   FileText,
   Highlighter,
@@ -15,10 +16,18 @@ import {
   Redo2,
   Underline,
   Undo2,
-  X,
 } from 'lucide-react';
 import type { DraftInput } from '../../app/types';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
+import {
+  insertLink,
+  normalizeLinkUrl,
+  readEditorFormatState,
+  runEditorCommand,
+  saveEditorSelection,
+  selectedEditorText,
+  type RichTextFormatState,
+} from './richTextCommands';
 
 const FONT_OPTIONS = [
   { value: '', label: '字体' },
@@ -35,39 +44,144 @@ const FONT_SIZE_OPTIONS = [
   { value: '5', label: '20' },
 ];
 
-function runEditorCommand(command: string, value?: string) {
-  const editor = document.querySelector<HTMLElement>('.composer-richtext-body');
-  if (!editor) return;
-  editor.focus();
-  try {
-    document.execCommand(command, false, value);
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
-  } catch {
-    // Unsupported browser commands should not interrupt composition.
-  }
-}
+type ToolbarButtonProps = {
+  label: string;
+  icon: React.ReactNode;
+  pressed?: boolean;
+  onClick: () => void;
+};
 
-function toolbarButton(
-  label: string,
-  icon: React.ReactNode,
-  onClick: () => void,
-) {
+function toolbarButton({ label, icon, pressed, onClick }: ToolbarButtonProps) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick}>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+    >
       {icon}
     </button>
   );
 }
 
-export function ComposerRichToolbar() {
+function linkTextFromSelection(editor: HTMLElement | null) {
+  return selectedEditorText(editor).trim();
+}
+
+export function ComposerRichToolbar({
+  editorRef,
+}: {
+  editorRef?: React.RefObject<HTMLDivElement | null>;
+}) {
   const [fontValue, setFontValue] = useState('');
   const [fontSizeValue, setFontSizeValue] = useState('');
+  const [formatState, setFormatState] = useState<RichTextFormatState>({
+    bold: false,
+    italic: false,
+    underline: false,
+    unorderedList: false,
+    orderedList: false,
+    justifyLeft: false,
+    justifyCenter: false,
+  });
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const linkSelectionRef = useRef<Range | null>(null);
+  const editorSelectionRef = useRef<Range | null>(null);
+  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
+  const linkUrlRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const editor = editorRef?.current;
+    if (!editor) return undefined;
+    const sync = () => {
+      const selection = saveEditorSelection(editor);
+      if (selection) editorSelectionRef.current = selection;
+      setFormatState(readEditorFormatState(editor));
+    };
+    editor.addEventListener('keyup', sync);
+    editor.addEventListener('mouseup', sync);
+    editor.addEventListener('input', sync);
+    editor.addEventListener('focus', sync);
+    editor.ownerDocument.addEventListener('selectionchange', sync);
+    sync();
+    return () => {
+      editor.removeEventListener('keyup', sync);
+      editor.removeEventListener('mouseup', sync);
+      editor.removeEventListener('input', sync);
+      editor.removeEventListener('focus', sync);
+      editor.ownerDocument.removeEventListener('selectionchange', sync);
+    };
+  }, [editorRef]);
+
+  useEffect(() => {
+    if (!linkOpen) return undefined;
+    linkUrlRef.current?.focus({ preventScroll: true });
+    function closeOnPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Node && (target instanceof Element && target.closest('.composer-link-popover'))) return;
+      setLinkOpen(false);
+      linkButtonRef.current?.focus({ preventScroll: true });
+    }
+    function closeOnKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setLinkOpen(false);
+      linkButtonRef.current?.focus({ preventScroll: true });
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown, true);
+    document.addEventListener('keydown', closeOnKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerDown, true);
+      document.removeEventListener('keydown', closeOnKeyDown, true);
+    };
+  }, [linkOpen]);
+
+  function execute(command: string, value?: string) {
+    const editor = editorRef?.current ?? null;
+    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    runEditorCommand(editor, command, value, selection);
+    if (editor) {
+      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
+      setFormatState(readEditorFormatState(editor));
+    }
+  }
+
+  function openLinkPopover() {
+    const editor = editorRef?.current ?? null;
+    linkSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    setLinkUrl('');
+    setLinkText(linkTextFromSelection(editor));
+    setLinkError('');
+    setLinkOpen(true);
+  }
+
+  function submitLink() {
+    const editor = editorRef?.current ?? null;
+    const normalizedUrl = normalizeLinkUrl(linkUrl);
+    if (!normalizedUrl) {
+      setLinkError('请输入有效的网址或邮箱链接');
+      return;
+    }
+    const inserted = insertLink(editor, normalizedUrl, linkText, linkSelectionRef.current);
+    if (!inserted) {
+      setLinkError('请先在正文中选择文字，或填写显示文本');
+      return;
+    }
+    setLinkOpen(false);
+    linkButtonRef.current?.focus({ preventScroll: true });
+  }
 
   return (
     <div className="composer-rich-toolbar" aria-label="富文本格式工具栏">
       <div className="composer-rich-toolbar-group" aria-label="撤销和重做">
-        {toolbarButton('撤销', <Undo2 size={17} />, () => runEditorCommand('undo'))}
-        {toolbarButton('重做', <Redo2 size={17} />, () => runEditorCommand('redo'))}
+        {toolbarButton({ label: '撤销', icon: <Undo2 size={17} />, onClick: () => execute('undo') })}
+        {toolbarButton({ label: '重做', icon: <Redo2 size={17} />, onClick: () => execute('redo') })}
       </div>
 
       <div className="composer-rich-toolbar-group composer-rich-toolbar-selects">
@@ -80,7 +194,7 @@ export function ComposerRichToolbar() {
           portalOwnerId="composer-rich-toolbar"
           portalZIndex={1200}
           onChange={(value) => {
-            if (value) runEditorCommand('fontName', value);
+            if (value) execute('fontName', value);
             setFontValue('');
           }}
         />
@@ -93,32 +207,66 @@ export function ComposerRichToolbar() {
           portalOwnerId="composer-rich-toolbar"
           portalZIndex={1200}
           onChange={(value) => {
-            if (value) runEditorCommand('fontSize', value);
+            if (value) execute('fontSize', value);
             setFontSizeValue('');
           }}
         />
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="文字样式">
-        {toolbarButton('加粗', <Bold size={17} />, () => runEditorCommand('bold'))}
-        {toolbarButton('斜体', <Italic size={17} />, () => runEditorCommand('italic'))}
-        {toolbarButton('下划线', <Underline size={17} />, () => runEditorCommand('underline'))}
-        {toolbarButton('文字高亮', <Highlighter size={17} />, () => runEditorCommand('hiliteColor', '#FFF1A8'))}
+        {toolbarButton({ label: '加粗', icon: <Bold size={17} />, pressed: formatState.bold, onClick: () => execute('bold') })}
+        {toolbarButton({ label: '斜体', icon: <Italic size={17} />, pressed: formatState.italic, onClick: () => execute('italic') })}
+        {toolbarButton({ label: '下划线', icon: <Underline size={17} />, pressed: formatState.underline, onClick: () => execute('underline') })}
+        {toolbarButton({ label: '文字高亮', icon: <Highlighter size={17} />, onClick: () => execute('hiliteColor', '#FFF1A8') })}
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="段落格式">
-        {toolbarButton('无序列表', <List size={17} />, () => runEditorCommand('insertUnorderedList'))}
-        {toolbarButton('有序列表', <ListOrdered size={17} />, () => runEditorCommand('insertOrderedList'))}
-        {toolbarButton('左对齐', <AlignLeft size={17} />, () => runEditorCommand('justifyLeft'))}
-        {toolbarButton('居中对齐', <AlignCenter size={17} />, () => runEditorCommand('justifyCenter'))}
+        {toolbarButton({ label: '无序列表', icon: <List size={17} />, pressed: formatState.unorderedList, onClick: () => execute('insertUnorderedList') })}
+        {toolbarButton({ label: '有序列表', icon: <ListOrdered size={17} />, pressed: formatState.orderedList, onClick: () => execute('insertOrderedList') })}
+        {toolbarButton({ label: '左对齐', icon: <AlignLeft size={17} />, pressed: formatState.justifyLeft, onClick: () => execute('justifyLeft') })}
+        {toolbarButton({ label: '居中对齐', icon: <AlignCenter size={17} />, pressed: formatState.justifyCenter, onClick: () => execute('justifyCenter') })}
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="插入内容">
-        {toolbarButton('插入链接', <Link2 size={17} />, () => {
-          const url = window.prompt('输入链接地址');
-          if (url?.trim()) runEditorCommand('createLink', url.trim());
-        })}
-        {toolbarButton('清除格式', <X size={17} />, () => runEditorCommand('removeFormat'))}
+        <button
+          ref={linkButtonRef}
+          type="button"
+          aria-label="插入链接"
+          title="插入链接"
+          aria-expanded={linkOpen}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={openLinkPopover}
+        >
+          <Link2 size={17} />
+        </button>
+        {toolbarButton({ label: '清除格式', icon: <Eraser size={17} />, onClick: () => execute('removeFormat') })}
+        {linkOpen && (
+          <div className="composer-link-popover" role="dialog" aria-label="插入链接">
+            <strong>插入链接</strong>
+            <label>
+              <span>网址</span>
+              <input
+                ref={linkUrlRef}
+                value={linkUrl}
+                onChange={(event) => {
+                  setLinkUrl(event.target.value);
+                  setLinkError('');
+                }}
+                placeholder="https://example.com"
+                inputMode="url"
+              />
+            </label>
+            <label>
+              <span>显示文本</span>
+              <input value={linkText} onChange={(event) => setLinkText(event.target.value)} placeholder="可选" />
+            </label>
+            {linkError && <p role="alert">{linkError}</p>}
+            <footer>
+              <button type="button" onClick={() => { setLinkOpen(false); linkButtonRef.current?.focus({ preventScroll: true }); }}>取消</button>
+              <button type="button" className="is-primary" onClick={submitLink}>插入</button>
+            </footer>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -137,6 +285,8 @@ type ComposerQuickToolsProps = {
   onToggleFormatting?: () => void;
   onOpenTemplates?: () => void;
   onOpenMore?: () => void;
+  templateButtonRef?: React.RefObject<HTMLButtonElement>;
+  moreButtonRef?: React.RefObject<HTMLButtonElement>;
   formattingExpanded?: boolean;
   hideRichToolbar?: boolean;
 };
@@ -154,6 +304,8 @@ export default function ComposerQuickTools({
   onToggleFormatting,
   onOpenTemplates,
   onOpenMore,
+  templateButtonRef,
+  moreButtonRef,
   formattingExpanded = true,
   hideRichToolbar = false,
 }: ComposerQuickToolsProps) {
@@ -192,13 +344,13 @@ export default function ComposerQuickTools({
               签名
             </button>
             {onOpenTemplates ? (
-              <button type="button" aria-label="插入模板" title="插入模板" onClick={onOpenTemplates}>
+              <button ref={templateButtonRef} type="button" aria-label="插入模板" title="插入模板" onClick={onOpenTemplates}>
                 <FileText size={17} />
                 模板
               </button>
             ) : null}
             {onOpenMore ? (
-              <button type="button" aria-label="更多写信工具" title="更多写信工具" onClick={onOpenMore}>
+              <button ref={moreButtonRef} type="button" aria-label="更多写信工具" title="更多写信工具" onClick={onOpenMore}>
                 <span className="composer-more-glyph" aria-hidden="true">•••</span>
                 更多
               </button>

@@ -1,5 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Trash2 } from 'lucide-react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 type ComposerSchedulePickerProps = {
@@ -8,6 +8,8 @@ type ComposerSchedulePickerProps = {
   openRequest?: number;
   triggerLabel?: string;
   className?: string;
+  anchorRef?: RefObject<HTMLElement | null>;
+  showTrigger?: boolean;
 };
 
 type TimeParts = {
@@ -42,21 +44,15 @@ function parseDateTimeLocal(value: string) {
       && date.getDate() === Number(match[3])
       && date.getHours() === Number(match[4])
       && date.getMinutes() === Number(match[5])
-    ) {
-      return date;
-    }
+    ) return date;
     return null;
   }
-
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function toDateTimeLocalValue(date: Date) {
-  return [
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    `${pad(date.getHours())}:${pad(date.getMinutes())}`,
-  ].join('T');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function startOfMonth(date: Date) {
@@ -67,13 +63,22 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function dateFromParts(day: string, time: TimeParts) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), time.hour, time.minute, 0, 0);
+  return date.getFullYear() === Number(match[1])
+    && date.getMonth() === Number(match[2]) - 1
+    && date.getDate() === Number(match[3])
+    ? date
+    : null;
+}
+
 function roundScheduleSeed() {
   const date = new Date();
   date.setSeconds(0, 0);
   date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15);
-  if (date.getMinutes() === 60) {
-    date.setHours(date.getHours() + 1, 0, 0, 0);
-  }
+  if (date.getMinutes() === 60) date.setHours(date.getHours() + 1, 0, 0, 0);
   return date;
 }
 
@@ -108,19 +113,17 @@ function TimeSelect({ ariaLabel, value, options, onChange }: TimeSelectProps) {
 
   useEffect(() => {
     if (!open) return undefined;
-
     function handlePointerDown(event: PointerEvent) {
       if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
       setOpen(false);
     }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
+      event.stopImmediatePropagation();
       event.preventDefault();
       setOpen(false);
       triggerRef.current?.focus({ preventScroll: true });
     }
-
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
@@ -178,57 +181,56 @@ export default function ComposerSchedulePicker({
   openRequest,
   triggerLabel,
   className = '',
+  anchorRef,
+  showTrigger = true,
 }: ComposerSchedulePickerProps) {
-  const initialDateRef = useRef(parseDateTimeLocal(value) ?? roundScheduleSeed());
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popoverRef = useRef<HTMLElement | null>(null);
-  const [open, setOpen] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => startOfMonth(initialDateRef.current));
-  const [time, setTime] = useState<TimeParts>(() => ({
-    hour: initialDateRef.current.getHours(),
-    minute: initialDateRef.current.getMinutes(),
-  }));
+  const initialValueOnOpenRef = useRef(value);
   const lastOpenRequestRef = useRef<number | null>(openRequest ?? null);
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(parseDateTimeLocal(value) ?? roundScheduleSeed()));
+  const [draftDate, setDraftDate] = useState(() => dateKey(parseDateTimeLocal(value) ?? roundScheduleSeed()));
+  const [draftTime, setDraftTime] = useState<TimeParts>(() => {
+    const seed = parseDateTimeLocal(value) ?? roundScheduleSeed();
+    return { hour: seed.getHours(), minute: seed.getMinutes() };
+  });
   const [position, setPosition] = useState<PickerPosition | null>(null);
-  const selectedDate = parseDateTimeLocal(value);
-  const selectedDayKey = selectedDate ? dateKey(selectedDate) : '';
+  const [error, setError] = useState('');
+  const committedDate = parseDateTimeLocal(value);
+  const draftDateValue = dateFromParts(draftDate, draftTime);
+  const isValid = Boolean(draftDateValue && draftDateValue.getTime() > Date.now());
   const calendarDays = buildCalendarDays(viewMonth);
 
   useEffect(() => {
+    if (open) return;
     const next = parseDateTimeLocal(value);
     if (!next) return;
     setViewMonth(startOfMonth(next));
-    setTime({ hour: next.getHours(), minute: next.getMinutes() });
-  }, [value]);
+    setDraftDate(dateKey(next));
+    setDraftTime({ hour: next.getHours(), minute: next.getMinutes() });
+  }, [open, value]);
 
   useLayoutEffect(() => {
     if (!open) return undefined;
-
     function updatePosition() {
-      const trigger = triggerRef.current;
+      const anchor = triggerRef.current ?? anchorRef?.current;
       const popover = popoverRef.current;
-      if (!trigger || !popover) return;
-      const triggerRect = trigger.getBoundingClientRect();
+      if (!anchor || !popover) return;
+      const anchorRect = anchor.getBoundingClientRect();
       const popoverRect = popover.getBoundingClientRect();
       const margin = 12;
-      const gap = 6;
-      const left = Math.min(
-        Math.max(margin, triggerRect.left),
-        Math.max(margin, window.innerWidth - popoverRect.width - margin),
-      );
-      const below = triggerRect.bottom + gap;
-      const above = triggerRect.top - popoverRect.height - gap;
-      const fitsBelow = below + popoverRect.height <= window.innerHeight - margin;
-      const fitsAbove = above >= margin;
-      const maxTop = Math.max(margin, window.innerHeight - popoverRect.height - margin);
-      const top = fitsBelow
+      const gap = 8;
+      const left = Math.min(Math.max(margin, anchorRect.right - popoverRect.width), Math.max(margin, window.innerWidth - popoverRect.width - margin));
+      const below = anchorRect.bottom + gap;
+      const above = anchorRect.top - popoverRect.height - gap;
+      const top = below + popoverRect.height <= window.innerHeight - margin
         ? below
-        : fitsAbove
+        : above >= margin
           ? above
-          : Math.min(Math.max(margin, below), maxTop);
+          : Math.min(Math.max(margin, below), Math.max(margin, window.innerHeight - popoverRect.height - margin));
       setPosition({ top, left });
     }
-
     updatePosition();
     window.addEventListener('resize', updatePosition);
     document.addEventListener('scroll', updatePosition, true);
@@ -236,33 +238,46 @@ export default function ComposerSchedulePicker({
       window.removeEventListener('resize', updatePosition);
       document.removeEventListener('scroll', updatePosition, true);
     };
-  }, [open]);
+  }, [anchorRef, open]);
+
+  function focusAnchor() {
+    (triggerRef.current ?? anchorRef?.current)?.focus({ preventScroll: true });
+  }
+
+  function closeWithoutCommit() {
+    const original = parseDateTimeLocal(initialValueOnOpenRef.current);
+    if (original) {
+      setViewMonth(startOfMonth(original));
+      setDraftDate(dateKey(original));
+      setDraftTime({ hour: original.getHours(), minute: original.getMinutes() });
+    } else {
+      const seed = roundScheduleSeed();
+      setViewMonth(startOfMonth(seed));
+      setDraftDate(dateKey(seed));
+      setDraftTime({ hour: seed.getHours(), minute: seed.getMinutes() });
+    }
+    setOpen(false);
+    setPosition(null);
+    setError('');
+    focusAnchor();
+  }
 
   useEffect(() => {
     if (!open) return undefined;
-
+    popoverRef.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
     function handlePointerDown(event: PointerEvent) {
       const target = event.target;
-      if (
-        target instanceof Node
-        && (triggerRef.current?.contains(target) || popoverRef.current?.contains(target))
-      ) {
-        return;
-      }
-      setOpen(false);
+      if (target instanceof Node && (triggerRef.current?.contains(target) || popoverRef.current?.contains(target))) return;
+      closeWithoutCommit();
     }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
+      if (event.target instanceof Node && popoverRef.current?.querySelector('.composer-schedule-time-options')?.contains(event.target)) return;
       event.preventDefault();
-      setOpen(false);
-      triggerRef.current?.focus({ preventScroll: true });
       event.stopImmediatePropagation();
+      closeWithoutCommit();
     }
-
     document.addEventListener('pointerdown', handlePointerDown);
-    // The composer modal also listens for Escape. Capture the first key so
-    // closing this picker does not dismiss the whole compose window.
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
@@ -271,9 +286,12 @@ export default function ComposerSchedulePicker({
   }, [open]);
 
   function openPicker() {
-    const current = selectedDate ?? initialDateRef.current;
+    const current = committedDate ?? roundScheduleSeed();
+    initialValueOnOpenRef.current = value;
     setViewMonth(startOfMonth(current));
-    setTime({ hour: current.getHours(), minute: current.getMinutes() });
+    setDraftDate(dateKey(current));
+    setDraftTime({ hour: current.getHours(), minute: current.getMinutes() });
+    setError('');
     setPosition(null);
     setOpen(true);
   }
@@ -284,27 +302,16 @@ export default function ComposerSchedulePicker({
     openPicker();
   }, [openRequest]);
 
-  function updateDateTime(date: Date, nextTime = time) {
-    const next = new Date(date);
-    next.setHours(nextTime.hour, nextTime.minute, 0, 0);
-    onChange(toDateTimeLocalValue(next));
-  }
-
-  function selectDay(day: Date) {
-    updateDateTime(day);
-    setViewMonth(startOfMonth(day));
-  }
-
-  function selectToday() {
-    const today = new Date();
-    setViewMonth(startOfMonth(today));
-    updateDateTime(today);
-  }
-
-  function updateTime(field: keyof TimeParts, valueText: string) {
-    const nextTime = { ...time, [field]: Number(valueText) };
-    setTime(nextTime);
-    updateDateTime(selectedDate ?? initialDateRef.current, nextTime);
+  function confirmSchedule() {
+    if (!draftDateValue || draftDateValue.getTime() <= Date.now()) {
+      setError('请选择晚于当前时间的发送时间');
+      return;
+    }
+    onChange(toDateTimeLocalValue(draftDateValue));
+    setOpen(false);
+    setPosition(null);
+    setError('');
+    focusAnchor();
   }
 
   const monthLabel = `${viewMonth.getFullYear()}年${viewMonth.getMonth() + 1}月`;
@@ -314,52 +321,32 @@ export default function ComposerSchedulePicker({
       className="composer-schedule-picker-popover"
       role="dialog"
       aria-label="选择定时发送时间"
-      style={{
-        top: position?.top ?? -10000,
-        left: position?.left ?? -10000,
-      }}
+      style={{ top: position?.top ?? -10000, left: position?.left ?? -10000 }}
     >
       <header className="composer-schedule-picker-header">
         <div className="composer-schedule-picker-header-copy">
-          <strong>{selectedDate ? displayValue(selectedDate) : '定时发送'}</strong>
-          <small>{selectedDate ? '邮件将在该时间自动发送' : '选择发送日期和时间'}</small>
+          <strong>{draftDateValue ? displayValue(draftDateValue) : '定时发送'}</strong>
+          <small>确认后才会更新邮件草稿</small>
         </div>
         <div className="composer-schedule-picker-actions">
-          <button
-            type="button"
-            className="composer-schedule-picker-today"
-            onClick={selectToday}
-          >
-            今天
-          </button>
-          <button
-            type="button"
-            className="composer-schedule-picker-confirm"
-            onClick={() => {
-              setOpen(false);
-              triggerRef.current?.focus({ preventScroll: true });
-            }}
-          >
-            <Check size={13} aria-hidden="true" />
-            确定
+          <button type="button" className="composer-schedule-picker-today" onClick={() => {
+            const today = new Date();
+            setViewMonth(startOfMonth(today));
+            setDraftDate(dateKey(today));
+            setError('');
+          }}>今天</button>
+          <button type="button" className="composer-schedule-picker-confirm" disabled={!isValid} onClick={confirmSchedule}>
+            <Check size={13} aria-hidden="true" />确定
           </button>
         </div>
       </header>
 
       <div className="composer-schedule-picker-monthbar">
-        <button
-          type="button"
-          aria-label="上个月"
-          onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-        >
+        <button type="button" aria-label="上个月" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
           <ChevronLeft size={15} />
         </button>
         <strong>{monthLabel}</strong>
-        <button
-          type="button"
-          aria-label="下个月"
-          onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-        >
+        <button type="button" aria-label="下个月" onClick={() => setViewMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
           <ChevronRight size={15} />
         </button>
       </div>
@@ -372,7 +359,7 @@ export default function ComposerSchedulePicker({
           const key = dateKey(day);
           const isCurrentMonth = day.getMonth() === viewMonth.getMonth();
           const isToday = key === dateKey(new Date());
-          const isSelected = key === selectedDayKey;
+          const isSelected = key === draftDate;
           return (
             <button
               key={key}
@@ -382,7 +369,11 @@ export default function ComposerSchedulePicker({
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={isSelected}
               className={`composer-schedule-picker-day${isCurrentMonth ? '' : ' is-outside'}${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
-              onClick={() => selectDay(day)}
+              onClick={() => {
+                setDraftDate(key);
+                setViewMonth(startOfMonth(day));
+                setError('');
+              }}
             >
               {day.getDate()}
             </button>
@@ -391,64 +382,33 @@ export default function ComposerSchedulePicker({
       </div>
 
       <div className="composer-schedule-picker-time">
-        <span>
-          <Clock3 size={14} aria-hidden="true" />
-          发送时间
-        </span>
+        <span><Clock3 size={14} aria-hidden="true" />发送时间</span>
         <div className="composer-schedule-picker-time-fields">
-          <TimeSelect
-            ariaLabel="小时"
-            value={time.hour}
-            options={Array.from({ length: 24 }, (_, hour) => hour)}
-            onChange={(hour) => updateTime('hour', String(hour))}
-          />
+          <TimeSelect ariaLabel="小时" value={draftTime.hour} options={Array.from({ length: 24 }, (_, hour) => hour)} onChange={(hour) => { setDraftTime((current) => ({ ...current, hour })); setError(''); }} />
           <b>:</b>
-          <TimeSelect
-            ariaLabel="分钟"
-            value={time.minute}
-            options={Array.from({ length: 60 }, (_, minute) => minute)}
-            onChange={(minute) => updateTime('minute', String(minute))}
-          />
+          <TimeSelect ariaLabel="分钟" value={draftTime.minute} options={Array.from({ length: 60 }, (_, minute) => minute)} onChange={(minute) => { setDraftTime((current) => ({ ...current, minute })); setError(''); }} />
         </div>
       </div>
-
-      <footer className="composer-schedule-picker-footer">
-        <button
-          type="button"
-          className="composer-schedule-picker-clear"
-          onClick={() => {
-            onChange('');
-            setOpen(false);
-            triggerRef.current?.focus({ preventScroll: true });
-          }}
-        >
-          <Trash2 size={14} aria-hidden="true" />
-          清除定时
-        </button>
-      </footer>
+      {error && <p className="composer-schedule-picker-error" role="alert">{error}</p>}
     </section>
   ) : null;
 
   return (
     <span className={`composer-schedule-picker${className ? ` ${className}` : ''}`}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`composer-schedule-picker-trigger${selectedDate ? ' is-set' : ''}`}
-        aria-label="定时发送时间"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            openPicker();
-          }
-        }}
-      >
-        <CalendarDays size={14} aria-hidden="true" />
-        <span>{triggerLabel ?? displayValue(selectedDate)}</span>
-      </button>
+      {showTrigger && (
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`composer-schedule-picker-trigger${committedDate ? ' is-set' : ''}`}
+          aria-label="定时发送时间"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => (open ? closeWithoutCommit() : openPicker())}
+        >
+          <CalendarDays size={14} aria-hidden="true" />
+          <span>{triggerLabel ?? displayValue(committedDate)}</span>
+        </button>
+      )}
       {open && createPortal(picker, document.body)}
     </span>
   );

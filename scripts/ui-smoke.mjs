@@ -383,7 +383,13 @@ async function clickButton(cdp, text, scope = 'document') {
         const root = ${scope};
         const button = [...root.querySelectorAll('button')].find((item) => {
           const navLabel = item.querySelector('.settings-nav-label')?.textContent.trim();
-          return navLabel ? navLabel === ${JSON.stringify(text)} : item.textContent.includes(${JSON.stringify(text)});
+          const ariaLabel = item.getAttribute('aria-label');
+          const title = item.getAttribute('title');
+          return navLabel
+            ? navLabel === ${JSON.stringify(text)}
+            : item.textContent.includes(${JSON.stringify(text)})
+              || ariaLabel === ${JSON.stringify(text)}
+              || title === ${JSON.stringify(text)};
         });
         if (!button) throw new Error('Button not found: ${text}');
         button.click();
@@ -1147,7 +1153,7 @@ async function main() {
     await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-mailbox-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
     await evalInPage(cdp, "document.querySelector('.mobile-mailbox-footer button')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer') && !document.querySelector('.mobile-mailbox-sheet')");
-    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
+    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-label=\"切换联系人面板\"][aria-pressed=\"false\"]')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
     await waitForExpression(cdp, "(() => { const panel = document.querySelector('.composer-contacts-panel'); return panel && getComputedStyle(panel).display !== 'none'; })()");
     await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
@@ -1446,7 +1452,7 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
     await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel')");
     await evalInPage(cdp, `(() => {
-      const button = document.querySelector('.composer header button[aria-label="最小化写信窗口"]');
+      const button = document.querySelector('.composer header button[aria-label="收起写信"]');
       if (!button) throw new Error('Composer minimize button not found');
       button.click();
     })()`);
@@ -1457,7 +1463,7 @@ async function main() {
       button.click();
     })()`);
     await waitForExpression(cdp, "document.querySelector('.composer textarea') || document.querySelector('.composer-richtext-body')");
-    await waitForExpression(cdp, "document.querySelector('.composer-advanced:not([open])')");
+    await waitForExpression(cdp, "!document.querySelector('.composer-advanced') && !document.querySelector('.composer-advanced-popover')");
     await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]').focus()");
     await fillInput(cdp, '.composer input[role="combobox"]', 'ada');
     await waitForExpression(cdp, "!document.querySelector('datalist') && [...document.querySelectorAll('.recipient-suggestions button')].some((item) => item.textContent.includes('ada@example.com')) && document.body.innerText.includes('匹配联系人')");
@@ -1469,6 +1475,24 @@ async function main() {
     await cdp.send('Page.reload', { ignoreCache: true });
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
+    await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal')");
+    await openSettingsSection(cdp, '联系人', 'contacts', '.settings-page[data-settings-page=\"contacts\"]');
+    const contactsNeedComposeSeed = await evalInPage(cdp, "![...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('ada@example.com'))");
+    if (contactsNeedComposeSeed) {
+      await openContactCreateDialog(cdp);
+      await fillInput(cdp, '.contact-create-form input[placeholder=\"联系人名称\"]', 'Ada');
+      await fillInput(cdp, '.contact-create-form input[placeholder=\"name@example.com\"]', 'ada@example.com');
+      await clickButton(cdp, '确认添加', "document.querySelector('.contact-create-form')");
+      await waitForExpression(cdp, "[...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('ada@example.com'))");
+      await openContactCreateDialog(cdp);
+      await fillInput(cdp, '.contact-create-form input[placeholder=\"联系人名称\"]', 'Security Team');
+      await fillInput(cdp, '.contact-create-form input[placeholder=\"name@example.com\"]', 'security@example.com');
+      await clickButton(cdp, '确认添加', "document.querySelector('.contact-create-form')");
+      await waitForExpression(cdp, "[...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('security@example.com'))");
+    }
+    await evalInPage(cdp, "document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Draft Flow' && document.body.innerText.includes('已从恢复点还原邮件')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
@@ -1509,9 +1533,9 @@ async function main() {
           && document.querySelectorAll('.composer footer .composer-quick-tools').length === 1
           && document.querySelectorAll('.composer > .composer-quick-tools').length === 0,
         noStandaloneScheduleStatus: !document.querySelector('.composer-schedule-status'),
-        oneWindowControlSet: document.querySelectorAll('.composer header button[aria-label="最小化写信窗口"]').length === 1
+        oneWindowControlSet: document.querySelectorAll('.composer header button[aria-label="收起写信"]').length === 1
           && document.querySelectorAll('.composer header button[aria-label="关闭写信窗口"]').length === 1
-          && document.querySelectorAll('.composer-contacts-panel [aria-label="最小化写信窗口"]').length === 0
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="收起写信"]').length === 0
           && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0,
         ranges: Boolean(
           within(contacts?.width, 390, 420)
@@ -1533,31 +1557,117 @@ async function main() {
       await evalInPage(cdp, "(() => { const list = document.querySelector('.composer-contacts-list'); if (list) list.scrollTop = list.scrollHeight; return true; })()");
       await waitForExpression(cdp, "(() => { const list = document.querySelector('.composer-contacts-list')?.getBoundingClientRect(); const rows = [...document.querySelectorAll('.composer-contact-row')]; const last = rows.at(-1)?.getBoundingClientRect(); return Boolean(list && last && last.bottom <= list.bottom + 1); })()");
     }
+    for (const [width, height, name] of [
+      [1536, 1024, 'compose-final-polish-1536'],
+      [1440, 900, 'compose-final-polish-1440'],
+      [1280, 800, 'compose-final-polish-1280'],
+    ]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width,
+        height,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await waitForExpression(cdp, `window.innerWidth === ${width} && document.querySelector('.composer-editor-pane')`);
+      await sleep(120);
+      await captureScreenshot(cdp, name);
+    }
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, 'window.innerWidth === 1440 && document.querySelector(\'.composer-editor-pane\')');
     await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
-    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"打开联系人面板\"]')");
+    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"切换联系人面板\"][aria-pressed=\"false\"]')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel')");
     await fillInput(cdp, '.composer-contacts-search input', 'nobody@example.com');
     await waitForExpression(cdp, "document.querySelector('.composer-contacts-empty')?.innerText.includes('没有找到匹配联系人')");
     await evalInPage(cdp, "document.querySelector('.composer-contacts-search button[aria-label=\"清除联系人搜索\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-contacts-search input')?.value === ''");
-    await openDetails(cdp, '.composer-advanced');
-    await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-trigger')?.click()");
+    await clickButton(cdp, '抄送', "document.querySelector('.composer-recipient-field')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.composer-recipient-field .composer-field-row')].some((row) => row.querySelector('span')?.textContent?.trim() === '抄送')");
+    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.composer-recipient-field .composer-field-row')].find((item) => item.querySelector('span')?.textContent?.trim() === '抄送'); row?.querySelector('input')?.focus(); })()");
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-footer button')?.textContent.includes('添加到抄送')");
+    await captureScreenshot(cdp, 'compose-final-polish-cc-target');
+    await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-send-menu')");
+    await clickButton(cdp, '定时发送…', "document.querySelector('.composer-send-menu')");
     await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer input[type=\"datetime-local\"]')");
+    await captureScreenshot(cdp, 'compose-final-polish-schedule-open');
     await clickButton(cdp, '今天', "document.querySelector('.composer-schedule-picker-popover')");
-    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-trigger.is-set') && !document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer-schedule-status')");
+    await evalInPage(cdp, `(() => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const label = String(tomorrow.getFullYear()) + '年' + String(tomorrow.getMonth() + 1) + '月' + String(tomorrow.getDate()) + '日';
+      const cell = [...document.querySelectorAll('.composer-schedule-picker-popover [role="gridcell"]')]
+        .find((item) => item.getAttribute('aria-label') === label);
+      if (!cell) throw new Error('Tomorrow schedule cell not found: ' + label);
+      cell.click();
+    })()`);
+    await clickButton(cdp, '确定', "document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-status') && document.querySelector('.composer-schedule-picker-trigger.is-set') && !document.querySelector('.composer-schedule-picker-popover')");
     await evalInPage(cdp, "document.querySelector('.composer-schedule-clear')?.click()");
-    await waitForExpression(cdp, "!document.querySelector('.composer-schedule-picker-popover') && !document.querySelector('.composer-schedule-picker-trigger.is-set')");
-    await fillInput(cdp, '.composer-template-save input[placeholder=\"模板名称\"]', 'Smoke 模板');
-    await clickButton(cdp, '保存当前', "document.querySelector('.composer-template-save')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-clear-confirm')");
+    await clickButton(cdp, '确认取消', "document.querySelector('.composer-schedule-clear-confirm')");
+    await waitForExpression(cdp, "!document.querySelector('.composer-schedule-status') && !document.querySelector('.composer-schedule-picker-trigger.is-set')");
+    await clickButton(cdp, '插入模板', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.composer-templates-popover')");
+    await captureScreenshot(cdp, 'compose-final-polish-template-popover');
+    await clickButton(cdp, '保存为模板…', "document.querySelector('.composer-templates-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-template-save-dialog')");
+    await fillInput(cdp, '.composer-template-save-dialog input[aria-label=\"模板名称\"]', 'Smoke 模板');
+    await clickButton(cdp, '保存', "document.querySelector('.composer-template-save-dialog')");
     await waitForExpression(cdp, "document.body.innerText.includes('模板已保存：Smoke 模板')");
     await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Template Mutated');
     await fillComposerBody(cdp, '模板覆盖前正文');
     await evalInPage(cdp, "(() => { const subject = document.querySelector('.composer input[aria-label=\"主题\"]'); subject?.focus(); return true; })()");
+    await clickButton(cdp, '插入模板', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.composer-template-list')");
     await clickButton(cdp, 'Smoke 模板', "document.querySelector('.composer-template-list')");
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Template Mutated' && document.body.innerText.includes('已插入模板：Smoke 模板') && document.body.innerText.includes('主题已保留')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('模板覆盖前正文'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('模板覆盖前正文')); })()");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
+    await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.composer-more-popover') && !document.querySelector('.composer-more-popover .composer-template-list')");
+    await captureScreenshot(cdp, 'compose-final-polish-more-menu');
+    await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    await waitForExpression(cdp, "!document.querySelector('.composer-more-popover')");
+    await evalInPage(cdp, `(() => {
+      const editor = document.querySelector('.composer-richtext-body');
+      if (!editor) return false;
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      const node = walker.nextNode();
+      if (!node) return false;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return true;
+    })()`);
+    await evalInPage(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"插入链接\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-link-popover')");
+    await captureScreenshot(cdp, 'compose-final-polish-link-popover');
+    await fillInput(cdp, '.composer-link-popover input', 'https://example.com', 0);
+    await clickButton(cdp, '插入', "document.querySelector('.composer-link-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-richtext-body a[href=\"https://example.com\"]')");
+    await evalInPage(cdp, `(() => {
+      const editor = document.querySelector('.composer-richtext-body');
+      if (!editor) return false;
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.querySelector('.composer-rich-toolbar button[aria-label="加粗"]')?.click();
+      return true;
+    })()`);
+    await waitForExpression(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"加粗\"]')?.getAttribute('aria-pressed') === 'true'");
+    await captureScreenshot(cdp, 'compose-final-polish-toolbar-active');
     await evalInPage(cdp, `(() => {
       const target = document.querySelector('.composer-attachments');
       if (!target) throw new Error('Composer attachment drop zone not found');
@@ -1580,7 +1690,9 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer .composer-footer-tool-group button')].some((button) => button.textContent.includes('签名') && !button.disabled)");
     await clickButton(cdp, '签名', "document.querySelector('.composer .composer-footer-tool-group')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('Better Email Support'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('Better Email Support')); })()");
-    await clickButton(cdp, '保存草稿', "document.querySelector('.composer')");
+    await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
+    await waitForExpression(cdp, "document.querySelector('.composer-more-popover')");
+    await clickButton(cdp, '保存草稿', "document.querySelector('.composer-more-popover')");
     await waitForExpression(cdp, "document.body.innerText.includes('同步到远端草稿箱')");
     await closeComposer(cdp);
 
@@ -2362,7 +2474,6 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"all\"]')?.innerText.includes('统一邮箱')");
 
     await clickButton(cdp, '写邮件');
-    await openDetails(cdp, '.composer-advanced');
     await waitForExpression(cdp, "document.querySelector('.composer .custom-select-summary[aria-label=\"发件人\"]')");
     await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
     await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Undo Send');
@@ -2528,7 +2639,6 @@ async function main() {
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[title=\"回复\"]') ?? document.querySelector('.reader-actions button[aria-label=\"回复\"]'); if (!button) throw new Error('Reply button not found'); button.click(); })()");
     await waitForExpression(cdp, "document.querySelector('.composer') && [...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.getAttribute('title') === 'alice@partner.example.com')");
     await waitForExpression(cdp, "!document.querySelector('.composer-risk-banner')");
-    await openDetails(cdp, '.composer-advanced');
     await pickCustomSelect(cdp, '.composer .custom-select-summary[aria-label="发件人"]', 'design@better-email.local');
     await waitForExpression(cdp, "document.querySelector('.composer-risk-banner')?.innerText.includes('正在回复其他账号的邮件')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-send-primary').click()");
@@ -2604,7 +2714,7 @@ async function main() {
         'mobile settings root and section navigation return through browser history',
         'recipient autocomplete works',
         'recipient rows keep hover geometry',
-        'composer advanced tools stay folded by default',
+        'composer templates and more use anchored overlays without an advanced details panel',
         'composer contacts rail opens and searches empty state',
         'composer contact rail exposes active state and target semantics',
         'composer schedule picker replaces native datetime control',

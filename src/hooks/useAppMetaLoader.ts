@@ -218,6 +218,7 @@ export default function useAppMetaLoader({
           nextLabels,
           nextStats,
           nextSyncRuns,
+          nextContacts,
           nextIdentities,
           nextOutbox,
           nextBackgroundTasks,
@@ -232,6 +233,7 @@ export default function useAppMetaLoader({
           invoke<Label[]>(IPC.ListLabels),
           invoke<MailStats>(IPC.GetStats, { accountId: nextAccountId }),
           invoke<SyncRun[]>(IPC.ListSyncRuns),
+          invoke<Contact[]>(IPC.ListContacts),
           invoke<MailIdentity[]>(IPC.ListIdentities, { accountId: nextAccountId }),
           invoke<OutboxItem[]>(IPC.ListOutbox),
           invoke<BackgroundTask[]>(IPC.ListBackgroundTasks),
@@ -263,6 +265,7 @@ export default function useAppMetaLoader({
         setLabels(nextLabels);
         setStats(nextStats);
         setSyncRuns?.(nextSyncRuns);
+        setContacts(nextContacts);
         setIdentities(nextIdentities);
         setOutbox(nextOutbox);
         setBackgroundTasks(nextBackgroundTasks);

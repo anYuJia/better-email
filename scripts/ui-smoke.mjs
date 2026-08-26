@@ -1670,8 +1670,6 @@ async function main() {
         throw new Error(`Recipient row geometry changed on hover: ${JSON.stringify({ before: row, after: hovered })}`);
       }
     }
-    await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
-    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel')");
     await evalInPage(cdp, `(() => {
       const button = document.querySelector('.composer header button[aria-label="收起写信"]');
       if (!button) throw new Error('Composer minimize button not found');
@@ -1718,7 +1716,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Draft Flow' && document.body.innerText.includes('已从恢复点还原邮件')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
     await waitForExpression(cdp, "document.querySelector('.composer.has-contacts-panel .composer-contacts-panel') && document.querySelector('.composer-contacts-search input')");
-    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-expanded=\"true\"][aria-controls=\"composer-contacts-panel\"]') && document.querySelector('.composer-contacts-tabs [role=\"tab\"][aria-selected=\"true\"]')");
+    await waitForExpression(cdp, "!document.querySelector('.composer .composer-contact-toggle') && !document.querySelector('.composer-contacts-panel .composer-contacts-close') && document.querySelector('.composer-contacts-tabs [role=\"tab\"][aria-selected=\"true\"]')");
     const composeGeometry = await evalInPage(cdp, `(() => {
       const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
       const editor = rect('.composer-editor-pane');
@@ -1757,7 +1755,9 @@ async function main() {
         oneWindowControlSet: document.querySelectorAll('.composer header button[aria-label="收起写信"]').length === 1
           && document.querySelectorAll('.composer header button[aria-label="关闭写信窗口"]').length === 1
           && document.querySelectorAll('.composer-contacts-panel [aria-label="收起写信"]').length === 0
-          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0,
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭联系人面板"]').length === 0
+          && document.querySelectorAll('.composer .composer-contact-toggle').length === 0,
         ranges: Boolean(
           within(contacts?.width, 420, 490)
           && within(sender?.height, 0, 60)
@@ -1800,10 +1800,7 @@ async function main() {
       mobile: false,
     });
     await waitForExpression(cdp, 'window.innerWidth === 1440 && document.querySelector(\'.composer-editor-pane\')');
-    await evalInPage(cdp, "document.querySelector('.composer-contacts-panel .composer-contacts-close')?.click()");
-    await waitForExpression(cdp, "!document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-label=\"切换联系人面板\"][aria-pressed=\"false\"]')");
-    await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle')?.click()");
-    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel')");
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel') && !document.querySelector('.composer .composer-contact-toggle') && !document.querySelector('.composer-contacts-panel .composer-contacts-close')");
     await fillInput(cdp, '.composer-contacts-search input', 'nobody@example.com');
     await waitForExpression(cdp, "document.querySelector('.composer-contacts-empty')?.innerText.includes('没有找到匹配联系人')");
     await evalInPage(cdp, "document.querySelector('.composer-contacts-search button[aria-label=\"清除联系人搜索\"]')?.click()");

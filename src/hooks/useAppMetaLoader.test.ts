@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useAppMetaLoader from './useAppMetaLoader';
-import type { Account, Folder, MailStats, SyncRun } from '../app/types';
+import type { Account, Contact, Folder, MailStats, SyncRun } from '../app/types';
 
 const mockSetBadgeCount = vi.fn(async () => undefined);
 
@@ -52,6 +52,16 @@ const stats: MailStats = {
   attachment_messages: 1,
 };
 
+const contact: Contact = {
+  id: 7,
+  name: '联系人示例',
+  email: 'contact@example.com',
+  aliases: [],
+  vip: false,
+  message_count: 1,
+  last_seen_at: '2026-08-25T10:00:00+08:00',
+};
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -62,7 +72,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setupInvokeMocks() {
+function setupInvokeMocks(contacts: Contact[] = []) {
   mockInvoke.mockImplementation(((command: string) => {
     switch (command) {
       case 'release_due_snoozed_messages':
@@ -92,7 +102,7 @@ function setupInvokeMocks() {
       case 'list_imap_mailboxes':
         return Promise.resolve([]);
       case 'list_contacts':
-        return Promise.resolve([]);
+        return Promise.resolve(contacts);
       case 'list_rules':
         return Promise.resolve([]);
       case 'list_oauth_sessions':
@@ -176,6 +186,17 @@ describe('useAppMetaLoader', () => {
     expect(setters.setFolderId).toHaveBeenCalledWith(101);
   });
 
+  it('loads contacts with mailbox metadata so compose can render them before settings opens', async () => {
+    setupInvokeMocks([contact]);
+    const { result, setters } = renderMetaLoader();
+
+    await act(async () => {
+      await result.current.loadMeta(101, 1, { mode: 'mailbox' });
+    });
+
+    expect(setters.setContacts).toHaveBeenCalledWith([contact]);
+  });
+
   it('uses mailbox metadata as the single startup owner for stats and tray state', async () => {
     setupInvokeMocks();
     const { result } = renderMetaLoader();
@@ -255,6 +276,7 @@ describe('useAppMetaLoader', () => {
           return Promise.resolve(folders);
         case 'list_labels':
         case 'list_sync_runs':
+        case 'list_contacts':
         case 'list_identities':
         case 'list_outbox':
         case 'list_background_tasks':

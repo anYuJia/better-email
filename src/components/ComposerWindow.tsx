@@ -183,6 +183,9 @@ export default function ComposerWindow({
   const [contactsOpen, setContactsOpen] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= 900,
   );
+  const [isNarrowContactsViewport, setIsNarrowContactsViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 900,
+  );
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
   const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
@@ -191,6 +194,7 @@ export default function ComposerWindow({
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
+  const contactsPanelVisible = !isNarrowContactsViewport || contactsOpen;
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -262,8 +266,20 @@ export default function ComposerWindow({
   }, [minimized]);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia('(max-width: 899px)');
+    const updateViewportMode = () => {
+      setIsNarrowContactsViewport(media.matches);
+      if (media.matches) setContactsOpen(false);
+    };
+    updateViewportMode();
+    media.addEventListener?.('change', updateViewportMode);
+    return () => media.removeEventListener?.('change', updateViewportMode);
+  }, []);
+
+  useEffect(() => {
     setPosition((current) => clampComposerPosition(panelRef.current, current));
-  }, [contactsOpen]);
+  }, [contactsPanelVisible]);
 
   useEffect(() => {
     if (draft.cc.trim()) setCcOpen(true);
@@ -421,14 +437,14 @@ export default function ComposerWindow({
     >
       <section
         ref={panelRef}
-        className={`composer${contactsOpen ? ' has-contacts-panel' : ''}`}
+        className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
         style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        <div className={`composer-workspace${contactsOpen ? ' has-contacts' : ''}`}>
+        <div className={`composer-workspace${contactsPanelVisible ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
             <header className="composer-editor-header" onPointerDown={beginDrag}>
               <span className="composer-title-copy">
@@ -443,19 +459,21 @@ export default function ComposerWindow({
                 </span>
               </span>
               <div className="composer-header-actions">
-                <button
-                  type="button"
-                  className="composer-contact-toggle"
-                  aria-label="切换联系人面板"
-                  aria-expanded={contactsOpen}
-                  aria-pressed={contactsOpen}
-                  aria-controls="composer-contacts-panel"
-                  title="切换联系人面板"
-                  onClick={() => setContactsOpen((current) => !current)}
-                >
-                  <UsersRound size={17} aria-hidden="true" />
-                  <span>联系人</span>
-                </button>
+                {isNarrowContactsViewport && (
+                  <button
+                    type="button"
+                    className="composer-contact-toggle"
+                    aria-label="切换联系人面板"
+                    aria-expanded={contactsOpen}
+                    aria-pressed={contactsOpen}
+                    aria-controls="composer-contacts-panel"
+                    title="切换联系人面板"
+                    onClick={() => setContactsOpen((current) => !current)}
+                  >
+                    <UsersRound size={17} aria-hidden="true" />
+                    <span>联系人</span>
+                  </button>
+                )}
                 <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
                   <PanelBottomClose size={17} aria-hidden="true" />
                 </button>
@@ -670,7 +688,7 @@ export default function ComposerWindow({
             </footer>
           </div>
 
-          {contactsOpen && (
+          {contactsPanelVisible && (
             <ComposerContactsPanel
               contacts={contacts}
               draft={draft}
@@ -678,6 +696,7 @@ export default function ComposerWindow({
               onRecipientFieldChange={setActiveRecipientField}
               onAddContacts={onAddContacts}
               onClose={() => setContactsOpen(false)}
+              showClose={isNarrowContactsViewport}
               onOpenContactsSettings={onOpenContactsSettings}
             />
           )}

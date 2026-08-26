@@ -126,15 +126,16 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(screen.queryByText('未输入内容')).toBeNull();
   });
 
-  it('keeps window actions global and does not duplicate them in the contacts rail', () => {
+  it('keeps one window action set while the desktop contacts rail stays fixed', () => {
     render(composer());
 
     const contactsPanel = screen.getByRole('complementary', { name: '联系人' });
     expect(contactsPanel.querySelector('[aria-label="收起写信"]')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="关闭写信窗口"]')).toBeNull();
-    expect(screen.getAllByRole('button', { name: '关闭联系人面板' })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: '收起写信' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '关闭写信窗口' })).not.toBeNull();
+    expect(contactsPanel.querySelector('[aria-label="关闭联系人面板"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: '切换联系人面板' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: '收起写信' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '关闭写信窗口' })).toHaveLength(1);
   });
 
   it('keeps immediate send, scheduled send, and outbox actions semantically distinct', () => {

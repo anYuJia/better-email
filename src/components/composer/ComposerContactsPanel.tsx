@@ -23,6 +23,7 @@ type ComposerContactsPanelProps = {
   onRecipientFieldChange: (field: ComposerRecipientField) => void;
   onAddContacts: (contacts: Contact[], field: ComposerRecipientField) => AddContactsResult;
   onClose: () => void;
+  showClose?: boolean;
   onOpenContactsSettings?: () => void;
 };
 
@@ -100,6 +101,7 @@ export default function ComposerContactsPanel({
   onRecipientFieldChange,
   onAddContacts,
   onClose,
+  showClose = true,
   onOpenContactsSettings,
 }: ComposerContactsPanelProps) {
   const [view, setView] = useState<ContactView>('recent');
@@ -217,15 +219,17 @@ export default function ComposerContactsPanel({
               <Settings2 size={16} aria-hidden="true" />
             </button>
           ) : null}
-          <button
-            type="button"
-            className="composer-contacts-close"
-            aria-label="关闭联系人面板"
-            title="关闭联系人面板"
-            onClick={onClose}
-          >
-            <X size={17} aria-hidden="true" />
-          </button>
+          {showClose && (
+            <button
+              type="button"
+              className="composer-contacts-close"
+              aria-label="关闭联系人面板"
+              title="关闭联系人面板"
+              onClick={onClose}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 

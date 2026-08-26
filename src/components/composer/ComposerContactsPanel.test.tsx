@@ -203,6 +203,22 @@ describe('ComposerContactsPanel', () => {
     expect(onOpenContactsSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('can hide its close action when the rail is persistent', () => {
+    render(
+      <ComposerContactsPanel
+        contacts={[]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onRecipientFieldChange={vi.fn()}
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+        showClose={false}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '关闭联系人面板' })).toBeNull();
+  });
+
   it('does not expose a group tab when the contact backend has no group data', () => {
     renderPanel();
 

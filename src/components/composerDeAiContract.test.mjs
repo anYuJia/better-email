@@ -134,7 +134,7 @@ describe('composer focus contract — quiet hairlines, not large rectangles', ()
       .filter((rule) => rule.selector === '.composer-field-row:focus-within')
       .at(-1);
     expect(fieldFocus).toBeDefined();
-    expect(fieldFocus.body).toMatch(/box-shadow:\s*none/);
+    expect(fieldFocus.body).toMatch(/box-shadow:\s*inset\s+0\s+-2px\s+0\s+var\(--ui-accent\)/);
     expect(fieldFocus.body).not.toMatch(/inset\s+0\s+-1px/);
 
     const keyboardFocus = findRules(composerCss, '.composer-field-row:has(input:focus-visible)')
@@ -142,7 +142,7 @@ describe('composer focus contract — quiet hairlines, not large rectangles', ()
       .at(-1);
     expect(keyboardFocus).toBeDefined();
     expect(keyboardFocus.body).toMatch(/outline:\s*none/);
-    expect(keyboardFocus.body).toMatch(/box-shadow:\s*none/);
+    expect(keyboardFocus.body).toMatch(/box-shadow:\s*inset\s+0\s+-2px\s+0\s+var\(--ui-accent\)/);
     expect(keyboardFocus.body).not.toMatch(/inset\s+0\s+-1px/);
   });
 });

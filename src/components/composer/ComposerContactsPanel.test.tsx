@@ -149,6 +149,38 @@ describe('ComposerContactsPanel', () => {
     expect(screen.queryByText('邮箱地址', { selector: '.composer-contact-copy small' })).toBeNull();
   });
 
+  it('treats a backend fallback name equal to the email as email-only', () => {
+    render(
+      <ComposerContactsPanel
+        contacts={[{ ...emailOnly, name: emailOnly.email }]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onRecipientFieldChange={vi.fn()}
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('noreply@example.com')).toHaveLength(1);
+    expect(screen.queryByText('noreply@example.com', { selector: '.composer-contact-copy small' })).toBeNull();
+  });
+
+  it('uses the generic avatar for an email-only contact with a numeric address', () => {
+    const numericContact = { ...emailOnly, email: '006973@chinatelecom.cn', name: '006973@chinatelecom.cn' };
+    render(
+      <ComposerContactsPanel
+        contacts={[numericContact]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onRecipientFieldChange={vi.fn()}
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('listitem').querySelector('.composer-contact-avatar svg')).not.toBeNull();
+  });
+
   it('keeps the empty address-book state actionable', () => {
     const onOpenContactsSettings = vi.fn();
     render(

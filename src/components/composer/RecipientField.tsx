@@ -28,15 +28,29 @@ function initialParse(value: string) {
   const lastToken = parsed.tokens[parsed.tokens.length - 1];
   const hasTrailingSeparator = /[,，;；\n\t]\s*$/.test(value);
   const query = lastToken && !lastToken.valid && !hasTrailingSeparator ? lastToken.raw : '';
+  const chipLabels = Object.fromEntries(
+    parsed.valid
+      .map((token) => {
+        const displayName = token.raw.match(/^(.+?)\s*<[^<>]+>$/)?.[1]?.trim().replace(/^(["'])(.*)\1$/, '$2') ?? '';
+        return [token.normalized, displayName];
+      })
+      .filter(([, displayName]) => Boolean(displayName)),
+  );
   return {
     chips: parsed.valid.map((token) => token.email),
     query,
+    chipLabels,
     validationMessage: recipientErrorMessage(parsed.invalid.length, parsed.duplicates.length),
   };
 }
 
-function deriveValue(chips: string[]) {
-  return chips.join(', ');
+function deriveValue(chips: string[], chipLabels: Record<string, string>) {
+  return chips
+    .map((chip) => {
+      const label = chipLabels[chip.toLowerCase()];
+      return label ? `${label} <${chip}>` : chip;
+    })
+    .join(', ');
 }
 
 function contactForEmail(entries: ContactSearchEntry[], email: string) {
@@ -55,6 +69,7 @@ function appendUnique(
   const next = [...currentChips];
   const seen = new Set(next.map((chip) => chip.toLowerCase()));
   const duplicates: ParsedRecipientToken[] = [];
+  const addedTokens: ParsedRecipientToken[] = [];
   for (const token of tokens) {
     if (!token.valid || seen.has(token.normalized) || blockedEmails.has(token.normalized)) {
       if (token.valid) duplicates.push(token);
@@ -62,8 +77,9 @@ function appendUnique(
     }
     seen.add(token.normalized);
     next.push(token.email);
+    addedTokens.push(token);
   }
-  return { next, duplicates };
+  return { next, duplicates, addedTokens };
 }
 
 export default function RecipientField({
@@ -78,6 +94,7 @@ export default function RecipientField({
 }: RecipientFieldProps) {
   const initial = useMemo(() => initialParse(value), [value]);
   const [chips, setChips] = useState<string[]>(initial.chips);
+  const [chipLabels, setChipLabels] = useState<Record<string, string>>(initial.chipLabels);
   const [query, setQuery] = useState(initial.query);
   const [focused, setFocused] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -87,6 +104,7 @@ export default function RecipientField({
   const errorId = useId();
   const lastValueRef = useRef(value);
   const chipsRef = useRef(chips);
+  const chipLabelsRef = useRef(chipLabels);
   const queryRef = useRef(query);
   const inputRef = useRef<HTMLInputElement>(null);
   const blockedEmailSet = useMemo(
@@ -95,6 +113,7 @@ export default function RecipientField({
   );
 
   chipsRef.current = chips;
+  chipLabelsRef.current = chipLabels;
   queryRef.current = query;
 
   const matches = useMemo(
@@ -112,15 +131,17 @@ export default function RecipientField({
     lastValueRef.current = value;
     const next = initialParse(value);
     chipsRef.current = next.chips;
+    chipLabelsRef.current = next.chipLabels;
     queryRef.current = next.query;
     setChips(next.chips);
+    setChipLabels(next.chipLabels);
     setQuery(next.query);
     setValidationMessage(next.validationMessage);
     setHighlight(0);
   }, [value]);
 
-  function emit(nextChips: string[]) {
-    const next = deriveValue(nextChips);
+  function emit(nextChips: string[], nextLabels = chipLabelsRef.current) {
+    const next = deriveValue(nextChips, nextLabels);
     lastValueRef.current = next;
     onChange(next);
   }
@@ -128,13 +149,20 @@ export default function RecipientField({
   function commitTokens(tokens: ParsedRecipientToken[]) {
     const validTokens = tokens.filter((token) => token.valid);
     const invalidCount = tokens.length - validTokens.length;
-    const { next, duplicates } = appendUnique(chipsRef.current, validTokens, blockedEmailSet);
+    const { next, duplicates, addedTokens } = appendUnique(chipsRef.current, validTokens, blockedEmailSet);
+    const nextLabels = { ...chipLabelsRef.current };
+    for (const token of addedTokens) {
+      const displayName = token.raw.match(/^(.+?)\s*<[^<>]+>$/)?.[1]?.trim().replace(/^(["'])(.*)\1$/, '$2') ?? '';
+      if (displayName) nextLabels[token.normalized] = displayName;
+    }
     chipsRef.current = next;
+    chipLabelsRef.current = nextLabels;
     queryRef.current = '';
     setChips(next);
+    setChipLabels(nextLabels);
     setQuery('');
     setValidationMessage(recipientErrorMessage(invalidCount, duplicates.length));
-    emit(next);
+    emit(next, nextLabels);
     setHighlight(0);
   }
 
@@ -153,9 +181,13 @@ export default function RecipientField({
     const currentChips = chipsRef.current;
     if (index < 0 || index >= currentChips.length) return;
     const next = currentChips.filter((_, chipIndex) => chipIndex !== index);
+    const nextLabels = { ...chipLabelsRef.current };
+    delete nextLabels[currentChips[index].toLowerCase()];
     chipsRef.current = next;
+    chipLabelsRef.current = nextLabels;
     setChips(next);
-    emit(next);
+    setChipLabels(nextLabels);
+    emit(next, nextLabels);
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -221,7 +253,7 @@ export default function RecipientField({
   }
 
   function chipDisplayName(email: string) {
-    return contactForEmail(contactSearchEntries, email)?.name || email;
+    return chipLabels[email.toLowerCase()] || contactForEmail(contactSearchEntries, email)?.name || email;
   }
 
   return (

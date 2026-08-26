@@ -7,6 +7,7 @@ type ComposerSchedulePickerProps = {
   onChange: (value: string) => void;
   openRequest?: number;
   triggerLabel?: string;
+  compactTriggerLabel?: string;
   className?: string;
   anchorRef?: RefObject<HTMLElement | null>;
   showTrigger?: boolean;
@@ -180,6 +181,7 @@ export default function ComposerSchedulePicker({
   onChange,
   openRequest,
   triggerLabel,
+  compactTriggerLabel,
   className = '',
   anchorRef,
   showTrigger = true,
@@ -406,7 +408,12 @@ export default function ComposerSchedulePicker({
           onClick={() => (open ? closeWithoutCommit() : openPicker())}
         >
           <CalendarDays size={14} aria-hidden="true" />
-          <span>{triggerLabel ?? displayValue(committedDate)}</span>
+          {compactTriggerLabel ? (
+            <>
+              <span className="composer-schedule-label-full">{triggerLabel ?? displayValue(committedDate)}</span>
+              <span className="composer-schedule-label-compact">{compactTriggerLabel}</span>
+            </>
+          ) : <span>{triggerLabel ?? displayValue(committedDate)}</span>}
         </button>
       )}
       {open && createPortal(picker, document.body)}

@@ -1080,6 +1080,227 @@ async function dragElement(cdp, selector, deltaX) {
   });
 }
 
+const composeReferenceContacts = [
+  { name: '李俊（东华）', email: 'lij140@chinatelecom.cn' },
+  { name: '吕东原', email: 'lvdy@chinatelecom.cn' },
+  { name: '', email: '006973@chinatelecom.cn' },
+  { name: '', email: '1364381330@qq.com' },
+  { name: '', email: '419763500@qq.com' },
+  { name: '', email: '424299903@qq.com' },
+  { name: '', email: '42499903@qq.com' },
+];
+
+async function setUiViewport(cdp, width, height) {
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width,
+    height,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await waitForExpression(cdp, `window.innerWidth === ${width} && window.innerHeight === ${height}`);
+}
+
+async function installFixedComposeClock(cdp) {
+  const source = `(() => {
+    const NativeDate = window.Date;
+    const fixedTime = NativeDate.parse('2026-08-26T11:05:00+08:00');
+    class BetterEmailFixedDate extends NativeDate {
+      constructor(...args) {
+        if (args.length === 0) super(fixedTime);
+        else if (args.length === 1) super(args[0]);
+        else super(...args);
+      }
+      static now() { return fixedTime; }
+    }
+    window.Date = BetterEmailFixedDate;
+    return new window.Date().toISOString();
+  })()`;
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source });
+  await evalInPage(cdp, source);
+}
+
+async function seedComposeReferenceContacts(cdp) {
+  return withStep('seedComposeReferenceContacts', async () => {
+    await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal')");
+    await openSettingsSection(cdp, '联系人', 'contacts', '.settings-page[data-settings-page="contacts"]');
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-page[data-settings-page=\"contacts\"] .contact-tool-row').length === 0");
+
+    for (const contact of composeReferenceContacts) {
+      await openContactCreateDialog(cdp);
+      await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', contact.name);
+      await fillInput(cdp, '.contact-create-form input[placeholder="name@example.com"]', contact.email);
+      await clickButton(cdp, '确认添加', "document.querySelector('.contact-create-form')");
+      await waitForExpression(
+        cdp,
+        `[...document.querySelectorAll('.settings-page[data-settings-page="contacts"] .contact-tool-row')].some((row) => row.innerText.includes(${JSON.stringify(contact.email)}))`,
+      );
+    }
+
+    await waitForExpression(
+      cdp,
+      `document.querySelectorAll('.settings-page[data-settings-page="contacts"] .contact-tool-row').length === ${composeReferenceContacts.length}`,
+    );
+    await evalInPage(cdp, "document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
+  });
+}
+
+async function commitComposeRecipient(cdp, value, displayName) {
+  await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.focus()");
+  await fillInput(cdp, '.composer input[role="combobox"]', value);
+  await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))");
+  await waitForExpression(
+    cdp,
+    `[...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.textContent.trim() === ${JSON.stringify(displayName)})`,
+  );
+}
+
+async function composeLayoutSnapshot(cdp) {
+  return evalInPage(cdp, `(() => {
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+    const workspace = rect('.composer-workspace');
+    const editor = rect('.composer-editor-pane');
+    const contacts = rect('.composer-contacts-panel');
+    const footer = rect('.composer footer');
+    const quick = rect('.composer-footer-main .composer-quick-tools');
+    const schedule = rect('.composer-schedule-status');
+    const send = rect('.composer-send-split');
+    const isVisible = (selector) => {
+      const element = document.querySelector(selector);
+      return element ? getComputedStyle(element).display !== 'none' : false;
+    };
+    const field = (selector) => rect(selector)?.height ?? null;
+    const noHorizontalScroll = document.documentElement.scrollWidth <= window.innerWidth + 1
+      && document.body.scrollWidth <= window.innerWidth + 1;
+    const noFooterOverlap = Boolean(quick && schedule && send)
+      && quick.right <= schedule.left + 1
+      && schedule.right <= send.left + 1
+      && footer && quick.top >= footer.top - 1 && quick.bottom <= footer.bottom + 1
+      && schedule.top >= footer.top - 1 && schedule.bottom <= footer.bottom + 1
+      && send.top >= footer.top - 1 && send.bottom <= footer.bottom + 1;
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      editorWidth: editor?.width ?? null,
+      contactsWidth: contacts?.width ?? null,
+      gap: workspace && editor && contacts ? contacts.left - editor.right : null,
+      senderHeight: field('.composer-sender-context'),
+      recipientHeight: field('.composer-recipient-field .composer-field-row'),
+      subjectHeight: field('.composer-subject-field'),
+      toolbarHeight: field('.composer-rich-toolbar'),
+      bodyHeight: field('.composer-body-field'),
+      footerHeight: footer?.height ?? null,
+      contactsRowHeight: field('.composer-contact-row'),
+      contactsFooterHeight: field('.composer-contacts-footer'),
+      scheduleWidth: schedule?.width ?? null,
+      sendWidth: send?.width ?? null,
+      noHorizontalScroll,
+      noFooterOverlap,
+      compactSchedule: isVisible('.composer-schedule-label-compact'),
+      compactSend: isVisible('.composer-send-label-compact'),
+      fullSchedule: isVisible('.composer-schedule-label-full'),
+      fullSend: isVisible('.composer-send-label-full'),
+    };
+  })()`);
+}
+
+async function captureComposeReferenceFixture(cdp) {
+  return withStep('captureComposeReferenceFixture', async () => {
+    await setUiViewport(cdp, 1188, 769);
+    await evalInPage(cdp, "localStorage.removeItem('better-email.composerAutosave'); localStorage.removeItem('swiftmail.composerAutosave'); location.reload()");
+    await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
+    await waitForExpression(cdp, "!document.querySelector('.composer')");
+
+    await clickButton(cdp, '写邮件');
+    await waitForExpression(cdp, "document.querySelector('.composer input[role=\"combobox\"]') && document.querySelector('.composer-contacts-panel')");
+    await waitForExpression(cdp, "!document.body.innerText.includes('未输入内容')");
+    const emptySnapshot = await composeLayoutSnapshot(cdp);
+    if (!emptySnapshot.noHorizontalScroll || emptySnapshot.contactsWidth < 360 || emptySnapshot.contactsWidth > 372 || emptySnapshot.footerHeight > 68) {
+      throw new Error(`Empty compose geometry contract failed: ${JSON.stringify(emptySnapshot)}`);
+    }
+    await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.focus()");
+    const focusSnapshot = await evalInPage(cdp, `(() => {
+      const input = document.querySelector('.composer input[role="combobox"]');
+      const row = input?.closest('.composer-field-row');
+      return {
+        inputOutline: input ? getComputedStyle(input).outlineStyle : null,
+        rowShadow: row ? getComputedStyle(row).boxShadow : null,
+      };
+    })()`);
+    if (focusSnapshot.inputOutline !== 'none' || focusSnapshot.rowShadow === 'none') {
+      throw new Error(`Recipient focus contract failed: ${JSON.stringify(focusSnapshot)}`);
+    }
+    await captureScreenshot(cdp, 'compose-final-empty-1188');
+    await closeComposer(cdp);
+
+    await seedComposeReferenceContacts(cdp);
+    await installFixedComposeClock(cdp);
+    await clickButton(cdp, '写邮件');
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel .composer-contact-row') && document.querySelectorAll('.composer-contacts-panel .composer-contact-row').length === 7");
+    await commitComposeRecipient(cdp, '崔栗嘉 <lij140@chinatelecom.cn>', '崔栗嘉');
+    await commitComposeRecipient(cdp, '代琴 <daiqin@chinatelecom.cn>', '代琴');
+    await waitForExpression(cdp, "[...document.querySelectorAll('.composer-contact-row')].some((row) => row.innerText.includes('李俊（东华）') && row.innerText.includes('已添加'))");
+    await waitForExpression(cdp, "!document.querySelector('.composer-richtext-body')?.textContent?.trim() && !document.querySelector('.composer textarea[placeholder=\"正文\"]')?.value?.trim()");
+    await waitForExpression(cdp, "document.body.innerText.includes('已自动保存') && document.body.innerText.includes('11:05')", 12_000);
+
+    await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-send-menu')");
+    await clickButton(cdp, '定时发送…', "document.querySelector('.composer-send-menu')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-picker-popover')");
+    await captureScreenshot(cdp, 'compose-reference-schedule-menu');
+    await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-popover [role=\"gridcell\"][aria-label=\"2026年8月28日\"]')?.click()");
+    await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-popover [role=\"combobox\"][aria-label=\"小时\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-time-options')");
+    await clickButton(cdp, '09', "document.querySelector('.composer-schedule-time-options')");
+    await evalInPage(cdp, "document.querySelector('.composer-schedule-picker-popover [role=\"combobox\"][aria-label=\"分钟\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-time-options')");
+    await clickButton(cdp, '00', "document.querySelector('.composer-schedule-time-options')");
+    await clickButton(cdp, '确定', "document.querySelector('.composer-schedule-picker-popover')");
+    await waitForExpression(cdp, "document.querySelector('.composer-schedule-status') && document.querySelector('.composer-schedule-picker-trigger')?.innerText.includes('8月28日 09:00')");
+    await waitForExpression(cdp, "document.body.innerText.includes('已自动保存') && document.body.innerText.includes('11:05')", 12_000);
+
+    const compactSnapshot = await composeLayoutSnapshot(cdp);
+    console.log(`[ui-smoke] compose-reference-1188 geometry ${JSON.stringify(compactSnapshot)}`);
+    if (!compactSnapshot.noHorizontalScroll || !compactSnapshot.noFooterOverlap || compactSnapshot.contactsWidth < 360 || compactSnapshot.contactsWidth > 372 || compactSnapshot.footerHeight > 68 || !compactSnapshot.compactSchedule || !compactSnapshot.compactSend || compactSnapshot.fullSchedule || compactSnapshot.fullSend) {
+      throw new Error(`1188 compose geometry contract failed: ${JSON.stringify(compactSnapshot)}`);
+    }
+    await captureScreenshot(cdp, 'compose-reference-state-1188');
+
+    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.composer-contact-row')].find((item) => !item.classList.contains('is-added')); row?.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.composer-contact-row.is-selected')");
+    await captureScreenshot(cdp, 'compose-reference-contact-selected');
+    await evalInPage(cdp, "document.querySelector('.composer-contact-row.is-selected')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.composer-contact-row.is-selected')");
+
+    await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.focus()");
+    await waitForExpression(cdp, "getComputedStyle(document.querySelector('.composer input[role=\"combobox\"]')).outlineStyle === 'none'");
+    await captureScreenshot(cdp, 'compose-reference-recipient-focus');
+    await evalInPage(cdp, "document.activeElement?.blur()");
+
+    await setUiViewport(cdp, 1583, 994);
+    await sleep(120);
+    const wideSnapshot = await composeLayoutSnapshot(cdp);
+    console.log(`[ui-smoke] compose-reference-1583 geometry ${JSON.stringify(wideSnapshot)}`);
+    if (!wideSnapshot.noHorizontalScroll || !wideSnapshot.noFooterOverlap || wideSnapshot.contactsWidth < 475 || wideSnapshot.contactsWidth > 490 || wideSnapshot.gap < 14 || wideSnapshot.gap > 16 || wideSnapshot.footerHeight > 68 || !wideSnapshot.fullSchedule || !wideSnapshot.fullSend || wideSnapshot.compactSchedule || wideSnapshot.compactSend) {
+      throw new Error(`1583 compose geometry contract failed: ${JSON.stringify(wideSnapshot)}`);
+    }
+
+    for (const [width, height] of [[1280, 800], [1440, 900]]) {
+      await setUiViewport(cdp, width, height);
+      await sleep(120);
+      const intermediateSnapshot = await composeLayoutSnapshot(cdp);
+      console.log(`[ui-smoke] compose-reference-${width} geometry ${JSON.stringify(intermediateSnapshot)}`);
+      if (!intermediateSnapshot.noHorizontalScroll || !intermediateSnapshot.noFooterOverlap || intermediateSnapshot.contactsWidth < 360 || intermediateSnapshot.contactsWidth > 490 || intermediateSnapshot.footerHeight > 68) {
+        throw new Error(`${width} compose geometry contract failed: ${JSON.stringify(intermediateSnapshot)}`);
+      }
+    }
+
+    await setUiViewport(cdp, 1583, 994);
+    await sleep(120);
+    await captureScreenshot(cdp, 'compose-reference-state-1583');
+  });
+}
+
 async function main() {
   const vite = spawnLogged('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
     env: { ...process.env, VITE_BETTER_EMAIL_UI_MOCK: '1', VITE_BETTER_EMAIL_SEED_MOCK_DATA: '1' },
@@ -1538,7 +1759,7 @@ async function main() {
           && document.querySelectorAll('.composer-contacts-panel [aria-label="收起写信"]').length === 0
           && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0,
         ranges: Boolean(
-          within(contacts?.width, 390, 420)
+          within(contacts?.width, 420, 490)
           && within(sender?.height, 0, 60)
           && within(recipient?.height, 0, 68)
           && within(subject?.height, 0, 60)
@@ -2678,6 +2899,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('AI 生成的模板已保存') && document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('向新客户介绍产品模板')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
+
+    await captureComposeReferenceFixture(cdp);
 
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);
 

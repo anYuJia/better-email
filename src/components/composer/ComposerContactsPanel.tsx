@@ -55,7 +55,7 @@ function dateValue(value: string) {
 
 function contactAvatarLabel(contact: Contact) {
   const name = contact.name.trim();
-  if (name) return Array.from(name)[0] ?? null;
+  if (name && normalized(name) !== normalized(contact.email)) return Array.from(name)[0] ?? null;
   const prefix = contact.email.trim().split('@')[0] ?? '';
   return /^[A-Za-z]/.test(prefix) ? prefix[0].toUpperCase() : null;
 }
@@ -272,7 +272,7 @@ export default function ComposerContactsPanel({
       <div className="composer-contacts-list" role="list" aria-label={view === 'recent' ? '最近联系人列表' : '常用联系人列表'}>
         {visibleContacts.map((contact) => {
           const name = contactDisplayName(contact);
-          const hasName = Boolean(contact.name.trim());
+          const hasName = Boolean(contact.name.trim() && normalized(contact.name) !== normalized(contact.email));
           const addedTo = addedField(contact, draft);
           const selected = selectedIds.has(contact.id) && !addedTo;
           const avatarLabel = contactAvatarLabel(contact);

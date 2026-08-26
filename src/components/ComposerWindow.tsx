@@ -206,7 +206,7 @@ export default function ComposerWindow({
     : /^正在保存|保存失败|网络异常/.test(status)
       ? status
       : isDraftEmpty(draft)
-        ? '未输入内容'
+        ? ''
         : '正在保存…';
 
   function patchDraft(patch: Partial<DraftInput>) {
@@ -589,6 +589,7 @@ export default function ComposerWindow({
                       onChange={(value) => patchDraft({ send_at: value })}
                       openRequest={scheduleOpenRequest}
                       triggerLabel={`将于 ${formatScheduleLabel(draft.send_at)} 发送`}
+                      compactTriggerLabel={formatScheduleLabel(draft.send_at)}
                     />
                     <button
                       type="button"
@@ -632,7 +633,12 @@ export default function ComposerWindow({
                     onClick={handlePrimarySend}
                   >
                     <Send size={17} aria-hidden="true" />
-                    {draft.send_at.trim() ? `定时发送 · ${formatScheduleLabel(draft.send_at)}` : '发送'}
+                    {draft.send_at.trim() ? (
+                      <>
+                        <span className="composer-send-label-full">定时发送 · {formatScheduleLabel(draft.send_at)}</span>
+                        <span className="composer-send-label-compact">定时发送</span>
+                      </>
+                    ) : '发送'}
                   </button>
                   <button
                     type="button"

@@ -152,12 +152,12 @@
 
 .composer-field-row:focus-within {
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
 }
 
 .composer-field-row:has(input:focus-visible) {
   outline: none;
-  box-shadow: none;
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
 }
 
 .composer-recipient-field {
@@ -171,7 +171,7 @@
 
 .composer-recipient-field .composer-field-row:focus-within {
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
 }
 
 .composer .composer-field-row input {
@@ -2357,6 +2357,7 @@
   --compose-footer-height: 64px;
   --compose-control-height: 36px;
   --compose-contact-row-height: 64px;
+  --compose-divider: color-mix(in oklch, var(--ui-border) 82%, var(--ui-surface));
   width: 100%;
   height: 100%;
   max-width: none;
@@ -2371,7 +2372,7 @@
 .composer-backdrop {
   align-items: stretch;
   justify-content: stretch;
-  padding: 10px;
+  padding: clamp(10px, 1vw, 16px);
   background: var(--ui-surface-muted);
 }
 
@@ -2387,11 +2388,11 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--compose-space-3);
+  gap: clamp(12px, 0.9vw, 16px);
 }
 
 .composer-workspace.has-contacts {
-  grid-template-columns: minmax(0, 1fr) clamp(390px, 28vw, 420px);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 30.5vw, 490px);
 }
 
 .composer-editor-pane,
@@ -2418,7 +2419,7 @@
   justify-content: space-between;
   gap: var(--compose-space-3);
   padding: 0 var(--compose-space-5);
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
   background: var(--ui-surface);
   cursor: grab;
 }
@@ -2509,7 +2510,7 @@
   grid-template-columns: 82px minmax(0, 1fr);
   align-items: center;
   padding: 0 var(--compose-space-5);
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
   background: var(--ui-surface);
 }
 
@@ -2596,7 +2597,7 @@
   margin: 0 var(--compose-space-5);
   padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
   border-radius: 0;
   color: var(--ui-text);
   background: transparent;
@@ -2606,7 +2607,7 @@
 
 .composer .composer-field-row:focus-within {
   background: transparent;
-  box-shadow: none;
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
 }
 
 .composer .composer-field-row input,
@@ -2622,6 +2623,10 @@
   font-size: 14px;
 }
 
+.composer .composer-field-row input:focus-visible {
+  outline: none;
+}
+
 .composer .composer-recipient-editor {
   min-width: 0;
   min-height: 40px;
@@ -2629,15 +2634,15 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 5px 0;
+  padding: 5px 96px 5px 0;
 }
 
 .composer .composer-recipient-editor input,
 .composer .composer-recipient-editor input:hover,
 .composer .composer-recipient-editor input:focus {
-  min-width: 120px;
+  min-width: 72px;
   min-height: 32px;
-  flex: 1 1 140px;
+  flex: 1 1 120px;
   padding: 0;
 }
 
@@ -2652,7 +2657,7 @@
   border-radius: 8px;
   color: var(--ui-text);
   background: var(--ui-surface-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .composer .composer-recipient-chip button {
@@ -2790,7 +2795,7 @@
   display: flex;
   flex-direction: column;
   overflow: auto;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
   background: var(--ui-surface);
   transition: none;
 }
@@ -2848,7 +2853,7 @@
   justify-content: center;
   align-items: stretch;
   padding: 0 var(--compose-space-5);
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid var(--compose-divider);
   background: var(--ui-surface);
 }
 
@@ -3277,6 +3282,11 @@
   gap: 2px;
 }
 
+.composer-schedule-label-compact,
+.composer-send-label-compact {
+  display: none;
+}
+
 .composer .composer-schedule-picker-trigger {
   min-width: 0;
   min-height: 40px;
@@ -3320,6 +3330,10 @@
   grid-template-columns: minmax(0, 1fr) 38px;
   border-radius: 8px;
   background: var(--ui-accent);
+}
+
+.composer-send-split:has(.composer-send-label-full) {
+  min-width: 220px;
 }
 
 .composer-send-primary,
@@ -3395,6 +3409,36 @@
   background: var(--ui-control-hover);
 }
 
+@media (max-width: 1280px) {
+  .composer .composer-recipient-editor {
+    padding-inline-end: 84px;
+  }
+
+  .composer-schedule-label-full,
+  .composer-send-label-full {
+    display: none;
+  }
+
+  .composer-schedule-label-compact,
+  .composer-send-label-compact {
+    display: inline;
+  }
+
+  .composer-schedule-status {
+    max-width: min(190px, 28%);
+  }
+
+  .composer .composer-schedule-picker-trigger {
+    gap: 6px;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .composer-send-split:has(.composer-send-label-full) {
+    min-width: 148px;
+  }
+}
+
 .composer-contacts-panel {
   display: flex;
   flex-direction: column;
@@ -3408,7 +3452,7 @@
   justify-content: space-between;
   gap: var(--compose-space-3);
   padding: 0 var(--compose-space-5);
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
 }
 
 .composer-contacts-header > strong {
@@ -3446,7 +3490,7 @@
   flex-direction: column;
   gap: var(--compose-space-2);
   padding: var(--compose-space-3) var(--compose-space-5) 0;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
 }
 
 .composer-contacts-search {
@@ -3535,7 +3579,7 @@
   gap: 10px;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--compose-divider);
   border-radius: 0;
   background: transparent;
 }
@@ -3641,7 +3685,7 @@
   justify-content: space-between;
   gap: var(--compose-space-3);
   padding: 0 var(--compose-space-5);
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid var(--compose-divider);
   background: var(--ui-surface);
 }
 

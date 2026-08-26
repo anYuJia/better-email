@@ -225,6 +225,15 @@ describe('ComposerPrimaryFields', () => {
     expect(container.querySelectorAll('.composer-recipient-chip')).toHaveLength(2);
   });
 
+  it('preserves display names from formatted recipient addresses in chips', () => {
+    const { container } = renderFields(draft({
+      to: '崔栗嘉 <lij140@chinatelecom.cn>, 代琴 <daiqin@chinatelecom.cn>',
+    }), true, vi.fn(), []);
+
+    const chips = [...container.querySelectorAll('.composer-recipient-chip-copy')].map((item) => item.textContent);
+    expect(chips).toEqual(['崔栗嘉', '代琴']);
+  });
+
   it('removes only the clicked chip when the draft is parent-controlled', () => {
     const { container } = render(
       <ControlledComposerFields

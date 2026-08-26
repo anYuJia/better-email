@@ -119,6 +119,13 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(screen.queryByText(/已备份恢复点/)).toBeNull();
   });
 
+  it('keeps a never-edited empty draft header focused on the window title', () => {
+    render(composer());
+
+    expect(screen.getByText('新邮件')).not.toBeNull();
+    expect(screen.queryByText('未输入内容')).toBeNull();
+  });
+
   it('keeps window actions global and does not duplicate them in the contacts rail', () => {
     render(composer());
 

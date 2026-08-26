@@ -241,6 +241,29 @@ describe('useComposerController close lifecycle', () => {
     expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringMatching(/^已从恢复点还原邮件：/));
   });
 
+  it('reuses the open composer and requests focus instead of replacing its draft', () => {
+    const { result } = renderComposer();
+    const existingDraft = {
+      ...result.current.draft,
+      subject: '继续编辑',
+      body: '保留这份正文',
+    };
+
+    act(() => {
+      result.current.setDraft(existingDraft);
+      result.current.setComposerOpen(true);
+    });
+    act(() => result.current.setComposerMinimized(true));
+    const focusRequestBefore = result.current.composerFocusRequest;
+
+    act(() => result.current.openComposer(emptyDraft));
+
+    expect(result.current.isComposerOpen).toBe(true);
+    expect(result.current.isComposerMinimized).toBe(false);
+    expect(result.current.draft).toEqual(existingDraft);
+    expect(result.current.composerFocusRequest).toBe(focusRequestBefore + 1);
+  });
+
   it('forwards a quick reply into the full composer while retaining the background draft', async () => {
     const { result } = renderComposer();
     const sourceMessage = {

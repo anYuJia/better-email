@@ -22,6 +22,7 @@ function makeOptions(): ShortcutOptions {
     undoAction: null,
     isComposerOpen: false,
     isComposerMinimized: false,
+    isComposerModal: false,
     isSettingsOpen: false,
     isShortcutsOpen: false,
     isAccountLoginRequired: false,

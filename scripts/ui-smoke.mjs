@@ -1089,6 +1089,7 @@ const composeReferenceContacts = [
   { name: '', email: '424299903@qq.com' },
   { name: '', email: '42499903@qq.com' },
 ];
+const COMPOSE_CONTACTS_WIDTH = 304;
 
 async function setUiViewport(cdp, width, height) {
   await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -1200,6 +1201,7 @@ async function composeLayoutSnapshot(cdp) {
       compactSend: isVisible('.composer-send-label-compact'),
       fullSchedule: isVisible('.composer-schedule-label-full'),
       fullSend: isVisible('.composer-send-label-full'),
+      connectedPanes: Boolean(editor && contacts && Math.abs(contacts.left - editor.right) <= 1),
     };
   })()`);
 }
@@ -1215,7 +1217,7 @@ async function captureComposeReferenceFixture(cdp) {
     await waitForExpression(cdp, "document.querySelector('.composer input[role=\"combobox\"]') && document.querySelector('.composer-contacts-panel')");
     await waitForExpression(cdp, "!document.body.innerText.includes('未输入内容')");
     const emptySnapshot = await composeLayoutSnapshot(cdp);
-    if (!emptySnapshot.noHorizontalScroll || emptySnapshot.contactsWidth < 360 || emptySnapshot.contactsWidth > 372 || emptySnapshot.footerHeight > 68) {
+    if (!emptySnapshot.noHorizontalScroll || !emptySnapshot.connectedPanes || emptySnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || emptySnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || emptySnapshot.gap < -1 || emptySnapshot.gap > 1 || emptySnapshot.footerHeight > 68) {
       throw new Error(`Empty compose geometry contract failed: ${JSON.stringify(emptySnapshot)}`);
     }
     await evalInPage(cdp, "document.querySelector('.composer input[role=\"combobox\"]')?.focus()");
@@ -1261,7 +1263,7 @@ async function captureComposeReferenceFixture(cdp) {
 
     const compactSnapshot = await composeLayoutSnapshot(cdp);
     console.log(`[ui-smoke] compose-reference-1188 geometry ${JSON.stringify(compactSnapshot)}`);
-    if (!compactSnapshot.noHorizontalScroll || !compactSnapshot.noFooterOverlap || compactSnapshot.contactsWidth < 360 || compactSnapshot.contactsWidth > 372 || compactSnapshot.footerHeight > 68 || !compactSnapshot.compactSchedule || !compactSnapshot.compactSend || compactSnapshot.fullSchedule || compactSnapshot.fullSend) {
+    if (!compactSnapshot.noHorizontalScroll || !compactSnapshot.noFooterOverlap || !compactSnapshot.connectedPanes || compactSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || compactSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || compactSnapshot.gap < -1 || compactSnapshot.gap > 1 || compactSnapshot.footerHeight > 68 || !compactSnapshot.compactSchedule || !compactSnapshot.compactSend || compactSnapshot.fullSchedule || compactSnapshot.fullSend) {
       throw new Error(`1188 compose geometry contract failed: ${JSON.stringify(compactSnapshot)}`);
     }
     await captureScreenshot(cdp, 'compose-reference-state-1188');
@@ -1281,7 +1283,7 @@ async function captureComposeReferenceFixture(cdp) {
     await sleep(120);
     const wideSnapshot = await composeLayoutSnapshot(cdp);
     console.log(`[ui-smoke] compose-reference-1583 geometry ${JSON.stringify(wideSnapshot)}`);
-    if (!wideSnapshot.noHorizontalScroll || !wideSnapshot.noFooterOverlap || wideSnapshot.contactsWidth < 475 || wideSnapshot.contactsWidth > 490 || wideSnapshot.gap < 14 || wideSnapshot.gap > 16 || wideSnapshot.footerHeight > 68 || !wideSnapshot.fullSchedule || !wideSnapshot.fullSend || wideSnapshot.compactSchedule || wideSnapshot.compactSend) {
+    if (!wideSnapshot.noHorizontalScroll || !wideSnapshot.noFooterOverlap || !wideSnapshot.connectedPanes || wideSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || wideSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || wideSnapshot.gap < -1 || wideSnapshot.gap > 1 || wideSnapshot.footerHeight > 68 || !wideSnapshot.fullSchedule || !wideSnapshot.fullSend || wideSnapshot.compactSchedule || wideSnapshot.compactSend) {
       throw new Error(`1583 compose geometry contract failed: ${JSON.stringify(wideSnapshot)}`);
     }
 
@@ -1290,7 +1292,7 @@ async function captureComposeReferenceFixture(cdp) {
       await sleep(120);
       const intermediateSnapshot = await composeLayoutSnapshot(cdp);
       console.log(`[ui-smoke] compose-reference-${width} geometry ${JSON.stringify(intermediateSnapshot)}`);
-      if (!intermediateSnapshot.noHorizontalScroll || !intermediateSnapshot.noFooterOverlap || intermediateSnapshot.contactsWidth < 360 || intermediateSnapshot.contactsWidth > 490 || intermediateSnapshot.footerHeight > 68) {
+      if (!intermediateSnapshot.noHorizontalScroll || !intermediateSnapshot.noFooterOverlap || !intermediateSnapshot.connectedPanes || intermediateSnapshot.contactsWidth < COMPOSE_CONTACTS_WIDTH - 4 || intermediateSnapshot.contactsWidth > COMPOSE_CONTACTS_WIDTH + 4 || intermediateSnapshot.gap < -1 || intermediateSnapshot.gap > 1 || intermediateSnapshot.footerHeight > 68) {
         throw new Error(`${width} compose geometry contract failed: ${JSON.stringify(intermediateSnapshot)}`);
       }
     }
@@ -1630,6 +1632,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.composer input[role=\"combobox\"]')");
     await fillInput(cdp, '.composer input[role="combobox"]', 'ada@example.com');
     await waitForExpression(cdp, "document.querySelector('.composer input[role=\"combobox\"]').value.includes('ada@example.com')");
+    await clickButton(cdp, '写邮件');
+    await waitForExpression(cdp, "document.querySelectorAll('.composer').length === 1 && document.querySelector('.composer input[role=\"combobox\"]').value.includes('ada@example.com') && document.activeElement?.closest('.composer')");
     await closeComposer(cdp);
 
     await clickButton(cdp, '写邮件');
@@ -1759,12 +1763,12 @@ async function main() {
           && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭联系人面板"]').length === 0
           && document.querySelectorAll('.composer .composer-contact-toggle').length === 0,
         ranges: Boolean(
-          within(contacts?.width, 420, 490)
+          within(contacts?.width, ${COMPOSE_CONTACTS_WIDTH - 4}, ${COMPOSE_CONTACTS_WIDTH + 4})
           && within(sender?.height, 0, 60)
           && within(recipient?.height, 0, 68)
           && within(subject?.height, 0, 60)
           && within(toolbar?.height, 0, 50)
-          && (body?.height ?? 0) >= 430
+          && (body?.height ?? 0) >= 220
           && (!rows.length || (rows[0].getBoundingClientRect().height <= 70))
           && (contactsFooter?.height ?? 999) <= 68
           && (send?.width ?? 999) <= 220,

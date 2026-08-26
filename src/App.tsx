@@ -754,7 +754,7 @@ export default function App() {
     if (!validationDraft) return;
     setSettingsOpen(false);
     setRichComposer(true);
-    openComposer(validationDraft);
+    openComposer(validationDraft, { replaceExisting: true });
     setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
   }
 
@@ -901,6 +901,7 @@ export default function App() {
     isComposerOpen,
     isComposerMinimized,
     setComposerMinimized,
+    composerFocusRequest,
     isComposerDropActive,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,
@@ -1344,6 +1345,7 @@ export default function App() {
     undoAction,
     isComposerOpen,
     isComposerMinimized,
+    isComposerModal: isMobileApp,
     isSettingsOpen,
     isShortcutsOpen,
     isAccountLoginRequired: isModalGateActive,
@@ -1358,8 +1360,6 @@ export default function App() {
     toggleAllVisibleMessages,
     openShortcuts: () => setShortcutsOpen(true),
     composeNew: () => {
-      setDraft(emptyDraft);
-      setRichComposer(true);
       openComposer(emptyDraft);
       setStatus('已打开新邮件');
     },
@@ -1446,7 +1446,7 @@ export default function App() {
   }, [setStatus]);
 
   const handleComposeNew = useCallback((fields: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string } | undefined) => {
-    setRichComposer(true);
+    const hasPrefill = Boolean(fields && Object.values(fields).some((value) => value?.trim()));
     openComposer({
       ...emptyDraft,
       account_id: account?.id ?? accounts[0]?.id ?? 0,
@@ -1455,7 +1455,7 @@ export default function App() {
       bcc: fields?.bcc || '',
       subject: fields?.subject || '',
       body: fields?.body || '',
-    });
+    }, { replaceExisting: hasPrefill });
     setStatus('已打开新邮件');
   }, [account, accounts, openComposer, setStatus]);
 
@@ -1906,6 +1906,7 @@ export default function App() {
           <AppErrorBoundary>
             <ComposerWindow
               minimized={isComposerMinimized}
+              focusRequest={composerFocusRequest}
               draft={draft}
               accounts={accounts}
               identities={identities}

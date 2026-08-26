@@ -83,6 +83,7 @@ function clampComposerPosition(
 
 export type ComposerWindowProps = {
   minimized: boolean;
+  focusRequest?: number;
   draft: DraftInput;
   accounts: Account[];
   identities: MailIdentity[];
@@ -128,6 +129,7 @@ export type ComposerWindowProps = {
 
 export default function ComposerWindow({
   minimized,
+  focusRequest = 0,
   draft,
   accounts,
   identities,
@@ -185,6 +187,9 @@ export default function ComposerWindow({
   );
   const [isNarrowContactsViewport, setIsNarrowContactsViewport] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 900,
+  );
+  const [isMobileComposerViewport, setIsMobileComposerViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
@@ -249,7 +254,7 @@ export default function ComposerWindow({
   }, []);
 
   useModalAccessibility({
-    open: !minimized,
+    open: !minimized && isMobileComposerViewport,
     dialogRef: panelRef,
     backdropRef,
     focusTrapDisabled: sendRiskConfirm !== null,
@@ -263,18 +268,24 @@ export default function ComposerWindow({
     const panel = panelRef.current;
     const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
     (firstField ?? panel)?.focus({ preventScroll: true });
-  }, [minimized]);
+  }, [focusRequest, minimized]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const media = window.matchMedia('(max-width: 899px)');
+    const contactsMedia = window.matchMedia('(max-width: 899px)');
+    const mobileMedia = window.matchMedia('(max-width: 720px)');
     const updateViewportMode = () => {
-      setIsNarrowContactsViewport(media.matches);
-      if (media.matches) setContactsOpen(false);
+      setIsNarrowContactsViewport(contactsMedia.matches);
+      setIsMobileComposerViewport(mobileMedia.matches);
+      if (contactsMedia.matches) setContactsOpen(false);
     };
     updateViewportMode();
-    media.addEventListener?.('change', updateViewportMode);
-    return () => media.removeEventListener?.('change', updateViewportMode);
+    contactsMedia.addEventListener?.('change', updateViewportMode);
+    mobileMedia.addEventListener?.('change', updateViewportMode);
+    return () => {
+      contactsMedia.removeEventListener?.('change', updateViewportMode);
+      mobileMedia.removeEventListener?.('change', updateViewportMode);
+    };
   }, []);
 
   useEffect(() => {
@@ -425,12 +436,12 @@ export default function ComposerWindow({
   return (
     <div
       ref={backdropRef}
-      className="composer-backdrop"
+      className={`composer-backdrop ${isMobileComposerViewport ? 'is-modal' : 'is-floating'}`}
       role="dialog"
-      aria-modal="true"
+      aria-modal={isMobileComposerViewport ? 'true' : undefined}
       aria-label="写信窗口"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
+        if (isMobileComposerViewport && event.target === event.currentTarget) {
           onClose();
         }
       }}

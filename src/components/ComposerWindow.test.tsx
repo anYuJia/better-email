@@ -83,25 +83,31 @@ describe('ComposerWindow focus lifecycle', () => {
   });
 
   it('restores focus after the background is no longer inert', async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     const shell = (open: boolean) => (
       <div data-testid="composer-shell">
         <button type="button">写邮件入口</button>
         {open ? composer() : null}
       </div>
     );
-    const { rerender } = render(shell(false));
-    const opener = screen.getByRole('button', { name: '写邮件入口' });
-    opener.focus();
+    try {
+      const { rerender } = render(shell(false));
+      const opener = screen.getByRole('button', { name: '写邮件入口' });
+      opener.focus();
 
-    rerender(shell(true));
-    expect(opener.closest('[inert]')).not.toBeNull();
-    expect(document.activeElement).not.toBe(opener);
+      rerender(shell(true));
+      expect(opener.closest('[inert]')).not.toBeNull();
+      expect(document.activeElement).not.toBe(opener);
 
-    rerender(shell(false));
-    await waitFor(() => {
-      expect(opener.closest('[inert]')).toBeNull();
-      expect(document.activeElement).toBe(opener);
-    });
+      rerender(shell(false));
+      await waitFor(() => {
+        expect(opener.closest('[inert]')).toBeNull();
+        expect(document.activeElement).toBe(opener);
+      });
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+    }
   });
 
   it('shows the local autosave state in the composer header', () => {
@@ -129,7 +135,10 @@ describe('ComposerWindow focus lifecycle', () => {
   it('keeps one window action set while the desktop contacts rail stays fixed', () => {
     render(composer());
 
+    const dialog = screen.getByRole('dialog', { name: '写信窗口' });
     const contactsPanel = screen.getByRole('complementary', { name: '联系人' });
+    expect(dialog.classList.contains('is-floating')).toBe(true);
+    expect(dialog.getAttribute('aria-modal')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="收起写信"]')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="关闭写信窗口"]')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="关闭联系人面板"]')).toBeNull();

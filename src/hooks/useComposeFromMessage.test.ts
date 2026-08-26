@@ -48,6 +48,7 @@ describe('useComposeFromMessage quick-reply handoff', () => {
     const draft = openComposer.mock.calls[0]?.[0];
     expect(draft.body).toMatch(/^转到写信窗口\n\n/);
     expect(draft.body).toContain('> Original body');
+    expect(openComposer.mock.calls[0]?.[1]).toEqual({ replaceExisting: true });
     expect(setStatus).toHaveBeenLastCalledWith('已将快速回复带入写信窗口，原快速回复仍保留');
   });
 });

@@ -60,6 +60,11 @@ type UseComposerControllerOptions = {
   setAttachmentProgress?: (progress: number | null) => void;
 };
 
+export type OpenComposerOptions = {
+  restoreAutosave?: boolean;
+  replaceExisting?: boolean;
+};
+
 export default function useComposerController({
   account,
   accounts,
@@ -86,6 +91,7 @@ export default function useComposerController({
   const composerAutosaveTimerRef = useRef<number | null>(null);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
+  const [composerFocusRequest, setComposerFocusRequest] = useState(0);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
   const [sendRiskConfirm, setSendRiskConfirm] = useState<CrossAccountRiskItem[] | null>(null);
@@ -206,22 +212,26 @@ export default function useComposerController({
     setAttachmentProgress,
   });
 
-  const openComposer = useCallback((nextDraft?: DraftInput, options: { restoreAutosave?: boolean } = {}) => {
-    setComposerContextAccountId(null);
-    setSendRiskConfirm(null);
-    setRichComposer(true);
-    setSendProgress?.(null);
-    setSendProgressMessage?.(null);
-    setAttachmentProgress?.(null);
-    if (nextDraft) {
-      setDraft(nextDraft);
-    } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
-      setDraft(composerAutosave.draft);
-      setStatus(`已从恢复点还原邮件：${formatDate(composerAutosave.saved_at)}`);
+  const openComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {
+    const shouldReplaceDraft = !isComposerOpen || options.replaceExisting === true;
+    if (shouldReplaceDraft) {
+      setComposerContextAccountId(null);
+      setRichComposer(true);
+      setSendProgress?.(null);
+      setSendProgressMessage?.(null);
+      setAttachmentProgress?.(null);
+      if (nextDraft) {
+        setDraft(nextDraft);
+      } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
+        setDraft(composerAutosave.draft);
+        setStatus(`已从恢复点还原邮件：${formatDate(composerAutosave.saved_at)}`);
+      }
     }
+    setSendRiskConfirm(null);
     setComposerMinimized(false);
     setComposerOpen(true);
-  }, [draft, composerAutosave, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
+    setComposerFocusRequest((current) => current + 1);
+  }, [draft, composerAutosave, isComposerOpen, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
   const {
     composeFromMessage: rawComposeFromMessage,
     editDraftMessage: rawEditDraftMessage,
@@ -276,7 +286,7 @@ export default function useComposerController({
       ...emptyDraft,
       account_id: account?.id ?? 0,
       to: contact.email,
-    });
+    }, { replaceExisting: true });
     setStatus(`正在给 ${contact.name || contact.email} 写邮件`);
   }
 
@@ -466,6 +476,7 @@ export default function useComposerController({
     setComposerOpen,
     isComposerMinimized,
     setComposerMinimized,
+    composerFocusRequest,
     isComposerDropActive,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,

@@ -17,10 +17,11 @@ import {
 } from '../app/forwarding';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import type { OpenComposerOptions } from './useComposerController';
 
 type ComposeFromMessageOptions = {
   account: Account | null;
-  openComposer: (draft?: DraftInput, options?: { restoreAutosave?: boolean }) => void;
+  openComposer: (draft?: DraftInput, options?: OpenComposerOptions) => void;
   setStatus: Dispatch<SetStateAction<string>>;
 };
 
@@ -84,7 +85,7 @@ export default function useComposeFromMessage({
       attachments: mode === 'forward' ? forwardPlan.attachments : [],
       in_reply_to: threading?.in_reply_to ?? '',
       references: threading?.references ?? '',
-    });
+    }, { replaceExisting: true });
     setStatus(
       replyLead
         ? '已将快速回复带入写信窗口，原快速回复仍保留'
@@ -119,7 +120,7 @@ export default function useComposeFromMessage({
         content_id: attachment.content_id,
         is_inline: attachment.is_inline,
       })),
-    });
+    }, { replaceExisting: true });
     setStatus('已打开草稿继续编辑');
   }, [openComposer, setStatus]);
 

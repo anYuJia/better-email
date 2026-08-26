@@ -15,6 +15,7 @@ type UseAppShortcutsOptions = {
   undoAction: UndoAction | null;
   isComposerOpen: boolean;
   isComposerMinimized: boolean;
+  isComposerModal: boolean;
   isSettingsOpen: boolean;
   isShortcutsOpen: boolean;
   isAccountLoginRequired: boolean;
@@ -72,6 +73,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         undoAction,
         isComposerOpen,
         isComposerMinimized,
+        isComposerModal,
         isSettingsOpen,
         isShortcutsOpen,
         isAccountLoginRequired,
@@ -101,9 +103,11 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         closeOverlays();
         return;
       }
+      const withinComposer = event.target instanceof Element && Boolean(event.target.closest('.composer, .composer-minimized'));
+      if (withinComposer) return;
       const hasBlockingOverlay = isSettingsOpen
         || isShortcutsOpen
-        || (isComposerOpen && !isComposerMinimized);
+        || (isComposerOpen && !isComposerMinimized && isComposerModal);
       if (hasBlockingOverlay) return;
 
       if (commandModifier && !event.shiftKey && key === 'k') {

@@ -1768,10 +1768,6 @@
   position: relative;
 }
 
-.composer.has-contacts-panel {
-  width: 100%;
-}
-
 .composer-workspace {
   position: relative;
   min-height: 0;
@@ -2358,27 +2354,27 @@
   --compose-control-height: 36px;
   --compose-contact-row-height: 64px;
   --compose-divider: color-mix(in oklch, var(--ui-border) 82%, var(--ui-surface));
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  width: min(760px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
 }
 
 .composer-backdrop {
-  align-items: stretch;
-  justify-content: stretch;
-  padding: clamp(10px, 1vw, 16px);
-  background: var(--ui-surface-muted);
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 16px;
+  background: transparent;
+  pointer-events: none;
 }
 
-.composer.has-contacts-panel,
-.composer-workspace:not(.has-contacts) {
-  width: 100%;
+.composer-backdrop > .composer {
+  pointer-events: auto;
 }
 
 .composer-workspace {
@@ -2388,11 +2384,11 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: clamp(12px, 0.9vw, 16px);
+  gap: 0;
 }
 
 .composer-workspace.has-contacts {
-  grid-template-columns: minmax(0, 1fr) clamp(360px, 30.5vw, 490px);
+  grid-template-columns: minmax(0, 1fr) 304px;
 }
 
 .composer-editor-pane,
@@ -2400,10 +2396,10 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border: 0;
+  border-radius: 0;
   background: var(--ui-surface);
-  box-shadow: var(--ui-box-shadow-subtle-border);
+  box-shadow: none;
 }
 
 .composer-editor-pane {
@@ -3450,6 +3446,7 @@
 .composer-contacts-panel {
   display: flex;
   flex-direction: column;
+  border-left: 1px solid var(--composer-divider);
 }
 
 .composer-contacts-header {
@@ -3845,6 +3842,39 @@
   .composer-contacts-list,
   .composer-contacts-footer {
     padding-inline: 16px;
+  }
+}
+
+/* Desktop is a floating, non-modal compose surface. The backdrop stays
+ * transparent and lets the mailbox remain usable behind the draft. */
+.composer-backdrop.is-floating {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 16px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.composer-backdrop.is-modal {
+  pointer-events: auto;
+}
+
+@media (max-width: 720px) {
+  .composer-backdrop.is-modal {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: var(--ui-surface-muted);
+  }
+
+  .composer-backdrop.is-modal > .composer {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 }
 

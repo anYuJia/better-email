@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
   Mail,
   Maximize2,
   Minus,
-  Save,
   Send,
   UsersRound,
   X,
@@ -19,13 +20,13 @@ import type {
   MailIdentity,
   OutboundAttachmentInput,
 } from '../app/types';
-import { formatDate } from '../mailUtils';
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
 import ConfirmDialog from './ConfirmDialog';
 import ComposerAdvancedTools, { ComposerSenderContext } from './composer/ComposerAdvancedTools';
 import ComposerContactsPanel, { type ComposerRecipientField } from './composer/ComposerContactsPanel';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
-import ComposerQuickTools from './composer/ComposerQuickTools';
+import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuickTools';
+import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
 import useModalAccessibility from '../hooks/useModalAccessibility';
 import './composer/composer.css';
 
@@ -46,6 +47,21 @@ type ComposerDragState = {
 };
 
 const COMPOSER_VIEWPORT_MARGIN = 10;
+
+function formatClock(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatScheduleLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 
 function clampComposerPosition(
   panel: HTMLElement | null,
@@ -161,8 +177,14 @@ export default function ComposerWindow({
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
   const [contactsOpen, setContactsOpen] = useState(
-    () => typeof window === 'undefined' || window.innerWidth > 720,
+    () => typeof window === 'undefined' || window.innerWidth >= 900,
   );
+  const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
+  const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
+  const [formattingOpen, setFormattingOpen] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [sendMenuOpen, setSendMenuOpen] = useState(false);
+  const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -173,6 +195,13 @@ export default function ComposerWindow({
     ?? draftIdentities.find((identity) => identity.is_default)
     ?? draftIdentities[0]
     ?? null;
+  const autosaveLabel = autosave && !isDraftEmpty(draft)
+    ? `已自动保存 · ${formatClock(autosave.saved_at)}`
+    : /^正在保存|保存失败|网络异常/.test(status)
+      ? status
+      : isDraftEmpty(draft)
+        ? '未输入内容'
+        : '正在保存…';
 
   function patchDraft(patch: Partial<DraftInput>) {
     onDraftChange((current) => ({ ...current, ...patch }));
@@ -213,6 +242,31 @@ export default function ComposerWindow({
   useEffect(() => {
     setPosition((current) => clampComposerPosition(panelRef.current, current));
   }, [contactsOpen]);
+
+  useEffect(() => {
+    if (draft.cc.trim()) setCcOpen(true);
+    if (draft.bcc.trim()) setBccOpen(true);
+  }, [draft.bcc, draft.cc]);
+
+  useEffect(() => {
+    if (!sendMenuOpen) return undefined;
+    function closeOnPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest('.composer-send-split')) return;
+      setSendMenuOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setSendMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerDown, true);
+      document.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [sendMenuOpen]);
 
   useEffect(() => {
     if (minimized) return undefined;
@@ -306,6 +360,13 @@ export default function ComposerWindow({
     : normalizedAttachmentProgress == null
       ? ''
       : `附件处理中（${normalizedAttachmentProgress}%）`;
+  const composerBusy = normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
+
+  function handlePrimarySend() {
+    if (composerBusy) return;
+    if (draft.send_at.trim()) onQueueDraft();
+    else onSendDraft();
+  }
 
   return (
     <div
@@ -329,162 +390,214 @@ export default function ComposerWindow({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        <header onPointerDown={beginDrag}>
-          <span className="composer-title-copy">
-            <strong>{windowHeading}</strong>
-            {draft.to.trim() && <small>{`发给 ${draft.to}`}</small>}
-          </span>
-          <div className="composer-header-actions">
-            <button
-              type="button"
-              className="composer-contact-toggle"
-              aria-label={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
-              aria-expanded={contactsOpen}
-              aria-controls="composer-contacts-panel"
-              title={contactsOpen ? '关闭联系人面板' : '打开联系人面板'}
-              onClick={() => setContactsOpen((current) => !current)}
-            >
-              <UsersRound size={15} />
-              <span>联系人</span>
-            </button>
-            <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
-              <Minus size={15} />
-              最小化
-            </button>
-            <button type="button" onClick={onClose} aria-label="关闭写信窗口">
-              <X size={15} />
-              关闭
-            </button>
-          </div>
-        </header>
-
         <div className={`composer-workspace${contactsOpen ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
-        <ComposerSenderContext
-          accounts={accounts}
-          identities={draftIdentities}
-          accountId={accountId}
-          identityId={draftIdentity?.id || 0}
-          onPatchDraft={patchDraft}
-        />
-
-        {crossAccountRisks.length > 0 && (
-          <div className="composer-risk-banner" role="alert">
-            <AlertTriangle size={15} />
-            <div>
-              {crossAccountRisks.map((risk) => (
-                <p key={risk.id}>
-                  <strong>{risk.message}</strong>：{risk.detail}
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <ComposerPrimaryFields
-          draft={draft}
-          contacts={contacts}
-          richComposer={richComposer}
-          dropActive={dropActive}
-          onPatchDraft={patchDraft}
-          onPickAttachments={onPickAttachments}
-          onRemoveAttachment={onRemoveAttachment}
-          onAttachmentDrop={onAttachmentDrop}
-          onAttachmentDragEnter={onAttachmentDragEnter}
-          onAttachmentDragLeave={onAttachmentDragLeave}
-          onAttachmentDragOver={onAttachmentDragOver}
-          onAttachmentPaste={onAttachmentPaste}
-          buildInlineImageAttachments={buildInlineImageAttachments}
-          onInlineImagesAdded={onInlineImagesAdded}
-        />
-
-        <ComposerQuickTools
-          draft={draft}
-          dropActive={dropActive}
-          signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
-          onPatchDraft={patchDraft}
-          onInsertSignature={onInsertSignature}
-          onPickAttachments={onPickAttachments}
-          onAttachmentDrop={onAttachmentDrop}
-          onAttachmentDragEnter={onAttachmentDragEnter}
-          onAttachmentDragLeave={onAttachmentDragLeave}
-          onAttachmentDragOver={onAttachmentDragOver}
-        />
-
-        <ComposerAdvancedTools
-          draft={draft}
-          templates={templates}
-          templateName={templateName}
-          onPatchDraft={patchDraft}
-          onApplyTemplate={onApplyTemplate}
-          onDeleteTemplate={onDeleteTemplate}
-          onTemplateNameChange={onTemplateNameChange}
-          onSaveTemplate={onSaveTemplate}
-        />
-
-        <footer>
-          <div className="composer-footer-status">
-            {normalizedAttachmentProgress !== null && (
-              <div className="composer-attachment-progress-wrapper" aria-live="polite">
-                <div
-                  className="composer-attachment-progress"
-                  role="progressbar"
-                  aria-label="附件处理进度"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={normalizedAttachmentProgress}
+            <header className="composer-editor-header" onPointerDown={beginDrag}>
+              <span className="composer-title-copy">
+                <strong>{windowHeading}</strong>
+                <span
+                  className="composer-autosave-status"
+                  aria-live="polite"
+                  title={autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel}
                 >
-                  <div
-                    className="composer-attachment-progress-fill"
-                    style={{ transform: `scaleX(${normalizedAttachmentProgress / 100})` }}
-                  />
+                  {autosave && !isDraftEmpty(draft) ? <CheckCircle2 size={16} aria-hidden="true" /> : null}
+                  {autosaveLabel}
+                </span>
+              </span>
+              {!contactsOpen && (
+                <div className="composer-header-actions">
+                  <button
+                    type="button"
+                    className="composer-contact-toggle"
+                    aria-label="打开联系人面板"
+                    aria-expanded={false}
+                    aria-controls="composer-contacts-panel"
+                    onClick={() => setContactsOpen(true)}
+                  >
+                    <UsersRound size={17} aria-hidden="true" />
+                    <span>联系人</span>
+                  </button>
+                  <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
+                    <Minus size={17} aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={onClose} aria-label="关闭写信窗口">
+                    <X size={17} aria-hidden="true" />
+                  </button>
                 </div>
-                <div className="composer-attachment-progress-message" title={attachmentProgressMessage}>
-                  {attachmentProgressMessage}
+              )}
+            </header>
+
+            <ComposerSenderContext
+              accounts={accounts}
+              identities={draftIdentities}
+              accountId={accountId}
+              identityId={draftIdentity?.id || 0}
+              onPatchDraft={patchDraft}
+            />
+
+            {crossAccountRisks.length > 0 && (
+              <div className="composer-risk-banner" role="alert">
+                <AlertTriangle size={15} />
+                <div>
+                  {crossAccountRisks.map((risk) => (
+                    <p key={risk.id}>
+                      <strong>{risk.message}</strong>：{risk.detail}
+                    </p>
+                  ))}
                 </div>
               </div>
             )}
-            {normalizedSendProgress !== null && (
-              <div className="composer-send-progress-wrapper">
-                <div
-                  className="composer-send-progress"
-                  role="progressbar"
-                  aria-label="发送进度"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={normalizedSendProgress}
-                >
-                  <div
-                    className="composer-send-progress-fill"
-                    style={{ transform: `scaleX(${normalizedSendProgress / 100})` }}
-                  />
-                </div>
-                {sendProgressMessage ? (
-                  <div className="composer-send-progress-message" title={sendProgressMessage}>
-                    {sendProgressMessage}
+
+            <ComposerPrimaryFields
+              draft={draft}
+              contacts={contacts}
+              richComposer={richComposer}
+              dropActive={dropActive}
+              ccOpen={ccOpen}
+              bccOpen={bccOpen}
+              onToggleCc={() => setCcOpen((current) => !current)}
+              onToggleBcc={() => setBccOpen((current) => !current)}
+              formattingToolbar={formattingOpen ? <ComposerRichToolbar onPickAttachments={onPickAttachments} /> : null}
+              onPatchDraft={patchDraft}
+              onPickAttachments={onPickAttachments}
+              onRemoveAttachment={onRemoveAttachment}
+              onAttachmentDrop={onAttachmentDrop}
+              onAttachmentDragEnter={onAttachmentDragEnter}
+              onAttachmentDragLeave={onAttachmentDragLeave}
+              onAttachmentDragOver={onAttachmentDragOver}
+              onAttachmentPaste={onAttachmentPaste}
+              buildInlineImageAttachments={buildInlineImageAttachments}
+              onInlineImagesAdded={onInlineImagesAdded}
+            />
+
+            <ComposerQuickTools
+              draft={draft}
+              dropActive={dropActive}
+              signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
+              onPatchDraft={patchDraft}
+              onInsertSignature={onInsertSignature}
+              onPickAttachments={onPickAttachments}
+              onAttachmentDrop={onAttachmentDrop}
+              onAttachmentDragEnter={onAttachmentDragEnter}
+              onAttachmentDragLeave={onAttachmentDragLeave}
+              onAttachmentDragOver={onAttachmentDragOver}
+              onToggleFormatting={() => setFormattingOpen((current) => !current)}
+              onOpenTemplates={() => setAdvancedOpen(true)}
+              onOpenMore={() => setAdvancedOpen(true)}
+              formattingExpanded={formattingOpen}
+              hideRichToolbar
+            />
+
+            <ComposerAdvancedTools
+              draft={draft}
+              templates={templates}
+              templateName={templateName}
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              onApplyTemplate={onApplyTemplate}
+              onDeleteTemplate={onDeleteTemplate}
+              onTemplateNameChange={onTemplateNameChange}
+              onSaveTemplate={onSaveTemplate}
+              onSaveDraft={onSaveDraft}
+            />
+
+            <footer>
+              <div className="composer-footer-progress" aria-live="polite">
+                {normalizedAttachmentProgress !== null && (
+                  <div className="composer-attachment-progress-wrapper">
+                    <div
+                      className="composer-attachment-progress"
+                      role="progressbar"
+                      aria-label="附件处理进度"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={normalizedAttachmentProgress}
+                    >
+                      <div
+                        className="composer-attachment-progress-fill"
+                        style={{ transform: `scaleX(${normalizedAttachmentProgress / 100})` }}
+                      />
+                    </div>
+                    <span className="composer-attachment-progress-message" title={attachmentProgressMessage}>
+                      {attachmentProgressMessage}
+                    </span>
                   </div>
-                ) : null}
+                )}
+                {normalizedSendProgress !== null && (
+                  <div className="composer-send-progress-wrapper">
+                    <div
+                      className="composer-send-progress"
+                      role="progressbar"
+                      aria-label="发送进度"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={normalizedSendProgress}
+                    >
+                      <div
+                        className="composer-send-progress-fill"
+                        style={{ transform: `scaleX(${normalizedSendProgress / 100})` }}
+                      />
+                    </div>
+                    {sendProgressMessage ? <span>{sendProgressMessage}</span> : null}
+                  </div>
+                )}
               </div>
-            )}
-            <span>
-              {status}
-              {autosave && !isDraftEmpty(draft) ? ` · 已备份恢复点 ${formatDate(autosave.saved_at)}` : ''}
-            </span>
-          </div>
-          <div className="composer-footer-actions">
-            <button className="dialog-button dialog-button-secondary" onClick={onSaveDraft}>
-              <Save size={14} />
-              保存草稿
-            </button>
-            <button className="dialog-button dialog-button-secondary" onClick={onQueueDraft}>
-              {draft.send_at.trim() ? '稍后发送' : '发件箱'}
-            </button>
-            <button className="dialog-button dialog-button-primary" onClick={onSendDraft}>
-              <Send size={14} />
-              发送
-            </button>
-          </div>
-        </footer>
+              <div className="composer-footer-main">
+                <div className="composer-schedule-status">
+                  <ComposerSchedulePicker
+                    value={draft.send_at}
+                    onChange={(value) => patchDraft({ send_at: value })}
+                    openRequest={scheduleOpenRequest}
+                    triggerLabel={draft.send_at ? `将于 ${formatScheduleLabel(draft.send_at)} 发送` : '定时发送'}
+                  />
+                  {draft.send_at.trim() && (
+                    <button
+                      type="button"
+                      className="composer-schedule-clear"
+                      aria-label="取消定时发送"
+                      onClick={() => patchDraft({ send_at: '' })}
+                    >
+                      <X size={15} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+                <div className="composer-send-split">
+                  <button
+                    type="button"
+                    className="composer-send-primary"
+                    disabled={composerBusy}
+                    onClick={handlePrimarySend}
+                  >
+                    <Send size={17} aria-hidden="true" />
+                    {draft.send_at.trim() ? `定时发送 · ${formatScheduleLabel(draft.send_at)}` : '发送'}
+                  </button>
+                  <button
+                    type="button"
+                    className="composer-send-menu-trigger"
+                    aria-label="发送选项"
+                    aria-expanded={sendMenuOpen}
+                    aria-haspopup="menu"
+                    disabled={composerBusy}
+                    onClick={() => setSendMenuOpen((current) => !current)}
+                  >
+                    <ChevronDown size={17} aria-hidden="true" />
+                  </button>
+                  {sendMenuOpen && (
+                    <div className="composer-send-menu" role="menu" aria-label="发送选项">
+                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); onSendDraft(); }}>
+                        立即发送
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); onQueueDraft(); }}>
+                        发件箱
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => { setSendMenuOpen(false); setScheduleOpenRequest((current) => current + 1); }}>
+                        定时发送…
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </footer>
           </div>
 
           {contactsOpen && (
@@ -493,6 +606,8 @@ export default function ComposerWindow({
               draft={draft}
               onAddContact={onAddContact}
               onClose={() => setContactsOpen(false)}
+              onMinimize={onMinimize}
+              onCloseWindow={onClose}
               onOpenContactsSettings={onOpenContactsSettings}
             />
           )}

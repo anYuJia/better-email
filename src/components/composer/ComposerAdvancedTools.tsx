@@ -1,4 +1,4 @@
-import { ChevronDown, Clock3, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, Trash2, Wand2 } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -6,55 +6,19 @@ import type {
   MailIdentity,
 } from '../../app/types';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
-import ComposerSchedulePicker from './ComposerSchedulePicker';
 
 type ComposerAdvancedToolsProps = {
   draft: DraftInput;
   templates: ComposeTemplate[];
   templateName: string;
-  onPatchDraft: (patch: Partial<DraftInput>) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onApplyTemplate: (template: ComposeTemplate) => void;
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
   onSaveTemplate: () => void;
+  onSaveDraft?: () => void;
 };
-
-type ComposerSelectOption = {
-  value: number;
-  label: string;
-  meta?: string;
-};
-
-type ComposerInlineSelectProps = {
-  label: string;
-  ariaLabel?: string;
-  value: number;
-  options: ComposerSelectOption[];
-  onChange: (value: number) => void;
-};
-
-function ComposerInlineSelect({ label, ariaLabel, value, options, onChange }: ComposerInlineSelectProps) {
-  const selected = options.find((option) => option.value === value) ?? options[0] ?? null;
-
-  return (
-    <div className="composer-from composer-inline-select">
-      <span>{label}</span>
-      <CustomSelect
-        ariaLabel={ariaLabel ?? label}
-        value={selected ? String(selected.value) : ''}
-        options={options.map((option) => ({
-          value: String(option.value),
-          label: option.label,
-          meta: option.meta,
-        }))}
-        dense
-        portalOwnerId="composer-sender"
-        portalZIndex={1200}
-        onChange={(nextValue) => onChange(Number(nextValue))}
-      />
-    </div>
-  );
-}
 
 type ComposerSenderContextProps = {
   accounts: Account[];
@@ -64,11 +28,6 @@ type ComposerSenderContextProps = {
   onPatchDraft: (patch: Partial<DraftInput>) => void;
 };
 
-/**
- * The sender is part of the message itself, not an advanced preference.
- * Keep both account and identity visible throughout composition so a user
- * working across several mailboxes can verify the sending context at a glance.
- */
 export function ComposerSenderContext({
   accounts,
   identities,
@@ -76,43 +35,51 @@ export function ComposerSenderContext({
   identityId,
   onPatchDraft,
 }: ComposerSenderContextProps) {
-  const accountOptions = accounts.map((entry) => ({
-    value: entry.id,
-    label: entry.display_name || entry.email,
-    meta: entry.email,
-  }));
   const selectedAccount = accounts.find((entry) => entry.id === accountId) ?? null;
-  const identityOptions = identities.length > 0
-    ? identities.map((identity) => ({
-        value: identity.id,
-        label: identity.name || identity.email,
-        meta: `${identity.email}${identity.is_default ? ' · 默认身份' : ''}`,
-      }))
+  const availableIdentities = identities.filter((identity) => identity.account_id === accountId);
+  const selectedIdentity = availableIdentities.find((identity) => identity.id === identityId)
+    ?? availableIdentities.find((identity) => identity.is_default)
+    ?? availableIdentities[0]
+    ?? null;
+
+  const accountOptions = accounts.map((entry) => ({
+    value: `account:${entry.id}`,
+    label: entry.display_name || entry.email,
+    meta: `<${entry.email}>`,
+  }));
+  const identityOptions = availableIdentities.map((identity) => ({
+    value: `identity:${identity.id}`,
+    label: identity.name || identity.email,
+    meta: `<${identity.email}>${identity.is_default ? ' · 默认身份' : ''}`,
+  }));
+  const options = [...accountOptions, ...identityOptions];
+  const selectedValue = selectedIdentity
+    ? `identity:${selectedIdentity.id}`
     : selectedAccount
-      ? [{
-          value: 0,
-          label: selectedAccount.display_name || selectedAccount.email,
-          meta: `${selectedAccount.email} · 账号默认身份`,
-        }]
-      : [];
+      ? `account:${selectedAccount.id}`
+      : '';
 
   return (
     <section className="composer-sender-context" aria-label="发件人信息">
       <span className="composer-sender-heading">发件人</span>
       <div className="composer-sender-selectors">
-        <ComposerInlineSelect
-          label="账号"
-          ariaLabel="发件账号"
-          value={accountId}
-          options={accountOptions}
-          onChange={(nextAccountId) => onPatchDraft({ account_id: nextAccountId, identity_id: 0 })}
-        />
-        <ComposerInlineSelect
-          label="身份"
-          ariaLabel="发件身份"
-          value={identityId}
-          options={identityOptions}
-          onChange={(nextIdentityId) => onPatchDraft({ identity_id: nextIdentityId })}
+        <CustomSelect
+          ariaLabel="发件人"
+          value={selectedValue}
+          options={options}
+          dense
+          portalOwnerId="composer-sender"
+          portalZIndex={1200}
+          onChange={(nextValue) => {
+            const [kind, rawId] = nextValue.split(':');
+            const nextId = Number(rawId);
+            if (!Number.isFinite(nextId)) return;
+            if (kind === 'account') {
+              onPatchDraft({ account_id: nextId, identity_id: 0 });
+            } else if (kind === 'identity') {
+              onPatchDraft({ identity_id: nextId });
+            }
+          }}
         />
       </div>
     </section>
@@ -123,49 +90,29 @@ export default function ComposerAdvancedTools({
   draft,
   templates,
   templateName,
-  onPatchDraft,
+  open,
+  onOpenChange,
   onApplyTemplate,
   onDeleteTemplate,
   onTemplateNameChange,
   onSaveTemplate,
+  onSaveDraft,
 }: ComposerAdvancedToolsProps) {
+  void draft;
+
   return (
-    <details className="composer-advanced">
+    <details
+      className="composer-advanced"
+      open={open}
+      onToggle={(event) => onOpenChange?.(event.currentTarget.open)}
+    >
       <summary>
-        <SlidersHorizontal size={15} />
-        <strong>更多选项</strong>
-        <span>
-          {draft.send_at.trim()
-            ? '已设置定时发送'
-            : draft.bcc.trim()
-              ? '已添加密送收件人'
-              : '密送 · 定时 · 模板'}
-        </span>
+        <SlidersHorizontal size={15} aria-hidden="true" />
+        <strong>更多</strong>
+        <span>模板与低频操作</span>
         <ChevronDown className="composer-advanced-chevron" size={14} aria-hidden="true" />
       </summary>
       <div className="composer-advanced-panel">
-        <section className="composer-delivery-controls" aria-label="其他发送选项">
-          <label className="composer-inline-input">
-            <span>密送</span>
-            <input
-              autoComplete="off"
-              value={draft.bcc}
-              onChange={(event) => onPatchDraft({ bcc: event.target.value })}
-              placeholder="输入姓名或邮箱地址"
-            />
-          </label>
-          <div className="composer-schedule">
-            <span>
-              <Clock3 size={13} />
-              定时
-            </span>
-            <ComposerSchedulePicker
-              value={draft.send_at}
-              onChange={(value) => onPatchDraft({ send_at: value })}
-            />
-          </div>
-        </section>
-
         <section className="composer-template-controls" aria-label="邮件模板">
           <div className="composer-template-list">
             {templates.length === 0 && <small>暂无模板</small>}
@@ -193,6 +140,11 @@ export default function ComposerAdvancedTools({
             />
             <button type="button" onClick={onSaveTemplate}>保存当前</button>
           </div>
+          {onSaveDraft ? (
+            <button type="button" className="composer-template-save-draft" onClick={onSaveDraft}>
+              保存草稿
+            </button>
+          ) : null}
         </section>
       </div>
     </details>

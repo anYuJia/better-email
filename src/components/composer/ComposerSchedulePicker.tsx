@@ -1,10 +1,12 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 type ComposerSchedulePickerProps = {
   value: string;
   onChange: (value: string) => void;
+  openRequest?: number;
+  triggerLabel?: string;
 };
 
 type TimeParts = {
@@ -172,6 +174,8 @@ function TimeSelect({ ariaLabel, value, options, onChange }: TimeSelectProps) {
 export default function ComposerSchedulePicker({
   value,
   onChange,
+  openRequest,
+  triggerLabel,
 }: ComposerSchedulePickerProps) {
   const initialDateRef = useRef(parseDateTimeLocal(value) ?? roundScheduleSeed());
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -182,6 +186,7 @@ export default function ComposerSchedulePicker({
     hour: initialDateRef.current.getHours(),
     minute: initialDateRef.current.getMinutes(),
   }));
+  const lastOpenRequestRef = useRef<number | null>(openRequest ?? null);
   const [position, setPosition] = useState<PickerPosition | null>(null);
   const selectedDate = parseDateTimeLocal(value);
   const selectedDayKey = selectedDate ? dateKey(selectedDate) : '';
@@ -211,9 +216,14 @@ export default function ComposerSchedulePicker({
       );
       const below = triggerRect.bottom + gap;
       const above = triggerRect.top - popoverRect.height - gap;
-      const top = below + popoverRect.height <= window.innerHeight - margin || above < margin
+      const fitsBelow = below + popoverRect.height <= window.innerHeight - margin;
+      const fitsAbove = above >= margin;
+      const maxTop = Math.max(margin, window.innerHeight - popoverRect.height - margin);
+      const top = fitsBelow
         ? below
-        : above;
+        : fitsAbove
+          ? above
+          : Math.min(Math.max(margin, below), maxTop);
       setPosition({ top, left });
     }
 
@@ -266,6 +276,12 @@ export default function ComposerSchedulePicker({
     setOpen(true);
   }
 
+  useEffect(() => {
+    if (openRequest == null || openRequest === lastOpenRequestRef.current) return;
+    lastOpenRequestRef.current = openRequest;
+    openPicker();
+  }, [openRequest]);
+
   function updateDateTime(date: Date, nextTime = time) {
     const next = new Date(date);
     next.setHours(nextTime.hour, nextTime.minute, 0, 0);
@@ -302,17 +318,30 @@ export default function ComposerSchedulePicker({
       }}
     >
       <header className="composer-schedule-picker-header">
-        <div>
+        <div className="composer-schedule-picker-header-copy">
           <strong>{selectedDate ? displayValue(selectedDate) : '定时发送'}</strong>
           <small>{selectedDate ? '邮件将在该时间自动发送' : '选择发送日期和时间'}</small>
         </div>
-        <button
-          type="button"
-          className="composer-schedule-picker-today"
-          onClick={selectToday}
-        >
-          今天
-        </button>
+        <div className="composer-schedule-picker-actions">
+          <button
+            type="button"
+            className="composer-schedule-picker-today"
+            onClick={selectToday}
+          >
+            今天
+          </button>
+          <button
+            type="button"
+            className="composer-schedule-picker-confirm"
+            onClick={() => {
+              setOpen(false);
+              triggerRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            <Check size={13} aria-hidden="true" />
+            确定
+          </button>
+        </div>
       </header>
 
       <div className="composer-schedule-picker-monthbar">
@@ -391,17 +420,8 @@ export default function ComposerSchedulePicker({
             triggerRef.current?.focus({ preventScroll: true });
           }}
         >
+          <Trash2 size={14} aria-hidden="true" />
           清除定时
-        </button>
-        <button
-          type="button"
-          className="composer-schedule-picker-done"
-          onClick={() => {
-            setOpen(false);
-            triggerRef.current?.focus({ preventScroll: true });
-          }}
-        >
-          完成
         </button>
       </footer>
     </section>
@@ -425,7 +445,7 @@ export default function ComposerSchedulePicker({
         }}
       >
         <CalendarDays size={14} aria-hidden="true" />
-        <span>{displayValue(selectedDate)}</span>
+        <span>{triggerLabel ?? displayValue(selectedDate)}</span>
       </button>
       {open && createPortal(picker, document.body)}
     </span>

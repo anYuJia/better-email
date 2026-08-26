@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
   Check,
-  ChevronRight,
+  ChevronDown,
+  Minus,
   Search,
   Settings2,
-  Star,
   UserRound,
   UsersRound,
   X,
@@ -18,10 +18,12 @@ type ComposerContactsPanelProps = {
   draft: DraftInput;
   onAddContact: (contact: Contact, field: ComposerRecipientField) => void;
   onClose: () => void;
+  onMinimize?: () => void;
+  onCloseWindow?: () => void;
   onOpenContactsSettings?: () => void;
 };
 
-type ContactView = 'recent' | 'frequent';
+type ContactView = 'recent' | 'frequent' | 'groups';
 
 const RECIPIENT_FIELDS: Array<{ value: ComposerRecipientField; label: string }> = [
   { value: 'to', label: '收件人' },
@@ -48,11 +50,9 @@ function dateValue(value: string) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
-function contactInitials(contact: Contact) {
+function contactInitial(contact: Contact) {
   const name = contact.name.trim();
   if (!name) return contact.email.trim().slice(0, 1).toUpperCase() || '?';
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length > 1) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
   return Array.from(name)[0] ?? '?';
 }
 
@@ -67,16 +67,16 @@ function recipientTokens(value: string) {
     .filter(Boolean);
 }
 
-function isContactInDraft(contact: Contact, draft: DraftInput) {
-  const currentRecipients = new Set([
-    ...recipientTokens(draft.to),
-    ...recipientTokens(draft.cc),
-    ...recipientTokens(draft.bcc),
-  ]);
-  return [contact.email, ...(contact.aliases ?? [])]
+function addedField(contact: Contact, draft: DraftInput) {
+  const addresses = [contact.email, ...(contact.aliases ?? [])]
     .map(normalized)
-    .filter(Boolean)
-    .some((email) => currentRecipients.has(email));
+    .filter(Boolean);
+  const fields: Array<[ComposerRecipientField, string]> = [
+    ['to', draft.to],
+    ['cc', draft.cc],
+    ['bcc', draft.bcc],
+  ];
+  return fields.find(([, value]) => recipientTokens(value).some((item) => addresses.includes(item)))?.[0] ?? null;
 }
 
 function compareByRecent(left: Contact, right: Contact) {
@@ -101,13 +101,18 @@ export default function ComposerContactsPanel({
   draft,
   onAddContact,
   onClose,
+  onMinimize,
+  onCloseWindow,
   onOpenContactsSettings,
 }: ComposerContactsPanelProps) {
   const [view, setView] = useState<ContactView>('recent');
   const [query, setQuery] = useState('');
   const [recipientField, setRecipientField] = useState<ComposerRecipientField>('to');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [targetMenuOpen, setTargetMenuOpen] = useState(false);
 
   const visibleContacts = useMemo(() => {
+    if (view === 'groups') return [];
     const candidates = view === 'frequent'
       ? contacts.filter((contact) => contact.vip || contact.message_count > 0)
       : contacts;
@@ -125,30 +130,103 @@ export default function ComposerContactsPanel({
     [contacts],
   );
 
+  const selectedContacts = useMemo(
+    () => contacts.filter((contact) => selectedIds.has(contact.id) && !addedField(contact, draft)),
+    [contacts, draft, selectedIds],
+  );
+
+  function toggleSelected(contact: Contact) {
+    if (addedField(contact, draft)) return;
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(contact.id)) next.delete(contact.id);
+      else next.add(contact.id);
+      return next;
+    });
+  }
+
+  function addSelected() {
+    if (selectedContacts.length === 0) return;
+    selectedContacts.forEach((contact) => onAddContact(contact, recipientField));
+    setSelectedIds(new Set());
+    setTargetMenuOpen(false);
+  }
+
+  const targetLabel = RECIPIENT_FIELDS.find((field) => field.value === recipientField)?.label ?? '收件人';
+  const emptyTitle = view === 'groups'
+    ? '暂无联系人群组'
+    : query
+      ? '没有找到匹配联系人'
+      : '还没有联系人';
+  const emptyDescription = view === 'groups'
+    ? '当前账号还没有可用的联系人群组'
+    : query
+      ? '试试搜索其他姓名或邮箱'
+      : '可以先到联系人设置中添加';
+
   return (
     <aside id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人">
-      <div className="composer-contacts-header">
-        <div className="composer-contacts-heading">
-          <span className="composer-contacts-heading-icon" aria-hidden="true">
-            <UsersRound size={16} />
-          </span>
-          <span>
-            <strong>联系人</strong>
-            <small>{contacts.length > 0 ? `${contacts.length} 位联系人` : '还没有联系人'}</small>
-          </span>
-        </div>
+      <div className="composer-contacts-windowbar">
         <button
           type="button"
-          className="composer-contacts-close"
+          className="composer-contact-toggle"
           aria-label="关闭联系人面板"
-          title="关闭联系人面板"
+          aria-expanded="true"
+          aria-controls="composer-contacts-panel"
           onClick={onClose}
         >
-          <X size={15} />
+          <UsersRound size={17} aria-hidden="true" />
+          <span>联系人</span>
         </button>
+        <div className="composer-contacts-window-actions composer-header-actions">
+          {onMinimize ? (
+            <button type="button" onClick={onMinimize} aria-label="最小化写信窗口">
+              <Minus size={17} aria-hidden="true" />
+            </button>
+          ) : null}
+          <button type="button" onClick={onCloseWindow ?? onClose} aria-label="关闭写信窗口">
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div className="composer-contacts-header">
+        <strong>联系人</strong>
+        <div className="composer-contacts-heading-actions">
+          {onOpenContactsSettings ? (
+            <button type="button" aria-label="管理联系人" title="管理联系人" onClick={onOpenContactsSettings}>
+              <Settings2 size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="composer-contacts-close"
+            aria-label="关闭联系人面板"
+            title="关闭联系人面板"
+            onClick={onClose}
+          >
+            <X size={17} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="composer-contacts-toolbar">
+        <label className="composer-contacts-search">
+          <Search size={18} aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="搜索联系人"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索姓名、邮箱或拼音"
+          />
+          {query && (
+            <button type="button" aria-label="清除联系人搜索" onClick={() => setQuery('')}>
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
+        </label>
+
         <div className="composer-contacts-tabs" role="tablist" aria-label="联系人分类">
           <button
             type="button"
@@ -169,78 +247,70 @@ export default function ComposerContactsPanel({
             常用联系人
             {frequentCount > 0 && <span>{frequentCount}</span>}
           </button>
-        </div>
-
-        <label className="composer-contacts-search">
-          <Search size={14} aria-hidden="true" />
-          <input
-            type="search"
-            aria-label="搜索联系人"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索姓名或邮箱"
-          />
-          {query && (
-            <button
-              type="button"
-              aria-label="清除联系人搜索"
-              onClick={() => setQuery('')}
-            >
-              <X size={12} />
-            </button>
-          )}
-        </label>
-
-        <div className="composer-contacts-target">
-          <span>添加到</span>
-          <div role="group" aria-label="添加到收件人、抄送或密送">
-            {RECIPIENT_FIELDS.map((field) => (
-              <button
-                key={field.value}
-                type="button"
-                aria-pressed={recipientField === field.value}
-                className={recipientField === field.value ? 'is-active' : ''}
-                onClick={() => setRecipientField(field.value)}
-              >
-                {field.label}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'groups'}
+            className={view === 'groups' ? 'is-active' : ''}
+            onClick={() => setView('groups')}
+          >
+            群组
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      <div className="composer-contacts-list" role="list" aria-label={view === 'recent' ? '最近联系人列表' : '常用联系人列表'}>
+      <div className="composer-contacts-list" role="list" aria-label={view === 'recent' ? '最近联系人列表' : view === 'frequent' ? '常用联系人列表' : '联系人群组列表'}>
         {visibleContacts.map((contact) => {
           const name = contactName(contact);
-          const alreadyAdded = isContactInDraft(contact, draft);
+          const addedTo = addedField(contact, draft);
+          const selected = selectedIds.has(contact.id) && !addedTo;
           return (
             <article
-              className={`composer-contact-row${alreadyAdded ? ' is-added' : ''}`}
+              className={`composer-contact-row${selected ? ' is-selected' : ''}${addedTo ? ' is-added' : ''}`}
               key={contact.id}
               data-contact-id={contact.id}
               role="listitem"
+              tabIndex={addedTo ? -1 : 0}
+              onClick={() => toggleSelected(contact)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  toggleSelected(contact);
+                }
+              }}
             >
+              <button
+                type="button"
+                className={`composer-contact-select${selected ? ' is-selected' : ''}`}
+                aria-label={addedTo ? `${name}已添加到${addedTo === 'to' ? '收件人' : addedTo === 'cc' ? '抄送' : '密送'}` : selected ? `取消选择 ${name}` : `选择 ${name}`}
+                aria-pressed={selected}
+                disabled={Boolean(addedTo)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleSelected(contact);
+                }}
+              >
+                {selected || addedTo ? <Check size={15} aria-hidden="true" /> : null}
+              </button>
               <span className={`composer-contact-avatar tone-${avatarTone(contact)}`} aria-hidden="true">
-                {contactInitials(contact)}
+                {contactInitial(contact)}
               </span>
               <span className="composer-contact-copy">
                 <strong title={name}>{name}</strong>
                 <small title={contact.email}>{contact.email}</small>
-                {contact.vip && (
-                  <span className="composer-contact-favorite">
-                    <Star size={10} fill="currentColor" aria-hidden="true" />
-                    常用
-                  </span>
-                )}
               </span>
               <button
                 type="button"
                 className="composer-contact-add"
-                disabled={alreadyAdded}
-                aria-label={alreadyAdded ? `${name}已添加` : `添加 ${name}`}
-                onClick={() => onAddContact(contact, recipientField)}
+                disabled={Boolean(addedTo)}
+                aria-label={addedTo ? `${name}已添加` : `添加 ${name}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!addedTo) onAddContact(contact, recipientField);
+                }}
               >
-                {alreadyAdded ? <><Check size={12} />已添加</> : '添加'}
+                {addedTo ? <><Check size={13} aria-hidden="true" />已添加</> : '添加'}
               </button>
             </article>
           );
@@ -248,24 +318,50 @@ export default function ComposerContactsPanel({
         {visibleContacts.length === 0 && (
           <div className="composer-contacts-empty">
             <span className="composer-contacts-empty-icon" aria-hidden="true">
-              <UserRound size={18} />
+              <UserRound size={19} />
             </span>
-            <strong>{query ? '没有找到匹配联系人' : '还没有联系人'}</strong>
-            <small>{query ? '试试搜索其他姓名或邮箱' : '可以先到联系人设置中添加'}</small>
+            <strong>{emptyTitle}</strong>
+            <small>{emptyDescription}</small>
           </div>
         )}
       </div>
 
       <div className="composer-contacts-footer">
-        <button
-          type="button"
-          onClick={onOpenContactsSettings}
-          disabled={!onOpenContactsSettings}
-        >
-          <Settings2 size={14} aria-hidden="true" />
-          管理联系人
-          <ChevronRight size={14} aria-hidden="true" />
-        </button>
+        <span>
+          已选择 <strong>{selectedContacts.length}</strong> 位联系人
+        </span>
+        <div className="composer-contact-batch">
+          <button type="button" disabled={selectedContacts.length === 0} onClick={addSelected}>
+            添加到{targetLabel}
+          </button>
+          <button
+            type="button"
+            aria-label="选择添加目标"
+            aria-expanded={targetMenuOpen}
+            disabled={selectedContacts.length === 0}
+            onClick={() => setTargetMenuOpen((current) => !current)}
+          >
+            <ChevronDown size={15} aria-hidden="true" />
+          </button>
+          {targetMenuOpen && (
+            <div className="composer-contact-target-menu" role="menu" aria-label="添加到">
+              {RECIPIENT_FIELDS.map((field) => (
+                <button
+                  key={field.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={recipientField === field.value}
+                  onClick={() => {
+                    setRecipientField(field.value);
+                    setTargetMenuOpen(false);
+                  }}
+                >
+                  {field.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );

@@ -10,6 +10,7 @@ type RecipientFieldProps = {
   value: string;
   contactSearchEntries: ContactSearchEntry[];
   onChange: (value: string) => void;
+  actions?: React.ReactNode;
 };
 
 const suggestionLimit = 4;
@@ -42,6 +43,7 @@ export default function RecipientField({
   value,
   contactSearchEntries,
   onChange,
+  actions,
 }: RecipientFieldProps) {
   const [chips, setChips] = useState<string[]>(() => initialParse(value).chips);
   const [query, setQuery] = useState<string>(() => initialParse(value).query);
@@ -236,6 +238,8 @@ export default function RecipientField({
           />
         </div>
       </label>
+
+      {actions ? <div className="composer-recipient-actions">{actions}</div> : null}
 
       {menuOpen && (
         <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}匹配联系人`}>

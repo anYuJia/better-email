@@ -43,6 +43,17 @@ describe('ComposerSchedulePicker', () => {
     expect(screen.getByRole('button', { name: '定时发送时间' }).textContent).toContain('8月25日 · 15:45');
   });
 
+  it('confirms the selected schedule from the picker header', () => {
+    render(<ControlledPicker initialValue="2026-08-25T12:30" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
+    expect(screen.getByRole('button', { name: '确定' })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('can clear an existing schedule without opening a native input', () => {
     render(<ControlledPicker initialValue="2026-08-25T12:30" />);
 

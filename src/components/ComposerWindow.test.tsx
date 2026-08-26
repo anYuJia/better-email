@@ -74,13 +74,11 @@ describe('ComposerWindow focus lifecycle', () => {
   it('keeps the sending account and identity visible outside advanced options', () => {
     render(composer());
 
-    const account = screen.getByRole('combobox', { name: '发件账号' });
-    const identity = screen.getByRole('combobox', { name: '发件身份' });
+    const sender = screen.getByRole('combobox', { name: '发件人' });
 
-    expect(account.closest('.composer-sender-context')).not.toBeNull();
-    expect(identity.closest('.composer-sender-context')).not.toBeNull();
-    expect(account.closest('details')).toBeNull();
-    expect(screen.getByText('更多选项').closest('details')?.hasAttribute('open')).toBe(false);
+    expect(sender.closest('.composer-sender-context')).not.toBeNull();
+    expect(sender.closest('details')).toBeNull();
+    expect(screen.getByRole('dialog').querySelector('.composer-advanced')?.hasAttribute('open')).toBe(false);
   });
 
   it('restores focus after the background is no longer inert', async () => {
@@ -105,7 +103,7 @@ describe('ComposerWindow focus lifecycle', () => {
     });
   });
 
-  it('describes local autosave as a recovery snapshot, not a saved draft', () => {
+  it('shows the local autosave state in the composer header', () => {
     const draft = { ...emptyDraft, subject: '待处理邮件' };
     render(cloneElement(composer(), {
       draft,
@@ -116,7 +114,7 @@ describe('ComposerWindow focus lifecycle', () => {
       },
     }));
 
-    expect(screen.getByText(/已备份恢复点/)).not.toBeNull();
-    expect(screen.queryByText(/自动保存/)).toBeNull();
+    expect(screen.getByText(/已自动保存/)).not.toBeNull();
+    expect(screen.queryByText(/已备份恢复点/)).toBeNull();
   });
 });

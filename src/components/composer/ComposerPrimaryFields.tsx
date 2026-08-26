@@ -20,6 +20,11 @@ type ComposerPrimaryFieldsProps = {
   contacts: Contact[];
   richComposer: boolean;
   dropActive: boolean;
+  ccOpen?: boolean;
+  bccOpen?: boolean;
+  onToggleCc?: () => void;
+  onToggleBcc?: () => void;
+  formattingToolbar?: React.ReactNode;
   onPatchDraft: (patch: Partial<DraftInput>) => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
@@ -83,6 +88,11 @@ export default function ComposerPrimaryFields({
   contacts,
   richComposer,
   dropActive,
+  ccOpen = true,
+  bccOpen = false,
+  onToggleCc,
+  onToggleBcc,
+  formattingToolbar,
   onPatchDraft,
   onPickAttachments,
   onRemoveAttachment,
@@ -281,15 +291,47 @@ export default function ComposerPrimaryFields({
         value={draft.to}
         contactSearchEntries={contactSearchEntries}
         onChange={(value) => onPatchDraft({ to: value })}
+        actions={(
+          <>
+            <button
+              type="button"
+              className={ccOpen ? 'is-active' : ''}
+              aria-expanded={ccOpen}
+              onClick={() => onToggleCc?.()}
+            >
+              抄送
+            </button>
+            <button
+              type="button"
+              className={bccOpen ? 'is-active' : ''}
+              aria-expanded={bccOpen}
+              onClick={() => onToggleBcc?.()}
+            >
+              密送
+            </button>
+          </>
+        )}
       />
 
-      <RecipientField
-        label="抄送"
-        placeholder="添加抄送"
-        value={draft.cc}
-        contactSearchEntries={contactSearchEntries}
-        onChange={(value) => onPatchDraft({ cc: value })}
-      />
+      {ccOpen && (
+        <RecipientField
+          label="抄送"
+          placeholder="姓名或邮箱"
+          value={draft.cc}
+          contactSearchEntries={contactSearchEntries}
+          onChange={(value) => onPatchDraft({ cc: value })}
+        />
+      )}
+
+      {bccOpen && (
+        <RecipientField
+          label="密送"
+          placeholder="姓名或邮箱"
+          value={draft.bcc}
+          contactSearchEntries={contactSearchEntries}
+          onChange={(value) => onPatchDraft({ bcc: value })}
+        />
+      )}
 
       <label className="composer-field-row composer-subject-field">
         <span className="sr-only">主题</span>
@@ -300,6 +342,8 @@ export default function ComposerPrimaryFields({
           placeholder="添加主题"
         />
       </label>
+
+      {formattingToolbar}
 
       <section
         className={`composer-body-field${originalQuote ? ' has-original-quote' : ''}${dropActive ? ' drop-active' : ''}`}

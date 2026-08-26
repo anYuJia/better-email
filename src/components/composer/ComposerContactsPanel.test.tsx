@@ -75,8 +75,10 @@ describe('ComposerContactsPanel', () => {
     expect(screen.getByText('Grace Hopper')).not.toBeNull();
     expect(screen.queryByText('Ada Lovelace')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '抄送' }));
-    fireEvent.click(screen.getByRole('button', { name: '添加 Grace Hopper' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择 Grace Hopper' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择添加目标' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '抄送' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加到抄送' }));
 
     expect(onAddContact).toHaveBeenCalledWith(grace, 'cc');
   });
@@ -117,7 +119,7 @@ describe('ComposerContactsPanel', () => {
 
     expect(screen.getByRole('complementary', { name: '联系人' }).id).toBe('composer-contacts-panel');
     expect(screen.getByText('还没有联系人', { selector: '.composer-contacts-empty strong' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '收件人' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '添加到收件人' })).toHaveProperty('disabled', true);
 
     fireEvent.click(screen.getByRole('button', { name: '管理联系人' }));
     expect(onOpenContactsSettings).toHaveBeenCalledTimes(1);

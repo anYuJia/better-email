@@ -9,8 +9,8 @@ function localValue(offsetDays = 3, hour = 12, minute = 30) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function dateLabel(value: string) {
-  const date = new Date(value);
+function dateLabel(value: string | Date) {
+  const date = typeof value === 'string' ? new Date(value) : value;
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
@@ -78,6 +78,33 @@ describe('ComposerSchedulePicker', () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('re-seeds an expired saved schedule before confirming', () => {
+    const onChange = vi.fn();
+    render(<ComposerSchedulePicker value={localValue(-3)} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(new Date(onChange.mock.calls[0][0]).getTime()).toBeGreaterThan(Date.now());
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('explains when a manually selected time is already in the past', () => {
+    const onChange = vi.fn();
+    const initial = localValue(1, 0, 0);
+    const past = new Date();
+    render(<ComposerSchedulePicker value={initial} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
+    fireEvent.click(screen.getByRole('gridcell', { name: dateLabel(past) }));
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain('请选择晚于当前时间的发送时间');
+    expect(screen.getByRole('dialog', { name: '选择定时发送时间' })).not.toBeNull();
   });
 
   it('keeps today and outside/Escape cancellation local', () => {

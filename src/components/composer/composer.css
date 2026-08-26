@@ -3466,7 +3466,7 @@
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--compose-divider);
-  border-radius: 0;
+  border-radius: var(--ui-radius-control);
   background: transparent;
 }
 
@@ -3515,12 +3515,15 @@
   font-size: 12px;
 }
 
-.composer-contact-add {
+.composer .composer-contact-add {
   position: absolute;
-  top: 50%;
+  top: 0;
   right: 8px;
+  bottom: 0;
+  height: 28px;
   min-width: 48px;
   min-height: 28px;
+  margin-block: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3536,7 +3539,6 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(-50%);
   transition: none;
 }
 
@@ -3562,6 +3564,13 @@
   opacity: 1;
   visibility: visible;
   pointer-events: none;
+}
+
+.composer-schedule-picker-error {
+  margin: -2px 12px 10px;
+  color: var(--ui-danger);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .composer-contacts-empty {

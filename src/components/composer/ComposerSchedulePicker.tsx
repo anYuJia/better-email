@@ -201,7 +201,6 @@ export default function ComposerSchedulePicker({
   const [error, setError] = useState('');
   const committedDate = parseDateTimeLocal(value);
   const draftDateValue = dateFromParts(draftDate, draftTime);
-  const isValid = Boolean(draftDateValue && draftDateValue.getTime() > Date.now());
   const calendarDays = buildCalendarDays(viewMonth);
 
   useEffect(() => {
@@ -288,7 +287,12 @@ export default function ComposerSchedulePicker({
   }, [open]);
 
   function openPicker() {
-    const current = committedDate ?? roundScheduleSeed();
+    // A stale autosaved schedule must not reopen on a time that can no longer
+    // be confirmed. Start from the next quarter-hour when the saved value has
+    // already passed, while preserving an active schedule for normal edits.
+    const current = committedDate && committedDate.getTime() > Date.now()
+      ? committedDate
+      : roundScheduleSeed();
     initialValueOnOpenRef.current = value;
     setViewMonth(startOfMonth(current));
     setDraftDate(dateKey(current));
@@ -309,10 +313,11 @@ export default function ComposerSchedulePicker({
       setError('请选择晚于当前时间的发送时间');
       return;
     }
-    onChange(toDateTimeLocalValue(draftDateValue));
+    const nextValue = toDateTimeLocalValue(draftDateValue);
     setOpen(false);
     setPosition(null);
     setError('');
+    onChange(nextValue);
     focusAnchor();
   }
 
@@ -337,7 +342,7 @@ export default function ComposerSchedulePicker({
             setDraftDate(dateKey(today));
             setError('');
           }}>今天</button>
-          <button type="button" className="composer-schedule-picker-confirm" disabled={!isValid} onClick={confirmSchedule}>
+          <button type="button" className="composer-schedule-picker-confirm" onClick={confirmSchedule}>
             <Check size={13} aria-hidden="true" />确定
           </button>
         </div>

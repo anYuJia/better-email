@@ -21,7 +21,6 @@ use tauri::Manager;
 
 #[cfg(desktop)]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(desktop)]
 use std::sync::Mutex;
 #[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
@@ -37,6 +36,13 @@ pub struct TrayState {
     pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
     pub unread_item: Mutex<Option<MenuItem<Wry>>>,
     pub is_quitting: AtomicBool,
+}
+
+/// The main window places the next compose request here before opening the
+/// native compose webview. The child consumes it during boot, or after a
+/// subsequent focus-and-reuse request.
+pub struct PendingComposerRequestState {
+    pub request: Mutex<Option<serde_json::Value>>,
 }
 
 /// 把 Rust panic 记录到应用数据目录的 crash.log，便于用户侧可诊断。
@@ -188,6 +194,25 @@ fn window_chrome_ready(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn set_pending_composer_request(
+    request: serde_json::Value,
+    state: tauri::State<'_, PendingComposerRequestState>,
+) -> Result<(), String> {
+    *state
+        .request
+        .lock()
+        .map_err(|_| "写信请求状态锁定失败".to_string())? = Some(request);
+    Ok(())
+}
+
+#[tauri::command]
+fn take_pending_composer_request(
+    state: tauri::State<'_, PendingComposerRequestState>,
+) -> Option<serde_json::Value> {
+    state.request.lock().ok()?.take()
+}
+
 #[cfg(desktop)]
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let unread_item = MenuItem::with_id(
@@ -310,6 +335,9 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 pub fn run() {
     install_crash_log_hook();
     tauri::Builder::default()
+        // Keep the native window titlebar (traffic lights and title), but do
+        // not create Tauri's default macOS application menu.
+        .enable_macos_default_menu(false)
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -317,6 +345,13 @@ pub fn run() {
         .setup(|app| {
             let store = MailStore::open(app.handle())?;
             app.manage(store);
+            app.manage(PendingComposerRequestState {
+                request: Mutex::new(None),
+            });
+            // Run as a windowed accessory so macOS does not attach a global
+            // application menu bar above the app windows.
+            #[cfg(target_os = "macos")]
+            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;
             // 主窗口图标与 bundle.icon 使用同一份 v4 源资源：
             // 无边框/透明窗口在 Windows 任务栏、Alt+Tab 需要显式设置图标。
             #[cfg(desktop)]
@@ -335,6 +370,10 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             #[cfg(desktop)]
+            if window.label() == "composer" {
+                return;
+            }
+            #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let app_handle = window.app_handle();
                 if let Some(state) = app_handle.try_state::<TrayState>() {
@@ -351,6 +390,8 @@ pub fn run() {
             set_tray_unread_count,
             get_platform,
             window_chrome_ready,
+            set_pending_composer_request,
+            take_pending_composer_request,
             commands::list_accounts,
             commands::get_account,
             commands::create_account,

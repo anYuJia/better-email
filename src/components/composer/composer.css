@@ -3859,6 +3859,84 @@
   pointer-events: auto;
 }
 
+/* A native compose window owns its whole webview. The operating system
+ * supplies the titlebar, minimize, and close controls; the webview only
+ * renders the connected editor surface below it. */
+.standalone-composer-app {
+  width: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.composer-backdrop.is-native-window {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background: var(--ui-surface);
+  pointer-events: auto;
+}
+
+.composer-backdrop.is-native-window > .composer {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.composer-backdrop.is-native-window .composer-workspace.has-contacts {
+  grid-template-columns: minmax(0, 1fr) 304px;
+}
+
+.composer-backdrop.is-native-window .composer-workspace.has-contacts .composer-contacts-panel {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  border-left: 1px solid var(--composer-divider);
+  box-shadow: none;
+}
+
+.standalone-composer-status {
+  width: min(460px, calc(100vw - 48px));
+  margin: auto;
+  padding: 28px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  text-align: center;
+}
+
+.standalone-composer-status strong,
+.standalone-composer-status p {
+  display: block;
+  margin: 0;
+}
+
+.standalone-composer-status strong {
+  color: var(--ui-text);
+  font-size: 15px;
+}
+
+.standalone-composer-status p {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @media (max-width: 720px) {
   .composer-backdrop.is-modal {
     align-items: stretch;

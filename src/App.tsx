@@ -17,6 +17,7 @@ import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import StandaloneComposerApp from './components/StandaloneComposerApp';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
 import type { MessageToast } from './components/MessageToastStack';
@@ -36,7 +37,7 @@ import useReaderActions from './hooks/useReaderActions';
 import useAppGlobalEffects from './hooks/useAppGlobalEffects';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
 import useUnreadFocusSync from './hooks/useUnreadFocusSync';
-import useComposerController from './hooks/useComposerController';
+import useComposerController, { type OpenComposerOptions } from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
 import useFolderManagement from './hooks/useFolderManagement';
 import useIdentityManagement from './hooks/useIdentityManagement';
@@ -57,7 +58,15 @@ import useAutoHideScrollbars from './hooks/useAutoHideScrollbars';
 import {
   type NotificationPolicy,
 } from './mailUtils';
-import { invoke, listen } from './tauriBridge';
+import {
+  COMPOSER_CLOSED_EVENT,
+  COMPOSER_CONTACTS_SETTINGS_EVENT,
+  invoke,
+  isStandaloneComposerWindow,
+  listen,
+  mockMode,
+  openComposerWindow,
+} from './tauriBridge';
 import type {
   AccountScope,
   Account,
@@ -83,6 +92,7 @@ import type {
   CredentialStatus,
   ProviderVerificationRecord,
   BackgroundTask,
+  DraftInput,
 } from './app/types';
 import {
   emptyDraft,
@@ -124,6 +134,11 @@ import { accountScopeStorageKey } from './app/storageConfig';
 import { IPC } from './ipc/commands';
 
 export default function App() {
+  if (isStandaloneComposerWindow()) return <StandaloneComposerApp />;
+  return <MailboxApp />;
+}
+
+function MailboxApp() {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountScope, setAccountScope] = useState<AccountScope>(loadAccountScope);
@@ -159,7 +174,9 @@ export default function App() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
-  const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>('web');
+  const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>(
+    () => (mockMode ? 'web' : 'desktop'),
+  );
   const [isViewportMobile, setIsViewportMobile] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
   );
@@ -184,7 +201,10 @@ export default function App() {
   // 登录遮罩或首次引导期间，应用整体进入门禁状态：
   // 快捷键、托盘命令、写邮件、切换账号、设置都不能穿透。
   const isModalGateActive = isAccountLoginActive || Boolean(pendingOnboardingAccount);
-  const isMobileApp = isViewportMobile || nativePlatform === 'android' || nativePlatform === 'ios';
+  const isMobileApp = nativePlatform === 'android'
+    || nativePlatform === 'ios'
+    || (nativePlatform === 'web' && isViewportMobile);
+  const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';
 
   useEffect(() => {
     let active = true;
@@ -887,6 +907,15 @@ export default function App() {
     task.kind === 'sync' && (task.status === 'queued' || task.status === 'running')
   ));
 
+  const openExternalComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {
+    void openComposerWindow({
+      draft: nextDraft,
+      ...options,
+    }).catch((error) => {
+      setStatus(`无法打开独立写信窗口：${String(error)}`);
+    });
+  }, []);
+
   const {
     draft,
     setDraft,
@@ -951,6 +980,7 @@ export default function App() {
     loadMeta: (nextFolderId?: number | null) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     refreshAll,
     focusMailboxRole,
+    openExternalComposer: useNativeComposerWindow ? openExternalComposer : undefined,
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
     setAttachmentProgress: setComposerAttachmentProgress,
@@ -969,6 +999,18 @@ export default function App() {
           setStatus('已打开新邮件');
         });
         unlisteners.push(unlistenCompose);
+
+        const unlistenComposerClosed = await listen(COMPOSER_CLOSED_EVENT, () => {
+          if (!active) return;
+          refreshAll().catch((error) => setStatus(String(error)));
+        });
+        unlisteners.push(unlistenComposerClosed);
+
+        const unlistenComposerContactsSettings = await listen(COMPOSER_CONTACTS_SETTINGS_EVENT, () => {
+          if (!active || isModalGateActive) return;
+          openMobileSettingsSection('contacts');
+        });
+        unlisteners.push(unlistenComposerContactsSettings);
 
         const unlistenSync = await listen('tray://sync', () => {
           if (!active || isModalGateActive) return;
@@ -1009,7 +1051,7 @@ export default function App() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, enqueueManualSync, folders, setFilter, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive, resetSearch, setSelectedId, setSelectedMessageIds]);
+  }, [openComposer, enqueueManualSync, folders, setFilter, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive, resetSearch, setSelectedId, setSelectedMessageIds, refreshAll, openMobileSettingsSection]);
 
   const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
     setSelectedMessageIds((current) => {
@@ -1901,7 +1943,7 @@ export default function App() {
         </>
       )}
 
-      {!isAccountLoginActive && isComposerOpen && (
+      {!isAccountLoginActive && !useNativeComposerWindow && isComposerOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
           <AppErrorBoundary>
             <ComposerWindow

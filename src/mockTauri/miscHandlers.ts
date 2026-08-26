@@ -66,6 +66,8 @@ function mockAppSettingsReport() {
 }
 
 export const handlers: Record<string, MockCommandHandler> = {
+  'set_pending_composer_request': () => undefined,
+  'take_pending_composer_request': () => null,
   'open_url': (args) => {
     logLine('Mock opening URL:', args?.url);
     return undefined;

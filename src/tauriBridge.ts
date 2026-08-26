@@ -1,4 +1,19 @@
 import type { Message } from './app/types';
+import {
+  type ComposerWindowRequest,
+  type NativeCloseRequestEvent,
+} from './app/composerWindow';
+
+export type {
+  ComposerWindowRequest,
+  NativeCloseRequestEvent,
+} from './app/composerWindow';
+export {
+  COMPOSER_CLOSED_EVENT,
+  COMPOSER_CONTACTS_SETTINGS_EVENT,
+  COMPOSER_OPEN_EVENT,
+  COMPOSER_WINDOW_LABEL,
+} from './app/composerWindow';
 
 export type InvokeArgs = Record<string, unknown> | undefined;
 export type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };
@@ -111,4 +126,45 @@ export async function listen<T>(event: string, handler: (event: { payload: T }) 
   }
   const { prodListen } = await loadProdBridge();
   return prodListen<T>(event, handler);
+}
+
+export function isStandaloneComposerWindow() {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('window') === 'compose';
+}
+
+export function openComposerWindow(request: ComposerWindowRequest = {}): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodOpenComposerWindow }) => prodOpenComposerWindow(request));
+}
+
+export function takePendingComposerRequest(): Promise<ComposerWindowRequest | null> {
+  if (mockMode) return Promise.resolve(null);
+  return loadProdBridge().then(({ prodTakePendingComposerRequest }) => prodTakePendingComposerRequest());
+}
+
+export async function listenCurrentWindow<T>(
+  event: string,
+  handler: (event: { payload: T }) => void,
+): Promise<() => void> {
+  if (mockMode) return () => {};
+  const { prodListenCurrentWindow } = await loadProdBridge();
+  return prodListenCurrentWindow<T>(event, handler);
+}
+
+export function emitToMain<T>(event: string, payload?: T): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodEmitToMain }) => prodEmitToMain(event, payload));
+}
+
+export function closeCurrentWindow(): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodCloseCurrentWindow }) => prodCloseCurrentWindow());
+}
+
+export function onCurrentWindowCloseRequested(
+  handler: (event: NativeCloseRequestEvent) => void,
+): Promise<() => void> {
+  if (mockMode) return Promise.resolve(() => {});
+  return loadProdBridge().then(({ prodOnCurrentWindowCloseRequested }) => prodOnCurrentWindowCloseRequested(handler));
 }

@@ -83,6 +83,7 @@ function clampComposerPosition(
 
 export type ComposerWindowProps = {
   minimized: boolean;
+  standaloneWindow?: boolean;
   focusRequest?: number;
   draft: DraftInput;
   accounts: Account[];
@@ -129,6 +130,7 @@ export type ComposerWindowProps = {
 
 export default function ComposerWindow({
   minimized,
+  standaloneWindow = false,
   focusRequest = 0,
   draft,
   accounts,
@@ -199,7 +201,7 @@ export default function ComposerWindow({
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
-  const contactsPanelVisible = !isNarrowContactsViewport || contactsOpen;
+  const contactsPanelVisible = standaloneWindow || !isNarrowContactsViewport || contactsOpen;
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -254,7 +256,7 @@ export default function ComposerWindow({
   }, []);
 
   useModalAccessibility({
-    open: !minimized && isMobileComposerViewport,
+    open: !standaloneWindow && !minimized && isMobileComposerViewport,
     dialogRef: panelRef,
     backdropRef,
     focusTrapDisabled: sendRiskConfirm !== null,
@@ -436,12 +438,12 @@ export default function ComposerWindow({
   return (
     <div
       ref={backdropRef}
-      className={`composer-backdrop ${isMobileComposerViewport ? 'is-modal' : 'is-floating'}`}
+      className={`composer-backdrop ${standaloneWindow ? 'is-native-window' : isMobileComposerViewport ? 'is-modal' : 'is-floating'}`}
       role="dialog"
-      aria-modal={isMobileComposerViewport ? 'true' : undefined}
+      aria-modal={!standaloneWindow && isMobileComposerViewport ? 'true' : undefined}
       aria-label="写信窗口"
       onMouseDown={(event) => {
-        if (isMobileComposerViewport && event.target === event.currentTarget) {
+        if (!standaloneWindow && isMobileComposerViewport && event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -449,7 +451,7 @@ export default function ComposerWindow({
       <section
         ref={panelRef}
         className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
-        style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+        style={standaloneWindow ? undefined : { transform: `translate(${position.x}px, ${position.y}px)` }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
@@ -457,7 +459,7 @@ export default function ComposerWindow({
       >
         <div className={`composer-workspace${contactsPanelVisible ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
-            <header className="composer-editor-header" onPointerDown={beginDrag}>
+            <header className="composer-editor-header" onPointerDown={standaloneWindow ? undefined : beginDrag}>
               <span className="composer-title-copy">
                 <strong>{windowHeading}</strong>
                 <span
@@ -470,7 +472,7 @@ export default function ComposerWindow({
                 </span>
               </span>
               <div className="composer-header-actions">
-                {isNarrowContactsViewport && (
+                {!standaloneWindow && isNarrowContactsViewport && (
                   <button
                     type="button"
                     className="composer-contact-toggle"
@@ -485,12 +487,16 @@ export default function ComposerWindow({
                     <span>联系人</span>
                   </button>
                 )}
-                <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
-                  <PanelBottomClose size={17} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={onClose} aria-label="关闭写信窗口" title="关闭写信窗口">
-                  <X size={17} aria-hidden="true" />
-                </button>
+                {!standaloneWindow && (
+                  <>
+                    <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
+                      <PanelBottomClose size={17} aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={onClose} aria-label="关闭写信窗口" title="关闭写信窗口">
+                      <X size={17} aria-hidden="true" />
+                    </button>
+                  </>
+                )}
               </div>
             </header>
 

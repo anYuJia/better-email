@@ -40,6 +40,11 @@ type LoadMetaResult = {
   folders: Folder[];
 };
 
+export type OpenComposerOptions = {
+  restoreAutosave?: boolean;
+  replaceExisting?: boolean;
+};
+
 type UseComposerControllerOptions = {
   account: Account | null;
   accounts: Account[];
@@ -55,14 +60,10 @@ type UseComposerControllerOptions = {
   loadMeta: (folderId?: number | null) => Promise<LoadMetaResult>;
   refreshAll: () => Promise<void>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
+  openExternalComposer?: (nextDraft?: DraftInput, options?: OpenComposerOptions) => void;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
   setAttachmentProgress?: (progress: number | null) => void;
-};
-
-export type OpenComposerOptions = {
-  restoreAutosave?: boolean;
-  replaceExisting?: boolean;
 };
 
 export default function useComposerController({
@@ -79,6 +80,7 @@ export default function useComposerController({
   loadMeta,
   refreshAll,
   focusMailboxRole,
+  openExternalComposer,
   setSendProgress,
   setSendProgressMessage,
   setAttachmentProgress,
@@ -213,6 +215,10 @@ export default function useComposerController({
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {
+    if (openExternalComposer) {
+      openExternalComposer(nextDraft, options);
+      return;
+    }
     const shouldReplaceDraft = !isComposerOpen || options.replaceExisting === true;
     if (shouldReplaceDraft) {
       setComposerContextAccountId(null);
@@ -231,7 +237,7 @@ export default function useComposerController({
     setComposerMinimized(false);
     setComposerOpen(true);
     setComposerFocusRequest((current) => current + 1);
-  }, [draft, composerAutosave, isComposerOpen, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
+  }, [draft, composerAutosave, isComposerOpen, openExternalComposer, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
   const {
     composeFromMessage: rawComposeFromMessage,
     editDraftMessage: rawEditDraftMessage,

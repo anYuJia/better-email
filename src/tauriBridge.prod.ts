@@ -1,6 +1,17 @@
+import type {
+  ComposerWindowRequest,
+  NativeCloseRequestEvent,
+} from './app/composerWindow';
+import {
+  COMPOSER_OPEN_EVENT,
+  COMPOSER_WINDOW_LABEL,
+} from './app/composerWindow';
+import { IPC } from './ipc/commands';
+
 type InvokeArgs = Record<string, unknown> | undefined;
 type TauriCore = typeof import('@tauri-apps/api/core');
 type TauriWindow = typeof import('@tauri-apps/api/window');
+type TauriWebviewWindow = typeof import('@tauri-apps/api/webviewWindow');
 type TauriNotification = typeof import('@tauri-apps/plugin-notification');
 type DesktopFileDropEvent =
   | { type: 'enter'; paths: string[]; position?: unknown }
@@ -11,6 +22,7 @@ type DesktopFileDropHandler = (event: DesktopFileDropEvent) => void;
 
 let coreModule: Promise<TauriCore> | null = null;
 let windowModule: Promise<TauriWindow> | null = null;
+let webviewWindowModule: Promise<TauriWebviewWindow> | null = null;
 let notificationModule: Promise<TauriNotification> | null = null;
 
 function loadCore() {
@@ -21,6 +33,11 @@ function loadCore() {
 function loadWindow() {
   windowModule ??= import('@tauri-apps/api/window');
   return windowModule;
+}
+
+function loadWebviewWindow() {
+  webviewWindowModule ??= import('@tauri-apps/api/webviewWindow');
+  return webviewWindowModule;
 }
 
 function loadNotification() {
@@ -85,4 +102,95 @@ export function prodSendNotification(notification: { title: string; body?: strin
 export async function prodListen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> {
   const { listen: tauriListen } = await loadEvent();
   return tauriListen<T>(event, handler);
+}
+
+let composerWindowCreation: Promise<void> | null = null;
+
+async function focusComposerWindow(window: {
+  show: () => Promise<void>;
+  unminimize: () => Promise<void>;
+  setFocus: () => Promise<void>;
+}) {
+  await window.show();
+  await window.unminimize();
+  await window.setFocus();
+}
+
+export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
+  await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
+  const { WebviewWindow } = await loadWebviewWindow();
+  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (existing) {
+    await focusComposerWindow(existing);
+    await existing.emit(COMPOSER_OPEN_EVENT);
+    return;
+  }
+
+  if (!composerWindowCreation) {
+    const composeUrl = new URL(window.location.href);
+    composeUrl.search = '?window=compose';
+    composeUrl.hash = '';
+    const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
+      url: composeUrl.toString(),
+      title: '写邮件',
+      width: 960,
+      height: 700,
+      minWidth: 760,
+      minHeight: 560,
+      resizable: true,
+      decorations: true,
+      titleBarStyle: 'visible',
+      hiddenTitle: false,
+      focus: true,
+      visible: true,
+      skipTaskbar: false,
+    });
+    composerWindowCreation = new Promise<void>((resolve, reject) => {
+      void child.once('tauri://created', () => resolve());
+      void child.once('tauri://error', (event) => {
+        reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
+      });
+    });
+  }
+
+  try {
+    await composerWindowCreation;
+    const created = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+    if (created) await focusComposerWindow(created);
+  } finally {
+    composerWindowCreation = null;
+  }
+}
+
+export function prodTakePendingComposerRequest(): Promise<ComposerWindowRequest | null> {
+  return prodInvoke<ComposerWindowRequest | null>(IPC.TakePendingComposerRequest);
+}
+
+export async function prodListenCurrentWindow<T>(
+  event: string,
+  handler: (event: { payload: T }) => void,
+): Promise<() => void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  return getTauriCurrentWindow().listen<T>(event, handler);
+}
+
+export async function prodEmitToMain<T>(event: string, payload?: T): Promise<void> {
+  const { emitTo } = await loadEvent();
+  await emitTo('main', event, payload);
+}
+
+export async function prodCloseCurrentWindow(): Promise<void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  // The native close-request listener deliberately prevents the first close
+  // request while it checks for unsaved content. Once React has decided that
+  // the window may close, destroy it so this programmatic follow-up cannot
+  // re-enter the same close-request cycle.
+  await getTauriCurrentWindow().destroy();
+}
+
+export async function prodOnCurrentWindowCloseRequested(
+  handler: (event: NativeCloseRequestEvent) => void,
+): Promise<() => void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  return getTauriCurrentWindow().onCloseRequested(handler);
 }

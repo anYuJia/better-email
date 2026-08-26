@@ -3328,7 +3328,7 @@
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 38px;
-  border-radius: 8px;
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-accent);
 }
 
@@ -3351,6 +3351,14 @@
   font-size: 14px;
   font-weight: 650;
   white-space: nowrap;
+}
+
+.composer-send-split > .composer-send-primary {
+  border-radius: var(--ui-radius-panel) 0 0 var(--ui-radius-panel);
+}
+
+.composer-send-split > .composer-send-menu-trigger {
+  border-radius: 0 var(--ui-radius-panel) var(--ui-radius-panel) 0;
 }
 
 .composer-send-primary {

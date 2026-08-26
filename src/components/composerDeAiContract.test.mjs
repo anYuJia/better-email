@@ -168,6 +168,20 @@ describe('composer readability contract — visible copy is at least 12px', () =
 });
 
 describe('composer de-AI contract — send button is accent, not flashy', () => {
+  it('split send button keeps rounded outer corners on both segments', () => {
+    const split = findRules(composerCss, '.composer-send-split')
+      .find((rule) => rule.selector === '.composer-send-split');
+    expect(split?.body).toMatch(/border-radius:\s*var\(--ui-radius-panel\)/);
+
+    const primary = findRules(composerCss, '.composer-send-split > .composer-send-primary')
+      .find((rule) => rule.selector === '.composer-send-split > .composer-send-primary');
+    expect(primary?.body).toMatch(/border-radius:\s*var\(--ui-radius-panel\)\s+0\s+0\s+var\(--ui-radius-panel\)/);
+
+    const menu = findRules(composerCss, '.composer-send-split > .composer-send-menu-trigger')
+      .find((rule) => rule.selector === '.composer-send-split > .composer-send-menu-trigger');
+    expect(menu?.body).toMatch(/border-radius:\s*0\s+var\(--ui-radius-panel\)\s+var\(--ui-radius-panel\)\s+0/);
+  });
+
   it('send button has no gradient', () => {
     const rules = findRules(sharedDialogsCss, '.dialog-button-primary');
     for (const r of rules) {

@@ -16,7 +16,7 @@ import { localFileAssetUrl } from '../../tauriBridge';
 import { logError } from '../../app/logger';
 import type { ComposerRecipientField } from './ComposerContactsPanel';
 import { canonicalRecipientEmails } from './recipientAddresses';
-import { autoLinkEditorText, syncRichTextEmptyState } from './richTextCommands';
+import { autoLinkEditorText, runEditorCommand, syncRichTextEmptyState } from './richTextCommands';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -286,6 +286,22 @@ export default function ComposerPrimaryFields({
     }
   }
 
+  function handleRichBodyKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const editor = event.currentTarget;
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      event.stopPropagation();
+      runEditorCommand(editor, event.shiftKey ? 'outdent' : 'indent');
+      return;
+    }
+
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (['a', 'c', 'x', 'v', 'z', 'y', 'b', 'i', 'u'].includes(key)) {
+      event.stopPropagation();
+    }
+  }
+
   function handleRichBodyInput(event: React.FormEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
     if (event.nativeEvent.isTrusted && editor.dataset.skipAutoLink !== 'true') {
@@ -395,6 +411,7 @@ export default function ComposerPrimaryFields({
             aria-multiline="true"
             aria-label="邮件正文（富文本）"
             spellCheck
+            onKeyDownCapture={handleRichBodyKeyDown}
             onInput={handleRichBodyInput}
             onBlur={handleRichBodyBlur}
             onPaste={handleRichBodyPaste}

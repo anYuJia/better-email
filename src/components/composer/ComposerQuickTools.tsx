@@ -21,6 +21,7 @@ import { CustomSelect } from '../settings/accounts/CustomSelect';
 import {
   clearEditorFormatting,
   readEditorFormatState,
+  restoreEditorSelection,
   runEditorCommand,
   saveEditorSelection,
   type RichTextFormatState,
@@ -104,13 +105,24 @@ export function ComposerRichToolbar({
     };
   }, [editorRef]);
 
+  function restoreEditorFocus(editor: HTMLDivElement) {
+    const selection = editorSelectionRef.current;
+    const restore = () => restoreEditorSelection(editor, selection);
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(restore);
+    } else {
+      queueMicrotask(restore);
+    }
+  }
+
   function execute(command: string, value?: string) {
     const editor = editorRef?.current ?? null;
     const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
     runEditorCommand(editor, command, value, selection);
     if (editor) {
-      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
+      editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;
       setFormatState(readEditorFormatState(editor));
+      restoreEditorFocus(editor);
     }
   }
 
@@ -119,8 +131,9 @@ export function ComposerRichToolbar({
     const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
     clearEditorFormatting(editor, selection);
     if (editor) {
-      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
+      editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;
       setFormatState(readEditorFormatState(editor));
+      restoreEditorFocus(editor);
     }
   }
 

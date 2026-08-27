@@ -117,35 +117,42 @@ async function focusComposerWindow(window: {
 }
 
 async function ensureComposerWindow(): Promise<void> {
+  // If a prewarm/create is already running, wait for the real native window
+  // creation event instead of treating a half-created WebviewWindow as ready.
+  if (composerWindowCreation) {
+    await composerWindowCreation;
+    return;
+  }
+
   const { WebviewWindow } = await loadWebviewWindow();
   const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
   if (existing) return;
-  if (!composerWindowCreation) {
-    const composeUrl = new URL(window.location.href);
-    composeUrl.search = '?window=compose&prewarm=1';
-    composeUrl.hash = '';
-    const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
-      url: composeUrl.toString(),
-      title: '写邮件',
-      width: 960,
-      height: 700,
-      minWidth: 760,
-      minHeight: 560,
-      resizable: true,
-      decorations: true,
-      titleBarStyle: 'visible',
-      hiddenTitle: false,
-      focus: false,
-      visible: false,
-      skipTaskbar: false,
+
+  const composeUrl = new URL(window.location.href);
+  composeUrl.search = '?window=compose&prewarm=1';
+  composeUrl.hash = '';
+  const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
+    url: composeUrl.toString(),
+    title: '写邮件',
+    width: 960,
+    height: 700,
+    minWidth: 760,
+    minHeight: 560,
+    resizable: true,
+    decorations: true,
+    titleBarStyle: 'visible',
+    hiddenTitle: false,
+    focus: false,
+    visible: false,
+    skipTaskbar: false,
+  });
+  composerWindowCreation = new Promise<void>((resolve, reject) => {
+    void child.once('tauri://created', () => resolve());
+    void child.once('tauri://error', (event) => {
+      reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
     });
-    composerWindowCreation = new Promise<void>((resolve, reject) => {
-      void child.once('tauri://created', () => resolve());
-      void child.once('tauri://error', (event) => {
-        reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
-      });
-    });
-  }
+  });
+
   try {
     await composerWindowCreation;
   } finally {
@@ -158,14 +165,22 @@ export async function prodPrewarmComposerWindow(): Promise<void> {
 }
 
 export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
+  // The pending request is authoritative. Events are only a wake-up signal and
+  // may be emitted before the React side has finished booting.
   await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
-  const { WebviewWindow } = await loadWebviewWindow();
-  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-  if (existing) {
-    await existing.emit(COMPOSER_OPEN_EVENT);
-    return;
-  }
   await ensureComposerWindow();
+
+  const { WebviewWindow } = await loadWebviewWindow();
+  const composerWindow = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (!composerWindow) {
+    throw new Error('独立写信窗口创建完成后仍不可用');
+  }
+
+  await composerWindow.emit(COMPOSER_OPEN_EVENT);
+  // Always show/focus on an explicit user action. The standalone app consumes
+  // the pending request on boot/event/focus, so a lost wake-up event cannot
+  // leave the native window permanently hidden.
+  await focusComposerWindow(composerWindow);
 }
 
 export async function prodShowCurrentWindow(): Promise<void> {
@@ -181,8 +196,9 @@ export async function prodListenCurrentWindow<T>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<() => void> {
-  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
-  return getTauriCurrentWindow().listen<T>(event, handler);
+  if (mockMode) return () => {};
+  const { prodListenCurrentWindow } = await loadProdBridge();
+  return prodListenCurrentWindow<T>(event, handler);
 }
 
 export async function prodEmitToMain<T>(event: string, payload?: T): Promise<void> {

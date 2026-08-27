@@ -39,6 +39,13 @@
   min-height: 0;
 }
 
+/* Keep high-churn mail panes from invalidating layout/paint outside their
+ * own workspace plane. This is especially useful while virtual list rows,
+ * selection state and message HTML update independently. */
+.app-shell > :is(.sidebar, .message-list-panel, .reader-panel) {
+  contain: layout paint;
+}
+
 /* Pane surfaces: each pane is a flat plane of the workspace, distinguished
  * by luminance only. The resizer columns stay transparent so the app canvas
  * shows through the 1px divider lines. */

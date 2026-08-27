@@ -1,0 +1,97 @@
+/*
+ * Composer polish layer
+ *
+ * Keep subtle interaction details here so they stay authoritative over the
+ * legacy composer stylesheet without adding more specificity churn there.
+ */
+
+/* Thin, neutral field separators. Focus should not turn rows into thick bars. */
+.composer .composer-field-row,
+.composer .composer-recipient-field .composer-field-row {
+  border-bottom: 1px solid color-mix(in oklch, var(--ui-border) 72%, transparent);
+  box-shadow: none;
+}
+
+.composer .composer-field-row:focus-within,
+.composer .composer-field-row:has(input:focus-visible),
+.composer .composer-recipient-field .composer-field-row:focus-within {
+  background: var(--ui-surface);
+  box-shadow: none;
+  outline: none;
+}
+
+/* Recipient autocomplete: size to content instead of stretching into a wide panel. */
+.composer .recipient-suggestions {
+  width: fit-content;
+  min-width: 220px;
+  max-width: min(310px, calc(100% - 88px));
+}
+
+.composer .recipient-suggestions button {
+  width: 100%;
+}
+
+.composer .recipient-suggestions button.is-active,
+.composer .recipient-suggestions button.is-active:hover {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: var(--ui-control-hover);
+}
+
+/* Contact search: one focus boundary only. */
+.composer .composer-contacts-search,
+.composer .composer-contacts-search:focus-within {
+  box-shadow: none;
+  outline: none;
+}
+
+.composer .composer-contacts-search {
+  border: 1px solid var(--ui-border);
+}
+
+.composer .composer-contacts-search:focus-within {
+  border-color: var(--ui-accent);
+}
+
+.composer .composer-contacts-search input,
+.composer .composer-contacts-search input:focus,
+.composer .composer-contacts-search input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Contact rows: more breathing room around the avatar and a soft full-row hover. */
+.composer .composer-contact-row {
+  width: calc(100% - 12px);
+  box-sizing: border-box;
+  margin-inline: 6px;
+  padding-inline: 12px;
+  column-gap: 10px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+}
+
+.composer .composer-contact-row:hover,
+.composer .composer-contact-row:focus-within {
+  border: 0;
+  background: var(--ui-control-hover);
+}
+
+.composer .composer-contact-row.is-added {
+  border: 0;
+}
+
+.composer .composer-contact-avatar {
+  border-radius: 50%;
+}
+
+/* The editor itself should stay quiet while typing: no green top/bottom rails. */
+.composer .composer-body-field:focus-within {
+  box-shadow: none;
+}
+
+.composer .composer-body-field:focus-within::after {
+  opacity: 1;
+}

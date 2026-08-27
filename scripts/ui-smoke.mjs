@@ -418,7 +418,7 @@ async function closeComposer(cdp) {
     await waitForExpression(cdp, "!document.querySelector('.composer') || document.querySelector('.dialog-card')");
     await evalInPage(
       cdp,
-      "(() => { const dialog = document.querySelector('.dialog-card'); if (!dialog) return; const button = [...dialog.querySelectorAll('button')].find((item) => item.textContent.includes('舍弃邮件')); if (!button) throw new Error('Discard draft button not found'); button.click(); })()",
+      "(() => { const dialog = document.querySelector('.dialog-card'); if (!dialog) return; const button = [...dialog.querySelectorAll('button')].find((item) => item.textContent.includes('舍弃并关闭')); if (!button) throw new Error('Discard draft button not found'); button.click(); })()",
     );
     await waitForExpression(cdp, "!document.querySelector('.composer')");
   });
@@ -784,10 +784,10 @@ async function assertOAuthResultCardGeometry(cdp, label) {
     }
   }
   const expectedChildren = {
-    strong: { fontSize: '14px', fontWeight: '580', fontStyle: 'normal' },
-    span: { fontSize: '13px', fontWeight: '400', fontStyle: 'normal' },
-    small: { fontSize: '13px', fontWeight: '400', fontStyle: 'normal' },
-    em: { fontSize: '13px', fontWeight: '400', fontStyle: 'normal' },
+    strong: { fontSize: '14px', fontWeight: '600', fontStyle: 'normal' },
+    span: { fontSize: '13.5px', fontWeight: '400', fontStyle: 'normal' },
+    small: { fontSize: '13.5px', fontWeight: '400', fontStyle: 'normal' },
+    em: { fontSize: '13.5px', fontWeight: '400', fontStyle: 'normal' },
   };
   for (const [sel, exp] of Object.entries(expectedChildren)) {
     const child = data.children[sel];
@@ -1983,7 +1983,7 @@ async function main() {
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('Better Email Support'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('Better Email Support')); })()");
     await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.querySelector('.composer-more-popover')");
-    await clickButton(cdp, '保存草稿', "document.querySelector('.composer-more-popover')");
+    await clickButton(cdp, '保存并关闭', "document.querySelector('.composer-more-popover')");
     await waitForExpression(cdp, "document.body.innerText.includes('同步到远端草稿箱')");
     await closeComposer(cdp);
 

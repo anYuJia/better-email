@@ -20,8 +20,6 @@
   animation: var(--ui-animation-global-tooltip-in);
   white-space: normal;
   overflow-wrap: anywhere;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
 }
 
 /* Keyframes required by --ui-animation-global-tooltip-in (also from

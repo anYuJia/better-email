@@ -166,6 +166,7 @@ export default function useComposerSend({
     forceCloseComposer();
     try {
       await refreshAll();
+      setStatus(report.message);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(`草稿已保存，但刷新邮件列表失败：${message}`);

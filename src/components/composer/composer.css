@@ -97,7 +97,7 @@
 .composer-title-copy strong {
   color: var(--ui-text);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-title-copy small {
@@ -118,7 +118,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
-  font-weight: 560;
+  font-weight: 500;
   transition: none;
 }
 
@@ -146,7 +146,7 @@
   border-bottom: 1px solid var(--ui-border);
   color: var(--ui-text-tertiary);
   font-size: 11px;
-  font-weight: 560;
+  font-weight: 500;
   transition: none;
 }
 
@@ -226,7 +226,7 @@
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .composer .composer-recipient-chip-copy {
@@ -309,7 +309,7 @@
 .composer .recipient-suggestions button strong {
   overflow: hidden;
   font-size: 12.5px;
-  font-weight: 560;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -613,7 +613,7 @@
   padding: 0 4px;
   color: currentColor;
   font-size: 8.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 12px;
   text-align: center;
@@ -708,7 +708,7 @@
   background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 /* 12. Quick tools strip ================================================== */
@@ -905,7 +905,7 @@
 :root[data-theme="dark"] .composer-recipient-field .composer-field-row:focus-within {
   border-bottom-color: var(--ui-border-strong);
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: inset 0 -1px 0 var(--ui-accent);
 }
 
 :root[data-theme="dark"] .composer .composer-field-row input,
@@ -1171,7 +1171,7 @@
 
 .custom-select-dropdown[data-portal-owner="composer-sender"] button strong {
   font-size: 12.5px;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .custom-select-dropdown[data-portal-owner="composer-sender"] button small {
@@ -1247,8 +1247,8 @@
 .composer .composer-sender-heading {
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-aux);
-  font-weight: 620;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: normal;
 }
 
 .composer .composer-sender-selectors {
@@ -1259,7 +1259,7 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 7px;
   font-size: var(--ui-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .composer .composer-sender-context .custom-select-summary {
@@ -1447,7 +1447,7 @@
 .composer-schedule-picker-header strong {
   color: var(--ui-text);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-header small {
@@ -1473,7 +1473,7 @@
   padding: 0 8px;
   color: var(--ui-accent);
   font-size: 11px;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-confirm {
@@ -1487,7 +1487,7 @@
   border-color: var(--ui-accent);
   background: var(--ui-accent);
   font-size: 11px;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-today:hover,
@@ -1519,7 +1519,7 @@
 .composer-schedule-picker-monthbar strong {
   color: var(--ui-text);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -1543,7 +1543,7 @@
   align-items: center;
   color: var(--ui-text-tertiary);
   font-size: 10px;
-  font-weight: 620;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -1577,7 +1577,7 @@
 .composer-schedule-picker-day.is-today {
   border-color: color-mix(in oklch, var(--ui-accent) 58%, transparent);
   color: var(--ui-accent);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-day.is-selected,
@@ -1587,7 +1587,7 @@
   background: var(--ui-accent);
   opacity: 1;
 
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-day:focus-visible,
@@ -1692,7 +1692,7 @@
 .composer-schedule-picker-time-fields b {
   color: var(--ui-text-tertiary);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-schedule-picker-footer {
@@ -1844,7 +1844,7 @@
 .composer-contacts-heading strong {
   color: var(--ui-text);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .composer-contacts-heading small {
@@ -1902,7 +1902,7 @@
   color: var(--ui-text-tertiary);
   background: transparent;
   font-size: 10.5px;
-  font-weight: 620;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -2020,8 +2020,8 @@
   border-radius: 11px;
   color: var(--ui-accent);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  letter-spacing: normal;
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ui-accent) 16%, transparent);
 }
 
@@ -2073,7 +2073,7 @@
 .composer-contact-copy strong {
   color: var(--ui-text);
   font-size: 11.5px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-contact-copy small {
@@ -2089,7 +2089,7 @@
   margin-top: 1px;
   color: var(--ui-accent);
   font-size: 9px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-contacts-empty {
@@ -2119,7 +2119,7 @@
 .composer-contacts-empty strong {
   color: var(--ui-text-secondary);
   font-size: 11.5px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-contacts-empty small {
@@ -2313,9 +2313,9 @@
 
 .composer-title-copy strong {
   color: var(--ui-text);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: normal;
   white-space: nowrap;
 }
 
@@ -2371,7 +2371,7 @@
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-header-actions .composer-contact-toggle:hover {
@@ -2448,7 +2448,7 @@
 .composer .composer-sender-context .custom-select-summary strong {
   color: var(--ui-text);
   font-size: 14px;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .composer .composer-sender-context .custom-select-summary small {
@@ -2566,7 +2566,7 @@
   color: var(--ui-accent);
   background: transparent;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer .recipient-suggestions {
@@ -2696,8 +2696,8 @@
   overflow: auto;
   color: var(--ui-text);
   background: transparent;
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: var(--ui-font-size-reader);
+  line-height: var(--ui-line-height-reader);
 }
 
 .composer .composer-body-field textarea:hover,
@@ -2829,7 +2829,7 @@
   color: var(--ui-text);
   background: transparent;
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -2889,7 +2889,7 @@
 .composer-template-save-dialog strong {
   color: var(--ui-text);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-template-save-dialog label {
@@ -2983,7 +2983,7 @@
 .composer-advanced-popover > header strong {
   color: var(--ui-text);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-advanced-popover > header button {
@@ -3219,7 +3219,7 @@
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -3336,7 +3336,7 @@
 
 .composer-contacts-header > strong {
   color: var(--ui-text);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -3481,7 +3481,7 @@
   place-items: center;
   border-radius: 10px;
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-contact-copy {
@@ -3501,7 +3501,7 @@
 .composer-contact-copy strong {
   color: var(--ui-text);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .composer-contact-copy small {
@@ -3528,7 +3528,7 @@
   color: var(--ui-accent);
   background: var(--ui-surface);
   font-size: var(--ui-font-size-aux);
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;

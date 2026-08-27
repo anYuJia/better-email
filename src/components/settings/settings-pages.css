@@ -234,7 +234,7 @@
 .settings-modal .settings-identity-form-heading strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-identity-form-heading small {
@@ -312,7 +312,7 @@
   background: transparent;
   box-shadow: inset 0 -2px 0 transparent;
   font-size: var(--st-font-size-secondary);
-  font-weight: 560;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -324,7 +324,7 @@
 .settings-modal .settings-page-content .settings-connection-tab.active {
   color: var(--st-accent);
   box-shadow: inset 0 -2px 0 var(--st-accent);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 /* --- Save & verify status --- */
@@ -356,7 +356,7 @@
 .settings-modal .settings-save-verify-status > header strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-save-verify-status > header small {
@@ -373,7 +373,7 @@
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-save-verify-status.success > header > em {
@@ -412,7 +412,7 @@
 .settings-modal .settings-save-verify-stages > span b {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .settings-save-verify-stages > span small {
@@ -545,7 +545,7 @@
 .settings-modal .settings-account-row-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .settings-modal .settings-account-row-copy span {
@@ -573,7 +573,7 @@
   background: var(--st-info-soft);
   font-size: var(--st-font-size-aux);
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-account-row-actions {
@@ -680,7 +680,7 @@
 .settings-modal .settings-account-add-dialog > header strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-account-add-dialog > header small {
@@ -762,7 +762,7 @@
   padding: 10px 14px;
   color: var(--st-text);
   font-size: var(--st-font-size-secondary);
-  font-weight: 540;
+  font-weight: 500;
 }
 
 .settings-modal .settings-account-form-grid > label > :is(input, select, textarea),
@@ -880,7 +880,7 @@
 
 .settings-modal .settings-account-history-attachments strong {
   font-size: var(--st-font-size-secondary);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .settings-account-history-attachments small {
@@ -907,7 +907,7 @@
 .settings-modal .settings-account-auto-match strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .settings-account-auto-match small {
@@ -980,7 +980,7 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1049,7 +1049,7 @@
 .settings-modal .settings-provider-matrix > button strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 /* --- Provider advanced (details disclosure) --- */
@@ -1111,7 +1111,7 @@
 .settings-modal .settings-provider-advanced > summary strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-provider-advanced > summary em {
@@ -1128,7 +1128,7 @@
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-provider-advanced-content {
@@ -1309,7 +1309,7 @@
 .settings-modal .settings-oauth-sessions strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .settings-oauth-sessions span,
@@ -1342,7 +1342,7 @@
 .settings-modal .settings-oauth-result strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 /* =====================================================================
@@ -1393,7 +1393,7 @@
 .settings-modal .settings-storage-metrics strong {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-body);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-storage-actions {
@@ -1417,7 +1417,7 @@
 .settings-modal .settings-storage-actions strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .settings-storage-actions small {
@@ -1532,7 +1532,7 @@
 }
 
 .settings-modal .st-data-row > span {
-  font-weight: 560;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -1752,7 +1752,7 @@
 .settings-modal .settings-confirm-dialog > header strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-cache-confirm > header small,
@@ -1788,7 +1788,7 @@
 .settings-modal .settings-cache-confirm-summary strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-cache-confirm-summary span {
@@ -1968,7 +1968,7 @@
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .credential-input-shell {
@@ -2143,7 +2143,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .mailbox-map-title > span.mapped {
@@ -2237,7 +2237,7 @@
 .settings-modal .write-validation-stage > span {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .write-validation-stage > b {
@@ -2247,7 +2247,7 @@
   color: var(--st-text-tertiary);
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .write-validation-stage > p {
@@ -2396,7 +2396,7 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2405,7 +2405,7 @@
   flex: 0 0 auto;
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .writeback-validation-step > p {
@@ -2656,7 +2656,7 @@
 .settings-modal .settings-contact-edit-email-label {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-contact-edit-email-value {
@@ -2664,7 +2664,7 @@
   overflow-wrap: anywhere;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 560;
+  font-weight: 500;
   line-height: 1.45;
 }
 
@@ -2724,7 +2724,7 @@
   gap: 6px;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 540;
+  font-weight: 500;
 }
 
 .settings-modal .contact-merge-picker select {
@@ -2859,9 +2859,9 @@
 
 .settings-modal .settings-contact-details { display: grid; margin: 0; border-top: 1px solid var(--st-border); }
 .settings-modal .settings-contact-details > div { min-width: 0; display: grid; gap: 3px; padding: 10px 2px; border-bottom: 1px solid var(--st-border); }
-.settings-modal .settings-contact-details dt { color: var(--st-text-secondary); font-size: var(--st-font-size-secondary); font-weight: 560; }
+.settings-modal .settings-contact-details dt { color: var(--st-text-secondary); font-size: var(--st-font-size-secondary); font-weight: 500; }
 .settings-modal .settings-contact-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--st-text); font-size: var(--st-font-size-body); line-height: 1.45; }
-.settings-modal .settings-contact-details .settings-contact-detail-primary dd { font-size: var(--st-font-size-card-title); font-weight: 620; }
+.settings-modal .settings-contact-details .settings-contact-detail-primary dd { font-size: var(--st-font-size-card-title); font-weight: 600; }
 .settings-modal .settings-contact-details dd.settings-contact-detail-empty { color: var(--st-text-tertiary); }
 .settings-modal .settings-contact-detail-actions { flex-wrap: wrap; }
 .settings-modal .settings-contact-detail-actions-danger {
@@ -2933,7 +2933,7 @@
 .settings-modal .settings-rule-builder-group > strong {
   color: var(--st-text);
   font-size: var(--st-font-size-aux);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .settings-rule-condition-fields {
@@ -2950,7 +2950,7 @@
   margin: 0;
   color: var(--st-text);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-rule-condition-fields label > span,
@@ -2958,7 +2958,7 @@
 .settings-modal .settings-rule-action-row > span {
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-rule-action-row {
@@ -3018,7 +3018,7 @@
   padding: 8px 0;
   color: var(--st-text);
   font-size: var(--st-font-size-secondary);
-  font-weight: 580;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -3083,7 +3083,7 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3185,7 +3185,7 @@
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);
   font-size: var(--st-font-size-body);
-  font-weight: 560;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
@@ -3254,7 +3254,7 @@
 .contact-import-dialog .st-field-label {
   color: var(--st-text);
   font-size: var(--st-font-size-secondary);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .contact-import-dialog .st-field > :is(input, select, textarea) {
@@ -3342,13 +3342,13 @@
 .contact-import-dialog .st-switch-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .contact-import-dialog .st-switch-copy small {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 440;
+  font-weight: 400;
   line-height: 1.45;
 }
 
@@ -3416,7 +3416,7 @@
 .contact-import-dialog-heading strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .contact-import-dialog-heading small {
@@ -3463,7 +3463,7 @@
   border-radius: 999px;
   font-size: var(--st-font-size-aux);
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .contact-import-counts .count-new {
@@ -3523,7 +3523,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .contact-import-status.new {
@@ -3558,7 +3558,7 @@
 .contact-import-identity strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .contact-import-identity em {
@@ -3600,7 +3600,7 @@
   color: var(--st-info);
   background: var(--st-info-soft);
   font-size: 12px;
-  font-weight: 560;
+  font-weight: 500;
   vertical-align: 1px;
 }
 
@@ -3641,7 +3641,7 @@
   color: var(--st-text-secondary);
   background: var(--st-surface-subtle);
   font-size: 12px;
-  font-weight: 540;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3663,7 +3663,7 @@
 .contact-import-result strong {
   color: var(--st-text);
   font-size: var(--st-font-size-page-title);
-  font-weight: 640;
+  font-weight: 600;
 }
 
 .contact-import-idle p,
@@ -3719,7 +3719,7 @@
 .contact-import-history-row strong {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .contact-import-history-row em {
@@ -3861,7 +3861,7 @@
   background: var(--st-warning-soft);
   font-size: var(--st-font-size-aux);
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .settings-ai-key-row {
@@ -3908,7 +3908,7 @@
 .settings-modal .settings-ai-test-result em {
   margin-left: auto;
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 /* --- Template pages --- */
@@ -4044,7 +4044,7 @@
   margin: 0;
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .settings-modal .template-variable-hints {
@@ -4062,7 +4062,7 @@
   width: 100%;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .template-variable-chip {
@@ -4111,14 +4111,14 @@
 .settings-modal .template-preview > strong {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .template-preview-subject {
   margin: 0;
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .template-preview-body {
@@ -4194,7 +4194,7 @@
   border-radius: 999px;
   font-size: var(--st-font-size-aux);
   font-style: normal;
-  font-weight: 560;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -4325,7 +4325,7 @@
 .settings-modal .connection-diagnostic-steps strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .connection-diagnostic-steps small {
@@ -4362,7 +4362,7 @@
 .settings-modal .connection-recommendations > strong {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .connection-recommendations ol {
@@ -4459,7 +4459,7 @@
 
 .settings-modal .connection-technical-details p strong {
   color: var(--st-text);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .connection-technical-details p small {
@@ -4512,7 +4512,7 @@
 .settings-modal .notification-account-grid strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 580;
+  font-weight: 600;
 }
 
 .settings-modal .notification-account-grid small {
@@ -4541,7 +4541,7 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .notification-account-grid button:hover,
@@ -4595,7 +4595,7 @@
   color: var(--st-text);
   background: var(--st-surface);
   font-size: var(--st-font-size-secondary);
-  font-weight: 520;
+  font-weight: 500;
 }
 
 .settings-modal .vip-sender-chip span {
@@ -4651,14 +4651,14 @@
 
 .settings-modal .notification-rule-order li span {
   color: var(--st-text);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .privacy-trust-scope {
   padding: 2px 8px;
   border-radius: 999px;
   font-size: var(--st-font-size-aux);
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .settings-modal .privacy-trust-scope.scope-sender {

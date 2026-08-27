@@ -102,14 +102,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    letter-spacing: normal;
   }
 
   .mobile-inbox-title span {
     flex: 0 0 auto;
     color: var(--ui-text-tertiary);
-    font-size: 12px;
+    font-size: var(--ui-font-size-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -152,7 +152,7 @@
     color: var(--ui-text-tertiary);
     background: transparent;
     font-size: 13px;
-    font-weight: 620;
+    font-weight: 600;
     white-space: nowrap;
   }
 
@@ -297,6 +297,27 @@
     padding-right: 58px;
   }
 
+  /* Touch typography has its own hierarchy; desktop list type must not be
+     scaled down and reused unchanged on a phone. */
+  .mobile-app-surface :is(.sender, .thread-sender) {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .mobile-app-surface :is(.subject, .thread-subject) {
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .mobile-app-surface :is(.message-card p, .thread-preview) {
+    font-size: 13.5px;
+    line-height: 1.4;
+  }
+
+  .mobile-app-surface :is(.message-card time, .thread-card time) {
+    font-size: 12.5px;
+  }
+
   .mobile-app-surface .message-mobile-menu-button {
     position: absolute;
     top: 50%;
@@ -354,7 +375,7 @@
     border: 0;
     color: var(--ui-text-tertiary);
     background: transparent;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     white-space: nowrap;
   }
@@ -429,17 +450,17 @@
 
   .mobile-sheet-header span {
     color: var(--ui-text-tertiary);
-    font-size: 10px;
-    letter-spacing: 0.02em;
+    font-size: 12px;
+    letter-spacing: normal;
   }
 
   .mobile-sheet-header h1 {
     margin: 0;
     color: var(--ui-text);
     font-size: 19px;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: normal;
   }
 
   .mobile-mailbox-scroll {
@@ -463,9 +484,9 @@
     margin: 0;
     padding: 0 4px 7px;
     color: var(--ui-text-tertiary);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: normal;
     line-height: 1.3;
     text-transform: uppercase;
   }
@@ -535,7 +556,7 @@
     color: var(--color-text-on-accent);
     background: var(--ui-accent);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .mobile-mailbox-row-copy {
@@ -553,23 +574,23 @@
 
   .mobile-mailbox-row-copy strong {
     color: inherit;
-    font-size: 14px;
-    font-weight: 620;
+    font-size: 15px;
+    font-weight: 600;
     line-height: 1.25;
   }
 
   .mobile-mailbox-row-copy small {
     color: var(--ui-text-tertiary);
-    font-size: 11px;
-    line-height: 1.25;
+    font-size: var(--ui-font-size-meta);
+    line-height: 1.35;
   }
 
   .mobile-mailbox-check,
   .mobile-mailbox-count {
     flex: 0 0 auto;
     color: var(--ui-accent);
-    font-size: 11px;
-    font-weight: 650;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .mobile-mailbox-empty {
@@ -603,7 +624,7 @@
     color: var(--ui-text-secondary);
     background: var(--ui-surface-muted);
     font-size: 12.5px;
-    font-weight: 620;
+    font-weight: 600;
   }
 
   .mobile-mailbox-footer button:hover {
@@ -626,9 +647,9 @@
     margin: 0;
     padding: 6px 18px 7px;
     color: var(--ui-text-tertiary);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: normal;
     text-transform: uppercase;
   }
 
@@ -676,7 +697,7 @@
     color: var(--ui-text-secondary);
     background: transparent;
     font-size: 13px;
-    font-weight: 620;
+    font-weight: 600;
   }
 
   .mobile-app-surface .narrow-reader-navigation button:hover,
@@ -813,7 +834,7 @@
     min-height: 52px;
     grid-template-columns: 58px minmax(0, 1fr);
     padding-inline: 14px;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .app-shell.is-mobile-app .composer .composer-field-row input,
@@ -956,7 +977,7 @@
     margin: 0;
     color: var(--ui-text);
     font-size: 19px;
-    font-weight: 700;
+    font-weight: 600;
     text-align: center;
   }
 
@@ -990,7 +1011,7 @@
     color: var(--color-text-on-accent);
     background: var(--ui-accent);
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .mobile-settings-account-summary > div {
@@ -1071,13 +1092,13 @@
 
   .mobile-settings-row-copy strong {
     color: inherit;
-    font-size: 14px;
-    font-weight: 630;
+    font-size: 15px;
+    font-weight: 600;
   }
 
   .mobile-settings-row-copy small {
     color: var(--ui-text-tertiary);
-    font-size: 11px;
+    font-size: var(--ui-font-size-meta);
   }
 
   .mobile-settings-row > svg {

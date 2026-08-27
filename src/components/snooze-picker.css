@@ -57,13 +57,13 @@
 
 .snooze-dialog > header strong {
   color: var(--ui-text);
-  font-size: 14px;
-  font-weight: 620;
+  font-size: var(--ui-font-size-section);
+  font-weight: 600;
 }
 
 .snooze-dialog > header small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .snooze-dialog > header button {
@@ -142,13 +142,13 @@
 
 .snooze-preset-grid strong {
   color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 560;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 500;
 }
 
 .snooze-preset-grid small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-variant-numeric: tabular-nums;
 }
 
@@ -167,13 +167,13 @@
 
 .snooze-custom > span strong {
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
 }
 
 .snooze-custom > span small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .snooze-custom > div {
@@ -205,8 +205,8 @@
   border-radius: var(--ui-radius-control, 8px);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .snooze-custom button:hover {

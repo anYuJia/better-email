@@ -43,7 +43,7 @@
 .custom-select-summary strong {
   overflow: hidden;
   font-size: var(--ui-font-size-body);
-  font-weight: 540;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -51,8 +51,8 @@
 .custom-select-summary small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-aux);
-  font-weight: 460;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -143,13 +143,13 @@
 
 .custom-select-dropdown button strong {
   font-size: var(--ui-font-size-secondary);
-  font-weight: 540;
+  font-weight: 500;
 }
 
 .custom-select-dropdown button small {
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-aux);
-  font-weight: 460;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 400;
 }
 
 .custom-select-dropdown button > svg {

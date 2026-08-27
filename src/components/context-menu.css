@@ -39,13 +39,13 @@
 
 .context-menu-heading strong {
   color: var(--ui-text);
-  font-size: 12px;
-  font-weight: 680;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 600;
 }
 
 .context-menu-heading span {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .context-menu-items {
@@ -65,8 +65,8 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12.5px;
-  font-weight: 520;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
   transition: var(--ui-transition-fast-color-background);
 }
@@ -131,7 +131,7 @@
 
 .context-menu-copy small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
 }
 

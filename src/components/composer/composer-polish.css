@@ -15,8 +15,9 @@
 .composer .composer-field-row:focus-within,
 .composer .composer-field-row:has(input:focus-visible),
 .composer .composer-recipient-field .composer-field-row:focus-within {
+  border-bottom-color: var(--ui-accent);
   background: var(--ui-surface);
-  box-shadow: none;
+  box-shadow: inset 0 -1px 0 var(--ui-accent);
   outline: none;
 }
 

@@ -73,7 +73,7 @@
 .undo-snackbar strong,
 .message-toast-undo strong {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,19 +82,19 @@
 
 .undo-snackbar strong {
   color: var(--ui-text);
-  font-weight: 680;
+  font-weight: 600;
 }
 
 .message-toast-undo strong {
   color: var(--ui-text);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .undo-snackbar span,
 .message-toast-undo-main span {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   color: var(--ui-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -109,8 +109,8 @@
   border-radius: var(--notification-inline-action-radius);
   color: var(--notification-inline-action-text);
   background: var(--notification-inline-action-bg);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -178,7 +178,7 @@
   border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text);
-  font-size: 12.5px;
+  font-size: 13px;
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--ui-border) 64%, transparent),
     var(--notification-toast-shadow);
@@ -246,7 +246,7 @@
 .message-toast-undo .message-toast-count {
   display: inline-block;
   color: var(--ui-accent);
-  font-weight: 720;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 

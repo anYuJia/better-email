@@ -98,9 +98,9 @@
 .settings-title-copy strong {
   min-width: 0;
   color: var(--st-text);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: var(--ui-font-size-section);
+  font-weight: 600;
+  letter-spacing: normal;
 }
 
 .settings-title-copy small {
@@ -326,7 +326,7 @@
   font-size: var(--st-font-size-aux);
   font-weight: 600;
   line-height: 1.2;
-  letter-spacing: 0.01em;
+  letter-spacing: normal;
 }
 
 .settings-modal .settings-nav-section > button {
@@ -503,8 +503,8 @@
   margin: 0;
   color: var(--st-text);
   font-size: var(--st-font-size-page-title);
-  font-weight: 650;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  letter-spacing: normal;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;

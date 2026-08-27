@@ -53,14 +53,26 @@
   --color-danger-hover: oklch(0.46 0.17 var(--primitive-hue-danger));
   --color-danger-soft: oklch(0.96 0.035 var(--primitive-hue-danger));
 
-  /* Type and spatial rhythm */
-  --ui-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  /* Native typography. Text surfaces use the platform text face; explicit
+     CJK fallbacks keep mixed Chinese/Latin runs visually consistent. Display
+     faces are intentionally excluded from body copy and application chrome. */
+  --ui-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", system-ui, sans-serif;
   --ui-font-size-aux: 12px;
-  --ui-font-size-secondary: 13px;
+  --ui-font-size-meta: 12.5px;
+  --ui-font-size-secondary: 13.5px;
   --ui-font-size-body: 14px;
+  --ui-font-size-reader: 15px;
+  --ui-font-size-section: 16px;
   --ui-font-size-title: 21px;
+  --ui-font-weight-regular: 400;
+  --ui-font-weight-medium: 500;
+  --ui-font-weight-semibold: 600;
+  --ui-line-height-tight: 1.25;
+  --ui-line-height-compact: 1.4;
   --ui-line-height: 1.45;
-  --ui-letter-spacing: -0.01em;
+  --ui-line-height-body: 1.55;
+  --ui-line-height-reader: 1.6;
+  --ui-letter-spacing: normal;
 
   --ui-space-1: 4px;
   --ui-space-2: 8px;

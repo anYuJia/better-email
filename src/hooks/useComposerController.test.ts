@@ -70,6 +70,9 @@ describe('useComposerController close lifecycle', () => {
   it('saving a draft closes the composer without the unsaved-changes confirmation', async () => {
     const { result, mocks } = renderComposer();
     mockInvoke.mockResolvedValueOnce({ message: '草稿已保存', draft_id: 7 });
+    mocks.refreshAll.mockImplementationOnce(async () => {
+      mocks.setStatus('已刷新本地邮箱数据');
+    });
 
     act(() => {
       result.current.setDraft({ ...result.current.draft, to: 'a@example.com', subject: 'Hi', body: 'Body' });
@@ -85,6 +88,7 @@ describe('useComposerController close lifecycle', () => {
     expect(result.current.composerCloseConfirmOpen).toBe(false);
     expect(mocks.setStatus).toHaveBeenCalledWith('正在保存草稿…');
     expect(mocks.setStatus).toHaveBeenCalledWith('草稿已保存');
+    expect(mocks.setStatus).toHaveBeenLastCalledWith('草稿已保存');
   });
 
   it('keeps the composer content open when saving a draft fails', async () => {

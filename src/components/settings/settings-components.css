@@ -46,8 +46,8 @@
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
-  font-weight: 650;
-  letter-spacing: -0.005em;
+  font-weight: 600;
+  letter-spacing: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -190,7 +190,7 @@
 .settings-modal .st-row-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .settings-modal .st-row-copy small {
@@ -357,7 +357,7 @@
 .settings-modal .st-switch-copy strong {
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .settings-modal .st-switch-copy small {

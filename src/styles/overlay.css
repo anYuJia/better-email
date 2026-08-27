@@ -40,7 +40,7 @@
     0 0 0 1px color-mix(in srgb, var(--ui-border) 70%, transparent),
     var(--ui-shadow-float);
   font-size: 12px;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .deferred-spinner {

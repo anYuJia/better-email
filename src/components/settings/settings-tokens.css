@@ -43,8 +43,8 @@
   --st-font-size-body: var(--ui-font-size-body);
   --st-font-size-secondary: var(--ui-font-size-secondary);
   --st-font-size-aux: var(--ui-font-size-aux);
-  --st-font-size-card-title: 15px;
-  --st-font-size-page-title: 19px;
+  --st-font-size-card-title: var(--ui-font-size-section);
+  --st-font-size-page-title: var(--ui-font-size-title);
   --st-space-1: 4px;
   --st-space-2: 8px;
   --st-space-3: 12px;

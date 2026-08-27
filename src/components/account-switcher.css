@@ -74,15 +74,15 @@
 
 .account-switcher-copy strong {
   color: var(--ui-text);
-  font-size: 12.5px;
-  font-weight: 620;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 600;
 }
 
 .account-switcher .account-switcher-copy > span {
   margin-top: 1px;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
-  font-weight: 520;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
 }
 
 .account-switcher-chevron {
@@ -123,8 +123,8 @@
   padding: 4px 7px;
   border-radius: 6px;
   color: var(--ui-text);
-  font-size: 12px;
-  font-weight: 520;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .account-switcher-menu .context-menu button.has-detail {
@@ -150,7 +150,7 @@
 
 .account-switcher-menu .context-menu-copy small {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .account-switcher-menu [data-context-item='add-account'] {
@@ -159,7 +159,7 @@
 
 .account-switcher-menu [data-context-item='add-account'] .context-menu-label {
   color: var(--ui-text);
-  font-weight: 540;
+  font-weight: 500;
 }
 
 .account-switcher-menu [data-context-item='add-account'] .context-menu-icon {

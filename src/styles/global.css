@@ -16,13 +16,9 @@
   color: var(--ui-text);
   background: var(--ui-bg);
   font-family: var(--ui-font-sans);
-  font-size: 14px;
-  letter-spacing: -0.01em;
-}
-
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-size: var(--ui-font-size-body);
+  line-height: var(--ui-line-height);
+  letter-spacing: var(--ui-letter-spacing);
 }
 
 /* The app root follows the token background so panes can sit on translucent

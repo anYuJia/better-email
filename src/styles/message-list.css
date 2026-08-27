@@ -189,7 +189,7 @@
   min-width: 0;
   height: 36px;
   border: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 36px;
   color: var(--ui-text);
   background: transparent;
@@ -295,7 +295,7 @@
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
@@ -397,13 +397,13 @@
 }
 
 .search-suggestion-panel strong {
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
 }
 
 .search-suggestion-panel em {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-style: normal;
   white-space: nowrap;
 }
@@ -412,7 +412,7 @@
   display: block;
   padding: 5px 9px 2px;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
 }
 
@@ -469,14 +469,14 @@
 .list-summary strong {
   overflow: hidden;
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .app-shell .list-summary strong {
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
 }
 
@@ -485,7 +485,7 @@
   overflow: hidden;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -493,7 +493,7 @@
 
 .app-shell .list-summary span {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 400;
 }
 
@@ -502,7 +502,7 @@
   border-radius: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-style: normal;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
@@ -538,7 +538,7 @@
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
@@ -636,7 +636,7 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
   display: flex;
   align-items: center;
@@ -1200,8 +1200,8 @@
   display: block;
   color: var(--ui-text);
   font-size: var(--ui-font-size-secondary);
-  font-weight: 400;
-  line-height: 1.3;
+  font-weight: 500;
+  line-height: var(--ui-line-height-tight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1218,8 +1218,8 @@
   width: 100%;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-secondary);
-  line-height: 1.25;
+  font-size: var(--ui-font-size-meta);
+  line-height: 1.4;
 }
 
 .message-card time {
@@ -1484,7 +1484,7 @@
 .thread-sender {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size-body);
   font-weight: 500;
   color: var(--ui-text-secondary);
   text-overflow: ellipsis;
@@ -1509,7 +1509,7 @@
   flex: 1;
   min-width: 0;
   color: var(--ui-text-secondary);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1537,7 +1537,7 @@
 
 .thread-preview {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   color: var(--ui-text-tertiary);
   font-weight: 400;
   overflow: hidden;
@@ -1923,8 +1923,8 @@
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
-  font-weight: 550;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .app-shell .list-control-tabs > button:hover,
@@ -1964,7 +1964,7 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   white-space: nowrap;
   list-style: none;
   cursor: pointer;
@@ -2002,7 +2002,7 @@
 
 .compact-dropdown > summary strong {
   color: var(--ui-text);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
 }
 
@@ -2044,7 +2044,7 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
   white-space: nowrap;
 }
@@ -2099,7 +2099,7 @@
   gap: 6px;
   padding: 0 8px;
   color: var(--ui-text);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 600;
 }
 
@@ -2113,8 +2113,8 @@
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
-  font-weight: 550;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
   box-shadow: var(--ui-box-shadow-none);
 }
 

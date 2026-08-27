@@ -10,11 +10,11 @@
    The pane surface (background) is mapped by the app-shell layer
    (layout.css); this sheet owns everything inside the rail.
 
-   Type scale (deliberately small, no fragmenting):
-     Brand       13.5px / 600
-     Navigation  13px
-     Secondary   11–12px
-     Unread      11.5px / tabular-nums
+   Type scale (native and compact, without microscopic chrome):
+     Brand       14px / 600
+     Navigation  13.5px / 500
+     Secondary   12–12.5px
+     Unread      12px / tabular-nums
 
    Radius: 6px rows, 8px primary controls; 999px reserved for the sync bar
    and true status dots only.
@@ -30,7 +30,7 @@
   padding: 0 12px 14px 20px;
   overflow: hidden;
   color: var(--ui-text-secondary);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
 }
 
 /* Brand --------------------------------------------------------------------
@@ -60,7 +60,7 @@
   color: var(--ui-text);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: normal;
   white-space: nowrap;
 }
 
@@ -94,7 +94,7 @@
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
   transition-property: color, background-color, border-color, scale;
   transition-duration: var(--ui-motion-fast);
@@ -135,8 +135,8 @@
   margin: 5px 0 1px;
   padding: 0 9px;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
-  font-weight: 560;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
 }
 
 /* Folder navigation ----------------------------------------------------------
@@ -181,8 +181,8 @@
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   text-align: left;
-  font-size: 13px;
-  font-weight: 520;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 500;
   transition: var(--ui-transition-fast-color-background);
 }
 
@@ -246,7 +246,7 @@
 
 .folder.active .badge {
   color: var(--ui-accent);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .folder-main:focus-visible {
@@ -331,7 +331,7 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
   background: var(--ui-control-bg);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .folder-rename input:focus,
@@ -348,8 +348,8 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: var(--ui-control-bg);
-  font-size: 12px;
-  font-weight: 520;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
 }
 
 .folder-rename button:hover,
@@ -374,8 +374,8 @@
   align-items: center;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  font-size: 13px;
-  font-weight: 520;
+  font-size: var(--ui-font-size-secondary);
+  font-weight: 500;
   cursor: pointer;
   transition: var(--ui-transition-fast-color-background);
 }
@@ -415,7 +415,7 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
   background: var(--ui-control-bg);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .saved-search-form input:focus {
@@ -430,8 +430,8 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: var(--ui-control-bg);
-  font-size: 12px;
-  font-weight: 520;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
 }
 
 .saved-search-form button:hover {
@@ -462,8 +462,8 @@
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12.5px;
-  font-weight: 520;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -507,7 +507,7 @@
 
 .sidebar-task-title {
   color: var(--ui-text-secondary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -516,7 +516,7 @@
 
 .sidebar-task-status {
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
 }
 
 .sidebar-task-progress {
@@ -567,8 +567,8 @@
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
-  font-weight: 540;
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
   transition: var(--ui-transition-fast-color-background);
 }
 

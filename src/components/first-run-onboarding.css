@@ -59,13 +59,13 @@
 }
 
 .first-run-onboarding-header strong {
-  font-size: var(--ui-font-size-body);
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
 }
 
 .first-run-onboarding-header small {
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-aux);
+  font-size: var(--ui-font-size-meta);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -112,7 +112,7 @@
 
 .first-run-onboarding-body h2 {
   margin: 0 0 10px;
-  font-size: var(--ui-font-size-body);
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
 }
 

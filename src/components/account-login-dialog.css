@@ -55,14 +55,14 @@
 }
 
 .account-login-header strong {
-  font-size: var(--ui-font-size-body);
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
   line-height: 1.25;
 }
 
 .account-login-header small {
   color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-aux);
+  font-size: var(--ui-font-size-meta);
   line-height: 1.3;
 }
 
@@ -79,7 +79,7 @@
   display: grid;
   gap: 6px;
   color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-aux);
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
 }
 
@@ -189,14 +189,14 @@
 
 .account-login-provider strong {
   color: var(--ui-text);
-  font-size: var(--ui-font-size-aux);
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
 }
 
 .account-login-provider small {
   overflow: hidden;
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-aux);
+  font-size: var(--ui-font-size-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;

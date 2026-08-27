@@ -86,7 +86,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   color: var(--ui-text);
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: normal;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -124,14 +124,14 @@ body[data-image-preview-modal='1'] .window-chrome {
 
 .titlebar-context-label {
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 600;
 }
 
 .titlebar-context-count {
   flex: 0 0 auto;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-variant-numeric: tabular-nums;
 }
 
@@ -214,7 +214,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 36px;
   appearance: none;
   -webkit-appearance: none;
@@ -257,7 +257,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   border-radius: 0 var(--ui-radius-control) var(--ui-radius-control) 0;
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 500;
 }
 
@@ -277,7 +277,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   min-width: 42px;
   justify-content: flex-end;
   color: var(--ui-text-tertiary);
-  font-size: 11px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -320,7 +320,7 @@ body[data-image-preview-modal='1'] .window-chrome {
   max-width: 124px;
   overflow: hidden;
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

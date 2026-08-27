@@ -1,249 +1,203 @@
-import { useEffect, useRef, type RefObject } from 'react';
-import type { ListMode, MessageSummary, UndoAction } from '../app/types';
-
-type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash';
-type ComposeMode = 'reply' | 'replyAll' | 'forward';
+import { useEffect } from 'react';
+import type { RefObject } from 'react';
 
 type UseAppShortcutsOptions = {
+  enabled?: boolean;
   searchInputRef: RefObject<HTMLInputElement>;
-  messages: MessageSummary[];
-  selected: MessageSummary | null;
+  openComposer: () => void;
   selectedId: number | null;
-  selectedMessages: MessageSummary[];
-  selectedMessageIds: number[];
-  listMode: ListMode;
-  undoAction: UndoAction | null;
-  isComposerOpen: boolean;
-  isComposerMinimized: boolean;
-  isComposerModal: boolean;
-  isSettingsOpen: boolean;
-  isShortcutsOpen: boolean;
-  isAccountLoginRequired: boolean;
-  closeOverlays: () => void;
-  clearSelection: () => void;
-  setStatus: (status: string) => void;
-  restoreUndoAction: () => Promise<void>;
-  toggleAllVisibleMessages: (checked: boolean) => void | Promise<number | null>;
-  openShortcuts: () => void;
-  composeNew: () => void;
-  setSelectedId: (messageId: number) => void;
-  runBulkAction: (action: BulkAction) => Promise<void>;
-  composeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
-  toggleStar: (message: MessageSummary) => Promise<void>;
-  toggleRead: (message: MessageSummary) => Promise<void>;
-  moveSelected: (role: 'archive' | 'trash') => Promise<void>;
+  selectAdjacent: (direction: -1 | 1) => void;
+  composeReply: (mode: 'reply' | 'replyAll' | 'forward') => void;
+  toggleStar: () => void;
+  toggleRead: () => void;
+  archive: () => void;
+  moveTrash: () => void;
+  selectAllVisible: () => void;
+  undo: () => void;
+  openHelp: () => void;
+  closeHelp: () => void;
+  shortcutHelpOpen: boolean;
+  confirmationOpen: boolean;
 };
 
-export default function useAppShortcuts(options: UseAppShortcutsOptions) {
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+function isTypingTarget(target: EventTarget | null) {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'));
+}
 
+export default function useAppShortcuts({
+  enabled = true,
+  searchInputRef,
+  openComposer,
+  selectedId,
+  selectAdjacent,
+  composeReply,
+  toggleStar,
+  toggleRead,
+  archive,
+  moveTrash,
+  selectAllVisible,
+  undo,
+  openHelp,
+  closeHelp,
+  shortcutHelpOpen,
+  confirmationOpen,
+}: UseAppShortcutsOptions) {
   useEffect(() => {
-    function isEditableTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) return false;
-      return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
-    }
+    if (!enabled) return undefined;
 
-    function hasActiveTextSelection(): boolean {
-      const selection = window.getSelection();
-      return Boolean(selection && !selection.isCollapsed && selection.toString());
-    }
-
-    function selectRelativeMessage(offset: number) {
-      const { messages, selectedId, setSelectedId } = optionsRef.current;
-      if (messages.length === 0) return;
-      const currentIndex = selectedId ? messages.findIndex((message) => message.id === selectedId) : -1;
-      const nextIndex = Math.min(Math.max(currentIndex + offset, 0), messages.length - 1);
-      setSelectedId(messages[nextIndex].id);
-    }
-
-    function runSafely(action: Promise<void>) {
-      const { setStatus } = optionsRef.current;
-      action.catch((error) => setStatus(String(error)));
-    }
-
-    function handleShortcut(event: KeyboardEvent) {
-      const {
-        searchInputRef,
-        messages,
-        selected,
-        selectedMessages,
-        selectedMessageIds,
-        listMode,
-        undoAction,
-        isComposerOpen,
-        isComposerMinimized,
-        isComposerModal,
-        isSettingsOpen,
-        isShortcutsOpen,
-        isAccountLoginRequired,
-        closeOverlays,
-        clearSelection,
-        setStatus,
-        restoreUndoAction,
-        toggleAllVisibleMessages,
-        openShortcuts,
-        composeNew,
-        runBulkAction,
-        composeFromMessage,
-        toggleStar,
-        toggleRead,
-        moveSelected,
-      } = optionsRef.current;
+    function onKeyDown(event: KeyboardEvent) {
       const key = event.key.toLowerCase();
-      const editable = isEditableTarget(event.target);
-      const commandModifier = event.metaKey || event.ctrlKey;
+      const mod = event.metaKey || event.ctrlKey;
 
-      if (isAccountLoginRequired) return;
-      // 图片预览模态期间快捷键不穿透。
-      if (document.body.dataset.imagePreviewModal === '1') return;
-
-      if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen)) {
+      if (shortcutHelpOpen && event.key === 'Escape') {
         event.preventDefault();
-        closeOverlays();
+        closeHelp();
         return;
       }
-      const withinComposer = event.target instanceof Element && Boolean(event.target.closest('.composer, .composer-minimized'));
-      if (withinComposer) return;
-      const hasBlockingOverlay = isSettingsOpen
-        || isShortcutsOpen
-        || (isComposerOpen && !isComposerMinimized && isComposerModal);
-      if (hasBlockingOverlay) return;
 
-      if (commandModifier && !event.shiftKey && key === 'k') {
+      if (confirmationOpen && event.key === 'Escape') return;
+
+      if (mod && key === 'k') {
         event.preventDefault();
         searchInputRef.current?.focus();
+        searchInputRef.current?.select();
         return;
       }
 
-      if (editable) return;
-
-      if (key === 'escape' && document.querySelector('.context-menu')) {
-        return;
-      }
-
-      if (key === 'escape' && selectedMessageIds.length > 0) {
+      if (mod && event.key === '/' && !isTypingTarget(event.target)) {
         event.preventDefault();
-        clearSelection();
-        setStatus('已取消邮件选择');
+        openHelp();
         return;
       }
 
-      if (commandModifier && !event.shiftKey && key === 'z' && undoAction) {
+      if (isTypingTarget(event.target)) return;
+
+      if (mod && key === 'a') {
         event.preventDefault();
-        runSafely(restoreUndoAction());
+        selectAllVisible();
         return;
       }
 
-      if (
-        commandModifier
-        && !event.shiftKey
-        && key === 'a'
-        && listMode === 'messages'
-        && messages.length > 0
-        && !hasActiveTextSelection()
-      ) {
+      if (mod && key === 'z') {
         event.preventDefault();
-        const selectionResult = toggleAllVisibleMessages(true);
-        if (selectionResult && typeof selectionResult.then === 'function') {
-          setStatus('正在选择当前列表中的全部邮件');
-          void selectionResult.then((count) => {
-            if (typeof count === 'number') {
-              setStatus(`已选择当前列表 ${count} 封邮件`);
-            }
-          });
-        } else {
-          setStatus(`已选择当前列表 ${messages.length} 封邮件`);
-        }
+        undo();
         return;
       }
 
-      if (commandModifier && key === '/') {
+      if (event.key === '?' && !mod) {
         event.preventDefault();
-        openShortcuts();
+        openHelp();
         return;
       }
 
-      if (commandModifier || event.altKey) return;
-
-      if (key === '?' || (event.shiftKey && key === '/')) {
-        event.preventDefault();
-        openShortcuts();
-        return;
-      }
-
-      if (key === '/') {
+      if (event.key === '/' && !mod) {
         event.preventDefault();
         searchInputRef.current?.focus();
-        return;
-      }
-      if (key === 'c') {
-        event.preventDefault();
-        composeNew();
-        return;
-      }
-      if (listMode === 'messages' && (key === 'j' || key === 'arrowdown')) {
-        event.preventDefault();
-        selectRelativeMessage(1);
-        return;
-      }
-      if (listMode === 'messages' && (key === 'k' || key === 'arrowup')) {
-        event.preventDefault();
-        selectRelativeMessage(-1);
+        searchInputRef.current?.select();
         return;
       }
 
-      if (selectedMessages.length > 0) {
-        if (key === 's') {
-          event.preventDefault();
-          const action = selectedMessages.every((message) => message.is_starred) ? 'unstar' : 'star';
-          runSafely(runBulkAction(action));
-          return;
-        }
-        if (key === 'm') {
-          event.preventDefault();
-          const action = selectedMessages.every((message) => message.is_read) ? 'unread' : 'read';
-          runSafely(runBulkAction(action));
-          return;
-        }
-        if (key === 'e') {
-          event.preventDefault();
-          runSafely(runBulkAction('archive'));
-          return;
-        }
-        if (key === 'delete' || key === 'backspace') {
-          event.preventDefault();
-          runSafely(runBulkAction('trash'));
-          return;
-        }
+      if (!mod && key === 'c') {
+        event.preventDefault();
+        openComposer();
+        return;
       }
 
-      if (!selected) return;
+      if (!mod && (event.key === 'j' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        selectAdjacent(1);
+        return;
+      }
+
+      if (!mod && (event.key === 'k' || event.key === 'ArrowUp')) {
+        event.preventDefault();
+        selectAdjacent(-1);
+        return;
+      }
+
+      if (!selectedId || mod) return;
+
+      if (key === 'r' && !event.shiftKey) {
+        event.preventDefault();
+        composeReply('reply');
+        return;
+      }
+
       if (key === 'r' && event.shiftKey) {
         event.preventDefault();
-        composeFromMessage(selected, 'replyAll');
-      } else if (key === 'r') {
+        composeReply('replyAll');
+        return;
+      }
+
+      // Gmail / Superhuman-style alias. Keep Shift+R for backward compatibility.
+      if (key === 'a') {
         event.preventDefault();
-        composeFromMessage(selected, 'reply');
-      } else if (key === 'f') {
+        composeReply('replyAll');
+        return;
+      }
+
+      if (key === 'f') {
         event.preventDefault();
-        composeFromMessage(selected, 'forward');
-      } else if (key === 's') {
+        composeReply('forward');
+        return;
+      }
+
+      if (key === 's') {
         event.preventDefault();
-        runSafely(toggleStar(selected));
-      } else if (key === 'm') {
+        toggleStar();
+        return;
+      }
+
+      if (key === 'm') {
         event.preventDefault();
-        runSafely(toggleRead(selected));
-      } else if (key === 'e') {
+        toggleRead();
+        return;
+      }
+
+      if (key === 'e') {
         event.preventDefault();
-        runSafely(moveSelected('archive'));
-      } else if (key === 'delete' || key === 'backspace') {
+        archive();
+        return;
+      }
+
+      if (event.key === '#' || event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
-        runSafely(moveSelected('trash'));
+        moveTrash();
       }
     }
 
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, []);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    enabled,
+    searchInputRef,
+    openComposer,
+    selectedId,
+    selectAdjacent,
+    composeReply,
+    toggleStar,
+    toggleRead,
+    archive,
+    moveTrash,
+    selectAllVisible,
+    undo,
+    openHelp,
+    closeHelp,
+    shortcutHelpOpen,
+    confirmationOpen,
+  ]);
+
+  useEffect(() => {
+    // 清理浏览器自动恢复的 search selection，确保持有稳定焦点。
+    const input = searchInputRef.current;
+    if (!input) return undefined;
+    const handleBlur = () => {
+      if (input.selectionStart !== input.selectionEnd) {
+        input.setSelectionRange(input.selectionEnd, input.selectionEnd);
+      }
+    };
+    input.addEventListener('blur', handleBlur);
+    return () => input.removeEventListener('blur', handleBlur);
+  }, [searchInputRef]);
 }

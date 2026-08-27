@@ -4,7 +4,6 @@ export {
   sampleRawMessage,
   searchScopeOptions,
   searchShortcuts,
-  shortcutGroups,
   filters,
   emptyAccountCreateForm,
   providerVerificationLabel,
@@ -13,6 +12,7 @@ export {
   canCancelOutboxItem,
   normalizeContactAliases,
 } from './uiConfig';
+export { shortcutGroups } from './shortcutConfig';
 export {
   emptyDraft,
   emptyIdentityForm,

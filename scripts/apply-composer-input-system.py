@@ -2,6 +2,8 @@ from pathlib import Path
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
+    if new in text:
+        return text
     count = text.count(old)
     if count != 1:
         raise SystemExit(f'{label}: expected one match, got {count}')
@@ -26,7 +28,10 @@ helper = """function insertTabInTextControl(target: HTMLInputElement | HTMLTextA
 }
 
 """
-text = replace_once(text, marker, helper + marker, 'text tab helper')
+if helper not in text:
+    if marker not in text:
+        raise SystemExit('text tab helper marker missing')
+    text = text.replace(marker, helper + marker, 1)
 
 old_keydown = """  function handleRichBodyKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
@@ -193,6 +198,12 @@ if marker not in text:
 .composer .composer-rich-toolbar-group {
   gap: 1px;
   padding-right: 6px;
+}
+
+/* Keep literal tab characters visible and predictable in rich-text mail bodies. */
+.composer .composer-richtext-body {
+  white-space: pre-wrap;
+  tab-size: 4;
 }
 """
 css.write_text(text, encoding='utf-8')

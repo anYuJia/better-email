@@ -1,3 +1,5 @@
+import { redactLogValue, redactSensitiveText } from './logRedaction';
+
 const verboseLogStorageKey = 'better-email.verbose-flow-logs';
 
 export function verboseFlowLogsEnabled(
@@ -36,16 +38,17 @@ export function formatLogTimestamp(date: Date = new Date()): string {
 }
 
 /**
- * 统一日志入口：在输出时生成时间戳前缀，并保留原有日志级别。
- * 第一个参数为字符串时作为正文；否则（如直接传入 Error）原样透传，仅追加时间戳。
+ * 所有应用日志统一在输出边界脱敏。业务代码仍可传结构化诊断对象，
+ * 但邮箱地址、Token、密码/API Key 与 Authorization 内容不会原样进入控制台日志。
  */
 function stampArgs(args: unknown[]): unknown[] {
   if (args.length === 0) return [`[${formatLogTimestamp()}]`];
   const [first, ...rest] = args;
+  const safeRest = rest.map((entry) => redactLogValue(entry));
   if (typeof first === 'string') {
-    return [`[${formatLogTimestamp()}] ${first}`, ...rest];
+    return [`[${formatLogTimestamp()}] ${redactSensitiveText(first)}`, ...safeRest];
   }
-  return [`[${formatLogTimestamp()}]`, ...args];
+  return [`[${formatLogTimestamp()}]`, redactLogValue(first), ...safeRest];
 }
 
 export function logInfo(...args: unknown[]) {

@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { X } from 'lucide-react';
 import type { ContactSearchEntry } from './contactSuggestions';
-import { matchingContacts, recommendedContacts } from './contactSuggestions';
+import { matchingContacts } from './contactSuggestions';
 import {
   parseRecipientInput,
   parseRecipientToken,
@@ -22,6 +22,7 @@ type RecipientFieldProps = {
 };
 
 const suggestionLimit = 4;
+const compositionEnterGuardMs = 80;
 
 function initialParse(value: string) {
   const parsed = parseRecipientInput(value);
@@ -107,6 +108,8 @@ export default function RecipientField({
   const chipLabelsRef = useRef(chipLabels);
   const queryRef = useRef(query);
   const inputRef = useRef<HTMLInputElement>(null);
+  const composingRef = useRef(false);
+  const compositionEndedAtRef = useRef(0);
   const blockedEmailSet = useMemo(
     () => new Set(blockedEmails.map((email) => email.trim().toLowerCase()).filter(Boolean)),
     [blockedEmails],
@@ -117,19 +120,16 @@ export default function RecipientField({
   queryRef.current = query;
 
   const matches = useMemo(() => {
+    if (!query.trim()) return [];
     const selectedEmails = new Set(chips.map((email) => email.toLowerCase()));
-    const candidates = query.trim()
-      ? matchingContacts(contactSearchEntries, query, suggestionLimit * 2)
-      : recommendedContacts(contactSearchEntries, suggestionLimit * 2);
-    return candidates
+    return matchingContacts(contactSearchEntries, query, suggestionLimit * 2)
       .filter((contact) => {
         const email = contact.email.trim().toLowerCase();
         return email && !selectedEmails.has(email) && !blockedEmailSet.has(email);
       })
       .slice(0, suggestionLimit);
   }, [blockedEmailSet, chips, contactSearchEntries, query]);
-  const suggestionHeading = query.trim() ? '匹配联系人' : '最近与常用';
-  const menuOpen = focused && matches.length > 0 && !suggestionsDismissed;
+  const menuOpen = focused && Boolean(query.trim()) && matches.length > 0 && !suggestionsDismissed;
   const activeMatch = matches[highlight] ?? matches[0];
   const activeSuggestionId = menuOpen && activeMatch
     ? `${suggestionListId}-option-${activeMatch.id}`
@@ -176,11 +176,10 @@ export default function RecipientField({
   }
 
   function commitEmail(raw: string) {
-    const token = parseRecipientToken(raw);
+    const normalizedRaw = raw.replace(/\t/g, '').trim();
+    const token = parseRecipientToken(normalizedRaw);
     if (!token.valid) {
-      setValidationMessage('地址格式不正确，已跳过');
-      setQuery('');
-      queryRef.current = '';
+      setValidationMessage('请选择匹配联系人，或输入完整邮箱地址');
       return;
     }
     commitTokens([token]);
@@ -199,25 +198,59 @@ export default function RecipientField({
     emit(next, nextLabels);
   }
 
-  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function setQueryValue(nextQuery: string) {
+    queryRef.current = nextQuery;
+    setQuery(nextQuery);
+    setHighlight(0);
     setSuggestionsDismissed(false);
+    if (!nextQuery.trim()) setValidationMessage('');
+  }
+
+  function insertTabAtCaret() {
+    const input = inputRef.current;
+    if (!input) return;
+    const start = input.selectionStart ?? queryRef.current.length;
+    const end = input.selectionEnd ?? start;
+    const nextQuery = `${queryRef.current.slice(0, start)}\t${queryRef.current.slice(end)}`;
+    setQueryValue(nextQuery);
+    requestAnimationFrame(() => {
+      input.setSelectionRange(start + 1, start + 1);
+    });
+  }
+
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const raw = event.target.value;
-    const parts = raw.split(/[,，;；\n\t]/);
+    if (composingRef.current || event.nativeEvent.isComposing) {
+      setQueryValue(raw);
+      return;
+    }
+    const parts = raw.split(/[,，;；\n]/);
     if (parts.length > 1) {
       const committed = parts.slice(0, -1).map((part) => part.trim()).filter(Boolean);
       commitTokens(committed.map(parseRecipientToken));
-      const nextQuery = parts[parts.length - 1] ?? '';
-      queryRef.current = nextQuery;
-      setQuery(nextQuery);
+      setQueryValue(parts[parts.length - 1] ?? '');
     } else {
-      queryRef.current = raw;
-      setQuery(raw);
-      if (!raw.trim()) setValidationMessage('');
+      setQueryValue(raw);
     }
-    setHighlight(0);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    const nativeEvent = event.nativeEvent;
+    if (composingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) return;
+    if (event.key === 'Enter' && performance.now() - compositionEndedAtRef.current < compositionEnterGuardMs) return;
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      event.stopPropagation();
+      insertTabAtCaret();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+      const key = event.key.toLowerCase();
+      if (['a', 'c', 'x', 'v', 'z', 'y'].includes(key)) event.stopPropagation();
+    }
+
     if (matches.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -256,8 +289,10 @@ export default function RecipientField({
   }
 
   function handleBlur() {
-    const trimmed = queryRef.current.trim();
-    if (trimmed) commitEmail(trimmed);
+    if (!composingRef.current) {
+      const trimmed = queryRef.current.trim();
+      if (trimmed && parseRecipientToken(trimmed.replace(/\t/g, '')).valid) commitEmail(trimmed);
+    }
     setFocused(false);
   }
 
@@ -293,6 +328,10 @@ export default function RecipientField({
           <input
             ref={inputRef}
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-gramm="false"
             role="combobox"
             aria-haspopup="listbox"
             aria-autocomplete="list"
@@ -304,6 +343,14 @@ export default function RecipientField({
             placeholder={chips.length === 0 ? placeholder : ''}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={(event) => {
+              composingRef.current = false;
+              compositionEndedAtRef.current = performance.now();
+              setQueryValue(event.currentTarget.value);
+            }}
             onFocus={() => {
               onFocus?.();
               setFocused(true);
@@ -318,8 +365,8 @@ export default function RecipientField({
       {actions ? <div className="composer-recipient-actions">{actions}</div> : null}
 
       {menuOpen && (
-        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}${suggestionHeading}`}>
-          <span aria-hidden="true">{suggestionHeading}</span>
+        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}匹配联系人`}>
+          <span aria-hidden="true">匹配联系人</span>
           {matches.map((contact, index) => (
             <button
               type="button"

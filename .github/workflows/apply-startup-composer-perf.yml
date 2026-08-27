@@ -1,0 +1,187 @@
+name: Apply Startup Composer Performance Fix
+
+on:
+  push:
+    branches:
+      - perf/startup-composer-latency-20260827
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.event.head_commit.message != 'feat:优化启动与写信窗口打开速度'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout performance branch
+        uses: actions/checkout@v4
+        with:
+          ref: perf/startup-composer-latency-20260827
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch startup and composer lifetime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.tsx')
+          text = app.read_text(encoding='utf-8')
+          text = text.replace("import StandaloneComposerApp from './components/StandaloneComposerApp';\n", '', 1)
+          text = text.replace("  isStandaloneComposerWindow,\n", '', 1)
+          text = text.replace("  mockMode,\n  openComposerWindow,\n", "  mockMode,\n  openComposerWindow,\n  prewarmComposerWindow,\n", 1)
+          old_app = "export default function App() {\n  if (isStandaloneComposerWindow()) return <StandaloneComposerApp />;\n  return <MailboxApp />;\n}\n"
+          new_app = "export default function App() {\n  return <MailboxApp />;\n}\n"
+          if old_app not in text:
+              raise SystemExit('App root routing block not found')
+          text = text.replace(old_app, new_app, 1)
+          marker = "  const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';\n"
+          prewarm = "\n  useEffect(() => {\n    if (!useNativeComposerWindow || !initialAccountListLoaded) return undefined;\n    const timer = window.setTimeout(() => {\n      void prewarmComposerWindow().catch(() => undefined);\n    }, 700);\n    return () => window.clearTimeout(timer);\n  }, [initialAccountListLoaded, useNativeComposerWindow]);\n"
+          if marker not in text:
+              raise SystemExit('native composer marker not found')
+          text = text.replace(marker, marker + prewarm, 1)
+          app.write_text(text, encoding='utf-8')
+
+          composer = Path('src/components/ComposerWindow.tsx')
+          text = composer.read_text(encoding='utf-8')
+          css_marker = "import './composer/composer.css';\n"
+          if css_marker not in text:
+              raise SystemExit('composer css import not found')
+          text = text.replace(css_marker, css_marker + "import './composer/composer-polish.css';\n", 1)
+          composer.write_text(text, encoding='utf-8')
+
+          bridge = Path('src/tauriBridge.ts')
+          text = bridge.read_text(encoding='utf-8')
+          marker = "export function openComposerWindow(request: ComposerWindowRequest = {}): Promise<void> {\n  if (mockMode) return Promise.resolve();\n  return loadProdBridge().then(({ prodOpenComposerWindow }) => prodOpenComposerWindow(request));\n}\n"
+          addition = marker + "\nexport function prewarmComposerWindow(): Promise<void> {\n  if (mockMode) return Promise.resolve();\n  return loadProdBridge().then(({ prodPrewarmComposerWindow }) => prodPrewarmComposerWindow());\n}\n\nexport function showCurrentWindow(): Promise<void> {\n  if (mockMode) return Promise.resolve();\n  return loadProdBridge().then(({ prodShowCurrentWindow }) => prodShowCurrentWindow());\n}\n"
+          if marker not in text:
+              raise SystemExit('bridge composer open block not found')
+          text = text.replace(marker, addition, 1)
+          bridge.write_text(text, encoding='utf-8')
+
+          prod = Path('src/tauriBridge.prod.ts')
+          text = prod.read_text(encoding='utf-8')
+          start = text.index('let composerWindowCreation: Promise<void> | null = null;')
+          end = text.index('export function prodTakePendingComposerRequest()', start)
+          replacement = """let composerWindowCreation: Promise<void> | null = null;
+
+async function focusComposerWindow(window: {
+  show: () => Promise<void>;
+  unminimize: () => Promise<void>;
+  setFocus: () => Promise<void>;
+}) {
+  await window.show();
+  await window.unminimize();
+  await window.setFocus();
+}
+
+async function ensureComposerWindow(): Promise<void> {
+  const { WebviewWindow } = await loadWebviewWindow();
+  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (existing) return;
+  if (!composerWindowCreation) {
+    const composeUrl = new URL(window.location.href);
+    composeUrl.search = '?window=compose&prewarm=1';
+    composeUrl.hash = '';
+    const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
+      url: composeUrl.toString(),
+      title: '写邮件',
+      width: 960,
+      height: 700,
+      minWidth: 760,
+      minHeight: 560,
+      resizable: true,
+      decorations: true,
+      titleBarStyle: 'visible',
+      hiddenTitle: false,
+      focus: false,
+      visible: false,
+      skipTaskbar: false,
+    });
+    composerWindowCreation = new Promise<void>((resolve, reject) => {
+      void child.once('tauri://created', () => resolve());
+      void child.once('tauri://error', (event) => {
+        reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
+      });
+    });
+  }
+  try {
+    await composerWindowCreation;
+  } finally {
+    composerWindowCreation = null;
+  }
+}
+
+export async function prodPrewarmComposerWindow(): Promise<void> {
+  await ensureComposerWindow();
+}
+
+export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
+  await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
+  const { WebviewWindow } = await loadWebviewWindow();
+  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (existing) {
+    await existing.emit(COMPOSER_OPEN_EVENT);
+    return;
+  }
+  await ensureComposerWindow();
+}
+
+export async function prodShowCurrentWindow(): Promise<void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  await focusComposerWindow(getTauriCurrentWindow());
+}
+
+"""
+          text = text[:start] + replacement + text[end:]
+          old_close = "export async function prodCloseCurrentWindow(): Promise<void> {\n  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();\n  // The native close-request listener deliberately prevents the first close\n  // request while it checks for unsaved content. Once React has decided that\n  // the window may close, destroy it so this programmatic follow-up cannot\n  // re-enter the same close-request cycle.\n  await getTauriCurrentWindow().destroy();\n}\n"
+          new_close = "export async function prodCloseCurrentWindow(): Promise<void> {\n  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();\n  const currentWindow = getTauriCurrentWindow();\n  if (currentWindow.label === COMPOSER_WINDOW_LABEL) {\n    await currentWindow.hide();\n    return;\n  }\n  await currentWindow.destroy();\n}\n"
+          if old_close not in text:
+              raise SystemExit('prod close block not found')
+          text = text.replace(old_close, new_close, 1)
+          prod.write_text(text, encoding='utf-8')
+
+          standalone = Path('src/components/StandaloneComposerApp.tsx')
+          text = standalone.read_text(encoding='utf-8')
+          text = text.replace("  onCurrentWindowCloseRequested,\n  takePendingComposerRequest,\n", "  onCurrentWindowCloseRequested,\n  showCurrentWindow,\n  takePendingComposerRequest,\n", 1)
+          state_marker = "  const applyComposerRequestRef = useRef<(\n"
+          if state_marker not in text:
+              raise SystemExit('standalone state marker not found')
+          prewarm_state = "  const isPrewarmedWindow = new URLSearchParams(window.location.search).get('prewarm') === '1';\n"
+          text = text.replace(state_marker, prewarm_state + state_marker, 1)
+          old_listener = "        const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_OPEN_EVENT, () => {\n          if (!bootedRef.current) return;\n          takePendingComposerRequest()\n            .then((value) => {\n              if (!active) return;\n              applyComposerRequestRef.current(normalizeComposerRequest(value));\n            })\n            .catch((error) => setStatus(`读取写信请求失败：${String(error)}`));\n        });\n"
+          new_listener = "        const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_OPEN_EVENT, () => {\n          if (!bootedRef.current) return;\n          closingRef.current = false;\n          takePendingComposerRequest()\n            .then((value) => {\n              if (!active) return;\n              const request = normalizeComposerRequest(value);\n              applyComposerRequestRef.current(request);\n              window.requestAnimationFrame(() => {\n                void showCurrentWindow();\n              });\n              void loadComposerData(request?.draft?.account_id || undefined).catch(() => undefined);\n            })\n            .catch((error) => setStatus(`读取写信请求失败：${String(error)}`));\n        });\n"
+          if old_listener not in text:
+              raise SystemExit('standalone open listener not found')
+          text = text.replace(old_listener, new_listener, 1)
+          old_boot = "        const pending = normalizeComposerRequest(await takePendingComposerRequest());\n        await loadComposerData(pending?.draft?.account_id || undefined);\n        if (!active) return;\n        applyComposerRequestRef.current(pending, true);\n        bootedRef.current = true;\n        setBooted(true);\n"
+          new_boot = "        const pending = normalizeComposerRequest(await takePendingComposerRequest());\n        await loadComposerData(pending?.draft?.account_id || undefined);\n        if (!active) return;\n        if (pending || !isPrewarmedWindow) {\n          applyComposerRequestRef.current(pending, true);\n        }\n        bootedRef.current = true;\n        setBooted(true);\n        if (pending || !isPrewarmedWindow) {\n          window.requestAnimationFrame(() => {\n            void showCurrentWindow();\n          });\n        }\n"
+          if old_boot not in text:
+              raise SystemExit('standalone boot block not found')
+          text = text.replace(old_boot, new_boot, 1)
+          text = text.replace("  }, [loadComposerData]);\n", "  }, [isPrewarmedWindow, loadComposerData]);\n", 1)
+          standalone.write_text(text, encoding='utf-8')
+          PY
+
+          npm ci
+          npm run lint
+          npx vitest run src/components/composer/ComposerPrimaryFields.test.tsx src/components/composer/ComposerQuickTools.test.tsx
+          npm run build
+          git diff --check
+
+      - name: Commit optimized startup path
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx src/components/ComposerWindow.tsx src/components/StandaloneComposerApp.tsx src/tauriBridge.ts src/tauriBridge.prod.ts
+          git commit -m 'feat:优化启动与写信窗口打开速度'
+          git push origin HEAD:perf/startup-composer-latency-20260827

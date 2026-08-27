@@ -32,6 +32,7 @@ import {
 import { IPC } from '../ipc/commands';
 import useComposerController from '../hooks/useComposerController';
 import useThemeMode from '../hooks/useThemeMode';
+import { decideComposerBootOpen } from '../app/composerWindowOpenPolicy';
 
 function normalizeComposerRequest(value: unknown): ComposerWindowRequest | null {
   if (!value || typeof value !== 'object') return null;
@@ -62,6 +63,7 @@ export default function StandaloneComposerApp() {
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
   const closingRef = useRef(false);
   const bootedRef = useRef(false);
+  const openRequestedBeforeBootRef = useRef(false);
   const closeComposerRef = useRef<() => void>(() => {});
   const draftRef = useRef(emptyDraft);
   const isPrewarmedWindow = new URLSearchParams(window.location.search).get('prewarm') === '1';
@@ -187,25 +189,43 @@ export default function StandaloneComposerApp() {
   // stable so a body edit cannot re-run initialization and steal focus from the editor.
   applyComposerRequestRef.current = applyComposerRequest;
 
+  const consumePendingComposerRequest = useCallback(async ({
+    restoreWhenMissing = false,
+    showWhenMissing = false,
+  }: {
+    restoreWhenMissing?: boolean;
+    showWhenMissing?: boolean;
+  } = {}) => {
+    const request = normalizeComposerRequest(await takePendingComposerRequest());
+    if (!request && !showWhenMissing) {
+      openRequestedBeforeBootRef.current = false;
+      return false;
+    }
+
+    closingRef.current = false;
+    applyComposerRequestRef.current(request, restoreWhenMissing);
+    openRequestedBeforeBootRef.current = false;
+    window.requestAnimationFrame(() => {
+      void showCurrentWindow();
+    });
+    if (request?.draft?.account_id) {
+      void loadComposerData(request.draft.account_id).catch(() => undefined);
+    }
+    return true;
+  }, [loadComposerData]);
+
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | undefined;
     const register = async () => {
       try {
         const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_OPEN_EVENT, () => {
+          openRequestedBeforeBootRef.current = true;
           if (!bootedRef.current) return;
-          closingRef.current = false;
-          takePendingComposerRequest()
-            .then((value) => {
-              if (!active) return;
-              const request = normalizeComposerRequest(value);
-              applyComposerRequestRef.current(request);
-              window.requestAnimationFrame(() => {
-                void showCurrentWindow();
-              });
-              void loadComposerData(request?.draft?.account_id || undefined).catch(() => undefined);
-            })
-            .catch((error) => setStatus(`读取写信请求失败：${String(error)}`));
+          void consumePendingComposerRequest({ showWhenMissing: true })
+            .catch((error) => {
+              if (active) setStatus(`读取写信请求失败：${String(error)}`);
+            });
         });
         if (active) unlisten = nextUnlisten;
         else nextUnlisten();
@@ -218,24 +238,56 @@ export default function StandaloneComposerApp() {
       active = false;
       unlisten?.();
     };
-  }, []);
+  }, [consumePendingComposerRequest]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      openRequestedBeforeBootRef.current = true;
+      if (!bootedRef.current) return;
+      void consumePendingComposerRequest()
+        .catch((error) => setStatus(`恢复写信窗口失败：${String(error)}`));
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [consumePendingComposerRequest]);
 
   useEffect(() => {
     let active = true;
     const boot = async () => {
       try {
-        const pending = normalizeComposerRequest(await takePendingComposerRequest());
-        await loadComposerData(pending?.draft?.account_id || undefined);
+        // Preload stable composer data first. Consume the pending request only
+        // after the standalone app is nearly ready, so a click during prewarm
+        // cannot be taken too early and then lose its wake-up event.
+        await loadComposerData();
         if (!active) return;
-        if (pending || !isPrewarmedWindow) {
-          applyComposerRequestRef.current(pending, true);
+        const pending = normalizeComposerRequest(await takePendingComposerRequest());
+        if (!active) return;
+        const decision = decideComposerBootOpen(
+          Boolean(pending),
+          isPrewarmedWindow,
+          openRequestedBeforeBootRef.current,
+        );
+        if (decision.shouldOpen) {
+          closingRef.current = false;
+          applyComposerRequestRef.current(pending, decision.restoreWhenMissing);
+          openRequestedBeforeBootRef.current = false;
+          if (pending?.draft?.account_id) {
+            void loadComposerData(pending.draft.account_id).catch(() => undefined);
+          }
         }
         bootedRef.current = true;
         setBooted(true);
-        if (pending || !isPrewarmedWindow) {
+        if (decision.shouldOpen) {
           window.requestAnimationFrame(() => {
             void showCurrentWindow();
           });
+        } else if (openRequestedBeforeBootRef.current) {
+          // Covers the tiny interval between the final pending read and marking
+          // the React side booted. The pending request remains authoritative.
+          void consumePendingComposerRequest({
+            restoreWhenMissing: true,
+            showWhenMissing: true,
+          }).catch((error) => setStatus(`恢复写信窗口失败：${String(error)}`));
         }
       } catch (error) {
         if (!active) return;
@@ -246,7 +298,7 @@ export default function StandaloneComposerApp() {
     return () => {
       active = false;
     };
-  }, [isPrewarmedWindow, loadComposerData]);
+  }, [consumePendingComposerRequest, isPrewarmedWindow, loadComposerData]);
 
   useEffect(() => {
     let active = true;

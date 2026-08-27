@@ -25,6 +25,20 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Patch helper locator
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-startup-composer-perf.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'text = replace_once(text, "  }, [loadComposerData]);\\n", "  }, [isPrewarmedWindow, loadComposerData]);\\n", \'composer boot dependencies\')'
+          new = 'boot_tail = "    void boot();\\n    return () => {\\n      active = false;\\n    };\\n  }, [loadComposerData]);\\n"\nnew_boot_tail = "    void boot();\\n    return () => {\\n      active = false;\\n    };\\n  }, [isPrewarmedWindow, loadComposerData]);\\n"\ntext = replace_once(text, boot_tail, new_boot_tail, \'composer boot dependencies\')'
+          if old not in text:
+              raise SystemExit('helper dependency locator not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Patch startup and composer lifetime
         run: python scripts/apply-startup-composer-perf.py
 

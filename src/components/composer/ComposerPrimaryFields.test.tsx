@@ -117,7 +117,9 @@ describe('ComposerPrimaryFields', () => {
     expect(container.querySelector('datalist')).toBeNull();
 
     fireEvent.focus(recipient);
-    expect(container.querySelector('.recipient-suggestions')).toBeNull();
+    expect(screen.getByText('最近与常用')).not.toBeNull();
+    expect(screen.getByRole('listbox', { name: '收件人最近与常用' })).not.toBeNull();
+    expect(screen.getByRole('option', { name: /Ada Lovelace/ })).not.toBeNull();
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     expect(screen.getByText('匹配联系人')).not.toBeNull();

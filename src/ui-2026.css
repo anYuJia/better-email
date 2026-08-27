@@ -16,6 +16,7 @@
 @import './styles/message-list.css';
 @import './styles/reader.css';
 @import './styles/skeleton.css';
+@import './styles/workspace-polish.css';
 
 /* Shared overlays and chrome */
 @import './styles/overlay.css';

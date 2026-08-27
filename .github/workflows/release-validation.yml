@@ -1,0 +1,265 @@
+name: Release Validation
+
+on:
+  push:
+    branches:
+      - 'release-validation/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  ANDROID_NDK_VERSION: r26b
+  ANDROID_BUILD_TOOLS_VERSION: '36.0.0'
+
+jobs:
+  build-desktop:
+    name: Validate installer (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Require updater signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required for release validation"
+            exit 1
+          fi
+
+      - name: Build signed installers
+        run: npm run tauri:build
+
+      - name: Prepare canonical release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/ci-prepare-assets.mjs --version="$VERSION" --bundle="src-tauri/target/release/bundle" > asset-plan.json
+          cat asset-plan.json
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  build-android:
+    name: Validate Android APK and AAB
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;${ANDROID_BUILD_TOOLS_VERSION}"
+
+      - name: Setup Android NDK
+        id: setup_ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+          add-to-path: true
+
+      - name: Export Android NDK paths
+        shell: bash
+        run: |
+          NDK_PATH="${{ steps.setup_ndk.outputs['ndk-path'] }}"
+          TOOLCHAIN_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$NDK_PATH" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$TOOLCHAIN_BIN/llvm-ar" >> "$GITHUB_ENV"
+          echo "RANLIB_aarch64_linux_android=$TOOLCHAIN_BIN/llvm-ranlib" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_BIN" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Require Android signing secrets
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEY_BASE64 ANDROID_KEY_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required for release validation"
+              exit 1
+            fi
+          done
+
+      - name: Initialize Android project
+        run: npm run tauri -- android init --ci --skip-targets-install
+
+      - name: Generate Android app icons
+        run: npm run tauri -- icon src-tauri/icons/icon.png
+
+      - name: Build Android artifacts
+        run: npm run tauri -- android build --ci --target aarch64 --apk --aab
+
+      - name: Sign and prepare Android release assets
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/prepare-android-artifacts.mjs \
+            --outputs="src-tauri/gen/android/app/build/outputs" \
+            --output="release-assets" \
+            --version="$VERSION"
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.sha }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  verify-release-assets:
+    name: Verify release asset set and updater manifest
+    needs: [build-desktop, build-android]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Verify canonical assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          MAC="dist/installers-macos-latest"
+          WIN="dist/installers-windows-latest"
+          ANDROID="dist/android-${GITHUB_SHA}"
+
+          required=(
+            "$MAC/Better_Email_${VERSION}_mac_arm.dmg"
+            "$MAC/Better_Email_${VERSION}_mac_arm.app.tar.gz"
+            "$MAC/Better_Email_${VERSION}_mac_arm.app.tar.gz.sig"
+            "$WIN/Better_Email_${VERSION}_windows_x64.msi"
+            "$WIN/Better_Email_${VERSION}_windows_x64.msi.sig"
+            "$ANDROID/Better_Email_${VERSION}_android_arm64.apk"
+            "$ANDROID/Better_Email_${VERSION}_android_arm64.aab"
+          )
+
+          for file in "${required[@]}"; do
+            test -s "$file" || { echo "::error::Missing or empty release asset: $file"; exit 1; }
+          done
+
+          sha256sum "${required[@]}"
+
+      - name: Generate and validate updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="validation-${GITHUB_SHA::7}"
+          node scripts/update-manifest.mjs \
+            --version="$VERSION" \
+            --tag="$TAG" \
+            --repo="${GITHUB_REPOSITORY}" \
+            --payload-darwin-aarch64="dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.app.tar.gz" \
+            --payload-windows-x86_64="dist/installers-windows-latest/Better_Email_${VERSION}_windows_x64.msi" \
+            --out="dist/latest.json"
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          const manifest = JSON.parse(fs.readFileSync('dist/latest.json', 'utf8'));
+          if (manifest.version !== pkg.version) throw new Error('latest.json version mismatch');
+          for (const target of ['darwin-aarch64', 'windows-x86_64']) {
+            const entry = manifest.platforms?.[target];
+            if (!entry?.signature) throw new Error(`missing signature for ${target}`);
+            if (!entry?.url?.startsWith('https://github.com/anYuJia/better-email/releases/download/validation-')) {
+              throw new Error(`invalid release URL for ${target}: ${entry?.url}`);
+            }
+          }
+          console.log(JSON.stringify(manifest, null, 2));
+          NODE
+
+      - name: Upload validated release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-${{ github.sha }}
+          path: dist/latest.json
+          if-no-files-found: error

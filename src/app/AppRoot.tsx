@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import DeferredSurface from '../components/DeferredSurface';
 import { isStandaloneComposerWindow } from '../tauriBridge';
 

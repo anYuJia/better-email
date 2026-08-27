@@ -1,35 +1,79 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
 import { createRef } from 'react';
+import type { MessageSummary } from '../app/types';
 import useAppShortcuts from './useAppShortcuts';
 
 afterEach(() => {
   cleanup();
+  document.body.innerHTML = '';
 });
+
+const selectedMessage: MessageSummary = {
+  id: 42,
+  account_id: 1,
+  account_email: 'me@example.com',
+  folder_id: 1,
+  folder_role: 'inbox',
+  sender_name: 'Ada',
+  sender_email: 'ada@example.com',
+  recipients: 'me@example.com',
+  cc: '',
+  bcc: '',
+  subject: 'Hello',
+  snippet: 'Hi',
+  security_warnings: [],
+  received_at: '2026-08-27T00:00:00Z',
+  is_read: true,
+  is_starred: false,
+  has_attachments: false,
+  snoozed_until: '',
+  labels: [],
+  attachment_count: 0,
+  remote_mailbox: 'INBOX',
+  remote_uid: 42,
+  message_id_header: '',
+  in_reply_to_header: '',
+  references_header: '',
+};
 
 function renderShortcuts(overrides: Partial<Parameters<typeof useAppShortcuts>[0]> = {}) {
   const searchInputRef = createRef<HTMLInputElement>();
   const handlers = {
-    openComposer: vi.fn(),
-    selectAdjacent: vi.fn(),
-    composeReply: vi.fn(),
-    toggleStar: vi.fn(),
-    toggleRead: vi.fn(),
-    archive: vi.fn(),
-    moveTrash: vi.fn(),
-    selectAllVisible: vi.fn(),
-    undo: vi.fn(),
-    openHelp: vi.fn(),
-    closeHelp: vi.fn(),
+    closeOverlays: vi.fn(),
+    clearSelection: vi.fn(),
+    setStatus: vi.fn(),
+    restoreUndoAction: vi.fn(async () => undefined),
+    toggleAllVisibleMessages: vi.fn(async () => 1),
+    openShortcuts: vi.fn(),
+    composeNew: vi.fn(),
+    setSelectedId: vi.fn(),
+    runBulkAction: vi.fn(async () => undefined),
+    composeFromMessage: vi.fn(),
+    toggleStar: vi.fn(async () => undefined),
+    toggleRead: vi.fn(async () => undefined),
+    moveSelected: vi.fn(async () => undefined),
   };
+
   renderHook(() => useAppShortcuts({
     searchInputRef,
-    selectedId: 42,
-    shortcutHelpOpen: false,
-    confirmationOpen: false,
+    messages: [selectedMessage],
+    selected: selectedMessage,
+    selectedId: selectedMessage.id,
+    selectedMessages: [],
+    selectedMessageIds: [],
+    listMode: 'messages',
+    undoAction: null,
+    isComposerOpen: false,
+    isComposerMinimized: false,
+    isComposerModal: false,
+    isSettingsOpen: false,
+    isShortcutsOpen: false,
+    isAccountLoginRequired: false,
     ...handlers,
     ...overrides,
   }));
+
   return handlers;
 }
 
@@ -37,18 +81,19 @@ describe('useAppShortcuts', () => {
   it('supports A as reply-all without replacing Cmd/Ctrl+A', () => {
     const handlers = renderShortcuts();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
-    expect(handlers.composeReply).toHaveBeenCalledWith('replyAll');
-    expect(handlers.selectAllVisible).not.toHaveBeenCalled();
+    expect(handlers.composeFromMessage).toHaveBeenCalledWith(selectedMessage, 'replyAll');
+    expect(handlers.toggleAllVisibleMessages).not.toHaveBeenCalled();
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true }));
-    expect(handlers.selectAllVisible).toHaveBeenCalledTimes(1);
+    expect(handlers.toggleAllVisibleMessages).toHaveBeenCalledTimes(1);
   });
 
   it('supports # as a trash shortcut while preserving Delete', () => {
     const handlers = renderShortcuts();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
-    expect(handlers.moveTrash).toHaveBeenCalledTimes(2);
+    expect(handlers.moveSelected).toHaveBeenNthCalledWith(1, 'trash');
+    expect(handlers.moveSelected).toHaveBeenNthCalledWith(2, 'trash');
   });
 
   it('does not run mail shortcuts while typing', () => {
@@ -58,8 +103,14 @@ describe('useAppShortcuts', () => {
     input.focus();
     input.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
-    expect(handlers.moveTrash).not.toHaveBeenCalled();
-    expect(handlers.composeReply).not.toHaveBeenCalled();
-    input.remove();
+    expect(handlers.moveSelected).not.toHaveBeenCalled();
+    expect(handlers.composeFromMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps bulk trash behavior when messages are selected', () => {
+    const handlers = renderShortcuts({ selectedMessages: [selectedMessage] });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
+    expect(handlers.runBulkAction).toHaveBeenCalledWith('trash');
+    expect(handlers.moveSelected).not.toHaveBeenCalled();
   });
 });

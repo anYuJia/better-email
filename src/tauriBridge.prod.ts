@@ -196,9 +196,8 @@ export async function prodListenCurrentWindow<T>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<() => void> {
-  if (mockMode) return () => {};
-  const { prodListenCurrentWindow } = await loadProdBridge();
-  return prodListenCurrentWindow<T>(event, handler);
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  return getTauriCurrentWindow().listen<T>(event, handler);
 }
 
 export async function prodEmitToMain<T>(event: string, payload?: T): Promise<void> {

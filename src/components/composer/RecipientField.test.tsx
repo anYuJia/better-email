@@ -46,6 +46,15 @@ describe('RecipientField keyboard', () => {
     expect(input.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('shows recent and frequent contacts when an empty recipient field gains focus', async () => {
+    renderField();
+    const input = recipientInput();
+    fireEvent.focus(input);
+    await act(async () => {});
+    expect(screen.getByRole('listbox', { name: '收件人最近与常用' })).toBeDefined();
+    expect(screen.getByText('最近与常用')).toBeDefined();
+  });
+
   it('exposes ARIA combobox/listbox state while suggestions are open', async () => {
     renderField();
     const input = recipientInput();
@@ -65,7 +74,6 @@ describe('RecipientField keyboard', () => {
 
     const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     input.dispatchEvent(event);
-    // Tab 不应被 preventDefault 拦截，浏览器可以按正常文档顺序离开字段。
     expect(event.defaultPrevented).toBe(false);
   });
 

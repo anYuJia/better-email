@@ -62,4 +62,30 @@ describe('composer contact suggestions', () => {
     expect(recommendedContacts(entries, 5)).toEqual([contacts[0], contacts[2]]);
     expect(recommendedContacts(entries, 1)).toEqual([contacts[0]]);
   });
+
+  it('ranks VIP, frequent and recent contacts before the original order', () => {
+    const frequent = {
+      ...contact(1, 'Frequent', 'frequent@example.com'),
+      message_count: 20,
+      last_seen_at: '2026-08-20T08:00:00Z',
+    };
+    const recent = {
+      ...contact(2, 'Recent', 'recent@example.com'),
+      message_count: 20,
+      last_seen_at: '2026-08-26T08:00:00Z',
+    };
+    const vip = {
+      ...contact(3, 'VIP', 'vip@example.com'),
+      vip: true,
+      message_count: 1,
+      last_seen_at: '2026-01-01T08:00:00Z',
+    };
+
+    const entries = buildContactSearchEntries([frequent, recent, vip]);
+    expect(entries.map((entry) => entry.contact.email)).toEqual([
+      'vip@example.com',
+      'recent@example.com',
+      'frequent@example.com',
+    ]);
+  });
 });

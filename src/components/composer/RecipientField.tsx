@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { X } from 'lucide-react';
 import type { ContactSearchEntry } from './contactSuggestions';
-import { matchingContacts } from './contactSuggestions';
+import { matchingContacts, recommendedContacts } from './contactSuggestions';
 import {
   parseRecipientInput,
   parseRecipientToken,
@@ -116,10 +116,19 @@ export default function RecipientField({
   chipLabelsRef.current = chipLabels;
   queryRef.current = query;
 
-  const matches = useMemo(
-    () => (query.trim() ? matchingContacts(contactSearchEntries, query, suggestionLimit) : []),
-    [contactSearchEntries, query],
-  );
+  const matches = useMemo(() => {
+    const selectedEmails = new Set(chips.map((email) => email.toLowerCase()));
+    const candidates = query.trim()
+      ? matchingContacts(contactSearchEntries, query, suggestionLimit * 2)
+      : recommendedContacts(contactSearchEntries, suggestionLimit * 2);
+    return candidates
+      .filter((contact) => {
+        const email = contact.email.trim().toLowerCase();
+        return email && !selectedEmails.has(email) && !blockedEmailSet.has(email);
+      })
+      .slice(0, suggestionLimit);
+  }, [blockedEmailSet, chips, contactSearchEntries, query]);
+  const suggestionHeading = query.trim() ? '匹配联系人' : '最近与常用';
   const menuOpen = focused && matches.length > 0 && !suggestionsDismissed;
   const activeMatch = matches[highlight] ?? matches[0];
   const activeSuggestionId = menuOpen && activeMatch
@@ -309,8 +318,8 @@ export default function RecipientField({
       {actions ? <div className="composer-recipient-actions">{actions}</div> : null}
 
       {menuOpen && (
-        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}匹配联系人`}>
-          <span aria-hidden="true">匹配联系人</span>
+        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}${suggestionHeading}`}>
+          <span aria-hidden="true">{suggestionHeading}</span>
           {matches.map((contact, index) => (
             <button
               type="button"

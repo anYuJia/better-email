@@ -10,10 +10,25 @@ function isSuggestedRecipient(contact: Contact) {
   return email.includes('@') && !/[;,]/.test(email);
 }
 
+function contactRecency(contact: Contact) {
+  const timestamp = Date.parse(contact.last_seen_at);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSuggestedContacts(left: Contact, right: Contact) {
+  if (left.vip !== right.vip) return left.vip ? -1 : 1;
+  if (left.message_count !== right.message_count) return right.message_count - left.message_count;
+  const recencyDelta = contactRecency(right) - contactRecency(left);
+  if (recencyDelta !== 0) return recencyDelta;
+  return 0;
+}
+
 export function buildContactSearchEntries(contacts: Contact[]): ContactSearchEntry[] {
   return contacts
     .filter(isSuggestedRecipient)
-    .map((contact) => ({
+    .map((contact, index) => ({ contact, index }))
+    .sort((left, right) => compareSuggestedContacts(left.contact, right.contact) || left.index - right.index)
+    .map(({ contact }) => ({
       contact,
       searchText: [
         contact.name,

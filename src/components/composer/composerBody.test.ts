@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   joinEditableBody,
   parseOriginalQuote,
+  plainTextToRichHtml,
   splitEditableBody,
 } from './composerBody';
 
@@ -27,5 +28,18 @@ describe('composer body helpers', () => {
       meta: ['From: Ada', 'Subject: Hi'],
       content: 'Hello\nTeam',
     });
+  });
+
+  it('auto-links web addresses while keeping trailing punctuation as text', () => {
+    expect(plainTextToRichHtml('访问 https://example.com/a?x=1&y=2。')).toBe(
+      '访问 <a class="composer-auto-link" href="https://example.com/a?x=1&amp;y=2">https://example.com/a?x=1&amp;y=2</a>。',
+    );
+    expect(plainTextToRichHtml('www.example.com')).toBe(
+      '<a class="composer-auto-link" href="https://www.example.com">www.example.com</a>',
+    );
+  });
+
+  it('does not turn the domain part of an email address into a link', () => {
+    expect(plainTextToRichHtml('请联系 ada@example.com')).toBe('请联系 ada@example.com');
   });
 });

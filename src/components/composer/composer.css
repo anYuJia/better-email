@@ -2408,7 +2408,6 @@
 .composer .composer-sender-context .custom-select-menu,
 .composer .composer-sender-context .custom-select-summary {
   min-width: 0;
-  width: 100%;
 }
 
 .composer .composer-sender-context .custom-select-summary {
@@ -2648,6 +2647,14 @@
   background: var(--ui-control-hover);
 }
 
+.composer-rich-toolbar button[aria-pressed="true"],
+.composer-rich-toolbar button[aria-pressed="true"]:hover,
+.composer-rich-toolbar button[aria-pressed="true"]:focus-visible {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
 .composer-rich-toolbar-selects label {
   display: inline-flex;
   align-items: center;
@@ -2704,6 +2711,22 @@
 .composer .composer-body-field .composer-richtext-body[data-empty="true"]::before {
   content: attr(data-placeholder);
   color: var(--ui-text-tertiary);
+}
+
+.composer .composer-body-field .composer-richtext-body a {
+  color: var(--ui-accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.composer .composer-body-field .composer-richtext-body a:hover {
+  color: var(--ui-accent-hover);
+}
+
+.composer .composer-body-field .composer-richtext-body a:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
 }
 
 .composer .composer-body-field.has-original-quote textarea,
@@ -2863,33 +2886,12 @@
   pointer-events: none;
 }
 
-.composer-rich-toolbar-group {
-  position: relative;
-}
-
-.composer-link-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 1300;
-  width: min(300px, calc(100vw - 24px));
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 9px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
-}
-
-.composer-link-popover strong,
 .composer-template-save-dialog strong {
   color: var(--ui-text);
   font-size: 13px;
   font-weight: 650;
 }
 
-.composer-link-popover label,
 .composer-template-save-dialog label {
   display: grid;
   gap: 5px;
@@ -2897,7 +2899,6 @@
   font-size: 12px;
 }
 
-.composer-link-popover input,
 .composer-template-save-dialog input {
   min-height: 34px;
   width: 100%;
@@ -2909,21 +2910,12 @@
   font-size: 13px;
 }
 
-.composer-link-popover input:focus,
 .composer-template-save-dialog input:focus {
   border-color: var(--ui-accent);
   outline: var(--ui-focus-outline);
   outline-offset: 1px;
 }
 
-.composer-link-popover p {
-  margin: 0;
-  color: var(--ui-danger);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.composer-link-popover footer,
 .composer-template-save-dialog footer {
   min-height: 0;
   display: flex;
@@ -2936,7 +2928,6 @@
   background: transparent;
 }
 
-.composer-link-popover footer button,
 .composer-template-save-dialog footer button,
 .composer-template-save-entry {
   min-height: 32px;
@@ -2948,21 +2939,18 @@
   font-size: 12px;
 }
 
-.composer-link-popover footer button:hover,
 .composer-template-save-dialog footer button:hover,
 .composer-template-save-entry:hover {
   color: var(--ui-text);
   background: var(--ui-control-hover);
 }
 
-.composer-link-popover footer button.is-primary,
 .composer-template-save-dialog footer button.is-primary {
   border-color: var(--ui-accent);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
 }
 
-.composer-link-popover footer button.is-primary:hover,
 .composer-template-save-dialog footer button.is-primary:hover {
   background: var(--ui-accent-hover);
 }

@@ -56,7 +56,6 @@ type MenuPlacement = {
 const TYPEAHEAD_RESET_MS = 700;
 const MENU_GAP = 4;
 const VIEWPORT_GUTTER = 12;
-const MENU_MAX_WIDTH = 560;
 const MENU_MAX_HEIGHT = 280;
 
 /**
@@ -115,6 +114,7 @@ export function CustomSelect({
   function closeMenu({ restoreFocus = false } = {}) {
     setOpen(false);
     setActiveValue(null);
+    setPlacement(null);
     resetTypeahead();
     if (restoreFocus) {
       triggerRef.current?.focus();
@@ -125,6 +125,7 @@ export function CustomSelect({
     ? selectedIndex
     : firstEnabledIndex) {
     setActiveValue(index >= 0 ? options[index].value : null);
+    if (!open) setPlacement(null);
     setOpen(true);
   }
 
@@ -163,6 +164,7 @@ export function CustomSelect({
     const continuing = now - typeaheadRef.current.updatedAt <= TYPEAHEAD_RESET_MS;
     const query = `${continuing ? typeaheadRef.current.query : ''}${normalizedKey}`;
     typeaheadRef.current = { query, updatedAt: now };
+    if (!open) setPlacement(null);
     setOpen(true);
 
     const repeatedCharacter = query.length > 1
@@ -249,6 +251,10 @@ export function CustomSelect({
     }
   }
 
+  const optionContentSignature = options
+    .map((option) => `${option.label}\u0000${option.meta ?? ''}`)
+    .join('\u0001');
+
   useLayoutEffect(() => {
     if (!open) return undefined;
     const measure = () => {
@@ -258,9 +264,13 @@ export function CustomSelect({
       const viewportWidth = Math.max(window.innerWidth, VIEWPORT_GUTTER * 2);
       const viewportHeight = Math.max(window.innerHeight, VIEWPORT_GUTTER * 2);
       const availableWidth = Math.max(viewportWidth - VIEWPORT_GUTTER * 2, 1);
+      const menu = menuRef.current;
+      const previousWidth = menu?.style.width ?? '';
+      if (menu) menu.style.width = 'max-content';
+      const contentWidth = menu?.getBoundingClientRect().width ?? 0;
+      if (menu) menu.style.width = previousWidth;
       const width = Math.min(
-        Math.max(rect.width, 240),
-        MENU_MAX_WIDTH,
+        Math.max(rect.width, contentWidth, 1),
         availableWidth,
       );
       const left = Math.min(
@@ -301,7 +311,7 @@ export function CustomSelect({
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [dense, open, options.length]);
+  }, [dense, open, optionContentSignature]);
 
   useEffect(() => {
     if (disabled && open) {
@@ -349,7 +359,7 @@ export function CustomSelect({
     }
   }, [activeIndex, listboxId, open, placement]);
 
-  const menu = open && placement
+  const menu = open
     ? createPortal(
         <div
           ref={menuRef}
@@ -362,11 +372,13 @@ export function CustomSelect({
           data-portal-owner={portalOwnerId}
           style={{
             position: 'fixed',
-            top: placement.top,
-            left: placement.left,
-            width: placement.width,
-            maxHeight: placement.maxHeight,
+            top: placement?.top ?? -10000,
+            left: placement?.left ?? -10000,
+            width: placement?.width ?? 'max-content',
+            maxHeight: placement?.maxHeight,
             zIndex: portalZIndex,
+            visibility: placement ? 'visible' : 'hidden',
+            pointerEvents: placement ? undefined : 'none',
           }}
         >
           {options.map((option, index) => {

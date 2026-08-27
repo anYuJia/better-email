@@ -9,7 +9,6 @@ import {
   FileText,
   Highlighter,
   Italic,
-  Link2,
   List,
   ListOrdered,
   Paperclip,
@@ -20,12 +19,10 @@ import {
 import type { DraftInput } from '../../app/types';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
 import {
-  insertLink,
-  normalizeLinkUrl,
+  clearEditorFormatting,
   readEditorFormatState,
   runEditorCommand,
   saveEditorSelection,
-  selectedEditorText,
   type RichTextFormatState,
 } from './richTextCommands';
 
@@ -66,10 +63,6 @@ function toolbarButton({ label, icon, pressed, onClick }: ToolbarButtonProps) {
   );
 }
 
-function linkTextFromSelection(editor: HTMLElement | null) {
-  return selectedEditorText(editor).trim();
-}
-
 export function ComposerRichToolbar({
   editorRef,
 }: {
@@ -86,14 +79,7 @@ export function ComposerRichToolbar({
     justifyLeft: false,
     justifyCenter: false,
   });
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const [linkText, setLinkText] = useState('');
-  const [linkError, setLinkError] = useState('');
-  const linkSelectionRef = useRef<Range | null>(null);
   const editorSelectionRef = useRef<Range | null>(null);
-  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
-  const linkUrlRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const editor = editorRef?.current;
@@ -118,30 +104,6 @@ export function ComposerRichToolbar({
     };
   }, [editorRef]);
 
-  useEffect(() => {
-    if (!linkOpen) return undefined;
-    linkUrlRef.current?.focus({ preventScroll: true });
-    function closeOnPointerDown(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Node && (target instanceof Element && target.closest('.composer-link-popover'))) return;
-      setLinkOpen(false);
-      linkButtonRef.current?.focus({ preventScroll: true });
-    }
-    function closeOnKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      setLinkOpen(false);
-      linkButtonRef.current?.focus({ preventScroll: true });
-    }
-    document.addEventListener('pointerdown', closeOnPointerDown, true);
-    document.addEventListener('keydown', closeOnKeyDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnPointerDown, true);
-      document.removeEventListener('keydown', closeOnKeyDown, true);
-    };
-  }, [linkOpen]);
-
   function execute(command: string, value?: string) {
     const editor = editorRef?.current ?? null;
     const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
@@ -152,29 +114,14 @@ export function ComposerRichToolbar({
     }
   }
 
-  function openLinkPopover() {
+  function clearFormatting() {
     const editor = editorRef?.current ?? null;
-    linkSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
-    setLinkUrl('');
-    setLinkText(linkTextFromSelection(editor));
-    setLinkError('');
-    setLinkOpen(true);
-  }
-
-  function submitLink() {
-    const editor = editorRef?.current ?? null;
-    const normalizedUrl = normalizeLinkUrl(linkUrl);
-    if (!normalizedUrl) {
-      setLinkError('请输入有效的网址或邮箱链接');
-      return;
+    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    clearEditorFormatting(editor, selection);
+    if (editor) {
+      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;
+      setFormatState(readEditorFormatState(editor));
     }
-    const inserted = insertLink(editor, normalizedUrl, linkText, linkSelectionRef.current);
-    if (!inserted) {
-      setLinkError('请先在正文中选择文字，或填写显示文本');
-      return;
-    }
-    setLinkOpen(false);
-    linkButtonRef.current?.focus({ preventScroll: true });
   }
 
   return (
@@ -227,46 +174,8 @@ export function ComposerRichToolbar({
         {toolbarButton({ label: '居中对齐', icon: <AlignCenter size={17} />, pressed: formatState.justifyCenter, onClick: () => execute('justifyCenter') })}
       </div>
 
-      <div className="composer-rich-toolbar-group" aria-label="插入内容">
-        <button
-          ref={linkButtonRef}
-          type="button"
-          aria-label="插入链接"
-          title="插入链接"
-          aria-expanded={linkOpen}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={openLinkPopover}
-        >
-          <Link2 size={17} />
-        </button>
-        {toolbarButton({ label: '清除格式', icon: <Eraser size={17} />, onClick: () => execute('removeFormat') })}
-        {linkOpen && (
-          <div className="composer-link-popover" role="dialog" aria-label="插入链接">
-            <strong>插入链接</strong>
-            <label>
-              <span>网址</span>
-              <input
-                ref={linkUrlRef}
-                value={linkUrl}
-                onChange={(event) => {
-                  setLinkUrl(event.target.value);
-                  setLinkError('');
-                }}
-                placeholder="https://example.com"
-                inputMode="url"
-              />
-            </label>
-            <label>
-              <span>显示文本</span>
-              <input value={linkText} onChange={(event) => setLinkText(event.target.value)} placeholder="可选" />
-            </label>
-            {linkError && <p role="alert">{linkError}</p>}
-            <footer>
-              <button type="button" onClick={() => { setLinkOpen(false); linkButtonRef.current?.focus({ preventScroll: true }); }}>取消</button>
-              <button type="button" className="is-primary" onClick={submitLink}>插入</button>
-            </footer>
-          </div>
-        )}
+      <div className="composer-rich-toolbar-group" aria-label="格式清理">
+        {toolbarButton({ label: '清除格式', icon: <Eraser size={17} />, onClick: clearFormatting })}
       </div>
     </div>
   );

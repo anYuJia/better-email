@@ -51,13 +51,13 @@ export default function MobileMailboxSheet({
         className="mobile-mailbox-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="邮箱导航"
+        aria-labelledby="mobile-mailbox-title"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="mobile-sheet-header">
           <div>
             <span>Better Email</span>
-            <strong>邮箱</strong>
+            <h1 id="mobile-mailbox-title">邮箱</h1>
           </div>
           <button type="button" className="mobile-header-icon" aria-label="关闭邮箱导航" onClick={onClose}>
             <X size={22} aria-hidden="true" />
@@ -67,70 +67,74 @@ export default function MobileMailboxSheet({
         <div className="mobile-mailbox-scroll">
           <section className="mobile-mailbox-section" aria-labelledby="mobile-account-heading">
             <h2 id="mobile-account-heading">账号</h2>
-            <button
-              type="button"
-              className={accountScope === 'all' ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
-              onClick={() => {
-                onAccountScopeChange('all');
-                onClose();
-              }}
-            >
-              <span className="mobile-mailbox-row-icon"><UserRound size={19} aria-hidden="true" /></span>
-              <span className="mobile-mailbox-row-copy">
-                <strong>所有账号</strong>
-                <small>{accounts.length ? `${accounts.length} 个账号` : '尚未添加账号'}</small>
-              </span>
-              {accountScope === 'all' && <span className="mobile-mailbox-check">当前</span>}
-            </button>
-            {accounts.map((account) => (
+            <div className="mobile-mailbox-list">
               <button
                 type="button"
-                className={accountScope === account.id ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
-                key={account.id}
+                className={accountScope === 'all' ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
                 onClick={() => {
-                  onAccountScopeChange(String(account.id));
+                  onAccountScopeChange('all');
                   onClose();
                 }}
               >
-                <span className="mobile-mailbox-avatar" aria-hidden="true">
-                  {(account.display_name || account.email || '?').slice(0, 1).toUpperCase()}
-                </span>
+                <span className="mobile-mailbox-row-icon"><UserRound size={18} aria-hidden="true" /></span>
                 <span className="mobile-mailbox-row-copy">
-                  <strong>{account.display_name || account.email}</strong>
-                  <small>{account.email}</small>
+                  <strong>所有账号</strong>
+                  <small>{accounts.length ? `${accounts.length} 个账号` : '尚未添加账号'}</small>
                 </span>
-                {accountScope === account.id && <span className="mobile-mailbox-check">当前</span>}
+                {accountScope === 'all' && <span className="mobile-mailbox-check">当前</span>}
               </button>
-            ))}
+              {accounts.map((account) => (
+                <button
+                  type="button"
+                  className={accountScope === account.id ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
+                  key={account.id}
+                  onClick={() => {
+                    onAccountScopeChange(String(account.id));
+                    onClose();
+                  }}
+                >
+                  <span className="mobile-mailbox-avatar" aria-hidden="true">
+                    {(account.display_name || account.email || '?').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="mobile-mailbox-row-copy">
+                    <strong>{account.display_name || account.email}</strong>
+                    <small>{account.email}</small>
+                  </span>
+                  {accountScope === account.id && <span className="mobile-mailbox-check">当前</span>}
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="mobile-mailbox-section" aria-labelledby="mobile-folder-heading">
             <h2 id="mobile-folder-heading">文件夹</h2>
-            {folders.map((folder) => (
-              <button
-                type="button"
-                className={folder.id === folderId ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
-                key={folder.id}
-                onClick={() => {
-                  onSelectFolder(folder.id);
-                  onClose();
-                }}
-              >
-                <span className="mobile-mailbox-row-icon">{folderIconForRole(folder.role)}</span>
-                <span className="mobile-mailbox-row-copy">
-                  <strong>{folderLabel(folder)}</strong>
-                  {folder.name !== folderLabel(folder) && <small>{folder.name}</small>}
-                </span>
-                {folder.unread_count > 0 && <span className="mobile-mailbox-count">{folder.unread_count}</span>}
-                <ChevronRight size={16} aria-hidden="true" />
-              </button>
-            ))}
-            {folders.length === 0 && (
-              <div className="mobile-mailbox-empty">
-                <FolderOpen size={20} aria-hidden="true" />
-                <span>暂无邮箱文件夹</span>
-              </div>
-            )}
+            <div className="mobile-mailbox-list">
+              {folders.map((folder) => (
+                <button
+                  type="button"
+                  className={folder.id === folderId ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
+                  key={folder.id}
+                  onClick={() => {
+                    onSelectFolder(folder.id);
+                    onClose();
+                  }}
+                >
+                  <span className="mobile-mailbox-row-icon">{folderIconForRole(folder.role)}</span>
+                  <span className="mobile-mailbox-row-copy">
+                    <strong>{folderLabel(folder)}</strong>
+                    {folder.name !== folderLabel(folder) && <small>{folder.name}</small>}
+                  </span>
+                  {folder.unread_count > 0 && <span className="mobile-mailbox-count">{folder.unread_count}</span>}
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+              {folders.length === 0 && (
+                <div className="mobile-mailbox-empty">
+                  <FolderOpen size={18} aria-hidden="true" />
+                  <span>暂无邮箱文件夹</span>
+                </div>
+              )}
+            </div>
           </section>
         </div>
 

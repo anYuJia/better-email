@@ -16,7 +16,7 @@ import { localFileAssetUrl } from '../../tauriBridge';
 import { logError } from '../../app/logger';
 import type { ComposerRecipientField } from './ComposerContactsPanel';
 import { canonicalRecipientEmails } from './recipientAddresses';
-import { syncRichTextEmptyState } from './richTextCommands';
+import { autoLinkEditorText, syncRichTextEmptyState } from './richTextCommands';
 
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
@@ -143,6 +143,7 @@ export default function ComposerPrimaryFields({
     if (editor.innerHTML !== nextHtml) {
       editor.innerHTML = nextHtml;
     }
+    autoLinkEditorText(editor, { force: true });
     syncRichTextEmptyState(editor);
   }, [draft.html_body, editableBody, richComposer]);
 
@@ -287,7 +288,18 @@ export default function ComposerPrimaryFields({
 
   function handleRichBodyInput(event: React.FormEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
+    if (event.nativeEvent.isTrusted && editor.dataset.skipAutoLink !== 'true') {
+      autoLinkEditorText(editor);
+    }
     scheduleSyncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
+  }
+
+  function handleRichBodyBlur(event: React.FocusEvent<HTMLDivElement>) {
+    const editor = event.currentTarget;
+    if (editor.dataset.skipAutoLink !== 'true') {
+      autoLinkEditorText(editor, { force: true });
+    }
+    syncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
   }
 
   useEffect(() => () => {
@@ -384,6 +396,7 @@ export default function ComposerPrimaryFields({
             aria-label="邮件正文（富文本）"
             spellCheck
             onInput={handleRichBodyInput}
+            onBlur={handleRichBodyBlur}
             onPaste={handleRichBodyPaste}
             onDrop={onAttachmentDrop}
             onDragEnter={onAttachmentDragEnter}

@@ -62,6 +62,10 @@ export default function StandaloneComposerApp() {
   const closingRef = useRef(false);
   const bootedRef = useRef(false);
   const closeComposerRef = useRef<() => void>(() => {});
+  const applyComposerRequestRef = useRef<(
+    request: ComposerWindowRequest | null,
+    restoreWhenMissing?: boolean,
+  ) => void>(() => {});
 
   const loadComposerData = useCallback(async (preferredAccountId?: number) => {
     const nextAccounts = await invoke<Account[]>(IPC.ListAccounts);
@@ -175,6 +179,9 @@ export default function StandaloneComposerApp() {
     }
     openComposer(undefined, restoreWhenMissing ? { restoreAutosave: true } : {});
   }, [openComposer]);
+  // Draft edits change the controller callback identity. Keep boot and IPC listeners
+  // stable so a body edit cannot re-run initialization and steal focus from the editor.
+  applyComposerRequestRef.current = applyComposerRequest;
 
   useEffect(() => {
     let active = true;
@@ -186,7 +193,7 @@ export default function StandaloneComposerApp() {
           takePendingComposerRequest()
             .then((value) => {
               if (!active) return;
-              applyComposerRequest(normalizeComposerRequest(value));
+              applyComposerRequestRef.current(normalizeComposerRequest(value));
             })
             .catch((error) => setStatus(`读取写信请求失败：${String(error)}`));
         });
@@ -201,7 +208,7 @@ export default function StandaloneComposerApp() {
       active = false;
       unlisten?.();
     };
-  }, [applyComposerRequest]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -210,7 +217,7 @@ export default function StandaloneComposerApp() {
         const pending = normalizeComposerRequest(await takePendingComposerRequest());
         await loadComposerData(pending?.draft?.account_id || undefined);
         if (!active) return;
-        applyComposerRequest(pending, true);
+        applyComposerRequestRef.current(pending, true);
         bootedRef.current = true;
         setBooted(true);
       } catch (error) {
@@ -222,7 +229,7 @@ export default function StandaloneComposerApp() {
     return () => {
       active = false;
     };
-  }, [applyComposerRequest, loadComposerData]);
+  }, [loadComposerData]);
 
   useEffect(() => {
     let active = true;

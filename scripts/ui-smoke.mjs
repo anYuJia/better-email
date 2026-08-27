@@ -1862,22 +1862,27 @@ async function main() {
     await evalInPage(cdp, `(() => {
       const editor = document.querySelector('.composer-richtext-body');
       if (!editor) return false;
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-      const node = walker.nextNode();
-      if (!node) return false;
+      editor.innerHTML = '';
+      editor.focus();
+      return true;
+    })()`);
+    await cdp.send('Input.insertText', { text: '自动链接 https://example.com/path?x=1&y=2。' });
+    await waitForExpression(cdp, "(() => { const link = document.querySelector('.composer-richtext-body a'); return link?.classList.contains('composer-auto-link') && link.getAttribute('href') === 'https://example.com/path?x=1&y=2' && link.textContent === 'https://example.com/path?x=1&y=2'; })()");
+    await waitForExpression(cdp, "!document.querySelector('.composer-link-popover') && !document.querySelector('.composer-rich-toolbar button[aria-label=\"插入链接\"]')");
+    await captureScreenshot(cdp, 'compose-final-polish-auto-link');
+    await evalInPage(cdp, `(() => {
+      const editor = document.querySelector('.composer-richtext-body');
+      if (!editor) return false;
       const range = document.createRange();
-      range.selectNodeContents(node);
+      range.selectNodeContents(editor);
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
       return true;
     })()`);
-    await evalInPage(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"插入链接\"]')?.click()");
-    await waitForExpression(cdp, "document.querySelector('.composer-link-popover')");
-    await captureScreenshot(cdp, 'compose-final-polish-link-popover');
-    await fillInput(cdp, '.composer-link-popover input', 'https://example.com', 0);
-    await clickButton(cdp, '插入', "document.querySelector('.composer-link-popover')");
-    await waitForExpression(cdp, "document.querySelector('.composer-richtext-body a[href=\"https://example.com\"]')");
+    await clickButton(cdp, '加粗', "document.querySelector('.composer-rich-toolbar')");
+    await waitForExpression(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"加粗\"]')?.getAttribute('aria-pressed') === 'true'");
+    await captureScreenshot(cdp, 'compose-final-polish-toolbar-active');
     await evalInPage(cdp, `(() => {
       const editor = document.querySelector('.composer-richtext-body');
       if (!editor) return false;
@@ -1886,11 +1891,11 @@ async function main() {
       range.selectNodeContents(editor);
       selection.removeAllRanges();
       selection.addRange(range);
-      document.querySelector('.composer-rich-toolbar button[aria-label="加粗"]')?.click();
       return true;
     })()`);
-    await waitForExpression(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"加粗\"]')?.getAttribute('aria-pressed') === 'true'");
-    await captureScreenshot(cdp, 'compose-final-polish-toolbar-active');
+    await clickButton(cdp, '清除格式', "document.querySelector('.composer-rich-toolbar')");
+    await waitForExpression(cdp, "(() => { const editor = document.querySelector('.composer-richtext-body'); const clear = document.querySelector('.composer-rich-toolbar button[aria-label=\"清除格式\"]'); return editor && !editor.querySelector('b,strong,i,em,u,s,strike,del,mark,font,small,big,sub,sup,span,a') && clear; })()");
+    await waitForExpression(cdp, "document.querySelector('.composer-rich-toolbar button[aria-label=\"加粗\"]')?.getAttribute('aria-pressed') === 'false'");
     await evalInPage(cdp, `(() => {
       const target = document.querySelector('.composer-attachments');
       if (!target) throw new Error('Composer attachment drop zone not found');
@@ -1911,6 +1916,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('smoke-brief.txt') && document.body.innerText.includes('已添加附件 1 个') && document.querySelectorAll('.composer .composer-attachment-tile').length === 2");
     await pickCustomSelect(cdp, '.composer .custom-select-summary[aria-label="发件人"]', 'Demo Support');
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer .composer-footer-tool-group button')].some((button) => button.textContent.includes('签名') && !button.disabled)");
+    await evalInPage(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]')?.focus()");
     await clickButton(cdp, '签名', "document.querySelector('.composer .composer-footer-tool-group')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('Better Email Support'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('Better Email Support')); })()");
     await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");

@@ -79,6 +79,7 @@
   --ui-control-height-comfortable: 40px;
   --ui-control-height-touch: 44px;
   --ui-control-padding-inline: 10px;
+  --ui-dropdown-max-width: 560px;
 
   /* Integrated native titlebar geometry. The app shell owns this row, so
      panes do not need scattered top-padding compensation. */

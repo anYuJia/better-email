@@ -23,14 +23,80 @@ export function joinEditableBody(editableBody: string, originalQuote: string) {
   return `${trimmedEditable}${trimmedEditable ? '\n\n' : ''}${originalQuote}`;
 }
 
-export function plainTextToRichHtml(value: string) {
+export type AutoLinkMatch = {
+  index: number;
+  raw: string;
+  text: string;
+  href: string;
+};
+
+const autoLinkPattern = /(?:https?:\/\/|www\.)[^\s<>"']+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>"']*)?/gi;
+const trailingAutoLinkPunctuationPattern = /[.,!?;:，。！？；：、)\]}]+$/;
+
+function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-    .replace(/\r\n?|\n/g, '<br>');
+    .replace(/'/g, '&#039;');
+}
+
+function escapeHtmlWithBreaks(value: string) {
+  return escapeHtml(value).replace(/\r\n?|\n/g, '<br>');
+}
+
+export function normalizeAutoLink(value: string) {
+  const text = value.trim().replace(trailingAutoLinkPunctuationPattern, '');
+  if (!text) return null;
+  const href = /^(?:https?:\/\/)/i.test(text) ? text : `https://${text}`;
+
+  try {
+    const parsed = new URL(href);
+    const hasWebHostname = parsed.hostname === 'localhost'
+      || parsed.hostname.includes('.')
+      || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(parsed.hostname);
+    if (!['http:', 'https:'].includes(parsed.protocol) || !hasWebHostname) return null;
+  } catch {
+    return null;
+  }
+
+  return { text, href };
+}
+
+export function findAutoLinkMatches(value: string): AutoLinkMatch[] {
+  const matches: AutoLinkMatch[] = [];
+  const pattern = new RegExp(autoLinkPattern.source, autoLinkPattern.flags);
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value)) !== null) {
+    const raw = match[0];
+    const index = match.index;
+    const isExplicitLink = /^(?:https?:\/\/|www\.)/i.test(raw);
+    const precedingCharacter = value[index - 1] ?? '';
+    if (!isExplicitLink && /[\w@]/.test(precedingCharacter)) continue;
+
+    const normalized = normalizeAutoLink(raw);
+    if (!normalized) continue;
+    matches.push({ index, raw, ...normalized });
+  }
+
+  return matches;
+}
+
+export function plainTextToRichHtml(value: string) {
+  const matches = findAutoLinkMatches(value);
+  if (matches.length === 0) return escapeHtmlWithBreaks(value);
+
+  let html = '';
+  let cursor = 0;
+  for (const match of matches) {
+    html += escapeHtmlWithBreaks(value.slice(cursor, match.index));
+    html += `<a class="composer-auto-link" href="${escapeHtml(match.href)}">${escapeHtml(match.text)}</a>`;
+    html += escapeHtmlWithBreaks(match.raw.slice(match.text.length));
+    cursor = match.index + match.raw.length;
+  }
+  return html + escapeHtmlWithBreaks(value.slice(cursor));
 }
 
 function stripQuotePrefix(line: string) {

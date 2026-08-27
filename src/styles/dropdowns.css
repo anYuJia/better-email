@@ -11,7 +11,8 @@
 .custom-select-menu {
   position: relative;
   min-width: 0;
-  width: 100%;
+  width: max-content;
+  max-width: min(var(--ui-dropdown-max-width), calc(100vw - 24px));
 }
 
 .custom-select-summary {
@@ -92,8 +93,9 @@
   z-index: 1000;
   display: grid;
   gap: 2px;
-  min-width: min(240px, calc(100vw - 24px));
-  max-width: min(560px, calc(100vw - 24px));
+  width: max-content;
+  min-width: 0;
+  max-width: min(var(--ui-dropdown-max-width), calc(100vw - 24px));
   max-height: min(280px, calc(100vh - 24px));
   padding: 4px;
   overflow-x: hidden;
@@ -181,6 +183,13 @@
 
 .custom-select-dropdown.dense button strong {
   font-size: var(--ui-font-size-aux);
+}
+
+@media (max-width: 720px) {
+  .custom-select-menu {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 @media (max-width: 640px) {

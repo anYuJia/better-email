@@ -54,6 +54,15 @@ function renderSheet(overrides: Partial<ComponentProps<typeof MobileMailboxSheet
 }
 
 describe('MobileMailboxSheet', () => {
+  it('keeps the drawer grouped and names it for assistive technology', () => {
+    renderSheet();
+
+    expect(screen.getByRole('dialog', { name: '邮箱' }).getAttribute('aria-labelledby')).toBe(
+      'mobile-mailbox-title',
+    );
+    expect(document.querySelectorAll('.mobile-mailbox-list')).toHaveLength(2);
+  });
+
   it('changes account scope without changing the default sender account', () => {
     const onAccountScopeChange = vi.fn();
     const onClose = vi.fn();

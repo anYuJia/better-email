@@ -390,19 +390,20 @@
     display: flex;
     align-items: stretch;
     justify-content: flex-start;
-    background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.42);
+    background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.48);
     animation: mobile-sheet-fade-in var(--ui-motion-fast) var(--ui-ease-standard) both;
   }
 
   .mobile-mailbox-sheet {
-    width: min(90vw, 380px);
-    max-width: 100%;
+    width: min(82vw, 336px);
+    max-width: calc(100vw - 48px);
     height: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     padding-top: env(safe-area-inset-top);
+    border-radius: 0 var(--ui-radius-modal) var(--ui-radius-modal) 0;
     border-inline-end: 1px solid var(--ui-border-strong);
     background: var(--ui-surface);
     box-shadow: var(--ui-shadow-float);
@@ -416,7 +417,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 12px 0 18px;
+    padding: 0 12px 0 16px;
     border-bottom: 1px solid var(--ui-border);
   }
 
@@ -428,13 +429,17 @@
 
   .mobile-sheet-header span {
     color: var(--ui-text-tertiary);
-    font-size: 11px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
   }
 
-  .mobile-sheet-header strong {
+  .mobile-sheet-header h1 {
+    margin: 0;
     color: var(--ui-text);
     font-size: 19px;
+    font-weight: 700;
     line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .mobile-mailbox-scroll {
@@ -442,31 +447,44 @@
     flex: 1 1 auto;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 12px 0 20px;
+    padding: 14px 12px 20px;
+    background: var(--ui-bg);
   }
 
   .mobile-mailbox-section {
-    margin: 0 0 20px;
+    margin: 0 0 18px;
   }
 
-  .mobile-mailbox-section h2,
-  .mobile-settings-group h2 {
+  .mobile-mailbox-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .mobile-mailbox-section h2 {
     margin: 0;
-    padding: 6px 18px 7px;
+    padding: 0 4px 7px;
     color: var(--ui-text-tertiary);
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
+    line-height: 1.3;
     text-transform: uppercase;
+  }
+
+  .mobile-mailbox-list {
+    overflow: hidden;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-panel);
+    background: var(--ui-surface);
+    box-shadow: var(--ui-box-shadow-subtle-edge);
   }
 
   .mobile-mailbox-row {
     width: 100%;
-    min-height: 60px;
+    min-height: 52px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 18px;
+    gap: 10px;
+    padding: 8px 12px;
     border: 0;
     border-bottom: 1px solid var(--ui-border);
     color: var(--ui-text-secondary);
@@ -474,16 +492,25 @@
     text-align: left;
   }
 
-  .mobile-mailbox-row:first-of-type {
-    border-top: 1px solid var(--ui-border);
+  .mobile-mailbox-list > .mobile-mailbox-row:last-child {
+    border-bottom: 0;
   }
 
-  .mobile-mailbox-row:hover,
-  .mobile-mailbox-row:focus-visible,
-  .mobile-mailbox-row.active {
+  .mobile-mailbox-row:hover {
     color: var(--ui-text);
     background: var(--quiet-row-hover);
-    outline: none;
+  }
+
+  .mobile-mailbox-row:focus-visible {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
+  }
+
+  .mobile-mailbox-row.active {
+    color: var(--ui-text);
+    background: var(--ui-accent-soft);
   }
 
   .mobile-mailbox-row.active .mobile-mailbox-row-icon,
@@ -493,9 +520,9 @@
 
   .mobile-mailbox-row-icon,
   .mobile-mailbox-avatar {
-    width: 36px;
-    min-width: 36px;
-    height: 36px;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
     display: grid;
     place-items: center;
     border-radius: var(--ui-radius-control);
@@ -507,7 +534,7 @@
     border-radius: 50%;
     color: var(--color-text-on-accent);
     background: var(--ui-accent);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
   }
 
@@ -515,7 +542,7 @@
     min-width: 0;
     flex: 1 1 auto;
     display: grid;
-    gap: 3px;
+    gap: 2px;
   }
 
   .mobile-mailbox-row-copy :is(strong, small) {
@@ -528,11 +555,13 @@
     color: inherit;
     font-size: 14px;
     font-weight: 620;
+    line-height: 1.25;
   }
 
   .mobile-mailbox-row-copy small {
     color: var(--ui-text-tertiary);
     font-size: 11px;
+    line-height: 1.25;
   }
 
   .mobile-mailbox-check,
@@ -544,12 +573,11 @@
   }
 
   .mobile-mailbox-empty {
-    min-height: 72px;
+    min-height: 60px;
     display: flex;
     align-items: center;
     gap: 9px;
-    padding: 0 18px;
-    border-top: 1px solid var(--ui-border);
+    padding: 0 12px;
     color: var(--ui-text-tertiary);
     font-size: 13px;
   }
@@ -559,13 +587,13 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--ui-border);
     background: var(--ui-surface);
   }
 
   .mobile-mailbox-footer button {
-    min-height: 48px;
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -574,15 +602,34 @@
     border-radius: var(--ui-radius-control);
     color: var(--ui-text-secondary);
     background: var(--ui-surface-muted);
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 620;
   }
 
-  .mobile-mailbox-footer button:active,
-  .mobile-mailbox-footer button:focus-visible {
+  .mobile-mailbox-footer button:hover {
+    color: var(--ui-text);
+    background: var(--ui-control-hover);
+  }
+
+  .mobile-mailbox-footer button:active {
     border-color: var(--ui-accent);
     color: var(--ui-accent);
-    outline: none;
+  }
+
+  .mobile-mailbox-footer button:focus-visible {
+    border-color: var(--ui-accent);
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
+  }
+
+  .mobile-settings-group h2 {
+    margin: 0;
+    padding: 6px 18px 7px;
+    color: var(--ui-text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   /* Reader destination ------------------------------------------------- */

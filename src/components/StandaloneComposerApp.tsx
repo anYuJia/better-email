@@ -310,11 +310,8 @@ export default function StandaloneComposerApp() {
           event.preventDefault();
           if (isDraftEmpty(draftRef.current)) {
             closingRef.current = true;
-            emitToMain(COMPOSER_CLOSED_EVENT)
-              .catch(() => undefined)
-              .finally(() => {
-                closeCurrentWindow().catch(() => undefined);
-              });
+            void closeCurrentWindow().catch(() => undefined);
+            void emitToMain(COMPOSER_CLOSED_EVENT).catch(() => undefined);
             return;
           }
           closeComposerRef.current();
@@ -335,11 +332,8 @@ export default function StandaloneComposerApp() {
   useEffect(() => {
     if (!booted || isComposerOpen || closingRef.current) return;
     closingRef.current = true;
-    emitToMain(COMPOSER_CLOSED_EVENT)
-      .catch(() => undefined)
-      .finally(() => {
-        closeCurrentWindow().catch(() => undefined);
-      });
+    void closeCurrentWindow().catch(() => undefined);
+    void emitToMain(COMPOSER_CLOSED_EVENT).catch(() => undefined);
   }, [booted, isComposerOpen]);
 
   const openContactsSettings = useCallback(() => {
@@ -380,8 +374,8 @@ export default function StandaloneComposerApp() {
   }
 
   return (
-    <main className="standalone-composer-app">
-      {isComposerOpen && (
+    <main className={`standalone-composer-app${isComposerOpen ? '' : ' has-status'}`}>
+      {isComposerOpen ? (
         <ComposerWindow
           standaloneWindow
           minimized={isComposerMinimized}
@@ -419,7 +413,7 @@ export default function StandaloneComposerApp() {
           onAttachmentPaste={handleComposerAttachmentPaste}
           buildInlineImageAttachments={buildInlineImageAttachments}
           onInlineImagesAdded={addInlineImages}
-          onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
+          onSaveDraft={saveDraft}
           onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
           onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
           onSendRiskConfirm={confirmSendRisk}
@@ -430,6 +424,11 @@ export default function StandaloneComposerApp() {
           attachmentProgress={composerAttachmentProgress}
           crossAccountRisks={crossAccountRisks}
         />
+      ) : (
+        <div className="standalone-composer-status" role="status" aria-live="polite">
+          <strong>正在关闭写信窗口</strong>
+          <p>{status || '内容已处理完成。'}</p>
+        </div>
       )}
       {composerCloseConfirmOpen && (
         <ComposerCloseConfirmDialog

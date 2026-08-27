@@ -83,7 +83,33 @@ describe('useComposerController close lifecycle', () => {
     expect(mockInvoke).toHaveBeenCalledWith('save_draft', expect.anything());
     expect(result.current.isComposerOpen).toBe(false);
     expect(result.current.composerCloseConfirmOpen).toBe(false);
+    expect(mocks.setStatus).toHaveBeenCalledWith('正在保存草稿…');
     expect(mocks.setStatus).toHaveBeenCalledWith('草稿已保存');
+  });
+
+  it('keeps the composer content open when saving a draft fails', async () => {
+    const { result, mocks } = renderComposer();
+    const failedDraft = {
+      ...result.current.draft,
+      to: 'a@example.com',
+      subject: '不能丢失',
+      body: '保留的正文',
+    };
+    mockInvoke.mockRejectedValueOnce(new Error('草稿服务暂时不可用'));
+
+    act(() => {
+      result.current.setDraft(failedDraft);
+      result.current.setComposerOpen(true);
+    });
+    await expect(act(async () => {
+      await result.current.saveDraft();
+    })).rejects.toThrow('草稿服务暂时不可用');
+
+    expect(result.current.isComposerOpen).toBe(true);
+    expect(result.current.draft).toEqual(failedDraft);
+    expect(mocks.setStatus).toHaveBeenLastCalledWith(
+      '保存失败，邮件内容已保留：草稿服务暂时不可用',
+    );
   });
 
   it('queuing a draft closes the composer without the unsaved-changes confirmation', async () => {

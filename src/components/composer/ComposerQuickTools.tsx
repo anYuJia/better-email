@@ -24,6 +24,9 @@ import {
   restoreEditorSelection,
   runEditorCommand,
   saveEditorSelection,
+  setEditorSelectionFormat,
+  setEditorTypingFormat,
+  type InlineTextFormatState,
   type RichTextFormatState,
 } from './richTextCommands';
 
@@ -82,6 +85,7 @@ export function ComposerRichToolbar({
     bold: false,
     italic: false,
     underline: false,
+    highlight: false,
     unorderedList: false,
     orderedList: false,
     justifyLeft: false,
@@ -95,7 +99,7 @@ export function ComposerRichToolbar({
     const sync = () => {
       const selection = saveEditorSelection(editor);
       if (selection) editorSelectionRef.current = selection;
-      setFormatState(readEditorFormatState(editor));
+      setFormatState(readEditorFormatState(editor, editorSelectionRef.current));
     };
     editor.addEventListener('keyup', sync);
     editor.addEventListener('mouseup', sync);
@@ -132,7 +136,7 @@ export function ComposerRichToolbar({
       if (!target) return;
       runEditorCommand(target, command, value, selection);
       editorSelectionRef.current = saveEditorSelection(target) ?? selection ?? editorSelectionRef.current;
-      setFormatState(readEditorFormatState(target));
+      setFormatState(readEditorFormatState(target, editorSelectionRef.current));
     };
     if (typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(run);
@@ -146,9 +150,43 @@ export function ComposerRichToolbar({
     runEditorCommand(editor, command, value, selection);
     if (editor) {
       editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;
-      setFormatState(readEditorFormatState(editor));
+      setFormatState(readEditorFormatState(editor, editorSelectionRef.current));
       restoreEditorFocus(editor);
     }
+  }
+
+  function executeInline(key: keyof InlineTextFormatState) {
+    const editor = editorRef?.current ?? null;
+    if (!editor) return;
+    const desired = !formatState[key];
+    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    if (!selection || selection.collapsed) {
+      const typingState: InlineTextFormatState = {
+        bold: formatState.bold,
+        italic: formatState.italic,
+        underline: formatState.underline,
+        highlight: formatState.highlight,
+        [key]: desired,
+      };
+      const nextSelection = setEditorTypingFormat(editor, selection, typingState) ?? selection;
+      editorSelectionRef.current = nextSelection ?? editorSelectionRef.current;
+      setFormatState({
+        ...readEditorFormatState(editor, nextSelection),
+        ...typingState,
+      });
+      restoreEditorFocus(editor);
+      return;
+    }
+
+    const nextSelection = setEditorSelectionFormat(editor, selection, key, desired) ?? selection;
+    const nextState = {
+      ...readEditorFormatState(editor, nextSelection),
+      [key]: desired,
+    };
+
+    editorSelectionRef.current = nextSelection ?? editorSelectionRef.current;
+    setFormatState(nextState);
+    restoreEditorFocus(editor);
   }
 
   function clearFormatting() {
@@ -157,7 +195,7 @@ export function ComposerRichToolbar({
     clearEditorFormatting(editor, selection);
     if (editor) {
       editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;
-      setFormatState(readEditorFormatState(editor));
+      setFormatState(readEditorFormatState(editor, editorSelectionRef.current));
       restoreEditorFocus(editor);
     }
   }
@@ -201,10 +239,15 @@ export function ComposerRichToolbar({
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="文字样式">
-        {toolbarButton({ label: '加粗', icon: <Bold size={17} />, pressed: formatState.bold, onClick: () => execute('bold') })}
-        {toolbarButton({ label: '斜体', icon: <Italic size={17} />, pressed: formatState.italic, onClick: () => execute('italic') })}
-        {toolbarButton({ label: '下划线', icon: <Underline size={17} />, pressed: formatState.underline, onClick: () => execute('underline') })}
-        {toolbarButton({ label: '文字高亮', icon: <Highlighter size={17} />, onClick: () => execute('hiliteColor', '#FFF1A8') })}
+        {toolbarButton({ label: '加粗', icon: <Bold size={17} />, pressed: formatState.bold, onClick: () => executeInline('bold') })}
+        {toolbarButton({ label: '斜体', icon: <Italic size={17} />, pressed: formatState.italic, onClick: () => executeInline('italic') })}
+        {toolbarButton({ label: '下划线', icon: <Underline size={17} />, pressed: formatState.underline, onClick: () => executeInline('underline') })}
+        {toolbarButton({
+          label: '文字高亮',
+          icon: <Highlighter size={17} />,
+          pressed: formatState.highlight,
+          onClick: () => executeInline('highlight'),
+        })}
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="段落格式">

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -117,7 +117,7 @@ export type ComposerWindowProps = {
   onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
   buildInlineImageAttachments: (files: File[]) => Promise<OutboundAttachmentInput[]>;
   onInlineImagesAdded: (attachments: OutboundAttachmentInput[]) => void;
-  onSaveDraft: () => void;
+  onSaveDraft: () => Promise<void> | void;
   onQueueDraft: () => void;
   onSendDraft: () => void;
   onSendRiskConfirm: () => void;
@@ -202,6 +202,7 @@ export default function ComposerWindow({
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
+  const [saveDraftPending, setSaveDraftPending] = useState(false);
   const contactsPanelVisible = standaloneWindow || !isNarrowContactsViewport || contactsOpen;
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
@@ -213,13 +214,22 @@ export default function ComposerWindow({
     ?? draftIdentities.find((identity) => identity.is_default)
     ?? draftIdentities[0]
     ?? null;
-  const autosaveLabel = autosave && !isDraftEmpty(draft)
-    ? `已自动保存 · ${formatClock(autosave.saved_at)}`
-    : /^正在保存|保存失败|网络异常/.test(status)
-      ? status
+  const explicitSaveStatus = /^正在保存|保存失败|网络异常/.test(status);
+  const autosaveLabel = explicitSaveStatus
+    ? status
+    : autosave && !isDraftEmpty(draft)
+      ? `已自动保存 · ${formatClock(autosave.saved_at)}`
       : isDraftEmpty(draft)
         ? ''
         : '正在保存…';
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return undefined;
+    if (saveDraftPending) panel.setAttribute('inert', '');
+    else panel.removeAttribute('inert');
+    return () => panel.removeAttribute('inert');
+  }, [saveDraftPending]);
 
   function patchDraft(patch: Partial<DraftInput>) {
     onDraftChange((current) => ({ ...current, ...patch }));
@@ -234,6 +244,21 @@ export default function ComposerWindow({
   function toggleComposerPopover(mode: Exclude<ComposerPopoverMode, null>) {
     setSendMenuOpen(false);
     setPopoverMode((current) => current === mode ? null : mode);
+  }
+
+  async function handleSaveDraft() {
+    if (saveDraftPending) return;
+    setSaveDraftPending(true);
+    let saved = false;
+    try {
+      await onSaveDraft();
+      saved = true;
+    } catch {
+      // The controller keeps the draft open and exposes the failure in status.
+    } finally {
+      setSaveDraftPending(false);
+    }
+    if (saved) closePopover();
   }
 
   function closeSendMenu() {
@@ -452,6 +477,7 @@ export default function ComposerWindow({
       <section
         ref={panelRef}
         className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
+        aria-busy={saveDraftPending || undefined}
         style={standaloneWindow ? undefined : { transform: `translate(${position.x}px, ${position.y}px)` }}
         onMouseDown={(event) => event.stopPropagation()}
         onPointerMove={moveDrag}
@@ -466,9 +492,11 @@ export default function ComposerWindow({
                 <span
                   className="composer-autosave-status"
                   aria-live="polite"
-                  title={autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel}
+                  title={explicitSaveStatus ? autosaveLabel : autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel}
                 >
-                  {autosave && !isDraftEmpty(draft) ? <CheckCircle2 size={16} aria-hidden="true" /> : null}
+                  {autosave && !isDraftEmpty(draft) && !explicitSaveStatus
+                    ? <CheckCircle2 size={16} aria-hidden="true" />
+                    : null}
                   {autosaveLabel}
                 </span>
               </span>
@@ -555,7 +583,8 @@ export default function ComposerWindow({
               onDeleteTemplate={onDeleteTemplate}
               onTemplateNameChange={onTemplateNameChange}
               onSaveTemplate={onSaveTemplate}
-              onSaveDraft={onSaveDraft}
+              onSaveDraft={handleSaveDraft}
+              saveDraftPending={saveDraftPending}
             />
 
             <footer>

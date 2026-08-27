@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { autoLinkEditorText, clearEditorFormatting } from './richTextCommands';
+import {
+  autoLinkEditorText,
+  cleanupEditorTypingFormatMarkers,
+  clearEditorFormatting,
+  setEditorSelectionFormat,
+  setEditorTypingFormat,
+} from './richTextCommands';
 
 function selectEditorContents(editor: HTMLElement) {
   const selection = editor.ownerDocument.getSelection();
@@ -86,4 +92,93 @@ describe('rich text commands', () => {
     expect(editor.textContent).toBe('重点');
     editor.remove();
   });
+
+  it('keeps preselected typing formats while removing the invisible caret marker from content', () => {
+    const editor = document.createElement('div');
+    document.body.append(editor);
+    const range = editor.ownerDocument.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(true);
+
+    const nextRange = setEditorTypingFormat(editor, range, {
+      bold: true,
+      italic: true,
+      underline: true,
+      highlight: true,
+    });
+    const marker = editor.querySelector<HTMLElement>('[data-composer-typing-format]');
+    const markerText = marker?.firstChild;
+    if (!(markerText instanceof Text) || !nextRange) throw new Error('typing marker missing');
+
+    markerText.appendData('新内容');
+    nextRange.setStart(markerText, markerText.data.length);
+    nextRange.collapse(true);
+    restoreSelection(editor, nextRange);
+
+    expect(cleanupEditorTypingFormatMarkers(editor)).toBe(true);
+    expect(editor.textContent).toBe('新内容');
+    expect(editor.innerHTML).not.toContain('data-composer-typing-format');
+    expect(editor.innerHTML).not.toContain('\u200b');
+    expect(marker?.style.fontWeight).toBe('700');
+    expect(marker?.style.fontStyle).toBe('italic');
+    expect(marker?.style.textDecorationLine).toBe('underline');
+    expect(marker?.style.backgroundColor).not.toBe('');
+    editor.remove();
+  });
+
+  it('removes a selected format without changing the text before or after the selection', () => {
+    const editor = document.createElement('div');
+    editor.innerHTML = '<strong>前选后</strong>';
+    document.body.append(editor);
+    const text = editor.querySelector('strong')?.firstChild;
+    if (!(text instanceof Text)) throw new Error('formatted text missing');
+    const range = editor.ownerDocument.createRange();
+    range.setStart(text, 1);
+    range.setEnd(text, 2);
+    restoreSelection(editor, range);
+
+    setEditorSelectionFormat(editor, range, 'bold', false);
+
+    expect(editor.textContent).toBe('前选后');
+    const textNodes = Array.from(editor.childNodes).flatMap((node) => (
+      node instanceof Text ? [node] : Array.from(node.childNodes).filter((child): child is Text => child instanceof Text)
+    ));
+    const selectedText = textNodes.find((node) => node.data === '选');
+    const beforeText = textNodes.find((node) => node.data === '前');
+    const afterText = textNodes.find((node) => node.data === '后');
+    expect(selectedText?.parentElement?.closest('strong')).toBeNull();
+    expect(beforeText?.parentElement?.closest('strong')).not.toBeNull();
+    expect(afterText?.parentElement?.closest('strong')).not.toBeNull();
+    editor.remove();
+  });
+
+  it('starts unformatted typing outside inherited inline formats at a collapsed caret', () => {
+    const editor = document.createElement('div');
+    editor.innerHTML = '<strong><em><u><mark>前后</mark></u></em></strong>';
+    document.body.append(editor);
+    const text = editor.querySelector('mark')?.firstChild;
+    if (!(text instanceof Text)) throw new Error('formatted text missing');
+    const range = editor.ownerDocument.createRange();
+    range.setStart(text, 1);
+    range.collapse(true);
+
+    setEditorTypingFormat(editor, range, {
+      bold: false,
+      italic: false,
+      underline: false,
+      highlight: false,
+    });
+
+    const marker = editor.querySelector<HTMLElement>('[data-composer-typing-format]');
+    expect(marker).not.toBeNull();
+    expect(marker?.closest('strong, em, u, mark')).toBeNull();
+    expect(editor.textContent?.replace('\u200b', '')).toBe('前后');
+    editor.remove();
+  });
 });
+
+function restoreSelection(editor: HTMLElement, range: Range) {
+  const selection = editor.ownerDocument.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}

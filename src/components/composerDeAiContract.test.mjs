@@ -234,6 +234,26 @@ describe('composer de-AI contract — toolbar is desktop icon buttons, not pill 
   });
 });
 
+describe('composer close confirmation — clear action hierarchy', () => {
+  it('keeps discard as a filled destructive action', () => {
+    const rule = findRules(sharedDialogsCss, '.dialog-button-danger')
+      .find((candidate) => candidate.selector === '.dialog-button-danger');
+    expect(rule).toBeDefined();
+    expect(rule.body).toMatch(/color:\s*var\(--color-text-on-accent\)/);
+    expect(rule.body).toMatch(/background:\s*var\(--ui-danger\)/);
+  });
+
+  it('uses one integrated focus border instead of a detached double outline', () => {
+    const rule = findRules(sharedDialogsCss, '.dialog-button:focus-visible')
+      .find((candidate) => candidate.selector === '.dialog-button:focus-visible');
+    expect(rule).toBeDefined();
+    expect(rule.body).toMatch(/border-color:\s*var\(--ui-accent\)/);
+    expect(rule.body).toMatch(/outline:\s*none/);
+    expect(rule.body).toMatch(/box-shadow:\s*inset/);
+    expect(rule.body).not.toMatch(/outline-offset/);
+  });
+});
+
 describe('composer de-AI contract — no press scale animation in motion system', () => {
   it('shared-motion.css has no scale(0.97) transform', () => {
     expect(sharedMotionCss).not.toContain('scale(0.97)');

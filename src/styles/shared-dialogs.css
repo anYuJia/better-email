@@ -26,7 +26,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   border: 0;
-  border-radius: var(--ui-radius-panel);
+  border-radius: var(--ui-radius-modal);
   background: var(--ui-surface);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--ui-border) 72%, transparent),
@@ -253,7 +253,7 @@
 }
 
 .dialog-button:active:not(:disabled) {
-  /* pressed: deeper surface, no scale */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .dialog-button-primary {
@@ -265,6 +265,11 @@
 .dialog-button-primary:hover:not(:disabled) {
   border-color: var(--ui-accent-hover);
   background: var(--ui-accent-hover);
+}
+
+.dialog-button-primary:active:not(:disabled) {
+  border-color: var(--ui-accent-pressed);
+  background: var(--ui-accent-pressed);
 }
 
 .dialog-button-secondary {
@@ -279,6 +284,10 @@
   background: var(--ui-surface-muted);
 }
 
+.dialog-button-secondary:active:not(:disabled) {
+  background: var(--ui-control-hover);
+}
+
 .dialog-button-danger {
   color: var(--color-text-on-accent);
   border-color: var(--ui-danger);
@@ -291,19 +300,80 @@
   background: var(--ui-danger-hover);
 }
 
+.dialog-button-danger:active:not(:disabled) {
+  border-color: var(--ui-danger-hover);
+  background: var(--ui-danger-hover);
+}
+
+/* Composer close confirmation is a three-way decision. Keep save and discard
+ * visually distinct while the neutral action remains secondary. */
+.composer-close-dialog-backdrop {
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.38);
+}
+
+.composer-close-dialog {
+  width: min(420px, 100%);
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-5);
+}
+
+.composer-close-dialog > header {
+  align-items: flex-start;
+}
+
+.composer-close-dialog .dialog-card-mark-info {
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+}
+
+.composer-close-dialog .dialog-card-heading strong {
+  font-size: 16px;
+}
+
+.composer-close-dialog-description {
+  max-width: 38em;
+}
+
+.composer-close-dialog > .composer-close-dialog-actions {
+  gap: var(--ui-space-2);
+  margin-top: 0;
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-border);
+}
+
 .dialog-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
 .dialog-button:focus-visible {
-  outline: var(--ui-focus-outline);
-  outline-offset: 2px;
+  border-color: var(--ui-accent);
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
 }
 
 @media (max-width: 640px) {
   .dialog-button {
     min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .composer-close-dialog {
+    padding: var(--ui-space-4);
+  }
+
+  .composer-close-dialog > .composer-close-dialog-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .composer-close-dialog .dialog-button {
+    width: 100%;
+  }
+
+  .composer-close-dialog .dialog-button-secondary {
+    grid-column: 1 / -1;
   }
 }
 

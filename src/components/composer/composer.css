@@ -3054,6 +3054,12 @@
   background: var(--ui-control-hover);
 }
 
+.composer-more-menu > button:disabled,
+.composer-advanced-popover > header button:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
 .composer-template-row > button:last-child:hover,
 .composer-template-row > button:last-child:focus-visible {
   color: var(--ui-danger);
@@ -3667,6 +3673,12 @@
   overflow: hidden;
   background: var(--ui-surface);
   color: var(--ui-text);
+}
+
+.standalone-composer-app.has-status {
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
 .composer-backdrop.is-native-window {

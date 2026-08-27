@@ -148,15 +148,28 @@ export default function useComposerSend({
       setStatus('草稿为空，未保存');
       return;
     }
-    const report = await invoke<DraftSaveReport>(IPC.SaveDraft, {
-      input: draftInputForCurrentAccount(draft),
-      threading: threadingForDraft(draft),
-    });
+    setStatus('正在保存草稿…');
+    let report: DraftSaveReport;
+    try {
+      report = await invoke<DraftSaveReport>(IPC.SaveDraft, {
+        input: draftInputForCurrentAccount(draft),
+        threading: threadingForDraft(draft),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`保存失败，邮件内容已保留：${message}`);
+      throw error;
+    }
+    setStatus(report.message);
     setDraft(emptyDraft);
     clearComposerAutosave();
     forceCloseComposer();
-    await refreshAll();
-    setStatus(report.message);
+    try {
+      await refreshAll();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`草稿已保存，但刷新邮件列表失败：${message}`);
+    }
   }, [draft, draftInputForCurrentAccount, threadingForDraft, setDraft, clearComposerAutosave, forceCloseComposer, refreshAll, setStatus]);
 
   const runDirectSendWithProgress = useCallback(async (

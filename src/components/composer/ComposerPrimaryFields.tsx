@@ -16,7 +16,12 @@ import { localFileAssetUrl } from '../../tauriBridge';
 import { logError } from '../../app/logger';
 import type { ComposerRecipientField } from './ComposerContactsPanel';
 import { canonicalRecipientEmails } from './recipientAddresses';
-import { autoLinkEditorText, runEditorCommand, syncRichTextEmptyState } from './richTextCommands';
+import {
+  autoLinkEditorText,
+  cleanupEditorTypingFormatMarkers,
+  runEditorCommand,
+  syncRichTextEmptyState,
+} from './richTextCommands';
 
 function insertTabInTextControl(target: HTMLInputElement | HTMLTextAreaElement) {
   const start = target.selectionStart ?? target.value.length;
@@ -209,7 +214,8 @@ export default function ComposerPrimaryFields({
     const html = nextHtml ?? editor.innerHTML;
     const empty = syncRichTextEmptyState(editor);
     const persistedHtml = empty ? '' : html;
-    const nextBody = joinEditableBody(nextTextContent ?? editor.textContent ?? '', originalQuote);
+    const normalizedText = (nextTextContent ?? editor.textContent ?? '').replace(/[\u200b\ufeff]/g, '');
+    const nextBody = joinEditableBody(normalizedText, originalQuote);
     if (
       syncedBodyRef.current.body === nextBody &&
       syncedBodyRef.current.html === persistedHtml
@@ -321,7 +327,20 @@ export default function ComposerPrimaryFields({
 
   function handleRichBodyInput(event: React.FormEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
-    if (event.nativeEvent.isTrusted && editor.dataset.skipAutoLink !== 'true') {
+    if (event.nativeEvent.isTrusted) {
+      if ((event.nativeEvent as InputEvent).isComposing) return;
+      cleanupEditorTypingFormatMarkers(editor);
+      if (editor.dataset.skipAutoLink !== 'true') {
+        autoLinkEditorText(editor);
+      }
+    }
+    scheduleSyncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
+  }
+
+  function handleRichBodyCompositionEnd(event: React.CompositionEvent<HTMLDivElement>) {
+    const editor = event.currentTarget;
+    cleanupEditorTypingFormatMarkers(editor);
+    if (editor.dataset.skipAutoLink !== 'true') {
       autoLinkEditorText(editor);
     }
     scheduleSyncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
@@ -329,6 +348,7 @@ export default function ComposerPrimaryFields({
 
   function handleRichBodyBlur(event: React.FocusEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
+    cleanupEditorTypingFormatMarkers(editor);
     if (editor.dataset.skipAutoLink !== 'true') {
       autoLinkEditorText(editor, { force: true });
     }
@@ -448,6 +468,7 @@ export default function ComposerPrimaryFields({
             data-gramm="false"
             onKeyDownCapture={handleRichBodyKeyDown}
             onInput={handleRichBodyInput}
+            onCompositionEnd={handleRichBodyCompositionEnd}
             onBlur={handleRichBodyBlur}
             onPaste={handleRichBodyPaste}
             onDrop={onAttachmentDrop}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, FileText, Save, Trash2, X } from 'lucide-react';
+import { Check, FileText, LoaderCircle, Save, Trash2, X } from 'lucide-react';
 import type {
   Account,
   ComposeTemplate,
@@ -21,7 +21,8 @@ type ComposerAdvancedToolsProps = {
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
   onSaveTemplate: () => void;
-  onSaveDraft?: () => void;
+  onSaveDraft?: () => Promise<void> | void;
+  saveDraftPending?: boolean;
 };
 
 type ComposerSenderContextProps = {
@@ -118,6 +119,7 @@ export default function ComposerAdvancedTools({
   onTemplateNameChange,
   onSaveTemplate,
   onSaveDraft,
+  saveDraftPending = false,
 }: ComposerAdvancedToolsProps) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const firstActionRef = useRef<HTMLButtonElement | null>(null);
@@ -148,12 +150,14 @@ export default function ComposerAdvancedTools({
     function closeOnPointerDown(event: PointerEvent) {
       const target = event.target;
       if (target instanceof Node && (popoverRef.current?.contains(target) || anchorRef?.current?.contains(target))) return;
+      if (saveDraftPending) return;
       onClose();
     }
     function closeOnKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (saveDraftPending) return;
         if (saveDialogOpen) setSaveDialogOpen(false);
         else onClose();
         return;
@@ -179,7 +183,7 @@ export default function ComposerAdvancedTools({
       document.removeEventListener('pointerdown', closeOnPointerDown, true);
       document.removeEventListener('keydown', closeOnKeyDown, true);
     };
-  }, [anchorRef, mode, onClose, saveDialogOpen]);
+  }, [anchorRef, mode, onClose, saveDialogOpen, saveDraftPending]);
 
   useEffect(() => {
     if (mode) return;
@@ -202,7 +206,7 @@ export default function ComposerAdvancedTools({
     >
       <header>
         <strong>{mode === 'more' ? '更多' : '模板'}</strong>
-        <button type="button" aria-label="关闭浮层" title="关闭" onClick={onClose}><X size={15} /></button>
+        <button type="button" aria-label="关闭浮层" title="关闭" disabled={saveDraftPending} onClick={onClose}><X size={15} /></button>
       </header>
 
       {mode === 'templates' ? (
@@ -283,12 +287,14 @@ export default function ComposerAdvancedTools({
               }}
               type="button"
               role="menuitem"
-              onClick={() => {
-                onSaveDraft();
-                onClose();
-              }}
+              disabled={saveDraftPending}
+              aria-busy={saveDraftPending || undefined}
+              onClick={() => { void onSaveDraft(); }}
             >
-              <Save size={14} aria-hidden="true" />保存草稿
+              {saveDraftPending
+                ? <LoaderCircle className="spinning" size={14} aria-hidden="true" />
+                : <Save size={14} aria-hidden="true" />}
+              {saveDraftPending ? '正在保存…' : '保存并关闭'}
             </button>
           ) : (
             <span className="composer-more-empty">暂无其他写信工具</span>

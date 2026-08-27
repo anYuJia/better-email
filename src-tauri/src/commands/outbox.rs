@@ -145,7 +145,7 @@ fn validate_outbound_message_attachments(
 }
 
 #[tauri::command]
-pub fn save_draft(
+pub async fn save_draft(
     store: State<'_, MailStore>,
     input: DraftInput,
     threading: Option<MessageThreadingInput>,

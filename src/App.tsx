@@ -1989,7 +1989,7 @@ function MailboxApp() {
               onAttachmentPaste={handleComposerAttachmentPaste}
               buildInlineImageAttachments={buildInlineImageAttachments}
               onInlineImagesAdded={addInlineImages}
-              onSaveDraft={() => { saveDraft().catch((error) => setStatus(String(error))); }}
+              onSaveDraft={saveDraft}
               onQueueDraft={() => { queueDraft().catch((error) => setStatus(String(error))); }}
               onSendDraft={() => { requestSend().catch((error) => setStatus(String(error))); }}
               onSendRiskConfirm={confirmSendRisk}

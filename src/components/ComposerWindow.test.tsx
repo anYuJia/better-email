@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneElement } from 'react';
 import { emptyDraft } from '../app/composerConfig';
 import ComposerWindow from './ComposerWindow';
@@ -123,6 +123,70 @@ describe('ComposerWindow focus lifecycle', () => {
 
     expect(screen.getByText(/已自动保存/)).not.toBeNull();
     expect(screen.queryByText(/已备份恢复点/)).toBeNull();
+  });
+
+  it('shows explicit draft-saving progress instead of a stale autosave timestamp', () => {
+    const draft = { ...emptyDraft, subject: '待保存邮件' };
+    render(cloneElement(composer(), {
+      draft,
+      status: '正在保存草稿…',
+      autosave: {
+        draft,
+        isRichComposer: false,
+        saved_at: '2026-08-23T13:17:00.000Z',
+      },
+    }));
+
+    expect(screen.getByText('正在保存草稿…')).not.toBeNull();
+    expect(screen.queryByText(/已自动保存/)).toBeNull();
+  });
+
+  it('locks the editor and keeps the save menu visible until saving finishes', async () => {
+    let finishSave: (() => void) | null = null;
+    const onSaveDraft = vi.fn(() => new Promise<void>((resolve) => {
+      finishSave = resolve;
+    }));
+    render(cloneElement(composer(), {
+      draft: { ...emptyDraft, subject: '需要保存' },
+      onSaveDraft,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' }));
+
+    const composerPanel = document.querySelector<HTMLElement>('.composer');
+    const savingAction = screen.getByRole('menuitem', { name: '正在保存…' });
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(composerPanel?.getAttribute('aria-busy')).toBe('true');
+    expect(composerPanel?.hasAttribute('inert')).toBe(true);
+    expect(savingAction.hasAttribute('disabled')).toBe(true);
+
+    await act(async () => {
+      finishSave?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem', { name: '正在保存…' })).toBeNull();
+      expect(composerPanel?.hasAttribute('inert')).toBe(false);
+    });
+  });
+
+  it('keeps the draft menu open and unlocks editing when saving fails', async () => {
+    const onSaveDraft = vi.fn().mockRejectedValue(new Error('暂时无法连接草稿箱'));
+    render(cloneElement(composer(), {
+      draft: { ...emptyDraft, subject: '不能丢失' },
+      onSaveDraft,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: '保存并关闭' }).hasAttribute('disabled')).toBe(false);
+      expect(document.querySelector('.composer')?.hasAttribute('inert')).toBe(false);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
   });
 
   it('keeps a never-edited empty draft header focused on the window title', () => {

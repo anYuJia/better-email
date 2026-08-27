@@ -52,7 +52,7 @@ export default function ComposerCloseConfirmDialog({
   return (
     <div
       ref={backdropRef}
-      className="dialog-backdrop"
+      className="dialog-backdrop composer-close-dialog-backdrop"
       onMouseDown={(event) => {
         if (!pending && event.target === event.currentTarget) {
           onClose();
@@ -61,7 +61,7 @@ export default function ComposerCloseConfirmDialog({
     >
       <section
         ref={dialogRef}
-        className="dialog-card"
+        className="dialog-card composer-close-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -74,8 +74,8 @@ export default function ComposerCloseConfirmDialog({
             <Mail size={17} />
           </span>
           <span className="dialog-card-heading">
-            <strong id={titleId}>关闭写信窗口</strong>
-            <small>当前邮件尚未保存到草稿箱</small>
+            <strong id={titleId}>保存这封邮件？</strong>
+            <small>当前内容还未保存到草稿箱</small>
           </span>
           <button
             className="dialog-card-close"
@@ -88,21 +88,18 @@ export default function ComposerCloseConfirmDialog({
             <X size={16} />
           </button>
         </header>
-        <div className="dialog-card-summary">
-          要保留这封邮件吗？
-        </div>
-        <p id={descriptionId}>
-          恢复点只用于意外关闭后的恢复，不等同于草稿箱中的草稿。保存后可从“草稿箱”继续编辑，也可以舍弃这封邮件。
+        <p id={descriptionId} className="composer-close-dialog-description">
+          保存后可随时从草稿箱继续编辑。恢复点仅用于意外关闭，不能代替草稿。
         </p>
         {error && (
           <div className="confirm-dialog-error" role="alert">
             保存草稿失败：{error}
           </div>
         )}
-        <footer>
+        <footer className="composer-close-dialog-actions">
           <button
             ref={continueButtonRef}
-            className="dialog-button dialog-button-secondary dialog-button-spacer"
+            className="dialog-button dialog-button-secondary"
             type="button"
             disabled={pending}
             onClick={handleClose}
@@ -115,7 +112,7 @@ export default function ComposerCloseConfirmDialog({
             disabled={pending}
             onClick={onDiscard}
           >
-            舍弃邮件
+            舍弃并关闭
           </button>
           <button
             className="dialog-button dialog-button-primary"
@@ -123,7 +120,7 @@ export default function ComposerCloseConfirmDialog({
             disabled={pending}
             onClick={() => { void handleSaveDraft(); }}
           >
-            {pending ? '保存中…' : '保存草稿'}
+            {pending ? '正在保存…' : '保存并关闭'}
           </button>
         </footer>
       </section>

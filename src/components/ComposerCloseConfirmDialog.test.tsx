@@ -84,10 +84,10 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     render(<Harness />);
     openDialog();
 
-    expect(screen.getByText('当前邮件尚未保存到草稿箱')).not.toBeNull();
-    expect(screen.getByText('要保留这封邮件吗？')).not.toBeNull();
-    expect(screen.getByText(/恢复点只用于意外关闭后的恢复/)).not.toBeNull();
-    expect(screen.getByRole('button', { name: '舍弃邮件' })).not.toBeNull();
+    expect(screen.getByText('当前内容还未保存到草稿箱')).not.toBeNull();
+    expect(screen.getByText('保存这封邮件？')).not.toBeNull();
+    expect(screen.getByText(/恢复点仅用于意外关闭/)).not.toBeNull();
+    expect(screen.getByRole('button', { name: '舍弃并关闭' })).not.toBeNull();
   });
 
   it('focuses the safe action, isolates the background, and restores focus on close', () => {
@@ -117,7 +117,7 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     openDialog();
 
     const closeButton = screen.getByRole('button', { name: '关闭确认' });
-    const saveButton = screen.getByRole('button', { name: '保存草稿' });
+    const saveButton = screen.getByRole('button', { name: '保存并关闭' });
     const backgroundButton = document.getElementById('background-action') as HTMLButtonElement;
 
     saveButton.focus();
@@ -138,7 +138,7 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     const confirmationBackdrop = container.querySelector<HTMLElement>('.dialog-backdrop')!;
     const composerBackdrop = container.querySelector<HTMLElement>('.composer-backdrop')!;
     const closeButton = screen.getByRole('button', { name: '关闭确认' });
-    const saveButton = screen.getByRole('button', { name: '保存草稿' });
+    const saveButton = screen.getByRole('button', { name: '保存并关闭' });
 
     expect(confirmationBackdrop.hasAttribute('inert')).toBe(false);
     expect(confirmationBackdrop.getAttribute('aria-hidden')).toBeNull();
@@ -168,7 +168,7 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     backgroundButton.setAttribute('inert', '');
     openDialog();
 
-    fireEvent.click(screen.getByRole('button', { name: '舍弃邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '舍弃并关闭' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(backgroundButton.hasAttribute('inert')).toBe(false);
@@ -181,14 +181,14 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
     openDialog();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+      fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     });
 
     expect(screen.getByRole('alert').textContent).toBe('保存草稿失败：磁盘暂时不可写');
-    expect(screen.getByRole('button', { name: '保存草稿' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: '保存并关闭' }).hasAttribute('disabled')).toBe(false);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+      fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     });
     expect(onSaveDraft).toHaveBeenCalledTimes(2);
   });

@@ -71,18 +71,28 @@ jobs:
               raise SystemExit('watchdog block not found')
           text = text.replace(old_watchdog, new_watchdog, 1)
 
-          old_rich = '''    const richReady = await evalInPage(
-              cdp,
-              "(() => { const rich = document.querySelector('.composer-richtext-body'); if (!rich) return false; rich.focus(); rich.innerHTML = ''; return true; })()",
-            );
-            if (richReady) {
-              // Input.insertText dispatches the same editable input path without
-              // relying on the deprecated document.execCommand API, which can hang
-              // Chrome's Runtime.evaluate on long-running smoke sessions.
-              await cdp.send('Input.insertText', { text: value });
-              await sleep(100);
-              return;
-            }'''
+          function_marker = 'async function fillComposerBody(cdp, value) {'
+          function_start = text.find(function_marker)
+          if function_start < 0:
+              raise SystemExit('fillComposerBody function not found')
+          rich_start_marker = '    const richReady = await evalInPage('
+          rich_start = text.find(rich_start_marker, function_start)
+          if rich_start < 0:
+              raise SystemExit('rich editor start marker not found')
+          rich_end_marker = '      return;\n    }'
+          rich_end = text.find(rich_end_marker, rich_start)
+          if rich_end < 0:
+              raise SystemExit('rich editor end marker not found')
+          rich_end += len(rich_end_marker)
+          old_rich = text[rich_start:rich_end]
+          required_fragments = [
+              "document.querySelector('.composer-richtext-body')",
+              'rich.focus()',
+              "rich.innerHTML = ''",
+              "await cdp.send('Input.insertText', { text: value })",
+          ]
+          if not all(fragment in old_rich for fragment in required_fragments):
+              raise SystemExit('rich editor block safety check failed')
 
           new_rich = '''    const richPoint = await evalInPage(
               cdp,
@@ -148,10 +158,7 @@ jobs:
               return;
             }'''
 
-          if old_rich not in text:
-              raise SystemExit('rich editor block not found')
-          text = text.replace(old_rich, new_rich, 1)
-
+          text = text[:rich_start] + new_rich + text[rich_end:]
           path.write_text(text, encoding='utf-8')
           PY
 

@@ -372,6 +372,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             #[cfg(desktop)]
             if window.label() == "composer" {
+                // The composer renderer installs its unsaved-draft guard before
+                // revealing the window and owns close-to-hide behavior.
                 return;
             }
             #[cfg(desktop)]

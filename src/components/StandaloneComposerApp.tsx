@@ -21,6 +21,8 @@ import {
   COMPOSER_CLOSED_EVENT,
   COMPOSER_CONTACTS_SETTINGS_EVENT,
   COMPOSER_OPEN_EVENT,
+  COMPOSER_READY_EVENT,
+  COMPOSER_READY_QUERY_EVENT,
   emitToMain,
   invoke,
   listenCurrentWindow,
@@ -32,7 +34,10 @@ import {
 import { IPC } from '../ipc/commands';
 import useComposerController from '../hooks/useComposerController';
 import useThemeMode from '../hooks/useThemeMode';
-import { decideComposerBootOpen } from '../app/composerWindowOpenPolicy';
+import {
+  decideComposerBootOpen,
+  shouldRevealComposerWindow,
+} from '../app/composerWindowOpenPolicy';
 
 function normalizeComposerRequest(value: unknown): ComposerWindowRequest | null {
   if (!value || typeof value !== 'object') return null;
@@ -58,11 +63,15 @@ export default function StandaloneComposerApp() {
   const [status, setStatus] = useState('正在准备写信窗口…');
   const [booted, setBooted] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [nativeCloseListenerReady, setNativeCloseListenerReady] = useState(false);
+  const [openRequestVersion, setOpenRequestVersion] = useState(0);
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
   const closingRef = useRef(false);
   const bootedRef = useRef(false);
+  const frontendReadyRef = useRef(false);
+  const loadErrorRef = useRef<string | null>(null);
   const openRequestedBeforeBootRef = useRef(false);
   const closeComposerRef = useRef<() => void>(() => {});
   const draftRef = useRef(emptyDraft);
@@ -71,6 +80,9 @@ export default function StandaloneComposerApp() {
     request: ComposerWindowRequest | null,
     restoreWhenMissing?: boolean,
   ) => void>(() => {});
+  const frontendReady = nativeCloseListenerReady && (booted || loadError !== null);
+  frontendReadyRef.current = frontendReady;
+  loadErrorRef.current = loadError;
 
   const loadComposerData = useCallback(async (preferredAccountId?: number) => {
     const nextAccounts = await invoke<Account[]>(IPC.ListAccounts);
@@ -111,6 +123,19 @@ export default function StandaloneComposerApp() {
 
   const showToast = useCallback((text: string) => {
     setStatus(text);
+  }, []);
+
+  const finishNativeClose = useCallback(async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    try {
+      await closeCurrentWindow();
+    } catch (error) {
+      closingRef.current = false;
+      setStatus(`无法关闭写信窗口：${String(error)}`);
+      return;
+    }
+    await emitToMain(COMPOSER_CLOSED_EVENT).catch(() => undefined);
   }, []);
 
   const {
@@ -205,9 +230,6 @@ export default function StandaloneComposerApp() {
     closingRef.current = false;
     applyComposerRequestRef.current(request, restoreWhenMissing);
     openRequestedBeforeBootRef.current = false;
-    window.requestAnimationFrame(() => {
-      void showCurrentWindow();
-    });
     if (request?.draft?.account_id) {
       void loadComposerData(request.draft.account_id).catch(() => undefined);
     }
@@ -221,6 +243,11 @@ export default function StandaloneComposerApp() {
       try {
         const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_OPEN_EVENT, () => {
           openRequestedBeforeBootRef.current = true;
+          setOpenRequestVersion((current) => current + 1);
+          if (loadErrorRef.current) {
+            closingRef.current = false;
+            return;
+          }
           if (!bootedRef.current) return;
           void consumePendingComposerRequest({ showWhenMissing: true })
             .catch((error) => {
@@ -239,6 +266,28 @@ export default function StandaloneComposerApp() {
       unlisten?.();
     };
   }, [consumePendingComposerRequest]);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    const register = async () => {
+      try {
+        const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_READY_QUERY_EVENT, () => {
+          if (!frontendReadyRef.current) return;
+          void emitToMain(COMPOSER_READY_EVENT).catch(() => undefined);
+        });
+        if (active) unlisten = nextUnlisten;
+        else nextUnlisten();
+      } catch (error) {
+        if (active) setStatus(`写信窗口就绪通信失败：${String(error)}`);
+      }
+    };
+    void register();
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     const handleWindowFocus = () => {
@@ -277,11 +326,7 @@ export default function StandaloneComposerApp() {
         }
         bootedRef.current = true;
         setBooted(true);
-        if (decision.shouldOpen) {
-          window.requestAnimationFrame(() => {
-            void showCurrentWindow();
-          });
-        } else if (openRequestedBeforeBootRef.current) {
+        if (!decision.shouldOpen && openRequestedBeforeBootRef.current) {
           // Covers the tiny interval between the final pending read and marking
           // the React side booted. The pending request remains authoritative.
           void consumePendingComposerRequest({
@@ -304,20 +349,23 @@ export default function StandaloneComposerApp() {
     let active = true;
     let unlisten: (() => void) | undefined;
     const register = async () => {
+      setNativeCloseListenerReady(false);
       try {
         const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
-          if (closingRef.current) return;
           event.preventDefault();
+          if (closingRef.current) return;
           if (isDraftEmpty(draftRef.current)) {
-            closingRef.current = true;
-            void closeCurrentWindow().catch(() => undefined);
-            void emitToMain(COMPOSER_CLOSED_EVENT).catch(() => undefined);
+            void finishNativeClose();
             return;
           }
           closeComposerRef.current();
         });
-        if (active) unlisten = nextUnlisten;
-        else nextUnlisten();
+        if (active) {
+          unlisten = nextUnlisten;
+          setNativeCloseListenerReady(true);
+        } else {
+          nextUnlisten();
+        }
       } catch (error) {
         if (active) setStatus(`窗口关闭监听失败：${String(error)}`);
       }
@@ -327,14 +375,42 @@ export default function StandaloneComposerApp() {
       active = false;
       unlisten?.();
     };
-  }, []);
+  }, [finishNativeClose]);
+
+  useEffect(() => {
+    if (!frontendReady) return;
+    void emitToMain(COMPOSER_READY_EVENT).catch((error) => {
+      setStatus(`写信窗口就绪通知失败：${String(error)}`);
+    });
+  }, [frontendReady]);
+
+  const shouldRevealWindow = shouldRevealComposerWindow({
+    booted,
+    closeListenerReady: nativeCloseListenerReady,
+    composerOpen: isComposerOpen,
+    hasLoadError: loadError !== null,
+    openRequested: openRequestVersion > 0,
+  });
+
+  useEffect(() => {
+    if (!shouldRevealWindow || closingRef.current) return undefined;
+    let active = true;
+    const frame = window.requestAnimationFrame(() => {
+      if (!active || closingRef.current) return;
+      void showCurrentWindow().catch((error) => {
+        if (active) setStatus(`无法显示写信窗口：${String(error)}`);
+      });
+    });
+    return () => {
+      active = false;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [composerFocusRequest, openRequestVersion, shouldRevealWindow]);
 
   useEffect(() => {
     if (!booted || isComposerOpen || closingRef.current) return;
-    closingRef.current = true;
-    void closeCurrentWindow().catch(() => undefined);
-    void emitToMain(COMPOSER_CLOSED_EVENT).catch(() => undefined);
-  }, [booted, isComposerOpen]);
+    void finishNativeClose();
+  }, [booted, finishNativeClose, isComposerOpen]);
 
   const openContactsSettings = useCallback(() => {
     void (async () => {

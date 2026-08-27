@@ -914,12 +914,15 @@ function MailboxApp() {
   ));
 
   const openExternalComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {
+    setStatus('正在打开写信窗口…');
     void openComposerWindow({
       draft: nextDraft,
       ...options,
-    }).catch((error) => {
-      setStatus(`无法打开独立写信窗口：${String(error)}`);
-    });
+    })
+      .then(() => setStatus('写信窗口已就绪'))
+      .catch((error) => {
+        setStatus(`无法打开独立写信窗口：${String(error)}`);
+      });
   }, []);
 
   const {

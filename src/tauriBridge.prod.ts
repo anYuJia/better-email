@@ -4,6 +4,8 @@ import type {
 } from './app/composerWindow';
 import {
   COMPOSER_OPEN_EVENT,
+  COMPOSER_READY_EVENT,
+  COMPOSER_READY_QUERY_EVENT,
   COMPOSER_WINDOW_LABEL,
 } from './app/composerWindow';
 import { IPC } from './ipc/commands';
@@ -105,15 +107,62 @@ export async function prodListen<T>(event: string, handler: (event: { payload: T
 }
 
 let composerWindowCreation: Promise<void> | null = null;
+let composerWindowReady: Promise<void> | null = null;
+const COMPOSER_READY_TIMEOUT_MS = 15_000;
 
-async function focusComposerWindow(window: {
+type ComposerNativeWindow = {
+  emit: (event: string) => Promise<void>;
   show: () => Promise<void>;
   unminimize: () => Promise<void>;
   setFocus: () => Promise<void>;
-}) {
+};
+
+async function focusComposerWindow(window: ComposerNativeWindow) {
   await window.show();
   await window.unminimize();
   await window.setFocus();
+}
+
+async function waitForComposerWindowReady(composerWindow: ComposerNativeWindow): Promise<void> {
+  if (!composerWindowReady) {
+    const readyWait = (async () => {
+      const { listen: tauriListen } = await loadEvent();
+      let resolveReady: (() => void) | undefined;
+      let timeoutId: number | undefined;
+      const readySignal = new Promise<void>((resolve) => {
+        resolveReady = resolve;
+      });
+      const unlisten = await tauriListen<void>(COMPOSER_READY_EVENT, () => {
+        resolveReady?.();
+      });
+
+      try {
+        // A prewarmed window may already be ready before the main window starts
+        // waiting. Querying it closes that lost-signal gap.
+        await composerWindow.emit(COMPOSER_READY_QUERY_EVENT);
+        await Promise.race([
+          readySignal,
+          new Promise<never>((_resolve, reject) => {
+            timeoutId = window.setTimeout(() => {
+              reject(new Error('写信窗口初始化超时，请重试'));
+            }, COMPOSER_READY_TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+        unlisten();
+      }
+    })();
+    composerWindowReady = readyWait;
+  }
+
+  const currentReadyWait = composerWindowReady;
+  try {
+    await currentReadyWait;
+  } catch (error) {
+    if (composerWindowReady === currentReadyWait) composerWindowReady = null;
+    throw error;
+  }
 }
 
 async function ensureComposerWindow(): Promise<void> {
@@ -128,6 +177,9 @@ async function ensureComposerWindow(): Promise<void> {
   const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
   if (existing) return;
 
+  // A previous composer may have been destroyed as a close fallback. Its
+  // readiness must never be reused for the replacement window.
+  composerWindowReady = null;
   const composeUrl = new URL(window.location.href);
   composeUrl.search = '?window=compose&prewarm=1';
   composeUrl.hash = '';
@@ -177,10 +229,12 @@ export async function prodOpenComposerWindow(request: ComposerWindowRequest): Pr
   }
 
   await composerWindow.emit(COMPOSER_OPEN_EVENT);
-  // Always show/focus on an explicit user action. The standalone app consumes
-  // the pending request on boot/event/focus, so a lost wake-up event cannot
-  // leave the native window permanently hidden.
-  await focusComposerWindow(composerWindow);
+  await waitForComposerWindowReady(composerWindow);
+  // Emit again after readiness. The first signal covers requests arriving
+  // during boot; the second covers a listener that was not registered yet.
+  // The composer reveals itself only after its UI and close handler are ready,
+  // so the main window never exposes a blank WebView.
+  await composerWindow.emit(COMPOSER_OPEN_EVENT);
 }
 
 export async function prodShowCurrentWindow(): Promise<void> {
@@ -209,7 +263,20 @@ export async function prodCloseCurrentWindow(): Promise<void> {
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
   const currentWindow = getTauriCurrentWindow();
   if (currentWindow.label === COMPOSER_WINDOW_LABEL) {
-    await currentWindow.hide();
+    try {
+      await currentWindow.hide();
+    } catch (hideError) {
+      // Hiding keeps the prewarmed composer reusable. If a platform or
+      // capability regression prevents it, force-destroy the window so the
+      // user's first close action still succeeds and the next open recreates it.
+      try {
+        await currentWindow.destroy();
+      } catch (destroyError) {
+        throw new Error(
+          `无法关闭写信窗口：隐藏失败（${String(hideError)}），销毁失败（${String(destroyError)}）`,
+        );
+      }
+    }
     return;
   }
   await currentWindow.destroy();

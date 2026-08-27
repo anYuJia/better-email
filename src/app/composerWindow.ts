@@ -12,5 +12,7 @@ export type NativeCloseRequestEvent = {
 
 export const COMPOSER_WINDOW_LABEL = 'composer';
 export const COMPOSER_OPEN_EVENT = 'better-email:composer-open';
+export const COMPOSER_READY_EVENT = 'better-email:composer-ready';
+export const COMPOSER_READY_QUERY_EVENT = 'better-email:composer-ready-query';
 export const COMPOSER_CLOSED_EVENT = 'better-email:composer-closed';
 export const COMPOSER_CONTACTS_SETTINGS_EVENT = 'better-email:composer-contacts-settings';

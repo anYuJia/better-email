@@ -1,0 +1,99 @@
+name: Apply Desktop Regression Fix
+
+on:
+  push:
+    branches:
+      - 'ci/fix-desktop-regressions-20260827'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch macOS Dock and composer close
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          lib = Path('src-tauri/src/lib.rs')
+          text = lib.read_text(encoding='utf-8')
+          old = '''            // Run as a windowed accessory so macOS does not attach a global
+            // application menu bar above the app windows.
+            #[cfg(target_os = "macos")]
+            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;'''
+          new = '''            // Keep Better Email as a regular macOS application so it remains
+            // visible in the Dock. Menu creation is controlled separately.
+            #[cfg(target_os = "macos")]
+            app.handle().set_activation_policy(tauri::ActivationPolicy::Regular)?;'''
+          if old not in text:
+              raise SystemExit('macOS activation policy block not found')
+          lib.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          composer = Path('src/components/StandaloneComposerApp.tsx')
+          text = composer.read_text(encoding='utf-8')
+          old_ref = '''  const closeComposerRef = useRef<() => void>(() => {});
+  const applyComposerRequestRef = useRef<('''
+          new_ref = '''  const closeComposerRef = useRef<() => void>(() => {});
+  const draftRef = useRef(emptyDraft);
+  const applyComposerRequestRef = useRef<('''
+          if old_ref not in text:
+              raise SystemExit('composer ref insertion point not found')
+          text = text.replace(old_ref, new_ref, 1)
+
+          old_assign = '''  closeComposerRef.current = closeComposer;
+
+  const applyComposerRequest = useCallback'''
+          new_assign = '''  closeComposerRef.current = closeComposer;
+  draftRef.current = draft;
+
+  const applyComposerRequest = useCallback'''
+          if old_assign not in text:
+              raise SystemExit('composer draft ref assignment point not found')
+          text = text.replace(old_assign, new_assign, 1)
+
+          old_close = '''        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
+          if (closingRef.current) return;
+          event.preventDefault();
+          closeComposerRef.current();
+        });'''
+          new_close = '''        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
+          if (closingRef.current) return;
+          event.preventDefault();
+          if (isDraftEmpty(draftRef.current)) {
+            closingRef.current = true;
+            emitToMain(COMPOSER_CLOSED_EVENT)
+              .catch(() => undefined)
+              .finally(() => {
+                closeCurrentWindow().catch(() => undefined);
+              });
+            return;
+          }
+          closeComposerRef.current();
+        });'''
+          if old_close not in text:
+              raise SystemExit('native composer close handler not found')
+          composer.write_text(text.replace(old_close, new_close, 1), encoding='utf-8')
+          PY
+
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          git diff --check
+          git diff -- src-tauri/src/lib.rs src/components/StandaloneComposerApp.tsx
+
+      - name: Commit and push fixes to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src-tauri/src/lib.rs src/components/StandaloneComposerApp.tsx
+          git commit -m 'feat:修复macOS Dock图标与写信窗口关闭'
+          git push origin HEAD:main

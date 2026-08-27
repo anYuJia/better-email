@@ -30,6 +30,23 @@ describe('composer contact suggestions', () => {
     expect(matchingContacts(entries, 'amazinggrace', 5)).toEqual([contacts[1]]);
   });
 
+  it('matches Chinese names by initials, partial/full pinyin and same-pinyin Chinese input', () => {
+    const hanhan = contact(1, '涵涵', 'hanhan@example.com');
+    const entries = buildContactSearchEntries([hanhan]);
+
+    expect(matchingContacts(entries, '涵涵', 5)).toEqual([hanhan]);
+    expect(matchingContacts(entries, 'hh', 5)).toEqual([hanhan]);
+    expect(matchingContacts(entries, 'hanh', 5)).toEqual([hanhan]);
+    expect(matchingContacts(entries, 'hanhan', 5)).toEqual([hanhan]);
+    expect(matchingContacts(entries, '韩韩', 5)).toEqual([hanhan]);
+  });
+
+  it('does not return matches for an empty query', () => {
+    const contacts = [contact(1, 'Ada Lovelace', 'ada@example.com')];
+    const entries = buildContactSearchEntries(contacts);
+    expect(matchingContacts(entries, '', 5)).toEqual([]);
+  });
+
   it('stops collecting matches once the visible suggestion limit is reached', () => {
     const contacts = Array.from({ length: 10 }, (_, index) =>
       contact(index + 1, `Contact ${index + 1}`, `contact${index + 1}@example.com`),
@@ -50,7 +67,7 @@ describe('composer contact suggestions', () => {
     expect(matchingContacts(entries, 'example', -1)).toEqual([]);
   });
 
-  it('uses recent valid contacts as the fallback recommendations', () => {
+  it('keeps recommendations available for explicit contact surfaces', () => {
     const contacts = [
       contact(1, 'Ada Lovelace', 'ada@example.com'),
       contact(2, 'Invalid combined recipient', 'ada@example.com, grace@example.com'),

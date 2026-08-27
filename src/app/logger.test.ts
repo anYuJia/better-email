@@ -97,23 +97,33 @@ describe('logger', () => {
       expect(warnSpy.mock.calls[0][0]).toContain('unread count stale');
     });
 
-    it('timestamps error logs and preserves the error argument', () => {
+    it('timestamps error logs and serializes the error through the redaction boundary', () => {
       const errorSpy = spyOnConsole('error');
       const err = new Error('boom');
       logError('Failed to sync:', err);
       const [first, ...rest] = errorSpy.mock.calls[0];
       expect(first).toMatch(TIMESTAMP_PREFIXED_RE);
       expect(first).toContain('Failed to sync:');
-      expect(rest).toEqual([err]);
+      expect(rest).toEqual([expect.objectContaining({
+        name: 'Error',
+        message: 'boom',
+        stack: expect.stringContaining('Error: boom'),
+      })]);
+      expect(rest[0]).not.toBe(err);
     });
 
-    it('timestamps bare non-string arguments without losing them', () => {
+    it('timestamps bare non-string arguments without bypassing error redaction', () => {
       const errorSpy = spyOnConsole('error');
       const err = new Error('boom');
       logError(err);
       const [first, ...rest] = errorSpy.mock.calls[0];
       expect(first).toMatch(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [+-]\d{2}:\d{2}\]$/);
-      expect(rest).toEqual([err]);
+      expect(rest).toEqual([expect.objectContaining({
+        name: 'Error',
+        message: 'boom',
+        stack: expect.stringContaining('Error: boom'),
+      })]);
+      expect(rest[0]).not.toBe(err);
     });
 
     it('timestamps plain log lines', () => {

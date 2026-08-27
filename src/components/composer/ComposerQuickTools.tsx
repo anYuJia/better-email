@@ -29,19 +29,26 @@ import {
 
 const FONT_OPTIONS = [
   { value: '', label: '字体' },
-  { value: 'Arial', label: 'Arial' },
+  { value: 'system-ui', label: '系统字体' },
+  { value: 'PingFang SC', label: '苹方' },
   { value: 'Microsoft YaHei', label: '微软雅黑' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Helvetica', label: 'Helvetica' },
   { value: 'Georgia', label: 'Georgia' },
+  { value: 'Times New Roman', label: 'Times New Roman' },
+  { value: 'Courier New', label: 'Courier New' },
 ];
 
 const FONT_SIZE_OPTIONS = [
   { value: '', label: '字号' },
+  { value: '1', label: '12' },
   { value: '2', label: '14' },
   { value: '3', label: '16' },
   { value: '4', label: '18' },
   { value: '5', label: '20' },
+  { value: '6', label: '24' },
+  { value: '7', label: '32' },
 ];
-
 type ToolbarButtonProps = {
   label: string;
   icon: React.ReactNode;
@@ -115,6 +122,24 @@ export function ComposerRichToolbar({
     }
   }
 
+  function executeFromSelect(command: string, value: string) {
+    const editor = editorRef?.current ?? null;
+    if (!editor) return;
+    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    if (selection) editorSelectionRef.current = selection;
+    const run = () => {
+      const target = editorRef?.current ?? null;
+      if (!target) return;
+      runEditorCommand(target, command, value, selection);
+      editorSelectionRef.current = saveEditorSelection(target) ?? selection ?? editorSelectionRef.current;
+      setFormatState(readEditorFormatState(target));
+    };
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(run);
+    } else {
+      queueMicrotask(run);
+    }
+  }
   function execute(command: string, value?: string) {
     const editor = editorRef?.current ?? null;
     const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
@@ -154,8 +179,9 @@ export function ComposerRichToolbar({
           portalOwnerId="composer-rich-toolbar"
           portalZIndex={1200}
           onChange={(value) => {
-            if (value) execute('fontName', value);
-            setFontValue('');
+            if (!value) return;
+            setFontValue(value);
+            executeFromSelect('fontName', value);
           }}
         />
         <CustomSelect
@@ -167,8 +193,9 @@ export function ComposerRichToolbar({
           portalOwnerId="composer-rich-toolbar"
           portalZIndex={1200}
           onChange={(value) => {
-            if (value) execute('fontSize', value);
-            setFontSizeValue('');
+            if (!value) return;
+            setFontSizeValue(value);
+            executeFromSelect('fontSize', value);
           }}
         />
       </div>

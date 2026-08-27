@@ -95,3 +95,17 @@
 .composer .composer-body-field:focus-within::after {
   opacity: 1;
 }
+
+
+/* Composer font-size scale: keep toolbar labels equal to rendered sizes. */
+.composer .composer-richtext-body font[size="1"] { font-size: 12px; }
+.composer .composer-richtext-body font[size="2"] { font-size: 14px; }
+.composer .composer-richtext-body font[size="3"] { font-size: 16px; }
+.composer .composer-richtext-body font[size="4"] { font-size: 18px; }
+.composer .composer-richtext-body font[size="5"] { font-size: 20px; }
+.composer .composer-richtext-body font[size="6"] { font-size: 24px; }
+.composer .composer-richtext-body font[size="7"] { font-size: 32px; }
+
+.composer .composer-richtext-body font[size] {
+  line-height: 1.55;
+}

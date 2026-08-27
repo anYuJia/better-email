@@ -25,6 +25,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Fix recipient native event typing
+        run: python scripts/fix-recipient-native-event.py
+
       - name: Apply input-system patch
         run: python scripts/apply-composer-input-system.py
 
@@ -54,6 +57,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
             package-lock.json \
+            src/components/composer/RecipientField.tsx \
             src/components/composer/ComposerPrimaryFields.tsx \
             src/components/composer/composer-polish.css \
             src/hooks/useAppShortcuts.ts \

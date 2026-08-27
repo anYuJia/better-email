@@ -1,0 +1,170 @@
+name: Apply UI Smoke Fix
+
+on:
+  push:
+    branches:
+      - 'ci/fix-ui-smoke-hang-20260827'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch UI smoke runner
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/ui-smoke.mjs')
+          text = path.read_text(encoding='utf-8')
+
+          old_timer_decl = "let heartbeatTimer = null;"
+          new_timer_decl = "let heartbeatTimer = null;\nlet hardTimeoutTimer = null;"
+          if old_timer_decl not in text:
+              raise SystemExit('heartbeat timer declaration not found')
+          text = text.replace(old_timer_decl, new_timer_decl, 1)
+
+          old_watchdog = '''function startWatchdog() {
+            heartbeatTimer = setInterval(() => {
+              console.log(`[ui-smoke] heartbeat elapsed=${formatDuration(Date.now() - startedAt)} current=${currentStep}`);
+            }, heartbeatMs);
+            heartbeatTimer.unref();
+          }
+
+          function stopWatchdog() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+          }'''
+
+          new_watchdog = '''function startWatchdog() {
+            heartbeatTimer = setInterval(() => {
+              console.log(`[ui-smoke] heartbeat elapsed=${formatDuration(Date.now() - startedAt)} current=${currentStep}`);
+            }, heartbeatMs);
+            heartbeatTimer.unref();
+
+            hardTimeoutTimer = setTimeout(() => {
+              const elapsed = Date.now() - startedAt;
+              console.error(
+                `[ui-smoke] HARD TIMEOUT elapsed=${formatDuration(elapsed)} limit=${formatDuration(globalSmokeTimeoutMs)} current=${currentStep}`,
+              );
+              process.exit(1);
+            }, globalSmokeTimeoutMs);
+          }
+
+          function stopWatchdog() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+            if (hardTimeoutTimer) clearTimeout(hardTimeoutTimer);
+            hardTimeoutTimer = null;
+          }'''
+
+          if old_watchdog not in text:
+              raise SystemExit('watchdog block not found')
+          text = text.replace(old_watchdog, new_watchdog, 1)
+
+          old_rich = '''    const richReady = await evalInPage(
+              cdp,
+              "(() => { const rich = document.querySelector('.composer-richtext-body'); if (!rich) return false; rich.focus(); rich.innerHTML = ''; return true; })()",
+            );
+            if (richReady) {
+              // Input.insertText dispatches the same editable input path without
+              // relying on the deprecated document.execCommand API, which can hang
+              // Chrome's Runtime.evaluate on long-running smoke sessions.
+              await cdp.send('Input.insertText', { text: value });
+              await sleep(100);
+              return;
+            }'''
+
+          new_rich = '''    const richPoint = await evalInPage(
+              cdp,
+              `(() => {
+                const rich = document.querySelector('.composer-richtext-body');
+                if (!rich) return null;
+                const rect = rich.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return null;
+                return {
+                  x: rect.left + Math.max(1, Math.min(16, rect.width / 2)),
+                  y: rect.top + Math.max(1, Math.min(16, rect.height / 2)),
+                };
+              })()`,
+            );
+            if (richPoint) {
+              // Keep rich-editor focus and mutation on Chrome's real input path.
+              // Calling focus()/innerHTML from Runtime.evaluate can wedge a long
+              // CDP session while React/contenteditable handlers are settling.
+              await cdp.send('Input.dispatchMouseEvent', {
+                type: 'mousePressed',
+                x: richPoint.x,
+                y: richPoint.y,
+                button: 'left',
+                buttons: 1,
+                clickCount: 1,
+              });
+              await cdp.send('Input.dispatchMouseEvent', {
+                type: 'mouseReleased',
+                x: richPoint.x,
+                y: richPoint.y,
+                button: 'left',
+                buttons: 0,
+                clickCount: 1,
+              });
+              await cdp.send('Input.dispatchKeyEvent', {
+                type: 'rawKeyDown',
+                key: 'a',
+                code: 'KeyA',
+                windowsVirtualKeyCode: 65,
+                modifiers: 2,
+              });
+              await cdp.send('Input.dispatchKeyEvent', {
+                type: 'keyUp',
+                key: 'a',
+                code: 'KeyA',
+                windowsVirtualKeyCode: 65,
+                modifiers: 2,
+              });
+              await cdp.send('Input.dispatchKeyEvent', {
+                type: 'rawKeyDown',
+                key: 'Backspace',
+                code: 'Backspace',
+                windowsVirtualKeyCode: 8,
+              });
+              await cdp.send('Input.dispatchKeyEvent', {
+                type: 'keyUp',
+                key: 'Backspace',
+                code: 'Backspace',
+                windowsVirtualKeyCode: 8,
+              });
+              await cdp.send('Input.insertText', { text: value });
+              await sleep(100);
+              return;
+            }'''
+
+          if old_rich not in text:
+              raise SystemExit('rich editor block not found')
+          text = text.replace(old_rich, new_rich, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          node --check scripts/ui-smoke.mjs
+          git diff --check
+          git diff -- scripts/ui-smoke.mjs
+
+      - name: Commit and push fix to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/ui-smoke.mjs
+          git commit -m 'fix:修复长时间UI冒烟测试卡死'
+          git push origin HEAD:main

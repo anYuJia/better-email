@@ -42,6 +42,7 @@ const startedAt = Date.now();
 let stepCounter = 0;
 let currentStep = 'startup';
 let heartbeatTimer = null;
+let hardTimeoutTimer = null;
 
 function formatDuration(ms) {
   const roundedMs = Math.max(0, Math.floor(ms));
@@ -91,11 +92,21 @@ function startWatchdog() {
     console.log(`[ui-smoke] heartbeat elapsed=${formatDuration(Date.now() - startedAt)} current=${currentStep}`);
   }, heartbeatMs);
   heartbeatTimer.unref();
+
+  hardTimeoutTimer = setTimeout(() => {
+    const elapsed = Date.now() - startedAt;
+    console.error(
+      `[ui-smoke] HARD TIMEOUT elapsed=${formatDuration(elapsed)} limit=${formatDuration(globalSmokeTimeoutMs)} current=${currentStep}`,
+    );
+    process.exit(1);
+  }, globalSmokeTimeoutMs);
 }
 
 function stopWatchdog() {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = null;
+  if (hardTimeoutTimer) clearTimeout(hardTimeoutTimer);
+  hardTimeoutTimer = null;
 }
 
 function spawnLogged(command, args, options = {}) {
@@ -970,18 +981,69 @@ async function selectValue(cdp, selector, value, index = 0) {
 
 async function fillComposerBody(cdp, value) {
   return withStep(`fillComposerBody ${shortText(value)}`, async () => {
-    const richReady = await evalInPage(
-      cdp,
-      "(() => { const rich = document.querySelector('.composer-richtext-body'); if (!rich) return false; rich.focus(); rich.innerHTML = ''; return true; })()",
-    );
-    if (richReady) {
-      // Input.insertText dispatches the same editable input path without
-      // relying on the deprecated document.execCommand API, which can hang
-      // Chrome's Runtime.evaluate on long-running smoke sessions.
-      await cdp.send('Input.insertText', { text: value });
-      await sleep(100);
-      return;
-    }
+    const richPoint = await evalInPage(
+    cdp,
+    `(() => {
+      const rich = document.querySelector('.composer-richtext-body');
+      if (!rich) return null;
+      const rect = rich.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      return {
+        x: rect.left + Math.max(1, Math.min(16, rect.width / 2)),
+        y: rect.top + Math.max(1, Math.min(16, rect.height / 2)),
+      };
+    })()`,
+  );
+  if (richPoint) {
+    // Keep rich-editor focus and mutation on Chrome's real input path.
+    // Calling focus()/innerHTML from Runtime.evaluate can wedge a long
+    // CDP session while React/contenteditable handlers are settling.
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: richPoint.x,
+      y: richPoint.y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+    });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: richPoint.x,
+      y: richPoint.y,
+      button: 'left',
+      buttons: 0,
+      clickCount: 1,
+    });
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown',
+      key: 'a',
+      code: 'KeyA',
+      windowsVirtualKeyCode: 65,
+      modifiers: 2,
+    });
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'a',
+      code: 'KeyA',
+      windowsVirtualKeyCode: 65,
+      modifiers: 2,
+    });
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown',
+      key: 'Backspace',
+      code: 'Backspace',
+      windowsVirtualKeyCode: 8,
+    });
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'Backspace',
+      code: 'Backspace',
+      windowsVirtualKeyCode: 8,
+    });
+    await cdp.send('Input.insertText', { text: value });
+    await sleep(100);
+    return;
+  }
     await evalInPage(
       cdp,
       `(() => {

@@ -34,18 +34,20 @@ function message(overrides: Partial<MessageSummary>): MessageSummary {
 }
 
 describe('message list search suggestions', () => {
-  it('offers all/sender/recipient/body options with matching counts', () => {
+  it('offers field and quick-filter options with matching counts', () => {
     const entries = buildMessageSearchEntries([
       message({
         recipients: 'Ada Lovelace <ada@example.com>',
         sender_name: 'Grace Hopper',
         subject: 'Quarterly roadmap attached',
         has_attachments: true,
+        is_starred: true,
       }),
       message({
         sender_email: 'alerts@example.com',
         cc: 'team@example.com',
         snippet: 'Roadmap follow-up',
+        is_read: true,
       }),
     ]);
 
@@ -56,10 +58,14 @@ describe('message list search suggestions', () => {
       ['from', '发件人', 0],
       ['to', '收件人', 0],
       ['body', '内容', 2],
+      ['attachment', '有附件', 1],
+      ['unread', '未读', 1],
+      ['starred', '星标', 1],
     ]);
     expect(suggestions[0].query).toBe('ROADMAP');
     expect(suggestions[0].active).toBe(true);
     expect(suggestions[3].query).toBe('body:ROADMAP');
+    expect(suggestions[4].query).toBe('has:attachment ROADMAP');
   });
 
   it('marks the active field and rewrites the prefix when switching', () => {
@@ -68,16 +74,13 @@ describe('message list search suggestions', () => {
     ]);
 
     const fromSuggestions = buildMessageSearchSuggestions(entries, 'from:ada');
-    expect(fromSuggestions.map((suggestion) => suggestion.id)).toEqual([
-      'all', 'from', 'to', 'body',
-    ]);
     expect(fromSuggestions.find((item) => item.id === 'from')?.active).toBe(true);
     expect(fromSuggestions.find((item) => item.id === 'all')?.query).toBe('ada');
     expect(fromSuggestions.find((item) => item.id === 'to')?.query).toBe('to:ada');
 
-    const toSuggestions = buildMessageSearchSuggestions(entries, 'to:ada');
-    expect(toSuggestions.find((item) => item.id === 'to')?.active).toBe(true);
-    expect(toSuggestions.find((item) => item.id === 'from')?.query).toBe('from:ada');
+    const unreadSuggestions = buildMessageSearchSuggestions(entries, 'is:unread ada');
+    expect(unreadSuggestions.find((item) => item.id === 'unread')?.active).toBe(true);
+    expect(unreadSuggestions.find((item) => item.id === 'body')?.query).toBe('body:ada');
   });
 
   it('returns no options for empty or bare-prefix queries', () => {
@@ -88,6 +91,16 @@ describe('message list search suggestions', () => {
     expect(buildMessageSearchSuggestions(entries, '')).toEqual([]);
     expect(buildMessageSearchSuggestions(entries, 'from:')).toEqual([]);
     expect(buildMessageSearchSuggestions(entries, '  ')).toEqual([]);
+  });
+
+  it('does not count unrelated attachment messages as text matches', () => {
+    const entries = buildMessageSearchEntries([
+      message({ subject: 'Invoice', has_attachments: false }),
+      message({ subject: 'Weekend photos', has_attachments: true }),
+    ]);
+    const suggestions = buildMessageSearchSuggestions(entries, 'invoice');
+    expect(suggestions.find((item) => item.id === 'all')?.count).toBe(1);
+    expect(suggestions.find((item) => item.id === 'attachment')?.count).toBe(0);
   });
 
   it('does not depend on message body/html fields for summary-only lists', () => {

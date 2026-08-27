@@ -17,6 +17,7 @@ import { movableFoldersForMessage } from '../../app/appConfig';
 import { canSnoozeRole } from '../../app/snooze';
 import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
+import ReaderAiContextActions from './ReaderAiContextActions';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 import { memo, useMemo, useRef } from 'react';
 
@@ -39,7 +40,7 @@ type ReaderToolbarProps = {
   onToggleStar: (message: Message) => void;
   onEditDraft: (message: Message) => void;
   onComposeNew?: (fields: { to: string }) => void;
-  onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
+  onComposeFromMessage: (message: Message, mode: ComposeMode, prefillBody?: string) => void;
   onRestoreFromTrash: () => void;
   onMoveArchive: () => void;
   onToggleRead: (message: Message) => void;
@@ -173,6 +174,12 @@ function ReaderToolbar({
             )}
             <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
           </button>
+        )}
+        {!isDraft && (
+          <ReaderAiContextActions
+            message={selected}
+            onComposeFromMessage={onComposeFromMessage}
+          />
         )}
         <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">

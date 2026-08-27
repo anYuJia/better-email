@@ -1,0 +1,166 @@
+/* Contextual AI belongs to the mail task, not a separate dashboard surface. */
+.reader-ai-context {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.reader-ai-menu {
+  position: relative;
+}
+
+.reader-ai-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--workspace-toolbar);
+  color: var(--ui-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.reader-ai-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.reader-ai-trigger:hover,
+.reader-ai-menu[open] .reader-ai-trigger {
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
+}
+
+.reader-ai-trigger:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.reader-ai-menu > div {
+  position: absolute;
+  z-index: 42;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  background: var(--color-surface-raised);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.reader-ai-menu > div > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text);
+  text-align: left;
+}
+
+.reader-ai-menu > div > button:hover:not(:disabled) {
+  background: var(--quiet-row-hover);
+}
+
+.reader-ai-menu > div > button:disabled {
+  opacity: 0.58;
+}
+
+.reader-ai-privacy-note {
+  display: block;
+  padding: 6px 9px 3px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.reader-ai-result {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(380px, calc(100vw - 32px));
+  padding: 12px 34px 12px 13px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  background: var(--color-surface-raised);
+  box-shadow: var(--ui-shadow-popover);
+  color: var(--ui-text);
+}
+
+.reader-ai-result > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.reader-ai-result p {
+  max-height: 210px;
+  margin: 0;
+  overflow: auto;
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.reader-ai-result > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-tertiary);
+}
+
+.reader-ai-result > button:hover {
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
+}
+
+.reader-ai-result.is-error {
+  border-color: color-mix(in srgb, var(--color-danger) 32%, var(--ui-border));
+}
+
+@media (max-width: 720px) {
+  .reader-ai-trigger span {
+    display: none;
+  }
+
+  .reader-ai-trigger {
+    width: 36px;
+    padding: 0;
+  }
+
+  .reader-ai-result {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 16px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-ai-trigger,
+  .reader-ai-menu > div > button {
+    transition: none;
+  }
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "check:css": "node scripts/check-css-graph.mjs",
     "bench": "node scripts/benchmark.mjs",
     "bench:release": "tauri build --no-bundle && npm run bench",

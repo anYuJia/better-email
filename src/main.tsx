@@ -1,7 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import { installInputPolicy } from './app/inputPolicy';
 import './ui-2026.css';
+
+installInputPolicy();
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 const isStandaloneComposer = new URLSearchParams(window.location.search).get('window') === 'compose';

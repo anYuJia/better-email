@@ -26,10 +26,11 @@ jobs:
 
           lib = Path('src-tauri/src/lib.rs')
           text = lib.read_text(encoding='utf-8')
-          needle = 'tauri::ActivationPolicy::Accessory'
-          if text.count(needle) != 1:
-              raise SystemExit(f'unexpected activation policy count: {text.count(needle)}')
-          lib.write_text(text.replace(needle, 'tauri::ActivationPolicy::Regular', 1), encoding='utf-8')
+          old_policy = '            // Run as a windowed accessory so macOS does not attach a global\n            // application menu bar above the app windows.\n            #[cfg(target_os = "macos")]\n            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;'
+          new_policy = '            // Keep Better Email as a regular macOS application so it stays visible\n            // in the Dock. Menu creation is controlled separately above.\n            #[cfg(target_os = "macos")]\n            app.handle().set_activation_policy(tauri::ActivationPolicy::Regular)?;'
+          if text.count(old_policy) != 1:
+              raise SystemExit(f'unexpected activation policy block count: {text.count(old_policy)}')
+          lib.write_text(text.replace(old_policy, new_policy, 1), encoding='utf-8')
 
           composer = Path('src/components/StandaloneComposerApp.tsx')
           text = composer.read_text(encoding='utf-8')
@@ -52,7 +53,7 @@ jobs:
           composer.write_text(text.replace(old_close, new_close, 1), encoding='utf-8')
           PY
 
-          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          cargo fmt --manifest-path src-tauri/Cargo.toml
           git diff --check
           git diff -- src-tauri/src/lib.rs src/components/StandaloneComposerApp.tsx
 

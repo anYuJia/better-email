@@ -44,7 +44,7 @@ describe('RecipientField keyboard', () => {
     const input = screen.getByRole('combobox', { name: '收件人' });
     expect(input.getAttribute('aria-haspopup')).toBe('listbox');
     expect(input.getAttribute('aria-expanded')).toBe('false');
-    expect(input.spellcheck).toBe(false);
+    expect(input.getAttribute('spellcheck')).toBe('false');
     expect(input.getAttribute('autocorrect')).toBe('off');
   });
 
@@ -73,10 +73,9 @@ describe('RecipientField keyboard', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'ada' } });
     input.setSelectionRange(3, 3);
-    fireEvent.keyDown(input, { key: 'Tab' });
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
     await act(async () => {});
     expect(input.value).toBe('ada\t');
-    expect(document.activeElement).toBe(input);
   });
 
   it('keeps focus in the field when Escape closes the suggestions', async () => {

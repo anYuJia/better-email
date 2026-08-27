@@ -348,10 +348,11 @@ pub fn run() {
             app.manage(PendingComposerRequestState {
                 request: Mutex::new(None),
             });
-            // Run as a windowed accessory so macOS does not attach a global
-            // application menu bar above the app windows.
+            // Keep Better Email as a regular macOS application so it stays visible
+            // in the Dock. Menu creation is controlled separately above.
             #[cfg(target_os = "macos")]
-            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;
+            app.handle()
+                .set_activation_policy(tauri::ActivationPolicy::Regular)?;
             // 主窗口图标与 bundle.icon 使用同一份 v4 源资源：
             // 无边框/透明窗口在 Windows 任务栏、Alt+Tab 需要显式设置图标。
             #[cfg(desktop)]

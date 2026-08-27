@@ -62,6 +62,7 @@ export default function StandaloneComposerApp() {
   const closingRef = useRef(false);
   const bootedRef = useRef(false);
   const closeComposerRef = useRef<() => void>(() => {});
+  const draftRef = useRef(emptyDraft);
   const applyComposerRequestRef = useRef<(
     request: ComposerWindowRequest | null,
     restoreWhenMissing?: boolean,
@@ -168,6 +169,7 @@ export default function StandaloneComposerApp() {
   });
 
   closeComposerRef.current = closeComposer;
+  draftRef.current = draft;
 
   const applyComposerRequest = useCallback((request: ComposerWindowRequest | null, restoreWhenMissing = false) => {
     if (request) {
@@ -239,6 +241,15 @@ export default function StandaloneComposerApp() {
         const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
           if (closingRef.current) return;
           event.preventDefault();
+          if (isDraftEmpty(draftRef.current)) {
+            closingRef.current = true;
+            emitToMain(COMPOSER_CLOSED_EVENT)
+              .catch(() => undefined)
+              .finally(() => {
+                closeCurrentWindow().catch(() => undefined);
+              });
+            return;
+          }
           closeComposerRef.current();
         });
         if (active) unlisten = nextUnlisten;

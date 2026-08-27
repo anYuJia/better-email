@@ -395,15 +395,16 @@ export default function StandaloneComposerApp() {
   useEffect(() => {
     if (!shouldRevealWindow || closingRef.current) return undefined;
     let active = true;
-    const frame = window.requestAnimationFrame(() => {
-      if (!active || closingRef.current) return;
-      void showCurrentWindow().catch((error) => {
-        if (active) setStatus(`无法显示写信窗口：${String(error)}`);
-      });
+    // Hidden native WebViews may suspend requestAnimationFrame until they are
+    // visible. Calling show from an animation frame therefore creates a
+    // deadlock: the frame waits for visibility while the frame itself is
+    // responsible for making the window visible. React has already committed
+    // the composer UI before this effect runs, so reveal it directly.
+    void showCurrentWindow().catch((error) => {
+      if (active) setStatus(`无法显示写信窗口：${String(error)}`);
     });
     return () => {
       active = false;
-      window.cancelAnimationFrame(frame);
     };
   }, [composerFocusRequest, openRequestVersion, shouldRevealWindow]);
 

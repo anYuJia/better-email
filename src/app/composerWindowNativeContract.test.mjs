@@ -33,6 +33,20 @@ describe('standalone composer native-window lifecycle contract', () => {
     expect(openComposer.match(/composerWindow\.emit\(COMPOSER_OPEN_EVENT\)/g)).toHaveLength(2);
   });
 
+  it('does not wait for an animation frame to reveal a hidden native WebView', () => {
+    const revealEffectStart = standaloneSource.indexOf('if (!shouldRevealWindow || closingRef.current)');
+    expect(revealEffectStart).toBeGreaterThanOrEqual(0);
+    const revealEffectEnd = standaloneSource.indexOf(
+      '}, [composerFocusRequest, openRequestVersion, shouldRevealWindow]);',
+      revealEffectStart,
+    );
+    expect(revealEffectEnd).toBeGreaterThan(revealEffectStart);
+    const revealEffect = standaloneSource.slice(revealEffectStart, revealEffectEnd);
+
+    expect(revealEffect).toContain('showCurrentWindow()');
+    expect(revealEffect).not.toContain('window.requestAnimationFrame(');
+  });
+
   it('destroys the composer as a safe fallback if hiding fails', () => {
     const closeComposer = exportedFunction(bridgeSource, 'prodCloseCurrentWindow');
     expect(closeComposer).toContain('await currentWindow.hide()');

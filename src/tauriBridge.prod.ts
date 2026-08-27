@@ -116,19 +116,13 @@ async function focusComposerWindow(window: {
   await window.setFocus();
 }
 
-export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
-  await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
+async function ensureComposerWindow(): Promise<void> {
   const { WebviewWindow } = await loadWebviewWindow();
   const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-  if (existing) {
-    await focusComposerWindow(existing);
-    await existing.emit(COMPOSER_OPEN_EVENT);
-    return;
-  }
-
+  if (existing) return;
   if (!composerWindowCreation) {
     const composeUrl = new URL(window.location.href);
-    composeUrl.search = '?window=compose';
+    composeUrl.search = '?window=compose&prewarm=1';
     composeUrl.hash = '';
     const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
       url: composeUrl.toString(),
@@ -141,8 +135,8 @@ export async function prodOpenComposerWindow(request: ComposerWindowRequest): Pr
       decorations: true,
       titleBarStyle: 'visible',
       hiddenTitle: false,
-      focus: true,
-      visible: true,
+      focus: false,
+      visible: false,
       skipTaskbar: false,
     });
     composerWindowCreation = new Promise<void>((resolve, reject) => {
@@ -152,14 +146,31 @@ export async function prodOpenComposerWindow(request: ComposerWindowRequest): Pr
       });
     });
   }
-
   try {
     await composerWindowCreation;
-    const created = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-    if (created) await focusComposerWindow(created);
   } finally {
     composerWindowCreation = null;
   }
+}
+
+export async function prodPrewarmComposerWindow(): Promise<void> {
+  await ensureComposerWindow();
+}
+
+export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
+  await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
+  const { WebviewWindow } = await loadWebviewWindow();
+  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (existing) {
+    await existing.emit(COMPOSER_OPEN_EVENT);
+    return;
+  }
+  await ensureComposerWindow();
+}
+
+export async function prodShowCurrentWindow(): Promise<void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  await focusComposerWindow(getTauriCurrentWindow());
 }
 
 export function prodTakePendingComposerRequest(): Promise<ComposerWindowRequest | null> {
@@ -181,11 +192,12 @@ export async function prodEmitToMain<T>(event: string, payload?: T): Promise<voi
 
 export async function prodCloseCurrentWindow(): Promise<void> {
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
-  // The native close-request listener deliberately prevents the first close
-  // request while it checks for unsaved content. Once React has decided that
-  // the window may close, destroy it so this programmatic follow-up cannot
-  // re-enter the same close-request cycle.
-  await getTauriCurrentWindow().destroy();
+  const currentWindow = getTauriCurrentWindow();
+  if (currentWindow.label === COMPOSER_WINDOW_LABEL) {
+    await currentWindow.hide();
+    return;
+  }
+  await currentWindow.destroy();
 }
 
 export async function prodOnCurrentWindowCloseRequested(

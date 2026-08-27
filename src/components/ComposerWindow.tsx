@@ -29,6 +29,7 @@ import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuic
 import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
 import useModalAccessibility from '../hooks/useModalAccessibility';
 import './composer/composer.css';
+import './composer/composer-polish.css';
 
 type ComposerPosition = {
   x: number;

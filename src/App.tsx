@@ -17,7 +17,6 @@ import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import AppErrorBoundary from './components/AppErrorBoundary';
-import StandaloneComposerApp from './components/StandaloneComposerApp';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
 import type { MessageToast } from './components/MessageToastStack';
@@ -62,10 +61,10 @@ import {
   COMPOSER_CLOSED_EVENT,
   COMPOSER_CONTACTS_SETTINGS_EVENT,
   invoke,
-  isStandaloneComposerWindow,
   listen,
   mockMode,
   openComposerWindow,
+  prewarmComposerWindow,
 } from './tauriBridge';
 import type {
   AccountScope,
@@ -134,7 +133,6 @@ import { accountScopeStorageKey } from './app/storageConfig';
 import { IPC } from './ipc/commands';
 
 export default function App() {
-  if (isStandaloneComposerWindow()) return <StandaloneComposerApp />;
   return <MailboxApp />;
 }
 
@@ -205,6 +203,14 @@ function MailboxApp() {
     || nativePlatform === 'ios'
     || (nativePlatform === 'web' && isViewportMobile);
   const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';
+
+  useEffect(() => {
+    if (!useNativeComposerWindow || !initialAccountListLoaded) return undefined;
+    const timer = window.setTimeout(() => {
+      void prewarmComposerWindow().catch(() => undefined);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [initialAccountListLoaded, useNativeComposerWindow]);
 
   useEffect(() => {
     let active = true;

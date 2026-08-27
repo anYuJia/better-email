@@ -25,6 +25,7 @@ import {
   invoke,
   listenCurrentWindow,
   onCurrentWindowCloseRequested,
+  showCurrentWindow,
   takePendingComposerRequest,
   type ComposerWindowRequest,
 } from '../tauriBridge';
@@ -63,6 +64,7 @@ export default function StandaloneComposerApp() {
   const bootedRef = useRef(false);
   const closeComposerRef = useRef<() => void>(() => {});
   const draftRef = useRef(emptyDraft);
+  const isPrewarmedWindow = new URLSearchParams(window.location.search).get('prewarm') === '1';
   const applyComposerRequestRef = useRef<(
     request: ComposerWindowRequest | null,
     restoreWhenMissing?: boolean,
@@ -192,10 +194,16 @@ export default function StandaloneComposerApp() {
       try {
         const nextUnlisten = await listenCurrentWindow<unknown>(COMPOSER_OPEN_EVENT, () => {
           if (!bootedRef.current) return;
+          closingRef.current = false;
           takePendingComposerRequest()
             .then((value) => {
               if (!active) return;
-              applyComposerRequestRef.current(normalizeComposerRequest(value));
+              const request = normalizeComposerRequest(value);
+              applyComposerRequestRef.current(request);
+              window.requestAnimationFrame(() => {
+                void showCurrentWindow();
+              });
+              void loadComposerData(request?.draft?.account_id || undefined).catch(() => undefined);
             })
             .catch((error) => setStatus(`读取写信请求失败：${String(error)}`));
         });
@@ -219,9 +227,16 @@ export default function StandaloneComposerApp() {
         const pending = normalizeComposerRequest(await takePendingComposerRequest());
         await loadComposerData(pending?.draft?.account_id || undefined);
         if (!active) return;
-        applyComposerRequestRef.current(pending, true);
+        if (pending || !isPrewarmedWindow) {
+          applyComposerRequestRef.current(pending, true);
+        }
         bootedRef.current = true;
         setBooted(true);
+        if (pending || !isPrewarmedWindow) {
+          window.requestAnimationFrame(() => {
+            void showCurrentWindow();
+          });
+        }
       } catch (error) {
         if (!active) return;
         setLoadError(String(error));
@@ -231,7 +246,7 @@ export default function StandaloneComposerApp() {
     return () => {
       active = false;
     };
-  }, [loadComposerData]);
+  }, [isPrewarmedWindow, loadComposerData]);
 
   useEffect(() => {
     let active = true;

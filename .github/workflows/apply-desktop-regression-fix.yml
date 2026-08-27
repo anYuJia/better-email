@@ -26,61 +26,29 @@ jobs:
 
           lib = Path('src-tauri/src/lib.rs')
           text = lib.read_text(encoding='utf-8')
-          old = '''            // Run as a windowed accessory so macOS does not attach a global
-            // application menu bar above the app windows.
-            #[cfg(target_os = "macos")]
-            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;'''
-          new = '''            // Keep Better Email as a regular macOS application so it remains
-            // visible in the Dock. Menu creation is controlled separately.
-            #[cfg(target_os = "macos")]
-            app.handle().set_activation_policy(tauri::ActivationPolicy::Regular)?;'''
-          if old not in text:
-              raise SystemExit('macOS activation policy block not found')
-          lib.write_text(text.replace(old, new, 1), encoding='utf-8')
+          needle = 'tauri::ActivationPolicy::Accessory'
+          if text.count(needle) != 1:
+              raise SystemExit(f'unexpected activation policy count: {text.count(needle)}')
+          lib.write_text(text.replace(needle, 'tauri::ActivationPolicy::Regular', 1), encoding='utf-8')
 
           composer = Path('src/components/StandaloneComposerApp.tsx')
           text = composer.read_text(encoding='utf-8')
-          old_ref = '''  const closeComposerRef = useRef<() => void>(() => {});
-  const applyComposerRequestRef = useRef<('''
-          new_ref = '''  const closeComposerRef = useRef<() => void>(() => {});
-  const draftRef = useRef(emptyDraft);
-  const applyComposerRequestRef = useRef<('''
-          if old_ref not in text:
-              raise SystemExit('composer ref insertion point not found')
+          old_ref = "  const closeComposerRef = useRef<() => void>(() => {});\n  const applyComposerRequestRef = useRef<("
+          new_ref = "  const closeComposerRef = useRef<() => void>(() => {});\n  const draftRef = useRef(emptyDraft);\n  const applyComposerRequestRef = useRef<("
+          if text.count(old_ref) != 1:
+              raise SystemExit(f'unexpected composer ref count: {text.count(old_ref)}')
           text = text.replace(old_ref, new_ref, 1)
 
-          old_assign = '''  closeComposerRef.current = closeComposer;
-
-  const applyComposerRequest = useCallback'''
-          new_assign = '''  closeComposerRef.current = closeComposer;
-  draftRef.current = draft;
-
-  const applyComposerRequest = useCallback'''
-          if old_assign not in text:
-              raise SystemExit('composer draft ref assignment point not found')
+          old_assign = "  closeComposerRef.current = closeComposer;\n\n  const applyComposerRequest = useCallback"
+          new_assign = "  closeComposerRef.current = closeComposer;\n  draftRef.current = draft;\n\n  const applyComposerRequest = useCallback"
+          if text.count(old_assign) != 1:
+              raise SystemExit(f'unexpected draft assignment count: {text.count(old_assign)}')
           text = text.replace(old_assign, new_assign, 1)
 
-          old_close = '''        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
-          if (closingRef.current) return;
-          event.preventDefault();
-          closeComposerRef.current();
-        });'''
-          new_close = '''        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
-          if (closingRef.current) return;
-          event.preventDefault();
-          if (isDraftEmpty(draftRef.current)) {
-            closingRef.current = true;
-            emitToMain(COMPOSER_CLOSED_EVENT)
-              .catch(() => undefined)
-              .finally(() => {
-                closeCurrentWindow().catch(() => undefined);
-              });
-            return;
-          }
-          closeComposerRef.current();
-        });'''
-          if old_close not in text:
-              raise SystemExit('native composer close handler not found')
+          old_close = "        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {\n          if (closingRef.current) return;\n          event.preventDefault();\n          closeComposerRef.current();\n        });"
+          new_close = "        const nextUnlisten = await onCurrentWindowCloseRequested((event) => {\n          if (closingRef.current) return;\n          event.preventDefault();\n          if (isDraftEmpty(draftRef.current)) {\n            closingRef.current = true;\n            emitToMain(COMPOSER_CLOSED_EVENT)\n              .catch(() => undefined)\n              .finally(() => {\n                closeCurrentWindow().catch(() => undefined);\n              });\n            return;\n          }\n          closeComposerRef.current();\n        });"
+          if text.count(old_close) != 1:
+              raise SystemExit(f'unexpected close handler count: {text.count(old_close)}')
           composer.write_text(text.replace(old_close, new_close, 1), encoding='utf-8')
           PY
 

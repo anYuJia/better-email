@@ -18,6 +18,19 @@ import type { ComposerRecipientField } from './ComposerContactsPanel';
 import { canonicalRecipientEmails } from './recipientAddresses';
 import { autoLinkEditorText, runEditorCommand, syncRichTextEmptyState } from './richTextCommands';
 
+function insertTabInTextControl(target: HTMLInputElement | HTMLTextAreaElement) {
+  const start = target.selectionStart ?? target.value.length;
+  const end = target.selectionEnd ?? start;
+  const nextValue = `${target.value.slice(0, start)}	${target.value.slice(end)}`;
+  const nativeSetter = Object.getOwnPropertyDescriptor(
+    target instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
+    'value',
+  )?.set;
+  nativeSetter?.call(target, nextValue);
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+  requestAnimationFrame(() => target.setSelectionRange(start + 1, start + 1));
+}
+
 type ComposerPrimaryFieldsProps = {
   draft: DraftInput;
   contacts: Contact[];
@@ -288,16 +301,20 @@ export default function ComposerPrimaryFields({
 
   function handleRichBodyKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const editor = event.currentTarget;
+    const nativeEvent = event.nativeEvent;
+    if (nativeEvent.isComposing || nativeEvent.keyCode === 229) return;
+
     if (event.key === 'Tab') {
       event.preventDefault();
       event.stopPropagation();
-      runEditorCommand(editor, event.shiftKey ? 'outdent' : 'indent');
+      runEditorCommand(editor, 'insertText', '	');
       return;
     }
 
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
     const key = event.key.toLowerCase();
     if (['a', 'c', 'x', 'v', 'z', 'y', 'b', 'i', 'u'].includes(key)) {
+      // Preserve the WebView/native edit command. We only stop app-level shortcuts.
       event.stopPropagation();
     }
   }
@@ -385,7 +402,22 @@ export default function ComposerPrimaryFields({
         <input
           aria-label="主题"
           value={draft.subject}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-gramm="false"
           onChange={(event) => onPatchDraft({ subject: event.target.value })}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (event.key === 'Tab') {
+              event.preventDefault();
+              event.stopPropagation();
+              insertTabInTextControl(event.currentTarget);
+              return;
+            }
+            if ((event.metaKey || event.ctrlKey) && !event.altKey) event.stopPropagation();
+          }}
           placeholder="添加主题"
         />
       </label>
@@ -410,7 +442,10 @@ export default function ComposerPrimaryFields({
             role="textbox"
             aria-multiline="true"
             aria-label="邮件正文（富文本）"
-            spellCheck
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            data-gramm="false"
             onKeyDownCapture={handleRichBodyKeyDown}
             onInput={handleRichBodyInput}
             onBlur={handleRichBodyBlur}
@@ -424,6 +459,21 @@ export default function ComposerPrimaryFields({
           <textarea
             aria-label="邮件正文"
             value={editableBody}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-gramm="false"
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+              if (event.key === 'Tab') {
+                event.preventDefault();
+                event.stopPropagation();
+                insertTabInTextControl(event.currentTarget);
+                return;
+              }
+              if ((event.metaKey || event.ctrlKey) && !event.altKey) event.stopPropagation();
+            }}
             onDrop={onAttachmentDrop}
             onDragEnter={onAttachmentDragEnter}
             onDragLeave={onAttachmentDragLeave}

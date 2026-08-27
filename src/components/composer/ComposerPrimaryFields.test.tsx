@@ -168,7 +168,7 @@ describe('ComposerPrimaryFields', () => {
     expect(options).toHaveLength(4);
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
-    recipient.setSelectionRange(4, 4);
+    (recipient as HTMLInputElement).setSelectionRange(4, 4);
     expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(false);
     expect((recipient as HTMLInputElement).value).toBe('wang\t');
     expect(options[0].getAttribute('aria-selected')).toBe('true');

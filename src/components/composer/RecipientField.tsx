@@ -220,7 +220,8 @@ export default function RecipientField({
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const raw = event.target.value;
-    if (composingRef.current || event.nativeEvent.isComposing) {
+    const nativeEvent = event.nativeEvent as InputEvent;
+    if (composingRef.current || nativeEvent.isComposing) {
       setQueryValue(raw);
       return;
     }

@@ -1,0 +1,163 @@
+name: Apply Composer Editor Keyboard Fix
+
+on:
+  push:
+    branches:
+      - ci/fix-composer-editor-keyboard-20260827
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch composer editor focus and keyboard behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          quick = Path('src/components/composer/ComposerQuickTools.tsx')
+          text = quick.read_text(encoding='utf-8')
+          old = "  readEditorFormatState,\n  runEditorCommand,\n  saveEditorSelection,\n"
+          new = "  readEditorFormatState,\n  restoreEditorSelection,\n  runEditorCommand,\n  saveEditorSelection,\n"
+          if text.count(old) != 1:
+              raise SystemExit(f'quick tools import marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          marker = "  function execute(command: string, value?: string) {\n"
+          insert = (
+              "  function restoreEditorFocus(editor: HTMLDivElement) {\n"
+              "    const selection = editorSelectionRef.current;\n"
+              "    const restore = () => restoreEditorSelection(editor, selection);\n"
+              "    if (typeof window.requestAnimationFrame === 'function') {\n"
+              "      window.requestAnimationFrame(restore);\n"
+              "    } else {\n"
+              "      queueMicrotask(restore);\n"
+              "    }\n"
+              "  }\n\n"
+          )
+          if text.count(marker) != 1:
+              raise SystemExit(f'execute marker count={text.count(marker)}')
+          text = text.replace(marker, insert + marker, 1)
+
+          old_execute = (
+              "  function execute(command: string, value?: string) {\n"
+              "    const editor = editorRef?.current ?? null;\n"
+              "    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "    runEditorCommand(editor, command, value, selection);\n"
+              "    if (editor) {\n"
+              "      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "      setFormatState(readEditorFormatState(editor));\n"
+              "    }\n"
+              "  }\n"
+          )
+          new_execute = (
+              "  function execute(command: string, value?: string) {\n"
+              "    const editor = editorRef?.current ?? null;\n"
+              "    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "    runEditorCommand(editor, command, value, selection);\n"
+              "    if (editor) {\n"
+              "      editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;\n"
+              "      setFormatState(readEditorFormatState(editor));\n"
+              "      restoreEditorFocus(editor);\n"
+              "    }\n"
+              "  }\n"
+          )
+          if text.count(old_execute) != 1:
+              raise SystemExit(f'execute block count={text.count(old_execute)}')
+          text = text.replace(old_execute, new_execute, 1)
+
+          old_clear = (
+              "  function clearFormatting() {\n"
+              "    const editor = editorRef?.current ?? null;\n"
+              "    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "    clearEditorFormatting(editor, selection);\n"
+              "    if (editor) {\n"
+              "      editorSelectionRef.current = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "      setFormatState(readEditorFormatState(editor));\n"
+              "    }\n"
+              "  }\n"
+          )
+          new_clear = (
+              "  function clearFormatting() {\n"
+              "    const editor = editorRef?.current ?? null;\n"
+              "    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;\n"
+              "    clearEditorFormatting(editor, selection);\n"
+              "    if (editor) {\n"
+              "      editorSelectionRef.current = saveEditorSelection(editor) ?? selection ?? editorSelectionRef.current;\n"
+              "      setFormatState(readEditorFormatState(editor));\n"
+              "      restoreEditorFocus(editor);\n"
+              "    }\n"
+              "  }\n"
+          )
+          if text.count(old_clear) != 1:
+              raise SystemExit(f'clear block count={text.count(old_clear)}')
+          quick.write_text(text.replace(old_clear, new_clear, 1), encoding='utf-8')
+
+          fields = Path('src/components/composer/ComposerPrimaryFields.tsx')
+          text = fields.read_text(encoding='utf-8')
+          old = "import { autoLinkEditorText, syncRichTextEmptyState } from './richTextCommands';"
+          new = "import { autoLinkEditorText, runEditorCommand, syncRichTextEmptyState } from './richTextCommands';"
+          if text.count(old) != 1:
+              raise SystemExit(f'primary import marker count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          marker = "  function handleRichBodyInput(event: React.FormEvent<HTMLDivElement>) {\n"
+          keyboard = (
+              "  function handleRichBodyKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {\n"
+              "    const editor = event.currentTarget;\n"
+              "    if (event.key === 'Tab') {\n"
+              "      event.preventDefault();\n"
+              "      event.stopPropagation();\n"
+              "      runEditorCommand(editor, event.shiftKey ? 'outdent' : 'indent');\n"
+              "      return;\n"
+              "    }\n\n"
+              "    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;\n"
+              "    const key = event.key.toLowerCase();\n"
+              "    if (['a', 'c', 'x', 'v', 'z', 'y', 'b', 'i', 'u'].includes(key)) {\n"
+              "      event.stopPropagation();\n"
+              "    }\n"
+              "  }\n\n"
+          )
+          if text.count(marker) != 1:
+              raise SystemExit(f'keyboard insertion marker count={text.count(marker)}')
+          text = text.replace(marker, keyboard + marker, 1)
+
+          old = "            spellCheck\n            onInput={handleRichBodyInput}\n"
+          new = "            spellCheck\n            onKeyDownCapture={handleRichBodyKeyDown}\n            onInput={handleRichBodyInput}\n"
+          if text.count(old) != 1:
+              raise SystemExit(f'rich body prop marker count={text.count(old)}')
+          fields.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          npm ci
+          npm run lint
+          npx vitest run src/components/composer/ComposerQuickTools.test.tsx src/components/composer/ComposerPrimaryFields.test.tsx
+          npm run build
+          git diff --check
+          git diff -- src/components/composer/ComposerQuickTools.tsx src/components/composer/ComposerPrimaryFields.tsx
+
+      - name: Commit and push fixes to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/composer/ComposerQuickTools.tsx src/components/composer/ComposerPrimaryFields.tsx
+          git commit -m 'feat:优化写信编辑器焦点与快捷键'
+          git push origin HEAD:main

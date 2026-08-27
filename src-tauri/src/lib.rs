@@ -335,9 +335,9 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 pub fn run() {
     install_crash_log_hook();
     tauri::Builder::default()
-        // Keep the native window titlebar (traffic lights and title), but do
-        // not create Tauri's default macOS application menu.
-        .enable_macos_default_menu(false)
+        // Keep the native macOS application/Edit menu so WebKit receives the
+        // standard Undo/Redo/Cut/Copy/Paste/Select All command chain and shortcuts.
+        .enable_macos_default_menu(true)
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())

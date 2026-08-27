@@ -108,7 +108,7 @@ describe('ComposerPrimaryFields', () => {
     mockLocalFileAssetUrl.mockReset();
   });
 
-  it('uses the app-controlled contact menu instead of a native datalist', () => {
+  it('uses the app-controlled contact menu only after a query is entered', () => {
     const { container } = renderFields(draft());
     const recipient = screen.getByRole('combobox', { name: '收件人' });
 
@@ -117,12 +117,11 @@ describe('ComposerPrimaryFields', () => {
     expect(container.querySelector('datalist')).toBeNull();
 
     fireEvent.focus(recipient);
-    expect(screen.getByText('最近与常用')).not.toBeNull();
-    expect(screen.getByRole('listbox', { name: '收件人最近与常用' })).not.toBeNull();
-    expect(screen.getByRole('option', { name: /Ada Lovelace/ })).not.toBeNull();
+    expect(screen.queryByRole('listbox')).toBeNull();
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
     expect(screen.getByText('匹配联系人')).not.toBeNull();
+    expect(screen.getByRole('listbox', { name: '收件人匹配联系人' })).not.toBeNull();
     expect(screen.getByRole('option', { name: /Ada Lovelace/ })).not.toBeNull();
   });
 
@@ -151,7 +150,7 @@ describe('ComposerPrimaryFields', () => {
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada.wu@example.com' });
   });
 
-  it('shows four matches and navigates with arrow keys, while Tab leaves the field', () => {
+  it('shows four matches and keeps Tab as a literal character while arrows navigate suggestions', () => {
     const contacts = Array.from({ length: 5 }, (_, index) => ({
       ...ada,
       id: index + 10,
@@ -169,9 +168,9 @@ describe('ComposerPrimaryFields', () => {
     expect(options).toHaveLength(4);
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
-    // Tab 不再被拦截循环建议：事件默认行为不被阻止，浏览器可正常离开字段；
-    // 高亮保持不变。
-    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(true);
+    (recipient as HTMLInputElement).setSelectionRange(4, 4);
+    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(false);
+    expect((recipient as HTMLInputElement).value).toBe('wang\t');
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
     // 建议导航只由 ArrowUp/ArrowDown 驱动。

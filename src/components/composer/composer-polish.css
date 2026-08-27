@@ -109,3 +109,34 @@
 .composer .composer-richtext-body font[size] {
   line-height: 1.55;
 }
+
+
+/* Compact formatting toolbar: keep formatting available without stealing vertical space. */
+.composer .composer-rich-toolbar {
+  min-height: 38px;
+  flex-basis: 38px;
+  gap: 4px;
+  padding-inline: 14px;
+}
+
+.composer .composer-rich-toolbar button {
+  width: 26px;
+  min-width: 26px;
+  min-height: 26px;
+}
+
+.composer .composer-rich-toolbar .composer-rich-toolbar-select .custom-select-summary {
+  min-height: 26px;
+  padding-inline: 6px;
+}
+
+.composer .composer-rich-toolbar-group {
+  gap: 1px;
+  padding-right: 6px;
+}
+
+/* Keep literal tab characters visible and predictable in rich-text mail bodies. */
+.composer .composer-richtext-body {
+  white-space: pre-wrap;
+  tab-size: 4;
+}

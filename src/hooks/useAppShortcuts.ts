@@ -63,6 +63,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
     }
 
     function handleShortcut(event: KeyboardEvent) {
+      if (event.isComposing || event.keyCode === 229) return;
       const {
         searchInputRef,
         messages,

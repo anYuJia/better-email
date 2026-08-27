@@ -138,6 +138,16 @@ export function openComposerWindow(request: ComposerWindowRequest = {}): Promise
   return loadProdBridge().then(({ prodOpenComposerWindow }) => prodOpenComposerWindow(request));
 }
 
+export function prewarmComposerWindow(): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodPrewarmComposerWindow }) => prodPrewarmComposerWindow());
+}
+
+export function showCurrentWindow(): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodShowCurrentWindow }) => prodShowCurrentWindow());
+}
+
 export function takePendingComposerRequest(): Promise<ComposerWindowRequest | null> {
   if (mockMode) return Promise.resolve(null);
   return loadProdBridge().then(({ prodTakePendingComposerRequest }) => prodTakePendingComposerRequest());

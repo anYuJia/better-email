@@ -44,15 +44,16 @@ describe('RecipientField keyboard', () => {
     const input = screen.getByRole('combobox', { name: '收件人' });
     expect(input.getAttribute('aria-haspopup')).toBe('listbox');
     expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.getAttribute('spellcheck')).toBe('false');
+    expect(input.getAttribute('autocorrect')).toBe('off');
   });
 
-  it('shows recent and frequent contacts when an empty recipient field gains focus', async () => {
+  it('does not open contacts until the user types a query', async () => {
     renderField();
     const input = recipientInput();
     fireEvent.focus(input);
     await act(async () => {});
-    expect(screen.getByRole('listbox', { name: '收件人最近与常用' })).toBeDefined();
-    expect(screen.getByText('最近与常用')).toBeDefined();
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('exposes ARIA combobox/listbox state while suggestions are open', async () => {
@@ -66,15 +67,15 @@ describe('RecipientField keyboard', () => {
     expect(input.getAttribute('aria-controls')).toBe(listbox.id);
   });
 
-  it('does not trap Tab inside the suggestions', async () => {
+  it('inserts a tab character instead of moving focus', async () => {
     renderField();
     const input = recipientInput();
-    await openSuggestions(input);
-    expect(screen.getByRole('listbox')).toBeDefined();
-
-    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
-    input.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(false);
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'ada' } });
+    input.setSelectionRange(3, 3);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+    await act(async () => {});
+    expect(input.value).toBe('ada\t');
   });
 
   it('keeps focus in the field when Escape closes the suggestions', async () => {
@@ -98,5 +99,19 @@ describe('RecipientField keyboard', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith(expect.stringContaining('ada@example.com'));
+  });
+
+  it('does not treat IME Enter as recipient confirmation', async () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    fireEvent.focus(input);
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: 'hanhan' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229, isComposing: true });
+    fireEvent.compositionEnd(input, { data: '涵涵', target: { value: '涵涵' } });
+    await act(async () => {});
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('涵涵');
   });
 });

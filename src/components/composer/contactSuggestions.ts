@@ -1,8 +1,11 @@
+import { pinyin } from 'pinyin-pro';
 import type { Contact } from '../../app/types';
 
 export type ContactSearchEntry = {
   contact: Contact;
   searchText: string;
+  pinyinText?: string;
+  pinyinInitials?: string;
 };
 
 function isSuggestedRecipient(contact: Contact) {
@@ -23,6 +26,50 @@ function compareSuggestedContacts(left: Contact, right: Contact) {
   return 0;
 }
 
+function compact(value: string) {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s'’`·._-]+/g, '');
+}
+
+function hasHan(value: string) {
+  return /[\u3400-\u9fff\uf900-\ufaff]/u.test(value);
+}
+
+function pinyinFull(value: string) {
+  if (!value.trim()) return '';
+  return compact(String(pinyin(value, {
+    toneType: 'none',
+    type: 'string',
+    surname: 'head',
+  })));
+}
+
+function pinyinInitials(value: string) {
+  if (!value.trim()) return '';
+  return compact(String(pinyin(value, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string',
+    surname: 'head',
+  })));
+}
+
+function contactNameText(contact: Contact) {
+  return [contact.name, ...contact.aliases].filter(Boolean).join('\n');
+}
+
+function contactPinyinText(contact: Contact) {
+  const names = contactNameText(contact);
+  return names ? pinyinFull(names) : '';
+}
+
+function contactPinyinInitials(contact: Contact) {
+  const names = contactNameText(contact);
+  return names ? pinyinInitials(names) : '';
+}
+
 export function buildContactSearchEntries(contacts: Contact[]): ContactSearchEntry[] {
   return contacts
     .filter(isSuggestedRecipient)
@@ -35,6 +82,8 @@ export function buildContactSearchEntries(contacts: Contact[]): ContactSearchEnt
         contact.email,
         ...contact.aliases,
       ].join('\n').toLowerCase(),
+      pinyinText: contactPinyinText(contact),
+      pinyinInitials: contactPinyinInitials(contact),
     }));
 }
 
@@ -45,9 +94,21 @@ export function matchingContacts(
 ): Contact[] {
   if (limit <= 0) return [];
   const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const compactQuery = compact(normalizedQuery);
+  const chineseQueryPinyin = hasHan(normalizedQuery) ? pinyinFull(normalizedQuery) : '';
   const matches: Contact[] = [];
+
   for (const entry of entries) {
-    if (!normalizedQuery || entry.searchText.includes(normalizedQuery)) {
+    const directMatch = entry.searchText.includes(normalizedQuery);
+    const fullPinyin = entry.pinyinText ?? contactPinyinText(entry.contact);
+    const initials = entry.pinyinInitials ?? contactPinyinInitials(entry.contact);
+    const pinyinMatch = chineseQueryPinyin
+      ? Boolean(chineseQueryPinyin && fullPinyin.includes(chineseQueryPinyin))
+      : Boolean(compactQuery && (fullPinyin.includes(compactQuery) || initials.includes(compactQuery)));
+
+    if (directMatch || pinyinMatch) {
       matches.push(entry.contact);
       if (matches.length >= limit) break;
     }

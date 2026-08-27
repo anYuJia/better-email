@@ -1,0 +1,172 @@
+name: Apply Composer Font State Fix
+
+on:
+  push:
+    branches:
+      - ci/fix-composer-font-state-20260827
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch font controls and caret state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          quick = Path('src/components/composer/ComposerQuickTools.tsx')
+          text = quick.read_text(encoding='utf-8')
+
+          old_fonts = """const FONT_OPTIONS = [
+  { value: '', label: '字体' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Microsoft YaHei', label: '微软雅黑' },
+  { value: 'Georgia', label: 'Georgia' },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: '', label: '字号' },
+  { value: '2', label: '14' },
+  { value: '3', label: '16' },
+  { value: '4', label: '18' },
+  { value: '5', label: '20' },
+];
+"""
+          new_fonts = """const FONT_OPTIONS = [
+  { value: '', label: '字体' },
+  { value: 'system-ui', label: '系统字体' },
+  { value: 'PingFang SC', label: '苹方' },
+  { value: 'Microsoft YaHei', label: '微软雅黑' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Helvetica', label: 'Helvetica' },
+  { value: 'Georgia', label: 'Georgia' },
+  { value: 'Times New Roman', label: 'Times New Roman' },
+  { value: 'Courier New', label: 'Courier New' },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: '', label: '字号' },
+  { value: '1', label: '12' },
+  { value: '2', label: '14' },
+  { value: '3', label: '16' },
+  { value: '4', label: '18' },
+  { value: '5', label: '20' },
+  { value: '6', label: '24' },
+  { value: '7', label: '32' },
+];
+"""
+          if text.count(old_fonts) != 1:
+              raise SystemExit(f'font options block count={text.count(old_fonts)}')
+          text = text.replace(old_fonts, new_fonts, 1)
+
+          marker = "  function execute(command: string, value?: string) {\n"
+          scheduled = """  function executeFromSelect(command: string, value: string) {
+    const editor = editorRef?.current ?? null;
+    if (!editor) return;
+    const selection = saveEditorSelection(editor) ?? editorSelectionRef.current;
+    if (selection) editorSelectionRef.current = selection;
+    const run = () => {
+      const target = editorRef?.current ?? null;
+      if (!target) return;
+      runEditorCommand(target, command, value, selection);
+      editorSelectionRef.current = saveEditorSelection(target) ?? selection ?? editorSelectionRef.current;
+      setFormatState(readEditorFormatState(target));
+    };
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(run);
+    } else {
+      queueMicrotask(run);
+    }
+  }
+
+"""
+          if text.count(marker) != 1:
+              raise SystemExit(f'execute marker count={text.count(marker)}')
+          text = text.replace(marker, scheduled + marker, 1)
+
+          old_font_change = """          onChange={(value) => {
+            if (value) execute('fontName', value);
+            setFontValue('');
+          }}
+"""
+          new_font_change = """          onChange={(value) => {
+            if (!value) return;
+            setFontValue(value);
+            executeFromSelect('fontName', value);
+          }}
+"""
+          if text.count(old_font_change) != 1:
+              raise SystemExit(f'font change block count={text.count(old_font_change)}')
+          text = text.replace(old_font_change, new_font_change, 1)
+
+          old_size_change = """          onChange={(value) => {
+            if (value) execute('fontSize', value);
+            setFontSizeValue('');
+          }}
+"""
+          new_size_change = """          onChange={(value) => {
+            if (!value) return;
+            setFontSizeValue(value);
+            executeFromSelect('fontSize', value);
+          }}
+"""
+          if text.count(old_size_change) != 1:
+              raise SystemExit(f'size change block count={text.count(old_size_change)}')
+          text = text.replace(old_size_change, new_size_change, 1)
+          quick.write_text(text, encoding='utf-8')
+
+          css = Path('src/components/composer/composer-polish.css')
+          styles = css.read_text(encoding='utf-8')
+          marker = '/* Composer font-size scale: keep toolbar labels equal to rendered sizes. */'
+          if marker not in styles:
+              styles += """
+
+/* Composer font-size scale: keep toolbar labels equal to rendered sizes. */
+.composer .composer-richtext-body font[size="1"] { font-size: 12px; }
+.composer .composer-richtext-body font[size="2"] { font-size: 14px; }
+.composer .composer-richtext-body font[size="3"] { font-size: 16px; }
+.composer .composer-richtext-body font[size="4"] { font-size: 18px; }
+.composer .composer-richtext-body font[size="5"] { font-size: 20px; }
+.composer .composer-richtext-body font[size="6"] { font-size: 24px; }
+.composer .composer-richtext-body font[size="7"] { font-size: 32px; }
+
+.composer .composer-richtext-body font[size] {
+  line-height: 1.55;
+}
+"""
+          css.write_text(styles, encoding='utf-8')
+          PY
+
+          npm ci
+          npm run lint
+          npx vitest run src/components/composer/ComposerQuickTools.test.tsx src/components/composer/ComposerPrimaryFields.test.tsx
+          npm run build
+          git diff --check
+          git diff -- src/components/composer/ComposerQuickTools.tsx src/components/composer/composer-polish.css
+
+      - name: Commit and push fixes to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/composer/ComposerQuickTools.tsx src/components/composer/composer-polish.css
+          git commit -m 'feat:优化写信字体字号选择体验'
+          git push origin HEAD:main

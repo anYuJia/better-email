@@ -1,29 +1,12 @@
-import { lazy, Suspense } from 'react';
-import DeferredSurface from '../components/DeferredSurface';
-import { isStandaloneComposerWindow } from '../tauriBridge';
-
-const MailboxApp = lazy(() => import('../App'));
-const StandaloneComposerApp = lazy(() => import('../components/StandaloneComposerApp'));
+import App from '../App';
 
 /**
- * Application entry boundary.
+ * Keep the root entry synchronous.
  *
- * Keep window-mode routing outside the mailbox workspace so the standalone
- * composer does not eagerly load the large mailbox application bundle.
+ * App owns the window-mode routing and imports the shared UI stylesheet, so
+ * both the mailbox and the standalone composer receive the same visual system
+ * immediately without an extra lazy chunk or first-launch loading surface.
  */
 export default function AppRoot() {
-  const standaloneComposer = isStandaloneComposerWindow();
-  const Surface = standaloneComposer ? StandaloneComposerApp : MailboxApp;
-
-  return (
-    <Suspense
-      fallback={(
-        <DeferredSurface
-          label={standaloneComposer ? '正在准备写信窗口' : '正在准备邮箱工作区'}
-        />
-      )}
-    >
-      <Surface />
-    </Suspense>
-  );
+  return <App />;
 }

@@ -9,6 +9,7 @@ import {
   outboxFlowLog,
   syncModeStatus,
 } from '../app/backgroundTaskFlow';
+import { syncRetryDelayMs } from '../app/syncRetryPolicy';
 import { isPermissionGranted } from '../tauriBridge';
 
 type BackgroundSchedulerOptions = {
@@ -37,6 +38,7 @@ export default function useBackgroundScheduler({
   enqueueBackgroundTask,
 }: BackgroundSchedulerOptions) {
   const outboxScheduleTimerRef = useRef<number | null>(null);
+  const syncScheduleTimerRef = useRef<number | null>(null);
   const enqueueBackgroundTaskRef = useRef(enqueueBackgroundTask);
   enqueueBackgroundTaskRef.current = enqueueBackgroundTask;
 
@@ -101,6 +103,10 @@ export default function useBackgroundScheduler({
 
   useEffect(() => {
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
+    if (syncScheduleTimerRef.current) {
+      window.clearTimeout(syncScheduleTimerRef.current);
+      syncScheduleTimerRef.current = null;
+    }
     if (!intervalMs) {
       fetchTimerLog('disabled', {
         accountId: account?.id ?? null,
@@ -110,6 +116,47 @@ export default function useBackgroundScheduler({
       setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
       return;
     }
+
+    let cancelled = false;
+    let failureAttempt = 0;
+
+    const scheduleNext = (delayMs: number) => {
+      if (cancelled) return;
+      if (syncScheduleTimerRef.current) {
+        window.clearTimeout(syncScheduleTimerRef.current);
+      }
+      syncScheduleTimerRef.current = window.setTimeout(() => {
+        syncScheduleTimerRef.current = null;
+        void runScheduledSync();
+      }, delayMs);
+    };
+
+    const runScheduledSync = async () => {
+      if (cancelled) return;
+      fetchTimerLog('timer fired', {
+        accountId: account?.id ?? null,
+        syncMode: account?.sync_mode ?? 'manual',
+        failureAttempt,
+      });
+      try {
+        await enqueueBackgroundTaskRef.current('sync', 'timer');
+        failureAttempt = 0;
+        if (!cancelled) scheduleNext(intervalMs);
+      } catch (error) {
+        failureAttempt += 1;
+        const retryDelayMs = syncRetryDelayMs(failureAttempt, intervalMs);
+        fetchTimerWarn('enqueue failed; retry scheduled', {
+          accountId: account?.id ?? null,
+          error: error instanceof Error ? error.message : String(error),
+          failureAttempt,
+          retryDelayMs,
+        });
+        setBackgroundSyncStatus(`后台同步暂时失败，${Math.max(1, Math.round(retryDelayMs / 1000))} 秒后重试`);
+        setStatus(String(error));
+        if (!cancelled) scheduleNext(retryDelayMs);
+      }
+    };
+
     fetchTimerLog('enabled', {
       accountId: account?.id ?? null,
       email: account?.email ?? null,
@@ -118,25 +165,18 @@ export default function useBackgroundScheduler({
       nextRunAt: new Date(Date.now() + intervalMs).toISOString(),
     });
     setBackgroundSyncStatus(syncModeStatus(account?.sync_mode ?? 'manual'));
-    const timer = window.setInterval(() => {
-      fetchTimerLog('timer fired', {
-        accountId: account?.id ?? null,
-        syncMode: account?.sync_mode ?? 'manual',
-      });
-      enqueueBackgroundTaskRef.current('sync', 'timer').catch((error) => {
-        fetchTimerWarn('enqueue failed', {
-          accountId: account?.id ?? null,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        setStatus(String(error));
-      });
-    }, intervalMs);
+    scheduleNext(intervalMs);
+
     return () => {
+      cancelled = true;
+      if (syncScheduleTimerRef.current) {
+        window.clearTimeout(syncScheduleTimerRef.current);
+        syncScheduleTimerRef.current = null;
+      }
       fetchTimerLog('cleared', {
         accountId: account?.id ?? null,
         syncMode: account?.sync_mode ?? 'manual',
       });
-      window.clearInterval(timer);
     };
   }, [
     account?.email,
@@ -146,5 +186,5 @@ export default function useBackgroundScheduler({
     setStatus,
   ]);
 
-  return { outboxScheduleTimerRef };
+  return { outboxScheduleTimerRef, syncScheduleTimerRef };
 }

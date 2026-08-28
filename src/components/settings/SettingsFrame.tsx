@@ -26,6 +26,7 @@ import './settings-components.css';
 import './settings-pages.css';
 import './settings-v3.css';
 import './settings-composer-language.css';
+import './settings-layout-contract.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 

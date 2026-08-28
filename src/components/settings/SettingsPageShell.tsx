@@ -5,6 +5,7 @@ import type {
   SettingsNavigationItem,
   SettingsSectionId,
 } from './settingsNavigation';
+import { getSettingsSectionPresentation } from './settingsNavigation';
 
 type SettingsPageShellProps = {
   activeSection: SettingsSectionId;
@@ -20,6 +21,7 @@ export default function SettingsPageShell({
   children,
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
+  const presentation = getSettingsSectionPresentation(activeSection) ?? item;
 
   useEffect(() => {
     if (pageRef.current) {
@@ -39,8 +41,8 @@ export default function SettingsPageShell({
     >
       <header className="settings-page-header">
         <div className="settings-page-heading">
-          <h2 id={`settings-page-${activeSection}`}>{item.label}</h2>
-          <p id={`settings-page-description-${activeSection}`}>{item.description}</p>
+          <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
+          <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
         </div>
       </header>
       <div className="settings-page-content">{children}</div>

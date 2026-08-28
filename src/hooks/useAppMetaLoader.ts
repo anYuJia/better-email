@@ -22,6 +22,7 @@ import type {
 } from '../app/types';
 import { flowInfo, flowWarn, logWarn } from '../app/logger';
 import { IPC } from '../ipc/commands';
+import { reportStartupMilestone } from '../startupTelemetry';
 
 /**
  * A mailbox view generation captured before an asynchronous refresh starts.
@@ -274,6 +275,7 @@ export default function useAppMetaLoader({
         setImapMailboxes(nextImapMailboxes);
         void updateAppUnreadBadge(nextStats.unread_messages, unreadRequest);
         setFolderId(resolvedFolderId);
+        if (mode === 'mailbox') void reportStartupMilestone('mailbox_metadata_ready');
         appFlowLog('loadMeta done', {
           accountCount: nextAccounts.length,
           activeAccountId: nextAccount?.id ?? null,
@@ -355,6 +357,7 @@ export default function useAppMetaLoader({
       setOauthSessions(nextOauthSessions);
       void updateAppUnreadBadge(nextStats.unread_messages, unreadRequest);
       setFolderId(resolvedFolderId);
+      if (mode === 'full') void reportStartupMilestone('mailbox_metadata_ready');
       appFlowLog('loadMeta done', {
         accountCount: nextAccounts.length,
         activeAccountId: nextAccount?.id ?? null,

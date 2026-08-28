@@ -218,7 +218,15 @@ async function waitForReadyFile(path, launchStart, timeoutMs) {
       try {
         payload = JSON.parse(readFileSync(path, 'utf8'));
       } catch {
-        payload = { parse_error: true };
+        await sleep(20);
+        continue;
+      }
+      const message = typeof payload?.message === 'string' ? payload.message : '';
+      const expectedMessages = Number(message.match(/messages=(\d+)/)?.[1] ?? 0);
+      const milestones = payload?.startupTimeline?.milestones ?? {};
+      if (expectedMessages > 0 && !milestones.first_message_row_painted) {
+        await sleep(20);
+        continue;
       }
       return {
         detected: true,

@@ -23,6 +23,7 @@ import type {
   MailboxRefreshRequest,
 } from './useAppMetaLoader';
 import { IPC } from '../ipc/commands';
+import { reportStartupMilestone } from '../startupTelemetry';
 
 type UseMailboxDataOptions = {
   accountScope: AccountScope;
@@ -249,6 +250,7 @@ export default function useMailboxData({
     });
     if (!frontendReadyRef.current) {
       frontendReadyRef.current = true;
+      void reportStartupMilestone('first_message_list_query_complete');
       void invoke(IPC.MarkFrontendReady, {
         message: `folder=${nextFolderId};messages=${visibleMessages.length};scope=${nextScope}`,
       });

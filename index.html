@@ -8,109 +8,27 @@
     <style>
       :root {
         color-scheme: light;
-        --boot-bg: #f7f8f7;
-        --boot-surface: #ffffff;
-        --boot-muted: #e9ecea;
-        --boot-border: #e3e7e4;
-        --boot-text: #1f2522;
+        --app-bg: #f7f8f7;
       }
       :root[data-theme='dark'] {
         color-scheme: dark;
-        --boot-bg: #101311;
-        --boot-surface: #151917;
-        --boot-muted: #252b27;
-        --boot-border: #2a302c;
-        --boot-text: #eef2ef;
+        --app-bg: #101311;
       }
-      html, body, #root {
+      html,
+      body,
+      #root {
         width: 100%;
         height: 100%;
         margin: 0;
-        background: var(--boot-bg);
+        background: var(--app-bg);
       }
       body {
         overflow: hidden;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", system-ui, sans-serif;
-        color: var(--boot-text);
-      }
-      .boot-shell {
-        height: 100%;
-        display: grid;
-        grid-template-rows: 52px minmax(0, 1fr);
-        background: var(--boot-bg);
-      }
-      .boot-titlebar {
-        display: flex;
-        align-items: center;
-        padding: 0 22px 0 82px;
-        border-bottom: 1px solid var(--boot-border);
-        background: color-mix(in srgb, var(--boot-surface) 94%, transparent);
-      }
-      .boot-brand {
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: normal;
-        opacity: .78;
-      }
-      .boot-workspace {
-        min-height: 0;
-        display: grid;
-        grid-template-columns: 218px 320px minmax(0, 1fr);
-      }
-      .boot-pane {
-        min-width: 0;
-        border-right: 1px solid var(--boot-border);
-        background: var(--boot-surface);
-      }
-      .boot-sidebar { padding: 24px 18px; background: var(--boot-bg); }
-      .boot-list { padding: 18px 14px; }
-      .boot-reader { padding: 34px 38px; border-right: 0; }
-      .boot-line {
-        height: 8px;
-        border-radius: 999px;
-        background: var(--boot-muted);
-        margin-bottom: 14px;
-      }
-      .boot-sidebar .boot-line:nth-child(1) { width: 44%; height: 10px; margin-bottom: 28px; }
-      .boot-sidebar .boot-line:nth-child(2) { width: 68%; }
-      .boot-sidebar .boot-line:nth-child(3) { width: 56%; }
-      .boot-sidebar .boot-line:nth-child(4) { width: 62%; }
-      .boot-mail-row {
-        padding: 15px 4px;
-        border-bottom: 1px solid var(--boot-border);
-      }
-      .boot-mail-row .boot-line:first-child { width: 34%; }
-      .boot-mail-row .boot-line:last-child { width: 78%; margin-bottom: 0; }
-      .boot-reader .boot-line:nth-child(1) { width: 42%; height: 13px; margin-bottom: 26px; }
-      .boot-reader .boot-line:nth-child(2) { width: 28%; }
-      .boot-reader .boot-line:nth-child(3) { width: 88%; margin-top: 34px; }
-      .boot-reader .boot-line:nth-child(4) { width: 76%; }
-      .boot-reader .boot-line:nth-child(5) { width: 82%; }
-      :root[data-window='compose'] .boot-titlebar { padding-left: 22px; }
-      :root[data-window='compose'] .boot-workspace {
-        display: block;
-        padding: 18px;
-      }
-      :root[data-window='compose'] .boot-sidebar,
-      :root[data-window='compose'] .boot-list { display: none; }
-      :root[data-window='compose'] .boot-reader {
-        height: calc(100% - 68px);
-        max-width: 920px;
-        margin: 0 auto;
-        padding: 26px 32px;
-        border: 1px solid var(--boot-border);
-        border-radius: 10px;
-        box-sizing: border-box;
-      }
-      @media (max-width: 760px) {
-        .boot-workspace { grid-template-columns: 1fr; }
-        .boot-sidebar, .boot-reader { display: none; }
-        .boot-list { border-right: 0; }
-        .boot-titlebar { padding-left: 20px; }
       }
     </style>
     <script>
-      /* Resolve theme and window mode before the first paint. */
+      /* Resolve theme before first paint and report only the static HTML milestone. */
       (function () {
         var theme = 'light';
         try {
@@ -125,29 +43,24 @@
         document.documentElement.dataset.window = new URLSearchParams(location.search).get('window') === 'compose'
           ? 'compose'
           : 'mailbox';
+        try {
+          performance.mark('better-email:main-html-bootstrap');
+        } catch (error) {
+          /* Performance marks are diagnostic-only. */
+        }
+        try {
+          var runtime = window.__TAURI_INTERNALS__;
+          if (runtime && typeof runtime.invoke === 'function') {
+            runtime.invoke('record_startup_milestone', { milestone: 'main_html_bootstrap' }).catch(function () {});
+          }
+        } catch (error) {
+          /* Startup diagnostics must never block the renderer. */
+        }
       })();
     </script>
   </head>
   <body>
-    <div id="root">
-      <div class="boot-shell" aria-hidden="true">
-        <div class="boot-titlebar"><span class="boot-brand">Better Email</span></div>
-        <div class="boot-workspace">
-          <aside class="boot-pane boot-sidebar">
-            <div class="boot-line"></div><div class="boot-line"></div><div class="boot-line"></div><div class="boot-line"></div>
-          </aside>
-          <section class="boot-pane boot-list">
-            <div class="boot-mail-row"><div class="boot-line"></div><div class="boot-line"></div></div>
-            <div class="boot-mail-row"><div class="boot-line"></div><div class="boot-line"></div></div>
-            <div class="boot-mail-row"><div class="boot-line"></div><div class="boot-line"></div></div>
-            <div class="boot-mail-row"><div class="boot-line"></div><div class="boot-line"></div></div>
-          </section>
-          <section class="boot-pane boot-reader">
-            <div class="boot-line"></div><div class="boot-line"></div><div class="boot-line"></div><div class="boot-line"></div><div class="boot-line"></div>
-          </section>
-        </div>
-      </div>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

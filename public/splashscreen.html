@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Better Email</title>
+    <link rel="preload" href="/brand/v4/brand-mark-64.png" as="image" />
+    <style>
+      :root {
+        color-scheme: light;
+        --splash-bg: #f7f8f7;
+        --splash-text: #202622;
+        --splash-subtle: #7b837e;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --splash-bg: #101311;
+        --splash-text: #edf1ee;
+        --splash-subtle: #8e9891;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: var(--splash-bg);
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        color: var(--splash-text);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .splash-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 32px;
+        text-align: center;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .splash-logo {
+        width: 78px;
+        height: 78px;
+        display: block;
+        object-fit: contain;
+        margin-bottom: 22px;
+      }
+
+      .splash-title {
+        margin: 0;
+        font-size: 23px;
+        line-height: 1.2;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+      }
+
+      .splash-tagline {
+        margin: 9px 0 0;
+        color: var(--splash-subtle);
+        font-size: 13px;
+        line-height: 1.55;
+        font-weight: 450;
+        letter-spacing: 0.01em;
+      }
+    </style>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var systemTheme = 'light';
+        var resolvedTheme = 'light';
+
+        try {
+          systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var mode = localStorage.getItem('better-email.theme-mode') || 'system';
+          resolvedTheme = mode === 'dark' || (mode === 'system' && systemTheme === 'dark') ? 'dark' : 'light';
+        } catch (error) {
+          /* The native system background remains the safe fallback. */
+        }
+
+        root.dataset.theme = resolvedTheme;
+
+        function mark(milestone) {
+          try {
+            performance.mark('better-email:' + milestone);
+          } catch (error) {
+            /* Startup diagnostics must never block the first frame. */
+          }
+          try {
+            var runtime = window.__TAURI_INTERNALS__;
+            if (runtime && typeof runtime.invoke === 'function') {
+              runtime.invoke('record_startup_milestone', { milestone: milestone }).catch(function () {});
+            }
+          } catch (error) {
+            /* Startup diagnostics must never block the first frame. */
+          }
+        }
+
+        if (resolvedTheme !== systemTheme) mark('splash_theme_corrected');
+
+        document.addEventListener('DOMContentLoaded', function () {
+          mark('splash_dom_content_loaded');
+          window.requestAnimationFrame(function () {
+            mark('splash_first_raf');
+          });
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <main class="splash-content" aria-label="Better Email 正在启动">
+      <img class="splash-logo" src="/brand/v4/brand-mark-64.png" alt="" draggable="false" />
+      <h1 class="splash-title">Better Email</h1>
+      <p class="splash-tagline">让邮件，重新变得简单。</p>
+    </main>
+  </body>
+</html>

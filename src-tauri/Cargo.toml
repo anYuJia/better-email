@@ -10,10 +10,10 @@ name = "better_email_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.4.0", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "2.9.5", features = ["macos-private-api", "protocol-asset", "tray-icon", "image-png"] }
+tauri = { version = "2.11.5", features = ["macos-private-api", "protocol-asset", "tray-icon", "image-png"] }
 tauri-plugin-shell = "2.3.1"
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-updater = "2.10.1"

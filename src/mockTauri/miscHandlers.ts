@@ -74,6 +74,7 @@ export const handlers: Record<string, MockCommandHandler> = {
   },
   'set_tray_unread_count': mockSetTrayUnreadCount,
   'get_platform': () => 'web',
+  'get_startup_status': () => ({ state: 'ready', elapsedMs: 0, error: null }),
   'window_chrome_ready': mockWindowChromeReady,
   'save_ai_settings': (args) => {
     const input = args?.input as Record<string, unknown> | undefined;

@@ -5,7 +5,10 @@ import type {
   SettingsNavigationItem,
   SettingsSectionId,
 } from './settingsNavigation';
-import { getSettingsSectionPresentation } from './settingsNavigation';
+import {
+  accountScopedSections,
+  getSettingsSectionPresentation,
+} from './settingsNavigation';
 
 type SettingsPageShellProps = {
   activeSection: SettingsSectionId;
@@ -22,6 +25,7 @@ export default function SettingsPageShell({
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
   const presentation = getSettingsSectionPresentation(activeSection) ?? item;
+  const accountWorkspace = accountScopedSections.has(activeSection);
 
   useEffect(() => {
     if (pageRef.current) {
@@ -36,15 +40,18 @@ export default function SettingsPageShell({
       className="settings-page"
       data-settings-page={activeSection}
       data-settings-group={group.label}
-      aria-labelledby={`settings-page-${activeSection}`}
-      aria-describedby={`settings-page-description-${activeSection}`}
+      aria-label={accountWorkspace ? presentation.label : undefined}
+      aria-labelledby={accountWorkspace ? undefined : `settings-page-${activeSection}`}
+      aria-describedby={accountWorkspace ? undefined : `settings-page-description-${activeSection}`}
     >
-      <header className="settings-page-header">
-        <div className="settings-page-heading">
-          <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
-          <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
-        </div>
-      </header>
+      {!accountWorkspace && (
+        <header className="settings-page-header">
+          <div className="settings-page-heading">
+            <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
+            <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
+          </div>
+        </header>
+      )}
       <div className="settings-page-content">{children}</div>
     </section>
   );

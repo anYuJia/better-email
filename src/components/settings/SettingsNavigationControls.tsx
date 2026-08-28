@@ -13,7 +13,10 @@ import {
 import {
   resolveSettingsNavigationSectionId,
   settingsNavigationGroups,
+  settingsNavigationItems,
+  settingsSearchEntries,
   type SettingsNavigationItem,
+  type SettingsSearchEntry,
   type SettingsSectionId,
 } from './settingsNavigation';
 
@@ -22,6 +25,30 @@ type SettingsNavigationProps = {
   activeItem: SettingsNavigationItem;
   onNavigate: (section: SettingsSectionId) => void;
 };
+
+function focusSearchTarget(entry: SettingsSearchEntry) {
+  window.setTimeout(() => {
+    const target = entry.target
+      ? document.querySelector<HTMLElement>(`[data-settings-section="${entry.target}"]`)
+      : document.querySelector<HTMLElement>(`[data-settings-page="${entry.section}"]`);
+    if (!target) return;
+
+    const disclosures = [
+      ...(target instanceof HTMLDetailsElement ? [target] : []),
+      ...Array.from(target.querySelectorAll<HTMLDetailsElement>('details')),
+    ];
+    let ancestor = target.parentElement;
+    while (ancestor) {
+      if (ancestor instanceof HTMLDetailsElement) disclosures.push(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+    disclosures.forEach((details) => { details.open = true; });
+
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target.classList.add('settings-search-hit');
+    window.setTimeout(() => target.classList.remove('settings-search-hit'), 1200);
+  }, 80);
+}
 
 export const SettingsSidebar = memo(function SettingsSidebar({
   activeSection,
@@ -34,32 +61,30 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         searchInputRef.current?.focus();
+        searchInputRef.current?.select();
       }
     }
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  const filteredGroups = useMemo(() => {
-    if (!normalizedQuery) return settingsNavigationGroups;
-    return settingsNavigationGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => (
-          `${item.label} ${item.description} ${(item.keywords || []).join(' ')}`
-            .toLowerCase()
-            .includes(normalizedQuery)
-        )),
-      }))
-      .filter((group) => group.items.length > 0);
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return settingsSearchEntries.filter((entry) => (
+      `${entry.label} ${entry.path} ${entry.keywords.join(' ')}`
+        .toLowerCase()
+        .includes(normalizedQuery)
+    )).slice(0, 10);
   }, [normalizedQuery]);
 
-  const totalMatchCount = useMemo(() => {
-    return filteredGroups.reduce((acc, group) => acc + group.items.length, 0);
-  }, [filteredGroups]);
+  const navigateToSearchResult = (entry: SettingsSearchEntry) => {
+    onNavigate(entry.section);
+    setQuery('');
+    focusSearchTarget(entry);
+  };
 
   return (
     <nav className="settings-nav" aria-label="设置分类">
@@ -68,9 +93,9 @@ export const SettingsSidebar = memo(function SettingsSidebar({
         <input
           ref={searchInputRef}
           type="search"
-          aria-label="搜索设置页面 (Cmd+K)"
+          aria-label="搜索设置"
           value={query}
-          placeholder="搜索设置 (⌘K)"
+          placeholder="搜索设置"
           onInput={(event) => setQuery(event.currentTarget.value)}
         />
         {query ? (
@@ -83,19 +108,44 @@ export const SettingsSidebar = memo(function SettingsSidebar({
             <X size={13} />
           </button>
         ) : (
-          <kbd className="settings-search-shortcut">⌘K</kbd>
+          <kbd className="settings-search-shortcut">⌘F</kbd>
         )}
       </div>
-      {query && (
-        <div className="settings-nav-match-count">
-          找到 {totalMatchCount} 个相关设置
-        </div>
-      )}
+
       <div className="settings-nav-scroll">
-        {filteredGroups.map((group) => (
-          <div className="settings-nav-section" key={group.label}>
-            <span className="settings-nav-group">{group.label}</span>
-            {group.items.map((item) => {
+        {normalizedQuery ? (
+          <div className="settings-search-results" aria-label="设置搜索结果">
+            <span className="settings-nav-match-count">
+              {searchResults.length > 0 ? `${searchResults.length} 个匹配` : '没有匹配'}
+            </span>
+            {searchResults.map((entry) => (
+              <button
+                type="button"
+                className="settings-search-result"
+                key={`${entry.section}-${entry.label}`}
+                onClick={() => navigateToSearchResult(entry)}
+              >
+                <strong>{entry.label}</strong>
+                <small>{entry.path}</small>
+              </button>
+            ))}
+            {searchResults.length === 0 && (
+              <div className="settings-nav-empty">
+                <strong>没有找到这个设置</strong>
+                <span>试试“附件”“撤销发送”或“免打扰”</span>
+                <button
+                  type="button"
+                  className="st-btn st-btn-secondary st-btn-sm"
+                  onClick={() => setQuery('')}
+                >
+                  清除搜索
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="settings-nav-list">
+            {settingsNavigationItems.map((item) => {
               const Icon = item.icon;
               const active = resolvedActiveSection === item.id;
               return (
@@ -116,19 +166,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                 </button>
               );
             })}
-          </div>
-        ))}
-        {filteredGroups.length === 0 && (
-          <div className="settings-nav-empty">
-            <strong>没有匹配的设置</strong>
-            <span>换一个关键词试试</span>
-            <button
-              type="button"
-              className="st-btn st-btn-secondary st-btn-sm"
-              onClick={() => setQuery('')}
-            >
-              清除搜索
-            </button>
           </div>
         )}
       </div>

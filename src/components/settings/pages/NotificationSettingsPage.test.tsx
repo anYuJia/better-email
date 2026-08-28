@@ -35,25 +35,26 @@ describe('NotificationSettingsPage', () => {
     cleanup();
   });
 
-  it('shows the current policy scope in the header status', () => {
+  it('renders compact primary notification controls', () => {
     renderPage(makePolicy({ vipOnly: true, quietHoursEnabled: true }), []);
-    expect(screen.getByTitle('当前生效的通知范围').textContent).toContain('仅 VIP');
-    expect(screen.getByTitle('当前生效的通知范围').textContent).toContain('免打扰');
+    expect(screen.getByText('通知')).not.toBeNull();
+    expect(screen.getByText('只保留真正需要打断你的提醒。')).not.toBeNull();
+    expect(screen.getByRole('checkbox', { name: /^只提醒 VIP/ })).not.toBeNull();
+    expect(screen.getByRole('checkbox', { name: /^免打扰/ })).not.toBeNull();
   });
 
-  it('dimms and disables quiet hours time inputs while the toggle is off', () => {
+  it('hides quiet hours time inputs while the toggle is off', () => {
     const { container } = renderPage(makePolicy({ quietHoursEnabled: false }), []);
     const times = container.querySelector('.notification-quiet-times');
-    expect(times?.className).toContain('is-dimmed');
-    const start = screen.getByLabelText('免打扰开始') as HTMLInputElement;
-    expect(start.disabled).toBe(true);
+    expect(times).toBeNull();
+    expect(screen.queryByLabelText('开始')).toBeNull();
   });
 
   it('enables quiet hours time inputs after the toggle is on', () => {
     const { container } = renderPage(makePolicy({ quietHoursEnabled: true }), []);
     const times = container.querySelector('.notification-quiet-times');
     expect(times?.className).not.toContain('is-dimmed');
-    const start = screen.getByLabelText('免打扰开始') as HTMLInputElement;
+    const start = screen.getByLabelText('开始') as HTMLInputElement;
     expect(start.disabled).toBe(false);
   });
 
@@ -64,10 +65,10 @@ describe('NotificationSettingsPage', () => {
 
     const workButtons = screen.getAllByRole('group', { name: 'work@example.com 提醒模式' })[0];
     const workLabels = Array.from(workButtons.querySelectorAll('button')).map((button) => button.textContent);
-    expect(workLabels).toEqual(['正常通知', '优先提醒', '不通知']);
+    expect(workLabels).toEqual(['正常', '优先', '静音']);
 
     const priorityButton = Array.from(workButtons.querySelectorAll('button'))
-      .find((button) => button.textContent === '优先提醒');
+      .find((button) => button.textContent === '优先');
     expect(priorityButton?.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -82,7 +83,8 @@ describe('NotificationSettingsPage', () => {
       mutedAccounts: 'archive@example.com',
     });
     renderPage(policy, accounts);
-    expect(screen.getByText('1 个优先 · 1 个静音')).not.toBeNull();
+    const accountRules = screen.getByText('账号通知优先级').closest('details');
+    expect(accountRules?.querySelector('em')?.textContent).toBe('1 优先 · 1 静音');
   });
 
   it('renders VIP senders as chips with an add form instead of a textarea', () => {
@@ -140,11 +142,11 @@ describe('NotificationSettingsPage', () => {
     expect(screen.queryByRole('textbox', { name: '重点账号' })).toBeNull();
   });
 
-  it('explains the rule evaluation order', () => {
+  it('groups account and sender exceptions behind disclosures', () => {
     renderPage(makePolicy(), []);
-    const order = screen.getByLabelText('规则优先级说明');
-    expect(order.textContent).toContain('静音账号');
-    expect(order.textContent).toContain('免打扰时段');
-    expect(order.textContent).toContain('正常通知');
+    expect(screen.getByText('账号通知优先级')).not.toBeNull();
+    expect(screen.getByText('为不同邮箱设置正常、优先或静音。')).not.toBeNull();
+    expect(screen.getByText('VIP 发件人')).not.toBeNull();
+    expect(screen.getByText('这些发件人的邮件可以穿透免打扰。')).not.toBeNull();
   });
 });

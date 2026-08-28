@@ -23,6 +23,7 @@ import type {
 } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
 import { copyTextToClipboard } from '../../app/clipboard';
+import { devMode } from './settingsNavigation';
 import {
   SettingsBadge,
   SettingsButton,
@@ -77,8 +78,6 @@ export default function DataSafetySettings({
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
   }, []);
 
-  // 嵌套缓存确认对话框拥有 Escape：在 document 冒泡阶段 stopPropagation，
-  // SettingsFrame 的 window 级 Escape 不会把整个设置页一起关闭。
   useEffect(() => {
     if (!cacheConfirmationOpen) return undefined;
     const previouslyFocused = document.activeElement;
@@ -185,9 +184,7 @@ export default function DataSafetySettings({
                 ? `${storageUsage.cached_attachment_count} 个远端附件 · ${storageUsage.partial_download_count} 个断点文件`
                 : '正在读取附件缓存'}
             </strong>
-            <small>
-              清理后远端附件可再次下载；导入 EML 和本地唯一附件不会删除。
-            </small>
+            <small>清理后远端附件可再次下载；导入 EML 和本地唯一附件不会删除。</small>
           </span>
           <SettingsButton
             variant="danger-secondary"
@@ -249,9 +246,7 @@ export default function DataSafetySettings({
               : '手动下载与自动下载的新附件都会保存到该文件夹。'}
           </p>
           {downloadDirError && (
-            <p className="settings-download-error" role="alert">
-              {downloadDirError}
-            </p>
+            <p className="settings-download-error" role="alert">{downloadDirError}</p>
           )}
         </div>
       </SettingsSection>
@@ -299,27 +294,29 @@ export default function DataSafetySettings({
         </SettingsSection>
       )}
 
-      {connectionReport && (
-        <SettingsSection
-          title="服务器连接"
-          description="仅检查 IMAP、SMTP 网络端点，不验证账号凭据"
-          badge={
-            <SettingsBadge tone="neutral">
-              {connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用
-            </SettingsBadge>
-          }
-        >
-          <div className="settings-endpoint-grid">
-            {connectionReport.endpoints.map((endpoint) => (
-              <div className={endpoint.reachable ? 'st-data-row ok' : 'st-data-row warn'} key={endpoint.name}>
-                <span>{endpoint.name}</span>
-                <em>{endpoint.address}</em>
-                <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
-                <p>{endpoint.message}</p>
-              </div>
-            ))}
-          </div>
-        </SettingsSection>
+      {devMode && connectionReport && (
+        <div className="settings-developer-diagnostics">
+          <SettingsSection
+            title="服务器连接"
+            description="开发模式：仅检查 IMAP、SMTP 网络端点，不验证账号凭据"
+            badge={
+              <SettingsBadge tone="neutral">
+                {connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用
+              </SettingsBadge>
+            }
+          >
+            <div className="settings-endpoint-grid">
+              {connectionReport.endpoints.map((endpoint) => (
+                <div className={endpoint.reachable ? 'st-data-row ok' : 'st-data-row warn'} key={endpoint.name}>
+                  <span>{endpoint.name}</span>
+                  <em>{endpoint.address}</em>
+                  <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
+                  <p>{endpoint.message}</p>
+                </div>
+              ))}
+            </div>
+          </SettingsSection>
+        </div>
       )}
 
       {cacheConfirmationOpen && storageUsage && createPortal((

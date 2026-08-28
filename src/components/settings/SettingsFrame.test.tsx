@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SettingsFrame from './SettingsFrame';
 
 describe('SettingsFrame dialog behavior', () => {
@@ -75,8 +75,8 @@ describe('SettingsFrame dialog behavior', () => {
 
   it('disables account detail tabs when no account exists', () => {
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
-    expect(screen.getByRole('button', { name: '服务器' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '概览' })).not.toBeDisabled();
+    expect((screen.getByRole('button', { name: '服务器' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '概览' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('marks background siblings inert and aria-hidden while open', () => {
@@ -197,7 +197,7 @@ describe('SettingsFrame dialog behavior', () => {
     expect(document.querySelector('.settings-floating-unsaved-bar')).toBeNull();
     fireEvent.click(saveActions[0]);
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: '测试连接' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '测试连接' })).not.toBeNull();
   });
 
   it('offers connection testing when the active connection page is clean', () => {
@@ -212,11 +212,11 @@ describe('SettingsFrame dialog behavior', () => {
     expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
   });
 
-  it('uses one General navigation entry with inner appearance and sending tabs', () => {
+  it('keeps sending as a direct top-level navigation entry', () => {
     const onNavigate = vi.fn();
     renderFrame({ activeSection: 'sending', onNavigate });
-    const tabs = screen.getByRole('navigation', { name: '通用设置分类' });
-    fireEvent.click(within(tabs).getByRole('button', { name: '外观' }));
+    expect(screen.getByRole('button', { name: '发送设置' }).getAttribute('aria-current')).toBe('page');
+    fireEvent.click(screen.getByRole('button', { name: '通用设置' }));
     expect(onNavigate).toHaveBeenCalledWith('appearance');
   });
 });

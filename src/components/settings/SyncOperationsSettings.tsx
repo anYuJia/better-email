@@ -31,7 +31,6 @@ import {
   SettingsEmptyState,
   SettingsSection,
 } from './shared';
-
 import { devMode } from './settingsNavigation';
 
 type SyncOperationsSettingsProps = {
@@ -107,7 +106,7 @@ export default function SyncOperationsSettings({
       {devMode && (
         <SettingsSection
           title="IMAP 文件夹发现"
-          description="读取远端邮箱文件夹 structure 并映射本地角色"
+          description="读取远端目录并检查映射状态。"
           actions={
             <SettingsButton icon={<Search size={14} />} onClick={onDiscoverImapFolders}>
               发现文件夹
@@ -115,7 +114,7 @@ export default function SyncOperationsSettings({
           }
         >
           {!imapProbe ? (
-            <SettingsEmptyState>保存本地凭据后，可真实登录 IMAP 并读取远端文件夹列表。</SettingsEmptyState>
+            <SettingsEmptyState>保存本地凭据后，可登录 IMAP 并读取远端文件夹。</SettingsEmptyState>
           ) : (
             <>
               <div className={imapProbe.status === 'ok' ? 'st-data-row ok' : 'st-data-row warn'}>
@@ -139,8 +138,8 @@ export default function SyncOperationsSettings({
       )}
 
       <SettingsSection
-        title="同步设置"
-        description={devMode ? '检查调度批次和文件夹状态' : '同步状态与手动刷新邮件头'}
+        title="同步"
+        description="查看文件夹状态并手动刷新邮件。"
         actions={
           <div className="st-actions">
             {devMode && <SettingsButton onClick={onRunSyncDryRun}>演练</SettingsButton>}
@@ -155,13 +154,13 @@ export default function SyncOperationsSettings({
               </SettingsButton>
             )}
             <SettingsButton variant="primary" icon={<RefreshCw size={14} />} onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
-              同步邮件头
+              同步邮件
             </SettingsButton>
           </div>
         }
         dataSection="sync"
       >
-        {syncSchedulePlan && (
+        {devMode && syncSchedulePlan && (
           <div className="sync-schedule-card">
             <div>
               <span>同步调度与限流</span>
@@ -253,44 +252,46 @@ export default function SyncOperationsSettings({
         )}
       </SettingsSection>
 
-      <SettingsSection
-        title="发件箱队列"
-        description="查看排队、定时发送、重试和撤回状态"
-        actions={devMode ? (
-          <div className="st-actions">
-            <SettingsButton onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}>
-              发送演练
-            </SettingsButton>
-            <SettingsButton variant="primary" icon={<Send size={14} />} onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}>
-              真实发送
-            </SettingsButton>
-          </div>
-        ) : undefined}
-      >
-        {outbox.length === 0 ? (
-          <SettingsEmptyState>发件箱当前为空。</SettingsEmptyState>
-        ) : (
-          <div className="st-list">
-            {outbox.map((item) => (
-              <div className="st-data-row" key={item.id}>
-                <span>{outboxStatusLabel(item.status)}</span>
-                <em>{item.recipients}</em>
-                <small>{item.attempts} 次</small>
-                <p>
-                  {item.subject || '(无主题)'}
-                  {outboxTimingLabel(item) ? ` · ${outboxTimingLabel(item)}` : ''}
-                  {item.last_error ? ` · ${item.last_error}` : ''}
-                </p>
-                {canCancelOutboxItem(item.status) && (
-                  <SettingsButton size="sm" variant="danger-secondary" onClick={() => onCancelOutboxItem(item)}>
-                    撤回
-                  </SettingsButton>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </SettingsSection>
+      {devMode && (
+        <SettingsSection
+          title="发件箱队列"
+          description="开发模式下检查排队、重试与撤回状态。"
+          actions={(
+            <div className="st-actions">
+              <SettingsButton onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}>
+                发送演练
+              </SettingsButton>
+              <SettingsButton variant="primary" icon={<Send size={14} />} onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}>
+                真实发送
+              </SettingsButton>
+            </div>
+          )}
+        >
+          {outbox.length === 0 ? (
+            <SettingsEmptyState>发件箱当前为空。</SettingsEmptyState>
+          ) : (
+            <div className="st-list">
+              {outbox.map((item) => (
+                <div className="st-data-row" key={item.id}>
+                  <span>{outboxStatusLabel(item.status)}</span>
+                  <em>{item.recipients}</em>
+                  <small>{item.attempts} 次</small>
+                  <p>
+                    {item.subject || '(无主题)'}
+                    {outboxTimingLabel(item) ? ` · ${outboxTimingLabel(item)}` : ''}
+                    {item.last_error ? ` · ${item.last_error}` : ''}
+                  </p>
+                  {canCancelOutboxItem(item.status) && (
+                    <SettingsButton size="sm" variant="danger-secondary" onClick={() => onCancelOutboxItem(item)}>
+                      撤回
+                    </SettingsButton>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </SettingsSection>
+      )}
     </div>
   );
 }

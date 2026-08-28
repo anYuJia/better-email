@@ -64,15 +64,16 @@ export type AccountConnectionSettingsProps = {
 
 const saveAndVerifyStateLabels = {
   pending: '等待',
-  running: '进行中',
-  success: '通过',
+  running: '验证中',
+  success: '连接正常',
   partial: '部分通过',
-  error: '失败',
+  error: '连接失败',
   needs_auth: '需要认证',
 } as const;
 
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
-  const showSaveAndVerifyStatus = Boolean(props.accountForm)
+  const showDiagnostics = Boolean(props.accountForm)
+    && props.section !== 'accounts'
     && props.saveAndVerifyReport.overall !== 'pending';
   let page: React.ReactNode;
 
@@ -137,35 +138,34 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
 
   return (
     <div className="settings-connection-shell">
-      {showSaveAndVerifyStatus && props.section !== 'accounts' && (
-        <section
-          className={`settings-save-verify-status ${props.saveAndVerifyReport.overall}`}
-          aria-label="账号保存与验证状态"
-        >
-          <header>
+      {page}
+      {showDiagnostics && (
+        <details className="settings-disclosure settings-connection-diagnostics">
+          <summary>
             <span>
-              <strong>账号连接状态</strong>
+              <strong>连接诊断</strong>
               <small>{props.saveAndVerifyReport.summary}</small>
             </span>
             <em>{saveAndVerifyStateLabels[props.saveAndVerifyReport.overall]}</em>
-          </header>
-          <div className="settings-save-verify-stages">
-            {props.saveAndVerifyReport.stages.map((stage) => (
-              <span className={stage.state} key={stage.id}>
-                <b>{stage.label}</b>
-                <small>{stage.detail}</small>
-              </span>
-            ))}
+          </summary>
+          <div className="settings-disclosure-body">
+            <div className="settings-save-verify-stages">
+              {props.saveAndVerifyReport.stages.map((stage) => (
+                <span className={stage.state} key={stage.id}>
+                  <b>{stage.label}</b>
+                  <small>{stage.detail}</small>
+                </span>
+              ))}
+            </div>
+            {props.saveAndVerifyReport.technicalDetails.length > 0 && (
+              <details className="settings-technical-details">
+                <summary>技术详情</summary>
+                <pre>{props.saveAndVerifyReport.technicalDetails.join('\n')}</pre>
+              </details>
+            )}
           </div>
-          {props.saveAndVerifyReport.technicalDetails.length > 0 && (
-            <details>
-              <summary>技术详情</summary>
-              <pre>{props.saveAndVerifyReport.technicalDetails.join('\n')}</pre>
-            </details>
-          )}
-        </section>
+        </details>
       )}
-      {page}
     </div>
   );
 }

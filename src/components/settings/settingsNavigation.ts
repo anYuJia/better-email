@@ -43,6 +43,14 @@ export type SettingsNavigationGroup = {
   items: SettingsNavigationItem[];
 };
 
+export type SettingsSearchEntry = {
+  label: string;
+  path: string;
+  section: SettingsSectionId;
+  keywords: string[];
+  target?: string;
+};
+
 export const devMode = typeof window !== 'undefined' &&
   (window.localStorage.getItem('better-email.dev-mode') === '1' ||
    import.meta.env.DEV ||
@@ -65,31 +73,31 @@ export const generalScopedSections = new Set<SettingsSectionId>([
 const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem, 'label' | 'description'>> = {
   accounts: {
     label: '账号',
-    description: '管理邮箱账号，并从这里进入服务器、登录、身份、同步和隐私设置。',
+    description: '管理邮箱账号与当前账号的常用行为。',
   },
   providers: {
     label: '服务器',
-    description: '配置服务商、收信协议以及 IMAP / POP3 / SMTP 服务器。',
+    description: '配置收信与发信服务器。',
   },
   auth: {
     label: '登录与安全',
-    description: '管理授权码、OAuth2 与当前邮箱的登录凭据。',
+    description: '管理授权码、OAuth2 与登录凭据。',
   },
   identities: {
     label: '身份与签名',
-    description: '管理发件显示名、别名、Reply-To 与签名。',
+    description: '管理发件身份、别名、Reply-To 与签名。',
   },
   sync: {
     label: '同步',
-    description: '查看当前邮箱的同步状态、文件夹映射与手动同步。',
+    description: '管理同步状态、文件夹映射与手动同步。',
   },
   privacy: {
     label: '隐私',
-    description: '控制当前邮箱的远程图片、外部发件人提示、链接保护与信任列表。',
+    description: '控制远程图片、外部发件人提示与信任列表。',
   },
   appearance: {
-    label: '外观',
-    description: '选择界面主题与系统外观跟随方式。',
+    label: '通用',
+    description: '外观与日常发送偏好。',
   },
   sending: {
     label: '发送',
@@ -97,31 +105,31 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
   },
   notifications: {
     label: '通知',
-    description: '设置免打扰、VIP 发件人和各邮箱账号的提醒优先级。',
+    description: '管理提醒、免打扰、VIP 与账号优先级。',
   },
   ai: {
     label: 'AI 与集成',
-    description: '配置 AI 推理服务、MCP 连接与外部服务隐私授权。',
+    description: '配置 AI 服务、模型与隐私授权。',
   },
   backup: {
     label: '数据与存储',
-    description: '管理本地占用、附件缓存、下载位置以及备份与恢复。',
+    description: '管理本地占用、附件缓存、下载位置与备份。',
   },
   contacts: {
     label: '通讯录',
-    description: '管理联系人、VIP、别名以及联系人导入导出。',
+    description: '管理联系人、VIP、别名与导入导出。',
   },
   templates: {
     label: '模板',
-    description: '管理写信模板、分类、变量和常用模板。',
+    description: '管理写信模板、分类与变量。',
   },
   rules: {
     label: '自动化',
-    description: '按发件人、主题和内容自动处理新邮件。',
+    description: '按条件自动处理新邮件。',
   },
   'security-preview': {
     label: '安全预览',
-    description: '开发模式下检查 MIME、HTML 清洗、附件和远程资源。',
+    description: '开发模式下检查 MIME、HTML、附件与远程资源。',
   },
   about: {
     label: '关于',
@@ -176,7 +184,7 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       {
         id: 'ai',
         label: 'AI 与集成',
-        description: 'AI 推理、MCP 与隐私授权。',
+        description: 'AI 服务、模型、MCP 与隐私授权。',
         keywords: ['ai', '人工智能', '翻译', '摘要', 'api', 'mcp', 'openai', '模型', 'key', '集成'],
         icon: Sparkles,
       },
@@ -241,6 +249,33 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
 export const settingsNavigationItems = settingsNavigationGroups.flatMap((group) => (
   group.items.map((item) => ({ ...item, groupLabel: group.label }))
 ));
+
+export const settingsSearchEntries: SettingsSearchEntry[] = [
+  { label: '界面外观', path: '通用 › 外观', section: 'appearance', target: 'appearance', keywords: ['主题', '系统', '亮色', '暗色', 'theme'] },
+  { label: '撤销发送', path: '通用 › 发送', section: 'sending', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
+  { label: '邮箱账号', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
+  { label: '获取新邮件', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['同步频率', '后台检查', 'sync'] },
+  { label: '自动下载附件', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['附件', '自动下载', 'download'] },
+  { label: '跨邮箱发送风险提示', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['发送提醒', '跨账号', 'risk'] },
+  { label: '收信与发信服务器', path: '账号 › 服务器', section: 'providers', keywords: ['imap', 'pop3', 'smtp', '端口', 'ssl', 'tls'] },
+  { label: '登录凭据与授权码', path: '账号 › 登录与安全', section: 'auth', keywords: ['密码', '授权码', 'oauth', 'token'] },
+  { label: '发件身份与签名', path: '账号 › 身份与签名', section: 'identities', keywords: ['签名', '别名', 'reply-to', '显示名'] },
+  { label: '同步与文件夹映射', path: '账号 › 同步', section: 'sync', keywords: ['文件夹', '同步', 'imap folder'] },
+  { label: '远程图片与信任列表', path: '账号 › 隐私', section: 'privacy', keywords: ['图片', '隐私', '信任', '外部发件人'] },
+  { label: '只提醒 VIP', path: '通知', section: 'notifications', target: 'notifications', keywords: ['vip', '只提醒', '重点联系人'] },
+  { label: '免打扰时段', path: '通知', section: 'notifications', target: 'notifications', keywords: ['免打扰', '静音', '时间', 'dnd'] },
+  { label: '账号通知优先级', path: '通知 › 高级', section: 'notifications', target: 'notification-account-rules', keywords: ['重点账号', '静音账号', '优先提醒'] },
+  { label: 'VIP 发件人', path: '通知 › 高级', section: 'notifications', target: 'notification-vip-rules', keywords: ['发件人', 'vip', '域名'] },
+  { label: 'AI 功能', path: 'AI 与集成', section: 'ai', target: 'ai', keywords: ['翻译', '摘要', '模板生成', '人工智能'] },
+  { label: 'AI 服务与模型', path: 'AI 与集成', section: 'ai', target: 'ai-llm-provider', keywords: ['openai', '模型', 'mcp', 'api', 'llm'] },
+  { label: 'AI 连接参数', path: 'AI 与集成 › 高级连接', section: 'ai', target: 'ai-advanced', keywords: ['endpoint', 'api key', 'token', 'timeout', '端点'] },
+  { label: '联系人与 VIP', path: '通讯录', section: 'contacts', keywords: ['联系人', '通讯录', '别名', 'vip'] },
+  { label: '写信模板', path: '模板', section: 'templates', keywords: ['模板', '变量', '常用模板'] },
+  { label: '邮件自动化规则', path: '自动化', section: 'rules', keywords: ['规则', '过滤', '自动处理'] },
+  { label: '附件缓存与下载位置', path: '数据与存储', section: 'backup', keywords: ['缓存', '附件', '下载目录', '存储'] },
+  { label: '备份与恢复', path: '数据与存储', section: 'backup', keywords: ['备份', '恢复', '导入', '导出'] },
+  { label: '版本与更新', path: '关于', section: 'about', keywords: ['版本', '更新', 'github', 'license'] },
+];
 
 export const connectionSettingsSections = new Set<SettingsSectionId>([
   'accounts',

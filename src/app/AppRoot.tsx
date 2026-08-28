@@ -1,9 +1,52 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import DeferredSurface from '../components/DeferredSurface';
-import { isStandaloneComposerWindow } from '../tauriBridge';
+import { emptyDraft } from './appConfig';
+import { importNativeDroppedAttachmentPaths } from './nativeDroppedAttachments';
+import {
+  getCurrentWindow,
+  isStandaloneComposerWindow,
+  mockMode,
+  openComposerWindow,
+} from '../tauriBridge';
 
 const MailboxApp = lazy(() => import('../App'));
 const StandaloneComposerApp = lazy(() => import('../components/StandaloneComposerApp'));
+
+function MainWindowFileDropBridge() {
+  useEffect(() => {
+    if (mockMode) return undefined;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+
+    void getCurrentWindow().onDragDropEvent(async (event) => {
+      if (!active || event.type !== 'drop') return;
+      const paths = event.paths.filter((path) => path.trim());
+      if (paths.length === 0) return;
+
+      const result = await importNativeDroppedAttachmentPaths(paths);
+      if (!active || result.attachments.length === 0) return;
+
+      await openComposerWindow({
+        draft: {
+          ...emptyDraft,
+          attachments: result.attachments,
+        },
+        replaceExisting: true,
+      });
+    })
+      .then((nextUnlisten) => {
+        unlisten = nextUnlisten;
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
+
+  return null;
+}
 
 /**
  * Application entry boundary.
@@ -16,14 +59,17 @@ export default function AppRoot() {
   const Surface = standaloneComposer ? StandaloneComposerApp : MailboxApp;
 
   return (
-    <Suspense
-      fallback={(
-        <DeferredSurface
-          label={standaloneComposer ? '正在准备写信窗口' : '正在准备邮箱工作区'}
-        />
-      )}
-    >
-      <Surface />
-    </Suspense>
+    <>
+      {!standaloneComposer ? <MainWindowFileDropBridge /> : null}
+      <Suspense
+        fallback={(
+          <DeferredSurface
+            label={standaloneComposer ? '正在准备写信窗口' : '正在准备邮箱工作区'}
+          />
+        )}
+      >
+        <Surface />
+      </Suspense>
+    </>
   );
 }

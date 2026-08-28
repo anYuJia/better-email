@@ -212,20 +212,30 @@
   color: var(--st-accent);
 }
 
-.settings-account-row-actions .settings-account-open-button {
-  color: var(--st-accent);
+/* V3 keeps operational / diagnostic surfaces out of normal preference pages. */
+.settings-modal[data-ui="settings-v3"] .settings-data-safety > .st-section:has(.settings-endpoint-grid) {
+  display: none;
 }
 
-/* Dense explanation disclosure for advanced notification logic. */
-.notification-rule-order.settings-rule-order-collapsible {
-  margin-top: 4px;
+.settings-modal[data-ui="settings-v3"] .settings-sync-stack > .st-section:last-child {
+  display: none;
 }
 
-.notification-rule-order.settings-rule-order-collapsible > summary {
-  cursor: pointer;
-  color: var(--st-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+.settings-modal[data-ui="settings-v3"] .notification-rule-order {
+  display: none;
+}
+
+/* The primary AI provider already supports MCP. The second MCP panel duplicated the same endpoint/token model. */
+.settings-modal[data-ui="settings-v3"] [data-settings-section="ai-mcp-gateway"] {
+  display: none;
+}
+
+/* Reduce card-like emphasis inside AI; settings should read as one continuous preference surface. */
+.settings-modal[data-ui="settings-v3"] .ai-hero-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 @media (max-width: 900px) {

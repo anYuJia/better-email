@@ -16,20 +16,20 @@ const themeOptions: Array<{
 }> = [
   {
     value: 'system',
-    label: '跟随系统',
-    description: '根据操作系统的外观设置自动切换亮色与暗色。',
+    label: '系统',
+    description: '跟随操作系统自动切换亮色与暗色',
     icon: Monitor,
   },
   {
     value: 'light',
-    label: '亮色',
-    description: '始终使用明亮的界面外观。',
+    label: '浅色',
+    description: '始终使用浅色界面',
     icon: Sun,
   },
   {
     value: 'dark',
-    label: '暗色',
-    description: '始终使用深色的界面外观。',
+    label: '深色',
+    description: '始终使用深色界面',
     icon: Moon,
   },
 ];
@@ -38,8 +38,6 @@ export default function AppearanceSettings({
   themeMode,
   onThemeModeChange,
 }: AppearanceSettingsProps) {
-  const selectedOption = themeOptions.find((option) => option.value === themeMode) ?? themeOptions[0];
-
   const handleOptionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = themeOptions.findIndex((option) => option.value === themeMode);
     let nextIndex = currentIndex;
@@ -70,47 +68,52 @@ export default function AppearanceSettings({
   };
 
   return (
-    <SettingsSection className="settings-appearance-section" dataSection="appearance">
-      <div className="settings-theme-preference">
-        <div
-          className="settings-theme-options"
-          role="radiogroup"
-          aria-label="界面外观"
-          aria-describedby="settings-theme-description"
-          onKeyDown={handleOptionKeyDown}
-        >
-          {themeOptions.map((option) => {
-            const Icon = option.icon;
-            const active = themeMode === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={active ? 'settings-theme-option active' : 'settings-theme-option'}
-                role="radio"
-                aria-checked={active}
-                tabIndex={active ? 0 : -1}
-                aria-label={`${option.label}：${option.description}`}
-                data-theme-mode={option.value}
-                title={option.description}
-                onClick={() => onThemeModeChange(option.value)}
-              >
-                <span className="settings-theme-option-icon" aria-hidden="true">
-                  <Icon size={17} />
+    <SettingsSection
+      title="外观"
+      description="选择最适合当前环境的界面。"
+      className="settings-appearance-section"
+      dataSection="appearance"
+    >
+      <div
+        className="settings-theme-options"
+        role="radiogroup"
+        aria-label="界面外观"
+        onKeyDown={handleOptionKeyDown}
+      >
+        {themeOptions.map((option) => {
+          const Icon = option.icon;
+          const active = themeMode === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={active ? 'settings-theme-option active' : 'settings-theme-option'}
+              role="radio"
+              aria-checked={active}
+              tabIndex={active ? 0 : -1}
+              aria-label={`${option.label}：${option.description}`}
+              data-theme-mode={option.value}
+              title={option.description}
+              onClick={() => onThemeModeChange(option.value)}
+            >
+              <span className="settings-theme-option-preview" aria-hidden="true">
+                <span className="settings-theme-preview-sidebar" />
+                <span className="settings-theme-preview-content">
+                  <i />
+                  <i />
+                  <i />
                 </span>
-                <span className="settings-theme-option-copy">
+              </span>
+              <span className="settings-theme-option-footer">
+                <span>
+                  <Icon size={15} aria-hidden="true" />
                   <strong>{option.label}</strong>
-                  <small>{option.description}</small>
                 </span>
-                <Check className="settings-theme-option-check" aria-hidden="true" size={17} />
-              </button>
-            );
-          })}
-        </div>
-        <p id="settings-theme-description" className="settings-theme-description" aria-live="polite">
-          <Check aria-hidden="true" size={14} />
-          <span>当前使用“{selectedOption.label}”，更改已自动保存。</span>
-        </p>
+                <Check className="settings-theme-option-check" aria-hidden="true" size={15} />
+              </span>
+            </button>
+          );
+        })}
       </div>
     </SettingsSection>
   );

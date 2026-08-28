@@ -14,6 +14,14 @@ export type ContactCreateInput = {
   vip: boolean;
 };
 
+export type RecentContactSyncReport = {
+  scanned_messages: number;
+  discovered_contacts: number;
+  created: number;
+  updated: number;
+  skipped: boolean;
+};
+
 
 export type ContactImportSummary = {
   path: string;

@@ -25,6 +25,14 @@ import {
 
 export const handlers: Record<string, MockCommandHandler> = {
   'list_contacts': () => contacts,
+  'should_auto_scan_recent_contacts': () => false,
+  'scan_recent_contacts': () => ({
+    scanned_messages: 3,
+    discovered_contacts: contacts.length,
+    created: 0,
+    updated: contacts.length,
+    skipped: false,
+  }),
   'create_contact': createMockContact,
   'update_contact': updateMockContact,
   'delete_contact': deleteMockContact,

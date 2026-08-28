@@ -1,0 +1,55 @@
+.composer-contacts-scan {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: var(--compose-space-2);
+  padding: 0 10px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--ui-radius-control);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.composer-contacts-scan:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+.composer-contacts-scan:active:not(:disabled) {
+  border-color: var(--ui-accent-pressed);
+  background: var(--ui-accent-pressed);
+}
+
+.composer-contacts-scan:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.composer-contacts-scan:disabled {
+  cursor: wait;
+  opacity: .68;
+}
+
+.composer-contacts-scan .is-spinning {
+  animation: composer-contact-scan-spin .8s linear infinite;
+}
+
+@keyframes composer-contact-scan-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-contacts-scan .is-spinning { animation: none; }
+}
+
+@media (max-width: 720px) {
+  .composer-contacts-scan {
+    min-height: 38px;
+    padding-inline: 9px;
+    font-size: 11px;
+  }
+}

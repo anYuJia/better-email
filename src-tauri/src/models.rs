@@ -701,6 +701,15 @@ pub struct ContactCreateInput {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RecentContactSyncReport {
+    pub scanned_messages: i64,
+    pub discovered_contacts: i64,
+    pub created: i64,
+    pub updated: i64,
+    pub skipped: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ContactImportSummary {
     pub path: String,
     pub total_cards: i64,

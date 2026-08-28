@@ -147,6 +147,19 @@ impl MailStore {
                     last_seen_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS contact_sent_messages (
+                    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                    email TEXT NOT NULL,
+                    scanned_at TEXT NOT NULL,
+                    PRIMARY KEY (message_id, email)
+                );
+
+                CREATE TABLE IF NOT EXISTS contact_sync_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    initial_scan_completed INTEGER NOT NULL DEFAULT 0,
+                    last_scanned_at TEXT NOT NULL DEFAULT ''
+                );
+
                 CREATE TABLE IF NOT EXISTS mail_rules (
                     id INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,

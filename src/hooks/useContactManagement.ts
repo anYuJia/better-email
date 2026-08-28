@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   emptyContactForm,
   normalizeContactAliases,
@@ -51,11 +51,11 @@ export default function useContactManagement({
     setContactEditAliases(contact.aliases.join(', '));
   }
 
-  async function refreshManagedContacts() {
+  const refreshManagedContacts = useCallback(async () => {
     const refreshed = await invoke<Contact[]>(IPC.ListContacts);
     setContacts(refreshed);
     return refreshed;
-  }
+  }, []);
 
   async function exportContactsVcard() {
     setContactTransferBusy(true);

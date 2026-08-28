@@ -46,6 +46,7 @@ type ComposerSendOptions = {
   forceCloseComposer: () => void;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   refreshAll: () => Promise<void>;
+  refreshContacts?: () => Promise<unknown>;
   loadMeta: (folderId?: number | null) => Promise<unknown>;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
@@ -79,6 +80,7 @@ export default function useComposerSend({
   forceCloseComposer,
   focusMailboxRole,
   refreshAll,
+  refreshContacts,
   loadMeta,
   setSendProgress,
   setSendProgressMessage,
@@ -309,6 +311,14 @@ export default function useComposerSend({
           clearComposerAutosave();
           forceCloseComposer();
           showToast('邮件已发送');
+          try {
+            await refreshContacts?.();
+          } catch (error) {
+            composerFlowWarn('refresh contacts after send failed', {
+              error: String(error),
+              messageId,
+            });
+          }
           composerFlowLog('sendDraft done', {
             messageId,
             accountId: input.account_id,
@@ -353,7 +363,7 @@ export default function useComposerSend({
       accountId: input.account_id,
       targetRole: 'current',
     });
-  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, forceCloseComposer, account, setOutbox, setPendingSendUndo, setStatus, showToast, runDirectSendWithProgress]);
+  }, [draft, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, setDraft, clearComposerAutosave, forceCloseComposer, account, setOutbox, setPendingSendUndo, setStatus, showToast, refreshContacts, runDirectSendWithProgress]);
 
   const sendQuickReply = useCallback(async (message: Message) => {
     const body = quickReplyBody.trim();
@@ -386,6 +396,14 @@ export default function useComposerSend({
           setQuickReplyBody('');
           setStatus('快速回复发送完成');
           showToast(`已快速回复：${message.sender_name || message.sender_email}`);
+          try {
+            await refreshContacts?.();
+          } catch (error) {
+            composerFlowWarn('refresh contacts after quick reply failed', {
+              error: String(error),
+              messageId,
+            });
+          }
           composerFlowLog('sendQuickReply done', {
             messageId,
             accountId: message.account_id,
@@ -440,7 +458,7 @@ export default function useComposerSend({
         targetRole: 'current',
       });
     }
-  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, setStatus, showToast, setOutbox, setPendingSendUndo, runDirectSendWithProgress]);
+  }, [quickReplyBody, sendUndoDelaySeconds, setQuickReplyBody, setStatus, showToast, refreshContacts, setOutbox, setPendingSendUndo, runDirectSendWithProgress]);
 
   const queueDraft = useCallback(async () => {
     if (!draft.to.trim()) {

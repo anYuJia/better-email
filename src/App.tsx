@@ -16,6 +16,7 @@ import MobileBottomNav from './components/mobile/MobileBottomNav';
 import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
+import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
@@ -26,6 +27,7 @@ import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
 import useBackgroundTaskCoordinator from './hooks/useBackgroundTaskCoordinator';
 import useContactManagement from './hooks/useContactManagement';
+import useRecentContactSync from './hooks/useRecentContactSync';
 import useMailboxData from './hooks/useMailboxData';
 import useMailboxBootstrap from './hooks/useMailboxBootstrap';
 import useBulkMessageActions from './hooks/useBulkMessageActions';
@@ -184,6 +186,15 @@ function MailboxApp() {
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
   const [status, setStatus] = useState('本地原型已就绪');
+  const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
+  const messageToastIdRef = useRef(0);
+  const showMessageToast = useCallback((text: string, tone: MessageToast['tone'] = 'success') => {
+    const id = ++messageToastIdRef.current;
+    setMessageToasts((current) => [...current, { id, text, tone }]);
+    window.setTimeout(() => {
+      setMessageToasts((current) => current.filter((toast) => toast.id !== id));
+    }, tone === 'error' ? 5000 : 3000);
+  }, []);
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
@@ -409,6 +420,18 @@ function MailboxApp() {
     setConfirmDeleteContact: setContactToDeleteFromHook,
   } = useContactManagement({ setStatus, setNotificationPolicy });
   const {
+    scanBusy: contactScanBusy,
+    scanRecentContacts,
+  } = useRecentContactSync({
+    accountsLength: accounts.length,
+    initialAccountListLoaded,
+    gateActive: isAccountLoginActive,
+    onboardingActive: Boolean(pendingOnboardingAccount),
+    refreshContacts: refreshManagedContacts,
+    setStatus,
+    showToast: showMessageToast,
+  });
+  const {
     oauthClientId,
     setOauthClientId,
     oauthClientSecret,
@@ -449,15 +472,6 @@ function MailboxApp() {
     queueUndoAction,
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
-  const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
-  const messageToastIdRef = useRef(0);
-  const showMessageToast = useCallback((text: string, tone: MessageToast['tone'] = 'success') => {
-    const id = ++messageToastIdRef.current;
-    setMessageToasts((current) => [...current, { id, text, tone }]);
-    window.setTimeout(() => {
-      setMessageToasts((current) => current.filter((toast) => toast.id !== id));
-    }, tone === 'error' ? 5000 : 3000);
-  }, []);
   const lastVisualStatusRef = useRef(status);
   useEffect(() => {
     if (lastVisualStatusRef.current === status) return;
@@ -989,6 +1003,7 @@ function MailboxApp() {
     showToast: showMessageToast,
     loadMeta: (nextFolderId?: number | null) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     refreshAll,
+    refreshContacts: refreshManagedContacts,
     focusMailboxRole,
     openExternalComposer: useNativeComposerWindow ? openExternalComposer : undefined,
     setSendProgress: setComposerSendProgress,
@@ -1966,6 +1981,7 @@ function MailboxApp() {
               contacts={managedContacts}
               onAddContacts={addContactsToDraft}
               onOpenContactsSettings={openComposerContactsSettings}
+              onScanRecentContacts={scanRecentContacts}
               templates={composeTemplates}
               templateName={templateName}
               richComposer={isRichComposer}
@@ -2283,6 +2299,7 @@ function MailboxApp() {
         </Suspense>
       )}
       {!isAccountLoginActive && <GlobalTooltip />}
+      <ContactSyncLoadingDialog open={contactScanBusy} />
       {!isAccountLoginActive && composerCloseConfirmOpen && (
         <Suspense fallback={<DeferredSurface label="正在打开关闭写信确认" />}>
           <ComposerCloseConfirmDialog

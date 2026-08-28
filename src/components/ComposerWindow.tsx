@@ -93,6 +93,7 @@ export type ComposerWindowProps = {
   contacts: Contact[];
   onAddContacts: (contacts: Contact[], field: ComposerRecipientField) => AddContactsResult;
   onOpenContactsSettings?: () => void;
+  onScanRecentContacts?: () => Promise<void>;
   templates: ComposeTemplate[];
   templateName: string;
   richComposer: boolean;
@@ -140,6 +141,7 @@ export default function ComposerWindow({
   contacts,
   onAddContacts,
   onOpenContactsSettings,
+  onScanRecentContacts,
   templates,
   templateName,
   richComposer,
@@ -744,6 +746,7 @@ export default function ComposerWindow({
               onClose={() => setContactsOpen(false)}
               showClose={isNarrowContactsViewport}
               onOpenContactsSettings={onOpenContactsSettings}
+              onScanRecentContacts={onScanRecentContacts}
             />
           )}
         </div>

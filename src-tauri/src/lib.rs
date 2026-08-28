@@ -493,6 +493,8 @@ pub fn run() {
             commands::exchange_oauth2_token,
             commands::refresh_oauth2_token,
             commands::list_contacts,
+            commands::should_auto_scan_recent_contacts,
+            commands::scan_recent_contacts,
             commands::create_contact,
             commands::update_contact,
             commands::delete_contact,

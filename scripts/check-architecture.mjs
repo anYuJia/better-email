@@ -30,7 +30,9 @@ for (const relativePath of requiredFiles) {
 for (const [relativePath, maxBytes] of budgets) {
   const absolutePath = path.join(root, relativePath);
   if (!fs.existsSync(absolutePath)) continue;
-  const size = fs.statSync(absolutePath).size;
+  // Git stores source with LF, while Windows checkouts commonly use CRLF.
+  // Measure normalized source bytes so the same commit has the same budget on every OS.
+  const size = Buffer.byteLength(fs.readFileSync(absolutePath, 'utf8').replace(/\r\n/g, '\n'));
   if (size > maxBytes) {
     console.error(`🚫 ${relativePath} 已增长到 ${size} B，超过架构预算 ${maxBytes} B`);
     failed = true;
@@ -56,6 +58,6 @@ console.log('✅ 架构边界检查通过');
 for (const [relativePath, maxBytes] of budgets) {
   const absolutePath = path.join(root, relativePath);
   if (!fs.existsSync(absolutePath)) continue;
-  const size = fs.statSync(absolutePath).size;
+  const size = Buffer.byteLength(fs.readFileSync(absolutePath, 'utf8').replace(/\r\n/g, '\n'));
   console.log(`  ${relativePath}: ${size}/${maxBytes} B`);
 }

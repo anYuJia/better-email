@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ComposerCloseConfirmDialog from './ComposerCloseConfirmDialog';
 import ComposerWindow from './ComposerWindow';
+import ContactSyncLoadingDialog from './ContactSyncLoadingDialog';
 import type {
   Account,
   Contact,
   MailIdentity,
   OutboxItem,
+  RecentContactSyncReport,
 } from '../app/types';
 import type { PendingSendUndo } from './UndoSnackbarStack';
 import {
@@ -61,6 +63,8 @@ export default function StandaloneComposerApp() {
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [status, setStatus] = useState('正在准备写信窗口…');
+  const [contactScanBusy, setContactScanBusy] = useState(false);
+  const contactScanBusyRef = useRef(false);
   const [booted, setBooted] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [nativeCloseListenerReady, setNativeCloseListenerReady] = useState(false);
@@ -112,6 +116,29 @@ export default function StandaloneComposerApp() {
   const refreshAll = useCallback(async () => {
     await loadComposerData();
   }, [loadComposerData]);
+
+  const refreshContacts = useCallback(async () => {
+    const refreshed = await invoke<Contact[]>(IPC.ListContacts);
+    setContacts(refreshed);
+    return refreshed;
+  }, []);
+
+  const scanRecentContacts = useCallback(async () => {
+    if (contactScanBusyRef.current) return;
+    contactScanBusyRef.current = true;
+    setContactScanBusy(true);
+    setStatus('正在扫描已发送邮件头并同步最近联系人…');
+    try {
+      const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, { initialOnly: false });
+      await refreshContacts();
+      setStatus(`最近联系人同步完成：发现 ${report.discovered_contacts} 位，新增 ${report.created} 位`);
+    } catch (error) {
+      setStatus(`最近联系人同步失败：${String(error)}`);
+    } finally {
+      contactScanBusyRef.current = false;
+      setContactScanBusy(false);
+    }
+  }, [refreshContacts]);
 
   const focusMailboxRole = useCallback(async (
     _role: FolderRole,
@@ -191,6 +218,7 @@ export default function StandaloneComposerApp() {
     showToast,
     loadMeta,
     refreshAll,
+    refreshContacts,
     focusMailboxRole,
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
@@ -464,6 +492,7 @@ export default function StandaloneComposerApp() {
           contacts={contacts}
           onAddContacts={addContactsToDraft}
           onOpenContactsSettings={openContactsSettings}
+          onScanRecentContacts={scanRecentContacts}
           templates={composeTemplates}
           templateName={templateName}
           richComposer={isRichComposer}
@@ -519,6 +548,7 @@ export default function StandaloneComposerApp() {
           onSaveDraft={saveDraft}
         />
       )}
+      <ContactSyncLoadingDialog open={contactScanBusy} />
     </main>
   );
 }

@@ -384,6 +384,12 @@ pub async fn send_message(
         task_progress.set(&store, 88, "SMTP 已提交，正在写入 sent 归档")?;
     }
     store.mark_outbox_smtp_sent_pending_archive(message_id, &message_id_header)?;
+    if let Err(error) = store.sync_contacts_from_sent_message(message_id) {
+        crate::logging::log_line(format!(
+            "[better-email][send] contact sync deferred message_id={} error={}",
+            message_id, error
+        ));
+    }
     if let Some(task_progress) = task_progress {
         task_progress.set(&store, 96, "远端已发送归档完成")?;
     }
@@ -646,6 +652,12 @@ pub async fn flush_outbox_smtp(
             Ok(raw_message) => {
                 let message_id_header = smtp::outbound_message_id(message);
                 store.mark_outbox_smtp_sent_pending_archive(message.id, &message_id_header)?;
+                if let Err(error) = store.sync_contacts_from_sent_message(message.id) {
+                    crate::logging::log_line(format!(
+                        "[better-email][send] contact sync deferred message_id={} error={}",
+                        message.id, error
+                    ));
+                }
                 archive_sent_message(store.inner(), &account, &secret, message, &raw_message)?;
                 if let Some(task_progress) = task_progress {
                     task_progress.set(

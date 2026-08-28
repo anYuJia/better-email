@@ -59,6 +59,7 @@ type UseComposerControllerOptions = {
   showToast: (text: string) => void;
   loadMeta: (folderId?: number | null) => Promise<LoadMetaResult>;
   refreshAll: () => Promise<void>;
+  refreshContacts?: () => Promise<unknown>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   openExternalComposer?: (nextDraft?: DraftInput, options?: OpenComposerOptions) => void;
   setSendProgress?: (progress: number | null) => void;
@@ -79,6 +80,7 @@ export default function useComposerController({
   showToast,
   loadMeta,
   refreshAll,
+  refreshContacts,
   focusMailboxRole,
   openExternalComposer,
   setSendProgress,
@@ -208,6 +210,7 @@ export default function useComposerController({
     forceCloseComposer,
     focusMailboxRole,
     refreshAll,
+    refreshContacts,
     loadMeta,
     setSendProgress,
     setSendProgressMessage,

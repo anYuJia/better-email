@@ -1,0 +1,50 @@
+.contact-sync-loading-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--ui-overlay, #111827) 22%, transparent);
+}
+
+.contact-sync-loading-dialog {
+  width: min(420px, 100%);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.contact-sync-loading-dialog > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--ui-accent);
+  animation: contact-sync-loading-spin .8s linear infinite;
+}
+
+.contact-sync-loading-dialog strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.contact-sync-loading-dialog p {
+  margin: 6px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@keyframes contact-sync-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-sync-loading-dialog > svg { animation: none; }
+}

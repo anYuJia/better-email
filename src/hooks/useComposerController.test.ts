@@ -26,6 +26,7 @@ function renderComposer(sendUndoDelaySeconds: SendUndoDelaySeconds = 5) {
   const setStatus = vi.fn();
   const showToast = vi.fn();
   const refreshAll = vi.fn().mockResolvedValue(undefined);
+  const refreshContacts = vi.fn().mockResolvedValue([]);
   const loadMeta = vi.fn().mockResolvedValue({ folderId: 101, folders: [] });
   const focusMailboxRole = vi.fn().mockResolvedValue(undefined);
 
@@ -43,6 +44,7 @@ function renderComposer(sendUndoDelaySeconds: SendUndoDelaySeconds = 5) {
     showToast,
     loadMeta,
     refreshAll,
+    refreshContacts,
     focusMailboxRole,
   }));
 
@@ -55,6 +57,7 @@ function renderComposer(sendUndoDelaySeconds: SendUndoDelaySeconds = 5) {
       setStatus,
       showToast,
       refreshAll,
+      refreshContacts,
       loadMeta,
       focusMailboxRole,
     },
@@ -195,6 +198,7 @@ describe('useComposerController close lifecycle', () => {
     expect(result.current.draft).toEqual(emptyDraft);
     expect(mocks.focusMailboxRole).not.toHaveBeenCalled();
     expect(mocks.showToast).toHaveBeenCalledWith('邮件已发送');
+    expect(mocks.refreshContacts).toHaveBeenCalledTimes(1);
     expect(mockInvoke).toHaveBeenCalledWith('complete_background_task', {
       taskId: 91,
       message: '发送完成',

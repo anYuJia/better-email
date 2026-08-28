@@ -4,7 +4,7 @@ use crate::models::{
     Contact, ContactCreateInput, ContactExportSummary, ContactImportBatch,
     ContactImportCommitSummary, ContactImportEntryInput, ContactImportPreview,
     ContactImportSelection, ContactImportSummary, ContactImportUndoReport, ContactInput, MailRule,
-    MailRuleInput,
+    MailRuleInput, RecentContactSyncReport,
 };
 use crate::vcard;
 use chrono::Utc;
@@ -164,6 +164,19 @@ pub fn undo_contact_import_batch(
 #[tauri::command]
 pub fn list_contacts(store: State<'_, MailStore>) -> MailResult<Vec<Contact>> {
     store.list_contacts()
+}
+
+#[tauri::command]
+pub fn should_auto_scan_recent_contacts(store: State<'_, MailStore>) -> MailResult<bool> {
+    store.should_auto_scan_recent_contacts()
+}
+
+#[tauri::command]
+pub fn scan_recent_contacts(
+    initial_only: Option<bool>,
+    store: State<'_, MailStore>,
+) -> MailResult<RecentContactSyncReport> {
+    store.scan_recent_contacts(initial_only.unwrap_or(false))
 }
 
 #[tauri::command]

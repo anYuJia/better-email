@@ -7,9 +7,9 @@ use crate::models::{
     MailIdentity, MailIdentityInput, MailRule, MailRuleInput, MailStats,
     MailboxSyncTransactionResult, Message, MessageSummary, MessageThreadingInput,
     OAuthCallbackReport, OAuthSession, OAuthStartReport, OAuthTokenExchangeReport,
-    OutboundAttachmentInput, OutboundMessage, OutboxItem, PendingRemoteWrite, ReleasedSnoozedCount,
-    RemoteImageTrust, RemoteImageTrustInput, RemoteMessageBody, StorageUsage, SyncRun,
-    SyncSchedulePlan, ThreadSummary,
+    OutboundAttachmentInput, OutboundMessage, OutboxItem, PendingRemoteWrite,
+    RecentContactSyncReport, ReleasedSnoozedCount, RemoteImageTrust, RemoteImageTrustInput,
+    RemoteMessageBody, StorageUsage, SyncRun, SyncSchedulePlan, ThreadSummary,
 };
 use crate::protocol;
 use chrono::{DateTime, Duration, Utc};
@@ -769,6 +769,8 @@ mod tests {
             })
             .expect("reopened messages query");
         assert_eq!(reopened_ok, 1);
+        drop(reopened);
+        drop(store);
         fs::remove_dir_all(data_dir).expect("legacy dir removed");
     }
 
@@ -2778,6 +2780,7 @@ mod tests {
         let reopened = MailStore::open_at(path).expect("empty account store reopens");
         assert!(reopened.list_accounts().unwrap().is_empty());
         assert!(reopened.get_account_by_id_optional(None).unwrap().is_none());
+        drop(reopened);
         fs::remove_dir_all(data_dir).expect("test data dir removed");
     }
 
@@ -5117,6 +5120,55 @@ mod tests {
     }
 
     #[test]
+    fn contact_list_orders_by_actual_last_seen_timestamp() {
+        let store =
+            MailStore::open_at_with_seed(test_database_path("better-email-contact-order"), false)
+                .expect("empty contact store opens");
+        let older = store
+            .create_contact(ContactCreateInput {
+                name: "Older Contact".to_string(),
+                email: "older-contact@example.com".to_string(),
+                aliases: Vec::new(),
+                vip: false,
+            })
+            .expect("older contact creates");
+        let newer = store
+            .create_contact(ContactCreateInput {
+                name: "Newer Contact".to_string(),
+                email: "newer-contact@example.com".to_string(),
+                aliases: Vec::new(),
+                vip: false,
+            })
+            .expect("newer contact creates");
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE contacts SET last_seen_at = ?2 WHERE id = ?1",
+                    params![older.id, "2026-08-25T00:00:00+08:00"],
+                )?;
+                // This instant is newer than the value above despite its
+                // lexically smaller local date.
+                conn.execute(
+                    "UPDATE contacts SET last_seen_at = ?2 WHERE id = ?1",
+                    params![newer.id, "2026-08-24T20:00:00Z"],
+                )?;
+                Ok(())
+            })
+            .expect("contact timestamps update");
+
+        let contacts = store.list_contacts().expect("contacts list");
+        let newer_position = contacts
+            .iter()
+            .position(|contact| contact.email == newer.email)
+            .expect("newer contact listed");
+        let older_position = contacts
+            .iter()
+            .position(|contact| contact.email == older.email)
+            .expect("older contact listed");
+        assert!(newer_position < older_position);
+    }
+
+    #[test]
     fn contact_edits_persist_aliases_and_vip_state() {
         let store = test_store();
         let contact = store
@@ -5241,6 +5293,71 @@ mod tests {
             .unwrap()
             .iter()
             .all(|contact| contact.id != deleted.id));
+    }
+
+    #[test]
+    fn sent_header_scan_is_explicit_idempotent_and_initial_scan_runs_once() {
+        let store = test_store();
+        assert!(store.should_auto_scan_recent_contacts().unwrap());
+
+        let first = store.scan_recent_contacts(true).unwrap();
+        assert!(!first.skipped);
+        assert!(first.scanned_messages >= 1);
+        assert!(store
+            .list_contacts()
+            .unwrap()
+            .iter()
+            .any(|contact| contact.email == "team@example.com"));
+        assert!(!store.should_auto_scan_recent_contacts().unwrap());
+
+        let repeated_initial = store.scan_recent_contacts(true).unwrap();
+        assert!(repeated_initial.skipped);
+        let manual = store.scan_recent_contacts(false).unwrap();
+        assert!(!manual.skipped);
+    }
+
+    #[test]
+    fn draft_recipients_are_added_only_after_smtp_success_transition() {
+        let store = test_store();
+        let message_id = store
+            .send_message(DraftInput {
+                draft_id: 0,
+                account_id: 0,
+                identity_id: 0,
+                to: "\"张三, 销售\" <new-to@example.com>".to_string(),
+                cc: "Ada New <new-cc@example.com>".to_string(),
+                bcc: "new-bcc@example.com".to_string(),
+                subject: "Contact success gate".to_string(),
+                body: "body".to_string(),
+                html_body: String::new(),
+                send_at: String::new(),
+                attachments: Vec::new(),
+            })
+            .unwrap();
+        let before = store.list_contacts().unwrap();
+        assert!(before
+            .iter()
+            .all(|contact| !contact.email.starts_with("new-")));
+
+        store
+            .mark_outbox_smtp_sent_pending_archive(message_id, "<contact-success@example.com>")
+            .unwrap();
+        store.sync_contacts_from_sent_message(message_id).unwrap();
+        store.sync_contacts_from_sent_message(message_id).unwrap();
+
+        let contacts = store.list_contacts().unwrap();
+        let to = contacts
+            .iter()
+            .find(|contact| contact.email == "new-to@example.com")
+            .unwrap();
+        assert_eq!(to.name, "张三, 销售");
+        assert_eq!(to.message_count, 1);
+        assert!(contacts
+            .iter()
+            .any(|contact| { contact.email == "new-cc@example.com" && contact.name == "Ada New" }));
+        assert!(contacts
+            .iter()
+            .any(|contact| contact.email == "new-bcc@example.com"));
     }
 
     #[test]

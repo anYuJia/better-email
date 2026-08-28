@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { emptyDraft } from '../../app/composerConfig';
 import type { Contact } from '../../app/types';
 import ComposerContactsPanel from './ComposerContactsPanel';
@@ -214,10 +214,100 @@ describe('ComposerContactsPanel', () => {
     expect(screen.queryByRole('button', { name: '关闭联系人面板' })).toBeNull();
   });
 
+  it('keeps the scan control centered between the contacts title and management actions', () => {
+    render(
+      <ComposerContactsPanel
+        contacts={[]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+        onOpenContactsSettings={vi.fn()}
+        onScanRecentContacts={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const header = document.querySelector('.composer-contacts-header');
+    expect(header).not.toBeNull();
+    expect(Array.from(header!.children).map((child) => child.className)).toEqual([
+      'composer-contacts-heading',
+      'composer-contacts-scan',
+      'composer-contacts-heading-actions',
+    ]);
+    expect(screen.getByRole('button', { name: '扫描同步最近联系人' }).classList.contains('composer-contacts-scan')).toBe(true);
+  });
+
   it('does not expose a group tab when the contact backend has no group data', () => {
     renderPanel();
 
     expect(screen.queryByRole('tab', { name: '群组' })).toBeNull();
     expect(screen.getByPlaceholderText('搜索姓名或邮箱')).not.toBeNull();
+  });
+
+  it('scans recent contacts on explicit user action and explains the data source', async () => {
+    const onScanRecentContacts = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ComposerContactsPanel
+        contacts={[]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+        onScanRecentContacts={onScanRecentContacts}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '扫描同步最近联系人' });
+    expect(button.getAttribute('title')).toBe('通过扫描已发送邮件头，获取联系人的姓名(若设置了别名)、邮箱地址等');
+    fireEvent.click(button);
+    await waitFor(() => expect(onScanRecentContacts).toHaveBeenCalledTimes(1));
+  });
+
+  it('disables repeated scans while the synchronization request is pending', async () => {
+    let resolveScan: (() => void) | undefined;
+    const onScanRecentContacts = vi.fn(() => new Promise<void>((resolve) => {
+      resolveScan = resolve;
+    }));
+    render(
+      <ComposerContactsPanel
+        contacts={[]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+        onScanRecentContacts={onScanRecentContacts}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '扫描同步最近联系人' });
+    fireEvent.click(button);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('正在扫描…')).not.toBeNull();
+    fireEvent.click(button);
+    expect(onScanRecentContacts).toHaveBeenCalledTimes(1);
+
+    resolveScan?.();
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('reorders recent contacts when the sent-mail timestamp changes', () => {
+    const { rerender } = renderPanel();
+    expect(screen.getAllByRole('listitem').map((row) => row.getAttribute('data-contact-id'))).toEqual([
+      '4',
+      '2',
+      '1',
+      '3',
+    ]);
+
+    rerender(
+      <ComposerContactsPanel
+        contacts={[{ ...ada, last_seen_at: '2026-08-27T10:00:00+08:00' }, grace, lin, newcomer]}
+        draft={emptyDraft}
+        activeRecipientField="to"
+        onAddContacts={() => ({ addedIds: [], skippedIds: [] })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByRole('listitem')[0].getAttribute('data-contact-id')).toBe('1');
   });
 });

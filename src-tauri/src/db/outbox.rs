@@ -1,6 +1,5 @@
 use super::accounts::{account_for_conn, identity_for_draft_conn};
 use super::attachments::attachments_for_message_conn;
-use super::contacts_rules::upsert_contact;
 use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
 use super::messages::{bool_to_int, normalized_subject, snippet_from_body};
 use super::*;
@@ -378,7 +377,6 @@ pub(super) fn create_outbound_message_for_conn(
     )?;
     let message_id = conn.last_insert_rowid();
     replace_outbound_attachments_for_conn(conn, message_id, &outbound_attachments)?;
-    upsert_contact(conn, input.to.trim(), input.to.trim(), &now)?;
     Ok(message_id)
 }
 pub(super) fn update_draft_message_for_conn(
@@ -454,7 +452,6 @@ pub(super) fn update_draft_message_for_conn(
         ],
     )?;
     replace_outbound_attachments_for_conn(conn, input.draft_id, &outbound_attachments)?;
-    upsert_contact(conn, input.to.trim(), input.to.trim(), &now)?;
     Ok(input.draft_id)
 }
 pub(super) fn replace_outbound_attachments_for_conn(

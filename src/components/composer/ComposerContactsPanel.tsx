@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   Check,
   Plus,
+  RefreshCw,
   Search,
   Settings2,
   UserRound,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Contact, DraftInput } from '../../app/types';
 import { parseRecipientInput } from './recipientAddresses';
+import './contact-scan.css';
 
 export type ComposerRecipientField = 'to' | 'cc' | 'bcc';
 
@@ -25,6 +27,7 @@ type ComposerContactsPanelProps = {
   onClose: () => void;
   showClose?: boolean;
   onOpenContactsSettings?: () => void;
+  onScanRecentContacts?: () => Promise<void>;
 };
 
 type ContactView = 'recent' | 'frequent';
@@ -102,9 +105,11 @@ export default function ComposerContactsPanel({
   onClose,
   showClose = true,
   onOpenContactsSettings,
+  onScanRecentContacts,
 }: ComposerContactsPanelProps) {
   const [view, setView] = useState<ContactView>('recent');
   const [query, setQuery] = useState('');
+  const [scanBusy, setScanBusy] = useState(false);
 
   const visibleContacts = useMemo(() => {
     const candidates = view === 'frequent'
@@ -136,7 +141,29 @@ export default function ComposerContactsPanel({
   return (
     <aside id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人">
       <div className="composer-contacts-header">
-        <strong>联系人</strong>
+        <div className="composer-contacts-heading">
+          <strong>联系人</strong>
+        </div>
+        {onScanRecentContacts ? (
+          <button
+            type="button"
+            className="composer-contacts-scan"
+            title="通过扫描已发送邮件头，获取联系人的姓名(若设置了别名)、邮箱地址等"
+            aria-label="扫描同步最近联系人"
+            disabled={scanBusy}
+            onClick={async () => {
+              setScanBusy(true);
+              try {
+                await onScanRecentContacts();
+              } finally {
+                setScanBusy(false);
+              }
+            }}
+          >
+            <RefreshCw size={14} aria-hidden="true" className={scanBusy ? 'is-spinning' : ''} />
+            {scanBusy ? '正在扫描…' : '扫描同步最近联系人'}
+          </button>
+        ) : null}
         <div className="composer-contacts-heading-actions">
           {onOpenContactsSettings ? (
             <button type="button" aria-label="管理联系人" title="管理联系人" onClick={onOpenContactsSettings}>

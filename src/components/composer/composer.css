@@ -1824,10 +1824,10 @@
 
 .composer-contacts-header {
   min-height: 58px;
-  display: flex;
+  display: grid;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 10px;
   padding: 10px 14px 9px;
   border-bottom: 1px solid var(--composer-divider-soft);
@@ -3350,22 +3350,23 @@
 .composer-contacts-header {
   min-height: 54px;
   flex: 0 0 54px;
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: var(--compose-space-3);
   padding: 0 var(--compose-space-5);
   border-bottom: 1px solid var(--compose-divider);
 }
 
-.composer-contacts-header > strong {
+.composer-contacts-header > .composer-contacts-heading > strong {
   color: var(--ui-text);
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .composer-contacts-heading-actions {
   display: inline-flex;
+  justify-self: end;
   align-items: center;
   gap: var(--compose-space-1);
 }

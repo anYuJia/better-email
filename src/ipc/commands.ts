@@ -56,6 +56,8 @@ export const IPC = {
   ListBackgroundTasks: 'list_background_tasks',
   ListContactImportBatches: 'list_contact_import_batches',
   ListContacts: 'list_contacts',
+  ScanRecentContacts: 'scan_recent_contacts',
+  ShouldAutoScanRecentContacts: 'should_auto_scan_recent_contacts',
   ListFolders: 'list_folders',
   ListIdentities: 'list_identities',
   ListImapMailboxes: 'list_imap_mailboxes',

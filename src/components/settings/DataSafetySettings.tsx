@@ -295,26 +295,28 @@ export default function DataSafetySettings({
       )}
 
       {devMode && connectionReport && (
-        <SettingsSection
-          title="服务器连接"
-          description="开发模式：仅检查 IMAP、SMTP 网络端点，不验证账号凭据"
-          badge={
-            <SettingsBadge tone="neutral">
-              {connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用
-            </SettingsBadge>
-          }
-        >
-          <div className="settings-endpoint-grid">
-            {connectionReport.endpoints.map((endpoint) => (
-              <div className={endpoint.reachable ? 'st-data-row ok' : 'st-data-row warn'} key={endpoint.name}>
-                <span>{endpoint.name}</span>
-                <em>{endpoint.address}</em>
-                <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
-                <p>{endpoint.message}</p>
-              </div>
-            ))}
-          </div>
-        </SettingsSection>
+        <div className="settings-developer-diagnostics">
+          <SettingsSection
+            title="服务器连接"
+            description="开发模式：仅检查 IMAP、SMTP 网络端点，不验证账号凭据"
+            badge={
+              <SettingsBadge tone="neutral">
+                {connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用
+              </SettingsBadge>
+            }
+          >
+            <div className="settings-endpoint-grid">
+              {connectionReport.endpoints.map((endpoint) => (
+                <div className={endpoint.reachable ? 'st-data-row ok' : 'st-data-row warn'} key={endpoint.name}>
+                  <span>{endpoint.name}</span>
+                  <em>{endpoint.address}</em>
+                  <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
+                  <p>{endpoint.message}</p>
+                </div>
+              ))}
+            </div>
+          </SettingsSection>
+        </div>
       )}
 
       {cacheConfirmationOpen && storageUsage && createPortal((

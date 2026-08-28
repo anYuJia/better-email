@@ -5,6 +5,7 @@ import {
   Info,
   LayoutTemplate,
   ScanSearch,
+  Send,
   Settings2,
   Sparkles,
   UserRound,
@@ -65,10 +66,9 @@ export const accountScopedSections = new Set<SettingsSectionId>([
   'privacy',
 ]);
 
-export const generalScopedSections = new Set<SettingsSectionId>([
-  'appearance',
-  'sending',
-]);
+// Kept as an export for compatibility. General preferences no longer use a
+// second tab row; each primary destination is directly reachable.
+export const generalScopedSections = new Set<SettingsSectionId>();
 
 const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem, 'label' | 'description'>> = {
   accounts: {
@@ -97,7 +97,7 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
   },
   appearance: {
     label: '通用',
-    description: '外观与日常发送偏好。',
+    description: '选择界面外观与主题。',
   },
   sending: {
     label: '发送',
@@ -143,7 +143,6 @@ export function getSettingsSectionPresentation(section: SettingsSectionId) {
 
 export function resolveSettingsNavigationSectionId(section: SettingsSectionId): SettingsSectionId {
   if (accountScopedSections.has(section)) return 'accounts';
-  if (generalScopedSections.has(section)) return 'appearance';
   return section;
 }
 
@@ -154,8 +153,8 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       {
         id: 'appearance',
         label: '通用',
-        description: '外观与发送偏好。',
-        keywords: ['通用', '外观', '主题', '亮色', '暗色', '发送', '撤销发送', 'undo', 'theme', 'appearance'],
+        description: '界面外观与主题。',
+        keywords: ['通用', '外观', '主题', '亮色', '暗色', 'theme', 'appearance'],
         icon: Settings2,
       },
       {
@@ -168,6 +167,13 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
           '信任', '外部发件人',
         ],
         icon: UserRound,
+      },
+      {
+        id: 'sending',
+        label: '发送',
+        description: '撤销发送与发送行为。',
+        keywords: ['发送', '撤销发送', '撤回', 'undo', 'send'],
+        icon: Send,
       },
       {
         id: 'notifications',
@@ -251,8 +257,8 @@ export const settingsNavigationItems = settingsNavigationGroups.flatMap((group) 
 ));
 
 export const settingsSearchEntries: SettingsSearchEntry[] = [
-  { label: '界面外观', path: '通用 › 外观', section: 'appearance', target: 'appearance', keywords: ['主题', '系统', '亮色', '暗色', 'theme'] },
-  { label: '撤销发送', path: '通用 › 发送', section: 'sending', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
+  { label: '界面外观', path: '通用', section: 'appearance', target: 'appearance', keywords: ['主题', '系统', '亮色', '暗色', 'theme'] },
+  { label: '撤销发送', path: '发送', section: 'sending', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
   { label: '邮箱账号', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
   { label: '获取新邮件', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['同步频率', '后台检查', 'sync'] },
   { label: '自动下载附件', path: '账号 › 概览', section: 'accounts', target: 'account-overview', keywords: ['附件', '自动下载', 'download'] },

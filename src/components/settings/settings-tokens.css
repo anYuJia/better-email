@@ -58,6 +58,9 @@
   --st-radius-md: 8px;
   --st-radius-lg: 8px;
   --st-radius-modal: 10px;
+  /* Settings popovers follow the global panel radius; the alias remains
+     scoped to Settings so the application radius scale stays authoritative. */
+  --ui-radius-popover: var(--ui-radius-panel);
 
   /* Shadows: only transient layers get elevation */
   --st-shadow-card: none;

@@ -1,0 +1,18 @@
+/*
+ * Settings desktop geometry contract.
+ *
+ * Composer and Settings share visual language, but Settings keeps the larger
+ * desktop header geometry required by its navigation and smoke-test contract.
+ * These selectors intentionally outrank the later polish layer without using
+ * !important, while leaving narrow/mobile layouts untouched.
+ */
+
+@media (min-width: 901px) {
+  .settings-backdrop .settings-modal[data-ui="settings-v3"] .settings-main-header {
+    min-height: 48px;
+  }
+
+  .settings-backdrop .settings-modal[data-ui="settings-v3"] .settings-page-header {
+    min-height: 78px;
+  }
+}

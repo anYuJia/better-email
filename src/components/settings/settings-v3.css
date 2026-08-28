@@ -11,11 +11,6 @@
   border-radius: 14px;
 }
 
-.settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
-  width: min(880px, calc(100vw - 48px));
-  height: min(580px, calc(100dvh - 48px));
-}
-
 .settings-modal[data-ui="settings-v3"] .settings-main-header {
   min-height: 48px;
   padding-inline: 16px 10px;
@@ -565,8 +560,7 @@
 }
 
 @media (max-width: 900px) {
-  .settings-modal[data-ui="settings-v3"],
-  .settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
+  .settings-modal[data-ui="settings-v3"] {
     width: calc(100vw - 16px);
     height: calc(100dvh - 16px);
     border-radius: 12px;
@@ -578,8 +572,7 @@
 }
 
 @media (max-width: 640px) {
-  .settings-modal[data-ui="settings-v3"],
-  .settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
+  .settings-modal[data-ui="settings-v3"] {
     width: 100vw;
     height: 100dvh;
     border-radius: 0;

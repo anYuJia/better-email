@@ -43,10 +43,6 @@
   animation: var(--ui-animation-settings-modal-pop);
 }
 
-.settings-modal[data-page-layout="compact"] {
-  height: min(520px, calc(100dvh - 40px));
-}
-
 @keyframes settings-modal-pop {
   from {
     opacity: 0;
@@ -565,10 +561,6 @@
     height: calc(100dvh - 16px);
     max-height: calc(100dvh - 16px);
     border-radius: var(--st-radius-modal);
-  }
-
-  .settings-modal[data-page-layout="compact"] {
-    height: calc(100dvh - 16px);
   }
 
   .settings-body {

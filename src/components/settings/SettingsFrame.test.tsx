@@ -184,6 +184,16 @@ describe('SettingsFrame dialog behavior', () => {
     expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
   });
 
+  it('uses the standard shell layout for every settings page', () => {
+    const sections = ['appearance', 'sending', 'notifications', 'about'] as const;
+
+    for (const activeSection of sections) {
+      const { container, unmount } = renderFrame({ activeSection });
+      expect(container.querySelector('.settings-modal')?.getAttribute('data-page-layout')).toBe('standard');
+      unmount();
+    }
+  });
+
   it('shows save only for a dirty account editing section', () => {
     const onSave = vi.fn();
     renderFrame({

@@ -59,13 +59,6 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'privacy',
 ]);
 
-const compactSettingsSections = new Set<SettingsSectionId>([
-  'appearance',
-  'sending',
-  'notifications',
-  'about',
-]);
-
 const accountWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
   { id: 'accounts', label: '概览' },
   { id: 'providers', label: '服务器' },
@@ -240,7 +233,7 @@ export default function SettingsFrame({
       <section
         className="settings-modal"
         data-ui="settings-v3"
-        data-page-layout={compactSettingsSections.has(activeSection) ? 'compact' : 'standard'}
+        data-page-layout="standard"
         role="dialog"
         aria-modal="true"
         aria-label={title}

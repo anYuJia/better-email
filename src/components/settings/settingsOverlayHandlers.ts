@@ -18,6 +18,9 @@ import type { ProviderWritebackValidationStepId } from '../../app/providerWriteV
  * actually change instead of on every application tick.
  */
 export type SettingsHandlers = {
+  readonly accountOptions: Array<{ id: number; label: string; email: string }>;
+  readonly activeAccountId: number | null;
+  onSelectAccountId: (accountId: number) => void;
   onNavigate: (section: SettingsSectionId) => void;
   onClose: () => void;
   onTestConnection: () => void;
@@ -111,6 +114,20 @@ type OverlayRef = { current: SettingsOverlayProps };
 export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
   const latest = (): SettingsOverlayProps => ref.current;
   return {
+    get accountOptions() {
+      return latest().accounts.map((account) => ({
+        id: account.id,
+        label: account.display_name || account.email,
+        email: account.email,
+      }));
+    },
+    get activeAccountId() {
+      return latest().accountForm?.id ?? null;
+    },
+    onSelectAccountId: (accountId) => {
+      const account = latest().accounts.find((candidate) => candidate.id === accountId);
+      if (account) latest().onSelectAccount(account);
+    },
     onNavigate: (section) => latest().onNavigate(section),
     onClose: () => latest().onClose(),
     onTestConnection: () => latest().onTestConnection(),

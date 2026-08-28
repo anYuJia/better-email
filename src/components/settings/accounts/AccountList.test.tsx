@@ -30,7 +30,8 @@ describe('AccountList semantics', () => {
         activeAccountId={2}
         accountCount={accounts.length}
         onAdd={() => undefined}
-        onOpen={() => undefined}
+        onSelect={() => undefined}
+        onDelete={() => undefined}
       />,
     );
 
@@ -44,15 +45,17 @@ describe('AccountList semantics', () => {
     expect(screen.queryByRole('option')).toBeNull();
   });
 
-  it('keeps each row action independently operable', () => {
-    const onOpen = vi.fn();
+  it('selects a row without opening a nested config dialog and keeps delete independent', () => {
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
     render(
       <AccountList
         accounts={accounts}
         activeAccountId={1}
         accountCount={accounts.length}
         onAdd={() => undefined}
-        onOpen={onOpen}
+        onSelect={onSelect}
+        onDelete={onDelete}
       />,
     );
 
@@ -60,7 +63,7 @@ describe('AccountList semantics', () => {
     fireEvent.click(within(personalRow).getByRole('button', { name: /个人邮箱/ }));
     fireEvent.click(within(personalRow).getByRole('button', { name: '删除' }));
 
-    expect(onOpen).toHaveBeenNthCalledWith(1, accounts[1], 'config');
-    expect(onOpen).toHaveBeenNthCalledWith(2, accounts[1], 'delete');
+    expect(onSelect).toHaveBeenCalledWith(accounts[1]);
+    expect(onDelete).toHaveBeenCalledWith(accounts[1]);
   });
 });

@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
+import { BadgeCheck, KeyRound, RefreshCw, Save, Server, ShieldCheck } from 'lucide-react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
+import type { SettingsSectionId } from '../settingsNavigation';
 import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
-import type { AccountDialogMode } from '../accounts/accountSettingsShared';
+import { syncModeOptions } from '../accounts/accountSettingsShared';
+import { accountFormForEmail, accountFormForIncomingProtocol } from '../accounts/accountSetupForm';
+import { CustomSelect } from '../accounts/CustomSelect';
 import {
-  accountFormForEmail,
-  accountFormForIncomingProtocol,
-} from '../accounts/accountSetupForm';
+  SettingsButton,
+  SettingsField,
+  SettingsSection,
+  SettingsSwitch,
+} from '../shared';
 
 function errorMessage(error: unknown) {
   return (error instanceof Error ? error.message : String(error))
@@ -28,7 +34,20 @@ type AccountSettingsPageProps = {
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
   onSaveAccountSettings?: (account: Account) => Promise<void>;
+  onNavigate: (section: SettingsSectionId) => void;
 };
+
+const accountQuickLinks: Array<{
+  id: SettingsSectionId;
+  label: string;
+  icon: typeof Server;
+}> = [
+  { id: 'providers', label: '服务器', icon: Server },
+  { id: 'auth', label: '登录与安全', icon: KeyRound },
+  { id: 'identities', label: '身份与签名', icon: BadgeCheck },
+  { id: 'sync', label: '同步', icon: RefreshCw },
+  { id: 'privacy', label: '隐私', icon: ShieldCheck },
+];
 
 export default function AccountSettingsPage({
   accounts,
@@ -41,6 +60,7 @@ export default function AccountSettingsPage({
   onCreateNewAccount,
   onRemoveAccount,
   onSaveAccountSettings,
+  onNavigate,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newAccountSecret, setNewAccountSecret] = useState('');
@@ -49,7 +69,9 @@ export default function AccountSettingsPage({
   const [addAccountError, setAddAccountError] = useState('');
   const [addAccountSubmitting, setAddAccountSubmitting] = useState(false);
   const [addAccountStage, setAddAccountStage] = useState('');
-  const [accountDialogMode, setAccountDialogMode] = useState<AccountDialogMode | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [overviewSaving, setOverviewSaving] = useState(false);
+  const [overviewError, setOverviewError] = useState('');
 
   useEffect(() => {
     if (!addDialogOpen) {
@@ -75,11 +97,6 @@ export default function AccountSettingsPage({
       : newAccountForm.auth_type === 'oauth2'
         ? '访问或刷新 Token'
         : '应用专用密码或授权码';
-
-  function providerPresetFor(provider: string) {
-    const normalized = provider.trim().toLowerCase();
-    return providerPresets.find((preset) => preset.provider === normalized || preset.id === normalized) ?? null;
-  }
 
   async function handleCreateNewAccount() {
     if (addAccountSubmitting) return;
@@ -112,8 +129,6 @@ export default function AccountSettingsPage({
     }
   }
 
-
-
   function updateNewAccountEmail(email: string) {
     setAddAccountError('');
     onNewAccountFormChange(accountFormForEmail(newAccountForm, email));
@@ -122,6 +137,11 @@ export default function AccountSettingsPage({
   function switchNewAccountProtocol(nextProtocol: IncomingProtocol) {
     setAddAccountError('');
     onNewAccountFormChange(accountFormForIncomingProtocol(newAccountForm, nextProtocol));
+  }
+
+  function providerPresetFor(provider: string) {
+    const normalized = provider.trim().toLowerCase();
+    return providerPresets.find((preset) => preset.provider === normalized || preset.id === normalized) ?? null;
   }
 
   function switchAccountProtocol(nextProtocol: IncomingProtocol) {
@@ -137,10 +157,17 @@ export default function AccountSettingsPage({
     });
   }
 
-  function openAccountDialog(account: Account, mode: AccountDialogMode) {
-    setAddDialogOpen(false);
-    onAccountFormChange(account);
-    setAccountDialogMode(mode);
+  async function saveOverview() {
+    if (!accountForm || !onSaveAccountSettings || overviewSaving) return;
+    setOverviewSaving(true);
+    setOverviewError('');
+    try {
+      await onSaveAccountSettings(accountForm);
+    } catch (error) {
+      setOverviewError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOverviewSaving(false);
+    }
   }
 
   return (
@@ -150,11 +177,102 @@ export default function AccountSettingsPage({
         activeAccountId={accountForm?.id ?? null}
         accountCount={accountCount}
         onAdd={() => {
-          setAccountDialogMode(null);
+          setDeleteDialogOpen(false);
           setAddDialogOpen(true);
         }}
-        onOpen={openAccountDialog}
+        onSelect={(account) => {
+          setOverviewError('');
+          onAccountFormChange(account);
+        }}
+        onDelete={(account) => {
+          setAddDialogOpen(false);
+          onAccountFormChange(account);
+          setDeleteDialogOpen(true);
+        }}
       />
+
+      {accountForm && (
+        <SettingsSection
+          title={accountForm.display_name || accountForm.email}
+          description={`${accountForm.email} · ${accountForm.provider}`}
+          actions={onSaveAccountSettings ? (
+            <SettingsButton
+              size="sm"
+              variant="primary"
+              icon={<Save size={14} />}
+              disabled={overviewSaving}
+              onClick={() => { void saveOverview(); }}
+            >
+              {overviewSaving ? '保存中…' : '保存概览'}
+            </SettingsButton>
+          ) : undefined}
+          className="settings-account-overview"
+          dataSection="account-overview"
+        >
+          <div className="settings-account-overview-grid">
+            <SettingsField label="显示名" hint="仅用于 Better Email 内识别此账号">
+              <input
+                value={accountForm.display_name}
+                onChange={(event) => onAccountFormChange({
+                  ...accountForm,
+                  display_name: event.target.value,
+                })}
+                placeholder="默认使用邮箱地址"
+              />
+            </SettingsField>
+            <SettingsField label="获取新邮件" hint="控制此账号的后台检查频率">
+              <CustomSelect
+                dense
+                value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
+                options={syncModeOptions}
+                onChange={(value) => onAccountFormChange({ ...accountForm, sync_mode: value })}
+              />
+            </SettingsField>
+          </div>
+
+          <SettingsSwitch
+            label="跨邮箱发送风险提示"
+            description="回复其他账号的邮件或快捷写信账号不一致时，在发送前提醒。"
+            checked={accountForm.cross_account_risk_warning !== false}
+            onChange={(checked) => onAccountFormChange({
+              ...accountForm,
+              cross_account_risk_warning: checked,
+            })}
+          />
+          <SettingsSwitch
+            label="自动下载新邮件附件"
+            description="同步新邮件时自动把附件保存到本地下载位置。"
+            checked={accountForm.auto_download_attachments}
+            onChange={(checked) => onAccountFormChange({
+              ...accountForm,
+              auto_download_attachments: checked,
+            })}
+          />
+
+          {overviewError && <p className="st-field-error" role="alert">{overviewError}</p>}
+
+          <div className="settings-account-quick-links" aria-label="账号详细设置">
+            {accountQuickLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <SettingsButton
+                  size="sm"
+                  variant="ghost"
+                  icon={<Icon size={13} />}
+                  onClick={() => onNavigate(item.id)}
+                  key={item.id}
+                >
+                  {item.label}
+                </SettingsButton>
+              );
+            })}
+          </div>
+        </SettingsSection>
+      )}
+
+      {!accountForm && accounts.length === 0 && (
+        <div className="settings-inline-status">添加第一个邮箱账号后，即可统一管理服务器、登录、身份、同步和隐私。</div>
+      )}
 
       {addDialogOpen && (
         <AddAccountDialog
@@ -186,12 +304,12 @@ export default function AccountSettingsPage({
         />
       )}
 
-      {accountDialogMode && accountForm && (
+      {deleteDialogOpen && accountForm && (
         <AccountManageDialog
-          mode={accountDialogMode}
+          mode="delete"
           account={accountForm}
           accountCount={accountCount}
-          onClose={() => setAccountDialogMode(null)}
+          onClose={() => setDeleteDialogOpen(false)}
           onAccountChange={onAccountFormChange}
           onProtocolChange={switchAccountProtocol}
           onRemoveAccount={onRemoveAccount}

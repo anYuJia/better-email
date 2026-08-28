@@ -46,12 +46,9 @@ export default function AboutSettings() {
     }
 
     try {
-      // Tauri verifies the release signature against the public key embedded in
-      // tauri.conf.json before returning an update. Unsigned or tampered GitHub
-      // assets therefore never reach the UI.
       const update = await check();
       if (!update) {
-        setStatus('当前已是最新版本。GitHub Release 签名校验已通过。');
+        setStatus('当前已是最新版本，更新签名校验正常。');
         return;
       }
       setAvailableUpdate({
@@ -62,7 +59,7 @@ export default function AboutSettings() {
       setStatus(`发现新版本 ${update.version}，签名校验已通过。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`更新检查失败：${message}。仅接受 GitHub 上带有效签名的更新包。`);
+      setStatus(`更新检查失败：${message}。仅接受带有效签名的更新包。`);
     } finally {
       setChecking(false);
     }
@@ -71,7 +68,7 @@ export default function AboutSettings() {
   return (
     <div className="settings-about-stack">
       <SettingsSection
-        title="关于 Better Email"
+        title="Better Email"
         className="settings-about-hero"
       >
         <div className="settings-about-brand">
@@ -84,18 +81,18 @@ export default function AboutSettings() {
           />
           <div>
             <strong>Better Email</strong>
-            <p>桌面邮箱客户端</p>
+            <p>简洁、私密的桌面邮箱客户端</p>
           </div>
         </div>
         <p className="settings-about-copy">
-          Better Email 是免费开源软件，邮件数据保留在你的设备上，不会被上传到服务器。
+          Better Email 是免费开源软件。邮件数据默认保留在你的设备上，不依赖 Better Email 云端服务器。
         </p>
       </SettingsSection>
 
-      <SettingsSection title="应用信息" description="版本、许可与项目地址。">
+      <SettingsSection title="应用信息" description="版本、许可与项目地址">
         <SettingsRow
           title="当前版本"
-          description="Installed application version"
+          description="当前安装的 Better Email 版本"
           control={<span className="settings-about-value">v{packageJson.version}</span>}
         />
         <SettingsRow
@@ -110,15 +107,15 @@ export default function AboutSettings() {
           )}
         />
         <SettingsRow
-          title="免费声明"
-          description="Free to use · MIT License"
-          control={<span className="settings-about-license"><CheckCircle2 size={15} /> 免费使用</span>}
+          title="开源许可"
+          description="MIT License，可免费使用和修改"
+          control={<span className="settings-about-license"><CheckCircle2 size={15} /> MIT</span>}
         />
       </SettingsSection>
 
       <SettingsSection
-        title="检查更新"
-        description="从 GitHub Releases 获取带签名的更新。"
+        title="软件更新"
+        description="从 GitHub Releases 获取并验证更新"
         actions={(
           <SettingsButton
             variant="primary"
@@ -132,7 +129,7 @@ export default function AboutSettings() {
       >
         <SettingsNotice tone="info" icon={ShieldCheck} title="签名更新保护">
           <span>
-            只有 GitHub Release 中包含 Tauri 签名且签名校验通过的更新包才会被接受。签名缺失、来源不符或文件被篡改时，检查会失败。
+            只有签名校验通过的更新包才会被接受；签名缺失、来源不符或文件被篡改时会拒绝更新。
           </span>
         </SettingsNotice>
         {status && (
@@ -151,7 +148,7 @@ export default function AboutSettings() {
           </div>
         )}
         <p className="settings-about-update-footnote">
-          <KeyRound size={13} /> 更新公钥内置于应用；私钥只保存在 GitHub Actions Secret 中。
+          <KeyRound size={13} /> 更新公钥内置于应用，发布私钥不会进入客户端。
         </p>
       </SettingsSection>
     </div>

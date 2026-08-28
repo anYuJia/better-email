@@ -1358,6 +1358,23 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+/* Use the supplied transparent artwork without turning the compact row into
+ * a card. Unknown formats keep the semantic fallback below. */
+.attachments .attachment-file-icon-has-asset {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.attachments .attachment-file-icon-has-asset img {
+  width: auto;
+  height: auto;
+  max-width: 32px;
+  max-height: 36px;
+  display: block;
+  object-fit: contain;
+}
+
 .attachment-file-icon {
   position: relative;
   width: 44px;

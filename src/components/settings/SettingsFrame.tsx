@@ -77,6 +77,7 @@ const accountWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
 function SettingsAccountWorkspace({
   activeSection,
   canUseAccountTabs,
+  accountSwitchDisabled,
   currentAccountLabel,
   accountOptions,
   activeAccountId,
@@ -86,6 +87,7 @@ function SettingsAccountWorkspace({
 }: {
   activeSection: SettingsSectionId;
   canUseAccountTabs: boolean;
+  accountSwitchDisabled: boolean;
   currentAccountLabel: string;
   accountOptions: SettingsAccountOption[];
   activeAccountId: number | null;
@@ -108,6 +110,8 @@ function SettingsAccountWorkspace({
             <select
               aria-label="切换当前设置账号"
               value={activeAccountId ?? ''}
+              disabled={accountSwitchDisabled}
+              title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
               onChange={(event) => onSelectAccountId?.(Number(event.target.value))}
             >
               {accountOptions.map((account) => (
@@ -191,7 +195,7 @@ export default function SettingsFrame({
   }, [isDirty]);
 
   const requestClose = () => {
-    if (isAccountEditingSection && isDirty) {
+    if (isDirty) {
       setShowDiscardConfirm(true);
       return;
     }
@@ -220,7 +224,7 @@ export default function SettingsFrame({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAccountEditingSection, isDirty, onClose, showDiscardConfirm]);
+  }, [isDirty, onClose, showDiscardConfirm]);
 
   return (
     <div
@@ -313,6 +317,7 @@ export default function SettingsFrame({
             <SettingsAccountWorkspace
               activeSection={activeSection}
               canUseAccountTabs={canSaveAndVerify}
+              accountSwitchDisabled={isDirty}
               currentAccountLabel={subtitle}
               accountOptions={accountOptions}
               activeAccountId={activeAccountId}

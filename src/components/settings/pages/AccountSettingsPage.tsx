@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, KeyRound, RefreshCw, Server, ShieldCheck } from 'lucide-react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
@@ -11,7 +10,6 @@ import { syncModeOptions } from '../accounts/accountSettingsShared';
 import { accountFormForEmail, accountFormForIncomingProtocol } from '../accounts/accountSetupForm';
 import { CustomSelect } from '../accounts/CustomSelect';
 import {
-  SettingsButton,
   SettingsField,
   SettingsSection,
   SettingsSwitch,
@@ -37,18 +35,6 @@ type AccountSettingsPageProps = {
   onNavigate: (section: SettingsSectionId) => void;
 };
 
-const accountQuickLinks: Array<{
-  id: SettingsSectionId;
-  label: string;
-  icon: typeof Server;
-}> = [
-  { id: 'providers', label: '服务器', icon: Server },
-  { id: 'auth', label: '登录与安全', icon: KeyRound },
-  { id: 'identities', label: '身份与签名', icon: BadgeCheck },
-  { id: 'sync', label: '同步', icon: RefreshCw },
-  { id: 'privacy', label: '隐私', icon: ShieldCheck },
-];
-
 export default function AccountSettingsPage({
   accounts,
   accountForm,
@@ -60,7 +46,6 @@ export default function AccountSettingsPage({
   onCreateNewAccount,
   onRemoveAccount,
   onSaveAccountSettings,
-  onNavigate,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newAccountSecret, setNewAccountSecret] = useState('');
@@ -175,8 +160,8 @@ export default function AccountSettingsPage({
 
       {accountForm && (
         <SettingsSection
-          title={accountForm.display_name || accountForm.email}
-          description={`${accountForm.email} · ${accountForm.provider}`}
+          title="账号偏好"
+          description={accountForm.email}
           className="settings-account-overview"
           dataSection="account-overview"
         >
@@ -191,7 +176,7 @@ export default function AccountSettingsPage({
                 placeholder="默认使用邮箱地址"
               />
             </SettingsField>
-            <SettingsField label="获取新邮件" hint="控制此账号的后台检查频率">
+            <SettingsField label="获取新邮件" hint="控制后台检查频率">
               <CustomSelect
                 dense
                 value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
@@ -203,7 +188,7 @@ export default function AccountSettingsPage({
 
           <SettingsSwitch
             label="跨邮箱发送风险提示"
-            description="回复其他账号的邮件或快捷写信账号不一致时，在发送前提醒。"
+            description="发件账号与当前邮件不一致时，在发送前提醒。"
             checked={accountForm.cross_account_risk_warning !== false}
             onChange={(checked) => onAccountFormChange({
               ...accountForm,
@@ -212,35 +197,18 @@ export default function AccountSettingsPage({
           />
           <SettingsSwitch
             label="自动下载新邮件附件"
-            description="同步新邮件时自动把附件保存到本地下载位置。"
+            description="收到新邮件时自动将附件保存到本地下载位置。"
             checked={accountForm.auto_download_attachments}
             onChange={(checked) => onAccountFormChange({
               ...accountForm,
               auto_download_attachments: checked,
             })}
           />
-
-          <div className="settings-account-quick-links" aria-label="账号详细设置">
-            {accountQuickLinks.map((item) => {
-              const Icon = item.icon;
-              return (
-                <SettingsButton
-                  size="sm"
-                  variant="ghost"
-                  icon={<Icon size={13} />}
-                  onClick={() => onNavigate(item.id)}
-                  key={item.id}
-                >
-                  {item.label}
-                </SettingsButton>
-              );
-            })}
-          </div>
         </SettingsSection>
       )}
 
       {!accountForm && accounts.length === 0 && (
-        <div className="settings-inline-status">添加第一个邮箱账号后，即可统一管理服务器、登录、身份、同步和隐私。</div>
+        <div className="settings-inline-status">添加第一个邮箱账号后，即可配置服务器、登录、身份、同步和隐私。</div>
       )}
 
       {addDialogOpen && (

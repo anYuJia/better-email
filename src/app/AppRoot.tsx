@@ -63,7 +63,7 @@ function useBackendStartupStatus(): StartupStatus {
 }
 
 function MainShellReadySignal({ standaloneComposer }: { standaloneComposer: boolean }) {
-  const revealStartedRef = useRef(false);
+  const revealPromiseRef = useRef<Promise<void> | null>(null);
 
   useLayoutEffect(() => {
     if (standaloneComposer) return undefined;
@@ -88,14 +88,14 @@ function MainShellReadySignal({ standaloneComposer }: { standaloneComposer: bool
 
     if (mockMode) {
       scheduleVisibleFrame();
-    } else if (!revealStartedRef.current) {
-      revealStartedRef.current = true;
+    } else {
       // A hidden native WebView may throttle rAF completely. Showing it while
       // the always-on-top splash remains visible lets WebKit produce a real
       // frame without exposing a blank desktop window.
-      void invoke<void>(IPC.RevealMainWindow)
-        .then(scheduleVisibleFrame)
-        .catch(scheduleVisibleFrame);
+      // Keep the native reveal single-flight, but attach the handoff callback
+      // on every effect pass because dev StrictMode re-runs effects once.
+      revealPromiseRef.current ??= invoke<void>(IPC.RevealMainWindow).catch(() => undefined);
+      void revealPromiseRef.current.then(scheduleVisibleFrame, scheduleVisibleFrame);
     }
 
     return () => {

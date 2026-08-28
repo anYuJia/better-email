@@ -46,13 +46,13 @@ describe('PrivacySettingsPage', () => {
     renderPage(makeAccount({ remote_images_allowed: false }), []);
     const toggles = screen.getAllByRole('checkbox');
     expect(toggles.length).toBe(4);
-    expect(screen.getByText('默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
+    expect(screen.getByText('默认阻止远程图片与追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
     expect((toggles[0] as HTMLInputElement).checked).toBe(false);
   });
 
   it('explains the risk when remote images are allowed', () => {
     renderPage(makeAccount({ remote_images_allowed: true }), []);
-    expect(screen.getByText(/可能暴露你的打开行为与网络位置/)).not.toBeNull();
+    expect(screen.getByText(/可能暴露打开行为与网络位置/)).not.toBeNull();
     expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(true);
   });
 
@@ -60,7 +60,7 @@ describe('PrivacySettingsPage', () => {
     renderPage(makeAccount(), []);
     expect(screen.getByText('拦截外部邮箱邮件')).not.toBeNull();
     expect(screen.getByText('隐藏邮件中的链接')).not.toBeNull();
-    expect(screen.getByText('提示来自其他邮箱 / 外部发件人的邮件')).not.toBeNull();
+    expect(screen.getByText('提示外部发件人')).not.toBeNull();
   });
 
   it('shows an explicit empty state for the trust list', () => {
@@ -68,25 +68,11 @@ describe('PrivacySettingsPage', () => {
     expect(screen.getByText('暂无信任项。你可以在邮件阅读页按发件人或域名允许图片。')).not.toBeNull();
   });
 
-  it('offers an account selector only when multiple accounts exist', () => {
-    renderPage(makeAccount(), []);
-    expect(screen.queryByLabelText('配置账号')).toBeNull();
+  it('does not duplicate the account selector inside the privacy page', () => {
     const second = makeAccount({ id: 2, email: 'home@example.com' });
     const first = makeAccount();
-    const select = vi.fn();
-    render(
-      <PrivacySettingsPage
-        accounts={[first, second]}
-        accountForm={first}
-        remoteImageTrusts={[]}
-        onAccountFormChange={() => undefined}
-        onSelectAccount={select}
-        onDeleteRemoteImageTrust={() => undefined}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText('配置账号'));
-    fireEvent.click(screen.getByRole('option', { name: /home@example\.com/ }));
-    expect(select).toHaveBeenCalledWith(second);
+    renderPage(first, [], undefined, [first, second]);
+    expect(screen.queryByLabelText('配置账号')).toBeNull();
   });
 
   it('renders trust items with scope, value, created date and remove button', () => {
@@ -113,8 +99,8 @@ describe('PrivacySettingsPage', () => {
     const navigate = () => undefined;
     const spy = vi.fn(navigate);
     renderPage(makeAccount(), [], spy);
-    expect(screen.getByText(/可能会把邮件内容发送到外部 AI 服务/)).not.toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /前往 AI 服务设置/ }));
+    expect(screen.getByText(/可能把邮件内容发送到你配置的外部服务/)).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /AI 与集成/ }));
     expect(spy).toHaveBeenCalledOnce();
   });
 });

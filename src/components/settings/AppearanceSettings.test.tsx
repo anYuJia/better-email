@@ -5,14 +5,14 @@ import AppearanceSettings from './AppearanceSettings';
 describe('AppearanceSettings', () => {
   afterEach(cleanup);
 
-  it('renders a radio group with option descriptions and automatic-save status', () => {
+  it('renders a radio group with compact option descriptions', () => {
     render(<AppearanceSettings themeMode="dark" onThemeModeChange={vi.fn()} />);
 
     const group = screen.getByRole('radiogroup', { name: '界面外观' });
     expect(group.querySelectorAll('[role="radio"]')).toHaveLength(3);
-    expect(screen.getByRole('radio', { name: /^暗色：/ }).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByText('始终使用深色的界面外观。')).toBeDefined();
-    expect(screen.getByText('当前使用“暗色”，更改已自动保存。')).toBeDefined();
+    expect(screen.getByRole('radio', { name: '深色：始终使用深色界面' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: '浅色：始终使用浅色界面' }).getAttribute('title')).toBe('始终使用浅色界面');
+    expect(screen.getByText('选择最适合当前环境的界面。')).toBeDefined();
   });
 
   it('changes the selection with arrow keys and moves focus to the next option', () => {
@@ -22,7 +22,7 @@ describe('AppearanceSettings', () => {
     const group = screen.getByRole('radiogroup', { name: '界面外观' });
     fireEvent.keyDown(group, { key: 'ArrowRight' });
 
-    const lightOption = screen.getByRole('radio', { name: /^亮色：/ });
+    const lightOption = screen.getByRole('radio', { name: '浅色：始终使用浅色界面' });
     expect(onThemeModeChange).toHaveBeenCalledWith('light');
     expect(document.activeElement).toBe(lightOption);
   });

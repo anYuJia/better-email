@@ -7,6 +7,7 @@ import {
   X,
 } from 'lucide-react';
 import SettingsPageShell from './SettingsPageShell';
+import { CustomSelect } from './accounts/CustomSelect';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 import {
   SettingsMobileNavigation,
@@ -105,21 +106,23 @@ function SettingsAccountWorkspace({
     <div className="settings-account-workspace">
       <div className="settings-account-workspace-topline">
         {canSwitchAccount ? (
-          <label className="settings-account-picker">
+          <label
+            className="settings-account-picker"
+            title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
+          >
             <span>当前账号</span>
-            <select
-              aria-label="切换当前设置账号"
-              value={activeAccountId ?? ''}
+            <CustomSelect
+              dense
+              ariaLabel="切换当前设置账号"
+              value={String(activeAccountId ?? '')}
+              options={accountOptions.map((account) => ({
+                value: String(account.id),
+                label: account.label,
+                meta: account.email,
+              }))}
               disabled={accountSwitchDisabled}
-              title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
-              onChange={(event) => onSelectAccountId?.(Number(event.target.value))}
-            >
-              {accountOptions.map((account) => (
-                <option value={account.id} key={account.id}>
-                  {account.label} · {account.email}
-                </option>
-              ))}
-            </select>
+              onChange={(nextValue) => onSelectAccountId?.(Number(nextValue))}
+            />
           </label>
         ) : (
           <span className="settings-account-current">

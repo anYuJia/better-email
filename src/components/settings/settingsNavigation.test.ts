@@ -26,9 +26,9 @@ describe('settingsNavigation v3 information architecture', () => {
     }
   });
 
-  it('maps sending into the General workspace while preserving its own page title', () => {
-    expect(resolveSettingsNavigationSectionId('sending')).toBe('appearance');
-    expect(getSettingsNavigationContext('sending').item.label).toBe('通用');
+  it('keeps sending directly reachable while preserving its own page title', () => {
+    expect(resolveSettingsNavigationSectionId('sending')).toBe('sending');
+    expect(getSettingsNavigationContext('sending').item.label).toBe('发送');
     expect(getSettingsSectionPresentation('sending').label).toBe('发送');
   });
 
@@ -47,7 +47,7 @@ describe('settingsNavigation v3 information architecture', () => {
 
   it('puts the core destinations into deliberate groups', () => {
     expect(settingsNavigationGroups.find((group) => group.label === '常用')?.items.map((item) => item.id))
-      .toEqual(['appearance', 'accounts', 'notifications']);
+      .toEqual(['appearance', 'accounts', 'sending', 'notifications']);
     expect(settingsNavigationGroups.find((group) => group.label === '智能')?.items.map((item) => item.id))
       .toEqual(['ai']);
     expect(settingsNavigationGroups.find((group) => group.label === '效率工具')?.items.map((item) => item.id))

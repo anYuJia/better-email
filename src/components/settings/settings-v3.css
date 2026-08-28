@@ -168,17 +168,28 @@
   font-size: 10px;
 }
 
-.settings-account-picker select {
+.settings-account-picker .custom-select-menu {
   min-width: 180px;
   max-width: 330px;
+}
+
+.settings-account-picker .custom-select-summary {
   height: 28px;
-  padding: 0 24px 0 8px;
-  border: 1px solid var(--st-border);
+  min-height: 28px;
+  padding-inline: 8px;
   border-radius: 7px;
   color: var(--st-text);
   background: var(--st-surface);
   font: inherit;
   font-size: 11px;
+}
+
+.settings-account-picker .custom-select-summary strong {
+  font-size: 11px;
+}
+
+.settings-account-picker .custom-select-summary small {
+  font-size: 10px;
 }
 
 .settings-account-current {
@@ -562,7 +573,7 @@
   }
 
   .settings-account-workspace-topline { padding-inline: 14px; }
-  .settings-account-picker select { max-width: 260px; }
+  .settings-account-picker .custom-select-menu { max-width: 260px; }
   .settings-context-tabs { padding-inline: 10px; }
 }
 

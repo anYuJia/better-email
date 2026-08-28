@@ -6,8 +6,6 @@ describe('SettingsFrame dialog behavior', () => {
   let modalRef: HTMLElement | null = null;
 
   beforeEach(() => {
-    // jsdom has no layout, so offsetParent is always null; stub it so the
-    // focus trap can enumerate visible focusable elements.
     Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
       configurable: true,
       get() {
@@ -29,6 +27,7 @@ describe('SettingsFrame dialog behavior', () => {
     isDirty = false,
     onSave = () => undefined,
     onTestConnection = () => undefined,
+    onNavigate = () => undefined,
   }: {
     onClose?: () => void;
     activeSection?: Parameters<typeof SettingsFrame>[0]['activeSection'];
@@ -36,6 +35,7 @@ describe('SettingsFrame dialog behavior', () => {
     isDirty?: boolean;
     onSave?: () => void;
     onTestConnection?: () => void;
+    onNavigate?: (section: Parameters<typeof SettingsFrame>[0]['activeSection']) => void;
   } = {}) {
     const utils = render(
       <div data-testid="app-shell">
@@ -44,7 +44,7 @@ describe('SettingsFrame dialog behavior', () => {
           title="设置"
           subtitle="work@example.com"
           activeSection={activeSection}
-          onNavigate={() => undefined}
+          onNavigate={onNavigate}
           onTestConnection={onTestConnection}
           onSave={onSave}
           canSaveAndVerify={canSaveAndVerify}
@@ -59,10 +59,24 @@ describe('SettingsFrame dialog behavior', () => {
     return utils;
   }
 
-  it('renders the dialog with role and label', () => {
+  it('renders the dialog and hides account context on global pages', () => {
     renderFrame();
     expect(screen.getByRole('dialog', { name: '设置' })).not.toBeNull();
+    expect(screen.queryByText('work@example.com')).toBeNull();
+  });
+
+  it('shows account context and scoped tabs inside the account workspace', () => {
+    renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
     expect(screen.getByText('work@example.com')).not.toBeNull();
+    expect(screen.getByRole('navigation', { name: '账号设置分类' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '身份与签名' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '隐私' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('disables account detail tabs when no account exists', () => {
+    renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
+    expect(screen.getByRole('button', { name: '服务器' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '概览' })).not.toBeDisabled();
   });
 
   it('marks background siblings inert and aria-hidden while open', () => {
@@ -196,5 +210,13 @@ describe('SettingsFrame dialog behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
     expect(onTestConnection).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
+  });
+
+  it('uses one General navigation entry with inner appearance and sending tabs', () => {
+    const onNavigate = vi.fn();
+    renderFrame({ activeSection: 'sending', onNavigate });
+    const tabs = screen.getByRole('navigation', { name: '通用设置分类' });
+    fireEvent.click(within(tabs).getByRole('button', { name: '外观' }));
+    expect(onNavigate).toHaveBeenCalledWith('appearance');
   });
 });

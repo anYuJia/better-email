@@ -3,6 +3,7 @@ import type { OutboundAttachmentInput } from '../app/types';
 import { getCurrentWindow, invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 import { logError } from '../app/logger';
+import { importNativeDroppedAttachmentPaths } from '../app/nativeDroppedAttachments';
 
 type ComposerAttachmentsOptions = {
   isComposerOpen: boolean;
@@ -37,50 +38,6 @@ export default function useComposerAttachments({
 }: ComposerAttachmentsOptions) {
   const [isComposerDropActive, setComposerDropActive] = useState(false);
 
-  useEffect(() => {
-    if (!isComposerOpen) return undefined;
-    let active = true;
-    let unlisten: (() => void) | undefined;
-
-    getCurrentWindow().onDragDropEvent(async (event) => {
-      if (!active) return;
-      if (event.type === 'enter' || event.type === 'over') {
-        setComposerDropActive(true);
-        return;
-      }
-      if (event.type === 'leave') {
-        setComposerDropActive(false);
-        return;
-      }
-      setComposerDropActive(false);
-      const paths = event.paths.filter((path) => path.trim());
-      if (paths.length === 0) {
-        setStatus('拖拽内容中没有文件');
-        return;
-      }
-      // 操作系统拖放只暴露路径，renderer 可伪造任意路径，后端不能据此授权文件。
-      // 因此 OS 拖放不再走路径 IPC（outbound_attachments_from_paths 已移除），
-      // 回退到原生文件选择器流程（由后端登记具体文件）。
-      // HTML5 拖放 / 粘贴（File 对象）仍走 save_temp_attachment，由后端写私有临时文件。
-      setStatus('已捕获系统拖放文件，请通过「选择附件」选择要附加的文件');
-      void pickDraftAttachments().catch((error) => {
-        setStatus(`附件选择失败：${String(error)}`);
-      });
-    })
-      .then((nextUnlisten) => {
-        unlisten = nextUnlisten;
-      })
-      .catch((error) => {
-        setStatus(`附件拖拽不可用：${String(error)}`);
-      });
-
-    return () => {
-      active = false;
-      setComposerDropActive(false);
-      unlisten?.();
-    };
-  }, [isComposerOpen, onAttachmentsReady]);
-
   function setDropActive(next: boolean) {
     setComposerDropActive(next);
   }
@@ -98,6 +55,63 @@ export default function useComposerAttachments({
   function clearAttachmentProgress() {
     setAttachmentProgress?.(null);
   }
+
+  useEffect(() => {
+    if (!isComposerOpen) return undefined;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+
+    getCurrentWindow().onDragDropEvent(async (event) => {
+      if (!active) return;
+      if (event.type === 'enter' || event.type === 'over') {
+        setComposerDropActive(true);
+        return;
+      }
+      if (event.type === 'leave') {
+        setComposerDropActive(false);
+        return;
+      }
+
+      setComposerDropActive(false);
+      const paths = event.paths.filter((path) => path.trim());
+      if (paths.length === 0) {
+        setStatus('拖拽内容中没有文件');
+        return;
+      }
+
+      setStatus(`正在导入附件 (${paths.length} 个)...`);
+      setAttachmentProgress?.(0);
+      try {
+        const result = await importNativeDroppedAttachmentPaths(paths, reportAttachmentProgress);
+        if (!active) return;
+        if (result.attachments.length > 0) {
+          onAttachmentsReady(result.attachments, '已拖入附件');
+        }
+        if (result.failed > 0) {
+          const prefix = result.attachments.length > 0
+            ? `已添加 ${result.attachments.length} 个附件，${result.failed} 个失败`
+            : '添加拖入附件失败';
+          setStatus(result.firstError ? `${prefix}：${result.firstError}` : prefix);
+        }
+      } catch (error) {
+        if (active) setStatus(`添加拖入附件失败：${String(error)}`);
+      } finally {
+        clearAttachmentProgress();
+      }
+    })
+      .then((nextUnlisten) => {
+        unlisten = nextUnlisten;
+      })
+      .catch((error) => {
+        setStatus(`附件拖拽不可用：${String(error)}`);
+      });
+
+    return () => {
+      active = false;
+      setComposerDropActive(false);
+      unlisten?.();
+    };
+  }, [isComposerOpen, onAttachmentsReady, setAttachmentProgress, setStatus]);
 
   async function pickDraftAttachments() {
     const newAttachments = await invoke<OutboundAttachmentInput[]>(IPC.PickOutboundAttachments);
@@ -148,7 +162,7 @@ export default function useComposerAttachments({
     if (validFiles.length === 0) return;
 
     const totalFiles = validFiles.length;
-    setStatus(`正在导入附件...`);
+    setStatus('正在导入附件...');
     reportAttachmentProgress(0, totalFiles);
     try {
       const savedAttachments: OutboundAttachmentInput[] = [];

@@ -1,3 +1,5 @@
+@import './settings-layout-contract.css';
+
 /*
  * Settings tokens.
  * The --st-* names are a local component contract; values come from the

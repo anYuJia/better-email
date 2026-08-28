@@ -32,6 +32,18 @@ function focusSearchTarget(entry: SettingsSearchEntry) {
       ? document.querySelector<HTMLElement>(`[data-settings-section="${entry.target}"]`)
       : document.querySelector<HTMLElement>(`[data-settings-page="${entry.section}"]`);
     if (!target) return;
+
+    const disclosures = [
+      ...(target instanceof HTMLDetailsElement ? [target] : []),
+      ...Array.from(target.querySelectorAll<HTMLDetailsElement>('details')),
+    ];
+    let ancestor = target.parentElement;
+    while (ancestor) {
+      if (ancestor instanceof HTMLDetailsElement) disclosures.push(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+    disclosures.forEach((details) => { details.open = true; });
+
     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     target.classList.add('settings-search-hit');
     window.setTimeout(() => target.classList.remove('settings-search-hit'), 1200);

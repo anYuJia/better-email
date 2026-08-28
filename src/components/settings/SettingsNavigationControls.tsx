@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import {
+  resolveSettingsNavigationSectionId,
   settingsNavigationGroups,
   type SettingsNavigationItem,
   type SettingsSectionId,
@@ -29,6 +30,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   const [query, setQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
+  const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -56,7 +58,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   }, [normalizedQuery]);
 
   const totalMatchCount = useMemo(() => {
-    return filteredGroups.reduce((acc, g) => acc + g.items.length, 0);
+    return filteredGroups.reduce((acc, group) => acc + group.items.length, 0);
   }, [filteredGroups]);
 
   return (
@@ -95,7 +97,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
             <span className="settings-nav-group">{group.label}</span>
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active = activeSection === item.id;
+              const active = resolvedActiveSection === item.id;
               return (
                 <button
                   type="button"
@@ -143,6 +145,7 @@ export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
   const containerRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLButtonElement>(null);
   const ActiveIcon = activeItem.icon;
+  const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -155,9 +158,6 @@ export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      // The page picker is a nested transient layer. It owns the first
-      // Escape, so the SettingsFrame window listener must not also close the
-      // entire settings workspace in the same key press.
       event.preventDefault();
       event.stopPropagation();
       setOpen(false);
@@ -204,7 +204,7 @@ export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
                 <button
                   type="button"
                   role="menuitem"
-                  className={item.id === activeSection ? 'active' : ''}
+                  className={item.id === resolvedActiveSection ? 'active' : ''}
                   key={item.id}
                   onClick={() => {
                     onNavigate(item.id);

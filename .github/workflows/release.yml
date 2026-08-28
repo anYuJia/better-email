@@ -87,6 +87,10 @@ jobs:
         run: npm run test:ui
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable
+          # Compose reference fixtures pin wall-clock expectations to UTC+8.
+          # Keep Chromium/Node on the same timezone so CI does not render 03:05
+          # while the fixture contract correctly expects 11:05.
+          TZ: Asia/Shanghai
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml

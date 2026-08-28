@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, KeyRound, RefreshCw, Save, Server, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, KeyRound, RefreshCw, Server, ShieldCheck } from 'lucide-react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
@@ -70,8 +70,6 @@ export default function AccountSettingsPage({
   const [addAccountSubmitting, setAddAccountSubmitting] = useState(false);
   const [addAccountStage, setAddAccountStage] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [overviewSaving, setOverviewSaving] = useState(false);
-  const [overviewError, setOverviewError] = useState('');
 
   useEffect(() => {
     if (!addDialogOpen) {
@@ -157,19 +155,6 @@ export default function AccountSettingsPage({
     });
   }
 
-  async function saveOverview() {
-    if (!accountForm || !onSaveAccountSettings || overviewSaving) return;
-    setOverviewSaving(true);
-    setOverviewError('');
-    try {
-      await onSaveAccountSettings(accountForm);
-    } catch (error) {
-      setOverviewError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setOverviewSaving(false);
-    }
-  }
-
   return (
     <>
       <AccountList
@@ -180,10 +165,7 @@ export default function AccountSettingsPage({
           setDeleteDialogOpen(false);
           setAddDialogOpen(true);
         }}
-        onSelect={(account) => {
-          setOverviewError('');
-          onAccountFormChange(account);
-        }}
+        onSelect={onAccountFormChange}
         onDelete={(account) => {
           setAddDialogOpen(false);
           onAccountFormChange(account);
@@ -195,17 +177,6 @@ export default function AccountSettingsPage({
         <SettingsSection
           title={accountForm.display_name || accountForm.email}
           description={`${accountForm.email} · ${accountForm.provider}`}
-          actions={onSaveAccountSettings ? (
-            <SettingsButton
-              size="sm"
-              variant="primary"
-              icon={<Save size={14} />}
-              disabled={overviewSaving}
-              onClick={() => { void saveOverview(); }}
-            >
-              {overviewSaving ? '保存中…' : '保存概览'}
-            </SettingsButton>
-          ) : undefined}
           className="settings-account-overview"
           dataSection="account-overview"
         >
@@ -248,8 +219,6 @@ export default function AccountSettingsPage({
               auto_download_attachments: checked,
             })}
           />
-
-          {overviewError && <p className="st-field-error" role="alert">{overviewError}</p>}
 
           <div className="settings-account-quick-links" aria-label="账号详细设置">
             {accountQuickLinks.map((item) => {

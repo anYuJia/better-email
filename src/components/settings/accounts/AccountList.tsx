@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { AtSign, Plus } from 'lucide-react';
 import type { Account } from '../../../app/types';
-import type { AccountDialogMode } from './accountSettingsShared';
 import { SettingsButton } from '../shared';
 
 type AccountListProps = {
@@ -9,19 +8,22 @@ type AccountListProps = {
   activeAccountId: number | null;
   accountCount: number;
   onAdd: () => void;
-  onOpen: (account: Account, mode: AccountDialogMode) => void;
+  onSelect: (account: Account) => void;
+  onDelete: (account: Account) => void;
 };
 
 type AccountRowProps = {
   account: Account;
   active: boolean;
-  onOpen: (account: Account, mode: AccountDialogMode) => void;
+  onSelect: (account: Account) => void;
+  onDelete: (account: Account) => void;
 };
 
 const AccountRow = memo(function AccountRow({
   account,
   active,
-  onOpen,
+  onSelect,
+  onDelete,
 }: AccountRowProps) {
   return (
     <div
@@ -32,7 +34,8 @@ const AccountRow = memo(function AccountRow({
       <button
         type="button"
         className="settings-account-row-main"
-        onClick={() => onOpen(account, 'config')}
+        aria-pressed={active}
+        onClick={() => onSelect(account)}
       >
         <span className="settings-account-row-icon" aria-hidden="true">
           <AtSign size={16} />
@@ -47,12 +50,11 @@ const AccountRow = memo(function AccountRow({
         {account.is_default && <em>默认</em>}
       </span>
       <span className="settings-account-row-actions" aria-label="账号操作">
-        <SettingsButton size="sm" onClick={() => onOpen(account, 'config')}>配置</SettingsButton>
         <SettingsButton
           size="sm"
           variant="ghost"
           className="settings-account-delete-button"
-          onClick={() => onOpen(account, 'delete')}
+          onClick={() => onDelete(account)}
         >
           删除
         </SettingsButton>
@@ -66,14 +68,15 @@ export default function AccountList({
   activeAccountId,
   accountCount,
   onAdd,
-  onOpen,
+  onSelect,
+  onDelete,
 }: AccountListProps) {
   return (
     <section className="st-section settings-account-list-panel" aria-labelledby="settings-account-list-title">
       <header className="st-section-header">
         <span className="st-section-heading">
           <strong id="settings-account-list-title">邮箱账号</strong>
-          <small>{accountCount} 个账号</small>
+          <small>选择账号后，在右侧工作区统一管理它的所有设置 · {accountCount} 个账号</small>
         </span>
         <span className="st-section-meta">
           <SettingsButton variant="primary" size="sm" icon={<Plus size={14} />} onClick={onAdd}>
@@ -87,7 +90,8 @@ export default function AccountList({
             key={account.id}
             account={account}
             active={account.id === activeAccountId}
-            onOpen={onOpen}
+            onSelect={onSelect}
+            onDelete={onDelete}
           />
         ))}
       </div>

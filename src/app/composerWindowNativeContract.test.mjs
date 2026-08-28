@@ -33,6 +33,11 @@ describe('standalone composer native-window lifecycle contract', () => {
     expect(openComposer.match(/composerWindow\.emit\(COMPOSER_OPEN_EVENT\)/g)).toHaveLength(2);
   });
 
+  it('prewarms through the same renderer-ready handshake used by explicit opens', () => {
+    const prewarmComposer = exportedFunction(bridgeSource, 'prodPrewarmComposerWindow');
+    expect(prewarmComposer).toContain('waitForComposerWindowReady(await getComposerWindow())');
+  });
+
   it('does not wait for an animation frame to reveal a hidden native WebView', () => {
     const revealEffectStart = standaloneSource.indexOf('if (!shouldRevealWindow || closingRef.current)');
     expect(revealEffectStart).toBeGreaterThanOrEqual(0);

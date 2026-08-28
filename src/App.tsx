@@ -205,12 +205,13 @@ function MailboxApp() {
   const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';
 
   useEffect(() => {
-    if (!useNativeComposerWindow || !initialAccountListLoaded) return undefined;
-    const timer = window.setTimeout(() => {
-      void prewarmComposerWindow().catch(() => undefined);
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [initialAccountListLoaded, useNativeComposerWindow]);
+    if (!useNativeComposerWindow || !initialAccountListLoaded || accounts.length === 0) return undefined;
+    // The composer is a separate native WebView. Start its full boot while
+    // the mailbox is settling so the first explicit compose action can reuse
+    // an already-ready window instead of paying the startup cost.
+    void prewarmComposerWindow().catch(() => undefined);
+    return undefined;
+  }, [accounts.length, initialAccountListLoaded, useNativeComposerWindow]);
 
   useEffect(() => {
     let active = true;

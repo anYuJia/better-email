@@ -166,54 +166,70 @@ async function waitForComposerWindowReady(composerWindow: ComposerNativeWindow):
 }
 
 async function ensureComposerWindow(): Promise<void> {
-  // If a prewarm/create is already running, wait for the real native window
-  // creation event instead of treating a half-created WebviewWindow as ready.
+  // If a prewarm/create is already running, wait for the same single-flight
+  // operation instead of treating a half-created WebviewWindow as ready.
   if (composerWindowCreation) {
     await composerWindowCreation;
     return;
   }
 
-  const { WebviewWindow } = await loadWebviewWindow();
-  const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-  if (existing) return;
+  // Assign the promise before the first await. The prewarm effect and a user
+  // click can enter this function in the same turn; both must share one
+  // native-window creation rather than racing to create two windows.
+  const creation = (async () => {
+    const { WebviewWindow } = await loadWebviewWindow();
+    const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+    if (existing) return;
 
-  // A previous composer may have been destroyed as a close fallback. Its
-  // readiness must never be reused for the replacement window.
-  composerWindowReady = null;
-  const composeUrl = new URL(window.location.href);
-  composeUrl.search = '?window=compose&prewarm=1';
-  composeUrl.hash = '';
-  const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
-    url: composeUrl.toString(),
-    title: '写邮件',
-    width: 960,
-    height: 700,
-    minWidth: 760,
-    minHeight: 560,
-    resizable: true,
-    decorations: true,
-    titleBarStyle: 'visible',
-    hiddenTitle: false,
-    focus: false,
-    visible: false,
-    skipTaskbar: false,
-  });
-  composerWindowCreation = new Promise<void>((resolve, reject) => {
-    void child.once('tauri://created', () => resolve());
-    void child.once('tauri://error', (event) => {
-      reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
+    // A previous composer may have been destroyed as a close fallback. Its
+    // readiness must never be reused for the replacement window.
+    composerWindowReady = null;
+    const composeUrl = new URL(window.location.href);
+    composeUrl.search = '?window=compose&prewarm=1';
+    composeUrl.hash = '';
+    const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
+      url: composeUrl.toString(),
+      title: '写邮件',
+      width: 960,
+      height: 700,
+      minWidth: 760,
+      minHeight: 560,
+      resizable: true,
+      decorations: true,
+      titleBarStyle: 'visible',
+      hiddenTitle: false,
+      focus: false,
+      visible: false,
+      skipTaskbar: false,
     });
-  });
+    await new Promise<void>((resolve, reject) => {
+      void child.once('tauri://created', () => resolve());
+      void child.once('tauri://error', (event) => {
+        reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
+      });
+    });
+  })();
+  composerWindowCreation = creation;
 
   try {
-    await composerWindowCreation;
+    await creation;
   } finally {
-    composerWindowCreation = null;
+    if (composerWindowCreation === creation) composerWindowCreation = null;
   }
+}
+
+async function getComposerWindow(): Promise<ComposerNativeWindow> {
+  const { WebviewWindow } = await loadWebviewWindow();
+  const composerWindow = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
+  if (!composerWindow) {
+    throw new Error('独立写信窗口创建完成后仍不可用');
+  }
+  return composerWindow;
 }
 
 export async function prodPrewarmComposerWindow(): Promise<void> {
   await ensureComposerWindow();
+  await waitForComposerWindowReady(await getComposerWindow());
 }
 
 export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
@@ -222,11 +238,7 @@ export async function prodOpenComposerWindow(request: ComposerWindowRequest): Pr
   await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
   await ensureComposerWindow();
 
-  const { WebviewWindow } = await loadWebviewWindow();
-  const composerWindow = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-  if (!composerWindow) {
-    throw new Error('独立写信窗口创建完成后仍不可用');
-  }
+  const composerWindow = await getComposerWindow();
 
   await composerWindow.emit(COMPOSER_OPEN_EVENT);
   await waitForComposerWindowReady(composerWindow);

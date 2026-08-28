@@ -43,6 +43,7 @@ vi.mock('@tauri-apps/api/webviewWindow', () => ({
 import {
   prodCloseCurrentWindow,
   prodOpenComposerWindow,
+  prodPrewarmComposerWindow,
 } from './tauriBridge.prod';
 
 const composerWindow = {
@@ -69,18 +70,19 @@ describe('production composer window bridge', () => {
     });
   });
 
-  it('waits for renderer readiness and never shows a blank native window', async () => {
+  it('prewarms the renderer and reuses readiness without exposing a blank window', async () => {
+    await prodPrewarmComposerWindow();
     await prodOpenComposerWindow({ restoreAutosave: true });
 
     expect(mocks.emit.mock.calls.map(([event]) => event)).toEqual([
-      COMPOSER_OPEN_EVENT,
       COMPOSER_READY_QUERY_EVENT,
       COMPOSER_OPEN_EVENT,
+      COMPOSER_OPEN_EVENT,
     ]);
+    expect(mocks.unlisten).toHaveBeenCalledOnce();
     expect(mocks.show).not.toHaveBeenCalled();
     expect(mocks.unminimize).not.toHaveBeenCalled();
     expect(mocks.setFocus).not.toHaveBeenCalled();
-    expect(mocks.unlisten).toHaveBeenCalledOnce();
   });
 
   it('destroys the composer on the first close when hide is unavailable', async () => {

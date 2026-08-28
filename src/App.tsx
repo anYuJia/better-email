@@ -3,7 +3,6 @@ import React, {
   Suspense,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -57,6 +56,7 @@ import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
 import useThemeMode from './hooks/useThemeMode';
 import useAutoHideScrollbars from './hooks/useAutoHideScrollbars';
+import useFirstMessageRowPaint from './hooks/useFirstMessageRowPaint';
 import {
   type NotificationPolicy,
 } from './mailUtils';
@@ -69,7 +69,6 @@ import {
   openComposerWindow,
   prewarmComposerWindow,
 } from './tauriBridge';
-import { reportStartupMilestone } from './startupTelemetry';
 import type {
   AccountScope,
   Account,
@@ -164,22 +163,7 @@ function MailboxApp() {
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageSummary[]>([]);
-  const firstMessageRowPaintedRef = useRef(false);
-  useLayoutEffect(() => {
-    if (messages.length === 0 || firstMessageRowPaintedRef.current) return undefined;
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        if (firstMessageRowPaintedRef.current) return;
-        firstMessageRowPaintedRef.current = true;
-        void reportStartupMilestone('first_message_row_painted');
-      });
-    });
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-    };
-  }, [messages.length]);
+  useFirstMessageRowPaint(messages.length);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const skipNextFolderEffectLoadRef = useRef(false);

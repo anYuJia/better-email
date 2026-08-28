@@ -99,6 +99,7 @@ describe('message list summary single-line rendering', () => {
     renderCard(messageWithLongPreview());
 
     expect(document.querySelector('.message-card')?.getAttribute('data-message-id')).toBe('1');
+    expect(document.querySelector('.message-card')?.getAttribute('data-folder-role')).toBe('inbox');
     const preview = document.querySelector<HTMLParagraphElement>('.message-card p');
     expect(preview).not.toBeNull();
 

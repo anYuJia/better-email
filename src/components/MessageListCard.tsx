@@ -121,6 +121,7 @@ export default React.memo(function MessageListCard({
         isNew ? 'is-new' : '',
       ].filter(Boolean).join(' ')}
       data-message-id={message.id}
+      data-folder-role={message.folder_role}
       style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
       draggable
       onClick={() => onSelectMessage(message.id)}

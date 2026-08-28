@@ -332,6 +332,8 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
         is_starred: true,
         labels: ['工作'],
         snoozed_until: '',
+        remote_mailbox: 'INBOX',
+        remote_uid: current.remote_uid + 1000,
       },
       remote: { message: '已恢复' },
     } as never);
@@ -347,6 +349,12 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
     expect(mocks.loadMeta).toHaveBeenCalledWith(101);
     expect(mocks.loadMessages).toHaveBeenCalledWith(101);
     expect(mocks.visibleFolderIdForRole).not.toHaveBeenCalled();
+    expect(mocks.patchSelectedDetailMetadata).toHaveBeenCalledWith(current.id, expect.objectContaining({
+      folder_id: 101,
+      folder_role: 'inbox',
+      remote_mailbox: 'INBOX',
+      remote_uid: current.remote_uid + 1000,
+    }));
     expect(mocks.setSelectedId).toHaveBeenLastCalledWith(next.id);
     expect(mocks.queueUndoAction).toHaveBeenCalledWith(
       undoTitle,

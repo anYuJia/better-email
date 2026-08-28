@@ -424,13 +424,20 @@ async function closeComposer(cdp) {
   });
 }
 
-async function openCardContextMenu(cdp, subject) {
-  return withStep(`openCardContextMenu ${subject}`, async () => {
-    await waitForExpression(cdp, `[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes(${JSON.stringify(subject)}))`);
+async function openCardContextMenu(cdp, subject, expectedFolderRole = null) {
+  const subjectLiteral = JSON.stringify(subject);
+  const rolePredicate = expectedFolderRole === null
+    ? ''
+    : ` && item.getAttribute('data-folder-role') === ${JSON.stringify(expectedFolderRole)}`;
+  const cardPredicate = `(item) => item.textContent.includes(${subjectLiteral})${rolePredicate}`;
+  const roleDescription = expectedFolderRole === null ? '' : ` in ${expectedFolderRole}`;
+
+  return withStep(`openCardContextMenu ${subject}${roleDescription}`, async () => {
+    await waitForExpression(cdp, `[...document.querySelectorAll('.message-card')].some(${cardPredicate})`);
     await evalInPage(
       cdp,
       `(() => {
-        const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes(${JSON.stringify(subject)}));
+        const card = [...document.querySelectorAll('.message-card')].find(${cardPredicate});
         if (!card) throw new Error('Context menu target card not found: ${subject}');
         card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 }));
       })()`,
@@ -2191,8 +2198,8 @@ async function main() {
     await clickContextMenuItem(cdp, '标为垃圾邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('已标为垃圾邮件')");
     await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.querySelector('.folder.active')?.getAttribute('data-folder-role') === 'spam'");
-    await openCardContextMenu(cdp, '安全检查清单');
+    await waitForExpression(cdp, "document.querySelector('.folder.active[data-folder-role=\"spam\"]') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单') && item.getAttribute('data-folder-role') === 'spam')");
+    await openCardContextMenu(cdp, '安全检查清单', 'spam');
     await clickContextMenuItem(cdp, '不是垃圾邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('已标记为不是垃圾邮件：安全检查清单')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
@@ -2895,8 +2902,8 @@ async function main() {
     await clickContextMenuItem(cdp, '标为垃圾邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('已标为垃圾邮件：安全检查清单')");
     await clickButton(cdp, '垃圾邮件', "document.querySelector('.primary-folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.querySelector('.folder.active')?.getAttribute('data-folder-role') === 'spam'");
-    await openCardContextMenu(cdp, '安全检查清单');
+    await waitForExpression(cdp, "document.querySelector('.folder.active[data-folder-role=\"spam\"]') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单') && item.getAttribute('data-folder-role') === 'spam')");
+    await openCardContextMenu(cdp, '安全检查清单', 'spam');
     await waitForExpression(cdp, "[...document.querySelectorAll('.context-menu button')].some((item) => item.textContent.includes('不是垃圾邮件'))");
     await clickContextMenuItem(cdp, '不是垃圾邮件');
     await waitForExpression(cdp, "document.body.innerText.includes('已标记为不是垃圾邮件：安全检查清单')");

@@ -128,6 +128,8 @@ export default function useSelectedMessageActions({
         is_starred: result.restored.is_starred,
         labels: result.restored.labels,
         snoozed_until: result.restored.snoozed_until,
+        remote_mailbox: result.restored.remote_mailbox,
+        remote_uid: result.restored.remote_uid,
       });
       await refreshSourceAndSelectNeighbor(selected.id);
       setStatus('已移回收件箱，并标记为不是垃圾邮件');
@@ -145,6 +147,8 @@ export default function useSelectedMessageActions({
         is_starred: result.restored.is_starred,
         labels: result.restored.labels,
         snoozed_until: result.restored.snoozed_until,
+        remote_mailbox: result.restored.remote_mailbox,
+        remote_uid: result.restored.remote_uid,
       });
       await refreshSourceAndSelectNeighbor(selected.id);
       setStatus(result.remote.message);

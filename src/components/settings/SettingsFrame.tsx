@@ -35,6 +35,7 @@ type SettingsAccountOption = {
 
 type SettingsFrameProps = {
   title: string;
+  subtitle?: string;
   activeSection: SettingsSectionId;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
@@ -76,6 +77,7 @@ const accountWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
 function SettingsAccountWorkspace({
   activeSection,
   canUseAccountTabs,
+  currentAccountLabel,
   accountOptions,
   activeAccountId,
   connectionSummary,
@@ -84,6 +86,7 @@ function SettingsAccountWorkspace({
 }: {
   activeSection: SettingsSectionId;
   canUseAccountTabs: boolean;
+  currentAccountLabel: string;
   accountOptions: SettingsAccountOption[];
   activeAccountId: number | null;
   connectionSummary?: string;
@@ -94,27 +97,32 @@ function SettingsAccountWorkspace({
 
   const hasConnectionSummary = Boolean(connectionSummary)
     && connectionSummary !== '尚未开始验证';
+  const canSwitchAccount = accountOptions.length > 0 && Boolean(onSelectAccountId);
 
   return (
     <div className="settings-account-workspace">
       <div className="settings-account-workspace-topline">
-        <label className="settings-account-picker">
-          <span>当前账号</span>
-          <select
-            aria-label="切换当前设置账号"
-            value={activeAccountId ?? ''}
-            disabled={accountOptions.length === 0 || !onSelectAccountId}
-            onChange={(event) => onSelectAccountId?.(Number(event.target.value))}
-          >
-            {accountOptions.length === 0 ? (
-              <option value="">尚未添加账号</option>
-            ) : accountOptions.map((account) => (
-              <option value={account.id} key={account.id}>
-                {account.label} · {account.email}
-              </option>
-            ))}
-          </select>
-        </label>
+        {canSwitchAccount ? (
+          <label className="settings-account-picker">
+            <span>当前账号</span>
+            <select
+              aria-label="切换当前设置账号"
+              value={activeAccountId ?? ''}
+              onChange={(event) => onSelectAccountId?.(Number(event.target.value))}
+            >
+              {accountOptions.map((account) => (
+                <option value={account.id} key={account.id}>
+                  {account.label} · {account.email}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="settings-account-current">
+            <small>当前账号</small>
+            <strong>{currentAccountLabel || '尚未添加账号'}</strong>
+          </span>
+        )}
         {hasConnectionSummary && (
           <span className="settings-account-connection-state" title={connectionSummary}>
             {connectionSummary}
@@ -145,6 +153,7 @@ function SettingsAccountWorkspace({
 
 export default function SettingsFrame({
   title,
+  subtitle = '',
   activeSection,
   children,
   onNavigate,
@@ -304,6 +313,7 @@ export default function SettingsFrame({
             <SettingsAccountWorkspace
               activeSection={activeSection}
               canUseAccountTabs={canSaveAndVerify}
+              currentAccountLabel={subtitle}
               accountOptions={accountOptions}
               activeAccountId={activeAccountId}
               connectionSummary={connectionSummary}

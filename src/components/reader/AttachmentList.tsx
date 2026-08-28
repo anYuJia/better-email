@@ -1,6 +1,7 @@
 import { Download } from 'lucide-react';
 import type { Attachment } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
+import { AttachmentIcon, attachmentIconAsset } from '../attachmentIcon';
 import { attachmentIcon, attachmentKind, attachmentTypeDescription } from './attachmentUtils';
 import type { AttachmentContextMenu } from './useImagePreview';
 
@@ -57,6 +58,7 @@ export default function AttachmentList({
           const downloading = downloadingIds.has(attachment.id);
           const transferError = errors[attachment.id] ?? '';
           const kind = attachmentKind(attachment);
+          const hasCustomIcon = Boolean(attachmentIconAsset(attachment.filename, attachment.mime_type));
           const canPreview = kind === 'image';
           return (
             <div
@@ -71,8 +73,12 @@ export default function AttachmentList({
                 onContextMenu({ attachment, x: event.clientX, y: event.clientY });
               }}
             >
-              <span className={`attachment-file-icon attachment-file-icon-${kind}`} aria-hidden="true">
-                {attachmentIcon(attachment)}
+              <span className={`attachment-file-icon attachment-file-icon-${kind}${hasCustomIcon ? ' attachment-file-icon-has-asset' : ''}`} aria-hidden="true">
+                <AttachmentIcon
+                  filename={attachment.filename}
+                  mimeType={attachment.mime_type}
+                  fallback={attachmentIcon(attachment)}
+                />
               </span>
               <span className="attachment-copy">
                 <strong>{attachment.filename}</strong>

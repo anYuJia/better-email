@@ -150,6 +150,10 @@
   right: 0;
   bottom: 0;
   z-index: 5;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   flex-wrap: nowrap;
   gap: 8px;
   padding: 10px 14px 11px;
@@ -158,12 +162,14 @@
   border-top: 1px solid var(--ui-border);
   background: var(--ui-surface);
   overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
 
 .composer .composer-attachment-tile {
-  width: auto;
-  min-width: 0;
+  width: 190px;
+  min-width: 190px;
   min-height: 62px;
   flex: 0 0 190px;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -218,6 +224,8 @@
   }
 
   .composer .composer-attachment-tile {
+    width: 168px;
+    min-width: 168px;
     flex-basis: 168px;
   }
 }

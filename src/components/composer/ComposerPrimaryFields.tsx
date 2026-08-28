@@ -3,6 +3,7 @@ import type React from 'react';
 import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput, OutboundAttachmentInput } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
+import { AttachmentIcon, attachmentIconAsset } from '../attachmentIcon';
 import { buildContactSearchEntries } from './contactSuggestions';
 import RecipientField from './RecipientField';
 import {
@@ -516,15 +517,22 @@ export default function ComposerPrimaryFields({
           <section className="composer-body-attachments composer-attachment-list" aria-label="附件">
             {regularAttachments.map((attachment) => {
               const iconMeta = attachmentIconMeta(attachment.filename, attachment.mime_type);
+              const customIcon = attachmentIconAsset(attachment.filename, attachment.mime_type);
               const attachmentIndex = draft.attachments.indexOf(attachment);
               return (
                 <article className={`composer-attachment-tile attachment-${iconMeta.tone}`} key={`${attachment.filename}-${attachmentIndex}`}>
-                  <span className="composer-attachment-filemark" aria-hidden="true">
-                    <span className="composer-attachment-filemark-fold" />
-                    <span className="composer-attachment-filemark-icon">
-                      {iconMeta.icon}
-                    </span>
-                    <span className="composer-attachment-filemark-label">{iconMeta.label}</span>
+                  <span className={`composer-attachment-filemark${customIcon ? ' composer-attachment-filemark-has-asset' : ''}`} aria-hidden="true">
+                    {customIcon ? (
+                      <AttachmentIcon filename={attachment.filename} mimeType={attachment.mime_type} />
+                    ) : (
+                      <>
+                        <span className="composer-attachment-filemark-fold" />
+                        <span className="composer-attachment-filemark-icon">
+                          {iconMeta.icon}
+                        </span>
+                        <span className="composer-attachment-filemark-label">{iconMeta.label}</span>
+                      </>
+                    )}
                   </span>
                   <span className="composer-attachment-tile-copy">
                     <strong title={attachment.filename}>{attachment.filename}</strong>

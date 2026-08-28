@@ -661,6 +661,30 @@
   background: var(--ui-warning-bg);
 }
 
+/* The supplied file artwork already includes the document shape and label;
+ * remove the CSS file mockup around it while keeping the tile compact. */
+.composer .composer-attachment-filemark.composer-attachment-filemark-has-asset,
+:root[data-theme="dark"] .composer .composer-attachment-filemark.composer-attachment-filemark-has-asset {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: var(--ui-box-shadow-none);
+}
+
+.composer .composer-attachment-filemark-has-asset::after,
+:root[data-theme="dark"] .composer .composer-attachment-filemark-has-asset::after {
+  display: none;
+}
+
+.composer .composer-attachment-filemark-has-asset img {
+  width: auto;
+  height: auto;
+  max-width: 38px;
+  max-height: 42px;
+  display: block;
+  object-fit: contain;
+}
+
 .composer-attachment-tile-copy {
   min-width: 0;
   display: grid;

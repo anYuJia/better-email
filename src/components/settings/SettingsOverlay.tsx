@@ -256,8 +256,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   propsRef.current = props;
   const handlers = useMemo(() => createSettingsHandlers(propsRef), []);
 
-  // Split the incoming state into per-section prop slices so a change in one
-  // section's data does not re-render the pages of other sections.
   const accountProps = useMemo(() => ({
     accounts: props.accounts,
     accountForm: props.accountForm,
@@ -464,7 +462,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               )}
             </>
           )}
-          {isExperienceSection && accountForm && (
+          {isExperienceSection && (
             <MemoizedExperience
               section={activeSettingsSection}
               accountForm={accountForm}

@@ -62,12 +62,6 @@ export type AccountConnectionSettingsProps = {
   onExchangeOAuth2Token: (sessionId: number) => void;
 };
 
-const connectionTabs = [
-  { id: 'accounts', label: '账号' },
-  { id: 'providers', label: '服务器' },
-  { id: 'auth', label: '认证' },
-] as const;
-
 const saveAndVerifyStateLabels = {
   pending: '等待',
   running: '进行中',
@@ -76,33 +70,6 @@ const saveAndVerifyStateLabels = {
   error: '失败',
   needs_auth: '需要认证',
 } as const;
-
-function ConnectionFlowHeader({
-  section,
-  onNavigate,
-}: {
-  section: AccountConnectionSettingsProps['section'];
-  onNavigate: (section: SettingsSectionId) => void;
-}) {
-  return (
-    <nav className="settings-connection-tabs" aria-label="账号设置分类">
-      {connectionTabs.map((tab) => (
-        <button
-          type="button"
-          className={[
-            'settings-connection-tab',
-            tab.id === section ? 'active' : '',
-          ].filter(Boolean).join(' ')}
-          aria-current={tab.id === section ? 'page' : undefined}
-          onClick={() => onNavigate(tab.id)}
-          key={tab.id}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </nav>
-  );
-}
 
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
   const showSaveAndVerifyStatus = Boolean(props.accountForm)
@@ -122,6 +89,7 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         onCreateNewAccount={props.onCreateNewAccount}
         onRemoveAccount={props.onRemoveAccount}
         onSaveAccountSettings={props.onSaveAccountSettings}
+        onNavigate={props.onNavigate}
       />
     );
   } else if (props.section === 'providers') {
@@ -169,8 +137,7 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
 
   return (
     <div className="settings-connection-shell">
-      <ConnectionFlowHeader section={props.section} onNavigate={props.onNavigate} />
-      {showSaveAndVerifyStatus && (
+      {showSaveAndVerifyStatus && props.section !== 'accounts' && (
         <section
           className={`settings-save-verify-status ${props.saveAndVerifyReport.overall}`}
           aria-label="账号保存与验证状态"

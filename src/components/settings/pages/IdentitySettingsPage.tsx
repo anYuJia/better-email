@@ -93,16 +93,16 @@ export default function IdentitySettingsPage({
 
   return (
     <SettingsSection
-      title="发件身份与签名"
-      description="维护默认身份、别名、Reply-To 和专用签名"
-      badge={<SettingsBadge tone="neutral">{accountIdentities.length} 个身份</SettingsBadge>}
+      title="发件身份"
+      description="管理显示给收件人的名称、别名、Reply-To 与签名"
+      badge={<SettingsBadge tone="neutral">{accountIdentities.length} 个</SettingsBadge>}
       dataSection="identities"
     >
-      <SettingsField label="账号默认签名" hint="用于没有专用签名的发件身份">
+      <SettingsField label="账号默认签名" hint="没有专用签名的发件身份会使用这里的内容">
         <textarea
           value={accountForm.signature}
           onChange={(event) => onAccountFormChange({ ...accountForm, signature: event.target.value })}
-          placeholder="用于没有专用签名的发件身份"
+          placeholder="账号默认签名"
         />
       </SettingsField>
 
@@ -130,8 +130,8 @@ export default function IdentitySettingsPage({
 
       <div className="st-identity-form">
         <header className="settings-identity-form-heading">
-          <strong>添加或编辑发件身份</strong>
-          <small>设置此身份显示给收件人的名称、地址和专用签名。</small>
+          <strong>{identityForm.id ? '编辑发件身份' : '添加发件身份'}</strong>
+          <small>设置名称、发件地址、回复地址和该身份专用签名。</small>
         </header>
         <SettingsField
           label="显示名"
@@ -160,7 +160,7 @@ export default function IdentitySettingsPage({
               clearSaveIssue();
               onIdentityFormChange({ ...identityForm, email: event.target.value });
             }}
-            placeholder="发件邮箱 / 别名"
+            placeholder="name@example.com"
           />
         </SettingsField>
         <SettingsField
@@ -174,7 +174,7 @@ export default function IdentitySettingsPage({
               clearSaveIssue();
               onIdentityFormChange({ ...identityForm, reply_to: event.target.value });
             }}
-            placeholder="Reply-To，可选"
+            placeholder="reply@example.com"
           />
         </SettingsField>
         <SettingsField className="settings-identity-signature-field" label="该身份专用签名">
@@ -184,7 +184,7 @@ export default function IdentitySettingsPage({
               clearSaveIssue();
               onIdentityFormChange({ ...identityForm, signature: event.target.value });
             }}
-            placeholder="该身份专用签名"
+            placeholder="留空则使用账号默认签名"
           />
         </SettingsField>
         {saveIssue?.field === 'save' && (

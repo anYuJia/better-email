@@ -13,7 +13,7 @@ import SendingSettingsPage from './pages/SendingSettingsPage';
 
 export type ExperienceSettingsProps = {
   section: 'sending' | 'notifications' | 'privacy' | 'identities';
-  accountForm: Account;
+  accountForm: Account | null;
   accounts: Account[];
   notificationPolicy: NotificationPolicy;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
@@ -53,6 +53,8 @@ export default function ExperienceSettings(props: ExperienceSettingsProps) {
       />
     );
   }
+
+  if (!props.accountForm) return null;
 
   if (section === 'privacy') {
     return (

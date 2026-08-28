@@ -1,80 +1,71 @@
 import { describe, expect, it } from 'vitest';
 import {
   getSettingsNavigationContext,
+  getSettingsSectionPresentation,
+  resolveSettingsNavigationSectionId,
   settingsNavigationGroups,
   settingsNavigationItems,
   type SettingsSectionId,
 } from './settingsNavigation';
 
-describe('settingsNavigation controls and fallback', () => {
-  it('does not include providers or auth in sidebar navigation groups', () => {
+describe('settingsNavigation v3 information architecture', () => {
+  it('keeps account-specific pages out of the top-level sidebar', () => {
     const sectionIds = settingsNavigationGroups.flatMap((group) => group.items.map((item) => item.id));
+    expect(sectionIds).toContain('accounts');
     expect(sectionIds).not.toContain('providers');
     expect(sectionIds).not.toContain('auth');
-    expect(sectionIds).toContain('accounts');
+    expect(sectionIds).not.toContain('identities');
+    expect(sectionIds).not.toContain('sync');
+    expect(sectionIds).not.toContain('privacy');
   });
 
-  it('updates accounts description', () => {
-    const accountsItem = settingsNavigationItems.find((item) => item.id === 'accounts');
-    expect(accountsItem?.description).toBe('管理邮箱账号、连接设置和登录方式');
+  it('maps all account-specific pages back to the account navigation context', () => {
+    for (const section of ['providers', 'auth', 'identities', 'sync', 'privacy'] as SettingsSectionId[]) {
+      expect(resolveSettingsNavigationSectionId(section)).toBe('accounts');
+      expect(getSettingsNavigationContext(section).item.id).toBe('accounts');
+    }
   });
 
-  it('falls back legacy provider section ID to accounts navigation context', () => {
-    const context = getSettingsNavigationContext('providers' as SettingsSectionId);
-    expect(context.item.id).toBe('accounts');
-    expect(context.group.label).toBe('账号与连接');
+  it('maps sending into the General workspace while preserving its own page title', () => {
+    expect(resolveSettingsNavigationSectionId('sending')).toBe('appearance');
+    expect(getSettingsNavigationContext('sending').item.label).toBe('通用');
+    expect(getSettingsSectionPresentation('sending').label).toBe('发送');
   });
 
-  it('falls back legacy auth section ID to accounts navigation context', () => {
-    const context = getSettingsNavigationContext('auth' as SettingsSectionId);
-    expect(context.item.id).toBe('accounts');
-    expect(context.group.label).toBe('账号与连接');
+  it('uses a compact top-level information architecture', () => {
+    const visible = settingsNavigationItems.map((item) => item.id);
+    expect(visible).toContain('appearance');
+    expect(visible).toContain('accounts');
+    expect(visible).toContain('notifications');
+    expect(visible).toContain('ai');
+    expect(visible).toContain('backup');
+    expect(visible).toContain('contacts');
+    expect(visible).toContain('templates');
+    expect(visible).toContain('rules');
+    expect(visible).toContain('about');
   });
 
-  it('matches search keywords like 服务商, 认证, OAuth, 密码 for accounts item', () => {
+  it('puts the core destinations into deliberate groups', () => {
+    expect(settingsNavigationGroups.find((group) => group.label === '常用')?.items.map((item) => item.id))
+      .toEqual(['appearance', 'accounts', 'notifications']);
+    expect(settingsNavigationGroups.find((group) => group.label === '智能')?.items.map((item) => item.id))
+      .toEqual(['ai']);
+    expect(settingsNavigationGroups.find((group) => group.label === '效率工具')?.items.map((item) => item.id))
+      .toEqual(['contacts', 'templates', 'rules']);
+  });
+
+  it('makes account search discover nested settings from the single account entry', () => {
     const accountsItem = settingsNavigationItems.find((item) => item.id === 'accounts');
     expect(accountsItem?.keywords).toContain('服务商');
-    expect(accountsItem?.keywords).toContain('认证');
     expect(accountsItem?.keywords).toContain('oauth');
-    expect(accountsItem?.keywords).toContain('密码');
+    expect(accountsItem?.keywords).toContain('同步');
+    expect(accountsItem?.keywords).toContain('签名');
+    expect(accountsItem?.keywords).toContain('隐私');
   });
 
-  it('groups appearance, sending and notifications under 使用偏好', () => {
-    const group = settingsNavigationGroups.find((candidate) => candidate.label === '使用偏好');
-    expect(group?.items.map((item) => item.id)).toEqual(['appearance', 'sending', 'notifications']);
-  });
-
-  it('groups privacy and identities under 安全与隐私', () => {
-    const group = settingsNavigationGroups.find((candidate) => candidate.label === '安全与隐私');
-    expect(group).toBeDefined();
-    const ids = group!.items.map((item) => item.id);
-    expect(ids).toContain('privacy');
-    expect(ids).toContain('identities');
-  });
-
-  it('groups ai and templates under 智能与效率', () => {
-    const group = settingsNavigationGroups.find((candidate) => candidate.label === '智能与效率');
-    expect(group?.items.map((item) => item.id)).toEqual(['ai', 'templates']);
-  });
-
-  it('groups backup, sync, contacts and rules under 数据与规则', () => {
-    const group = settingsNavigationGroups.find((candidate) => candidate.label === '数据与规则');
-    const ids = group?.items.map((item) => item.id) ?? [];
-    expect(ids).toContain('backup');
-    expect(ids).toContain('sync');
-    expect(ids).toContain('contacts');
-    expect(ids).toContain('rules');
-  });
-
-  it('no longer mixes ai and templates into a 使用与隐私 group', () => {
-    expect(settingsNavigationGroups.find((candidate) => candidate.label === '使用与隐私')).toBeUndefined();
-    const aiItem = settingsNavigationItems.find((item) => item.id === 'ai');
-    const templatesItem = settingsNavigationItems.find((item) => item.id === 'templates');
-    expect(aiItem?.groupLabel).toBe('智能与效率');
-    expect(templatesItem?.groupLabel).toBe('智能与效率');
-    expect(settingsNavigationItems.find((item) => item.id === 'sending')?.groupLabel).toBe('使用偏好');
-    expect(settingsNavigationItems.find((item) => item.id === 'notifications')?.groupLabel).toBe('使用偏好');
-    expect(settingsNavigationItems.find((item) => item.id === 'privacy')?.groupLabel).toBe('安全与隐私');
-    expect(settingsNavigationItems.find((item) => item.id === 'identities')?.groupLabel).toBe('安全与隐私');
+  it('renames backup to a broader data and storage destination', () => {
+    const backup = settingsNavigationItems.find((item) => item.id === 'backup');
+    expect(backup?.label).toBe('数据与存储');
+    expect(getSettingsSectionPresentation('backup').description).toContain('附件缓存');
   });
 });

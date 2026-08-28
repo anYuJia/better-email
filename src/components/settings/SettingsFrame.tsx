@@ -14,7 +14,9 @@ import {
   SettingsSidebar,
 } from './SettingsNavigationControls';
 import {
+  accountScopedSections,
   connectionSettingsSections,
+  generalScopedSections,
   getSettingsNavigationContext,
   settingsNavigationItems,
   type SettingsSectionId,
@@ -24,12 +26,13 @@ import './settings-foundation.css';
 import './settings-layout.css';
 import './settings-components.css';
 import './settings-pages.css';
+import './settings-v3.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 
 type SettingsFrameProps = {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   activeSection: SettingsSectionId;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
@@ -46,15 +49,73 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'accounts',
   'providers',
   'auth',
+  'privacy',
 ]);
 
 const compactSettingsSections = new Set<SettingsSectionId>([
   'appearance',
+  'sending',
 ]);
+
+const accountWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
+  { id: 'accounts', label: '概览' },
+  { id: 'providers', label: '服务器' },
+  { id: 'auth', label: '登录与安全' },
+  { id: 'identities', label: '身份与签名' },
+  { id: 'sync', label: '同步' },
+  { id: 'privacy', label: '隐私' },
+];
+
+const generalWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
+  { id: 'appearance', label: '外观' },
+  { id: 'sending', label: '发送' },
+];
+
+function SettingsContextTabs({
+  activeSection,
+  canUseAccountTabs,
+  onNavigate,
+}: {
+  activeSection: SettingsSectionId;
+  canUseAccountTabs: boolean;
+  onNavigate: (section: SettingsSectionId) => void;
+}) {
+  const tabs = accountScopedSections.has(activeSection)
+    ? accountWorkspaceTabs
+    : generalScopedSections.has(activeSection)
+      ? generalWorkspaceTabs
+      : null;
+  if (!tabs) return null;
+
+  const accountScope = accountScopedSections.has(activeSection);
+  return (
+    <nav
+      className="settings-context-tabs"
+      aria-label={accountScope ? '账号设置分类' : '通用设置分类'}
+    >
+      {tabs.map((tab) => {
+        const disabled = accountScope && tab.id !== 'accounts' && !canUseAccountTabs;
+        return (
+          <button
+            type="button"
+            className={tab.id === activeSection ? 'active' : ''}
+            aria-current={tab.id === activeSection ? 'page' : undefined}
+            disabled={disabled}
+            title={disabled ? '请先添加或选择邮箱账号' : undefined}
+            onClick={() => onNavigate(tab.id)}
+            key={tab.id}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
 
 export default function SettingsFrame({
   title,
-  subtitle,
+  subtitle = '',
   activeSection,
   children,
   onNavigate,
@@ -82,6 +143,7 @@ export default function SettingsFrame({
     : canActOnConnection
       ? 'test'
       : null;
+  const visibleSubtitle = accountScopedSections.has(activeSection) ? subtitle : '';
   const modalRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -103,10 +165,6 @@ export default function SettingsFrame({
             && target !== settingsDialog
             && target.matches('[aria-modal="true"]')
           ));
-        // Nested account/confirmation dialogs own the first Escape. Inspect
-        // the immutable event path instead of the live DOM: their close
-        // handler may unmount the nested dialog before this window listener
-        // runs, which must not make the same keypress close Settings too.
         if (startedInNestedDialog) return;
         event.preventDefault();
         onClose();
@@ -135,7 +193,7 @@ export default function SettingsFrame({
     >
       <section
         className="settings-modal"
-        data-ui="settings-v2"
+        data-ui="settings-v3"
         data-page-layout={compactSettingsSections.has(activeSection) ? 'compact' : 'standard'}
         role="dialog"
         aria-modal="true"
@@ -146,10 +204,12 @@ export default function SettingsFrame({
           <div className="settings-title">
             <span className="settings-title-copy">
               <strong>{title}</strong>
-              <small>
-                {subtitle}
-                {isAccountEditingSection && isDirty ? ' · 有未保存修改' : ''}
-              </small>
+              {visibleSubtitle && (
+                <small>
+                  {visibleSubtitle}
+                  {isAccountEditingSection && isDirty ? ' · 有未保存修改' : ''}
+                </small>
+              )}
             </span>
           </div>
           <div className="settings-header-actions">
@@ -206,6 +266,11 @@ export default function SettingsFrame({
             <SettingsMobileNavigation
               activeSection={activeSection}
               activeItem={activeItem}
+              onNavigate={onNavigate}
+            />
+            <SettingsContextTabs
+              activeSection={activeSection}
+              canUseAccountTabs={canSaveAndVerify}
               onNavigate={onNavigate}
             />
             <SettingsPageShell

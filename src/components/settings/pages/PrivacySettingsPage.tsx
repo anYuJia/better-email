@@ -1,7 +1,6 @@
 import { ShieldAlert, Sparkles } from 'lucide-react';
 import type { Account, RemoteImageTrust } from '../../../app/types';
 import { formatDate } from '../../../mailUtils';
-import { CustomSelect } from '../accounts/CustomSelect';
 import {
   SettingsBadge,
   SettingsButton,
@@ -22,11 +21,9 @@ type PrivacySettingsPageProps = {
 };
 
 export default function PrivacySettingsPage({
-  accounts,
   accountForm,
   remoteImageTrusts,
   onAccountFormChange,
-  onSelectAccount,
   onDeleteRemoteImageTrust,
   onNavigateToAi,
 }: PrivacySettingsPageProps) {
@@ -41,32 +38,12 @@ export default function PrivacySettingsPage({
       badge={<SettingsBadge tone="info">{accountTrusts.length} 条信任</SettingsBadge>}
       dataSection="privacy"
     >
-      {accounts.length > 1 && (
-        <div className="st-field">
-          <label className="st-field-label" id="privacy-account-select-label">配置账号</label>
-          <CustomSelect
-            dense
-            ariaLabel="配置账号"
-            value={String(accountForm.id)}
-            options={accounts.map((item) => ({
-              value: String(item.id),
-              label: `${item.display_name || item.email} · ${item.email}`,
-            }))}
-            onChange={(nextValue) => {
-              const next = accounts.find((item) => item.id === Number(nextValue));
-              if (next) onSelectAccount(next);
-            }}
-          />
-          <span className="st-field-hint">隐私策略按账号独立生效，切换后保存才会应用到所选账号。</span>
-        </div>
-      )}
-
       <SettingsSwitch
-        label="允许此账号加载远程图片"
+        label="允许加载远程图片"
         description={
           remoteImagesAllowed
-            ? '开启后邮件中的远程图片会直接加载，可能暴露你的打开行为与网络位置；可信发件人或域名仍可单独放行。'
-            : '默认阻止远程图片，减少追踪像素；可信发件人或域名可单独放行。'
+            ? '邮件中的远程图片会直接加载，可能暴露打开行为与网络位置；可信发件人或域名仍可单独放行。'
+            : '默认阻止远程图片与追踪像素；可信发件人或域名可单独放行。'
         }
         checked={remoteImagesAllowed}
         onChange={(checked) => onAccountFormChange({
@@ -79,7 +56,7 @@ export default function PrivacySettingsPage({
         label="拦截外部邮箱邮件"
         description={
           externalBlocked
-            ? '外部发件人（域名与本账号不同）的邮件会显示拦截提示，且不加载其中的远程图片。'
+            ? '域名与当前账号不同的邮件会显示拦截提示，并阻止其中的远程图片。'
             : '关闭后，外部发件人的邮件按普通策略处理。'
         }
         checked={externalBlocked}
@@ -90,11 +67,11 @@ export default function PrivacySettingsPage({
       />
 
       <SettingsSwitch
-        label="提示来自其他邮箱 / 外部发件人的邮件"
+        label="提示外部发件人"
         description={
           warnExternalSenders
-            ? '发件人域名与本账号不同的邮件会显示「外部发件人」提示，便于核对身份。'
-            : '关闭后，外部发件人的邮件不额外提示（仍按普通策略处理）。'
+            ? '发件人域名与当前账号不同的邮件会显示「外部发件人」提示，便于核对身份。'
+            : '关闭后，外部发件人的邮件不额外提示。'
         }
         checked={warnExternalSenders}
         onChange={(checked) => onAccountFormChange({
@@ -107,8 +84,8 @@ export default function PrivacySettingsPage({
         label="隐藏邮件中的链接"
         description={
           interceptsHttps
-            ? '开启后，正文中的链接默认显示为「已隐藏链接」，点击「查看链接」后在原文位置显示并可直接打开。'
-            : '关闭后，邮件中的链接直接显示并可直接打开。'
+            ? '正文链接默认隐藏，确认查看后才显示真实地址并允许打开。'
+            : '邮件中的链接直接显示并可直接打开。'
         }
         checked={interceptsHttps}
         onChange={(checked) => onAccountFormChange({
@@ -120,7 +97,7 @@ export default function PrivacySettingsPage({
       <div className="st-subsection">
         <header className="st-subsection-header">
           <span>
-            <strong>信任列表</strong>
+            <strong>远程图片信任列表</strong>
             <small>已放行远程图片的发件人与域名。</small>
           </span>
         </header>
@@ -152,13 +129,13 @@ export default function PrivacySettingsPage({
         title="邮件内容与外部 AI 服务"
         action={onNavigateToAi ? (
           <SettingsButton size="sm" variant="ghost" onClick={onNavigateToAi}>
-            <Sparkles size={13} aria-hidden="true" /> 前往 AI 服务设置
+            <Sparkles size={13} aria-hidden="true" /> AI 与集成
           </SettingsButton>
         ) : undefined}
       >
         <p>
-          翻译、摘要、模板生成可能会把邮件内容发送到外部 AI 服务。
-          可在「AI 服务」中查看服务来源、数据说明或关闭该功能。
+          翻译、摘要与模板生成可能把邮件内容发送到你配置的外部服务。
+          可在「AI 与集成」中查看服务来源、隐私说明或关闭相关功能。
         </p>
       </SettingsNotice>
     </SettingsSection>

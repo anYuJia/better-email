@@ -1,0 +1,282 @@
+/* Settings IA V3 — scope-first navigation and desktop density polish. */
+
+.settings-backdrop {
+  --st-sidebar-width: 196px;
+  --st-content-max-width: 780px;
+}
+
+.settings-modal[data-ui="settings-v3"] {
+  width: min(1040px, calc(100vw - 40px));
+  height: min(760px, calc(100dvh - 40px));
+}
+
+.settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
+  height: min(620px, calc(100dvh - 40px));
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-main-header {
+  min-height: 48px;
+  padding-inline: 16px 12px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-title-copy strong {
+  font-size: 15px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-title-copy small {
+  font-size: 11px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav {
+  padding: 12px 8px 14px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search {
+  margin-bottom: 8px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav .settings-nav-group {
+  margin: 12px 10px 5px;
+  font-size: 10px;
+  letter-spacing: .02em;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-section > button {
+  min-height: 34px;
+  gap: 9px;
+  padding-inline: 9px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-section > button.active {
+  background: var(--st-accent-soft);
+  color: var(--st-text);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-section > button.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 2px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--st-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.settings-context-tabs {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 42px;
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  padding: 0 22px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--st-border);
+  background: var(--st-canvas);
+}
+
+.settings-context-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-context-tabs > button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 41px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 0;
+  color: var(--st-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.settings-context-tabs > button:hover:not(:disabled) {
+  color: var(--st-text);
+  background: transparent;
+}
+
+.settings-context-tabs > button.active {
+  color: var(--st-text);
+  font-weight: 600;
+}
+
+.settings-context-tabs > button.active::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: -1px;
+  left: 8px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: var(--st-accent);
+}
+
+.settings-context-tabs > button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page {
+  flex: 1 1 auto;
+  height: auto;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-header {
+  min-height: 62px;
+  padding: 13px 24px 11px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading {
+  gap: 3px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading h2 {
+  font-size: 18px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-content {
+  gap: 22px;
+  padding: 20px 24px 28px;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-body {
+  margin-top: 10px;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-subsection {
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row, .st-switch) {
+  min-height: 44px;
+  padding-block: 10px;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-heading small,
+.settings-modal[data-ui="settings-v3"] .st-row-copy small,
+.settings-modal[data-ui="settings-v3"] .st-switch small {
+  line-height: 1.4;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-notice:not(.danger):not(.warning) {
+  padding-block: 9px;
+}
+
+/* Account overview becomes the account workspace landing page rather than a dialog launcher. */
+.settings-account-overview {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-account-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-account-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-account-row-main[aria-pressed="true"] {
+  color: var(--st-text);
+}
+
+.settings-account-row.active {
+  background: var(--st-accent-soft);
+}
+
+.settings-account-row.active .settings-account-row-icon {
+  color: var(--st-accent);
+}
+
+/* V3 keeps operational / diagnostic surfaces out of normal preference pages. */
+.settings-modal[data-ui="settings-v3"] .settings-data-safety > .st-section:has(.settings-endpoint-grid) {
+  display: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-sync-stack > .st-section:last-child {
+  display: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .notification-rule-order {
+  display: none;
+}
+
+/* The primary AI provider already supports MCP. The second MCP panel duplicated the same endpoint/token model. */
+.settings-modal[data-ui="settings-v3"] [data-settings-section="ai-mcp-gateway"] {
+  display: none;
+}
+
+/* Reduce card-like emphasis inside AI; settings should read as one continuous preference surface. */
+.settings-modal[data-ui="settings-v3"] .ai-hero-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .settings-modal[data-ui="settings-v3"],
+  .settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+  }
+
+  .settings-context-tabs {
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+
+  .settings-context-tabs > button {
+    min-height: 39px;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-modal[data-ui="settings-v3"],
+  .settings-modal[data-ui="settings-v3"][data-page-layout="compact"] {
+    width: 100vw;
+    height: 100dvh;
+  }
+
+  .settings-context-tabs {
+    padding-inline: 10px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-header {
+    min-height: 58px;
+    padding: 11px 16px 10px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-content {
+    gap: 18px;
+    padding: 16px 16px 24px;
+  }
+
+  .settings-account-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}

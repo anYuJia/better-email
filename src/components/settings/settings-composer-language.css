@@ -1,0 +1,688 @@
+/*
+ * Settings × Composer shared visual language.
+ *
+ * Settings keeps its own information architecture, but its chrome, control
+ * rhythm and interaction feedback intentionally follow the composer: quiet
+ * surfaces, compact toolbars, small radii, thin separators and restrained
+ * focus/hover states.
+ */
+
+.settings-backdrop {
+  --st-sidebar-width: 204px;
+  --st-content-max-width: 724px;
+  padding: 22px;
+  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.22);
+}
+
+.settings-modal[data-ui="settings-v3"] {
+  width: min(948px, calc(100vw - 44px));
+  height: min(680px, calc(100dvh - 44px));
+  max-height: calc(100dvh - 44px);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-modal);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+/* Composer-like application toolbar ------------------------------------ */
+
+.settings-modal[data-ui="settings-v3"] .settings-main-header {
+  min-height: 42px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-title-copy strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-actions {
+  gap: var(--ui-space-1);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-header-button, .settings-close-button) {
+  min-height: 28px;
+  border-radius: var(--ui-radius-sm);
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-button {
+  padding: 0 var(--ui-space-2);
+  gap: 5px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-button.secondary {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-button.secondary:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-button.primary {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-header-button.primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-close-button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-close-button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+/* Sidebar: same quiet, full-row interaction language as composer contacts. */
+
+.settings-modal[data-ui="settings-v3"] .settings-nav {
+  gap: 0;
+  padding: 10px 7px 12px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-sidebar);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search {
+  min-height: 32px;
+  margin: 0 3px 8px;
+  padding: 0 9px;
+  gap: 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-tertiary);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search input {
+  min-height: 30px;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 12px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-search-shortcut {
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--ui-text-tertiary);
+  background: var(--ui-control-hover);
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-scroll {
+  padding-top: 0;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list,
+.settings-modal[data-ui="settings-v3"] .settings-search-results {
+  gap: 1px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button {
+  min-height: 32px;
+  gap: 9px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button.active {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+  font-weight: 600;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--ui-text-tertiary);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button:hover .settings-nav-icon {
+  color: var(--ui-text-secondary);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button.active .settings-nav-icon {
+  color: var(--ui-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-search-result {
+  padding: 7px 9px;
+  border-radius: var(--ui-radius-control);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-search-result:hover {
+  background: var(--ui-control-hover);
+}
+
+/* Main settings canvas -------------------------------------------------- */
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-body, .settings-content, .settings-page) {
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page {
+  width: min(100%, var(--st-content-max-width));
+  scrollbar-gutter: stable;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-header {
+  min-height: 62px;
+  padding: 15px 24px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading {
+  gap: 3px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading h2 {
+  color: var(--ui-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-heading p {
+  max-width: 620px;
+  color: var(--ui-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-page-content {
+  gap: 20px;
+  padding: 18px 24px 30px;
+}
+
+/* Account sub-navigation is a thin field/header strip, not another card. */
+
+.settings-modal[data-ui="settings-v3"] .settings-account-workspace {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-workspace-topline {
+  min-height: 38px;
+  padding: 5px 24px 1px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker {
+  gap: 7px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary {
+  height: 27px;
+  min-height: 27px;
+  padding-inline: 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-context-tabs {
+  min-height: 34px;
+  padding: 0 20px;
+  gap: 2px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-context-tabs > button {
+  min-height: 33px;
+  padding: 0 8px;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-context-tabs > button:hover:not(:disabled) {
+  color: var(--ui-text);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-context-tabs > button.active {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-context-tabs > button.active::after {
+  right: 8px;
+  left: 8px;
+  height: 1px;
+  border-radius: 0;
+  background: var(--ui-accent);
+}
+
+/* Section → row → control. Dividers do the grouping, not nested cards. */
+
+.settings-modal[data-ui="settings-v3"] .st-section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-header {
+  gap: 5px 12px;
+  padding: 0;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-heading {
+  gap: 2px;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-heading strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-heading :is(small, em) {
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-section-body {
+  margin-top: 8px;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-subsection {
+  gap: 9px;
+  padding-top: 15px;
+  border-top-color: var(--ui-border);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row, .st-switch) {
+  min-height: 44px;
+  gap: 14px;
+  padding: 9px 0;
+  border-top-color: var(--ui-border);
+  background: transparent;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row, .st-switch):hover {
+  background: transparent;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row-copy, .st-switch-copy) {
+  gap: 2px;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row-copy, .st-switch-copy) strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-row-copy, .st-switch-copy) small {
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Controls use the same border/radius/focus language as composer search. */
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea),
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary {
+  min-height: 32px;
+  padding-inline: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: none;
+  font-size: 12px;
+  transition: var(--ui-transition-short-bg-border-box-shadow);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):hover,
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:hover {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):focus,
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-accent);
+  outline: none;
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) textarea {
+  min-height: 88px;
+  padding: 10px;
+  line-height: 1.55;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-field {
+  gap: 5px;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(.st-field-label, label.st-field) {
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-field-hint {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+/* Buttons deliberately mirror the composer toolbar/action hierarchy. */
+
+.settings-modal[data-ui="settings-v3"] .st-btn {
+  min-height: 30px;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: var(--ui-radius-sm);
+  box-shadow: none;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-btn-secondary {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-btn-secondary:hover:not(:disabled),
+.settings-modal[data-ui="settings-v3"] .st-btn-ghost:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.settings-modal[data-ui="settings-v3"] .st-btn-primary {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] .st-btn-primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent-hover);
+}
+
+.settings-modal[data-ui="settings-v3"] .st-btn-sm {
+  min-height: 28px;
+  padding-inline: 9px;
+  font-size: 11px;
+}
+
+/* Compact native switch. */
+
+.settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"] {
+  width: 34px;
+  min-width: 34px;
+  height: 18px;
+  min-height: 18px;
+  border-radius: 999px;
+  background: var(--ui-border-strong);
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"]::after {
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px oklch(0.2 0.02 var(--primitive-hue-neutral) / 0.16);
+}
+
+.settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"]:checked {
+  background: var(--ui-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+/* Focus is visible but never turns the interface into glowing cards. */
+
+.settings-modal[data-ui="settings-v3"] :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(input, select, textarea):focus-visible {
+  outline: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-list > button:focus-visible {
+  outline-offset: 1px;
+}
+
+/* Transient layers keep elevation; permanent settings sections do not. */
+
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-discard-confirm,
+  .settings-mobile-menu,
+  .custom-select-options,
+  .custom-select-menu
+) {
+  border-color: var(--ui-border);
+  border-radius: var(--ui-radius-popover);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-disclosure {
+  border-top-color: var(--ui-border);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-disclosure:last-child {
+  border-bottom-color: var(--ui-border);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-disclosure > summary {
+  min-height: 44px;
+  padding: 7px 2px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-disclosure > summary strong {
+  font-size: 12px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-disclosure > summary :is(small, em) {
+  font-size: 10.5px;
+}
+
+/* Theme previews are real previews, so they may remain bounded surfaces. */
+
+.settings-modal[data-ui="settings-v3"] .settings-theme-options {
+  gap: 8px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-theme-option {
+  min-height: 110px;
+  grid-template-rows: 72px 1fr;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-theme-option:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-theme-option.active {
+  border-color: var(--ui-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+/* Dirty-close guard adopts the same compact popover geometry. */
+
+.settings-modal[data-ui="settings-v3"] .settings-discard-confirm {
+  top: 46px;
+  right: 10px;
+  padding: 9px 9px 9px 11px;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-discard-confirm button {
+  min-height: 27px;
+  border-radius: var(--ui-radius-sm);
+}
+
+/* Mobile: native full-screen Settings, not a squeezed desktop popup. */
+
+@media (max-width: 720px) {
+  .settings-backdrop {
+    padding: 0;
+    background: var(--ui-surface);
+  }
+
+  .settings-modal[data-ui="settings-v3"] {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-main-header {
+    min-height: 48px;
+    padding-inline: 12px 8px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-title-copy strong {
+    font-size: 15px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-header-button span {
+    display: none;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-header-button,
+  .settings-modal[data-ui="settings-v3"] .settings-close-button {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-mobile-toolbar {
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-header {
+    min-height: auto;
+    padding: 14px 18px 11px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-heading h2 {
+    font-size: 18px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-heading p {
+    font-size: 12px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .settings-page-content {
+    gap: 22px;
+    padding: 16px 18px 32px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] :is(.st-row, .st-switch) {
+    min-height: 50px;
+    padding-block: 11px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea),
+  .settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .st-btn {
+    min-height: 40px;
+    font-size: 13px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"] {
+    width: 38px;
+    min-width: 38px;
+    height: 22px;
+    min-height: 22px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"]::after {
+    width: 18px;
+    height: 18px;
+  }
+
+  .settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"]:checked::after {
+    transform: translateX(16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-backdrop,
+  .settings-modal[data-ui="settings-v3"],
+  .settings-modal[data-ui="settings-v3"] .settings-page,
+  .settings-modal[data-ui="settings-v3"] *,
+  .settings-modal[data-ui="settings-v3"] *::before,
+  .settings-modal[data-ui="settings-v3"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

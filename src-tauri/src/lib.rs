@@ -22,6 +22,7 @@ use tauri::Manager;
 #[cfg(desktop)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
 #[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
 #[cfg(desktop)]
@@ -43,6 +44,76 @@ pub struct TrayState {
 /// subsequent focus-and-reuse request.
 pub struct PendingComposerRequestState {
     pub request: Mutex<Option<serde_json::Value>>,
+}
+
+#[derive(Debug)]
+enum StartupPhase {
+    Starting,
+    Ready(u64),
+    Failed { elapsed_ms: u64, error: String },
+}
+
+pub struct StartupState {
+    started_at: Instant,
+    phase: Mutex<StartupPhase>,
+}
+
+impl StartupState {
+    fn new() -> Self {
+        Self {
+            started_at: Instant::now(),
+            phase: Mutex::new(StartupPhase::Starting),
+        }
+    }
+
+    fn set_ready(&self, elapsed_ms: u64) {
+        if let Ok(mut phase) = self.phase.lock() {
+            *phase = StartupPhase::Ready(elapsed_ms);
+        }
+    }
+
+    fn set_failed(&self, elapsed_ms: u64, error: String) {
+        if let Ok(mut phase) = self.phase.lock() {
+            *phase = StartupPhase::Failed { elapsed_ms, error };
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartupStatus {
+    state: &'static str,
+    elapsed_ms: u64,
+    error: Option<String>,
+}
+
+#[tauri::command]
+fn get_startup_status(state: tauri::State<'_, StartupState>) -> StartupStatus {
+    let fallback_elapsed = state.started_at.elapsed().as_millis() as u64;
+    match state.phase.lock() {
+        Ok(phase) => match &*phase {
+            StartupPhase::Starting => StartupStatus {
+                state: "starting",
+                elapsed_ms: fallback_elapsed,
+                error: None,
+            },
+            StartupPhase::Ready(elapsed_ms) => StartupStatus {
+                state: "ready",
+                elapsed_ms: *elapsed_ms,
+                error: None,
+            },
+            StartupPhase::Failed { elapsed_ms, error } => StartupStatus {
+                state: "failed",
+                elapsed_ms: *elapsed_ms,
+                error: Some(error.clone()),
+            },
+        },
+        Err(_) => StartupStatus {
+            state: "failed",
+            elapsed_ms: fallback_elapsed,
+            error: Some("启动状态锁定失败。".to_string()),
+        },
+    }
 }
 
 /// 把 Rust panic 记录到应用数据目录的 crash.log，便于用户侧可诊断。
@@ -343,11 +414,56 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let store = MailStore::open(app.handle())?;
-            app.manage(store);
+            app.manage(StartupState::new());
             app.manage(PendingComposerRequestState {
                 request: Mutex::new(None),
             });
+
+            // MailStore initialization includes opening SQLite, migrations and
+            // startup maintenance. Run it off the UI thread so the native
+            // WebView can paint the static branded cover immediately.
+            let app_handle = app.handle().clone();
+            let _ = std::thread::Builder::new()
+                .name("better-email-db-bootstrap".to_string())
+                .spawn(move || {
+                    let started = Instant::now();
+                    crate::logging::log_line("[better-email][startup] database bootstrap start");
+                    match MailStore::open(&app_handle) {
+                        Ok(store) => {
+                            let elapsed_ms = started.elapsed().as_millis() as u64;
+                            if !app_handle.manage(store) {
+                                let error = "MailStore 已被重复注册。".to_string();
+                                if let Some(state) = app_handle.try_state::<StartupState>() {
+                                    state.set_failed(elapsed_ms, error.clone());
+                                }
+                                crate::logging::log_line(format!(
+                                    "[better-email][startup] database bootstrap failed elapsed_ms={} error={}",
+                                    elapsed_ms, error
+                                ));
+                                return;
+                            }
+                            if let Some(state) = app_handle.try_state::<StartupState>() {
+                                state.set_ready(elapsed_ms);
+                            }
+                            crate::logging::log_line(format!(
+                                "[better-email][startup] database bootstrap ready elapsed_ms={}",
+                                elapsed_ms
+                            ));
+                        }
+                        Err(error) => {
+                            let elapsed_ms = started.elapsed().as_millis() as u64;
+                            let message = error.to_string();
+                            if let Some(state) = app_handle.try_state::<StartupState>() {
+                                state.set_failed(elapsed_ms, message.clone());
+                            }
+                            crate::logging::log_line(format!(
+                                "[better-email][startup] database bootstrap failed elapsed_ms={} error={}",
+                                elapsed_ms, message
+                            ));
+                        }
+                    }
+                });
+
             // Keep Better Email as a regular macOS application so it stays visible
             // in the Dock. Menu creation is controlled separately above.
             #[cfg(target_os = "macos")]
@@ -392,6 +508,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_tray_unread_count,
             get_platform,
+            get_startup_status,
             window_chrome_ready,
             set_pending_composer_request,
             take_pending_composer_request,

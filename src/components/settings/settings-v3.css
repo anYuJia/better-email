@@ -1,4 +1,4 @@
-/* Settings popup polish — compact, scope-first, low-chrome preferences UI. */
+/* Settings popup polish — compact, low-chrome, preference-first. */
 
 .settings-backdrop {
   --st-sidebar-width: 188px;
@@ -46,7 +46,7 @@
   border-radius: 7px;
 }
 
-/* Sidebar: one calm hierarchy. Search is for real settings, not only pages. */
+/* Sidebar */
 .settings-modal[data-ui="settings-v3"] .settings-nav {
   padding: 10px 8px 12px;
 }
@@ -59,13 +59,13 @@
   padding-top: 2px;
 }
 
-.settings-nav-list {
+.settings-nav-list,
+.settings-search-results {
   display: grid;
   gap: 2px;
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-nav-list > button {
-  position: relative;
   min-height: 34px;
   display: flex;
   align-items: center;
@@ -93,11 +93,6 @@
   color: var(--st-accent);
 }
 
-.settings-search-results {
-  display: grid;
-  gap: 2px;
-}
-
 .settings-search-results .settings-nav-match-count {
   display: block;
   padding: 4px 8px 6px;
@@ -113,8 +108,8 @@
   padding: 8px 9px;
   border: 0;
   border-radius: 7px;
-  background: transparent;
   color: var(--st-text);
+  background: transparent;
   text-align: left;
 }
 
@@ -148,7 +143,7 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-/* Only account settings keep a secondary workspace navigation. */
+/* Account workspace: the only secondary navigation in Settings. */
 .settings-account-workspace {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--st-border);
@@ -186,6 +181,28 @@
   font-size: 11px;
 }
 
+.settings-account-current {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.settings-account-current small {
+  flex: 0 0 auto;
+  color: var(--st-text-tertiary);
+  font-size: 10px;
+}
+
+.settings-account-current strong {
+  overflow: hidden;
+  color: var(--st-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-account-connection-state {
   max-width: 300px;
   overflow: hidden;
@@ -196,14 +213,12 @@
 }
 
 .settings-context-tabs {
-  min-width: 0;
   min-height: 36px;
   display: flex;
   align-items: end;
   gap: 2px;
   padding: 0 18px;
   overflow-x: auto;
-  overflow-y: hidden;
   scrollbar-width: none;
 }
 
@@ -223,16 +238,15 @@
   box-shadow: none;
   font-size: 11px;
   font-weight: 500;
-  white-space: nowrap;
 }
 
-.settings-context-tabs > button:hover:not(:disabled) {
+.settings-context-tabs > button:hover:not(:disabled),
+.settings-context-tabs > button.active {
   color: var(--st-text);
   background: transparent;
 }
 
 .settings-context-tabs > button.active {
-  color: var(--st-text);
   font-weight: 600;
 }
 
@@ -252,7 +266,7 @@
   cursor: not-allowed;
 }
 
-/* Page hierarchy: one compact page heading, then flat sections. */
+/* Page hierarchy */
 .settings-modal[data-ui="settings-v3"] .settings-content {
   display: flex;
   flex-direction: column;
@@ -312,11 +326,11 @@
   line-height: 1.38;
 }
 
-.settings-modal[data-ui="settings-v3"] .st-notice:not(.danger):not(.warning) {
-  padding-block: 8px;
+.settings-inline-select {
+  width: 136px;
 }
 
-/* Closing a dirty explicit-save page should never silently discard work. */
+/* Dirty-close guard */
 .settings-discard-confirm {
   position: absolute;
   z-index: 20;
@@ -340,15 +354,8 @@
   gap: 2px;
 }
 
-.settings-discard-confirm strong {
-  color: var(--st-text);
-  font-size: 11px;
-}
-
-.settings-discard-confirm small {
-  color: var(--st-text-tertiary);
-  font-size: 10px;
-}
+.settings-discard-confirm strong { color: var(--st-text); font-size: 11px; }
+.settings-discard-confirm small { color: var(--st-text-tertiary); font-size: 10px; }
 
 .settings-discard-confirm > div {
   flex: 0 0 auto;
@@ -372,30 +379,16 @@
 }
 
 /* Account overview */
-.settings-account-overview {
-  display: grid;
-  gap: 12px;
-}
-
+.settings-account-overview { display: grid; gap: 12px; }
 .settings-account-overview-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.settings-account-row.active { background: var(--st-accent-soft); }
+.settings-account-row.active .settings-account-row-icon { color: var(--st-accent); }
 
-.settings-account-row-main[aria-pressed="true"] {
-  color: var(--st-text);
-}
-
-.settings-account-row.active {
-  background: var(--st-accent-soft);
-}
-
-.settings-account-row.active .settings-account-row-icon {
-  color: var(--st-accent);
-}
-
-/* Progressive disclosure for advanced notification and AI controls. */
+/* Progressive disclosure */
 .settings-disclosure {
   border-top: 1px solid var(--st-border);
 }
@@ -416,21 +409,9 @@
   list-style: none;
 }
 
-.settings-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-disclosure > summary > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-disclosure > summary strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-
+.settings-disclosure > summary::-webkit-details-marker { display: none; }
+.settings-disclosure > summary > span { min-width: 0; display: grid; gap: 2px; }
+.settings-disclosure > summary strong { font-size: 12px; font-weight: 600; }
 .settings-disclosure > summary small,
 .settings-disclosure > summary em {
   color: var(--st-text-tertiary);
@@ -449,30 +430,22 @@
   transition: transform 140ms ease;
 }
 
-.settings-disclosure[open] > summary::after {
-  transform: rotate(270deg);
+.settings-disclosure[open] > summary::after { transform: rotate(270deg); }
+.settings-disclosure-body { padding: 4px 0 14px; }
+.settings-ai-advanced .settings-disclosure-body { gap: 12px; padding-top: 8px; }
+.settings-ai-actions { margin-top: 2px; padding-top: 14px; border-top: 1px solid var(--st-border); }
+
+.settings-connection-diagnostics .settings-save-verify-stages {
+  padding-inline: 0;
 }
 
-.settings-disclosure-body {
-  padding: 4px 0 14px;
+.settings-technical-details summary {
+  color: var(--st-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
 }
 
-.settings-ai-advanced .settings-disclosure-body {
-  gap: 12px;
-  padding-top: 8px;
-}
-
-.settings-ai-actions {
-  margin-top: 2px;
-  padding-top: 14px;
-  border-top: 1px solid var(--st-border);
-}
-
-.settings-inline-select {
-  width: 136px;
-}
-
-/* Appearance is the one place where visual option tiles improve scanning. */
+/* Appearance previews */
 .settings-modal[data-ui="settings-v3"] .settings-theme-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -496,7 +469,6 @@
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-theme-option:hover {
-  border-color: var(--st-border-strong);
   background: var(--st-surface);
 }
 
@@ -536,21 +508,10 @@
   background: color-mix(in srgb, var(--st-text-tertiary) 20%, transparent);
 }
 
-.settings-theme-preview-content i:nth-child(2) {
-  width: 78%;
-}
-
-.settings-theme-preview-content i:nth-child(3) {
-  width: 58%;
-}
-
-.settings-theme-option[data-theme-mode="light"] .settings-theme-option-preview {
-  background: #f4f5f7;
-}
-
-.settings-theme-option[data-theme-mode="dark"] .settings-theme-option-preview {
-  background: #202329;
-}
+.settings-theme-preview-content i:nth-child(2) { width: 78%; }
+.settings-theme-preview-content i:nth-child(3) { width: 58%; }
+.settings-theme-option[data-theme-mode="light"] .settings-theme-option-preview { background: #f4f5f7; }
+.settings-theme-option[data-theme-mode="dark"] .settings-theme-option-preview { background: #202329; }
 
 .settings-theme-option-footer {
   min-width: 0;
@@ -587,12 +548,8 @@
   opacity: 1;
 }
 
-/* Temporary structural guards for legacy operational panels. Remove once their render paths are split. */
+/* Legacy data diagnostics stay out of the normal preferences surface. */
 .settings-modal[data-ui="settings-v3"] .settings-data-safety > .st-section:has(.settings-endpoint-grid) {
-  display: none;
-}
-
-.settings-modal[data-ui="settings-v3"] .settings-sync-stack > .st-section:last-child {
   display: none;
 }
 
@@ -604,17 +561,9 @@
     border-radius: 12px;
   }
 
-  .settings-account-workspace-topline {
-    padding-inline: 14px;
-  }
-
-  .settings-account-picker select {
-    max-width: 260px;
-  }
-
-  .settings-context-tabs {
-    padding-inline: 10px;
-  }
+  .settings-account-workspace-topline { padding-inline: 14px; }
+  .settings-account-picker select { max-width: 260px; }
+  .settings-context-tabs { padding-inline: 10px; }
 }
 
 @media (max-width: 640px) {
@@ -625,53 +574,26 @@
     border-radius: 0;
   }
 
-  .settings-account-workspace-topline {
-    display: none;
-  }
-
-  .settings-context-tabs {
-    min-height: 38px;
-    padding-inline: 8px;
-  }
-
-  .settings-context-tabs > button {
-    min-height: 37px;
-  }
-
+  .settings-account-workspace-topline { display: none; }
+  .settings-context-tabs { min-height: 38px; padding-inline: 8px; }
+  .settings-context-tabs > button { min-height: 37px; }
   .settings-modal[data-ui="settings-v3"] .settings-page-header {
     min-height: 52px;
     padding: 11px 16px 9px;
   }
-
   .settings-modal[data-ui="settings-v3"] .settings-page-content {
     gap: 16px;
     padding: 12px 16px 22px;
   }
-
   .settings-account-overview-grid,
-  .settings-modal[data-ui="settings-v3"] .settings-theme-options {
-    grid-template-columns: 1fr;
-  }
-
+  .settings-modal[data-ui="settings-v3"] .settings-theme-options { grid-template-columns: 1fr; }
   .settings-modal[data-ui="settings-v3"] .settings-theme-option {
     min-height: 92px;
     grid-template-columns: 100px minmax(0, 1fr);
     grid-template-rows: 1fr;
   }
-
-  .settings-theme-option-preview {
-    margin: 8px 0 8px 8px;
-  }
-
-  .settings-theme-option-footer {
-    padding-inline: 10px;
-  }
-
-  .settings-discard-confirm {
-    right: 8px;
-    left: 8px;
-    width: auto;
-  }
+  .settings-theme-option-preview { margin: 8px 0 8px 8px; }
+  .settings-discard-confirm { right: 8px; left: 8px; width: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -679,8 +601,5 @@
     animation: none;
     box-shadow: 0 0 0 2px var(--st-accent);
   }
-
-  .settings-disclosure > summary::after {
-    transition: none;
-  }
+  .settings-disclosure > summary::after { transition: none; }
 }

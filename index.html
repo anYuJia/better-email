@@ -4,20 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/brand/v4/favicon.png" type="image/png" />
-    <link rel="preload" href="/brand/v4/brand-mark-64.png" as="image" />
     <title>Better Email</title>
     <style>
       :root {
         color-scheme: light;
-        --boot-bg: #f7f8f7;
-        --boot-text: #202622;
-        --boot-subtle: #7b837e;
+        --app-bg: #f7f8f7;
       }
       :root[data-theme='dark'] {
         color-scheme: dark;
-        --boot-bg: #101311;
-        --boot-text: #edf1ee;
-        --boot-subtle: #8e9891;
+        --app-bg: #101311;
       }
       html,
       body,
@@ -25,77 +20,15 @@
         width: 100%;
         height: 100%;
         margin: 0;
-        background: var(--boot-bg);
+        background: var(--app-bg);
       }
       body {
         overflow: hidden;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", system-ui, sans-serif;
-        color: var(--boot-text);
-      }
-      #root {
-        position: relative;
-        z-index: 0;
-      }
-      #boot-splash {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483000;
-        display: grid;
-        place-items: center;
-        overflow: hidden;
-        background: var(--boot-bg);
-        opacity: 1;
-        visibility: visible;
-        transition: opacity 160ms ease-out, visibility 0s linear 160ms;
-      }
-      .boot-splash__content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 32px;
-        text-align: center;
-        transform: translateY(-8px);
-        user-select: none;
-        -webkit-user-select: none;
-      }
-      .boot-splash__logo {
-        width: 78px;
-        height: 78px;
-        display: block;
-        object-fit: contain;
-        margin-bottom: 22px;
-      }
-      .boot-splash__title {
-        margin: 0;
-        font-size: 23px;
-        line-height: 1.2;
-        font-weight: 650;
-        letter-spacing: -0.025em;
-      }
-      .boot-splash__tagline {
-        margin: 9px 0 0;
-        color: var(--boot-subtle);
-        font-size: 13px;
-        line-height: 1.55;
-        font-weight: 450;
-        letter-spacing: 0.01em;
-      }
-      :root[data-window='compose'] #boot-splash {
-        display: none;
-      }
-      :root[data-app-ready='true'] #boot-splash {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #boot-splash {
-          transition: none;
-        }
       }
     </style>
     <script>
-      /* Resolve theme/window mode before first paint and mark the HTML bootstrap point. */
+      /* Resolve theme before first paint and report only the static HTML milestone. */
       (function () {
         var theme = 'light';
         try {
@@ -111,22 +44,23 @@
           ? 'compose'
           : 'mailbox';
         try {
-          performance.mark('better-email:html-bootstrap');
+          performance.mark('better-email:main-html-bootstrap');
         } catch (error) {
           /* Performance marks are diagnostic-only. */
+        }
+        try {
+          var runtime = window.__TAURI_INTERNALS__;
+          if (runtime && typeof runtime.invoke === 'function') {
+            runtime.invoke('record_startup_milestone', { milestone: 'main_html_bootstrap' }).catch(function () {});
+          }
+        } catch (error) {
+          /* Startup diagnostics must never block the renderer. */
         }
       })();
     </script>
   </head>
   <body>
     <div id="root"></div>
-    <div id="boot-splash" aria-hidden="true" data-tauri-drag-region>
-      <div class="boot-splash__content" data-tauri-drag-region>
-        <img class="boot-splash__logo" src="/brand/v4/brand-mark-64.png" alt="" draggable="false" />
-        <h1 class="boot-splash__title">Better Email</h1>
-        <p class="boot-splash__tagline">让邮件，重新变得简单。</p>
-      </div>
-    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

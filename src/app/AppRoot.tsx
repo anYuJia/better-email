@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import DeferredSurface from '../components/DeferredSurface';
 import { emptyDraft } from './appConfig';
 import { logError } from './logger';
@@ -11,6 +11,7 @@ import {
   invoke,
 } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { reportStartupMilestone } from '../startupTelemetry';
 
 const loadMailboxApp = () => import('../App');
 const loadStandaloneComposerApp = () => import('../components/StandaloneComposerApp');
@@ -61,45 +62,48 @@ function useBackendStartupStatus(): StartupStatus {
   return status;
 }
 
-function BootReadySignal({ backendElapsedMs }: { backendElapsedMs: number }) {
-  useEffect(() => {
-    let firstFrame = 0;
-    let secondFrame = 0;
-    let removalTimer: number | undefined;
+function MainShellReadySignal({ standaloneComposer }: { standaloneComposer: boolean }) {
+  const revealStartedRef = useRef(false);
 
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        document.documentElement.dataset.appReady = 'true';
-        try {
-          performance.mark('better-email:app-shell-ready');
-          performance.measure(
-            'better-email:html-to-app-shell',
-            'better-email:html-bootstrap',
-            'better-email:app-shell-ready',
-          );
-          if (import.meta.env.DEV) {
-            const measures = performance.getEntriesByName('better-email:html-to-app-shell');
-            const measure = measures[measures.length - 1];
-            console.info('[better-email][startup]', {
-              backendMs: backendElapsedMs,
-              htmlToShellMs: Math.round(measure?.duration ?? 0),
-            });
-          }
-        } catch {
-          // Startup timing is diagnostic-only and must never block the UI.
-        }
-        removalTimer = window.setTimeout(() => {
-          document.getElementById('boot-splash')?.remove();
-        }, 220);
+  useLayoutEffect(() => {
+    if (standaloneComposer) return undefined;
+
+    let active = true;
+    let firstFrame = 0;
+    let switchFrame = 0;
+    void reportStartupMilestone('app_shell_mount');
+
+    const scheduleVisibleFrame = () => {
+      if (!active) return;
+      firstFrame = window.requestAnimationFrame(() => {
+        void reportStartupMilestone('app_shell_first_painted');
+        if (!active || mockMode) return;
+        // The first frame is now produced by the visible main WebView. Keep
+        // the splash above it for one more frame so the handoff is opaque.
+        switchFrame = window.requestAnimationFrame(() => {
+          void invoke<void>(IPC.HideSplashscreen).catch(() => undefined);
+        });
       });
-    });
+    };
+
+    if (mockMode) {
+      scheduleVisibleFrame();
+    } else if (!revealStartedRef.current) {
+      revealStartedRef.current = true;
+      // A hidden native WebView may throttle rAF completely. Showing it while
+      // the always-on-top splash remains visible lets WebKit produce a real
+      // frame without exposing a blank desktop window.
+      void invoke<void>(IPC.RevealMainWindow)
+        .then(scheduleVisibleFrame)
+        .catch(scheduleVisibleFrame);
+    }
 
     return () => {
+      active = false;
       window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-      if (removalTimer !== undefined) window.clearTimeout(removalTimer);
+      window.cancelAnimationFrame(switchFrame);
     };
-  }, [backendElapsedMs]);
+  }, [standaloneComposer]);
 
   return null;
 }
@@ -181,15 +185,20 @@ function MainWindowFileDropBridge() {
 /**
  * Application entry boundary.
  *
- * The static HTML splash is painted before React. Native database bootstrap and
- * the large application chunk are warmed in parallel; the mailbox surface only
- * mounts after Rust reports that MailStore has been registered, preventing
- * early IPC calls from racing startup while keeping the first frame immediate.
+ * The independent native splash window remains above the hidden main window
+ * while the database, main HTML and application chunk warm in parallel. The
+ * mailbox surface mounts only after Rust reports that MailStore is registered,
+ * preventing early IPC calls from racing startup while keeping the handoff
+ * aligned to a real visible frame.
  */
 export default function AppRoot() {
   const startup = useBackendStartupStatus();
   const standaloneComposer = isStandaloneComposerWindow();
   const Surface = standaloneComposer ? StandaloneComposerApp : MailboxApp;
+
+  useLayoutEffect(() => {
+    void reportStartupMilestone('app_root_mount');
+  }, []);
 
   useEffect(() => {
     const preloadSurface = standaloneComposer ? loadStandaloneComposerApp : loadMailboxApp;
@@ -202,7 +211,7 @@ export default function AppRoot() {
     return (
       <>
         <StartupFailure message={startup.error || '本地数据库初始化失败。'} />
-        <BootReadySignal backendElapsedMs={startup.elapsedMs} />
+        <MainShellReadySignal standaloneComposer={standaloneComposer} />
       </>
     );
   }
@@ -214,7 +223,7 @@ export default function AppRoot() {
         fallback={standaloneComposer ? <DeferredSurface label="正在准备写信窗口" /> : null}
       >
         <Surface />
-        <BootReadySignal backendElapsedMs={startup.elapsedMs} />
+        <MainShellReadySignal standaloneComposer={standaloneComposer} />
       </Suspense>
     </>
   );

@@ -12,12 +12,39 @@
   "app": {
     "windows": [
       {
+        "label": "main",
+        "url": "index.html",
         "title": "Better Email",
         "width": 1180,
         "height": 760,
         "minWidth": 960,
         "minHeight": 640,
         "backgroundColor": "#f7f8f7",
+        "visible": false,
+        "focus": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 18
+        },
+        "hiddenTitle": true
+      },
+      {
+        "label": "splashscreen",
+        "create": false,
+        "url": "splashscreen.html",
+        "title": "Better Email",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 640,
+        "backgroundColor": "#f7f8f7",
+        "visible": false,
+        "focus": true,
+        "focusable": true,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
         "decorations": true,
         "titleBarStyle": "Overlay",
         "trafficLightPosition": {

@@ -1,0 +1,90 @@
+/*
+ * Shared Settings primitives.
+ * Page-specific styles may compose these primitives, but should not override
+ * their sizing, focus and disabled-state contract with higher specificity.
+ */
+
+.settings-shell {
+  --settings-control-height: 34px;
+  --settings-icon-control-size: 32px;
+  --settings-control-radius: 7px;
+}
+
+.settings-shell :is(.settings-header-button, .st-btn) {
+  min-height: var(--settings-control-height);
+  border-radius: var(--settings-control-radius);
+  box-shadow: none;
+}
+
+.settings-shell :is(
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  input[type='url'],
+  input[type='number'],
+  select,
+  .custom-select-summary
+) {
+  min-height: var(--settings-control-height);
+  border-radius: var(--settings-control-radius);
+}
+
+.settings-shell :is(.st-section, .settings-section) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-shell :is(.st-row, .st-switch) {
+  min-height: 44px;
+  border-top-color: var(--st-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-shell :is(.st-row, .st-switch):hover {
+  background: transparent;
+}
+
+.settings-shell button:disabled,
+.settings-shell :is(input, select, textarea):disabled,
+.settings-shell .custom-select-summary:disabled {
+  color: var(--st-text-tertiary);
+  border-color: var(--st-border);
+  background: var(--st-surface-muted);
+  opacity: .62;
+  box-shadow: none;
+}
+
+.settings-shell :is(
+  button,
+  input,
+  select,
+  textarea,
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 2px solid var(--st-focus-border);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.settings-shell .custom-select-menu,
+.settings-shell [role='menu'] {
+  border: 1px solid var(--st-border);
+  border-radius: 8px;
+  background: var(--st-surface);
+  box-shadow: 0 10px 28px rgb(0 0 0 / .12);
+}
+
+.settings-shell .settings-disclosure {
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-shell .settings-disclosure:last-child {
+  border-bottom: 1px solid var(--st-border);
+}

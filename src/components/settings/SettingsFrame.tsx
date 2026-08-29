@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import {
+  ChevronLeft,
   FlaskConical,
   LoaderCircle,
   Save,
@@ -9,10 +10,7 @@ import {
 import SettingsPageShell from './SettingsPageShell';
 import { CustomSelect } from './accounts/CustomSelect';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
-import {
-  SettingsMobileNavigation,
-  SettingsSidebar,
-} from './SettingsNavigationControls';
+import { SettingsSidebar } from './SettingsNavigationControls';
 import {
   accountScopedSections,
   connectionSettingsSections,
@@ -21,12 +19,11 @@ import {
 } from './settingsNavigation';
 import './settings-tokens.css';
 import './settings-foundation.css';
-import './settings-layout.css';
 import './settings-components.css';
 import './settings-pages.css';
-import './settings-v3.css';
-import './settings-composer-language.css';
-import './settings-layout-contract.css';
+import './settings-primitives.css';
+import './settings-shell.css';
+import './settings-responsive.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 
@@ -63,35 +60,22 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'privacy',
 ]);
 
-const accountWorkspaceTabs: Array<{ id: SettingsSectionId; label: string }> = [
-  { id: 'accounts', label: '概览' },
-  { id: 'providers', label: '服务器' },
-  { id: 'auth', label: '登录与安全' },
-  { id: 'identities', label: '身份与签名' },
-  { id: 'sync', label: '同步' },
-  { id: 'privacy', label: '隐私' },
-];
-
-function SettingsAccountWorkspace({
+function SettingsAccountContext({
   activeSection,
-  canUseAccountTabs,
   accountSwitchDisabled,
   currentAccountLabel,
   accountOptions,
   activeAccountId,
   connectionSummary,
   onSelectAccountId,
-  onNavigate,
 }: {
   activeSection: SettingsSectionId;
-  canUseAccountTabs: boolean;
   accountSwitchDisabled: boolean;
   currentAccountLabel: string;
   accountOptions: SettingsAccountOption[];
   activeAccountId: number | null;
   connectionSummary?: string;
   onSelectAccountId?: (accountId: number) => void;
-  onNavigate: (section: SettingsSectionId) => void;
 }) {
   if (!accountScopedSections.has(activeSection)) return null;
 
@@ -100,7 +84,7 @@ function SettingsAccountWorkspace({
   const canSwitchAccount = accountOptions.length > 0 && Boolean(onSelectAccountId);
 
   return (
-    <div className="settings-account-workspace">
+    <div className="settings-account-workspace" aria-label="当前账号">
       <div className="settings-account-workspace-topline">
         {canSwitchAccount ? (
           <div
@@ -133,24 +117,6 @@ function SettingsAccountWorkspace({
           </span>
         )}
       </div>
-      <nav className="settings-context-tabs" aria-label="账号设置分类">
-        {accountWorkspaceTabs.map((tab) => {
-          const disabled = tab.id !== 'accounts' && !canUseAccountTabs;
-          return (
-            <button
-              type="button"
-              className={tab.id === activeSection ? 'active' : ''}
-              aria-current={tab.id === activeSection ? 'page' : undefined}
-              disabled={disabled}
-              title={disabled ? '请先添加或选择邮箱账号' : undefined}
-              onClick={() => onNavigate(tab.id)}
-              key={tab.id}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </nav>
     </div>
   );
 }
@@ -182,13 +148,13 @@ export default function SettingsFrame({
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const modalRef = useRef<HTMLElement | null>(null);
-  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const shellRef = useRef<HTMLElement | null>(null);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useModalAccessibility({
-    dialogRef: modalRef,
-    backdropRef,
+    dialogRef: shellRef,
+    backdropRef: workspaceRef,
     initialFocusRef: closeButtonRef,
   });
 
@@ -207,11 +173,11 @@ export default function SettingsFrame({
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.key !== 'Escape') return;
-      const settingsDialog = modalRef.current;
-      const startedInNestedDialog = settingsDialog !== null
+      const settingsShell = shellRef.current;
+      const startedInNestedDialog = settingsShell !== null
         && event.composedPath().some((target) => (
           target instanceof HTMLElement
-          && target !== settingsDialog
+          && target !== settingsShell
           && target.matches('[aria-modal="true"]')
         ));
       if (startedInNestedDialog) return;
@@ -229,26 +195,30 @@ export default function SettingsFrame({
   }, [isDirty, onClose, showDiscardConfirm]);
 
   return (
-    <div
-      className="settings-backdrop"
-      ref={backdropRef}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) requestClose();
-      }}
-    >
+    <div className="settings-workspace" ref={workspaceRef}>
       <section
-        className="settings-modal"
-        data-ui="settings-v3"
+        className="settings-modal settings-shell"
+        data-ui="settings-app"
         data-page-layout="standard"
-        role="dialog"
-        aria-modal="true"
+        role="region"
         aria-label={title}
-        ref={modalRef}
+        ref={shellRef}
+        tabIndex={-1}
       >
         <header className="settings-main-header">
           <div className="settings-title">
+            <button
+              type="button"
+              className="settings-mobile-back"
+              aria-label="返回设置"
+              onClick={requestClose}
+            >
+              <ChevronLeft size={20} aria-hidden="true" />
+              <span>设置</span>
+            </button>
             <span className="settings-title-copy">
-              <strong>{title}</strong>
+              <strong className="settings-desktop-title">{title}</strong>
+              <strong className="settings-mobile-page-title">{activeItem.label}</strong>
             </span>
           </div>
           <div className="settings-header-actions">
@@ -318,24 +288,18 @@ export default function SettingsFrame({
         <div className="settings-body">
           <SettingsSidebar
             activeSection={activeSection}
+            accountSectionsEnabled={canSaveAndVerify}
             onNavigate={onNavigate}
           />
           <div className="settings-content">
-            <SettingsMobileNavigation
+            <SettingsAccountContext
               activeSection={activeSection}
-              activeItem={activeItem}
-              onNavigate={onNavigate}
-            />
-            <SettingsAccountWorkspace
-              activeSection={activeSection}
-              canUseAccountTabs={canSaveAndVerify}
               accountSwitchDisabled={isDirty}
               currentAccountLabel={subtitle}
               accountOptions={accountOptions}
               activeAccountId={activeAccountId}
               connectionSummary={connectionSummary}
               onSelectAccountId={onSelectAccountId}
-              onNavigate={onNavigate}
             />
             <SettingsPageShell
               activeSection={activeSection}

@@ -130,16 +130,3 @@ export type FolderReadReport = {
   message: string;
 };
 
-
-export type ParsedMessagePreview = {
-  subject: string;
-  from: string;
-  to: string;
-  body_preview: string;
-  sanitized_html: string;
-  attachment_count: number;
-  attachment_names: string[];
-  warning_count: number;
-  warnings: string[];
-};
-

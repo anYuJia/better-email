@@ -3,12 +3,19 @@
 @media (max-width: 720px) {
   .settings-workspace {
     --st-content-max-width: 100%;
+    padding: 0;
     background: var(--st-canvas);
   }
 
-  .settings-shell {
+  .settings-shell.settings-modal {
     --settings-control-height: 44px;
     --settings-icon-control-size: 44px;
+    width: 100%;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
   }
 
   .settings-main-header {
@@ -150,6 +157,17 @@
 
   .settings-shell button:not(.settings-discard-confirm button) {
     min-height: 44px;
+  }
+
+  .settings-modal .settings-destination-row {
+    min-height: 56px;
+    padding-block: 8px;
+  }
+
+  .settings-modal .settings-destination-copy small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .settings-connection-feedback {

@@ -89,7 +89,6 @@ export const IPC = {
   NextBackgroundTask: 'next_background_task',
   OpenAttachment: 'open_attachment',
   OpenUrl: 'open_url',
-  ParseRawMessage: 'parse_raw_message',
   PickContactImportFile: 'pick_contact_import_file',
   PickOutboundAttachments: 'pick_outbound_attachments',
   PreviewContactImport: 'preview_contact_import',

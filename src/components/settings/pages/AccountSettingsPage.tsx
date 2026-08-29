@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
-import type { SettingsSectionId } from '../settingsNavigation';
+import {
+  settingsAccountDetailItems,
+  type SettingsSectionId,
+} from '../settingsNavigation';
 import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
 import { syncModeOptions } from '../accounts/accountSettingsShared';
 import { accountFormForEmail, accountFormForIncomingProtocol } from '../accounts/accountSetupForm';
 import { CustomSelect } from '../accounts/CustomSelect';
+import SettingsDestinationList from '../SettingsDestinationList';
 import {
   SettingsField,
   SettingsSection,
@@ -46,6 +50,7 @@ export default function AccountSettingsPage({
   onCreateNewAccount,
   onRemoveAccount,
   onSaveAccountSettings,
+  onNavigate,
 }: AccountSettingsPageProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newAccountSecret, setNewAccountSecret] = useState('');
@@ -204,6 +209,20 @@ export default function AccountSettingsPage({
               ...accountForm,
               auto_download_attachments: checked,
             })}
+          />
+        </SettingsSection>
+      )}
+
+      {accountForm && (
+        <SettingsSection
+          title="详细设置"
+          description="服务器、登录、发件身份、同步与隐私按需打开。"
+          dataSection="account-details"
+        >
+          <SettingsDestinationList
+            ariaLabel="账号详细设置"
+            items={settingsAccountDetailItems}
+            onNavigate={onNavigate}
           />
         </SettingsSection>
       )}

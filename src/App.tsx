@@ -32,7 +32,6 @@ import useMailboxData from './hooks/useMailboxData';
 import useMailboxBootstrap from './hooks/useMailboxBootstrap';
 import useBulkMessageActions from './hooks/useBulkMessageActions';
 import useOAuthFlow from './hooks/useOAuthFlow';
-import useProviderWriteValidation from './hooks/useProviderWriteValidation';
 import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import useAppGlobalEffects from './hooks/useAppGlobalEffects';
@@ -88,7 +87,6 @@ import type {
   ImapProbeReport,
   ImapMailboxState,
   SyncSchedulePlan,
-  ParsedMessagePreview,
   MailRule,
   ThreadSummary,
   OutboxItem,
@@ -104,7 +102,6 @@ import {
   loadProviderVerifications,
   loadAccountScope,
   isDraftEmpty,
-  sampleRawMessage,
   emptyAccountCreateForm,
 } from './app/appConfig';
 import type {
@@ -158,9 +155,7 @@ function MailboxApp() {
   const [diagnosticExport, setDiagnosticExport] = useState<string | null>(null);
   const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | null>(null);
   const [providerVerifications, setProviderVerifications] = useState<Record<string, ProviderVerificationRecord>>(loadProviderVerifications);
-  const [rawMessage, setRawMessage] = useState(sampleRawMessage);
-  const [parsedPreview, setParsedPreview] = useState<ParsedMessagePreview | null>(null);
-  const [imapProbe, setImapProbe] = useState<ImapProbeReport | null>(null);
+  const [, setImapProbe] = useState<ImapProbeReport | null>(null);
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageSummary[]>([]);
@@ -169,7 +164,7 @@ function MailboxApp() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const skipNextFolderEffectLoadRef = useRef(false);
-  // 导航动作（focusMailboxRole/locateProviderWriteValidation）主动切换账号 scope
+  // 导航动作（focusMailboxRole）主动切换账号 scope
   // 时，由导航动作自己驱动加载；accountScope effect 读到这个标记就跳过 refreshMailbox，
   // 避免两个异步流程并发写 folderId/messages 造成「先导航后刷新覆盖」竞态。
   const navigationScopeClaimRef = useRef<number | 'all' | null>(null);
@@ -389,7 +384,7 @@ function MailboxApp() {
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
-  const [syncSchedulePlan, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
+  const [, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
   const [remoteImageTrusts, setRemoteImageTrusts] = useState<RemoteImageTrust[]>([]);
   const [, setLastNewMailNotice] = useState<string | null>(null);
   const [, setNotificationStatus] = useState('系统提醒未检查');
@@ -659,7 +654,6 @@ function MailboxApp() {
     connectionTestRunning,
     connectionTestFeedback,
     verifyAccountCredentials,
-    discoverImapFolders,
     runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
@@ -708,23 +702,8 @@ function MailboxApp() {
     syncImapHistoryPage,
   };
   const {
-    activeValidationId,
-    validationStatus: providerWriteValidationStatus,
-    validationLoading: providerWriteValidationLoading,
-    writebackProgress: providerWritebackValidationProgress,
-    runWritebackStep: runProviderWritebackValidationStep,
-    resetWritebackProgress: resetProviderWritebackValidation,
-    createValidationDraft,
-    refreshValidation: refreshProviderWriteValidation,
-    } = useProviderWriteValidation({
-    account: accountForm,
-    outbox,
-    setStatus,
-  });
-  const {
     scrollSettingsSection,
     openSettingsHome,
-    locateProviderWriteValidation,
     focusMailboxRole,
     scopeRevision,
     currentFolderAccountId,
@@ -735,27 +714,20 @@ function MailboxApp() {
   } = useMailboxNavigation({
     account,
     accounts,
-    accountForm,
     accountScope,
     folderId,
     folders,
-    activeValidationId,
-    providerWriteValidationStatus,
     mailboxRefreshRef,
     skipNextFolderEffectLoadRef,
     resetSearch,
     loadMeta,
-    loadMessages,
     loadMessagesWithVisibleFallback,
     setActiveSettingsSection,
     setActiveThread,
     setAccountScope,
     setAttachments,
-    setFilter,
     setFolderId,
-    setListMode,
     setMessages,
-    setQuery,
     setSelectedId,
     setSelectedMessageIds,
     setSettingsOpen,
@@ -798,15 +770,6 @@ function MailboxApp() {
     setSettingsOpen(false);
     if (isMobileApp) setMobileScreen('settings');
   }, [isMobileApp, resetSaveAndVerifyReport]);
-
-  function prepareProviderWriteValidation() {
-    const validationDraft = createValidationDraft();
-    if (!validationDraft) return;
-    setSettingsOpen(false);
-    setRichComposer(true);
-    openComposer(validationDraft, { replaceExisting: true });
-    setStatus('验证草稿已生成；请检查收件人并按需添加小附件，只有手动点击发送才会真实发信');
-  }
 
   useMailboxBootstrap({
     accountScope,
@@ -999,7 +962,6 @@ function MailboxApp() {
     crossAccountRisks,
     sendQuickReply,
     queueDraft,
-    cancelOutboxItem,
     undoPendingSend,
     composeToContact,
   } = useComposerController({
@@ -1334,7 +1296,6 @@ function MailboxApp() {
     appSettings,
     downloadDirBusy,
     downloadDirError,
-    exportDiagnostics,
     exportLocalBackup,
     previewLocalBackup,
     importLocalBackup,
@@ -1390,14 +1351,6 @@ function MailboxApp() {
       await renderSelectedWithRemoteImagePolicy(selected.id);
     }
     setStatus(`已移除远程图片信任：${trust.value}`);
-  }
-
-  async function parseRawMessage() {
-    const preview = await invoke<ParsedMessagePreview>(IPC.ParseRawMessage, {
-      input: { raw: rawMessage },
-    });
-    setParsedPreview(preview);
-    setStatus(preview.warning_count > 0 ? `发现 ${preview.warning_count} 个安全提示` : '原始邮件预览解析完成');
   }
 
   useAppShortcuts({
@@ -2088,26 +2041,20 @@ function MailboxApp() {
             remoteImageTrusts={remoteImageTrusts}
             identities={identities}
             identityForm={identityForm}
-            diagnosticExport={diagnosticExport}
             localBackupSummary={localBackupSummary}
             storageUsage={storageUsage}
             storageBusy={storageBusy}
             appSettings={appSettings}
             downloadDirBusy={downloadDirBusy}
             downloadDirError={downloadDirError}
-            imapProbe={imapProbe}
-            syncSchedulePlan={syncSchedulePlan}
             imapMailboxes={imapMailboxes}
             folders={folders}
-            outbox={outbox}
             labels={labels}
             rules={rules}
             ruleForm={ruleForm}
             ruleBuilderField={ruleBuilderField}
             ruleBuilderNeedle={ruleBuilderNeedle}
             editingRuleId={editingRuleId}
-            rawMessage={rawMessage}
-            parsedPreview={parsedPreview}
             contactForm={contactForm}
             contactFormAliases={contactFormAliases}
             contacts={managedContacts}
@@ -2115,11 +2062,8 @@ function MailboxApp() {
             contactEditName={contactEditName}
             contactEditAliases={contactEditAliases}
             contactTransferBusy={contactTransferBusy}
-            providerWriteValidationStatus={providerWriteValidationStatus}
-            providerWriteValidationLoading={providerWriteValidationLoading}
-            providerWritebackValidationProgress={providerWritebackValidationProgress}
             setStatus={setStatus}
-            onNavigate={scrollSettingsSection}
+            onNavigate={isMobileApp ? openMobileSettingsSection : scrollSettingsSection}
             onClose={closeSettingsSurface}
             onTestConnection={() => {
               testConnection().catch(() => undefined);
@@ -2199,7 +2143,6 @@ function MailboxApp() {
             onEditIdentity={editIdentity}
             onDeleteIdentity={deleteIdentity}
             onSaveIdentity={() => saveIdentity()}
-            onExportDiagnostics={() => { exportDiagnostics().catch((error) => setStatus(String(error))); }}
             onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
             onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
             onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
@@ -2208,20 +2151,6 @@ function MailboxApp() {
             onClearAttachmentCache={() => clearAttachmentCache()}
             onPickDownloadDir={() => pickDownloadDir()}
             onResetDownloadDir={() => resetDownloadDir()}
-            onDiscoverImapFolders={() => { discoverImapFolders().catch((error) => setStatus(String(error))); }}
-            onPrepareWriteValidation={prepareProviderWriteValidation}
-            onRefreshWriteValidation={() => {
-              refreshProviderWriteValidation().catch((error) => setStatus(String(error)));
-            }}
-            onLocateWriteValidation={(role) => {
-              locateProviderWriteValidation(role).catch((error) => setStatus(String(error)));
-            }}
-            onRunWritebackValidationStep={(step) => {
-              runProviderWritebackValidationStep(step).catch((error) => setStatus(String(error)));
-            }}
-            onResetWritebackValidation={resetProviderWritebackValidation}
-            onRunSyncDryRun={() => { runSyncDryRun().catch((error) => setStatus(String(error))); }}
-            onSyncHistory={() => { syncImapHistoryPage().catch((error) => setStatus(String(error))); }}
             onMapImapMailbox={(mailbox, targetFolderId) => {
               mapImapMailbox(mailbox, targetFolderId).catch((error) => setStatus(String(error)));
             }}
@@ -2229,7 +2158,6 @@ function MailboxApp() {
               createAndMapImapMailbox(mailbox).catch((error) => setStatus(String(error)));
             }}
             onEnqueueBackgroundTask={(kind, source) => { enqueueBackgroundTask(kind, source).catch((error) => setStatus(String(error))); }}
-            onCancelOutboxItem={(item) => { cancelOutboxItem(item).catch((error) => setStatus(String(error))); }}
             onContactFormChange={setContactForm}
             onContactFormAliasesChange={setContactFormAliases}
             filteredContacts={filteredContacts}
@@ -2263,8 +2191,6 @@ function MailboxApp() {
             onToggleRule={(rule) => { toggleRule(rule).catch((error) => setStatus(String(error))); }}
             onEditRule={editRule}
             onRemoveRule={(rule) => { removeRule(rule); }}
-            onRawMessageChange={setRawMessage}
-            onParseRawMessage={parseRawMessage}
             />
           </AppErrorBoundary>
         </Suspense>

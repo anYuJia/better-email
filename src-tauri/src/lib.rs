@@ -1015,7 +1015,6 @@ pub fn run() {
             commands::sync_imap_history,
             commands::fetch_message_body,
             commands::list_sync_runs,
-            commands::parse_raw_message,
             commands::store_account_secret,
             commands::check_account_secret,
             commands::delete_account_secret,

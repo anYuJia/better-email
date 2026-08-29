@@ -1,33 +1,38 @@
 /*
  * Application-level Settings shell.
- * Settings replaces the mail workspace visually: no dimmed backdrop, no
- * floating modal chrome, no permanent-surface shadow.
+ * Desktop uses a compact centered window on a quiet application backdrop;
+ * mobile remains a native full-screen surface. The shell deliberately keeps
+ * a flat border and no shadow.
  */
 
 .settings-workspace {
   --st-sidebar-width: 228px;
   --st-content-max-width: 720px;
+  --st-window-max-width: 1040px;
+  --st-window-max-height: 720px;
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: block;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vh, 48px) clamp(24px, 5vw, 64px);
   overflow: hidden;
-  background: var(--st-canvas);
+  background: var(--st-surface-muted);
 }
 
 .settings-shell.settings-modal {
   position: relative;
-  width: 100%;
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
+  width: min(100%, var(--st-window-max-width));
+  height: min(100%, var(--st-window-max-height));
+  max-width: var(--st-window-max-width);
+  max-height: var(--st-window-max-height);
   display: flex;
   flex-direction: column;
   margin: 0;
   overflow: hidden;
   isolation: isolate;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid var(--st-border-strong);
+  border-radius: var(--st-radius-modal);
   background: var(--st-canvas);
   box-shadow: none;
   animation: none;

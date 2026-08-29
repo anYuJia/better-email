@@ -19,7 +19,6 @@ import type {
   CredentialVerificationReport,
   Folder,
   ImapMailboxState,
-  ImapProbeReport,
   Label,
   LocalBackupSummary,
   MailIdentity,
@@ -31,12 +30,9 @@ import type {
   OAuthSession,
   OAuthStartReport,
   OAuthTokenExchangeReport,
-  OutboxItem,
-  ParsedMessagePreview,
   ProviderVerificationRecord,
   RemoteImageTrust,
   StorageUsage,
-  SyncSchedulePlan,
 } from '../../app/types';
 import type {
   RuleConditionField,
@@ -45,11 +41,6 @@ import type {
 import type { AccountProviderPreset } from '../../providerCatalog';
 import type { ProviderValidationReport } from '../../app/providerValidation';
 import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
-import type {
-  ProviderWritebackValidationProgress,
-  ProviderWritebackValidationStepId,
-  ProviderWriteValidationStatus,
-} from '../../app/providerWriteValidation';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
@@ -60,12 +51,12 @@ import { createSettingsHandlers } from './settingsOverlayHandlers';
 const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));
 const CredentialSecuritySettings = lazy(() => import('./CredentialSecuritySettings'));
 const ExperienceSettings = lazy(() => import('./ExperienceSettings'));
-const AppearanceSettings = lazy(() => import('./AppearanceSettings'));
+const GeneralSettings = lazy(() => import('./GeneralSettings'));
 const DataSafetySettings = lazy(() => import('./DataSafetySettings'));
 const SyncOperationsSettings = lazy(() => import('./SyncOperationsSettings'));
 const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings'));
 const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
-const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
+const ToolsSettingsPage = lazy(() => import('./ToolsSettingsPage'));
 const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
 const McpSettings = lazy(() => import('./McpSettings'));
 const TemplateSettings = lazy(() => import('./TemplateSettings'));
@@ -109,26 +100,20 @@ export type SettingsOverlayProps = {
   remoteImageTrusts: RemoteImageTrust[];
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
-  diagnosticExport: string | null;
   localBackupSummary: LocalBackupSummary | null;
   storageUsage: StorageUsage | null;
   storageBusy: boolean;
   appSettings: AppSettingsReport | null;
   downloadDirBusy: boolean;
   downloadDirError: string | null;
-  imapProbe: ImapProbeReport | null;
-  syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
   folders: Folder[];
-  outbox: OutboxItem[];
   labels: Label[];
   rules: MailRule[];
   ruleForm: MailRuleInput;
   ruleBuilderField: RuleConditionField;
   ruleBuilderNeedle: string;
   editingRuleId: number | null;
-  rawMessage: string;
-  parsedPreview: ParsedMessagePreview | null;
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
@@ -136,9 +121,6 @@ export type SettingsOverlayProps = {
   contactEditName: string;
   contactEditAliases: string;
   contactTransferBusy: boolean;
-  providerWriteValidationStatus: ProviderWriteValidationStatus | null;
-  providerWriteValidationLoading: boolean;
-  providerWritebackValidationProgress: ProviderWritebackValidationProgress | null;
   setStatus: Dispatch<SetStateAction<string>>;
   onNavigate: (section: SettingsSectionId) => void;
   onClose: () => void;
@@ -182,7 +164,6 @@ export type SettingsOverlayProps = {
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
   onSaveIdentity: () => Promise<void>;
-  onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
   onImportBackup: () => void;
@@ -191,18 +172,9 @@ export type SettingsOverlayProps = {
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
-  onDiscoverImapFolders: () => void;
-  onPrepareWriteValidation: () => void;
-  onRefreshWriteValidation: () => void;
-  onLocateWriteValidation: (role: 'sent' | 'inbox') => void;
-  onRunWritebackValidationStep: (step: ProviderWritebackValidationStepId) => void;
-  onResetWritebackValidation: () => void;
-  onRunSyncDryRun: () => void;
-  onSyncHistory: () => void;
   onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
   onCreateAndMapImapMailbox: (mailbox: ImapMailboxState) => void;
   onEnqueueBackgroundTask: (kind: BackgroundTaskKind, source: 'manual' | 'timer') => void;
-  onCancelOutboxItem: (item: OutboxItem) => void;
   onContactFormChange: Dispatch<SetStateAction<ContactCreateInput>>;
   onContactFormAliasesChange: Dispatch<SetStateAction<string>>;
   filteredContacts: Contact[];
@@ -229,19 +201,17 @@ export type SettingsOverlayProps = {
   onToggleRule: (rule: MailRule) => void;
   onEditRule: (rule: MailRule) => void;
   onRemoveRule: (rule: MailRule) => void;
-  onRawMessageChange: Dispatch<SetStateAction<string>>;
-  onParseRawMessage: () => void;
 };
 
 const MemoizedAccountConnection = memo(AccountConnectionSettings);
 const MemoizedCredentialSecurity = memo(CredentialSecuritySettings);
 const MemoizedExperience = memo(ExperienceSettings);
-const MemoizedAppearance = memo(AppearanceSettings);
+const MemoizedGeneral = memo(GeneralSettings);
 const MemoizedDataSafety = memo(DataSafetySettings);
 const MemoizedSyncOperations = memo(SyncOperationsSettings);
 const MemoizedContactAutomation = memo(ContactAutomationSettings);
 const MemoizedRuleAutomation = memo(RuleAutomationSettings);
-const MemoizedSecurityPreview = memo(SecurityPreviewSettings);
+const MemoizedTools = memo(ToolsSettingsPage);
 const MemoizedAiService = memo(AiServiceSettings);
 const MemoizedMcp = memo(McpSettings);
 const MemoizedTemplates = memo(TemplateSettings);
@@ -330,18 +300,14 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const backupProps = useMemo(() => ({
-    diagnosticExport: props.diagnosticExport,
     localBackupSummary: props.localBackupSummary,
-    connectionReport: props.connectionReport,
     storageUsage: props.storageUsage,
     storageBusy: props.storageBusy,
     appSettings: props.appSettings,
     downloadDirBusy: props.downloadDirBusy,
     downloadDirError: props.downloadDirError,
   }), [
-    props.diagnosticExport,
     props.localBackupSummary,
-    props.connectionReport,
     props.storageUsage,
     props.storageBusy,
     props.appSettings,
@@ -350,23 +316,11 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const syncProps = useMemo(() => ({
-    imapProbe: props.imapProbe,
-    syncSchedulePlan: props.syncSchedulePlan,
     imapMailboxes: props.imapMailboxes,
     folders: props.folders,
-    outbox: props.outbox,
-    writeValidationStatus: props.providerWriteValidationStatus,
-    writeValidationLoading: props.providerWriteValidationLoading,
-    writebackValidationProgress: props.providerWritebackValidationProgress,
   }), [
-    props.imapProbe,
-    props.syncSchedulePlan,
     props.imapMailboxes,
     props.folders,
-    props.outbox,
-    props.providerWriteValidationStatus,
-    props.providerWriteValidationLoading,
-    props.providerWritebackValidationProgress,
   ]);
 
   const contactsProps = useMemo(() => ({
@@ -407,17 +361,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.labels,
   ]);
 
-  const securityPreviewProps = useMemo(() => ({
-    rawMessage: props.rawMessage,
-    parsedPreview: props.parsedPreview,
-  }), [props.rawMessage, props.parsedPreview]);
-
   const isAccountSection = activeSettingsSection === 'accounts'
     || activeSettingsSection === 'providers'
     || activeSettingsSection === 'auth';
-  const isExperienceSection = activeSettingsSection === 'sending'
-    || activeSettingsSection === 'notifications'
-    || activeSettingsSection === 'privacy'
+  const isExperienceSection = activeSettingsSection === 'privacy'
     || activeSettingsSection === 'identities';
 
   const connectionReportForAccount = accountForm
@@ -477,6 +424,17 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               {...handlers}
             />
           )}
+          {activeSettingsSection === 'general' && (
+            <MemoizedGeneral
+              accounts={props.accounts}
+              themeMode={props.themeMode}
+              notificationPolicy={props.notificationPolicy}
+              sendUndoDelaySeconds={props.sendUndoDelaySeconds}
+              onThemeModeChange={props.onThemeModeChange}
+              onNotificationPolicyChange={handlers.onNotificationPolicyChange}
+              onSendUndoDelayChange={handlers.onSendUndoDelayChange}
+            />
+          )}
           {activeSettingsSection === 'backup' && (
             <MemoizedDataSafety
               {...backupProps}
@@ -502,17 +460,8 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               {...handlers}
             />
           )}
-          {activeSettingsSection === 'security-preview' && (
-            <MemoizedSecurityPreview
-              {...securityPreviewProps}
-              {...handlers}
-            />
-          )}
-          {activeSettingsSection === 'appearance' && (
-            <MemoizedAppearance
-              themeMode={props.themeMode}
-              onThemeModeChange={props.onThemeModeChange}
-            />
+          {activeSettingsSection === 'tools' && (
+            <MemoizedTools onNavigate={handlers.onNavigate} />
           )}
           {activeSettingsSection === 'ai' && (
             <MemoizedAiService />

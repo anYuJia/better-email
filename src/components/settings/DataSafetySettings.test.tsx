@@ -34,15 +34,12 @@ function renderPage(overrides: Overrides = {}) {
   const resetDownloadDir = overrides.onResetDownloadDir ?? vi.fn();
   render(
     <DataSafetySettings
-      diagnosticExport={null}
       localBackupSummary={null}
-      connectionReport={null}
       storageUsage={baseStorage}
       storageBusy={false}
       appSettings={overrides.appSettings ?? defaultReport}
       downloadDirBusy={overrides.downloadDirBusy ?? false}
       downloadDirError={overrides.downloadDirError ?? null}
-      onExportDiagnostics={vi.fn()}
       onImportEml={vi.fn()}
       onPreviewBackup={vi.fn()}
       onImportBackup={vi.fn()}

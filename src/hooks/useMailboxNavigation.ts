@@ -4,10 +4,8 @@ import type {
   Account,
   AccountScope,
   Attachment,
-  FilterMode,
   Folder,
   FolderRole,
-  ListMode,
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
@@ -20,12 +18,9 @@ import { IPC } from '../ipc/commands';
 type UseMailboxNavigationOptions = {
   account: Account | null;
   accounts: Account[];
-  accountForm: Account | null;
   accountScope: AccountScope;
   folderId: number | null;
   folders: Folder[];
-  activeValidationId: string;
-  providerWriteValidationStatus: { sentMessageId: number | null; receivedMessageId: number | null } | null;
   mailboxRefreshRef: MutableRefObject<number>;
   skipNextFolderEffectLoadRef: MutableRefObject<boolean>;
   /** 导航动作认领的账号 scope；accountScope effect 读到匹配值时跳过 refreshMailbox。 */
@@ -39,17 +34,13 @@ type UseMailboxNavigationOptions = {
       mailboxRequest?: { id: number; scope: AccountScope };
     },
   ) => Promise<{ folderId: number | null; folders: Folder[] }>;
-  loadMessages: MailboxDataController['loadMessages'];
   loadMessagesWithVisibleFallback: MailboxDataController['loadMessagesWithVisibleFallback'];
   setActiveSettingsSection: Dispatch<SetStateAction<SettingsSectionId>>;
   setActiveThread: Dispatch<SetStateAction<ThreadSummary | null>>;
   setAccountScope: Dispatch<SetStateAction<AccountScope>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
-  setFilter: Dispatch<SetStateAction<FilterMode>>;
   setFolderId: Dispatch<SetStateAction<number | null>>;
-  setListMode: Dispatch<SetStateAction<ListMode>>;
   setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
-  setQuery: Dispatch<SetStateAction<string>>;
   setSelectedId: Dispatch<SetStateAction<number | null>>;
   setSelectedMessageIds: Dispatch<SetStateAction<number[]>>;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
@@ -68,28 +59,21 @@ function appFlowWarn(event: string, details: Record<string, unknown> = {}) {
 export default function useMailboxNavigation({
   account,
   accounts,
-  accountForm,
   accountScope,
   folderId,
   folders,
-  activeValidationId,
-  providerWriteValidationStatus,
   mailboxRefreshRef,
   skipNextFolderEffectLoadRef,
   navigationScopeClaimRef,
   resetSearch,
   loadMeta,
-  loadMessages,
   loadMessagesWithVisibleFallback,
   setActiveSettingsSection,
   setActiveThread,
   setAccountScope,
   setAttachments,
-  setFilter,
   setFolderId,
-  setListMode,
   setMessages,
-  setQuery,
   setSelectedId,
   setSelectedMessageIds,
   setSettingsOpen,
@@ -116,92 +100,6 @@ export default function useMailboxNavigation({
     setSettingsOpen(true);
     loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
   }, [folderId, accountScope, loadMeta, setActiveSettingsSection, setSettingsOpen, setStatus]);
-
-  const locateProviderWriteValidation = useCallback(async (role: 'sent' | 'inbox') => {
-    if (!accountForm || !activeValidationId) return;
-    const targetAccountId = accountForm.id;
-    const scopeChanging = accountScope !== targetAccountId;
-    if (scopeChanging) {
-      // 认领该 scope：accountScope effect 跳过 refreshMailbox，由本导航驱动加载。
-      navigationScopeClaimRef.current = targetAccountId;
-    }
-    setAccountScope(targetAccountId);
-    setQuery(activeValidationId);
-    setFilter('all');
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    setSettingsOpen(false);
-    // 自行递增 mailbox 世代：使在途旧刷新失效；用户进一步导航则放弃提交。
-    mailboxRefreshRef.current += 1;
-    const startedRefreshId = mailboxRefreshRef.current;
-    try {
-      const meta = await loadMeta(null, targetAccountId, {
-        mode: 'mailbox',
-        mailboxRequest: { id: startedRefreshId, scope: targetAccountId },
-      });
-      if (mailboxRefreshRef.current !== startedRefreshId) {
-        appFlowLog('locate provider validation aborted by newer navigation', {
-          refreshId: startedRefreshId,
-          currentRefreshId: mailboxRefreshRef.current,
-        });
-        return;
-      }
-      const targetFolder =
-        meta.folders.find((folder) => folder.account_id === targetAccountId && folder.role === role) ??
-        meta.folders.find((folder) => folder.role === role);
-      if (!targetFolder) {
-        setStatus(`当前账号没有可用的${role === 'sent' ? '已发送' : '收件箱'}目录`);
-        return;
-      }
-      skipNextFolderEffectLoadRef.current = true;
-      setFolderId(targetFolder.id);
-      const nextMessages = await loadMessages(
-        targetFolder.id,
-        activeValidationId,
-        'all',
-        targetAccountId,
-        startedRefreshId,
-        messagePageSize,
-        undefined,
-        false,
-      );
-      const preferredMessageId = role === 'sent'
-        ? providerWriteValidationStatus?.sentMessageId
-        : providerWriteValidationStatus?.receivedMessageId;
-      if (preferredMessageId && nextMessages.some((message) => message.id === preferredMessageId)) {
-        setSelectedId(preferredMessageId);
-      }
-      setStatus(
-        nextMessages.length
-          ? `已定位验证 ${activeValidationId} 的${role === 'sent' ? '已发送' : '收件'}邮件`
-          : `已打开${role === 'sent' ? '已发送' : '收件箱'}，暂未找到验证 ${activeValidationId}`,
-      );
-    } finally {
-      if (scopeChanging) {
-        navigationScopeClaimRef.current = null;
-      }
-    }
-  }, [
-    accountForm,
-    activeValidationId,
-    loadMessages,
-    loadMeta,
-    providerWriteValidationStatus,
-    navigationScopeClaimRef,
-    setAccountScope,
-    setActiveThread,
-    setFilter,
-    setFolderId,
-    setListMode,
-    setQuery,
-    setSelectedId,
-    setSettingsOpen,
-    setStatus,
-    setThreadMessages,
-    skipNextFolderEffectLoadRef,
-    mailboxRefreshRef,
-  ]);
 
   const focusMailboxRole = useCallback(async (role: FolderRole, targetAccountId: number | null, statusMessage: string) => {
     const startedAt = performance.now();
@@ -363,7 +261,6 @@ export default function useMailboxNavigation({
     accountIdForScope,
     scrollSettingsSection,
     openSettingsHome,
-    locateProviderWriteValidation,
     focusMailboxRole,
     currentFolderAccountId,
     visibleFolderIdForRole,

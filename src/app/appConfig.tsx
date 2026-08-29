@@ -1,7 +1,6 @@
 export {
   emptyContactForm,
   messagePageSize,
-  sampleRawMessage,
   searchScopeOptions,
   searchShortcuts,
   filters,

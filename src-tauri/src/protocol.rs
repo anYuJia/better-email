@@ -37,6 +37,7 @@ pub fn test_endpoints(
     })
 }
 
+#[cfg(test)]
 pub fn parse_message_preview(raw: &str) -> ParsedMessagePreview {
     parse_message_preview_bytes(raw.as_bytes())
 }

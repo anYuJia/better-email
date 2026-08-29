@@ -22,7 +22,6 @@ export type { MessageSummary } from './types/message';
 export type { UndoMessageSnapshot } from './types/message';
 export type { UndoAction } from './types/message';
 export type { RemoteImageTrust } from './types/message';
-export type { ParsedMessagePreview } from './types/message';
 export type { RemoteActionReport } from './types/message';
 export type { RestoreMessageReport } from './types/message';
 export type { TrashActionReport } from './types/message';

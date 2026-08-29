@@ -17,13 +17,11 @@ import {
 } from 'lucide-react';
 import type {
   AppSettingsReport,
-  ConnectionReport,
   LocalBackupSummary,
   StorageUsage,
 } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
 import { copyTextToClipboard } from '../../app/clipboard';
-import { devMode } from './settingsNavigation';
 import {
   SettingsBadge,
   SettingsButton,
@@ -33,15 +31,12 @@ import {
 } from './shared';
 
 type DataSafetySettingsProps = {
-  diagnosticExport: string | null;
   localBackupSummary: LocalBackupSummary | null;
-  connectionReport: ConnectionReport | null;
   storageUsage: StorageUsage | null;
   storageBusy: boolean;
   appSettings: AppSettingsReport | null;
   downloadDirBusy: boolean;
   downloadDirError: string | null;
-  onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
   onImportBackup: () => void;
@@ -53,9 +48,7 @@ type DataSafetySettingsProps = {
 };
 
 export default function DataSafetySettings({
-  diagnosticExport,
   localBackupSummary,
-  connectionReport,
   storageUsage,
   storageBusy,
   appSettings,
@@ -283,41 +276,6 @@ export default function DataSafetySettings({
           </div>
         )}
       </SettingsSection>
-
-      {diagnosticExport && (
-        <SettingsSection
-          title="脱敏诊断"
-          description="敏感字段已移除，可用于排查连接和同步问题"
-          badge={<SettingsBadge tone="neutral">{Math.round(diagnosticExport.length / 1024)} KB JSON</SettingsBadge>}
-        >
-          <textarea readOnly value={diagnosticExport.slice(0, 2500)} />
-        </SettingsSection>
-      )}
-
-      {devMode && connectionReport && (
-        <div className="settings-developer-diagnostics">
-          <SettingsSection
-            title="服务器连接"
-            description="开发模式：仅检查 IMAP、SMTP 网络端点，不验证账号凭据"
-            badge={
-              <SettingsBadge tone="neutral">
-                {connectionReport.endpoints.filter((endpoint) => endpoint.reachable).length}/{connectionReport.endpoints.length} 可用
-              </SettingsBadge>
-            }
-          >
-            <div className="settings-endpoint-grid">
-              {connectionReport.endpoints.map((endpoint) => (
-                <div className={endpoint.reachable ? 'st-data-row ok' : 'st-data-row warn'} key={endpoint.name}>
-                  <span>{endpoint.name}</span>
-                  <em>{endpoint.address}</em>
-                  <small>{endpoint.latency_ms === null ? '未连通' : `${endpoint.latency_ms}ms`}</small>
-                  <p>{endpoint.message}</p>
-                </div>
-              ))}
-            </div>
-          </SettingsSection>
-        </div>
-      )}
 
       {cacheConfirmationOpen && storageUsage && createPortal((
         <div

@@ -15,6 +15,8 @@ import {
   accountScopedSections,
   connectionSettingsSections,
   getSettingsNavigationContext,
+  getSettingsSectionPresentation,
+  resolveSettingsNavigationSectionId,
   type SettingsSectionId,
 } from './settingsNavigation';
 import './settings-tokens.css';
@@ -165,6 +167,10 @@ export default function SettingsFrame({
     group: activeGroup,
     item: activeItem,
   } = getSettingsNavigationContext(activeSection);
+  const activePresentation = getSettingsSectionPresentation(activeSection);
+  const parentSection = resolveSettingsNavigationSectionId(activeSection);
+  const isNestedSection = parentSection !== activeSection;
+  const parentPresentation = getSettingsSectionPresentation(parentSection);
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
@@ -232,17 +238,17 @@ export default function SettingsFrame({
             <button
               type="button"
               className="settings-mobile-back"
-              aria-label="返回设置"
+              aria-label={isNestedSection ? `返回${parentPresentation.label}` : '返回设置'}
               aria-hidden={isMobileViewport ? undefined : true}
               tabIndex={isMobileViewport ? undefined : -1}
               onClick={requestClose}
             >
               <ChevronLeft size={20} aria-hidden="true" />
-              <span>设置</span>
+              <span>{isNestedSection ? parentPresentation.label : '设置'}</span>
             </button>
             <span className="settings-title-copy">
               <strong className="settings-desktop-title">{title}</strong>
-              <strong className="settings-mobile-page-title">{activeItem.label}</strong>
+              <strong className="settings-mobile-page-title">{activePresentation.label}</strong>
             </span>
           </div>
           <div className="settings-header-actions">

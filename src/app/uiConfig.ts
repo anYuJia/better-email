@@ -84,15 +84,6 @@ export const emptyContactForm: ContactCreateInput = {
 };
 
 
-export const sampleRawMessage = `Subject: 安全预览样例
-From: sender@example.com
-To: demo@better-email.local
-
-<img src="http://tracking.example.com/open.png">
-<script>alert('xss')</script>
-这是一封用于验证 MIME/HTML 安全预览的原始邮件。`;
-
-
 export const shortcutGroups = [
   {
     title: '导航',

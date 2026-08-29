@@ -19,7 +19,7 @@ describe('SettingsFrame application shell', () => {
 
   function renderFrame({
     onClose = () => undefined,
-    activeSection = 'notifications',
+    activeSection = 'general',
     canSaveAndVerify = false,
     isDirty = false,
     isTestingConnection = false,
@@ -77,14 +77,15 @@ describe('SettingsFrame application shell', () => {
     expect(screen.queryByRole('dialog', { name: '设置' })).toBeNull();
   });
 
-  it('groups desktop navigation and exposes account destinations directly', () => {
+  it('keeps desktop navigation compact and marks nested account pages through their parent', () => {
     renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
     expect(screen.getByRole('navigation', { name: '设置分类' })).not.toBeNull();
-    expect(screen.getByText('基础')).not.toBeNull();
-    expect(screen.getByText('账户')).not.toBeNull();
-    expect(screen.getByRole('button', { name: '服务器设置' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '发件身份与标签设置' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '隐私设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByText('偏好')).not.toBeNull();
+    expect(screen.getByText('工具与数据')).not.toBeNull();
+    expect(screen.getAllByRole('navigation', { name: '设置分类' })[0].querySelectorAll('button').length).toBe(7);
+    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '发件身份与标签设置' })).toBeNull();
     expect(screen.queryByRole('navigation', { name: '账号设置分类' })).toBeNull();
   });
 
@@ -92,7 +93,7 @@ describe('SettingsFrame application shell', () => {
     const { unmount } = renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
     expect(screen.getByText('work@example.com')).not.toBeNull();
     unmount();
-    renderFrame({ activeSection: 'notifications' });
+    renderFrame({ activeSection: 'general' });
     expect(screen.queryByText('work@example.com')).toBeNull();
   });
 
@@ -128,10 +129,10 @@ describe('SettingsFrame application shell', () => {
     expect((screen.getByRole('combobox', { name: '切换当前设置账号' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('disables account detail destinations when no account exists', () => {
+  it('keeps the account hub reachable when no account exists', () => {
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
-    expect((screen.getByRole('button', { name: '服务器设置' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: '邮箱账号设置' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
   });
 
   it('keeps the mail workspace inaccessible while settings owns the application surface', () => {
@@ -165,12 +166,23 @@ describe('SettingsFrame application shell', () => {
 
   it('uses the mobile back action instead of a category dropdown', () => {
     const onClose = vi.fn();
-    const { container } = renderFrame({ activeSection: 'notifications', onClose });
+    const { container } = renderFrame({ activeSection: 'general', onClose });
     expect(container.querySelector('.settings-page-picker')).toBeNull();
     const mobileBack = container.querySelector<HTMLButtonElement>('.settings-mobile-back');
     expect(mobileBack).not.toBeNull();
     fireEvent.click(mobileBack!);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates nested mobile back navigation to the history-aware close handler', () => {
+    const onClose = vi.fn();
+    const onNavigate = vi.fn();
+    const { container } = renderFrame({ activeSection: 'providers', onClose, onNavigate });
+    const mobileBack = container.querySelector<HTMLButtonElement>('.settings-mobile-back');
+    expect(mobileBack?.getAttribute('aria-label')).toBe('返回邮箱账号');
+    fireEvent.click(mobileBack!);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('keeps Tab focus inside the settings surface', () => {

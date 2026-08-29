@@ -880,11 +880,6 @@ pub struct OutboundMessage {
     pub attachments: Vec<Attachment>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct RawMessageInput {
-    pub raw: String,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct ParsedMessagePreview {
     pub subject: String,

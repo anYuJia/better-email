@@ -1,158 +1,47 @@
 import {
   FolderPlus,
-  History,
   RefreshCw,
-  Search,
-  Send,
 } from 'lucide-react';
-import {
-  canCancelOutboxItem,
-  outboxStatusLabel,
-  outboxTimingLabel,
-} from '../../app/appConfig';
-import type {
-  ProviderWritebackValidationProgress,
-  ProviderWritebackValidationStepId,
-  ProviderWriteValidationStatus,
-} from '../../app/providerWriteValidation';
 import type {
   Account,
   BackgroundTaskKind,
   Folder,
   ImapMailboxState,
-  ImapProbeReport,
-  OutboxItem,
-  SyncSchedulePlan,
 } from '../../app/types';
-import ProviderWriteValidationSettings from './ProviderWriteValidationSettings';
 import { CustomSelect } from './accounts/CustomSelect';
 import {
   SettingsButton,
-  SettingsEmptyState,
   SettingsSection,
 } from './shared';
-import { devMode } from './settingsNavigation';
 
 type SyncOperationsSettingsProps = {
   accountForm: Account;
-  imapProbe: ImapProbeReport | null;
-  syncSchedulePlan: SyncSchedulePlan | null;
   imapMailboxes: ImapMailboxState[];
   folders: Folder[];
-  outbox: OutboxItem[];
-  writeValidationStatus: ProviderWriteValidationStatus | null;
-  writeValidationLoading: boolean;
-  writebackValidationProgress: ProviderWritebackValidationProgress | null;
-  onDiscoverImapFolders: () => void;
-  onPrepareWriteValidation: () => void;
-  onRefreshWriteValidation: () => void;
-  onLocateWriteValidation: (role: 'sent' | 'inbox') => void;
-  onRunWritebackValidationStep: (step: ProviderWritebackValidationStepId) => void;
-  onResetWritebackValidation: () => void;
-  onRunSyncDryRun: () => void;
-  onSyncHistory: () => void;
   onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => void;
   onCreateAndMapImapMailbox: (mailbox: ImapMailboxState) => void;
   onEnqueueBackgroundTask: (kind: BackgroundTaskKind, source: 'manual' | 'timer') => void;
-  onCancelOutboxItem: (item: OutboxItem) => void;
 };
 
 export default function SyncOperationsSettings({
   accountForm,
-  imapProbe,
-  syncSchedulePlan,
   imapMailboxes,
   folders,
-  outbox,
-  writeValidationStatus,
-  writeValidationLoading,
-  writebackValidationProgress,
-  onDiscoverImapFolders,
-  onPrepareWriteValidation,
-  onRefreshWriteValidation,
-  onLocateWriteValidation,
-  onRunWritebackValidationStep,
-  onResetWritebackValidation,
-  onRunSyncDryRun,
-  onSyncHistory,
   onMapImapMailbox,
   onCreateAndMapImapMailbox,
   onEnqueueBackgroundTask,
-  onCancelOutboxItem,
 }: SyncOperationsSettingsProps) {
   const accountMailboxes = imapMailboxes.filter((mailbox) => mailbox.account_id === accountForm.id);
   const customFolders = folders.filter(
     (folder) => folder.account_id === accountForm.id && folder.role.startsWith('custom:'),
   );
-  const pendingHistoryCount = accountMailboxes.filter(
-    (mailbox) => (mailbox.local_role !== 'custom' || mailbox.local_folder_id) && !mailbox.history_complete,
-  ).length;
-
   return (
     <div className="settings-sync-stack" data-settings-section="sync">
-      {devMode && (
-        <ProviderWriteValidationSettings
-          status={writeValidationStatus}
-          loading={writeValidationLoading}
-          writebackProgress={writebackValidationProgress}
-          onPrepare={onPrepareWriteValidation}
-          onRefresh={onRefreshWriteValidation}
-          onLocate={onLocateWriteValidation}
-          onRunWritebackStep={onRunWritebackValidationStep}
-          onResetWriteback={onResetWritebackValidation}
-        />
-      )}
-
-      {devMode && (
-        <SettingsSection
-          title="IMAP 文件夹发现"
-          description="读取远端目录并检查映射状态。"
-          actions={
-            <SettingsButton icon={<Search size={14} />} onClick={onDiscoverImapFolders}>
-              发现文件夹
-            </SettingsButton>
-          }
-        >
-          {!imapProbe ? (
-            <SettingsEmptyState>保存本地凭据后，可登录 IMAP 并读取远端文件夹。</SettingsEmptyState>
-          ) : (
-            <>
-              <div className={imapProbe.status === 'ok' ? 'st-data-row ok' : 'st-data-row warn'}>
-                <span>{imapProbe.status}</span>
-                <em>{imapProbe.account_email}</em>
-                <small>{imapProbe.folder_count} 个</small>
-                <p>{imapProbe.message}</p>
-              </div>
-              <div className="settings-folder-grid">
-                {imapProbe.folders.slice(0, 12).map((folder) => (
-                  <div className="st-data-row" key={folder.name}>
-                    <span>{folder.name}</span>
-                    <em>{folder.delimiter || 'flat'}</em>
-                    <small>{folder.attributes.join(', ')}</small>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </SettingsSection>
-      )}
-
       <SettingsSection
         title="同步"
         description="查看文件夹状态并手动刷新邮件。"
         actions={
           <div className="st-actions">
-            {devMode && <SettingsButton onClick={onRunSyncDryRun}>演练</SettingsButton>}
-            {devMode && (
-              <SettingsButton
-                disabled={pendingHistoryCount === 0}
-                title={pendingHistoryCount === 0 ? '当前账号历史邮件已回填完成' : `为 ${pendingHistoryCount} 个目录各回填一页`}
-                icon={<History size={14} />}
-                onClick={onSyncHistory}
-              >
-                回填一页
-              </SettingsButton>
-            )}
             <SettingsButton variant="primary" icon={<RefreshCw size={14} />} onClick={() => onEnqueueBackgroundTask('sync', 'manual')}>
               同步邮件
             </SettingsButton>
@@ -160,35 +49,6 @@ export default function SyncOperationsSettings({
         }
         dataSection="sync"
       >
-        {devMode && syncSchedulePlan && (
-          <div className="sync-schedule-card">
-            <div>
-              <span>同步调度与限流</span>
-              <strong>
-                本轮 {syncSchedulePlan.batch_accounts.length}/{syncSchedulePlan.total_accounts || 0} 个账号
-              </strong>
-            </div>
-            <div className="sync-schedule-metrics">
-              <span>每轮最多 {syncSchedulePlan.max_accounts_per_batch} 个账号</span>
-              <span>
-                下一批 {syncSchedulePlan.delayed_accounts.length
-                  ? `${syncSchedulePlan.delayed_accounts.length} 个账号`
-                  : '无等待'}
-              </span>
-            </div>
-            <p>{syncSchedulePlan.strategy}</p>
-            <div className="sync-account-strip">
-              {syncSchedulePlan.batch_accounts.map((syncAccount) => (
-                <span className="active" key={syncAccount.id}>
-                  {syncAccount.display_name || syncAccount.email}
-                </span>
-              ))}
-              {syncSchedulePlan.delayed_accounts.slice(0, 3).map((syncAccount) => (
-                <span key={syncAccount.id}>下轮 · {syncAccount.display_name || syncAccount.email}</span>
-              ))}
-            </div>
-          </div>
-        )}
         {accountMailboxes.length > 0 && (
           <div className="mailbox-grid">
             {accountMailboxes.slice(0, 12).map((mailbox) => (
@@ -252,46 +112,6 @@ export default function SyncOperationsSettings({
         )}
       </SettingsSection>
 
-      {devMode && (
-        <SettingsSection
-          title="发件箱队列"
-          description="开发模式下检查排队、重试与撤回状态。"
-          actions={(
-            <div className="st-actions">
-              <SettingsButton onClick={() => onEnqueueBackgroundTask('outbox-dry-run', 'manual')}>
-                发送演练
-              </SettingsButton>
-              <SettingsButton variant="primary" icon={<Send size={14} />} onClick={() => onEnqueueBackgroundTask('outbox-smtp', 'manual')}>
-                真实发送
-              </SettingsButton>
-            </div>
-          )}
-        >
-          {outbox.length === 0 ? (
-            <SettingsEmptyState>发件箱当前为空。</SettingsEmptyState>
-          ) : (
-            <div className="st-list">
-              {outbox.map((item) => (
-                <div className="st-data-row" key={item.id}>
-                  <span>{outboxStatusLabel(item.status)}</span>
-                  <em>{item.recipients}</em>
-                  <small>{item.attempts} 次</small>
-                  <p>
-                    {item.subject || '(无主题)'}
-                    {outboxTimingLabel(item) ? ` · ${outboxTimingLabel(item)}` : ''}
-                    {item.last_error ? ` · ${item.last_error}` : ''}
-                  </p>
-                  {canCancelOutboxItem(item.status) && (
-                    <SettingsButton size="sm" variant="danger-secondary" onClick={() => onCancelOutboxItem(item)}>
-                      撤回
-                    </SettingsButton>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </SettingsSection>
-      )}
     </div>
   );
 }

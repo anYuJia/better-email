@@ -2,11 +2,10 @@ use super::common::is_pop3_account;
 use crate::db::{MailError, MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
-    FolderReadReport, Message, MessageSummary, ParsedMessagePreview, PendingRemoteWrite,
-    RawMessageInput, ReleasedSnoozedCount, RemoteActionReport, RemoteImageTrust,
-    RemoteImageTrustInput, RestoreMessageReport, ThreadSummary, TrashActionReport,
+    FolderReadReport, Message, MessageSummary, PendingRemoteWrite, ReleasedSnoozedCount,
+    RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, RestoreMessageReport,
+    ThreadSummary, TrashActionReport,
 };
-use crate::protocol;
 use std::collections::BTreeMap;
 use tauri::State;
 #[tauri::command]
@@ -404,11 +403,6 @@ pub fn remove_label_from_message(
     label_id: i64,
 ) -> MailResult<()> {
     store.remove_label_from_message(message_id, label_id)
-}
-
-#[tauri::command]
-pub fn parse_raw_message(input: RawMessageInput) -> ParsedMessagePreview {
-    protocol::parse_message_preview(&input.raw)
 }
 
 fn sync_remote_seen(

@@ -503,7 +503,7 @@ export default function FirstRunOnboarding({
 
           {step === 'security' && (
             <div className="onboarding-step-content onboarding-security">
-              <p>按你的习惯决定邮件内容的安全显示策略，之后可在「设置 → 隐私」中随时修改。</p>
+              <p>按你的习惯决定邮件内容的安全显示策略，之后可在「设置 → 邮箱账号 → 隐私」中随时修改。</p>
               <StepToggle
                 label="隐藏远程图片"
                 description="默认阻止邮件中的远程图片，避免追踪像素暴露打开行为。"
@@ -584,7 +584,7 @@ export default function FirstRunOnboarding({
             onCancel={handleCloseImport}
             onOpenHistory={() => {
               handleCloseImport();
-              onStatus('导入记录可在「设置 → 联系人」中查看');
+              onStatus('导入记录可在「设置 → 效率工具 → 通讯录」中查看');
             }}
           />
         )}

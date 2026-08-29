@@ -4,9 +4,8 @@ import type { NotificationPolicy } from '../../mailUtils';
 import type { AccountProviderPreset } from '../../providerCatalog';
 import type { ProviderVerificationRecord } from '../../app/types';
 import type { SettingsOverlayProps } from './SettingsOverlay';
-import type { BackgroundTaskKind, Account, AccountCreateInput, Contact, ContactCreateInput, ImapMailboxState, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, OutboxItem, RemoteImageTrust } from '../../app/types';
+import type { BackgroundTaskKind, Account, AccountCreateInput, Contact, ContactCreateInput, ImapMailboxState, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, RemoteImageTrust } from '../../app/types';
 import type { RuleConditionField, SendUndoDelaySeconds } from '../../app/appConfig';
-import type { ProviderWritebackValidationStepId } from '../../app/providerWriteValidation';
 
 /**
  * Stable handler wrappers for the settings workspace.
@@ -60,7 +59,6 @@ export type SettingsHandlers = {
   onEditIdentity: SettingsOverlayProps['onEditIdentity'];
   onDeleteIdentity: SettingsOverlayProps['onDeleteIdentity'];
   onSaveIdentity: () => Promise<void>;
-  onExportDiagnostics: () => void;
   onImportEml: () => void;
   onPreviewBackup: () => void;
   onImportBackup: () => void;
@@ -69,18 +67,9 @@ export type SettingsHandlers = {
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
-  onDiscoverImapFolders: () => void;
-  onPrepareWriteValidation: SettingsOverlayProps['onPrepareWriteValidation'];
-  onRefreshWriteValidation: () => void;
-  onLocateWriteValidation: SettingsOverlayProps['onLocateWriteValidation'];
-  onRunWritebackValidationStep: SettingsOverlayProps['onRunWritebackValidationStep'];
-  onResetWritebackValidation: SettingsOverlayProps['onResetWritebackValidation'];
-  onRunSyncDryRun: () => void;
-  onSyncHistory: () => void;
   onMapImapMailbox: SettingsOverlayProps['onMapImapMailbox'];
   onCreateAndMapImapMailbox: SettingsOverlayProps['onCreateAndMapImapMailbox'];
   onEnqueueBackgroundTask: SettingsOverlayProps['onEnqueueBackgroundTask'];
-  onCancelOutboxItem: SettingsOverlayProps['onCancelOutboxItem'];
   onContactFormChange: SettingsOverlayProps['onContactFormChange'];
   onContactFormAliasesChange: SettingsOverlayProps['onContactFormAliasesChange'];
   onContactQueryChange: SettingsOverlayProps['onContactQueryChange'];
@@ -105,8 +94,6 @@ export type SettingsHandlers = {
   onToggleRule: SettingsOverlayProps['onToggleRule'];
   onEditRule: SettingsOverlayProps['onEditRule'];
   onRemoveRule: SettingsOverlayProps['onRemoveRule'];
-  onRawMessageChange: SettingsOverlayProps['onRawMessageChange'];
-  onParseRawMessage: () => void;
 };
 
 type OverlayRef = { current: SettingsOverlayProps };
@@ -167,7 +154,6 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onEditIdentity: (identity: MailIdentity) => latest().onEditIdentity(identity),
     onDeleteIdentity: (identity: MailIdentity) => latest().onDeleteIdentity(identity),
     onSaveIdentity: () => latest().onSaveIdentity(),
-    onExportDiagnostics: () => latest().onExportDiagnostics(),
     onImportEml: () => latest().onImportEml(),
     onPreviewBackup: () => latest().onPreviewBackup(),
     onImportBackup: () => latest().onImportBackup(),
@@ -176,18 +162,9 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onClearAttachmentCache: () => latest().onClearAttachmentCache(),
     onPickDownloadDir: () => latest().onPickDownloadDir(),
     onResetDownloadDir: () => latest().onResetDownloadDir(),
-    onDiscoverImapFolders: () => latest().onDiscoverImapFolders(),
-    onPrepareWriteValidation: () => latest().onPrepareWriteValidation(),
-    onRefreshWriteValidation: () => latest().onRefreshWriteValidation(),
-    onLocateWriteValidation: (role: 'sent' | 'inbox') => latest().onLocateWriteValidation(role),
-    onRunWritebackValidationStep: (step: ProviderWritebackValidationStepId) => latest().onRunWritebackValidationStep(step),
-    onResetWritebackValidation: () => latest().onResetWritebackValidation(),
-    onRunSyncDryRun: () => latest().onRunSyncDryRun(),
-    onSyncHistory: () => latest().onSyncHistory(),
     onMapImapMailbox: (mailbox: ImapMailboxState, folderId: number | null) => latest().onMapImapMailbox(mailbox, folderId),
     onCreateAndMapImapMailbox: (mailbox: ImapMailboxState) => latest().onCreateAndMapImapMailbox(mailbox),
     onEnqueueBackgroundTask: (kind: BackgroundTaskKind, source: 'manual' | 'timer') => latest().onEnqueueBackgroundTask(kind, source),
-    onCancelOutboxItem: (item: OutboxItem) => latest().onCancelOutboxItem(item),
     onContactFormChange: (contact: SetStateAction<ContactCreateInput>) => latest().onContactFormChange(contact),
     onContactFormAliasesChange: (value: SetStateAction<string>) => latest().onContactFormAliasesChange(value),
     onContactQueryChange: (value: SetStateAction<string>) => latest().onContactQueryChange(value),
@@ -212,7 +189,5 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onToggleRule: (rule: MailRule) => latest().onToggleRule(rule),
     onEditRule: (rule: MailRule) => latest().onEditRule(rule),
     onRemoveRule: (rule: MailRule) => latest().onRemoveRule(rule),
-    onRawMessageChange: (value: SetStateAction<string>) => latest().onRawMessageChange(value),
-    onParseRawMessage: () => latest().onParseRawMessage(),
   };
 }

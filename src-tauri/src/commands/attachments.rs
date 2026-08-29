@@ -1382,11 +1382,15 @@ fn split_extension(filename: &str) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::{
-        authorize_outbound_path, create_private_file, create_private_temp_attachment_file,
-        ensure_private_attachment_dir, ensure_private_temp_dir, max_base64_encoded_len,
-        open_private_attachment_file, private_resume_offset, read_verified_outbound_attachment,
-        render_eml_message, split_extension, unique_download_path, validate_outbound_attachment,
+        authorize_outbound_path, create_private_temp_attachment_file, ensure_private_temp_dir,
+        max_base64_encoded_len, read_verified_outbound_attachment, render_eml_message,
+        split_extension, unique_download_path, validate_outbound_attachment,
         validate_outbound_attachment_inputs, MAX_OUTBOUND_TOTAL_BYTES,
+    };
+    #[cfg(unix)]
+    use super::{
+        create_private_file, ensure_private_attachment_dir, open_private_attachment_file,
+        private_resume_offset,
     };
     use crate::db::MailStore;
     use crate::models::{Attachment, Message};
@@ -1911,6 +1915,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn outbound_attachment_rejects_symlink_swap_after_authorization() {
         let store =
@@ -1932,6 +1937,7 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&sensitive, &original).unwrap();
 
+        #[cfg(unix)]
         let attachment = sample_attachment("original.bin", &input.local_path, input.size_bytes);
         #[cfg(unix)]
         {

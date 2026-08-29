@@ -98,6 +98,9 @@ impl MailStore {
     /// protects the renderer and SQLite memory use; callers can advance with
     /// `offset` instead of repeatedly asking for a larger (and eventually
     /// clamped) LIMIT.
+    // Scope, filtering, sorting, and paging are independent SQL dimensions;
+    // keeping them explicit avoids an opaque parameter object at this DB seam.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_messages_for_scope_sorted_page(
         &self,
         account_id: Option<i64>,

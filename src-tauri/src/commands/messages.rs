@@ -10,6 +10,9 @@ use crate::protocol;
 use std::collections::BTreeMap;
 use tauri::State;
 #[tauri::command]
+// The IPC contract intentionally keeps scope, search, sort, and paging fields
+// flat so the generated command schema remains backwards-compatible.
+#[allow(clippy::too_many_arguments)]
 pub fn list_messages(
     store: State<'_, MailStore>,
     account_id: Option<i64>,

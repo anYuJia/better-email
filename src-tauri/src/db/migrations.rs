@@ -530,6 +530,10 @@ impl MailStore {
             conn.execute_batch(
                 "
                 CREATE INDEX IF NOT EXISTS idx_messages_folder_time ON messages(folder_id, received_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_messages_thread_latest
+                    ON messages(thread_key, received_at DESC, id DESC);
+                CREATE INDEX IF NOT EXISTS idx_messages_account_thread_latest
+                    ON messages(account_id, thread_key, received_at DESC, id DESC);
                 CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(folder_id, is_read);
                 CREATE INDEX IF NOT EXISTS idx_messages_subject_like ON messages(subject);
                 CREATE INDEX IF NOT EXISTS idx_messages_sender_like ON messages(sender_name, sender_email);

@@ -78,7 +78,9 @@ function dateFromParts(day: string, time: TimeParts) {
 function roundScheduleSeed() {
   const date = new Date();
   date.setSeconds(0, 0);
-  date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15);
+  // Always advance at an exact quarter boundary; rounding 11:45:16 to
+  // 11:45:00 would leave an expired schedule that cannot be confirmed.
+  date.setMinutes(Math.ceil((date.getMinutes() + 1) / 15) * 15);
   if (date.getMinutes() === 60) date.setHours(date.getHours() + 1, 0, 0, 0);
   return date;
 }

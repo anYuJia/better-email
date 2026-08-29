@@ -66,12 +66,10 @@ function renderToolbar(selectedMessageIds: number[] = []) {
       onShowThreads={vi.fn()}
       onFilterChange={vi.fn()}
       onSortChange={vi.fn()}
-      visibleMessageCount={40}
       selectedMessageIds={selectedMessageIds}
       selectedMessages={selectedMessageIds.length > 0 ? [message] : []}
       folders={[]}
       labels={[]}
-      onToggleAllVisible={vi.fn()}
       onRunBulkAction={vi.fn()}
       onRequestSnooze={vi.fn()}
       onMoveBulkToFolder={vi.fn()}
@@ -130,12 +128,10 @@ describe('Inbox toolbar selection mode', () => {
         onShowThreads={vi.fn()}
         onFilterChange={onFilterChange}
         onSortChange={onSortChange}
-        visibleMessageCount={40}
         selectedMessageIds={[]}
         selectedMessages={[]}
         folders={[]}
         labels={[]}
-        onToggleAllVisible={vi.fn()}
         onRunBulkAction={vi.fn()}
         onRequestSnooze={vi.fn()}
         onMoveBulkToFolder={vi.fn()}
@@ -181,12 +177,10 @@ describe('Inbox toolbar selection mode', () => {
         onShowThreads={vi.fn()}
         onFilterChange={vi.fn()}
         onSortChange={vi.fn()}
-        visibleMessageCount={40}
         selectedMessageIds={[message.id]}
         selectedMessages={[message]}
         folders={[]}
         labels={[]}
-        onToggleAllVisible={vi.fn()}
         onRunBulkAction={vi.fn()}
         onRequestSnooze={vi.fn()}
         onMoveBulkToFolder={vi.fn()}
@@ -205,8 +199,7 @@ describe('Inbox toolbar selection mode', () => {
     expect(screen.getByRole('button', { name: '更多批量操作，已选 1 封' })).toBeDefined();
   });
 
-  it('keeps the bulk selection affordance keyboard and Escape friendly', () => {
-    const onToggleAllVisible = vi.fn();
+  it('keeps the bulk actions compact without a duplicate selection control', () => {
     const view = render(
       <MessageListToolbar
         filter="all"
@@ -219,21 +212,18 @@ describe('Inbox toolbar selection mode', () => {
         onShowThreads={vi.fn()}
         onFilterChange={vi.fn()}
         onSortChange={vi.fn()}
-        visibleMessageCount={40}
         selectedMessageIds={[message.id]}
         selectedMessages={[message]}
         folders={[]}
         labels={[]}
-        onToggleAllVisible={onToggleAllVisible}
         onRunBulkAction={vi.fn()}
         onRequestSnooze={vi.fn()}
         onMoveBulkToFolder={vi.fn()}
         onToggleBulkLabel={vi.fn()}
       />,
     );
-    const checkbox = view.getByRole('checkbox', { name: '选择当前列表中的全部邮件' });
-    fireEvent.click(checkbox);
-    expect(onToggleAllVisible).toHaveBeenCalledWith(true);
+    expect(view.container.querySelector('.bulk-selection')).toBeNull();
+    expect(view.queryByRole('checkbox')).toBeNull();
 
     const summary = view.getByRole('button', { name: '更多批量操作，已选 1 封' });
     fireEvent.click(summary);

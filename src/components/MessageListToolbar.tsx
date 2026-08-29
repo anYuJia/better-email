@@ -24,17 +24,14 @@ type MessageListToolbarProps = {
   onShowThreads: () => void;
   onFilterChange: (filter: FilterMode) => void;
   onSortChange: (sort: ListSort) => void;
-  visibleMessageCount: number;
   selectedMessageIds: number[];
   selectedMessages: MessageSummary[];
   folders: Folder[];
   labels: Label[];
-  onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
-  isSelectingAll?: boolean;
   onOpenNavigation?: () => void;
 };
 
@@ -55,17 +52,14 @@ function MessageListToolbar({
   onShowThreads,
   onFilterChange,
   onSortChange,
-  visibleMessageCount,
   selectedMessageIds,
   selectedMessages,
   folders,
   labels,
-  onToggleAllVisible,
   onRunBulkAction,
   onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
-  isSelectingAll,
   onOpenNavigation,
 }: MessageListToolbarProps) {
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
@@ -99,17 +93,14 @@ function MessageListToolbar({
         {isSelectionMode ? (
           <MessageBulkToolbar
             inline
-            visibleMessageCount={visibleMessageCount}
             selectedMessageIds={selectedMessageIds}
             selectedMessages={selectedMessages}
             folders={folders}
             labels={labels}
-            onToggleAllVisible={onToggleAllVisible}
             onRunBulkAction={onRunBulkAction}
             onRequestSnooze={onRequestSnooze}
             onMoveBulkToFolder={onMoveBulkToFolder}
             onToggleBulkLabel={onToggleBulkLabel}
-            isSelectingAll={isSelectingAll}
           />
         ) : (
           <div className="list-control-actions" aria-label="邮件显示模式">

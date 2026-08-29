@@ -13,53 +13,36 @@ import type { BulkMessageAction } from './messageContextMenu';
 import { useDetailsMenu } from '../hooks/useDetailsMenu';
 
 type MessageBulkToolbarProps = {
-  visibleMessageCount: number;
   selectedMessageIds: number[];
   selectedMessages: MessageSummary[];
   folders: Folder[];
   labels: Label[];
-  onToggleAllVisible: (checked: boolean) => void;
   onRunBulkAction: (action: BulkMessageAction) => void;
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
-  isSelectingAll?: boolean;
   inline?: boolean;
 };
 
 export default function MessageBulkToolbar({
-  visibleMessageCount,
   selectedMessageIds,
   selectedMessages,
   folders,
   labels,
-  onToggleAllVisible,
   onRunBulkAction,
   onRequestSnooze,
   onMoveBulkToFolder,
   onToggleBulkLabel,
-  isSelectingAll = false,
   inline = false,
 }: MessageBulkToolbarProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
   if (selectedMessageIds.length === 0) return null;
 
-  const allVisibleSelected = visibleMessageCount > 0 && selectedMessageIds.length === visibleMessageCount;
   const snoozableSelectedMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
 
   return (
     <div className={`bulk-toolbar active${inline ? ' bulk-toolbar-inline' : ''}`}>
-      <label className="bulk-selection" title="选择或取消选择当前筛选结果中的全部邮件">
-        <input
-          type="checkbox"
-          aria-label={isSelectingAll ? '正在选择全部邮件' : '选择当前列表中的全部邮件'}
-          checked={allVisibleSelected}
-          disabled={isSelectingAll}
-          onChange={(event) => onToggleAllVisible(event.target.checked)}
-        />
-        <span>{isSelectingAll ? '正在选择…' : `已选 ${selectedMessageIds.length}`}</span>
-      </label>
       <button
         type="button"
         className="bulk-primary-action"

@@ -385,7 +385,6 @@ function MailboxApp() {
     setStatus,
   });
   const [isSelectingAllMessages, setIsSelectingAllMessages] = useState(false);
-  const selectAllRequestRef = useRef(0);
   const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
@@ -513,8 +512,8 @@ function MailboxApp() {
     onAccountListLoaded: () => setInitialAccountListLoaded(true),
   });
   const mailboxContextKey = useMemo(
-    () => buildMailboxContextKey({ accountScope, folderId, query: appliedQuery, filter, listMode }),
-    [accountScope, folderId, appliedQuery, filter, listMode],
+    () => buildMailboxContextKey({ accountScope, folderId, query: appliedQuery, filter }),
+    [accountScope, folderId, appliedQuery, filter],
   );
   const {
     selectedId,
@@ -832,11 +831,6 @@ function MailboxApp() {
   // refreshUnreadIndicators 是稳定 useCallback，任何无关渲染都不会重新订阅或触发 GetStats。
   useUnreadFocusSync(refreshUnreadIndicators, accountScope);
 
-  const selectedMessageSet = useMemo(() => new Set(selectedMessageIds), [selectedMessageIds]);
-  const selectedMessages = useMemo(
-    () => messages.filter((message) => selectedMessageSet.has(message.id)),
-    [messages, selectedMessageSet],
-  );
   const unreadTotal = stats?.unread_messages ?? 0;
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
@@ -1086,47 +1080,25 @@ function MailboxApp() {
     };
   }, [openComposer, enqueueManualSync, folders, setFilter, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive, resetSearch, setSelectedId, setSelectedMessageIds, refreshAll, openMobileSettingsSection]);
 
-  const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
-    setSelectedMessageIds((current) => {
-      if (checked) return current.includes(messageId) ? current : [...current, messageId];
-      return current.filter((id) => id !== messageId);
-    });
-  }, []);
-
-  const { toggleGroup, groupSyncBusy, selectDateRange } = useMessageSelectionControls(
+  const {
+    toggleGroup,
+    groupSyncBusy,
+    selectDateRange,
+    selectedMessages,
+    clearSelection,
+    isAllMessagesSelected,
+    toggleMessageSelection,
+    toggleAllMessages,
+  } = useMessageSelectionControls(
     messages,
     setSelectedMessageIds,
     setStatus,
     loadAllMessages,
     mailboxRefreshRef,
+    selectedMessageIds,
+    mailboxListStateKey,
+    setIsSelectingAllMessages,
   );
-
-  const toggleAllVisibleMessages = useCallback(async (checked: boolean): Promise<number | null> => {
-    const requestId = selectAllRequestRef.current + 1;
-    selectAllRequestRef.current = requestId;
-    if (!checked) {
-      setSelectedMessageIds([]);
-      setIsSelectingAllMessages(false);
-      return null;
-    }
-
-    const refreshId = mailboxRefreshRef.current;
-    setIsSelectingAllMessages(true);
-    return loadAllMessages()
-      .then((allMessages) => {
-        if (requestId !== selectAllRequestRef.current || refreshId !== mailboxRefreshRef.current) return null;
-        const selectedIds = [...new Set(allMessages.map((message) => message.id))];
-        setSelectedMessageIds(selectedIds);
-        return selectedIds.length;
-      })
-      .catch((error) => {
-        if (requestId === selectAllRequestRef.current) setStatus(String(error));
-        return null;
-      })
-      .finally(() => {
-        if (requestId === selectAllRequestRef.current) setIsSelectingAllMessages(false);
-      });
-  }, [loadAllMessages, mailboxRefreshRef, setStatus]);
 
   function snapshotMessages(items: MessageSummary[]): UndoMessageSnapshot[] {
     return items.map((message) => ({
@@ -1437,10 +1409,10 @@ function MailboxApp() {
       setSettingsOpen(false);
       setShortcutsOpen(false);
     },
-    clearSelection: () => setSelectedMessageIds([]),
+    clearSelection,
     setStatus,
     restoreUndoAction,
-    toggleAllVisibleMessages,
+    toggleAllVisibleMessages: toggleAllMessages,
     openShortcuts: () => setShortcutsOpen(true),
     composeNew: () => {
       openComposer(emptyDraft);
@@ -1668,6 +1640,7 @@ function MailboxApp() {
         listMode={listMode}
         listSort={listSort}
         selectedMessageIds={selectedMessageIds}
+        selectedMessages={selectedMessages}
         folders={folders}
         labels={labels}
         threads={threads}
@@ -1687,8 +1660,9 @@ function MailboxApp() {
         onShowThreads={handleShowThreads}
         onFilterChange={setFilter}
         onSortChange={setListSort}
-        onToggleAllVisible={toggleAllVisibleMessages}
+        onToggleAllVisible={toggleAllMessages}
         isSelectingAll={isSelectingAllMessages}
+        isAllMessagesSelected={isAllMessagesSelected}
         onRunBulkAction={runBulkAction}
         onRequestSnooze={requestSnooze}
         onMoveBulkToFolder={handleMoveBulkToFolder}

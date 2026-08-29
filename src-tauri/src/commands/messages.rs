@@ -1,5 +1,5 @@
 use super::common::is_pop3_account;
-use crate::db::{MailResult, MailStore, MessageRemoteRef};
+use crate::db::{MailError, MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
     FolderReadReport, Message, MessageSummary, ParsedMessagePreview, PendingRemoteWrite,
@@ -681,7 +681,7 @@ fn remote_failed_report(message: impl Into<String>) -> RemoteActionReport {
 }
 
 #[tauri::command]
-pub fn list_threads(
+pub async fn list_threads(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
     folder_id: Option<i64>,
@@ -690,5 +690,14 @@ pub fn list_threads(
     sort: Option<String>,
     limit: i64,
 ) -> MailResult<Vec<ThreadSummary>> {
-    store.list_threads_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store.list_threads_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
+    })
+    .await
+    .map_err(|error| {
+        MailError::Io(std::io::Error::other(format!(
+            "list_threads task failed: {error}"
+        )))
+    })?
 }

@@ -30,6 +30,7 @@ import type {
   SyncRun,
   ThreadSummary,
 } from '../app/types';
+import type { MailboxThreadLoader } from './useMailboxData';
 
 export type MailboxSearchLoaders = {
   loadMessagesWithVisibleFallback: (
@@ -59,14 +60,7 @@ export type MailboxSearchLoaders = {
     nextOffset?: number,
     nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
-  loadThreads: (
-    nextFolderId?: number | null,
-    nextQuery?: string,
-    nextFilter?: FilterMode,
-    nextScope?: AccountScope,
-    refreshId?: number,
-    nextSearchScope?: SearchScope,
-  ) => Promise<ThreadSummary[]>;
+  loadThreads: MailboxThreadLoader;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -408,10 +402,14 @@ export default function useMailboxSearchController({
   }, [applySearchShortcut, setStatus]);
 
   const handleShowMessages = useCallback(() => {
+    // Invalidate only thread commits. Advancing mailboxRefreshRef here would
+    // also stale an in-flight first message page and can leave the mail view
+    // empty when the user switches back quickly.
+    loadersRef.current?.loadThreads.invalidate?.();
     setListMode('messages');
     setActiveThread(null);
     setThreadMessages([]);
-  }, [setActiveThread, setThreadMessages]);
+  }, [loadersRef, setActiveThread, setThreadMessages]);
 
   // 排序变更也是视图刷新：先自增世代使在途旧请求失效，再应用新排序并触发加载。
   const changeListSort = useCallback((nextSort: ListSort) => {
@@ -438,7 +436,7 @@ export default function useMailboxSearchController({
       appliedQuery,
       filter,
       accountScope,
-      nextSearchRefreshId(),
+      mailboxRefreshRef.current,
       searchScope,
     ).catch((error) => setStatus(String(error)));
   }, [
@@ -447,7 +445,7 @@ export default function useMailboxSearchController({
     appliedQuery,
     filter,
     accountScope,
-    nextSearchRefreshId,
+    mailboxRefreshRef,
     searchScope,
     setSelectedMessageIds,
     setStatus,

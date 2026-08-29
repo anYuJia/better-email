@@ -76,6 +76,8 @@ function createLoaders() {
   });
   const loadMessages = vi.fn(async (): Promise<MessageSummary[]> => []);
   const loadThreads = vi.fn(async () => []);
+  const invalidateThreads = vi.fn();
+  Object.assign(loadThreads, { invalidate: invalidateThreads });
   const loadMeta = vi.fn(async () => ({ folderId: 101, folders }));
   const syncImapHistoryPage = vi.fn(async () => ({
     id: 1,
@@ -89,9 +91,23 @@ function createLoaders() {
     message: '同步完成',
   }));
   const loadersRef: { current: MailboxSearchLoaders | null } = {
-    current: { loadMessagesWithVisibleFallback, loadMessages, loadThreads, loadMeta, syncImapHistoryPage },
+    current: {
+      loadMessagesWithVisibleFallback,
+      loadMessages,
+      loadThreads,
+      loadMeta,
+      syncImapHistoryPage,
+    },
   };
-  return { loadMessagesWithVisibleFallback, loadMessages, loadThreads, loadMeta, syncImapHistoryPage, loadersRef };
+  return {
+    loadMessagesWithVisibleFallback,
+    loadMessages,
+    loadThreads,
+    invalidateThreads,
+    loadMeta,
+    syncImapHistoryPage,
+    loadersRef,
+  };
 }
 
 function renderController({
@@ -127,7 +143,14 @@ function renderController({
     setThreadMessages,
     setStatus,
   }));
-  return { ...utils, ...loaders, setStatus, setActiveThread, setThreadMessages };
+  return {
+    ...utils,
+    ...loaders,
+    mailboxRefreshRef,
+    setStatus,
+    setActiveThread,
+    setThreadMessages,
+  };
 }
 
 describe('useMailboxSearchController', () => {
@@ -329,6 +352,70 @@ describe('useMailboxSearchController', () => {
     ]);
   });
 
+  it('shares one complete paging request for concurrent full selections', async () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    let resolveFirst: ((value: MessageSummary[]) => void) | null = null;
+    loadMessagesWithVisibleFallback.mockImplementation((...args: unknown[]) => {
+      const offset = Number(args[10] ?? 0);
+      if (offset === 0 && !resolveFirst) {
+        return new Promise((resolve) => { resolveFirst = resolve; });
+      }
+      return Promise.resolve(offset === 0
+        ? [{ id: 1 } as MessageSummary]
+        : []);
+    });
+
+    let first: Promise<MessageSummary[]> | null = null;
+    let second: Promise<MessageSummary[]> | null = null;
+    act(() => {
+      first = result.current.loadAllMessages();
+      second = result.current.loadAllMessages();
+    });
+    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveFirst?.([{ id: 1 } as MessageSummary]);
+      await Promise.all([first!, second!]);
+    });
+    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledTimes(2);
+    expect(await first!).toEqual([{ id: 1 }]);
+    expect(await second!).toEqual([{ id: 1 }]);
+  });
+
+  it('loads all pages independently while normal load-more is busy', async () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    let resolveLoadMore: ((value: MessageSummary[]) => void) | null = null;
+    let invocation = 0;
+    loadMessagesWithVisibleFallback.mockImplementation((...args: unknown[]) => {
+      invocation += 1;
+      if (invocation === 1) {
+        return new Promise((resolve) => { resolveLoadMore = resolve; });
+      }
+      const offset = Number(args[10] ?? 0);
+      return Promise.resolve(offset === 0
+        ? Array.from({ length: 199 }, (_, id) => ({ id } as MessageSummary))
+        : offset === 199
+          ? [{ id: 199 } as MessageSummary]
+          : []);
+    });
+
+    let loadMore: Promise<MessageSummary[]> | null = null;
+    let loadAll: Promise<MessageSummary[]> | null = null;
+    act(() => {
+      loadMore = result.current.loadMoreMessages();
+      loadAll = result.current.loadAllMessages();
+    });
+    let all: MessageSummary[] = [];
+    await act(async () => {
+      all = await loadAll!;
+    });
+    expect(all).toHaveLength(200);
+    expect(loadMessagesWithVisibleFallback.mock.calls.map((call) => call[10])).toEqual([0, 0, 199, 200]);
+    await act(async () => {
+      resolveLoadMore?.([]);
+      await loadMore;
+    });
+  });
+
   it('loadMoreMessages ignores concurrent invocations', async () => {
     const { result, loadMessagesWithVisibleFallback } = renderController();
     let resolveFirst: ((value: MessageSummary[]) => void) | null = null;
@@ -464,13 +551,31 @@ describe('useMailboxSearchController', () => {
     expect(setThreadMessages).toHaveBeenCalledWith([]);
   });
 
+  it('invalidates a pending thread toggle when switching back to messages', async () => {
+    let resolveThread!: (threads: never[]) => void;
+    const { result, loadThreads, invalidateThreads } = renderController();
+    const pending = new Promise<never[]>((resolve) => { resolveThread = resolve; });
+    loadThreads.mockReturnValue(pending);
+
+    act(() => result.current.handleShowThreads());
+    expect(result.current.listMode).toBe('threads');
+
+    act(() => result.current.handleShowMessages());
+    expect(result.current.listMode).toBe('messages');
+    expect(invalidateThreads).toHaveBeenCalledTimes(1);
+
+    resolveThread([]);
+    await act(async () => { await pending; });
+    expect(result.current.listMode).toBe('messages');
+  });
+
   it('handleShowThreads loads threads in the current scope', async () => {
     const { result, loadThreads } = renderController();
     await act(async () => {
       await result.current.handleShowThreads();
     });
     expect(result.current.listMode).toBe('threads');
-    expect(loadThreads).toHaveBeenCalledWith(101, '', 'all', 'all', 2, 'folder');
+    expect(loadThreads).toHaveBeenCalledWith(101, '', 'all', 'all', 1, 'folder');
   });
 
   it('resetSearch clears query filter scope and list mode', () => {

@@ -49,15 +49,45 @@ describe('useMessageSelectionControls', () => {
       const [selected, setSelected] = useState<number[]>([3]);
       return {
         selected,
-        ...useMessageSelectionControls(visible, setSelected, setStatus, loadAllMessages, refreshRef),
+        ...useMessageSelectionControls(visible, setSelected, setStatus, loadAllMessages, refreshRef, selected),
       };
     });
 
     await act(async () => { await result.current.toggleGroup('today', [1], true); });
     expect(result.current.selected).toEqual([3, 1, 2]);
+    expect(result.current.selectedMessages.map((item) => item.id)).toEqual([3, 1, 2]);
     await act(async () => { await result.current.toggleGroup('today', [1], false); });
     expect(result.current.selected).toEqual([3]);
     expect(loadAllMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps every full-result summary for bulk actions after selecting all', async () => {
+    const visible = [message(1, localDay(0))];
+    const allMessages = Array.from({ length: 450 }, (_, index) => (
+      message(index + 1, localDay(index % 4))
+    ));
+    const loadAllMessages = vi.fn(async () => allMessages);
+    const { result } = renderHook(() => {
+      const [selected, setSelected] = useState<number[]>([]);
+      return {
+        selected,
+        ...useMessageSelectionControls(
+          visible,
+          setSelected,
+          vi.fn(),
+          loadAllMessages,
+          undefined,
+          selected,
+        ),
+      };
+    });
+
+    await act(async () => { await result.current.toggleAllMessages(true); });
+    expect(result.current.selected).toHaveLength(450);
+    expect(result.current.selectedMessages.map((item) => item.id)).toEqual(
+      allMessages.map((item) => item.id),
+    );
+    expect(result.current.isAllMessagesSelected).toBe(true);
   });
 
   it('replaces selection with an inclusive local date range', async () => {
@@ -70,7 +100,7 @@ describe('useMessageSelectionControls', () => {
       const [selected, setSelected] = useState<number[]>([99]);
       return {
         selected,
-        ...useMessageSelectionControls(visible, setSelected, setStatus, undefined, refreshRef),
+        ...useMessageSelectionControls(visible, setSelected, setStatus, undefined, refreshRef, selected),
       };
     });
 
@@ -85,6 +115,33 @@ describe('useMessageSelectionControls', () => {
     expect(result.current.selected).toEqual([2, 3]);
   });
 
+  it('filters the complete result, including matches on later pages', async () => {
+    const visible = [message(1, localDay(0))];
+    const pageTwo = [message(2, localDay(2))];
+    const pageThree = [message(3, localDay(3))];
+    const loadAllMessages = vi.fn(async () => [...visible, ...pageTwo, ...pageThree]);
+    const setStatus = vi.fn();
+    const { result } = renderHook(() => {
+      const [selected, setSelected] = useState<number[]>([]);
+      return {
+        selected,
+        ...useMessageSelectionControls(visible, setSelected, setStatus, loadAllMessages, undefined, selected),
+      };
+    });
+
+    await act(async () => {
+      await result.current.selectDateRange({
+        startDate: localDateKey(pageThree[0].received_at)!,
+        startTime: '00:00:00',
+        endDate: localDateKey(pageTwo[0].received_at)!,
+        endTime: '24:00:00',
+      });
+    });
+
+    expect(result.current.selected).toEqual([2, 3]);
+    expect(setStatus).toHaveBeenLastCalledWith(expect.stringContaining('已按日期范围选择 2 封邮件'));
+  });
+
   it('ignores a group result after mailbox refresh generation changes', async () => {
     const visible = [message(1, localDay(0))];
     const refreshRef = { current: 7 };
@@ -94,7 +151,7 @@ describe('useMessageSelectionControls', () => {
       const [selected, setSelected] = useState<number[]>([]);
       return {
         selected,
-        ...useMessageSelectionControls(visible, setSelected, vi.fn(), loadAllMessages, refreshRef),
+        ...useMessageSelectionControls(visible, setSelected, vi.fn(), loadAllMessages, refreshRef, selected),
       };
     });
 
@@ -120,6 +177,8 @@ describe('useMessageSelectionControls', () => {
           setSelected,
           setStatus,
           vi.fn(async () => visible),
+          undefined,
+          selected,
         ),
       };
     });

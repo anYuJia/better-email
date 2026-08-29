@@ -27,6 +27,19 @@ import { reportStartupMilestone } from '../startupTelemetry';
 
 const THREAD_PAGE_LIMIT = 80;
 
+type PendingThreadRequest = {
+  promise: Promise<ThreadSummary[]>;
+};
+
+export type MailboxThreadLoader = ((
+  nextFolderId?: number | null,
+  nextQuery?: string,
+  nextFilter?: FilterMode,
+  nextScope?: AccountScope,
+  refreshId?: number,
+  nextSearchScope?: SearchScope,
+) => Promise<ThreadSummary[]>) & { invalidate?: () => void };
+
 function mergeMessagePage(
   current: MessageSummary[],
   page: MessageSummary[],
@@ -94,14 +107,7 @@ export type MailboxDataController = {
     nextOffset?: number,
     nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
-  loadThreads: (
-    nextFolderId?: number | null,
-    nextQuery?: string,
-    nextFilter?: FilterMode,
-    nextScope?: AccountScope,
-    refreshId?: number,
-    nextSearchScope?: SearchScope,
-  ) => Promise<ThreadSummary[]>;
+  loadThreads: MailboxThreadLoader;
   refreshMailbox: (
     nextScope?: AccountScope,
     preferredFolderId?: number | null,
@@ -136,6 +142,9 @@ export default function useMailboxData({
 }: UseMailboxDataOptions): MailboxDataController {
   const frontendReadyRef = useRef(false);
   const threadCacheRef = useRef<Map<string, ThreadSummary[]>>(new Map());
+  const threadInflightRef = useRef<Map<string, PendingThreadRequest>>(new Map());
+  const threadCacheEpochRef = useRef(0);
+  const threadRequestEpochRef = useRef(0);
   const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
@@ -185,7 +194,15 @@ export default function useMailboxData({
       return [];
     }
     const startedAt = performance.now();
-    if (nextOffset === 0) threadCacheRef.current.clear();
+    if (nextOffset === 0) {
+      threadCacheRef.current.clear();
+      // A full mailbox reload invalidates both completed and in-flight thread
+      // reads. The old Promise cannot be cancelled reliably, so its epoch is
+      // checked before it is allowed to repopulate the cache or commit rows.
+      threadCacheEpochRef.current += 1;
+      threadRequestEpochRef.current += 1;
+      threadInflightRef.current.clear();
+    }
     const stateKey = buildMailboxListStateKey({
       accountScope: nextScope,
       folderId: nextFolderId,
@@ -282,9 +299,13 @@ export default function useMailboxData({
     startTransition(() => {
       setThreads(nextIncludeThreads ? nextThreads : []);
       setMessages(visibleMessages);
-      setSelectedMessageIds((current) =>
-        current.filter((id) => visibleMessageIds.has(id)),
-      );
+      // Loading another page must not discard IDs already selected from the
+      // complete result. Only a fresh scope load may prune stale selections.
+      if (nextOffset === 0) {
+        setSelectedMessageIds((current) =>
+          current.filter((id) => visibleMessageIds.has(id)),
+        );
+      }
       setSelectedId((current) => {
         if (current && visibleMessageIds.has(current)) return current;
         return visibleMessages[0]?.id ?? null;
@@ -389,6 +410,13 @@ export default function useMailboxData({
   ) {
     const refreshId = mailboxRefreshRef.current + 1;
     mailboxRefreshRef.current = refreshId;
+    // Invalidate thread reads at the same boundary as the mailbox refresh.
+    // Otherwise a quick toggle during the metadata round-trip could reuse a
+    // response from the previous folder/account generation.
+    threadCacheRef.current.clear();
+    threadCacheEpochRef.current += 1;
+    threadRequestEpochRef.current += 1;
+    threadInflightRef.current.clear();
     const mailboxRequest: MailboxRefreshRequest = { id: refreshId, scope: nextScope };
     setHasMoreMessages(false);
     setMessages([]);
@@ -434,10 +462,22 @@ export default function useMailboxData({
       nextSearchScope,
       listSort,
     ]);
+    const cacheEpoch = threadCacheEpochRef.current;
+    const requestEpoch = threadRequestEpochRef.current;
     const cachedThreads = threadCacheRef.current.get(cacheKey);
     if (cachedThreads) {
       if (isMailboxRequestCurrent(nextScope, refreshId)) setThreads(cachedThreads);
       return cachedThreads;
+    }
+    const pendingRequest = threadInflightRef.current.get(cacheKey);
+    if (pendingRequest) {
+      const nextThreads = await pendingRequest.promise;
+      if (
+        requestEpoch !== threadRequestEpochRef.current
+        || !isMailboxRequestCurrent(nextScope, refreshId)
+      ) return nextThreads;
+      setThreads(nextThreads);
+      return nextThreads;
     }
     const requests = buildMailboxRequests(
       nextScope,
@@ -449,18 +489,43 @@ export default function useMailboxData({
       listSort,
       THREAD_PAGE_LIMIT,
     );
-    const nextThreads = await invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads);
-    if (!isMailboxRequestCurrent(nextScope, refreshId)) return nextThreads;
-    threadCacheRef.current.set(cacheKey, nextThreads);
+    let threadRequest!: Promise<ThreadSummary[]>;
+    threadRequest = invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads)
+      .then((nextThreads) => {
+        if (cacheEpoch === threadCacheEpochRef.current) {
+          threadCacheRef.current.set(cacheKey, nextThreads);
+        }
+        return nextThreads;
+      })
+      .finally(() => {
+        const current = threadInflightRef.current.get(cacheKey);
+        if (current?.promise === threadRequest) threadInflightRef.current.delete(cacheKey);
+      });
+    threadInflightRef.current.set(cacheKey, { promise: threadRequest });
+    const nextThreads = await threadRequest;
+    if (
+      requestEpoch !== threadRequestEpochRef.current
+      || !isMailboxRequestCurrent(nextScope, refreshId)
+    ) return nextThreads;
     setThreads(nextThreads);
     return nextThreads;
   }
+
+  function invalidateThreads() {
+    // Presentation changes should not advance mailboxRefreshRef: doing so
+    // would make an in-flight first message page stale. Only thread commits
+    // are invalidated, while a still-valid result may populate the cache for
+    // the next switch back to the thread view.
+    threadRequestEpochRef.current += 1;
+  }
+
+  const threadLoader = Object.assign(loadThreads, { invalidate: invalidateThreads });
 
   return {
     mailboxRefreshRef,
     loadMessages,
     loadMessagesWithVisibleFallback,
-    loadThreads,
+    loadThreads: threadLoader,
     refreshMailbox,
   };
 }

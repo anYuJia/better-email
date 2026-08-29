@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { buildMailboxRequests } from './mailboxDataRequests';
 import useMailboxData from './useMailboxData';
 import { invoke } from '../tauriBridge';
-import type { MessageSummary } from '../app/types';
+import type { MessageSummary, ThreadSummary } from '../app/types';
 
 vi.mock('../tauriBridge', () => ({
   invoke: vi.fn(),
@@ -331,6 +331,118 @@ describe('useMailboxData request guard', () => {
     });
     expect(mockInvoke).toHaveBeenCalledTimes(1);
     expect(setThreads).toHaveBeenCalledTimes(31);
+  });
+
+  it('deduplicates an in-flight thread request and reuses its completed cache', async () => {
+    const pending = deferred<ThreadSummary[]>();
+    mockInvoke.mockReturnValue(pending.promise as never);
+    const setThreads = vi.fn();
+    const mailboxRefreshRef = { current: 3 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      setMessages: vi.fn(),
+      setThreads,
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    let first!: Promise<ThreadSummary[]>;
+    let second!: Promise<ThreadSummary[]>;
+    act(() => {
+      first = result.current.loadThreads(101, '', 'all', 1, 3, 'folder');
+      second = result.current.loadThreads(101, '', 'all', 1, 3, 'folder');
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    result.current.loadThreads.invalidate?.();
+    let afterToggle!: Promise<ThreadSummary[]>;
+    act(() => {
+      afterToggle = result.current.loadThreads(101, '', 'all', 1, 3, 'folder');
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+
+    const threads = [{
+      thread_key: 'thread-1',
+      subject: '主题',
+      message_count: 2,
+      unread_count: 1,
+      latest_at: '2026-08-29T10:00:00Z',
+      latest_preview: '预览',
+      participants: '发件人',
+      is_muted: false,
+    }];
+    pending.resolve(threads);
+    await act(async () => {
+      await first;
+      await second;
+      await afterToggle;
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.loadThreads(101, '', 'all', 1, 3, 'folder');
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not commit a late thread result after mailboxRefreshRef changes', async () => {
+    const pending = deferred<ThreadSummary[]>();
+    mockInvoke.mockReturnValue(pending.promise as never);
+    const setThreads = vi.fn();
+    const mailboxRefreshRef = { current: 3 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      setMessages: vi.fn(),
+      setThreads,
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    let loading!: Promise<ThreadSummary[]>;
+    act(() => {
+      loading = result.current.loadThreads(101, '', 'all', 1, 3, 'folder');
+    });
+    mailboxRefreshRef.current = 4;
+    pending.resolve([]);
+    await act(async () => { await loading; });
+    expect(setThreads).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.loadThreads(101, '', 'all', 1, 4, 'folder');
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(setThreads).toHaveBeenCalledWith([]);
   });
 
   it('merges a subsequent page from an imperative buffer before React commits', async () => {

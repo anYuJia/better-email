@@ -14,6 +14,60 @@ use super::search::{
 use super::*;
 use std::collections::VecDeque;
 
+pub(super) fn build_thread_summary_query(
+    scope_condition: &str,
+    filter_clause: &str,
+    order_clause: &str,
+) -> String {
+    format!(
+        "
+        WITH scoped_messages AS (
+            SELECT m.id, m.account_id, m.thread_key, m.subject, m.sender_name,
+                   m.snippet, m.received_at, m.is_read
+            FROM messages m
+            JOIN accounts a ON a.id = m.account_id
+            JOIN folders f ON f.id = m.folder_id
+            WHERE {scope_condition} {filter_clause}
+        ),
+        ranked_messages AS (
+            SELECT scoped_messages.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY thread_key
+                       ORDER BY received_at DESC, id DESC
+                   ) AS latest_rank
+            FROM scoped_messages
+        ),
+        thread_rows AS (
+            SELECT ranked.thread_key,
+                   COALESCE(
+                       MAX(CASE WHEN ranked.latest_rank = 1 THEN ranked.subject END),
+                       '(无主题)'
+                   ) AS subject,
+                   COUNT(*) AS message_count,
+                   SUM(CASE WHEN ranked.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
+                   MAX(ranked.received_at) AS latest_at,
+                   COALESCE(
+                       MAX(CASE WHEN ranked.latest_rank = 1 THEN ranked.snippet END),
+                       ''
+                   ) AS latest_preview,
+                   GROUP_CONCAT(DISTINCT ranked.sender_name) AS participants,
+                   MAX(CASE WHEN muted.account_id IS NOT NULL THEN 1 ELSE 0 END) AS is_muted
+            FROM ranked_messages ranked
+            LEFT JOIN muted_threads muted
+              ON muted.account_id = ranked.account_id
+             AND muted.thread_key = ranked.thread_key
+            GROUP BY ranked.thread_key
+        )
+        SELECT scoped.thread_key, scoped.subject, scoped.message_count,
+               scoped.unread_count, scoped.latest_at, scoped.latest_preview,
+               scoped.participants, scoped.is_muted
+        FROM thread_rows scoped
+        ORDER BY {order_clause}
+        LIMIT ?
+        ",
+    )
+}
+
 impl MailStore {
     #[allow(dead_code)]
     pub fn list_messages_for_scope(
@@ -1322,55 +1376,7 @@ impl MailStore {
             };
             let filter_clause = build_message_filter_clause(&search_criteria, &filter);
             let order_clause = thread_order_clause(sort.as_deref());
-            let sql = format!(
-                "
-                WITH scoped_messages AS (
-                    SELECT m.id, m.account_id, m.thread_key, m.subject, m.sender_name,
-                           m.snippet, m.received_at, m.is_read
-                    FROM messages m
-                    JOIN accounts a ON a.id = m.account_id
-                    JOIN folders f ON f.id = m.folder_id
-                    WHERE {scope_condition} {filter_clause}
-                )
-                SELECT scoped.thread_key,
-                       COALESCE(
-                           (
-                               SELECT latest.subject
-                               FROM scoped_messages latest
-                               WHERE latest.thread_key = scoped.thread_key
-                               ORDER BY latest.received_at DESC, latest.id DESC
-                               LIMIT 1
-                           ),
-                           '(无主题)'
-                       ) AS subject,
-                       COUNT(*) AS message_count,
-                       SUM(CASE WHEN scoped.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
-                       MAX(scoped.received_at) AS latest_at,
-                       COALESCE(
-                           (
-                               SELECT latest.snippet
-                               FROM scoped_messages latest
-                               WHERE latest.thread_key = scoped.thread_key
-                               ORDER BY latest.received_at DESC, latest.id DESC
-                               LIMIT 1
-                           ),
-                           ''
-                       ) AS latest_preview,
-                       GROUP_CONCAT(DISTINCT scoped.sender_name) AS participants,
-                       MAX(
-                           CASE WHEN EXISTS (
-                               SELECT 1
-                               FROM muted_threads muted
-                               WHERE muted.account_id = scoped.account_id
-                                 AND muted.thread_key = scoped.thread_key
-                           ) THEN 1 ELSE 0 END
-                       ) AS is_muted
-                FROM scoped_messages scoped
-                GROUP BY scoped.thread_key
-                ORDER BY {order_clause}
-                LIMIT ?
-                ",
-            );
+            let sql = build_thread_summary_query(&scope_condition, &filter_clause, order_clause);
             query_params.extend(search_criteria.params().into_iter().map(Value::Text));
             query_params.push(Value::Integer(limit));
             let mut stmt = conn.prepare(&sql)?;

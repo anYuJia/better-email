@@ -18,6 +18,12 @@ import type { MailboxSearchLoaders } from './useMailboxSearchController';
 // keep the visible page below the Rust 200-row safety cap.
 const SELECT_ALL_PAGE_SIZE = 199;
 
+type PendingLoadAllRequest = {
+  key: string;
+  refreshId: number;
+  promise: Promise<MessageSummary[]>;
+};
+
 type UseMailboxLoadMoreOptions = {
   account: Account | null;
   accountScope: AccountScope;
@@ -51,6 +57,9 @@ export default function useMailboxLoadMore({
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
   const loadingMoreRef = useRef(false);
+  const loadAllInFlightRef = useRef<PendingLoadAllRequest | null>(null);
+  const loadAllBusyRef = useRef(false);
+  const loadAllRequestTokenRef = useRef(0);
   const loadedCursorRef = useRef<{ key: string; count: number } | null>(null);
 
   const loadMoreMessages = useCallback(async () => {
@@ -131,7 +140,7 @@ export default function useMailboxLoadMore({
       }
     } finally {
       loadingMoreRef.current = false;
-      setLoadMoreStatus(null);
+      if (!loadAllBusyRef.current) setLoadMoreStatus(null);
     }
   }, [
     loadersRef,
@@ -148,46 +157,83 @@ export default function useMailboxLoadMore({
     setStatus,
   ]);
 
-  const loadAllMessages = useCallback(async () => {
+  const loadAllMessages = useCallback(() => {
     const loaders = loadersRef.current;
-    if (!loaders) return messages;
-    if (loadingMoreRef.current) return messages;
-    loadingMoreRef.current = true;
+    if (!loaders) return Promise.resolve(messages);
     const startedRefreshId = mailboxRefreshRef.current;
-    setLoadMoreStatus('正在读取全部邮件...');
-    try {
-      let loadedMessages: MessageSummary[] = [];
-      let offset = 0;
-      while (true) {
-        const page = await loaders.loadMessagesWithVisibleFallback(
-          folderId,
-          query,
-          filter,
-          accountScope,
-          startedRefreshId,
-          folders,
-          SELECT_ALL_PAGE_SIZE,
-          searchScope,
-          false,
-          undefined,
-          offset,
-          true,
-        );
-        if (startedRefreshId !== mailboxRefreshRef.current) return page;
-        if (page.length === 0) return loadedMessages;
-        const knownIds = new Set(loadedMessages.map((message) => message.id));
-        const newMessages = page.filter((message) => !knownIds.has(message.id));
-        if (newMessages.length === 0) return loadedMessages;
-        loadedMessages = loadedMessages.concat(newMessages);
-        // Offset tracks rows returned by SQLite, not the React state. The
-        // backend returns at most one capped page, so this remains bounded
-        // and independent of transition scheduling.
-        offset += page.length;
-      }
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadMoreStatus(null);
+    const key = JSON.stringify([
+      accountScope,
+      folderId,
+      query.trim(),
+      filter,
+      searchScope,
+    ]);
+    const pending = loadAllInFlightRef.current;
+    if (pending?.key === key && pending.refreshId === startedRefreshId) {
+      return pending.promise;
     }
+
+    const requestToken = loadAllRequestTokenRef.current + 1;
+    loadAllRequestTokenRef.current = requestToken;
+    loadAllBusyRef.current = true;
+    setLoadMoreStatus('正在读取全部邮件...');
+    const request = (async () => {
+      const loadedIds = new Set<number>();
+      try {
+        let loadedMessages: MessageSummary[] = [];
+        let offset = 0;
+        while (true) {
+          const page = await loaders.loadMessagesWithVisibleFallback(
+            folderId,
+            query,
+            filter,
+            accountScope,
+            startedRefreshId,
+            folders,
+            SELECT_ALL_PAGE_SIZE,
+            searchScope,
+            false,
+            undefined,
+            offset,
+            true,
+          );
+          if (startedRefreshId !== mailboxRefreshRef.current) return loadedMessages;
+          if (page.length === 0) return loadedMessages;
+          const newMessages = page.filter((message) => {
+            if (loadedIds.has(message.id)) return false;
+            loadedIds.add(message.id);
+            return true;
+          });
+          if (newMessages.length === 0) return loadedMessages;
+          loadedMessages = loadedMessages.concat(newMessages);
+          // Offset tracks rows returned by SQLite, not the React state. The
+          // backend returns at most one capped page, so this remains bounded
+          // and independent of transition scheduling.
+          offset += page.length;
+        }
+      } finally {
+        // A newer scope may already have started another full-result request;
+        // an old request must not clear its busy state or status.
+        if (loadAllRequestTokenRef.current === requestToken) {
+          loadAllBusyRef.current = false;
+          if (!loadingMoreRef.current) setLoadMoreStatus(null);
+        }
+      }
+    })();
+    loadAllInFlightRef.current = { key, refreshId: startedRefreshId, promise: request };
+    // Use both fulfillment and rejection handlers so cleanup never creates an
+    // unhandled rejection of its own. A changed context can leave this entry
+    // in place until the old pages settle; identity prevents it clearing a
+    // newer request for the same key.
+    request.then(
+      () => {
+        if (loadAllInFlightRef.current?.promise === request) loadAllInFlightRef.current = null;
+      },
+      () => {
+        if (loadAllInFlightRef.current?.promise === request) loadAllInFlightRef.current = null;
+      },
+    );
+    return request;
   }, [
     loadersRef,
     folderId,

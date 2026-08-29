@@ -37,6 +37,7 @@ export type MessageListPaneProps = {
   listMode: ListMode;
   listSort: ListSort;
   selectedMessageIds: number[];
+  selectedMessages: MessageSummary[];
   folders: Folder[];
   labels: Label[];
   threads: ThreadSummary[];
@@ -58,6 +59,7 @@ export type MessageListPaneProps = {
   onSortChange: (sort: ListSort) => void;
   onToggleAllVisible: (checked: boolean) => void;
   isSelectingAll?: boolean;
+  isAllMessagesSelected?: boolean;
   onRunBulkAction: (action: BulkMessageAction) => void;
   onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveBulkToFolder: (folder: Folder) => void;
@@ -89,6 +91,7 @@ function MessageListPane({
   listMode,
   listSort,
   selectedMessageIds,
+  selectedMessages,
   folders,
   labels,
   threads,
@@ -110,6 +113,7 @@ function MessageListPane({
   onSortChange,
   onToggleAllVisible,
   isSelectingAll,
+  isAllMessagesSelected,
   onRunBulkAction,
   onRequestSnooze,
   onMoveBulkToFolder,
@@ -170,14 +174,6 @@ function MessageListPane({
     setMessageMenu(null);
   }, []);
 
-  const selectedMessageSet = React.useMemo(
-    () => new Set(selectedMessageIds),
-    [selectedMessageIds],
-  );
-  const selectedMessages = React.useMemo(
-    () => messages.filter((message) => selectedMessageSet.has(message.id)),
-    [messages, selectedMessageSet],
-  );
   const activeSortLabel = React.useMemo(
     () => listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先',
     [listSort],
@@ -301,17 +297,14 @@ function MessageListPane({
           onShowThreads={onShowThreads}
           onFilterChange={onFilterChange}
           onSortChange={onSortChange}
-          visibleMessageCount={messages.length}
           selectedMessageIds={selectedMessageIds}
           selectedMessages={selectedMessages}
           folders={folders}
           labels={labels}
-          onToggleAllVisible={onToggleAllVisible}
           onRunBulkAction={onRunBulkAction}
           onRequestSnooze={onRequestSnooze}
           onMoveBulkToFolder={onMoveBulkToFolder}
           onToggleBulkLabel={onToggleBulkLabel}
-          isSelectingAll={isSelectingAll}
         />
       )}
       {listMode === 'threads' ? (
@@ -339,6 +332,7 @@ function MessageListPane({
           onToggleMessageSelection={onToggleMessageSelection}
           onToggleAllVisible={onToggleAllVisible}
           isSelectingAll={isSelectingAll}
+          isAllMessagesSelected={isAllMessagesSelected}
           onToggleMessageGroup={onToggleMessageGroup}
           isSelectingMessageGroup={isSelectingMessageGroup}
           onSelectMessageDateRange={onSelectMessageDateRange}

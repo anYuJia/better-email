@@ -377,8 +377,7 @@
   border-color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .app-shell .message-select input:checked,
-:root[data-theme="dark"] .app-shell .bulk-selection > input:checked {
+:root[data-theme="dark"] .app-shell .message-select input:checked {
   background: var(--ui-surface);
   border-color: var(--ui-accent);
 }

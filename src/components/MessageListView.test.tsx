@@ -191,7 +191,7 @@ describe('MessageListView theme-safe separators', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择当前列表中的全部可见邮件' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' }));
     expect(onToggleAllVisible).toHaveBeenCalledWith(true);
     fireEvent.click(screen.getByRole('checkbox', { name: '选择今天邮件' }));
     expect(onToggleMessageGroup).toHaveBeenCalledWith('today', [1, 2], true);
@@ -226,7 +226,40 @@ describe('MessageListView theme-safe separators', () => {
       />,
     );
     expect(screen.getByRole('checkbox', { name: '选择今天邮件' }).getAttribute('aria-checked')).toBe('mixed');
-    expect(screen.getByRole('checkbox', { name: '选择当前列表中的全部可见邮件' }).getAttribute('aria-checked')).toBe('mixed');
+    expect(screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' }).getAttribute('aria-checked')).toBe('mixed');
+  });
+
+  it('shows the full selection count and checked state after paginated selection', () => {
+    const visible = [message, { ...message, id: 2, remote_uid: 2 }];
+    render(
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages: visible }]}
+        messages={visible}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages
+        listStateKey="full-selection"
+        initialScrollTop={0}
+        selectedMessageIds={[1, 2, 3, 4]}
+        isAllMessagesSelected
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const allCheckbox = screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' });
+    expect((allCheckbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('已选 4 封')).toBeDefined();
   });
 
   it('shows the overlay thumb during list scrolling without adding a track column', () => {

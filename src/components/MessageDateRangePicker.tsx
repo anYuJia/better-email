@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import useModalAccessibility from '../hooks/useModalAccessibility';
@@ -55,6 +55,88 @@ function calendarDays(value: CalendarMonth): Array<Date | null> {
   return days;
 }
 
+function CalendarSelect({
+  label,
+  value,
+  options,
+  onChange,
+  format,
+}: {
+  label: string;
+  value: number;
+  options: number[];
+  onChange: (value: number) => void;
+  format: (value: number) => string;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listboxId = useId();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeFromOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const closeFromEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener('pointerdown', closeFromOutside);
+    document.addEventListener('keydown', closeFromEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeFromOutside);
+      document.removeEventListener('keydown', closeFromEscape, true);
+    };
+  }, [open]);
+
+  return (
+    <div className="message-date-range-calendar-select" ref={rootRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        role="combobox"
+        aria-label={label}
+        aria-controls={listboxId}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' && !open) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {format(value)}
+      </button>
+      {open && (
+        <div id={listboxId} className="message-date-range-calendar-options" role="listbox" aria-label={label}>
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+                triggerRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              {format(option)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalendarPane({
   label,
   value,
@@ -76,12 +158,20 @@ function CalendarPane({
           <ChevronLeft size={16} aria-hidden="true" />
         </button>
         <div className="message-date-range-calendar-selects">
-          <select aria-label={`${label}年份`} value={value.year} onChange={(event) => onChangeMonth({ year: Number(event.target.value), month: value.month })}>
-            {YEAR_OPTIONS.map((year) => <option key={year} value={year}>{year}年</option>)}
-          </select>
-          <select aria-label={`${label}月份`} value={value.month} onChange={(event) => onChangeMonth({ year: value.year, month: Number(event.target.value) })}>
-            {Array.from({ length: 12 }, (_, month) => <option key={month} value={month}>{month + 1}月</option>)}
-          </select>
+          <CalendarSelect
+            label={`${label}年份`}
+            value={value.year}
+            options={YEAR_OPTIONS}
+            format={(year) => `${year}年`}
+            onChange={(year) => onChangeMonth({ year, month: value.month })}
+          />
+          <CalendarSelect
+            label={`${label}月份`}
+            value={value.month}
+            options={Array.from({ length: 12 }, (_, month) => month)}
+            format={(month) => `${month + 1}月`}
+            onChange={(month) => onChangeMonth({ year: value.year, month })}
+          />
         </div>
         <button type="button" aria-label={`${label}下一个月`} onClick={() => onChangeMonth(shiftMonth(value, 1))}>
           <ChevronRight size={16} aria-hidden="true" />

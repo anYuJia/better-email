@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { MessageSummary } from '../app/types';
 import { messageDateGroup, messageMatchesLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils';
 
 type SelectionSetter = Dispatch<SetStateAction<number[]>>;
 type LoadAllMessages = () => Promise<MessageSummary[]>;
+type SelectionMode = 'none' | 'partial' | 'all';
 
 export default function useMessageSelectionControls(
   messages: MessageSummary[],
@@ -11,6 +12,9 @@ export default function useMessageSelectionControls(
   setStatus: Dispatch<SetStateAction<string>>,
   loadAllMessages?: LoadAllMessages,
   mailboxRefreshRef?: MutableRefObject<number>,
+  selectedMessageIds: number[] = [],
+  selectionContextKey = '',
+  setSelectingAll?: Dispatch<SetStateAction<boolean>>,
 ) {
   const dateRangeRequestRef = useRef(0);
   const groupRequestRef = useRef(0);
@@ -18,6 +22,118 @@ export default function useMessageSelectionControls(
   const dateRangeBusyRef = useRef(false);
   const [groupSyncBusy, setGroupSyncBusy] = useState(false);
   const [dateRangeBusy, setDateRangeBusy] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('none');
+  const [snapshotRevision, setSnapshotRevision] = useState(0);
+  const messageSnapshotRef = useRef(new Map<number, MessageSummary>());
+  const selectionContextRef = useRef(selectionContextKey);
+  const previousSelectedCountRef = useRef(selectedMessageIds.length);
+  const selectAllRequestRef = useRef(0);
+
+  useEffect(() => {
+    messages.forEach((message) => messageSnapshotRef.current.set(message.id, message));
+  }, [messages]);
+
+  useEffect(() => {
+    if (selectionContextRef.current === selectionContextKey) return;
+    selectionContextRef.current = selectionContextKey;
+    messageSnapshotRef.current.clear();
+    setSnapshotRevision((current) => current + 1);
+    setSelectionMode('none');
+    if (selectedMessageIds.length > 0) setSelectedMessageIds([]);
+  }, [selectedMessageIds.length, selectionContextKey, setSelectedMessageIds]);
+
+  useEffect(() => {
+    const hadSelectedMessages = previousSelectedCountRef.current > 0;
+    previousSelectedCountRef.current = selectedMessageIds.length;
+    if (selectedMessageIds.length === 0 && hadSelectedMessages && selectionMode !== 'none') {
+      messageSnapshotRef.current.clear();
+      setSnapshotRevision((current) => current + 1);
+      setSelectionMode('none');
+    }
+  }, [selectedMessageIds.length, selectionMode]);
+
+  const rememberMessages = useCallback((sourceMessages: MessageSummary[]) => {
+    let changed = false;
+    sourceMessages.forEach((message) => {
+      if (messageSnapshotRef.current.get(message.id) !== message) {
+        messageSnapshotRef.current.set(message.id, message);
+        changed = true;
+      }
+    });
+    if (changed) setSnapshotRevision((current) => current + 1);
+  }, []);
+
+  const selectedMessages = useMemo(() => {
+    const visibleById = new Map(messages.map((message) => [message.id, message]));
+    const seen = new Set<number>();
+    // Snapshot entries are written synchronously by rememberMessages before
+    // selected ids are committed, so off-page selections remain actionable.
+    return selectedMessageIds.flatMap((id) => {
+      if (seen.has(id)) return [];
+      seen.add(id);
+      const message = messageSnapshotRef.current.get(id) ?? visibleById.get(id);
+      return message ? [message] : [];
+    });
+  }, [messages, selectedMessageIds, snapshotRevision]);
+
+  const clearSelection = useCallback(() => {
+    messageSnapshotRef.current.clear();
+    setSnapshotRevision((current) => current + 1);
+    setSelectionMode('none');
+    setSelectedMessageIds([]);
+  }, [setSelectedMessageIds]);
+
+  const markPartialSelection = useCallback((sourceMessages: MessageSummary[] = []) => {
+    rememberMessages(sourceMessages);
+    setSelectionMode('partial');
+  }, [rememberMessages]);
+
+  const markAllSelected = useCallback((sourceMessages: MessageSummary[]) => {
+    rememberMessages(sourceMessages);
+    setSelectionMode('all');
+  }, [rememberMessages]);
+
+  const toggleMessageSelection = useCallback((messageId: number, checked: boolean) => {
+    if (checked) {
+      const message = messages.find((item) => item.id === messageId);
+      if (message) rememberMessages([message]);
+    }
+    markPartialSelection();
+    setSelectedMessageIds((current) => {
+      if (checked) return current.includes(messageId) ? current : [...current, messageId];
+      return current.filter((id) => id !== messageId);
+    });
+  }, [markPartialSelection, messages, rememberMessages, setSelectedMessageIds]);
+
+  const toggleAllMessages = useCallback(async (checked: boolean): Promise<number | null> => {
+    const requestId = selectAllRequestRef.current + 1;
+    selectAllRequestRef.current = requestId;
+    if (!checked) {
+      clearSelection();
+      setSelectingAll?.(false);
+      return null;
+    }
+
+    const refreshId = mailboxRefreshRef?.current;
+    setSelectingAll?.(true);
+    try {
+      const allMessages = loadAllMessages ? await loadAllMessages() : messages;
+      if (
+        requestId !== selectAllRequestRef.current
+        || (refreshId !== undefined && refreshId !== mailboxRefreshRef?.current)
+      ) return null;
+      const selectedIds = [...new Set(allMessages.map((message) => message.id))];
+      markAllSelected(allMessages);
+      setSelectedMessageIds(selectedIds);
+      setStatus(`已选择 ${selectedIds.length} 封邮件`);
+      return selectedIds.length;
+    } catch (error) {
+      if (requestId === selectAllRequestRef.current) setStatus(String(error));
+      return null;
+    } finally {
+      if (requestId === selectAllRequestRef.current) setSelectingAll?.(false);
+    }
+  }, [clearSelection, loadAllMessages, mailboxRefreshRef, markAllSelected, messages, setSelectingAll, setSelectedMessageIds, setStatus]);
 
   const toggleMessageGroup = useCallback(async (groupId: string, visibleMessageIds: number[], checked: boolean) => {
     if (groupBusyRef.current || dateRangeBusyRef.current) return;
@@ -41,6 +157,8 @@ export default function useMessageSelectionControls(
       // an empty group must remain empty rather than selecting visible rows.
       const selectedGroupIds = loadAllMessages ? matchingIds : visibleMessageIds;
       const groupIds = new Set(selectedGroupIds);
+      rememberMessages(sourceMessages);
+      setSelectionMode('partial');
       setSelectedMessageIds((current) => {
         const withoutGroup = current.filter((id) => !groupIds.has(id));
         return checked ? [...new Set([...withoutGroup, ...selectedGroupIds])] : withoutGroup;
@@ -53,7 +171,7 @@ export default function useMessageSelectionControls(
         setGroupSyncBusy(false);
       }
     }
-  }, [loadAllMessages, mailboxRefreshRef, messages, setSelectedMessageIds, setStatus]);
+  }, [loadAllMessages, mailboxRefreshRef, messages, rememberMessages, setSelectedMessageIds, setStatus]);
 
   const selectMessagesByDateRange = useCallback(async (range: LocalDateTimeRange) => {
     if (groupBusyRef.current || dateRangeBusyRef.current) return;
@@ -70,10 +188,13 @@ export default function useMessageSelectionControls(
         requestId !== dateRangeRequestRef.current
         || (startedRefreshId !== undefined && startedRefreshId !== mailboxRefreshRef?.current)
       ) return;
-      setSelectedMessageIds(sourceMessages
+      rememberMessages(sourceMessages);
+      setSelectionMode('partial');
+      const matchingIds = [...new Set(sourceMessages
         .filter((message) => messageMatchesLocalDateTimeRange(message.received_at, range))
-        .map((message) => message.id));
-      setStatus(`已按日期范围选择邮件：${range.startDate} ${range.startTime} 至 ${range.endDate} ${range.endTime}`);
+        .map((message) => message.id))];
+      setSelectedMessageIds(matchingIds);
+      setStatus(`已按日期范围选择 ${matchingIds.length} 封邮件：${range.startDate} ${range.startTime} 至 ${range.endDate} ${range.endTime}`);
     } catch (error) {
       if (requestId === dateRangeRequestRef.current) setStatus(String(error));
     } finally {
@@ -82,7 +203,7 @@ export default function useMessageSelectionControls(
         setDateRangeBusy(false);
       }
     }
-  }, [loadAllMessages, mailboxRefreshRef, messages, setSelectedMessageIds, setStatus]);
+  }, [loadAllMessages, mailboxRefreshRef, messages, rememberMessages, setSelectedMessageIds, setStatus]);
 
   return {
     toggleGroup: toggleMessageGroup,
@@ -90,5 +211,13 @@ export default function useMessageSelectionControls(
     // full-result selection operations cannot overwrite one another.
     groupSyncBusy: groupSyncBusy || dateRangeBusy,
     selectDateRange: selectMessagesByDateRange,
+    selectedMessages,
+    rememberMessages,
+    markAllSelected,
+    markPartialSelection,
+    clearSelection,
+    toggleMessageSelection,
+    toggleAllMessages,
+    isAllMessagesSelected: selectionMode === 'all' && selectedMessageIds.length > 0,
   };
 }

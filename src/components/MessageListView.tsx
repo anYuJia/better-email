@@ -51,6 +51,7 @@ type MessageListViewProps = {
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onToggleAllVisible: (checked: boolean) => void;
   isSelectingAll?: boolean;
+  isAllMessagesSelected?: boolean;
   onToggleMessageGroup?: (groupId: string, messageIds: number[], checked: boolean) => void | Promise<void>;
   isSelectingMessageGroup?: boolean;
   onSelectMessageDateRange?: (range: LocalDateTimeRange) => void;
@@ -80,6 +81,7 @@ export default function MessageListView({
   onToggleMessageSelection,
   onToggleAllVisible,
   isSelectingAll = false,
+  isAllMessagesSelected = false,
   onToggleMessageGroup,
   isSelectingMessageGroup = false,
   onSelectMessageDateRange,
@@ -280,9 +282,13 @@ export default function MessageListView({
     () => visibleMessageIds.filter((id) => selectedMessageSet.has(id)).length,
     [selectedMessageSet, visibleMessageIds],
   );
-  const allVisibleSelected = visibleMessageIds.length > 0
-    && selectedVisibleMessageCount === visibleMessageIds.length;
-  const visibleSelectionIndeterminate = selectedVisibleMessageCount > 0 && !allVisibleSelected;
+  const allMessagesSelected = isAllMessagesSelected || (
+    !hasMoreMessages
+    && visibleMessageIds.length > 0
+    && selectedMessageIds.length === visibleMessageIds.length
+    && selectedVisibleMessageCount === visibleMessageIds.length
+  );
+  const visibleSelectionIndeterminate = selectedMessageIds.length > 0 && !allMessagesSelected;
   const visibleCheckboxRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -591,9 +597,9 @@ export default function MessageListView({
             <input
               ref={visibleCheckboxRef}
               type="checkbox"
-              aria-label="选择当前列表中的全部可见邮件"
-              aria-checked={visibleSelectionIndeterminate ? 'mixed' : allVisibleSelected}
-              checked={allVisibleSelected}
+              aria-label="选择当前筛选结果中的全部邮件"
+              aria-checked={visibleSelectionIndeterminate ? 'mixed' : allMessagesSelected}
+              checked={allMessagesSelected}
               disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
               onChange={(event) => toggleVisibleMessages(event.target.checked)}
             />
@@ -603,8 +609,18 @@ export default function MessageListView({
             onConfirm={handleDateRangeConfirm}
             disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
           />
-          <span className="message-selection-strip-summary" aria-live="polite">
-            {selectedVisibleMessageCount > 0 ? `已选 ${selectedVisibleMessageCount} 封` : '选择邮件'}
+          <span
+            className="message-selection-strip-summary"
+            aria-live="polite"
+            aria-busy={isSelectingAll || isSelectingMessageGroup}
+          >
+            {isSelectingAll
+              ? '正在选择全部邮件…'
+              : isSelectingMessageGroup
+                ? '正在读取完整结果…'
+              : selectedMessageIds.length > 0
+                ? `已选 ${selectedMessageIds.length} 封`
+                : '选择邮件'}
           </span>
         </div>
         <div

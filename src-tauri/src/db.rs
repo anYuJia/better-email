@@ -21,7 +21,7 @@ use rusqlite::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
@@ -164,8 +164,9 @@ const LOCAL_BACKUP_TABLES: &[&str] = &[
     "oauth_sessions",
 ];
 
+#[derive(Clone)]
 pub struct MailStore {
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
     data_dir: PathBuf,
     database_path: PathBuf,
 }
@@ -222,7 +223,7 @@ impl MailStore {
             }
         }
         let store = Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
             data_dir,
             database_path: path,
         };

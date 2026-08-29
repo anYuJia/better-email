@@ -728,20 +728,6 @@
   background: var(--ui-surface-muted);
 }
 
-.bulk-toolbar label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ui-text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.bulk-selection {
-  padding-right: 4px;
-  font-weight: 600;
-}
-
 .bulk-toolbar button {
   min-height: 36px;
   padding: 0 10px;
@@ -984,8 +970,7 @@
 .message-date-header-selection input:focus-visible,
 .message-date-range-trigger:focus-visible,
 .message-date-range-modal button:focus-visible,
-.message-date-range-modal input:focus-visible,
-.message-date-range-modal select:focus-visible {
+.message-date-range-modal input:focus-visible {
   outline: var(--ui-focus-outline);
   outline-offset: 2px;
   box-shadow: var(--ui-focus-ring);
@@ -1229,8 +1214,7 @@
   pointer-events: auto;
 }
 
-.message-select input,
-.bulk-selection > input {
+.message-select input {
   box-sizing: border-box;
   width: 16px;
   height: 16px;
@@ -1249,8 +1233,7 @@
   cursor: pointer;
 }
 
-.message-select input::before,
-.bulk-selection > input::before {
+.message-select input::before {
   content: "";
   width: 7px;
   height: 4px;
@@ -1260,20 +1243,17 @@
   transform-origin: center;
 }
 
-.message-select input:checked,
-.bulk-selection > input:checked {
+.message-select input:checked {
   border-color: var(--ui-accent);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.message-select input:checked::before,
-.bulk-selection > input:checked::before {
+.message-select input:checked::before {
   transform: translateY(-1px) rotate(-45deg) scale(1);
 }
 
-.message-select input:focus-visible,
-.bulk-selection > input:focus-visible {
+.message-select input:focus-visible {
   outline: var(--ui-focus-outline);
   outline-offset: 2px;
   box-shadow: var(--ui-focus-ring);
@@ -2296,17 +2276,6 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .bulk-toolbar-inline .bulk-selection {
-  flex: 0 0 auto;
-  min-height: 32px;
-  height: 32px;
-  gap: 6px;
-  padding: 0 8px;
-  color: var(--ui-text);
-  font-size: var(--ui-font-size-meta);
-  font-weight: 600;
-}
-
 .app-shell .bulk-toolbar-inline button,
 .app-shell .bulk-toolbar-inline .compact-menu > summary {
   min-width: 0;
@@ -2536,7 +2505,7 @@
 }
 
 .message-date-range-inputs input,
-.message-date-range-calendar-selects select {
+.message-date-range-calendar-select button {
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
@@ -2585,10 +2554,52 @@
   gap: 4px;
 }
 
-.message-date-range-calendar-selects select {
+.message-date-range-calendar-select button {
   min-height: 30px;
   padding-inline: 5px;
   font-size: 12px;
+  cursor: pointer;
+}
+
+.message-date-range-calendar-select {
+  position: relative;
+  min-width: 0;
+}
+
+.message-date-range-calendar-options {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+}
+
+.message-date-range-calendar-options button {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.message-date-range-calendar-options button:hover,
+.message-date-range-calendar-options button[aria-selected="true"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
 .message-date-range-weekdays,

@@ -1,5 +1,4 @@
 import {
-  ChevronDown,
   Search,
   X,
 } from 'lucide-react';
@@ -11,19 +10,18 @@ import {
   useState,
 } from 'react';
 import {
+  accountScopedSections,
   resolveSettingsNavigationSectionId,
   settingsNavigationGroups,
-  settingsNavigationItems,
   settingsSearchEntries,
-  type SettingsNavigationItem,
   type SettingsSearchEntry,
   type SettingsSectionId,
 } from './settingsNavigation';
 
-type SettingsNavigationProps = {
+type SettingsSidebarProps = {
   activeSection: SettingsSectionId;
-  activeItem: SettingsNavigationItem;
   onNavigate: (section: SettingsSectionId) => void;
+  accountSectionsEnabled?: boolean;
 };
 
 function focusSearchTarget(entry: SettingsSearchEntry) {
@@ -50,10 +48,15 @@ function focusSearchTarget(entry: SettingsSearchEntry) {
   }, 80);
 }
 
+function requiresAccount(section: SettingsSectionId) {
+  return section !== 'accounts' && accountScopedSections.has(section);
+}
+
 export const SettingsSidebar = memo(function SettingsSidebar({
   activeSection,
   onNavigate,
-}: Omit<SettingsNavigationProps, 'activeItem'>) {
+  accountSectionsEnabled = true,
+}: SettingsSidebarProps) {
   const [query, setQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
@@ -81,6 +84,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   }, [normalizedQuery]);
 
   const navigateToSearchResult = (entry: SettingsSearchEntry) => {
+    if (requiresAccount(entry.section) && !accountSectionsEnabled) return;
     onNavigate(entry.section);
     setQuery('');
     focusSearchTarget(entry);
@@ -118,17 +122,22 @@ export const SettingsSidebar = memo(function SettingsSidebar({
             <span className="settings-nav-match-count">
               {searchResults.length > 0 ? `${searchResults.length} 个匹配` : '没有匹配'}
             </span>
-            {searchResults.map((entry) => (
-              <button
-                type="button"
-                className="settings-search-result"
-                key={`${entry.section}-${entry.label}`}
-                onClick={() => navigateToSearchResult(entry)}
-              >
-                <strong>{entry.label}</strong>
-                <small>{entry.path}</small>
-              </button>
-            ))}
+            {searchResults.map((entry) => {
+              const disabled = requiresAccount(entry.section) && !accountSectionsEnabled;
+              return (
+                <button
+                  type="button"
+                  className="settings-search-result"
+                  key={`${entry.section}-${entry.label}`}
+                  disabled={disabled}
+                  title={disabled ? '请先添加或选择邮箱账号' : undefined}
+                  onClick={() => navigateToSearchResult(entry)}
+                >
+                  <strong>{entry.label}</strong>
+                  <small>{entry.path}</small>
+                </button>
+              );
+            })}
             {searchResults.length === 0 && (
               <div className="settings-nav-empty">
                 <strong>没有找到这个设置</strong>
@@ -145,119 +154,38 @@ export const SettingsSidebar = memo(function SettingsSidebar({
           </div>
         ) : (
           <div className="settings-nav-list">
-            {settingsNavigationItems.map((item) => {
-              const Icon = item.icon;
-              const active = resolvedActiveSection === item.id;
-              return (
-                <button
-                  type="button"
-                  className={active ? 'active' : ''}
-                  key={item.id}
-                  aria-current={active ? 'page' : undefined}
-                  aria-label={`${item.label}设置`}
-                  onClick={() => onNavigate(item.id)}
-                >
-                  <span className="settings-nav-icon">
-                    <Icon size={15} />
-                  </span>
-                  <span className="settings-nav-copy">
-                    <span className="settings-nav-label">{item.label}</span>
-                  </span>
-                </button>
-              );
-            })}
+            {settingsNavigationGroups.map((group) => (
+              <section className="settings-nav-section" key={group.label} aria-label={group.label}>
+                <span className="settings-nav-group">{group.label}</span>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = resolvedActiveSection === item.id;
+                  const disabled = requiresAccount(item.id) && !accountSectionsEnabled;
+                  return (
+                    <button
+                      type="button"
+                      className={active ? 'active' : ''}
+                      key={item.id}
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={`${item.label}设置`}
+                      disabled={disabled}
+                      title={disabled ? '请先添加或选择邮箱账号' : item.description}
+                      onClick={() => onNavigate(item.id)}
+                    >
+                      <span className="settings-nav-icon">
+                        <Icon size={15} aria-hidden="true" />
+                      </span>
+                      <span className="settings-nav-copy">
+                        <span className="settings-nav-label">{item.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </section>
+            ))}
           </div>
         )}
       </div>
     </nav>
-  );
-});
-
-export const SettingsMobileNavigation = memo(function SettingsMobileNavigation({
-  activeSection,
-  activeItem,
-  onNavigate,
-}: SettingsNavigationProps) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const pickerRef = useRef<HTMLButtonElement>(null);
-  const ActiveIcon = activeItem.icon;
-  const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    function closeOnOutsidePointer(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen(false);
-      queueMicrotask(() => pickerRef.current?.focus({ preventScroll: true }));
-    }
-
-    document.addEventListener('pointerdown', closeOnOutsidePointer);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [open]);
-
-  return (
-    <div className="settings-mobile-toolbar" ref={containerRef}>
-      <button
-        ref={pickerRef}
-        type="button"
-        className="settings-page-picker"
-        aria-label="切换设置页面"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="settings-page-picker-icon" aria-hidden="true">
-          <ActiveIcon size={16} />
-        </span>
-        <span className="settings-page-picker-copy">
-          <strong>{activeItem.label}</strong>
-        </span>
-        <ChevronDown
-          className={open ? 'open' : ''}
-          size={16}
-          aria-hidden="true"
-        />
-      </button>
-      {open && (
-        <div className="settings-mobile-menu" role="menu" aria-label="设置页面">
-          {settingsNavigationGroups.map((group) => (
-            <div className="settings-mobile-menu-group" key={group.label}>
-              <span>{group.label}</span>
-              {group.items.map((item) => (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={item.id === resolvedActiveSection ? 'active' : ''}
-                  key={item.id}
-                  onClick={() => {
-                    onNavigate(item.id);
-                    setOpen(false);
-                  }}
-                >
-                  <item.icon size={15} aria-hidden="true" />
-                  <span>
-                    <strong>{item.label}</strong>
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 });

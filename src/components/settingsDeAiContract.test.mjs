@@ -20,9 +20,11 @@ function rulesOnly(css) {
 
 const settingsTokensCss = rulesOnly(readCss('src/components/settings/settings-tokens.css'));
 const settingsComponentsCss = rulesOnly(readCss('src/components/settings/settings-components.css'));
-const settingsLayoutCss = rulesOnly(readCss('src/components/settings/settings-layout.css'));
 const settingsFoundationCss = rulesOnly(readCss('src/components/settings/settings-foundation.css'));
 const settingsPagesCss = rulesOnly(readCss('src/components/settings/settings-pages.css'));
+const settingsPrimitivesCss = rulesOnly(readCss('src/components/settings/settings-primitives.css'));
+const settingsShellCss = rulesOnly(readCss('src/components/settings/settings-shell.css'));
+const settingsResponsiveCss = rulesOnly(readCss('src/components/settings/settings-responsive.css'));
 const onboardingCss = rulesOnly(readCss('src/components/first-run-onboarding.css'));
 const notificationsCss = rulesOnly(readCss('src/components/notifications.css'));
 const accountLoginCss = rulesOnly(readCss('src/components/account-login-dialog.css'));
@@ -33,9 +35,11 @@ const darkModeCss = rulesOnly(readCss('src/styles/dark-mode.css'));
 const allSettingsCss = [
   settingsTokensCss,
   settingsComponentsCss,
-  settingsLayoutCss,
   settingsFoundationCss,
   settingsPagesCss,
+  settingsPrimitivesCss,
+  settingsShellCss,
+  settingsResponsiveCss,
 ].join('\n');
 
 const aiServiceTs = readTs('src/components/settings/AiServiceSettings.tsx');
@@ -94,8 +98,14 @@ describe('settings de-AI contract — no !important', () => {
   it('settings-components.css has no !important', () => {
     expect(settingsComponentsCss).not.toContain('!important');
   });
-  it('settings-layout.css has no !important', () => {
-    expect(settingsLayoutCss).not.toContain('!important');
+  it('settings-primitives.css has no !important', () => {
+    expect(settingsPrimitivesCss).not.toContain('!important');
+  });
+  it('settings-shell.css has no !important', () => {
+    expect(settingsShellCss).not.toContain('!important');
+  });
+  it('settings-responsive.css has no !important', () => {
+    expect(settingsResponsiveCss).not.toContain('!important');
   });
   it('settings-foundation.css has no !important', () => {
     expect(settingsFoundationCss).not.toContain('!important');

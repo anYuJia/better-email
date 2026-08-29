@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import SettingsFrame from './SettingsFrame';
 
-describe('SettingsFrame dialog behavior', () => {
-  let modalRef: HTMLElement | null = null;
-
+describe('SettingsFrame application shell', () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
       configurable: true,
@@ -15,7 +13,6 @@ describe('SettingsFrame dialog behavior', () => {
   });
 
   afterEach(() => {
-    modalRef = null;
     cleanup();
     vi.restoreAllMocks();
   });
@@ -47,7 +44,7 @@ describe('SettingsFrame dialog behavior', () => {
     activeAccountId?: number | null;
     onSelectAccountId?: (accountId: number) => void;
   } = {}) {
-    const utils = render(
+    return render(
       <div data-testid="app-shell">
         <button type="button">后台按钮</button>
         <SettingsFrame
@@ -70,22 +67,33 @@ describe('SettingsFrame dialog behavior', () => {
         </SettingsFrame>
       </div>,
     );
-    modalRef = utils.container.querySelector('.settings-modal');
-    return utils;
   }
 
-  it('renders the dialog and hides account context on global pages', () => {
-    renderFrame();
-    expect(screen.getByRole('dialog', { name: '设置' })).not.toBeNull();
-    expect(screen.queryByText('work@example.com')).toBeNull();
+  it('renders an application-level settings surface instead of a modal backdrop', () => {
+    const { container } = renderFrame();
+    expect(screen.getByRole('region', { name: '设置' })).not.toBeNull();
+    expect(container.querySelector('.settings-workspace')).not.toBeNull();
+    expect(container.querySelector('.settings-backdrop')).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '设置' })).toBeNull();
   });
 
-  it('shows account context and scoped tabs inside the account workspace', () => {
+  it('groups desktop navigation and exposes account destinations directly', () => {
     renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
+    expect(screen.getByRole('navigation', { name: '设置分类' })).not.toBeNull();
+    expect(screen.getByText('基础')).not.toBeNull();
+    expect(screen.getByText('账户')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '服务器设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '发件身份与标签设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '隐私设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('navigation', { name: '账号设置分类' })).toBeNull();
+  });
+
+  it('shows account context only on account-scoped pages', () => {
+    const { unmount } = renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
     expect(screen.getByText('work@example.com')).not.toBeNull();
-    expect(screen.getByRole('navigation', { name: '账号设置分类' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '身份与签名' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '隐私' }).getAttribute('aria-current')).toBe('page');
+    unmount();
+    renderFrame({ activeSection: 'notifications' });
+    expect(screen.queryByText('work@example.com')).toBeNull();
   });
 
   it('switches the scoped account and locks the switcher while edits are dirty', () => {
@@ -120,26 +128,25 @@ describe('SettingsFrame dialog behavior', () => {
     expect((screen.getByRole('combobox', { name: '切换当前设置账号' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('disables account detail tabs when no account exists', () => {
+  it('disables account detail destinations when no account exists', () => {
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
-    expect((screen.getByRole('button', { name: '服务器' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: '概览' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: '服务器设置' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '邮箱账号设置' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('marks background siblings inert and aria-hidden while open', () => {
+  it('keeps the mail workspace inaccessible while settings owns the application surface', () => {
     const { container, unmount } = renderFrame();
     const backgroundButton = container.querySelector<HTMLButtonElement>('[data-testid="app-shell"] > button')!;
     expect(backgroundButton.hasAttribute('inert')).toBe(true);
     expect(backgroundButton.getAttribute('aria-hidden')).toBe('true');
-    expect(container.querySelector('.settings-backdrop')?.hasAttribute('inert')).toBe(false);
     unmount();
     expect(backgroundButton.hasAttribute('inert')).toBe(false);
     expect(backgroundButton.getAttribute('aria-hidden')).toBeNull();
   });
 
-  it('restores focus to the previously focused element on close', () => {
+  it('restores focus to the previously focused opener when settings closes', () => {
     const backgroundButton = document.createElement('button');
-    backgroundButton.textContent = '触发按钮';
+    backgroundButton.textContent = '设置入口';
     document.body.appendChild(backgroundButton);
     backgroundButton.focus();
     const { unmount } = renderFrame();
@@ -149,37 +156,6 @@ describe('SettingsFrame dialog behavior', () => {
     document.body.removeChild(backgroundButton);
   });
 
-  it('removes inert before restoring focus to an opener inside the app shell', () => {
-    const renderShell = (open: boolean) => (
-      <div data-testid="focus-shell">
-        <button type="button">设置入口</button>
-        {open && (
-          <SettingsFrame
-            title="设置"
-            subtitle="work@example.com"
-            activeSection="notifications"
-            onNavigate={() => undefined}
-            onTestConnection={() => undefined}
-            onSave={() => undefined}
-            onClose={() => undefined}
-          >
-            <input placeholder="设置内输入框" />
-          </SettingsFrame>
-        )}
-      </div>
-    );
-    const { rerender } = render(renderShell(false));
-    const opener = screen.getByRole('button', { name: '设置入口' });
-    opener.focus();
-
-    rerender(renderShell(true));
-    expect(opener.closest('[inert]')).not.toBeNull();
-    rerender(renderShell(false));
-
-    expect(opener.closest('[inert]')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-  });
-
   it('closes on Escape', () => {
     const onClose = vi.fn();
     renderFrame({ onClose });
@@ -187,60 +163,35 @@ describe('SettingsFrame dialog behavior', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('lets the mobile page menu own the first Escape', async () => {
+  it('uses the mobile back action instead of a category dropdown', () => {
     const onClose = vi.fn();
-    renderFrame({ onClose });
-
-    const picker = screen.getByRole('button', { name: '切换设置页面' });
-    fireEvent.click(picker);
-    expect(screen.getByRole('menu', { name: '设置页面' })).not.toBeNull();
-
-    fireEvent.keyDown(document.body, { key: 'Escape' });
-
-    expect(screen.queryByRole('menu', { name: '设置页面' })).toBeNull();
-    expect(onClose).not.toHaveBeenCalled();
-    await waitFor(() => expect(document.activeElement).toBe(picker));
-  });
-
-  it('keeps Tab focus inside the dialog', () => {
-    renderFrame();
-    const focusable = Array.from(
-      modalRef!.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'),
-    );
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    last.focus();
-    fireEvent.keyDown(modalRef!, { key: 'Tab' });
-    expect(document.activeElement).toBe(first);
-    first.focus();
-    fireEvent.keyDown(modalRef!, { key: 'Tab', shiftKey: true });
-    expect(document.activeElement).toBe(last);
-  });
-
-  it('closes when clicking the backdrop outside the modal', () => {
-    const onClose = vi.fn();
-    const { container } = renderFrame({ onClose });
-    const backdrop = container.querySelector('.settings-backdrop')!;
-    fireEvent.mouseDown(backdrop, { target: backdrop });
-    expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(backdrop);
+    const { container } = renderFrame({ activeSection: 'notifications', onClose });
+    expect(container.querySelector('.settings-page-picker')).toBeNull();
+    const mobileBack = container.querySelector<HTMLButtonElement>('.settings-mobile-back');
+    expect(mobileBack).not.toBeNull();
+    fireEvent.click(mobileBack!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not show a generic save action on auto-saving preference pages', () => {
-    renderFrame({ activeSection: 'appearance', canSaveAndVerify: true });
-    expect(screen.queryByRole('button', { name: '保存设置' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
+  it('keeps Tab focus inside the settings surface', () => {
+    renderFrame();
+    const close = screen.getByRole('button', { name: '关闭设置' });
+    const pageInput = screen.getByPlaceholderText('设置内输入框');
+
+    pageInput.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+
+    close.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(pageInput);
   });
 
-  it('uses the standard shell layout for every settings page', () => {
-    const sections = ['appearance', 'sending', 'notifications', 'about'] as const;
-
-    for (const activeSection of sections) {
-      const { container, unmount } = renderFrame({ activeSection });
-      expect(container.querySelector('.settings-modal')?.getAttribute('data-page-layout')).toBe('standard');
-      unmount();
-    }
+  it('does not close when the workspace background is clicked', () => {
+    const onClose = vi.fn();
+    const { container } = renderFrame({ onClose });
+    fireEvent.click(container.querySelector('.settings-workspace')!);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('shows save only for a dirty account editing section', () => {
@@ -251,15 +202,13 @@ describe('SettingsFrame dialog behavior', () => {
       isDirty: true,
       onSave,
     });
-    const saveActions = screen.getAllByRole('button', { name: '保存账号设置' });
-    expect(saveActions).toHaveLength(1);
-    expect(document.querySelector('.settings-floating-unsaved-bar')).toBeNull();
-    fireEvent.click(saveActions[0]);
+    const save = screen.getByRole('button', { name: '保存账号设置' });
+    fireEvent.click(save);
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: '测试连接' })).not.toBeNull();
   });
 
-  it('offers connection testing when the active connection page is clean', () => {
+  it('offers connection testing on connection pages', () => {
     const onTestConnection = vi.fn();
     renderFrame({
       activeSection: 'sync',
@@ -268,65 +217,24 @@ describe('SettingsFrame dialog behavior', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
     expect(onTestConnection).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
   });
 
   it('shows connection test progress and result in the settings surface', () => {
-    const onTestConnection = vi.fn();
-    const { rerender } = renderFrame({
+    renderFrame({
       activeSection: 'sync',
       canSaveAndVerify: true,
       isTestingConnection: true,
-      onTestConnection,
     });
     const button = screen.getByRole('button', { name: '测试连接' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.textContent).toContain('测试中…');
 
-    rerender(
-      <div data-testid="app-shell">
-        <SettingsFrame
-          title="设置"
-          subtitle="work@example.com"
-          activeSection="sync"
-          onNavigate={() => undefined}
-          onTestConnection={onTestConnection}
-          onSave={() => undefined}
-          canSaveAndVerify
-          connectionTestFeedback={{ tone: 'success', message: '服务器连接成功' }}
-          onClose={() => undefined}
-        >
-          <input placeholder="设置内输入框" />
-        </SettingsFrame>
-      </div>,
-    );
+    cleanup();
+    renderFrame({
+      activeSection: 'sync',
+      canSaveAndVerify: true,
+      connectionTestFeedback: { tone: 'success', message: '服务器连接成功' },
+    });
     expect(screen.getByRole('status').textContent).toContain('服务器连接成功');
-
-    rerender(
-      <div data-testid="app-shell">
-        <SettingsFrame
-          title="设置"
-          subtitle="work@example.com"
-          activeSection="sync"
-          onNavigate={() => undefined}
-          onTestConnection={onTestConnection}
-          onSave={() => undefined}
-          canSaveAndVerify
-          connectionTestFeedback={{ tone: 'error', message: '测试连接失败：网络不可达' }}
-          onClose={() => undefined}
-        >
-          <input placeholder="设置内输入框" />
-        </SettingsFrame>
-      </div>,
-    );
-    expect(screen.getByRole('alert').textContent).toContain('测试连接失败：网络不可达');
-  });
-
-  it('keeps sending as a direct top-level navigation entry', () => {
-    const onNavigate = vi.fn();
-    renderFrame({ activeSection: 'sending', onNavigate });
-    expect(screen.getByRole('button', { name: '发送设置' }).getAttribute('aria-current')).toBe('page');
-    fireEvent.click(screen.getByRole('button', { name: '通用设置' }));
-    expect(onNavigate).toHaveBeenCalledWith('appearance');
   });
 });

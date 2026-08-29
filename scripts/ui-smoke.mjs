@@ -830,7 +830,7 @@ async function assertSettingsNoHorizontalOverflow(cdp, label) {
   }
 }
 
-async function assertSettingsV2LayoutContract(cdp, label, viewport) {
+async function assertSettingsLayoutContract(cdp, label, viewport) {
   const data = await evalInPage(
     cdp,
     `(() => {
@@ -844,41 +844,48 @@ async function assertSettingsV2LayoutContract(cdp, label, viewport) {
         for (const p of props) style[p] = cs[p];
         out[name] = { rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }, style };
       };
-      pick('modal', '.settings-modal', ['display', 'flexDirection', 'width', 'height', 'borderRadius', 'overflow']);
+      pick('workspace', '.settings-workspace', ['display', 'position', 'width', 'height', 'overflow']);
+      pick('shell', '.settings-shell', ['display', 'flexDirection', 'width', 'height', 'borderRadius', 'boxShadow', 'overflow']);
       pick('mainHeader', '.settings-main-header', ['display', 'position', 'minHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'backgroundColor']);
       pick('nav', '.settings-nav', ['display', 'flexDirection', 'width', 'borderRightWidth']);
       pick('content', '.settings-content', ['display', 'paddingTop', 'paddingBottom', 'overflow']);
       pick('page', '.settings-page', ['display', 'width', 'overflowY']);
       pick('pageHeader', '.settings-page-header', ['display', 'position', 'minHeight', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'backgroundColor']);
-      pick('mobileToolbar', '.settings-mobile-toolbar', ['display', 'position']);
+      pick('mobileBack', '.settings-mobile-back', ['display', 'minHeight', 'minWidth']);
       pick('pageContent', '.settings-page-content', ['display', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']);
       const content = document.querySelector('.settings-content');
       if (content) {
         out.contentOverflow = { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth };
       }
       out.pageData = document.querySelector('.settings-page')?.dataset.settingsPage ?? null;
+      out.hasLegacyNavigation = !!document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs');
       return out;
     })()`,
   );
   const failures = [];
   const rect = (name) => data[name]?.rect ?? null;
   const style = (name, prop) => data[name]?.style?.[prop] ?? null;
-  if (!data.modal) failures.push('modal missing');
+  if (!data.workspace) failures.push('settings workspace missing');
+  if (!data.shell) failures.push('settings shell missing');
   if (viewport === 'desktop') {
     if (data.nav && style('nav', 'display') !== 'flex') failures.push(`nav display=${style('nav', 'display')}`);
-    if (data.mobileToolbar && style('mobileToolbar', 'display') !== 'none') failures.push(`mobileToolbar display=${style('mobileToolbar', 'display')}`);
     if (data.mainHeader && style('mainHeader', 'minHeight') !== '48px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
-    if (data.mainHeader && style('mainHeader', 'position') !== 'sticky') failures.push(`mainHeader position=${style('mainHeader', 'position')}`);
-    if (data.pageHeader && style('pageHeader', 'minHeight') !== '78px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
+    if (data.shell && style('shell', 'borderRadius') !== '0px') failures.push(`shell borderRadius=${style('shell', 'borderRadius')}`);
+    if (data.shell && style('shell', 'boxShadow') !== 'none') failures.push(`shell boxShadow=${style('shell', 'boxShadow')}`);
+    if (data.pageHeader && style('pageHeader', 'minHeight') !== '72px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
     if (data.content && style('content', 'paddingTop') !== '0px') failures.push(`content paddingTop=${style('content', 'paddingTop')}`);
     if (data.content && style('content', 'paddingBottom') !== '0px') failures.push(`content paddingBottom=${style('content', 'paddingBottom')}`);
-    const m = rect('modal');
-    if (m && m.width > 1081) failures.push(`modal width=${m.width}`);
+    const workspace = rect('workspace');
+    if (workspace && Math.abs(workspace.width - data.viewport.width) > 1) failures.push(`workspace width=${workspace.width} vs viewport=${data.viewport.width}`);
+    if (workspace && Math.abs(workspace.height - data.viewport.height) > 1) failures.push(`workspace height=${workspace.height} vs viewport=${data.viewport.height}`);
   } else if (viewport === 'narrow') {
     if (data.nav && style('nav', 'display') === 'flex') failures.push('nav visible on narrow');
-    if (data.mobileToolbar && style('mobileToolbar', 'display') !== 'block') failures.push(`mobileToolbar display=${style('mobileToolbar', 'display')}`);
-    const m = rect('modal');
-    if (m && Math.abs(m.width - data.viewport.width) > 1) failures.push(`modal width=${m.width} vs viewport=${data.viewport.width}`);
+    if (data.shell && style('shell', 'borderRadius') !== '0px') failures.push(`shell borderRadius=${style('shell', 'borderRadius')}`);
+    if (data.shell && style('shell', 'boxShadow') !== 'none') failures.push(`shell boxShadow=${style('shell', 'boxShadow')}`);
+    const workspace = rect('workspace');
+    if (workspace && Math.abs(workspace.width - data.viewport.width) > 1) failures.push(`workspace width=${workspace.width} vs viewport=${data.viewport.width}`);
+    if (style('mobileBack', 'display') === 'none') failures.push('mobile back missing on narrow');
+    if (data.hasLegacyNavigation) failures.push('legacy mobile settings navigation present');
   }
   if (data.contentOverflow && data.contentOverflow.scrollWidth > data.contentOverflow.clientWidth) {
     failures.push(`content horizontal overflow ${JSON.stringify(data.contentOverflow)}`);
@@ -897,14 +904,8 @@ async function assertSettingsPagesEnterable(cdp, label, pages) {
       `(() => {
         const label = ${JSON.stringify(page.label)};
         let button = null;
-        if (${JSON.stringify(page.tab === true)}) {
-          button = [...document.querySelectorAll('.settings-context-tabs button')]
-            .find((item) => item.textContent.trim() === label);
-        }
-        if (!button) {
-          button = [...document.querySelectorAll('.settings-nav-list > button')]
-            .find((item) => item.textContent.trim() === label);
-        }
+        button = [...document.querySelectorAll('.settings-nav-list button')]
+          .find((item) => item.querySelector('.settings-nav-label')?.textContent.trim() === label);
         if (!button) return { entered: false, reason: 'nav button missing' };
         button.click();
         return { entered: true, label };
@@ -925,8 +926,8 @@ async function assertSettingsPagesEnterable(cdp, label, pages) {
           modalOpen: !!document.querySelector('.settings-modal'),
           page: document.querySelector('.settings-page')?.dataset.settingsPage ?? null,
           header: document.querySelector('.settings-page-header h2')?.textContent.trim() ?? document.querySelector('.settings-page')?.getAttribute('aria-label') ?? null,
-          navButtons: [...document.querySelectorAll('.settings-nav-list > button')].map((b) => b.textContent.trim()),
-          tabs: [...document.querySelectorAll('.settings-context-tabs button')].map((b) => b.textContent.trim()),
+          navButtons: [...document.querySelectorAll('.settings-nav-list button')].map((b) => b.textContent.trim()),
+          legacyTabs: document.querySelectorAll('.settings-context-tabs button').length,
         }))()`,
       );
       throw new Error(`${label}: ${page.id} navigation timed out; state=${JSON.stringify(probe)}; original=${error.message}`);
@@ -1467,7 +1468,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && window.history.state?.betterEmailScreen === 'settings' && !document.querySelector('.settings-modal')");
     await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-settings-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
     await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.textContent.includes('联系人'))?.click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-v3\"]') && document.querySelector('.settings-page[data-settings-page=\"contacts\"]') && window.history.state?.betterEmailSettingsSection === 'contacts'");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-app\"]') && document.querySelector('.settings-page[data-settings-page=\"contacts\"]') && window.history.state?.betterEmailSettingsSection === 'contacts'");
     await evalInPage(cdp, "document.querySelector('.settings-close-button[aria-label=\"关闭设置\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && !document.querySelector('.settings-modal') && window.history.state?.betterEmailScreen === 'settings' && !window.history.state?.betterEmailSettingsSection");
     await evalInPage(cdp, "document.querySelector('.mobile-settings-header .mobile-header-icon[aria-label=\"返回邮箱\"]')?.click()");
@@ -2210,8 +2211,8 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && !document.body.innerText.includes('OAuth2 向导')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-list > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.body.innerText.includes('OAuth2 向导')");
+    await waitForExpression(cdp, "(() => { const labels = [...document.querySelectorAll('.settings-nav-list .settings-nav-label')].map((item) => item.textContent.trim()); return document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && labels.length === 17 && ['邮箱账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私', 'AI 接入', 'MCP'].every((label) => labels.includes(label)) && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置\"]') && !document.querySelector('.settings-context-tabs'); })()");
     await evalInPage(
       cdp,
       `(() => {
@@ -2229,20 +2230,12 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelectorAll('.settings-search-results > button').length === 1 && document.querySelector('.settings-search-results > button')?.innerText.includes('隐私')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-list > button').length === 12");
-    await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && [...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].some((item) => item.innerText.includes('发送'))");
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
-    await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page')?.dataset.settingsPage === 'sending' && document.querySelector('.settings-page-header h2')?.textContent.trim() === '发送'");
-    await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && [...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].some((item) => item.innerText.includes('账号'))");
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('账号')).click()");
-    await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-list button').length === 17");
     await clickButton(cdp, '发送', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'sending' && document.querySelector('.settings-page-header h2')?.textContent.trim() === '发送'");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '登录与安全', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '登录与安全', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'auth' && document.querySelector('.settings-oauth-primary')");
     await openDetails(cdp, '.settings-provider-advanced');
     await assertSettingsAuthOAuth2Alignment(cdp, '认证 OAuth2 模式 1440x980');
@@ -2301,8 +2294,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')?.innerText.includes('默认发件') && document.querySelector('[data-context-item=\"set-default-account\"]').disabled");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]')");
-    // 账号页头部为干净的 v2 头：只保留关闭按钮，不再有旧版保存动作栏。
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]')");
+    // 账号页头部只保留设置外壳操作，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await waitForExpression(cdp, "!document.querySelector('.add-account-disclosure')?.open");
     await evalInPage(cdp, `(() => {
@@ -2310,7 +2303,7 @@ async function main() {
       if (!picker) throw new Error('Settings account picker not found');
       const style = getComputedStyle(picker);
       const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
-      const summaries = [...document.querySelectorAll('.settings-modal[data-ui="settings-v3"] .settings-page-content .custom-select-summary')];
+      const summaries = [...document.querySelectorAll('.settings-modal[data-ui="settings-app"] .settings-page-content .custom-select-summary')];
       const controls = [picker, ...summaries];
       if (summaries.length === 0 || controls.some((control) => getComputedStyle(control).boxShadow !== 'none')) {
         throw new Error('Settings select controls are rendered with elevation');
@@ -2322,7 +2315,7 @@ async function main() {
       if (new Set(controlSignatures).size !== 1 || transparent(style.borderTopColor) || transparent(style.backgroundColor)) {
         throw new Error('Settings select controls do not share the embedded control treatment');
       }
-      const wrappers = [...document.querySelectorAll('.settings-modal[data-ui="settings-v3"] .custom-select-menu')];
+      const wrappers = [...document.querySelectorAll('.settings-modal[data-ui="settings-app"] .custom-select-menu')];
       if (wrappers.some((wrapper) => {
         const wrapperStyle = getComputedStyle(wrapper);
         return wrapperStyle.boxShadow !== 'none'
@@ -2351,28 +2344,30 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'block' && document.querySelector('.settings-page-picker[aria-label=\"切换设置页面\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-page-picker')?.innerText.includes('发送') && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
-    await waitForExpression(cdp, "(() => { const content = document.querySelector('.settings-content'); const toolbar = document.querySelector('.settings-mobile-toolbar'); const page = document.querySelector('.settings-page'); return content && toolbar && page && getComputedStyle(page).overflowY === 'auto' && page.clientHeight >= 200 && page.clientHeight <= content.clientHeight - toolbar.offsetHeight + 40; })()");
-    await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 12 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
-    await captureScreenshot(cdp, 'settings-page-picker-narrow');
-    await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
-    await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page')?.dataset.settingsPage === 'sending'");
+    await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-back')).display !== 'none' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs') && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
+    await assertSettingsLayoutContract(cdp, '设置移动端推入布局 430x780', 'narrow');
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-sending-narrow');
+    await evalInPage(cdp, "document.querySelector('.settings-mobile-back').click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.querySelector('.mobile-settings-root')");
+    await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.textContent.includes('邮箱账号'))?.click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-app\"]') && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs')");
+    await captureScreenshot(cdp, 'settings-account-narrow');
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
       height: 980,
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await waitForExpression(cdp, "window.innerWidth === 1440 && getComputedStyle(document.querySelector('.settings-nav')).display === 'flex' && getComputedStyle(document.querySelector('.settings-nav')).flexDirection === 'column' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'none'");
+    await waitForExpression(cdp, "window.innerWidth === 1440 && getComputedStyle(document.querySelector('.settings-nav')).display === 'flex' && getComputedStyle(document.querySelector('.settings-nav')).flexDirection === 'column' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs')");
+    await clickButton(cdp, '发送', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'sending'");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sending\"] .custom-select-summary span')?.textContent.includes('10')");
     await pickCustomSelect(cdp, '.settings-page[data-settings-page="sending"] .custom-select-summary', '5 秒');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('.settings-page[data-settings-page=\"sending\"]').innerText.includes('5 秒')");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '服务器', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '服务器', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'providers' && document.querySelector('.settings-provider-advanced')");
     await waitForExpression(cdp, "!document.querySelector('details[data-settings-section=\"providers\"]')?.open && [...document.querySelectorAll('.settings-nav button')].some((item) => item.textContent.trim() === '发送')");
     await waitForSettingsPageStable(cdp);
@@ -2400,7 +2395,7 @@ async function main() {
     });
     await waitForExpression(cdp, 'window.innerWidth === 430');
     await assertSettingsNoHorizontalOverflow(cdp, '服务器页 430x780');
-    await assertSettingsV2LayoutContract(cdp, '服务器页 窄屏布局契约 430x780', 'narrow');
+    await assertSettingsLayoutContract(cdp, '服务器页 窄屏布局契约 430x780', 'narrow');
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
       height: 980,
@@ -2409,14 +2404,14 @@ async function main() {
     });
     await waitForExpression(cdp, 'window.innerWidth === 1440');
     await waitForSettingsPageStable(cdp);
-    await clickButton(cdp, '登录与安全', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '登录与安全', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('本地凭据存储') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后立即清空输入框') && document.querySelector('.settings-credential-panel')?.innerText.includes('验证登录')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel .credential-guide-card') && document.querySelector('.credential-provider-tag')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-auth-desktop');
     await waitForExpression(cdp, "document.querySelector('.settings-auth-guide')?.innerText.includes('授权码模式')");
     await assertSettingsAuthAlignment(cdp, '认证 授权码模式 1440x980');
-    await assertSettingsV2LayoutContract(cdp, '认证页 桌面布局契约 1440x980', 'desktop');
+    await assertSettingsLayoutContract(cdp, '认证页 桌面布局契约 1440x980', 'desktop');
     await fillInput(cdp, '.credential-input-shell input', 'local-smoke-app-password');
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('保存并验证') && document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]')");
     await evalInPage(cdp, "document.querySelector('.credential-input-tools button[aria-label=\"显示凭据\"]').click()");
@@ -2429,9 +2424,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-provider-validation-status=\"success\"]') && [...document.querySelectorAll('[data-provider-validation-stage]')].length === 4 && [...document.querySelectorAll('[data-provider-validation-stage]')].every((stage) => stage.classList.contains('success')) && document.querySelector('[data-provider-validation]')?.innerText.includes('未发送邮件或修改远端邮件状态')");
     await evalInPage(cdp, "document.querySelector('.connection-technical-details > summary').click()");
     await waitForExpression(cdp, "document.querySelector('.connection-technical-details')?.open && document.querySelector('.connection-technical-details')?.textContent.includes('未发送任何邮件') && document.querySelector('.connection-technical-details')?.textContent.includes('不显示或导出授权码与 Token')");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '同步', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '同步', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "document.body.innerText.includes('同步调度与限流') && document.body.innerText.includes('每轮最多 2 个账号') && document.body.innerText.includes('Smoke Outbox Flow') && document.body.innerText.includes('排队中')");
     await waitForSettingsPageStable(cdp);
@@ -2453,9 +2448,9 @@ async function main() {
     await waitForExpression(cdp, "(() => { const policy = JSON.parse(localStorage.getItem('better-email.notificationPolicy')); const row = document.querySelector('[data-notification-account=\"design@better-email.local\"]'); return policy.priorityAccounts.includes('design@better-email.local') && !policy.mutedAccounts.includes('design@better-email.local') && row.querySelector('button[aria-pressed=\"true\"]')?.textContent.trim() === '优先'; })()");
     await evalInPage(cdp, "(() => { const row = document.querySelector('[data-notification-account=\"design@better-email.local\"]'); const button = row && [...row.querySelectorAll('button')].find((item) => item.textContent.trim() === '静音'); if (!button) throw new Error('Muted notification button not found'); button.click(); })()");
     await waitForExpression(cdp, "(() => { const policy = JSON.parse(localStorage.getItem('better-email.notificationPolicy')); const row = document.querySelector('[data-notification-account=\"design@better-email.local\"]'); return policy.mutedAccounts.includes('design@better-email.local') && !policy.priorityAccounts.includes('design@better-email.local') && row.querySelector('button[aria-pressed=\"true\"]')?.textContent.trim() === '静音'; })()");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '隐私', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '隐私', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"privacy\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"privacy\"]')?.innerText.includes('允许加载远程图片') && document.querySelector('.settings-page[data-settings-page=\"privacy\"]')?.innerText.includes('提示外部发件人') && !document.querySelector('.settings-page[data-settings-page=\"privacy\"] .custom-select-summary[aria-label=\"配置账号\"]')");
     await openSettingsSection(cdp, '数据与存储', 'backup', '.settings-page[data-settings-page="backup"]');
@@ -2704,9 +2699,9 @@ async function main() {
     await waitForExpression(cdp, 'window.innerWidth === 1440');
     await waitForSettingsPageStable(cdp);
 
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '同步', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '同步', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await clickButton(cdp, '撤回', "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已撤回到草稿箱') && document.querySelector('.settings-page[data-settings-page=\"sync\"]')?.innerText.includes('已撤回到草稿箱')");
@@ -2721,28 +2716,28 @@ async function main() {
     await closeComposer(cdp);
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-header-actions')");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '同步', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '同步', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "(() => { const stored = JSON.parse(localStorage.getItem('better-email.providerWriteValidationIds.v1') || '{}'); const panel = document.querySelector('.write-validation-status'); const pageButtons = [...document.querySelectorAll('.settings-page[data-settings-page=\"sync\"] button')]; return Boolean(stored['2']) && panel?.dataset.writeValidationId === stored['2'] && panel.querySelectorAll('[data-validation-stage]').length === 5 && document.querySelector('.settings-page[data-settings-page=\"sync\"]')?.innerText.includes('核心步骤') && !pageButtons.find((button) => button.textContent.includes('刷新状态'))?.disabled && pageButtons.filter((button) => button.textContent.includes('定位')).every((button) => button.disabled); })()");
     await clickButton(cdp, '刷新状态', "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('暂未找到已发送或收件副本') && document.querySelector('[data-validation-stage=\"smtp\"]')?.innerText.includes('真实发送仍需手动确认')");
     await waitForExpression(cdp, "document.querySelector('.writeback-validation-panel')?.innerText.includes('等待自发自收邮件') && document.querySelectorAll('[data-writeback-step]').length === 4 && [...document.querySelectorAll('[data-writeback-step-action]')].every((button) => button.disabled)");
 
-    await assertSettingsPagesEnterable(cdp, 'settings-v2 五页可进入 1440x980', [
+    await assertSettingsPagesEnterable(cdp, 'settings Phase 1 五页可进入 1440x980', [
       { id: 'sending', label: '发送' },
       { id: 'ai', label: 'AI 接入' },
       { id: 'mcp', label: 'MCP' },
-      { id: 'accounts', label: '账号' },
-      { id: 'providers', label: '服务器', tab: true },
-      { id: 'auth', label: '登录与安全', tab: true },
+      { id: 'accounts', label: '邮箱账号' },
+      { id: 'providers', label: '服务器' },
+      { id: 'auth', label: '登录与安全' },
     ]);
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
 
-    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
-    // 账号页头部为干净的 v2 头契约：无旧版保存动作栏，保存与验证在账号配置/认证页内。
+    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    // 账号页头部为独立设置外壳契约：无旧版保存动作栏，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
@@ -2759,7 +2754,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar')?.innerText.includes('远端邮件已移动到 Projects/Alpha')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
-    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     await clickButton(cdp, '添加账号', "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-account-add-dialog')");
     await fillInput(cdp, '.settings-account-add-dialog input[placeholder="name@example.com"]', 'qa-new@better-email.local');
@@ -2776,12 +2771,12 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.first-run-onboarding-backdrop')");
     await waitForExpression(cdp, "document.querySelector('.settings-account-list-panel')?.innerText.includes('qa-new@better-email.local')");
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
-    await clickButton(cdp, '身份与签名', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
+    await clickButton(cdp, '发件身份与标签', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"identities\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"identities\"]')?.innerText.includes('QA New') && document.querySelector('.settings-page[data-settings-page=\"identities\"]')?.innerText.includes('1 个')");
-    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     await clickButton(cdp, '会话', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
@@ -2958,15 +2953,15 @@ async function main() {
 
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置'");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号'");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号'");
     await clickButton(cdp, 'Demo User', "document.querySelector('.settings-page[data-settings-page=\"accounts\"] .settings-account-list')");
     await waitForExpression(cdp, "document.querySelector('.settings-account-row.active')?.innerText.includes('demo@better-email.local')");
-    await clickButton(cdp, '隐私', "document.querySelector('.settings-context-tabs')");
+    await clickButton(cdp, '隐私', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"privacy\"]') && document.body.innerText.includes('拦截外部邮箱邮件') && document.body.innerText.includes('隐藏邮件中的链接')");
     await evalInPage(cdp, "(() => { const boxes = [...document.querySelectorAll('.settings-page[data-settings-page=\"privacy\"] input[type=\"checkbox\"]')]; const target = boxes[1]; if (!target) throw new Error('External mailbox toggle not found'); target.click(); })()");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"privacy\"] input[type=\"checkbox\"]')][1]?.checked");
-    await clickButton(cdp, '账号', "document.querySelector('.settings-nav')");
+    await clickButton(cdp, '邮箱账号', "document.querySelector('.settings-nav')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"accounts\"]') && document.querySelector('.settings-header-actions')?.innerText.includes('保存修改')");
     await clickButton(cdp, '保存修改', "document.querySelector('.settings-header-actions')");
     await waitForExpression(cdp, "(() => { const calls = window.__betterEmailMockInvocations || []; const call = [...calls].reverse().find((e) => e.command === 'update_account_settings'); return call?.args?.input?.block_external_mailboxes === true; })()");
@@ -3108,16 +3103,16 @@ async function main() {
         'ai service settings save and test connection',
         'template settings manage and ai-generate templates',
         'outbox queue and cancel works',
-        'settings modal opens',
+        'settings application surface opens',
         'settings navigation renders one page at a time',
         'settings desktop sidebar switches standalone pages',
-        'settings narrow layout uses grouped page selector',
+        'settings narrow layout uses native root and detail navigation',
         'settings page hierarchy stays isolated from legacy header and footer styles',
-        'settings v2 provider and auth cards stay edge-aligned at desktop sizes',
-        'settings v2 compatibility matrix stays inside advanced content without legacy margins',
-        'settings v2 content column has no horizontal overflow on narrow viewports',
-        'settings v2 desktop and narrow layout contracts hold',
-        'settings v2 five core pages stay enterable',
+        'settings provider and auth cards stay edge-aligned at desktop sizes',
+        'settings compatibility matrix stays inside advanced content without legacy margins',
+        'settings content column has no horizontal overflow on narrow viewports',
+        'settings desktop and narrow layout contracts hold',
+        'settings five core pages stay enterable',
         'settings low-frequency account creation stays folded and background feedback stays hidden',
         'settings connection test only appears on relevant pages',
         'settings primary sections open without redundant disclosure',
@@ -3132,8 +3127,8 @@ async function main() {
         'account switcher right click sets and labels default sender account',
         'unified compose uses the configured default sender account',
         'oauth pkce callback exchange and refresh flow works',
-        'settings v2 oauth result cards own namespaced classes',
-        'settings v2 oauth result cards preserve style and overflow contracts across viewports',
+        'settings oauth result cards own namespaced classes',
+        'settings oauth result cards preserve style and overflow contracts across viewports',
         'multi-account diagnostics target selected account',
         'provider-aware secure credential controls protect and clear local input',
         'provider-aware credential diagnostics guide recovery and fold technical details',
@@ -3152,11 +3147,11 @@ async function main() {
         'contact create edit detail delete and VIP sync works',
         'contact vCard import export works',
         'rules create flow works',
-        'settings v2 rule automation page owns namespaced rule classes',
+        'settings rule automation page owns namespaced rule classes',
         'rule editor create edit delete flows and advanced toggle work',
         'raw MIME preview works',
-        'settings v2 security preview page owns namespaced preview classes',
-        'settings v2 security preview metadata tags own namespaced styles',
+        'settings security preview page owns namespaced preview classes',
+        'settings security preview metadata tags own namespaced styles',
         'snooze and unsnooze flow works',
         'global keyboard undo restores archived message',
         'inline quick reply sends from reader',

@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import type { Account } from '../../app/types';
 import {
+  accountScopedSections,
   settingsNavigationGroups,
   type SettingsSectionId,
 } from '../settings/settingsNavigation';
@@ -29,7 +30,7 @@ export default function MobileSettingsRoot({
       </header>
 
       <div className="mobile-settings-scroll">
-        <section className="mobile-settings-account-summary">
+        <section className="mobile-settings-account-summary" aria-label="当前账号">
           <span className="mobile-settings-account-avatar" aria-hidden="true">
             {(account?.display_name || account?.email || 'B').slice(0, 1).toUpperCase()}
           </span>
@@ -45,11 +46,16 @@ export default function MobileSettingsRoot({
             <div className="mobile-settings-group-list">
               {group.items.map((item) => {
                 const Icon = item.icon;
+                const disabled = item.id !== 'accounts'
+                  && accountScopedSections.has(item.id)
+                  && accounts.length === 0;
                 return (
                   <button
                     type="button"
                     className="mobile-settings-row"
                     key={item.id}
+                    disabled={disabled}
+                    title={disabled ? '请先添加或选择邮箱账号' : item.description}
                     onClick={() => onOpenSection(item.id)}
                   >
                     <span className="mobile-settings-row-icon"><Icon size={20} aria-hidden="true" /></span>

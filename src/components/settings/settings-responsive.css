@@ -125,6 +125,10 @@
     display: none;
   }
 
+  .settings-page-eyebrow {
+    display: none;
+  }
+
   .settings-page-heading p {
     max-width: none;
     font-size: 13px;

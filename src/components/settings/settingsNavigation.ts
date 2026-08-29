@@ -2,11 +2,14 @@ import {
   ContactRound,
   HardDrive,
   Info,
+  KeyRound,
   LayoutTemplate,
   PlugZap,
-  ScanSearch,
-  Send,
+  RefreshCw,
+  Server,
   Settings2,
+  ShieldCheck,
+  Signature,
   Sparkles,
   UserRound,
   Workflow,
@@ -133,35 +136,35 @@ export const settingsAccountDetailItems: SettingsNavigationItem[] = [
     label: '服务器',
     description: 'IMAP、POP3 与 SMTP 连接',
     keywords: ['服务商', '服务器', 'imap', 'pop3', 'smtp', '端口', 'tls', 'ssl'],
-    icon: PlugZap,
+    icon: Server,
   },
   {
     id: 'auth',
     label: '登录与安全',
     description: '授权码、OAuth2 与登录凭据',
     keywords: ['登录', '密码', '授权码', 'oauth', 'oauth2', 'token'],
-    icon: ScanSearch,
+    icon: KeyRound,
   },
   {
     id: 'identities',
     label: '发件身份与标签',
     description: '发件身份、别名、回复地址与签名',
     keywords: ['身份', '别名', '签名', 'reply-to', '回复地址'],
-    icon: Send,
+    icon: Signature,
   },
   {
     id: 'sync',
     label: '同步',
     description: '同步策略、文件夹映射与后台任务',
     keywords: ['同步', '文件夹', '映射', '后台', 'sync'],
-    icon: Workflow,
+    icon: RefreshCw,
   },
   {
     id: 'privacy',
     label: '隐私',
     description: '远程图片、外部发件人与信任列表',
     keywords: ['隐私', '远程图片', '信任', '外部发件人'],
-    icon: ScanSearch,
+    icon: ShieldCheck,
   },
 ];
 
@@ -193,6 +196,15 @@ const nestedSettingsParents = new Map<SettingsSectionId, SettingsSectionId>([
   ...settingsAccountDetailItems.map((item) => [item.id, 'accounts'] as const),
   ...settingsToolDetailItems.map((item) => [item.id, 'tools'] as const),
 ]);
+
+const settingsDetailItemsByParent = new Map<SettingsSectionId, SettingsNavigationItem[]>([
+  ['accounts', settingsAccountDetailItems],
+  ['tools', settingsToolDetailItems],
+]);
+
+export function getSettingsDetailItems(section: SettingsSectionId): SettingsNavigationItem[] {
+  return settingsDetailItemsByParent.get(section) ?? [];
+}
 
 export function resolveSettingsNavigationSectionId(section: SettingsSectionId): SettingsSectionId {
   return nestedSettingsParents.get(section) ?? section;

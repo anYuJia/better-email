@@ -478,7 +478,7 @@
   align-items: center;
   gap: 14px;
   min-height: 60px;
-  padding: 8px 6px;
+  padding: 8px 8px;
   border: 0;
   border-top: 1px solid var(--st-border);
   border-radius: 0;
@@ -492,7 +492,18 @@
 }
 
 .settings-modal .settings-account-row.active {
-  background: var(--st-surface-muted);
+  background: color-mix(in srgb, var(--st-accent-soft) 64%, transparent);
+}
+
+.settings-modal .settings-account-row.active::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 2px;
+  border-radius: var(--st-radius-pill);
+  background: var(--st-accent);
 }
 
 .settings-modal .settings-account-row:first-child {
@@ -4718,132 +4729,70 @@
  * ===================================================================== */
 
 .settings-modal .settings-appearance-section .st-section-body {
-  margin-top: 0;
-}
-
-.settings-modal .settings-theme-preference {
-  width: min(100%, 580px);
-  display: grid;
-  gap: 12px;
+  margin-top: 14px;
 }
 
 .settings-modal .settings-theme-options {
+  min-width: 246px;
   display: grid;
-  gap: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-theme-option {
   min-width: 0;
-  min-height: 64px;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 20px;
+  min-height: 30px;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 0;
-  border-top: 1px solid var(--st-border);
-  border-radius: 0;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--st-radius-sm);
   color: var(--st-text-secondary);
   background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: var(--st-font-size-body);
-  text-align: left;
+  box-shadow: none;
+  font-size: var(--st-font-size-secondary);
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--ui-transition-fast-color-background-border);
 }
 
-.settings-modal .settings-theme-option:first-child {
-  border-top: 0;
-}
-
 .settings-modal .settings-theme-option:hover {
   color: var(--st-text);
-  background: var(--st-surface-muted);
+  background: color-mix(in srgb, var(--st-surface) 70%, transparent);
 }
 
 .settings-modal .settings-theme-option.active {
   color: var(--st-text);
-  background: var(--st-surface-muted);
+  border-color: var(--st-border);
+  background: var(--st-surface);
   box-shadow: none;
 }
 
-.settings-modal .settings-theme-option-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--st-radius-sm);
-  color: var(--st-text-secondary);
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .settings-theme-option.active .settings-theme-option-icon {
-  color: var(--st-accent);
-  background: var(--st-surface);
-}
-
-.settings-modal .settings-theme-option-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .settings-theme-option-copy :is(strong, small) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.settings-modal .settings-theme-option-copy strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .settings-theme-option-copy small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 400;
-  line-height: 1.4;
-}
-
-.settings-modal .settings-theme-option-check {
-  color: var(--st-accent);
-  opacity: 0;
-}
-
-.settings-modal .settings-theme-option.active .settings-theme-option-check {
-  opacity: 1;
-}
-
-.settings-modal .settings-theme-description {
-  min-height: 20px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
-}
-
-.settings-modal .settings-theme-description > svg {
+.settings-modal .settings-theme-option.active > svg {
   flex: 0 0 auto;
-  color: var(--st-success);
+  color: var(--st-accent);
+}
+
+.settings-modal .settings-theme-option:focus-visible {
+  outline-width: 1px;
+  outline-offset: -1px;
 }
 
 @media (max-width: 480px) {
-  .settings-modal .settings-theme-option {
-    min-height: 60px;
-    grid-template-columns: 30px minmax(0, 1fr) 18px;
-    gap: 10px;
-    padding-inline: 12px;
+  .settings-modal .settings-theme-options {
+    min-width: 0;
+    width: 100%;
   }
 
-  .settings-modal .settings-theme-option-icon {
-    width: 30px;
-    height: 30px;
+  .settings-modal .settings-theme-option {
+    min-height: 38px;
+    padding-inline: 7px;
   }
 }

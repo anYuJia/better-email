@@ -11,6 +11,7 @@ import {
 } from 'react';
 import {
   accountScopedSections,
+  getSettingsDetailItems,
   resolveSettingsNavigationSectionId,
   settingsNavigationGroups,
   settingsSearchEntries,
@@ -91,7 +92,10 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   };
 
   return (
-    <nav className="settings-nav" aria-label="设置分类">
+    <nav
+      className={`settings-nav${resolvedActiveSection !== activeSection ? ' has-detail-navigation' : ''}`}
+      aria-label="设置分类"
+    >
       <div className="settings-nav-search" role="search">
         <Search size={14} aria-hidden="true" />
         <input
@@ -159,26 +163,60 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                 <span className="settings-nav-group">{group.label}</span>
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = resolvedActiveSection === item.id;
+                  const active = activeSection === item.id;
+                  const contextActive = resolvedActiveSection === item.id;
+                  const detailItems = getSettingsDetailItems(item.id);
+                  const showDetailItems = contextActive && !active && detailItems.length > 0;
+                  const detailGroupId = `settings-nav-${item.id}-details`;
                   const disabled = requiresAccount(item.id) && !accountSectionsEnabled;
                   return (
-                    <button
-                      type="button"
-                      className={active ? 'active' : ''}
-                      key={item.id}
-                      aria-current={active ? 'page' : undefined}
-                      aria-label={`${item.label}设置`}
-                      disabled={disabled}
-                      title={disabled ? '请先添加或选择邮箱账号' : item.description}
-                      onClick={() => onNavigate(item.id)}
-                    >
-                      <span className="settings-nav-icon">
-                        <Icon size={15} aria-hidden="true" />
-                      </span>
-                      <span className="settings-nav-copy">
-                        <span className="settings-nav-label">{item.label}</span>
-                      </span>
-                    </button>
+                    <div className="settings-nav-branch" key={item.id}>
+                      <button
+                        type="button"
+                        className={`${active ? 'active' : ''}${showDetailItems ? ' context-active' : ''}`.trim()}
+                        aria-current={active ? 'page' : undefined}
+                        aria-expanded={showDetailItems ? true : undefined}
+                        aria-controls={showDetailItems ? detailGroupId : undefined}
+                        aria-label={`${item.label}设置`}
+                        disabled={disabled}
+                        title={disabled ? '请先添加或选择邮箱账号' : item.description}
+                        onClick={() => onNavigate(item.id)}
+                      >
+                        <span className="settings-nav-icon">
+                          <Icon size={15} aria-hidden="true" />
+                        </span>
+                        <span className="settings-nav-copy">
+                          <span className="settings-nav-label">{item.label}</span>
+                        </span>
+                      </button>
+                      {showDetailItems && (
+                        <div
+                          className="settings-nav-subsection"
+                          id={detailGroupId}
+                          role="group"
+                          aria-label={`${item.label}详细设置`}
+                        >
+                          {detailItems.map((detailItem) => {
+                            const detailActive = activeSection === detailItem.id;
+                            const detailDisabled = requiresAccount(detailItem.id) && !accountSectionsEnabled;
+                            return (
+                              <button
+                                type="button"
+                                className={`settings-nav-subitem${detailActive ? ' active' : ''}`}
+                                key={detailItem.id}
+                                aria-current={detailActive ? 'page' : undefined}
+                                aria-label={`${detailItem.label}设置`}
+                                disabled={detailDisabled}
+                                title={detailDisabled ? '请先添加或选择邮箱账号' : detailItem.description}
+                                onClick={() => onNavigate(detailItem.id)}
+                              >
+                                <span className="settings-nav-subitem-label">{detailItem.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </section>

@@ -178,12 +178,11 @@ export default function SettingsFrame({
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useModalAccessibility({
     dialogRef: shellRef,
     backdropRef: workspaceRef,
-    initialFocusRef: closeButtonRef,
+    initialFocusRef: shellRef,
   });
 
   useEffect(() => {
@@ -280,7 +279,6 @@ export default function SettingsFrame({
               </button>
             )}
             <button
-              ref={closeButtonRef}
               type="button"
               className="settings-close-button"
               aria-label="关闭设置"

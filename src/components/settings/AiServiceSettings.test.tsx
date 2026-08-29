@@ -16,7 +16,7 @@ describe('AiServiceSettings', () => {
   it('shows the AI access page without a service type selector', () => {
     render(<AiServiceSettings />);
     expect(screen.getByText('AI 功能')).not.toBeNull();
-    expect(screen.getByText('AI 接入')).not.toBeNull();
+    expect(screen.getByText('服务与模型')).not.toBeNull();
     expect(screen.getByText('OpenAI 兼容 API')).not.toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
   });

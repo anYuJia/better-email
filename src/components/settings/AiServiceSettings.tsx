@@ -76,7 +76,7 @@ export default function AiServiceSettings({ mode = 'ai' }: AiServiceSettingsProp
 
       <div className={`settings-ai-config-area${connectorEnabled ? '' : ' is-dimmed'}`}>
         <SettingsSection
-          title={isMcp ? '连接参数' : 'AI 接入'}
+          title={isMcp ? '连接参数' : '服务与模型'}
           description={isMcp
             ? '配置 MCP 服务端点与访问凭据。'
             : '配置兼容 OpenAI API 的服务与模型。'}

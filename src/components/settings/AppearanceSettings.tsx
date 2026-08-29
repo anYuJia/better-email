@@ -1,6 +1,9 @@
-import { Check, Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
-import SettingsSection from './shared/SettingsSection';
+import {
+  SettingsRow,
+  SettingsSection,
+} from './shared';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 
 type AppearanceSettingsProps = {
@@ -38,6 +41,8 @@ export default function AppearanceSettings({
   themeMode,
   onThemeModeChange,
 }: AppearanceSettingsProps) {
+  const selectedOption = themeOptions.find((option) => option.value === themeMode) ?? themeOptions[0];
+
   const handleOptionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const currentIndex = themeOptions.findIndex((option) => option.value === themeMode);
     let nextIndex = currentIndex;
@@ -70,51 +75,44 @@ export default function AppearanceSettings({
   return (
     <SettingsSection
       title="外观"
-      description="选择最适合当前环境的界面。"
+      description="保持界面在不同环境下清晰舒适。"
       className="settings-appearance-section"
       dataSection="appearance"
     >
-      <div
-        className="settings-theme-options"
-        role="radiogroup"
-        aria-label="界面外观"
-        onKeyDown={handleOptionKeyDown}
-      >
-        {themeOptions.map((option) => {
-          const Icon = option.icon;
-          const active = themeMode === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              className={active ? 'settings-theme-option active' : 'settings-theme-option'}
-              role="radio"
-              aria-checked={active}
-              tabIndex={active ? 0 : -1}
-              aria-label={`${option.label}：${option.description}`}
-              data-theme-mode={option.value}
-              title={option.description}
-              onClick={() => onThemeModeChange(option.value)}
-            >
-              <span className="settings-theme-option-preview" aria-hidden="true">
-                <span className="settings-theme-preview-sidebar" />
-                <span className="settings-theme-preview-content">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </span>
-              <span className="settings-theme-option-footer">
-                <span>
-                  <Icon size={15} aria-hidden="true" />
-                  <strong>{option.label}</strong>
-                </span>
-                <Check className="settings-theme-option-check" aria-hidden="true" size={15} />
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <SettingsRow
+        title="界面主题"
+        description={selectedOption.description}
+        control={(
+          <div
+            className="settings-theme-options"
+            role="radiogroup"
+            aria-label="界面外观"
+            onKeyDown={handleOptionKeyDown}
+          >
+            {themeOptions.map((option) => {
+              const Icon = option.icon;
+              const active = themeMode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={active ? 'settings-theme-option active' : 'settings-theme-option'}
+                  role="radio"
+                  aria-checked={active}
+                  tabIndex={active ? 0 : -1}
+                  aria-label={`${option.label}：${option.description}`}
+                  data-theme-mode={option.value}
+                  title={option.description}
+                  onClick={() => onThemeModeChange(option.value)}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  <span>{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      />
     </SettingsSection>
   );
 }

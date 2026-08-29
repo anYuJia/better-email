@@ -26,6 +26,7 @@ export default function SettingsPageShell({
   const pageRef = useRef<HTMLElement | null>(null);
   const presentation = getSettingsSectionPresentation(activeSection) ?? item;
   const accountWorkspace = accountScopedSections.has(activeSection);
+  const isNestedPage = item.id !== activeSection;
 
   useEffect(() => {
     if (pageRef.current) {
@@ -44,14 +45,13 @@ export default function SettingsPageShell({
       aria-labelledby={accountWorkspace ? undefined : `settings-page-${activeSection}`}
       aria-describedby={accountWorkspace ? undefined : `settings-page-description-${activeSection}`}
     >
-      {!accountWorkspace && (
-        <header className="settings-page-header">
-          <div className="settings-page-heading">
-            <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
-            <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
-          </div>
-        </header>
-      )}
+      <header className="settings-page-header">
+        <div className="settings-page-heading">
+          {isNestedPage && <span className="settings-page-eyebrow">{item.label}</span>}
+          <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
+          <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
+        </div>
+      </header>
       <div className="settings-page-content">{children}</div>
     </section>
   );

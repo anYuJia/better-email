@@ -558,14 +558,14 @@ async function clickContextSubmenuItem(cdp, branchText, itemText) {
 async function openSettingsSection(cdp, label, section, expectedSelector) {
   return withStep(`openSettingsSection ${label}`, async () => {
     const nestedParents = {
-      providers: { id: 'accounts', label: '邮箱账号' },
-      auth: { id: 'accounts', label: '邮箱账号' },
-      identities: { id: 'accounts', label: '邮箱账号' },
-      sync: { id: 'accounts', label: '邮箱账号' },
-      privacy: { id: 'accounts', label: '邮箱账号' },
-      contacts: { id: 'tools', label: '效率工具' },
-      templates: { id: 'tools', label: '效率工具' },
-      rules: { id: 'tools', label: '效率工具' },
+      providers: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      auth: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      identities: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      sync: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      privacy: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      contacts: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
+      templates: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
+      rules: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
     };
     const parent = nestedParents[section];
     await clickButton(cdp, parent?.label ?? label, "document.querySelector('.settings-nav')");
@@ -582,10 +582,22 @@ async function openSettingsSection(cdp, label, section, expectedSelector) {
       cdp,
       `((document.querySelector('.settings-page-header h2')?.textContent.trim() === ${JSON.stringify(label)})
         || (document.querySelector('.settings-page')?.getAttribute('aria-label') === ${JSON.stringify(label)}))
-        && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(parent?.label ?? label)})
+        && document.querySelector('.settings-nav button[aria-current="page"]')?.textContent.includes(${JSON.stringify(label)})
         && document.querySelector('.settings-page')?.dataset.settingsPage === ${JSON.stringify(section)}
         && document.querySelector(${JSON.stringify(expectedSelector)})`,
     );
+    if (parent) {
+      await waitForExpression(
+        cdp,
+        `(() => {
+          const group = document.querySelector('.settings-nav-subsection[aria-label="${parent.label}详细设置"]');
+          const labels = group ? [...group.querySelectorAll('.settings-nav-subitem')].map((item) => item.textContent.trim()) : [];
+          return group
+            && JSON.stringify(labels) === ${JSON.stringify(JSON.stringify(parent.details))}
+            && document.querySelector('.settings-nav button[aria-label="${parent.label}设置"]')?.getAttribute('aria-current') === null;
+        })()`,
+      );
+    }
   });
 }
 
@@ -885,7 +897,7 @@ async function assertSettingsLayoutContract(cdp, label, viewport) {
     if (data.mainHeader && style('mainHeader', 'minHeight') !== '48px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
     if (data.shell && style('shell', 'borderRadius') !== '10px') failures.push(`shell borderRadius=${style('shell', 'borderRadius')}`);
     if (data.shell && style('shell', 'boxShadow') !== 'none') failures.push(`shell boxShadow=${style('shell', 'boxShadow')}`);
-    if (data.pageHeader && style('pageHeader', 'minHeight') !== '72px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
+    if (data.pageHeader && style('pageHeader', 'minHeight') !== '76px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
     if (data.content && style('content', 'paddingTop') !== '0px') failures.push(`content paddingTop=${style('content', 'paddingTop')}`);
     if (data.content && style('content', 'paddingBottom') !== '0px') failures.push(`content paddingBottom=${style('content', 'paddingBottom')}`);
     const workspace = rect('workspace');
@@ -2313,16 +2325,19 @@ async function main() {
       const style = getComputedStyle(picker);
       const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
       const summaries = [...document.querySelectorAll('.settings-modal[data-ui="settings-app"] .settings-page-content .custom-select-summary')];
-      const controls = [picker, ...summaries];
-      if (summaries.length === 0 || controls.some((control) => getComputedStyle(control).boxShadow !== 'none')) {
+      if (summaries.length === 0 || [picker, ...summaries].some((control) => getComputedStyle(control).boxShadow !== 'none')) {
         throw new Error('Settings select controls are rendered with elevation');
       }
-      const controlSignatures = controls.map((control) => {
+      if (!transparent(style.borderTopColor) || !transparent(style.backgroundColor)) {
+        throw new Error('Settings account context picker is rendered as a form control');
+      }
+      const controlSignatures = summaries.map((control) => {
         const controlStyle = getComputedStyle(control);
         return controlStyle.borderTopColor + '|' + controlStyle.backgroundColor;
       });
-      if (new Set(controlSignatures).size !== 1 || transparent(style.borderTopColor) || transparent(style.backgroundColor)) {
-        throw new Error('Settings select controls do not share the embedded control treatment');
+      const summaryStyle = getComputedStyle(summaries[0]);
+      if (new Set(controlSignatures).size !== 1 || transparent(summaryStyle.borderTopColor) || transparent(summaryStyle.backgroundColor)) {
+        throw new Error('Settings form selects do not share the embedded control treatment');
       }
       const wrappers = [...document.querySelectorAll('.settings-modal[data-ui="settings-app"] .custom-select-menu')];
       if (wrappers.some((wrapper) => {
@@ -2586,7 +2601,7 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await waitForExpression(cdp, 'window.innerWidth === 1440');
+    await waitForExpression(cdp, "window.innerWidth === 1440 && !document.querySelector('.app-shell.is-mobile-app')");
     await waitForSettingsPageStable(cdp);
 
     await assertSettingsPagesEnterable(cdp, '收口后设置核心页可进入 1440x980', [
@@ -2991,7 +3006,7 @@ async function main() {
         'provider-aware credential diagnostics guide recovery and fold technical details',
         'read-only provider validation runs connection login folder and header checks',
         'settings navigation is consolidated into seven top-level destinations',
-        'settings account and tool details use secondary destinations',
+        'settings account and tool details expose contextual secondary navigation',
         'settings omits developer-only security and sync diagnostics',
         'remote custom mailbox creates and maps a local folder',
         'manual sync scans multiple mapped folders',

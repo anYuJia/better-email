@@ -77,16 +77,34 @@ describe('SettingsFrame application shell', () => {
     expect(screen.queryByRole('dialog', { name: '设置' })).toBeNull();
   });
 
-  it('keeps desktop navigation compact and marks nested account pages through their parent', () => {
-    renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
-    expect(screen.getByRole('navigation', { name: '设置分类' })).not.toBeNull();
+  it('keeps top-level navigation compact and exposes sibling destinations on nested account pages', () => {
+    const onNavigate = vi.fn();
+    renderFrame({ activeSection: 'privacy', canSaveAndVerify: true, onNavigate });
+    const navigation = screen.getByRole('navigation', { name: '设置分类' });
     expect(screen.getByText('偏好')).not.toBeNull();
     expect(screen.getByText('工具与数据')).not.toBeNull();
-    expect(screen.getAllByRole('navigation', { name: '设置分类' })[0].querySelectorAll('button').length).toBe(7);
-    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-current')).toBe('page');
-    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '发件身份与标签设置' })).toBeNull();
-    expect(screen.queryByRole('navigation', { name: '账号设置分类' })).toBeNull();
+    expect(navigation.querySelectorAll('.settings-nav-branch > button')).toHaveLength(7);
+    expect(navigation.querySelectorAll('.settings-nav-subitem')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('group', { name: '邮箱账号详细设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '隐私设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('button', { name: '服务器设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '发件身份与标签设置' })).not.toBeNull();
+    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '服务器设置' }));
+    expect(onNavigate).toHaveBeenCalledWith('providers');
+    fireEvent.click(screen.getByRole('button', { name: '邮箱账号设置' }));
+    expect(onNavigate).toHaveBeenCalledWith('accounts');
+  });
+
+  it('exposes tool siblings and marks only the current nested tool page', () => {
+    renderFrame({ activeSection: 'templates' });
+    expect(screen.getByRole('button', { name: '效率工具设置' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('button', { name: '效率工具设置' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '模板设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('button', { name: '通讯录设置' }).getAttribute('aria-current')).toBeNull();
   });
 
   it('shows account context only on account-scoped pages', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getSettingsNavigationContext,
+  getSettingsDetailItems,
   getSettingsSectionPresentation,
   resolveSettingsNavigationSectionId,
   settingsAccountDetailItems,
@@ -24,6 +25,7 @@ describe('settingsNavigation information architecture', () => {
       expect(resolveSettingsNavigationSectionId(section)).toBe('accounts');
       expect(getSettingsNavigationContext(section).item.id).toBe('accounts');
     }
+    expect(getSettingsDetailItems('accounts')).toEqual(settingsAccountDetailItems);
   });
 
   it('uses the same seven top-level destinations on desktop and mobile', () => {
@@ -55,6 +57,7 @@ describe('settingsNavigation information architecture', () => {
       expect(resolveSettingsNavigationSectionId(section)).toBe('tools');
       expect(getSettingsNavigationContext(section).item.id).toBe('tools');
     }
+    expect(getSettingsDetailItems('tools')).toEqual(settingsToolDetailItems);
   });
 
   it('keeps AI and MCP as independent destinations', () => {

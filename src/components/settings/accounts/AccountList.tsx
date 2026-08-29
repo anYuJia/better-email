@@ -75,8 +75,8 @@ export default function AccountList({
     <section className="st-section settings-account-list-panel" aria-labelledby="settings-account-list-title">
       <header className="st-section-header">
         <span className="st-section-heading">
-          <strong id="settings-account-list-title">邮箱账号</strong>
-          <small>选择账号后，在右侧工作区统一管理它的所有设置 · {accountCount} 个账号</small>
+          <strong id="settings-account-list-title">已添加账号</strong>
+          <small>选择账号后管理偏好与连接设置 · {accountCount} 个账号</small>
         </span>
         <span className="st-section-meta">
           <SettingsButton variant="primary" size="sm" icon={<Plus size={14} />} onClick={onAdd}>

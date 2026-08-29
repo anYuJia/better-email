@@ -75,7 +75,7 @@ export default function ConfirmDialog({
     <div
       ref={backdropRef}
       className="dialog-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (!pending && event.target === event.currentTarget) {
           onCancel();
         }

@@ -90,7 +90,7 @@ export default function AddAccountDialog({
       ref={backdropRef}
       className="settings-account-add-overlay"
       role="presentation"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
@@ -156,15 +156,16 @@ export default function AddAccountDialog({
               placeholder="默认使用邮箱地址"
             />
           </label>
-          <label>
+          <div className="settings-account-form-field">
             获取新邮件时间
             <CustomSelect
               dense
+              ariaLabel="获取新邮件时间"
               value={form.sync_mode === 'push' ? '5min' : form.sync_mode}
               options={syncModeOptions}
               onChange={(val) => onFormChange({ ...form, sync_mode: val })}
             />
-          </label>
+          </div>
         </div>
 
         <label className="settings-account-history-attachments">
@@ -199,27 +200,29 @@ export default function AddAccountDialog({
         {manualConfigOpen && (
           <div className="st-section-body dialog-nested-body">
             <div className="settings-account-form-grid">
-              <label>
+              <div className="settings-account-form-field">
                 认证方式
                 <CustomSelect
                   dense
+                  ariaLabel="认证方式"
                   value={form.auth_type}
                   options={authTypeOptions}
                   onChange={(val) => onFormChange({ ...form, auth_type: val })}
                 />
-              </label>
+              </div>
             </div>
 
             <div className="settings-account-protocol-grid" aria-label="邮件协议">
-              <label>
+              <div className="settings-account-form-field">
                 收信协议
                 <CustomSelect
                   dense
+                  ariaLabel="收信协议"
                   value={form.incoming_protocol}
                   options={protocolOptions}
                   onChange={(val) => onProtocolChange(val as IncomingProtocol)}
                 />
-              </label>
+              </div>
               <span>
                 {protocolHint(form.incoming_protocol)}
               </span>

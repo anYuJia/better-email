@@ -282,12 +282,12 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
         {aiOpen && (
           <div className="template-ai-body">
             {!aiEnabled && (
-              <SettingsNotice tone="warning" title="提示：AI 服务尚未开启" action={
+              <SettingsNotice tone="warning" title="提示：AI 接入尚未开启" action={
                 onNavigateToAi ? (
-                  <SettingsButton size="sm" onClick={onNavigateToAi}>前往 AI 服务设置</SettingsButton>
+                  <SettingsButton size="sm" onClick={onNavigateToAi}>前往 AI 接入设置</SettingsButton>
                 ) : undefined
               }>
-                <p>请先在「AI 服务」设置中配置并开启，才能使用模板生成。</p>
+                <p>请先在「AI 接入」设置中配置并开启，才能使用模板生成。</p>
               </SettingsNotice>
             )}
             <div className="template-ai-row">
@@ -397,7 +397,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
               onChange={(event) => setEditor({ ...editor, tags: event.target.value })}
             />
           </SettingsField>
-          <SettingsField label="适用账号">
+          <SettingsField label="适用账号" labelMode="static">
             <CustomSelect
               dense
               ariaLabel="适用账号"

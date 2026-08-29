@@ -128,7 +128,7 @@ export default function ProviderSettingsPage({
         badge={<SettingsBadge tone="info">{accountForm.provider}</SettingsBadge>}
         dataSection="providers"
       >
-        <SettingsField label="服务商">
+        <SettingsField label="服务商" labelMode="static">
           <CustomSelect
             dense
             ariaLabel="服务商"
@@ -213,7 +213,7 @@ export default function ProviderSettingsPage({
             <SettingsSection title="真实账号验证记录" description="记录真实账号环境下的可用性" badge={
               <SettingsBadge>{providerVerificationLabel(activeProviderVerification.status)}</SettingsBadge>
             }>
-              <SettingsField label="验证状态">
+              <SettingsField label="验证状态" labelMode="static">
                 <CustomSelect
                   dense
                   ariaLabel="验证状态"

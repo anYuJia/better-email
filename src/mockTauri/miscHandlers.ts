@@ -31,16 +31,14 @@ function normalizedEndpoint(endpoint: string): string {
   return endpoint.trim().replace(/\/+$/, '');
 }
 
-/** 与 Rust 后端保持一致：密钥只允许留在原服务类型和原端点上。 */
+/** 与 Rust 后端保持一致：两类密钥分别绑定到各自的端点。 */
 export function resolveMockBoundSecretKey(
   incoming: string,
   clear: boolean,
   existing: string,
-  serviceTypeChanged: boolean,
   endpointChanged: boolean,
 ): string {
   if (clear) return '';
-  if (serviceTypeChanged) return incoming.trim();
   if (!incoming.trim()) {
     if (endpointChanged && existing.trim()) {
       throw new Error('服务端点已更改，请重新输入 API Key 后再保存。');
@@ -82,7 +80,6 @@ export const handlers: Record<string, MockCommandHandler> = {
     const service_type = String(input.service_type ?? 'http').trim();
     const endpoint = String(input.endpoint ?? '').trim();
     const mcp_endpoint = String(input.mcp_endpoint ?? '').trim();
-    const serviceTypeChanged = service_type !== mockAiSettingsState.service_type;
     const endpointChanged = normalizedEndpoint(endpoint)
       !== normalizedEndpoint(mockAiSettingsState.endpoint);
     const mcpEndpointChanged = normalizedEndpoint(mcp_endpoint)
@@ -91,14 +88,12 @@ export const handlers: Record<string, MockCommandHandler> = {
       String(input.api_key ?? ''),
       input.clear_api_key === true,
       mockAiSettingsState.api_key,
-      serviceTypeChanged,
       endpointChanged,
     );
     const mcp_api_key = resolveMockBoundSecretKey(
       String(input.mcp_api_key ?? ''),
       input.clear_mcp_api_key === true,
       mockAiSettingsState.mcp_api_key,
-      serviceTypeChanged,
       mcpEndpointChanged,
     );
     Object.assign(mockAiSettingsState, {

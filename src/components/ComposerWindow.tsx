@@ -470,7 +470,7 @@ export default function ComposerWindow({
       role="dialog"
       aria-modal={!standaloneWindow && isMobileComposerViewport ? 'true' : undefined}
       aria-label="写信窗口"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (!standaloneWindow && isMobileComposerViewport && event.target === event.currentTarget) {
           onClose();
         }

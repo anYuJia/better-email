@@ -483,7 +483,7 @@ export default function FirstRunOnboarding({
                 发送邮件后，多久才真正发出？
                 <small>倒计时结束后邮件才真正进入待发送队列，到期后发送，期间可随时撤回。</small>
               </p>
-              <label className="onboarding-field">
+              <div className="onboarding-field">
                 <span>撤销发送延迟</span>
                 <CustomSelect
                   dense
@@ -497,7 +497,7 @@ export default function FirstRunOnboarding({
                   }))}
                   onChange={(value) => handleSendDelayChange(Number(value) as SendUndoDelaySeconds)}
                 />
-              </label>
+              </div>
             </div>
           )}
 

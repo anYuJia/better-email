@@ -36,6 +36,11 @@ import {
 
 const FOCUSABLE_SELECTOR = 'button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+function contactInitial(contact: Contact) {
+  const source = contact.name.trim() || contact.email.trim();
+  return Array.from(source)[0]?.toLocaleUpperCase() ?? '?';
+}
+
 type ContactAutomationSettingsProps = {
   contactForm: ContactCreateInput;
   contactFormAliases: string;
@@ -175,6 +180,7 @@ export default function ContactAutomationSettings({
   const pageCount = Math.max(1, Math.ceil(filteredContacts.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const visibleContacts = filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const vipCount = contacts.filter((contact) => contact.vip).length;
 
   async function handleCommitImport() {
     await commitImport();
@@ -308,8 +314,10 @@ export default function ContactAutomationSettings({
     >
 
       {contacts.length === 0 ? (
-        <SettingsEmptyState>
-           还没有联系人。点击右上角“添加联系人”，或从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件导入。
+        <SettingsEmptyState className="settings-contacts-empty">
+          <span className="settings-contacts-empty-mark" aria-hidden="true"><Users size={22} /></span>
+          <strong>还没有联系人</strong>
+          <p>添加常用收件人，写信时可以快速选择；也可以从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件批量导入。</p>
         </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">
@@ -335,22 +343,46 @@ export default function ContactAutomationSettings({
                 )}
               </div>
             </SettingsField>
-          </div>
-          {visibleContacts.map((contact) => (
-            <div className="st-data-row contact-tool-row" key={contact.id}>
-              <button type="button" className="settings-contact-main" onClick={() => openDetails(contact)}>
-                <span>
-                  <strong>{contact.vip ? '★ ' : ''}{contact.name || contact.email}</strong>
-                  <em>{contact.email}</em>
-                </span>
-              </button>
-              <div className="contact-tool-actions">
-                <SettingsButton size="sm" variant="ghost" aria-label={`编辑 ${contact.name || contact.email}`} title="编辑联系人" icon={<Pencil size={13} />} onClick={() => openEdit(contact)}>
-                  <span className="contact-action-label">编辑</span>
-                </SettingsButton>
-              </div>
+            <div className="settings-contact-list-summary" role="status" aria-live="polite">
+              <span>{contactQuery ? '搜索结果' : '全部联系人'}</span>
+              <strong>{filteredContacts.length}</strong>
+              <span>位</span>
+              {vipCount > 0 && (
+                <>
+                  <span className="settings-contact-list-summary-separator" aria-hidden="true">·</span>
+                  <span><strong>{vipCount}</strong> 位 VIP</span>
+                </>
+              )}
             </div>
-          ))}
+          </div>
+          {visibleContacts.map((contact) => {
+            const displayName = contact.name.trim() || contact.email;
+            const hasDisplayName = Boolean(contact.name.trim());
+            return (
+              <div className="st-data-row contact-tool-row" key={contact.id}>
+                <button type="button" className="settings-contact-main" onClick={() => openDetails(contact)}>
+                  <span className="settings-contact-avatar" aria-hidden="true">{contactInitial(contact)}</span>
+                  <span className="settings-contact-copy">
+                    <span className="settings-contact-name-line">
+                      <strong>{contact.vip ? '★ ' : ''}{displayName}</strong>
+                      {contact.vip && <SettingsBadge tone="warning">VIP</SettingsBadge>}
+                    </span>
+                    {hasDisplayName && <span className="settings-contact-email">{contact.email}</span>}
+                    <span className="settings-contact-meta">
+                      {contact.aliases.length > 0 ? `${contact.aliases.length} 个别名` : '无别名'}
+                      <span aria-hidden="true">·</span>
+                      {contact.message_count} 封往来
+                    </span>
+                  </span>
+                </button>
+                <div className="contact-tool-actions">
+                  <SettingsButton size="sm" variant="ghost" aria-label={`编辑 ${displayName}`} title="编辑联系人" icon={<Pencil size={13} />} onClick={() => openEdit(contact)}>
+                    <span className="contact-action-label">编辑</span>
+                  </SettingsButton>
+                </div>
+              </div>
+            );
+          })}
           {filteredContacts.length === 0 && contactQuery && (
             <p className="settings-empty-hint">没有匹配「{contactQuery}」的联系人。</p>
           )}
@@ -367,8 +399,10 @@ export default function ContactAutomationSettings({
       )}
 
       {dialog === 'create' && (
-        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
-          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-create-form" role="dialog" aria-modal="true" aria-labelledby="contact-create-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="settings-contact-dialog-backdrop" onClick={(event) => {
+          if (event.target === event.currentTarget) closeContactDialog();
+        }}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-create-form" role="dialog" aria-modal="true" aria-labelledby="contact-create-title">
             <header>
               <span className="settings-contact-dialog-mark"><UserPlus size={18} /></span>
               <span><strong id="contact-create-title">添加联系人</strong><small>填写姓名、邮箱和可选别名。</small></span>
@@ -389,8 +423,10 @@ export default function ContactAutomationSettings({
       )}
 
       {dialog === 'details' && selectedContact && (
-        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
-          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog" role="dialog" aria-modal="true" aria-labelledby="contact-details-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="settings-contact-dialog-backdrop" onClick={(event) => {
+          if (event.target === event.currentTarget) closeContactDialog();
+        }}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog" role="dialog" aria-modal="true" aria-labelledby="contact-details-title">
             <header>
               <span className="settings-contact-dialog-mark"><Users size={18} /></span>
               <span><strong id="contact-details-title">{selectedContact.name || selectedContact.email}</strong><small>{selectedContact.vip ? 'VIP 联系人' : '联系人详情'}</small></span>
@@ -427,8 +463,10 @@ export default function ContactAutomationSettings({
       )}
 
       {dialog === 'edit' && selectedContact && (
-        <div className="settings-contact-dialog-backdrop" onMouseDown={closeContactDialog}>
-          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-edit-form" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="settings-contact-dialog-backdrop" onClick={(event) => {
+          if (event.target === event.currentTarget) closeContactDialog();
+        }}>
+          <section ref={(node) => { dialogRef.current = node; }} className="settings-contact-dialog contact-edit-form" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title">
             <header><span className="settings-contact-dialog-mark"><Pencil size={18} /></span><span><strong id="contact-edit-title">编辑联系人</strong><small>修改显示名称与别名邮箱</small></span><button type="button" className="settings-contact-dialog-close" aria-label="关闭" onClick={closeContactDialog}><X size={17} /></button></header>
             <div className="settings-contact-edit-email" role="group" aria-label="主邮箱">
               <span className="settings-contact-edit-email-label">主邮箱</span>

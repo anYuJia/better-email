@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AiServiceConfig, AiTestConnectionResult } from '../app/types/ai';
+import type { AiServiceConfig, AiServiceType, AiTestConnectionResult } from '../app/types/ai';
 import {
   defaultAiServiceConfig,
   loadAiServiceConfig,
@@ -12,15 +12,27 @@ import { testAiConnection } from '../app/aiService';
 
 type UseAiServiceOptions = {
   setStatus: (status: string) => void;
+  /**
+   * Settings pages expose one connector at a time. The persisted config still
+   * keeps both connector credentials, while test/save use the page's service
+   * type as the active route.
+   */
+  serviceType?: AiServiceType;
 };
 
-export default function useAiService({ setStatus }: UseAiServiceOptions) {
+export default function useAiService({ setStatus, serviceType }: UseAiServiceOptions) {
   const [config, setConfig] = useState<AiServiceConfig>(() => loadAiServiceConfig());
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AiTestConnectionResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [secretsLoaded, setSecretsLoaded] = useState(false);
+
+  const requestConfig = useMemo(() => (
+    serviceType && config.serviceType !== serviceType
+      ? { ...config, serviceType }
+      : config
+  ), [config, serviceType]);
 
   useEffect(() => {
     saveAiServiceConfig(config);
@@ -69,22 +81,23 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
   const runTestConnection = useCallback(async () => {
     setTesting(true);
     try {
-      const result = await testAiConnection(config);
+      const result = await testAiConnection(requestConfig);
       setTestResult(result);
       setStatus(result.ok ? result.message : `AI 服务测试失败：${result.message}`);
     } finally {
       setTesting(false);
     }
-  }, [config, setStatus]);
+  }, [requestConfig, setStatus]);
 
   const saveConfig = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
     try {
-      const message = await saveAiSettingsToBackend(config);
+      const message = await saveAiSettingsToBackend(requestConfig);
       // 清除标记只发一次；保存成功后复位，避免 localStorage/下次保存误清。
       setConfig((current) => ({
         ...current,
+        ...(serviceType ? { serviceType } : {}),
         clearApiKey: false,
         clearMcpApiKey: false,
       }));
@@ -97,7 +110,7 @@ export default function useAiService({ setStatus }: UseAiServiceOptions) {
     } finally {
       setSaving(false);
     }
-  }, [config, setStatus]);
+  }, [requestConfig, serviceType, setStatus]);
 
   return {
     config,

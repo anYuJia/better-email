@@ -38,6 +38,7 @@ describe('settingsNavigation v3 information architecture', () => {
     expect(visible).toContain('accounts');
     expect(visible).toContain('notifications');
     expect(visible).toContain('ai');
+    expect(visible).toContain('mcp');
     expect(visible).toContain('backup');
     expect(visible).toContain('contacts');
     expect(visible).toContain('templates');
@@ -49,7 +50,7 @@ describe('settingsNavigation v3 information architecture', () => {
     expect(settingsNavigationGroups.find((group) => group.label === '常用')?.items.map((item) => item.id))
       .toEqual(['appearance', 'accounts', 'sending', 'notifications']);
     expect(settingsNavigationGroups.find((group) => group.label === '智能')?.items.map((item) => item.id))
-      .toEqual(['ai']);
+      .toEqual(['ai', 'mcp']);
     expect(settingsNavigationGroups.find((group) => group.label === '效率工具')?.items.map((item) => item.id))
       .toEqual(['contacts', 'templates', 'rules']);
   });

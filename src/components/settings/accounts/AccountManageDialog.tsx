@@ -76,7 +76,7 @@ export default function AccountManageDialog({
       ref={backdropRef}
       className="settings-account-add-overlay"
       role="presentation"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
@@ -113,15 +113,16 @@ export default function AccountManageDialog({
                   placeholder="默认使用邮箱地址"
                 />
               </label>
-              <label>
+              <div className="settings-account-form-field">
                 获取新邮件时间
                 <CustomSelect
                   dense
+                  ariaLabel="获取新邮件时间"
                   value={account.sync_mode === 'push' ? '5min' : account.sync_mode}
                   options={syncModeOptions}
                   onChange={(val) => onAccountChange({ ...account, sync_mode: val })}
                 />
-              </label>
+              </div>
               <label>
                 服务商
                 <input
@@ -129,24 +130,26 @@ export default function AccountManageDialog({
                   onChange={(event) => onAccountChange({ ...account, provider: event.target.value })}
                 />
               </label>
-              <label>
+              <div className="settings-account-form-field">
                 认证方式
                 <CustomSelect
                   dense
+                  ariaLabel="认证方式"
                   value={account.auth_type}
                   options={authTypeOptions}
                   onChange={(val) => onAccountChange({ ...account, auth_type: val })}
                 />
-              </label>
-              <label>
+              </div>
+              <div className="settings-account-form-field">
                 收信协议
                 <CustomSelect
                   dense
+                  ariaLabel="收信协议"
                   value={account.incoming_protocol}
                   options={protocolOptions}
                   onChange={(val) => onProtocolChange(val as IncomingProtocol)}
                 />
-              </label>
+              </div>
               <label>
                 收信服务器（{protocolLabel(account.incoming_protocol)}）
                 <input

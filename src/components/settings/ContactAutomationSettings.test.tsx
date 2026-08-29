@@ -231,7 +231,7 @@ describe('ContactAutomationSettings', () => {
     openDetails();
     const backdrop = container.querySelector('.settings-contact-dialog-backdrop');
     expect(backdrop).not.toBeNull();
-    fireEvent.mouseDown(backdrop as Element);
+    fireEvent.click(backdrop as Element);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

@@ -224,6 +224,30 @@ describe('CustomSelect', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('treats nearby field copy as outside the dropdown', () => {
+    render(
+      <div>
+        <span>服务类型</span>
+        <CustomSelect
+          ariaLabel={ariaLabel}
+          value="5"
+          options={options}
+          onChange={() => undefined}
+        />
+      </div>,
+    );
+    const combobox = getCombobox();
+    fireEvent.click(combobox);
+    expect(screen.queryByRole('listbox')).not.toBeNull();
+
+    const fieldLabel = screen.getByText('服务类型');
+    fireEvent.pointerDown(fieldLabel);
+    fireEvent.click(fieldLabel);
+
+    expect(combobox.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
   it('closes on Escape without committing and restores focus', () => {
     const onChange = vi.fn();
     render(

@@ -98,7 +98,7 @@ describe('ShortcutHelpModal 键盘可达性', () => {
     fireEvent.click(trigger());
 
     const backdrop = document.querySelector('.shortcut-backdrop') as HTMLElement;
-    fireEvent.mouseDown(backdrop, { target: backdrop });
+    fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.shortcut-modal')).toBeNull();
   });

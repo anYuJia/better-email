@@ -53,7 +53,7 @@ export default function ComposerCloseConfirmDialog({
     <div
       ref={backdropRef}
       className="dialog-backdrop composer-close-dialog-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (!pending && event.target === event.currentTarget) {
           onClose();
         }

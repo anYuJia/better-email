@@ -54,13 +54,13 @@ export function mockAiResult(operation: AiOperation, text: string, prompt: strin
 export function aiErrorMessage(error: AiRequestError): string {
   switch (error.kind) {
     case 'not_configured':
-      return '请先配置 AI 服务（设置 > AI 服务）。';
+      return '请先配置 AI 服务（设置 > AI 接入）。';
     case 'disabled':
       return 'AI 服务已关闭，请先在设置中开启。';
     case 'mcp_disabled':
       return 'MCP 服务未开启，请先在设置中启用 MCP 服务。';
     case 'privacy_not_acknowledged':
-      return '首次发送邮件内容到外部 AI 服务前，请先在设置 > AI 服务中阅读并确认隐私说明。';
+      return '首次发送邮件内容到外部 AI 服务前，请先在设置 > AI 接入中阅读并确认隐私说明。';
     case 'external':
       return error.message;
   }

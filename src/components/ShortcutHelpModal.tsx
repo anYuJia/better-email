@@ -31,7 +31,7 @@ export default function ShortcutHelpModal({
     <div
       ref={backdropRef}
       className="composer-backdrop shortcut-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >

@@ -157,7 +157,7 @@ export default function SnoozePicker({
     <div
       className="snooze-backdrop"
       ref={modalRef}
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget && !submitting) onClose();
       }}
     >

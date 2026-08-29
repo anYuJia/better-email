@@ -754,7 +754,7 @@
   gap: 12px;
 }
 
-.settings-modal .settings-account-form-grid > label,
+.settings-modal .settings-account-form-grid > :is(label, .settings-account-form-field),
 .settings-modal .settings-oauth-grid > label {
   min-width: 0;
   display: grid;
@@ -765,7 +765,7 @@
   font-weight: 500;
 }
 
-.settings-modal .settings-account-form-grid > label > :is(input, select, textarea),
+.settings-modal .settings-account-form-grid > :is(label, .settings-account-form-field) > :is(input, select, textarea),
 .settings-modal .settings-oauth-grid > label > :is(input, select, textarea) {
   width: 100%;
 }
@@ -2468,7 +2468,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .settings-modal .settings-contact-create {
@@ -2548,14 +2548,15 @@
 
 .settings-modal .settings-contact-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
 }
 
 .settings-modal .settings-contact-list-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  padding: 0 0 10px;
+  grid-template-columns: minmax(220px, 420px) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  padding: 0 0 12px;
   border: 0;
   border-bottom: 1px solid var(--st-border);
   border-radius: 0;
@@ -2563,7 +2564,33 @@
 }
 
 .settings-modal .settings-contact-list-toolbar .st-field {
+  width: 100%;
   padding: 0;
+}
+
+.settings-modal .settings-contact-list-summary {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 7px;
+  color: var(--st-text-secondary);
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.4;
+}
+
+.settings-modal .settings-contact-list-summary strong {
+  color: var(--st-text);
+  font-size: var(--ui-font-size-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-modal .settings-contact-list-summary-separator {
+  margin-inline: 3px;
+  color: var(--st-text-tertiary);
 }
 
 .settings-modal .settings-contact-merge-field .st-field-hint {
@@ -2572,24 +2599,32 @@
 
 .settings-modal .settings-contact-list .contact-tool-row {
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
+  align-items: center;
+  gap: 16px;
+  min-height: 74px;
+  padding: 12px 8px;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+  border-radius: 0;
+  background: transparent;
+  transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .settings-contact-list .contact-tool-row:hover {
+  background: var(--ui-control-hover);
 }
 
 .settings-modal .settings-contact-main {
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   text-align: left;
+  cursor: pointer;
 }
 
 .settings-modal .settings-contact-main > svg {
@@ -2598,17 +2633,65 @@
   color: var(--st-text-tertiary);
 }
 
-.settings-modal .settings-contact-main > span {
-  min-width: 0;
+.settings-modal .settings-contact-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+  font-size: var(--ui-font-size-body);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.settings-modal .settings-contact-main > .settings-contact-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  align-content: center;
   gap: 2px;
 }
 
+.settings-modal .settings-contact-name-line {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settings-modal .settings-contact-main strong {
+  min-width: 0;
+  flex: 0 1 auto;
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-contact-email {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--st-text-secondary);
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-contact-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--st-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2678,6 +2761,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .settings-modal .settings-contact-search > svg {
@@ -2688,6 +2772,8 @@
 }
 
 .settings-modal .settings-contact-search input {
+  width: 100%;
+  flex: 1 1 auto;
   padding-left: 30px;
   padding-right: 30px;
 }
@@ -2695,8 +2781,8 @@
 .settings-modal .settings-contact-search-clear {
   position: absolute;
   right: 6px;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -2734,40 +2820,46 @@
 /* Contact management keeps the list deliberately scan-friendly; editing lives
  * in dialogs so an address book with many people does not turn into a card wall. */
 .settings-modal .settings-contact-list .contact-tool-row {
-  min-height: 48px;
+  min-height: 74px;
   align-items: center;
-  padding: 4px 10px 4px 14px;
+  padding: 10px 8px;
 }
 
 .settings-modal .settings-contact-main {
   align-items: center;
-  min-height: 38px;
-  cursor: pointer;
-}
-
-.settings-modal .settings-contact-main > span {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  min-height: 54px;
 }
 
 .settings-modal .settings-contact-main strong {
-  flex: 0 1 auto;
-  max-width: 46%;
-}
-
-.settings-modal .settings-contact-main em {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
 }
 
 .settings-modal .contact-tool-actions {
   align-self: center;
-  padding-left: 8px;
+  padding-left: 12px;
+}
+
+.settings-modal .settings-contacts-empty {
+  gap: 8px;
+  padding: 28px 24px;
+}
+
+.settings-modal .settings-contacts-empty-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-contacts-empty p {
+  max-width: 500px;
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.55;
 }
 
 .settings-modal .settings-contact-pagination {
@@ -2942,7 +3034,7 @@
   gap: 10px;
 }
 
-.settings-modal .settings-rule-condition-fields label,
+.settings-modal .settings-rule-condition-fields :is(label, .settings-rule-select-field),
 .settings-modal .settings-rule-label-action {
   min-width: 0;
   display: grid;
@@ -2953,7 +3045,7 @@
   font-weight: 500;
 }
 
-.settings-modal .settings-rule-condition-fields label > span,
+.settings-modal .settings-rule-condition-fields :is(label, .settings-rule-select-field) > span,
 .settings-modal .settings-rule-label-action > span,
 .settings-modal .settings-rule-action-row > span {
   color: var(--st-text-tertiary);
@@ -3783,6 +3875,22 @@
   display: grid;
   gap: 12px;
   transition: var(--ui-transition-opacity-fast);
+}
+
+.settings-modal .settings-ai-provider-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+}
+
+.settings-modal .settings-ai-gated-note {
+  margin: 0;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.5;
 }
 
 .settings-modal .settings-ai-service-pills {
@@ -4713,6 +4821,59 @@
 }
 
 @media (max-width: 640px) {
+  .settings-modal .st-section-meta {
+    width: 100%;
+  }
+
+  .settings-modal .contact-transfer-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .settings-modal .contact-transfer-actions .st-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .settings-modal .contact-transfer-actions .st-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .settings-modal .contact-transfer-actions .st-btn-primary {
+    grid-column: 1 / -1;
+  }
+
+  .settings-modal .settings-contact-list-summary {
+    justify-content: flex-start;
+    padding-bottom: 0;
+  }
+
+  .settings-modal .settings-contact-list .contact-tool-row {
+    gap: 10px;
+    min-height: 78px;
+    padding: 12px 0;
+  }
+
+  .settings-modal .settings-contact-avatar {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .settings-modal .contact-tool-actions {
+    padding-left: 8px;
+  }
+
+  .settings-modal .contact-tool-actions .st-btn {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
   .settings-modal .contact-tool-actions .contact-action-label {
     display: none;
   }

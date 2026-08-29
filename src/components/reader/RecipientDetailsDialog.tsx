@@ -49,7 +49,7 @@ export default function RecipientDetailsDialog({ groups, onClose }: RecipientDet
     <div
       ref={backdropRef}
       className="dialog-backdrop recipient-details-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >

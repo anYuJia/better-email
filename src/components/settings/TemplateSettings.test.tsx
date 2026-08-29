@@ -114,6 +114,6 @@ describe('TemplateSettings', () => {
     window.localStorage.setItem(aiServiceStorageKey, JSON.stringify({ enabled: false }));
     render(<TemplateSettings />);
     fireEvent.click(screen.getByRole('button', { name: /AI 辅助生成模板/ }));
-    expect(screen.getByText(/AI 服务尚未开启/)).not.toBeNull();
+    expect(screen.getByText(/AI 接入尚未开启/)).not.toBeNull();
   });
 });

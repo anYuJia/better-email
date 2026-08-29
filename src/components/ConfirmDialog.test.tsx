@@ -157,7 +157,7 @@ describe('ConfirmDialog Component robust behaviors', () => {
 
     // Try background dismiss
     const backdrop = document.querySelector('.dialog-backdrop') as HTMLElement;
-    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
     expect(onCancel).not.toHaveBeenCalled();
 
     // Try Escape key

@@ -266,7 +266,7 @@ export default function ContactImportDialog({
   return createPortal(
     <div
       className="settings-backdrop contact-import-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget && !importing) onCancel();
       }}
     >
@@ -277,7 +277,6 @@ export default function ContactImportDialog({
         aria-modal="true"
         aria-labelledby="contact-import-title"
         aria-busy={previewing || importing || undefined}
-        onMouseDown={(event) => event.stopPropagation()}
       >
         {preview ? (
           <div className="contact-import-step">

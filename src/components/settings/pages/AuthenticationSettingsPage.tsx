@@ -71,7 +71,7 @@ export default function AuthenticationSettingsPage({
         badge={<SettingsBadge tone="info">{accountForm.auth_type === 'oauth2' ? 'OAuth2' : '密码/授权码'}</SettingsBadge>}
         dataSection="auth"
       >
-        <SettingsField label="登录方式">
+        <SettingsField label="登录方式" labelMode="static">
           <CustomSelect
             dense
             ariaLabel="登录方式"

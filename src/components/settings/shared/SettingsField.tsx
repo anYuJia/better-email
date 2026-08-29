@@ -7,6 +7,12 @@ type SettingsFieldProps = {
   error?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /**
+   * Custom controls such as the portalled select must not sit inside a
+   * wrapping <label>, otherwise clicking the field copy can synthesize a
+   * second click on the control.
+   */
+  labelMode?: 'implicit' | 'static';
 };
 
 /**
@@ -20,6 +26,7 @@ export default function SettingsField({
   error,
   children,
   className = '',
+  labelMode = 'implicit',
 }: SettingsFieldProps) {
   const body = (
     <>
@@ -37,6 +44,11 @@ export default function SettingsField({
         {error != null && <span className="st-field-error">{error}</span>}
         {hint != null && <span className="st-field-hint">{hint}</span>}
       </div>
+    );
+  }
+  if (labelMode === 'static') {
+    return (
+      <div className={`st-field st-field-static-label ${className}`.trim()}>{body}</div>
     );
   }
   return (

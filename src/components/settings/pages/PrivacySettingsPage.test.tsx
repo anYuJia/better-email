@@ -100,7 +100,7 @@ describe('PrivacySettingsPage', () => {
     const spy = vi.fn(navigate);
     renderPage(makeAccount(), [], spy);
     expect(screen.getByText(/可能把邮件内容发送到你配置的外部服务/)).not.toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /AI 与集成/ }));
+    fireEvent.click(screen.getByRole('button', { name: /AI 接入/ }));
     expect(spy).toHaveBeenCalledOnce();
   });
 });

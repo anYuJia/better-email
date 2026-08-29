@@ -230,7 +230,7 @@
   align-content: start;
 }
 
-.settings-modal label.st-field {
+.settings-modal :is(label.st-field, .st-field-static-label) {
   padding: 10px 0;
   color: var(--st-text);
   font-size: var(--st-font-size-secondary);

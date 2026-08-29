@@ -4,6 +4,7 @@ import {
   HardDrive,
   Info,
   LayoutTemplate,
+  PlugZap,
   ScanSearch,
   Send,
   Settings2,
@@ -28,6 +29,7 @@ export type SettingsSectionId =
   | 'rules'
   | 'security-preview'
   | 'ai'
+  | 'mcp'
   | 'templates'
   | 'about';
 
@@ -108,8 +110,12 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
     description: '管理提醒、免打扰、VIP 与账号优先级。',
   },
   ai: {
-    label: 'AI 与集成',
+    label: 'AI 接入',
     description: '配置 AI 服务、模型与隐私授权。',
+  },
+  mcp: {
+    label: 'MCP',
+    description: '连接 MCP 服务，为 AI 功能提供外部工具。',
   },
   backup: {
     label: '数据与存储',
@@ -189,10 +195,17 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
     items: [
       {
         id: 'ai',
-        label: 'AI 与集成',
-        description: 'AI 服务、模型、MCP 与隐私授权。',
-        keywords: ['ai', '人工智能', '翻译', '摘要', 'api', 'mcp', 'openai', '模型', 'key', '集成'],
+        label: 'AI 接入',
+        description: 'AI 服务、模型与隐私授权。',
+        keywords: ['ai', '人工智能', '翻译', '摘要', 'api', 'openai', '模型', 'key', '接入'],
         icon: Sparkles,
+      },
+      {
+        id: 'mcp',
+        label: 'MCP',
+        description: 'MCP 服务端点、访问 Token 与工具连接。',
+        keywords: ['mcp', '工具', 'json-rpc', '端点', 'token', '连接'],
+        icon: PlugZap,
       },
     ],
   },
@@ -272,9 +285,11 @@ export const settingsSearchEntries: SettingsSearchEntry[] = [
   { label: '免打扰时段', path: '通知', section: 'notifications', target: 'notifications', keywords: ['免打扰', '静音', '时间', 'dnd'] },
   { label: '账号通知优先级', path: '通知 › 高级', section: 'notifications', target: 'notification-account-rules', keywords: ['重点账号', '静音账号', '优先提醒'] },
   { label: 'VIP 发件人', path: '通知 › 高级', section: 'notifications', target: 'notification-vip-rules', keywords: ['发件人', 'vip', '域名'] },
-  { label: 'AI 功能', path: 'AI 与集成', section: 'ai', target: 'ai', keywords: ['翻译', '摘要', '模板生成', '人工智能'] },
-  { label: 'AI 服务与模型', path: 'AI 与集成', section: 'ai', target: 'ai-llm-provider', keywords: ['openai', '模型', 'mcp', 'api', 'llm'] },
-  { label: 'AI 连接参数', path: 'AI 与集成 › 高级连接', section: 'ai', target: 'ai-advanced', keywords: ['endpoint', 'api key', 'token', 'timeout', '端点'] },
+  { label: 'AI 功能', path: 'AI 接入', section: 'ai', target: 'ai', keywords: ['翻译', '摘要', '模板生成', '人工智能'] },
+  { label: 'AI 服务与模型', path: 'AI 接入', section: 'ai', target: 'ai-llm-provider', keywords: ['openai', '模型', 'api', 'llm'] },
+  { label: 'AI 连接参数', path: 'AI 接入 › 高级连接', section: 'ai', target: 'ai-advanced', keywords: ['endpoint', 'api key', 'token', 'timeout', '端点'] },
+  { label: 'MCP 服务', path: 'MCP', section: 'mcp', target: 'mcp', keywords: ['mcp', '工具', 'json-rpc'] },
+  { label: 'MCP 连接参数', path: 'MCP › 连接参数', section: 'mcp', target: 'mcp-connection', keywords: ['mcp', 'endpoint', 'token', '端点', '访问密钥'] },
   { label: '联系人与 VIP', path: '通讯录', section: 'contacts', keywords: ['联系人', '通讯录', '别名', 'vip'] },
   { label: '写信模板', path: '模板', section: 'templates', keywords: ['模板', '变量', '常用模板'] },
   { label: '邮件自动化规则', path: '自动化', section: 'rules', keywords: ['规则', '过滤', '自动处理'] },

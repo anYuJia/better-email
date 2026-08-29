@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import AiServiceSettings from './AiServiceSettings';
 import { aiServiceStorageKey } from '../../app/aiServiceConfig';
 
@@ -13,14 +13,15 @@ describe('AiServiceSettings', () => {
     window.localStorage.clear();
   });
 
-  it('shows compact AI sections and service type labels', () => {
+  it('shows the AI access page without a service type selector', () => {
     render(<AiServiceSettings />);
     expect(screen.getByText('AI 功能')).not.toBeNull();
-    expect(screen.getByText('服务与模型')).not.toBeNull();
-    expect(screen.getByRole('combobox').textContent).toContain('OpenAI 兼容服务');
+    expect(screen.getByText('AI 接入')).not.toBeNull();
+    expect(screen.getByText('OpenAI 兼容 API')).not.toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
-  it('allows MCP to be selected as the active inference engine', () => {
+  it('renders MCP as a separate settings surface', () => {
     seedConfig({
       enabled: true,
       serviceType: 'mcp',
@@ -28,18 +29,18 @@ describe('AiServiceSettings', () => {
       mcpEndpoint: 'http://127.0.0.1:8080/mcp',
       privacyAcknowledged: true,
     });
-    render(<AiServiceSettings />);
-    expect(screen.getByRole('combobox').textContent).toContain('MCP 服务');
+    render(<AiServiceSettings mode="mcp" />);
+    expect(screen.getByText('MCP 服务')).not.toBeNull();
     expect(screen.getByDisplayValue('http://127.0.0.1:8080/mcp')).not.toBeNull();
     expect(screen.getByText('访问 Token')).not.toBeNull();
-    expect(screen.getByText('服务与模型')).not.toBeNull();
+    expect(screen.queryByText('OpenAI 兼容 API')).toBeNull();
   });
 
-  it('offers MCP in the inference engine selector', () => {
+  it('does not expose MCP or local demo as AI access options', () => {
     seedConfig({ enabled: true, serviceType: 'http', endpoint: 'https://api.example.com/v1' });
     render(<AiServiceSettings />);
-    fireEvent.click(screen.getByRole('combobox'));
-    expect(screen.getByRole('option', { name: /MCP 服务/ })).not.toBeNull();
+    expect(screen.queryByText('MCP 服务')).toBeNull();
+    expect(screen.queryByText('本地演示')).toBeNull();
   });
 
   it('configures MCP as a client endpoint rather than a local gateway', () => {
@@ -49,7 +50,7 @@ describe('AiServiceSettings', () => {
       mcpEndpoint: 'http://127.0.0.1:8080/mcp',
       privacyAcknowledged: true,
     });
-    render(<AiServiceSettings />);
+    render(<AiServiceSettings mode="mcp" />);
     // 不再宣称本地暴露 MCP HTTP 服务（无 listener）。
     expect(screen.queryByText('开启 MCP 网关服务')).toBeNull();
     expect(screen.queryByText(/本地暴露/)).toBeNull();
@@ -66,14 +67,12 @@ describe('AiServiceSettings', () => {
     expect(screen.getByText('用于翻译、摘要、模板生成。')).not.toBeNull();
   });
 
-  it('shows 本地演示 status and no external privacy confirmation in mock mode', () => {
+  it('keeps internal mock compatibility without exposing local demo in the UI', () => {
     seedConfig({ enabled: true, serviceType: 'mock' });
     render(<AiServiceSettings />);
-    expect(screen.getAllByText('本地演示').length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('隐私确认')).toBeNull();
-    expect(screen.queryByText(/我已阅读并同意将邮件内容发送到外部 AI 服务/)).toBeNull();
-    expect(screen.getByText('本地演示不会向外部服务器发送邮件内容。')).not.toBeNull();
-    expect(screen.getByText('返回稳定的示例结果，不需要网络、密钥或隐私授权。')).not.toBeNull();
+    expect(screen.queryByText('本地演示')).toBeNull();
+    expect(screen.getByText('OpenAI 兼容 API')).not.toBeNull();
+    expect(screen.getByText('外部服务隐私')).not.toBeNull();
   });
 
   it('shows the privacy confirmation area for external service modes', () => {

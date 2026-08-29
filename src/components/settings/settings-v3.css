@@ -92,7 +92,7 @@
   display: block;
   padding: 4px 8px 6px;
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-search-result {
@@ -120,13 +120,13 @@
 }
 
 .settings-search-result strong {
-  font-size: 12px;
+  font-size: var(--ui-font-size-body);
   font-weight: 600;
 }
 
 .settings-search-result small {
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-search-hit {
@@ -160,7 +160,7 @@
   align-items: center;
   gap: 8px;
   color: var(--st-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-account-picker .custom-select-menu {
@@ -177,7 +177,7 @@
   color: var(--st-text);
   background: var(--st-surface);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-size-body);
 }
 
 .settings-account-picker .custom-select-summary > span {
@@ -187,14 +187,14 @@
 
 .settings-account-picker .custom-select-summary strong {
   overflow: hidden;
-  font-size: 12px;
+  font-size: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .settings-account-picker .custom-select-summary small {
   overflow: hidden;
-  font-size: 11px;
+  font-size: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -209,14 +209,14 @@
 .settings-account-current small {
   flex: 0 0 auto;
   color: var(--st-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-account-current strong {
   min-width: 0;
   overflow: hidden;
   color: var(--st-text-secondary);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -227,7 +227,7 @@
   max-width: 300px;
   overflow: hidden;
   color: var(--st-text-tertiary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-aux);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -277,7 +277,7 @@
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: none;
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
 }
 
@@ -338,7 +338,7 @@
 
 .settings-modal[data-ui="settings-v3"] .settings-page-heading p {
   max-width: 620px;
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 1.4;
 }
 
@@ -395,8 +395,8 @@
   gap: 2px;
 }
 
-.settings-discard-confirm strong { color: var(--st-text); font-size: 11px; }
-.settings-discard-confirm small { color: var(--st-text-tertiary); font-size: 10px; }
+.settings-discard-confirm strong { color: var(--st-text); font-size: var(--ui-font-size-body); }
+.settings-discard-confirm small { color: var(--st-text-tertiary); font-size: var(--ui-font-size-aux); }
 
 .settings-discard-confirm > div {
   flex: 0 0 auto;
@@ -411,7 +411,7 @@
   border-radius: 6px;
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-discard-confirm button.danger {
@@ -452,11 +452,11 @@
 
 .settings-disclosure > summary::-webkit-details-marker { display: none; }
 .settings-disclosure > summary > span { min-width: 0; display: grid; gap: 2px; }
-.settings-disclosure > summary strong { font-size: 12px; font-weight: 600; }
+.settings-disclosure > summary strong { font-size: var(--ui-font-size-body); font-weight: 600; }
 .settings-disclosure > summary small,
 .settings-disclosure > summary em {
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
   font-style: normal;
   font-weight: 400;
 }
@@ -482,7 +482,7 @@
 
 .settings-technical-details summary {
   color: var(--st-text-secondary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-aux);
   cursor: pointer;
 }
 
@@ -573,7 +573,7 @@
 .settings-theme-option-footer strong {
   overflow: hidden;
   color: var(--st-text);
-  font-size: 11px;
+  font-size: var(--ui-font-size-body);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -119,8 +119,8 @@ pub fn save_ai_settings(
     store: State<'_, MailStore>,
     input: AiSettingsSaveInput,
 ) -> Result<String, String> {
-    // 密钥必须绑定到 (service_type, endpoint)：API key 不能跟随 endpoint 或服务
-    // 类型变化而被静默沿用，否则旧 key 可能被发到新的端点。
+    // 两类密钥分别绑定到各自的 endpoint：AI 接入页和 MCP 页可以独立保存，
+    // 但密钥仍不能跟随 endpoint 变化而被静默沿用，否则旧 key 可能被发到新的端点。
     let existing = store.load_ai_settings().ok();
     let (api_key, mcp_api_key) = resolve_ai_secrets_for_save(existing.as_ref(), &input)?;
     let record = AiSettingsRecord {
@@ -149,16 +149,12 @@ fn normalized_endpoint(endpoint: &str) -> String {
     endpoint.trim().trim_end_matches('/').to_string()
 }
 
-/// 解析保存时的密钥（返回 (api_key, mcp_api_key)），密钥绑定到 (service_type, endpoint)：
-/// - service_type 变化：不得跨服务类型复用旧 key；
-/// - 同类型但端点变化：空 key 不得静默沿用旧 key，拒绝保存并要求重新输入；
-/// - 类型与端点均未变：空值表示保持现有密钥；显式清除标记则删除。
+/// 解析保存时的密钥（返回 (api_key, mcp_api_key)）。两类密钥分别绑定到自己的
+/// endpoint，允许切换当前服务类型而不丢失另一类连接的已保存密钥。
 fn resolve_ai_secrets_for_save(
     existing: Option<&AiSettingsRecord>,
     input: &AiSettingsSaveInput,
 ) -> Result<(String, String), String> {
-    let service_type_changed =
-        existing.is_some_and(|record| record.service_type != input.service_type);
     let http_endpoint_changed = existing.is_some_and(|record| {
         normalized_endpoint(&record.endpoint) != normalized_endpoint(&input.endpoint)
     });
@@ -169,14 +165,12 @@ fn resolve_ai_secrets_for_save(
         input.api_key.trim(),
         input.clear_api_key,
         existing.map(|record| record.api_key.as_str()),
-        service_type_changed,
         http_endpoint_changed,
     )?;
     let mcp_api_key = resolve_bound_secret_key(
         input.mcp_api_key.trim(),
         input.clear_mcp_api_key,
         existing.map(|record| record.mcp_api_key.as_str()),
-        service_type_changed,
         mcp_endpoint_changed,
     )?;
     Ok((api_key, mcp_api_key))
@@ -184,21 +178,16 @@ fn resolve_ai_secrets_for_save(
 
 /// 单条密钥的绑定解析：
 /// - 显式清除标记：删除；
-/// - service_type 变化：不得跨服务类型复用旧 key，采用新输入值（为空则清空）；
-/// - 同类型但端点变化：空 key 拒绝保存并要求重新输入；
-/// - 类型与端点均未变：空值表示保持现有密钥。
+/// - endpoint 变化：空 key 拒绝保存并要求重新输入；
+/// - endpoint 未变：空值表示保持现有密钥。
 fn resolve_bound_secret_key(
     incoming: &str,
     clear: bool,
     existing: Option<&str>,
-    service_type_changed: bool,
     endpoint_changed: bool,
 ) -> Result<String, String> {
     if clear {
         return Ok(String::new());
-    }
-    if service_type_changed {
-        return Ok(incoming.to_string());
     }
     if incoming.is_empty() {
         if endpoint_changed {
@@ -248,7 +237,7 @@ fn enforce_saved_http_request(
     }
     if !saved.privacy_acknowledged {
         return Err(
-            "首次发送邮件内容到外部 AI 服务前，请先在设置 > AI 服务中确认隐私说明。".to_string(),
+            "首次发送邮件内容到外部 AI 服务前，请先在设置 > AI 接入中确认隐私说明。".to_string(),
         );
     }
     if service_type == "mcp" {
@@ -394,41 +383,33 @@ mod tests {
 
     #[test]
     fn empty_key_preserves_existing_only_when_binding_is_unchanged() {
-        // 类型与端点均未变：空 key 保持现有；显式清除删除；新输入覆盖。
+        // endpoint 未变：空 key 保持现有；显式清除删除；新输入覆盖。
         assert_eq!(
-            resolve_bound_secret_key("", false, Some("existing-key"), false, false).expect("keep"),
+            resolve_bound_secret_key("", false, Some("existing-key"), false).expect("keep"),
             "existing-key",
             "绑定未变时空值应保持现有密钥"
         );
         assert_eq!(
-            resolve_bound_secret_key("", true, Some("existing-key"), false, false).expect("clear"),
+            resolve_bound_secret_key("", true, Some("existing-key"), false).expect("clear"),
             "",
             "显式清除应删除密钥"
         );
         assert_eq!(
-            resolve_bound_secret_key("new-key", false, Some("existing-key"), false, false)
+            resolve_bound_secret_key("new-key", false, Some("existing-key"), false)
                 .expect("replace"),
             "new-key",
             "新输入应覆盖旧密钥"
         );
         assert_eq!(
-            resolve_bound_secret_key("", false, None, false, false).expect("none"),
+            resolve_bound_secret_key("", false, None, false).expect("none"),
             "",
             "无既有密钥且未输入时保持空"
         );
 
         // 端点变化：空 key 不得静默沿用旧 key。
-        let err = resolve_bound_secret_key("", false, Some("existing-key"), false, true)
+        let err = resolve_bound_secret_key("", false, Some("existing-key"), true)
             .expect_err("endpoint changed rejects empty key");
         assert!(err.contains("重新输入"), "端点变化应要求重新输入：{err}");
-
-        // 类型变化：不得跨服务类型复用旧 key（清空）。
-        assert_eq!(
-            resolve_bound_secret_key("", false, Some("existing-key"), true, false)
-                .expect("type change"),
-            "",
-            "类型变化不得跨服务类型复用旧 key"
-        );
     }
 
     fn save_input(record: &AiSettingsRecord) -> super::AiSettingsSaveInput {
@@ -477,16 +458,16 @@ mod tests {
     }
 
     #[test]
-    fn saving_with_service_type_change_clears_keys_not_reuses() {
+    fn saving_with_service_type_change_preserves_independent_keys() {
         let existing = stored_http_record();
-        // 修改 service_type：不得跨服务类型复用旧 http key（清空），也不沿用旧 mcp key。
+        // AI 接入页与 MCP 页独立保存：切换当前服务类型不应清掉另一页的密钥。
         let mut input = save_input(&existing);
         input.service_type = "mcp".to_string();
         input.mcp_enabled = true;
         let (api_key, mcp_api_key) =
             resolve_ai_secrets_for_save(Some(&existing), &input).expect("save proceeds");
-        assert_eq!(api_key, "", "类型变化后旧 http key 不得保留");
-        assert_eq!(mcp_api_key, "", "类型变化后旧 mcp key 不得保留");
+        assert_eq!(api_key, "sk-saved-secret", "AI 接入密钥应独立保留");
+        assert_eq!(mcp_api_key, "mcp-saved-secret", "MCP 密钥应独立保留");
     }
 
     #[test]

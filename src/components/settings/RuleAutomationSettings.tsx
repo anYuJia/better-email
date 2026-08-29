@@ -125,7 +125,7 @@ export default function RuleAutomationSettings({
           <section className="settings-rule-builder-group">
             <strong>匹配条件</strong>
             <div className="settings-rule-condition-fields">
-              <label>
+              <div className="settings-rule-select-field">
                 <span>字段</span>
                 <CustomSelect
                   ariaLabel="规则条件字段"
@@ -136,7 +136,7 @@ export default function RuleAutomationSettings({
                   }))}
                   onChange={(nextField) => onRuleConditionFieldChange(nextField as RuleConditionField)}
                 />
-              </label>
+              </div>
               <label>
                 <span>包含</span>
                 <input
@@ -154,7 +154,7 @@ export default function RuleAutomationSettings({
           </section>
           <section className="settings-rule-builder-group">
             <strong>处理操作</strong>
-            <label className="settings-rule-label-action">
+            <div className="settings-rule-label-action">
               <span>打标签</span>
               <CustomSelect
                 ariaLabel="规则标签动作"
@@ -172,7 +172,7 @@ export default function RuleAutomationSettings({
                   onRuleLabelActionChange(labelName);
                 }}
               />
-            </label>
+            </div>
             <div className="settings-rule-action-row">
               <span>附加操作</span>
               <div className="settings-rule-action-chips">

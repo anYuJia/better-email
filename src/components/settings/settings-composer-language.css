@@ -3,7 +3,7 @@
  *
  * Settings keeps its own information architecture, but its chrome, control
  * rhythm and interaction feedback intentionally follow the composer: quiet
- * surfaces, compact toolbars, small radii, thin separators and restrained
+ * surfaces, readable controls, small radii, thin separators and restrained
  * focus/hover states.
  */
 
@@ -35,7 +35,7 @@
 
 .settings-modal[data-ui="settings-v3"] .settings-title-copy strong {
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-body);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -48,7 +48,7 @@
   min-height: 28px;
   border-radius: var(--ui-radius-sm);
   box-shadow: none;
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
 }
 
@@ -128,7 +128,7 @@
   min-height: 30px;
   color: var(--ui-text);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-secondary);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-search-shortcut {
@@ -137,7 +137,7 @@
   border-radius: 4px;
   color: var(--ui-text-tertiary);
   background: var(--ui-control-hover);
-  font-size: 9.5px;
+  font-size: var(--ui-font-size-aux);
   font-weight: 500;
 }
 
@@ -158,7 +158,7 @@
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
   transition: var(--ui-transition-fast-color-background-border);
 }
@@ -197,6 +197,14 @@
   background: var(--ui-control-hover);
 }
 
+.settings-modal[data-ui="settings-v3"] .settings-search-result strong {
+  font-size: var(--ui-font-size-body);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-search-result small {
+  font-size: var(--ui-font-size-aux);
+}
+
 /* Main settings canvas -------------------------------------------------- */
 
 .settings-modal[data-ui="settings-v3"] :is(.settings-body, .settings-content, .settings-page) {
@@ -230,7 +238,7 @@
 .settings-modal[data-ui="settings-v3"] .settings-page-heading p {
   max-width: 620px;
   color: var(--ui-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 1.45;
 }
 
@@ -254,7 +262,7 @@
 .settings-modal[data-ui="settings-v3"] .settings-account-picker {
   gap: 7px;
   color: var(--ui-text-tertiary);
-  font-size: 10px;
+  font-size: var(--ui-font-size-aux);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary {
@@ -266,6 +274,34 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: none;
+  font-size: var(--ui-font-size-body);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary :is(strong, small) {
+  font-size: inherit;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > strong {
+  flex: 0 1 auto;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > small {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > small::before {
+  content: '·';
+  margin-right: 4px;
+  color: var(--ui-text-tertiary);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary:hover {
@@ -282,7 +318,7 @@
   min-height: 33px;
   padding: 0 8px;
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-context-tabs > button:hover:not(:disabled) {
@@ -311,6 +347,19 @@
   box-shadow: none;
 }
 
+/* Account rows form one grouped surface; only the group owns the radius. */
+
+.settings-modal[data-ui="settings-v3"] .settings-account-list {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-list .settings-account-row.active {
+  background: var(--ui-accent-soft);
+}
+
 .settings-modal[data-ui="settings-v3"] .st-section-header {
   gap: 5px 12px;
   padding: 0;
@@ -322,13 +371,13 @@
 
 .settings-modal[data-ui="settings-v3"] .st-section-heading strong {
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-section);
   font-weight: 600;
 }
 
 .settings-modal[data-ui="settings-v3"] .st-section-heading :is(small, em) {
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 1.42;
 }
 
@@ -360,13 +409,13 @@
 
 .settings-modal[data-ui="settings-v3"] :is(.st-row-copy, .st-switch-copy) strong {
   color: var(--ui-text);
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-body);
   font-weight: 500;
 }
 
 .settings-modal[data-ui="settings-v3"] :is(.st-row-copy, .st-switch-copy) small {
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   line-height: 1.4;
 }
 
@@ -381,7 +430,7 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--ui-font-size-body);
   transition: var(--ui-transition-short-bg-border-box-shadow);
 }
 
@@ -398,6 +447,18 @@
   box-shadow: none;
 }
 
+.settings-modal[data-ui="settings-v3"] .settings-contact-search > svg {
+  top: 50%;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-contact-search input {
+  padding-left: 32px;
+}
+
 .settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) textarea {
   min-height: 88px;
   padding: 10px;
@@ -410,13 +471,13 @@
 
 .settings-modal[data-ui="settings-v3"] :is(.st-field-label, label.st-field) {
   color: var(--ui-text-secondary);
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
 }
 
 .settings-modal[data-ui="settings-v3"] .st-field-hint {
   color: var(--ui-text-tertiary);
-  font-size: 10.5px;
+  font-size: var(--ui-font-size-aux);
 }
 
 /* Buttons deliberately mirror the composer toolbar/action hierarchy. */
@@ -427,7 +488,7 @@
   padding: 0 10px;
   border-radius: var(--ui-radius-sm);
   box-shadow: none;
-  font-size: 11.5px;
+  font-size: var(--ui-font-size-secondary);
   font-weight: 500;
 }
 
@@ -459,7 +520,7 @@
 .settings-modal[data-ui="settings-v3"] .st-btn-sm {
   min-height: 28px;
   padding-inline: 9px;
-  font-size: 11px;
+  font-size: var(--ui-font-size-secondary);
 }
 
 /* Compact native switch. */
@@ -503,6 +564,24 @@
   outline: none;
 }
 
+/* The search field container owns the focus indicator; the native search input must not add a second ring. */
+.settings-modal[data-ui="settings-v3"] .settings-nav-search input {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-nav-search input:focus,
+.settings-modal[data-ui="settings-v3"] .settings-nav-search input:focus-visible {
+  border: 0;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
 .settings-modal[data-ui="settings-v3"] .settings-nav-list > button:focus-visible {
   outline-offset: 1px;
 }
@@ -535,11 +614,11 @@
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-disclosure > summary strong {
-  font-size: 12px;
+  font-size: var(--ui-font-size-body);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-disclosure > summary :is(small, em) {
-  font-size: 10.5px;
+  font-size: var(--ui-font-size-aux);
 }
 
 /* Theme previews are real previews, so they may remain bounded surfaces. */
@@ -632,7 +711,7 @@
   }
 
   .settings-modal[data-ui="settings-v3"] .settings-page-heading p {
-    font-size: 12px;
+    font-size: var(--ui-font-size-secondary);
   }
 
   .settings-modal[data-ui="settings-v3"] .settings-page-content {
@@ -652,8 +731,8 @@
   }
 
   .settings-modal[data-ui="settings-v3"] .st-btn {
-    min-height: 40px;
-    font-size: 13px;
+    min-height: 44px;
+    font-size: var(--ui-font-size-secondary);
   }
 
   .settings-modal[data-ui="settings-v3"] .st-switch input[type="checkbox"] {

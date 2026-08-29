@@ -23,7 +23,7 @@ export default function ContactImportHistoryDialog({
   return createPortal(
     <div
       className="settings-backdrop contact-import-backdrop"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >

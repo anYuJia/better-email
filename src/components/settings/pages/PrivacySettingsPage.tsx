@@ -129,13 +129,13 @@ export default function PrivacySettingsPage({
         title="邮件内容与外部 AI 服务"
         action={onNavigateToAi ? (
           <SettingsButton size="sm" variant="ghost" onClick={onNavigateToAi}>
-            <Sparkles size={13} aria-hidden="true" /> AI 与集成
+            <Sparkles size={13} aria-hidden="true" /> AI 接入
           </SettingsButton>
         ) : undefined}
       >
         <p>
           翻译、摘要与模板生成可能把邮件内容发送到你配置的外部服务。
-          可在「AI 与集成」中查看服务来源、隐私说明或关闭相关功能。
+          可在「AI 接入」中查看服务来源、隐私说明或关闭相关功能。
         </p>
       </SettingsNotice>
     </SettingsSection>

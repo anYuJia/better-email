@@ -30,6 +30,9 @@ describe('SettingsFrame dialog behavior', () => {
     onSave = () => undefined,
     onTestConnection = () => undefined,
     onNavigate = () => undefined,
+    accountOptions = [],
+    activeAccountId = null,
+    onSelectAccountId = () => undefined,
   }: {
     onClose?: () => void;
     activeSection?: Parameters<typeof SettingsFrame>[0]['activeSection'];
@@ -40,6 +43,9 @@ describe('SettingsFrame dialog behavior', () => {
     onSave?: () => void;
     onTestConnection?: () => void;
     onNavigate?: (section: Parameters<typeof SettingsFrame>[0]['activeSection']) => void;
+    accountOptions?: Array<{ id: number; label: string; email: string }>;
+    activeAccountId?: number | null;
+    onSelectAccountId?: (accountId: number) => void;
   } = {}) {
     const utils = render(
       <div data-testid="app-shell">
@@ -55,6 +61,9 @@ describe('SettingsFrame dialog behavior', () => {
           isDirty={isDirty}
           isTestingConnection={isTestingConnection}
           connectionTestFeedback={connectionTestFeedback}
+          accountOptions={accountOptions}
+          activeAccountId={activeAccountId}
+          onSelectAccountId={onSelectAccountId}
           onClose={onClose}
         >
           <input placeholder="设置内输入框" />
@@ -77,6 +86,38 @@ describe('SettingsFrame dialog behavior', () => {
     expect(screen.getByRole('navigation', { name: '账号设置分类' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '身份与签名' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '隐私' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('switches the scoped account and locks the switcher while edits are dirty', () => {
+    const onSelectAccountId = vi.fn();
+    const accountOptions = [
+      { id: 1, label: '工作邮箱', email: 'work@example.com' },
+      { id: 2, label: '个人邮箱', email: 'personal@example.com' },
+    ];
+    renderFrame({
+      activeSection: 'privacy',
+      canSaveAndVerify: true,
+      accountOptions,
+      activeAccountId: 1,
+      onSelectAccountId,
+    });
+
+    const picker = screen.getByRole('combobox', { name: '切换当前设置账号' });
+    expect((picker as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(picker);
+    fireEvent.click(screen.getByRole('option', { name: /个人邮箱/ }));
+    expect(onSelectAccountId).toHaveBeenCalledWith(2);
+
+    cleanup();
+    renderFrame({
+      activeSection: 'privacy',
+      canSaveAndVerify: true,
+      isDirty: true,
+      accountOptions,
+      activeAccountId: 1,
+      onSelectAccountId,
+    });
+    expect((screen.getByRole('combobox', { name: '切换当前设置账号' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('disables account detail tabs when no account exists', () => {
@@ -181,6 +222,8 @@ describe('SettingsFrame dialog behavior', () => {
     const { container } = renderFrame({ onClose });
     const backdrop = container.querySelector('.settings-backdrop')!;
     fireEvent.mouseDown(backdrop, { target: backdrop });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

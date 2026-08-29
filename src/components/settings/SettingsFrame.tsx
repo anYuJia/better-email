@@ -103,7 +103,7 @@ function SettingsAccountWorkspace({
     <div className="settings-account-workspace">
       <div className="settings-account-workspace-topline">
         {canSwitchAccount ? (
-          <label
+          <div
             className="settings-account-picker"
             title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
           >
@@ -120,7 +120,7 @@ function SettingsAccountWorkspace({
               disabled={accountSwitchDisabled}
               onChange={(nextValue) => onSelectAccountId?.(Number(nextValue))}
             />
-          </label>
+          </div>
         ) : (
           <span className="settings-account-current">
             <small>当前账号</small>
@@ -232,7 +232,7 @@ export default function SettingsFrame({
     <div
       className="settings-backdrop"
       ref={backdropRef}
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) requestClose();
       }}
     >

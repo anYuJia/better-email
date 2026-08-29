@@ -322,7 +322,7 @@ export default function DataSafetySettings({
       {cacheConfirmationOpen && storageUsage && createPortal((
         <div
           className="settings-cache-confirm-backdrop"
-          onMouseDown={(event) => {
+          onClick={(event) => {
             if (event.target === event.currentTarget && !storageBusy) {
               setCacheConfirmationOpen(false);
             }

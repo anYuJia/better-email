@@ -178,7 +178,7 @@ export default function AccountRemovalPanel({
         <div
           className="settings-confirm-overlay"
           role="presentation"
-          onMouseDown={(event) => {
+          onClick={(event) => {
             if (event.target === event.currentTarget && !pending) setDialogOpen(false);
           }}
         >

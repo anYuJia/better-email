@@ -67,6 +67,7 @@ const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings
 const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
 const SecurityPreviewSettings = lazy(() => import('./SecurityPreviewSettings'));
 const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
+const McpSettings = lazy(() => import('./McpSettings'));
 const TemplateSettings = lazy(() => import('./TemplateSettings'));
 const AboutSettings = lazy(() => import('./AboutSettings'));
 
@@ -242,6 +243,7 @@ const MemoizedContactAutomation = memo(ContactAutomationSettings);
 const MemoizedRuleAutomation = memo(RuleAutomationSettings);
 const MemoizedSecurityPreview = memo(SecurityPreviewSettings);
 const MemoizedAiService = memo(AiServiceSettings);
+const MemoizedMcp = memo(McpSettings);
 const MemoizedTemplates = memo(TemplateSettings);
 const MemoizedAbout = memo(AboutSettings);
 
@@ -514,6 +516,9 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
           )}
           {activeSettingsSection === 'ai' && (
             <MemoizedAiService />
+          )}
+          {activeSettingsSection === 'mcp' && (
+            <MemoizedMcp />
           )}
           {activeSettingsSection === 'templates' && (
             <MemoizedTemplates onNavigateToAi={() => handlers.onNavigate('ai')} />

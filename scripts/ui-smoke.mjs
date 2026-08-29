@@ -2211,13 +2211,17 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && !document.body.innerText.includes('OAuth2 向导')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-list > button').length === 11 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && document.querySelectorAll('.settings-nav-list > button').length === 12 && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置\"]')");
     await evalInPage(
       cdp,
       `(() => {
         const element = document.querySelector('.settings-nav-search input');
         if (!element) throw new Error('Settings search input not found');
         element.focus();
+        const style = getComputedStyle(element);
+        if (style.borderTopWidth !== '0px' || style.outlineStyle !== 'none' || style.boxShadow !== 'none') {
+          throw new Error('Settings search input has a duplicate focus ring');
+        }
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
         setter.call(element, '隐私');
         element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '隐私' }));
@@ -2225,7 +2229,7 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelectorAll('.settings-search-results > button').length === 1 && document.querySelector('.settings-search-results > button')?.innerText.includes('隐私')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-list > button').length === 11");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-list > button').length === 12");
     await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
     await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && [...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].some((item) => item.innerText.includes('发送'))");
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
@@ -2318,7 +2322,7 @@ async function main() {
     await waitForExpression(cdp, "window.innerWidth === 430 && getComputedStyle(document.querySelector('.settings-nav')).display === 'none' && getComputedStyle(document.querySelector('.settings-mobile-toolbar')).display === 'block' && document.querySelector('.settings-page-picker[aria-label=\"切换设置页面\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-page-picker')?.innerText.includes('发送') && document.querySelector('.settings-content').scrollWidth === document.querySelector('.settings-content').clientWidth");
     await waitForExpression(cdp, "(() => { const content = document.querySelector('.settings-content'); const toolbar = document.querySelector('.settings-mobile-toolbar'); const page = document.querySelector('.settings-page'); return content && toolbar && page && getComputedStyle(page).overflowY === 'auto' && page.clientHeight >= 200 && page.clientHeight <= content.clientHeight - toolbar.offsetHeight + 40; })()");
     await evalInPage(cdp, "document.querySelector('.settings-page-picker').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 11 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
+    await waitForExpression(cdp, "document.querySelector('.settings-mobile-menu') && document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]').length === 12 && document.querySelector('.settings-page-picker')?.getAttribute('aria-expanded') === 'true'");
     await captureScreenshot(cdp, 'settings-page-picker-narrow');
     await evalInPage(cdp, "[...document.querySelectorAll('.settings-mobile-menu [role=\"menuitem\"]')].find((item) => item.innerText.includes('发送')).click()");
     await waitForExpression(cdp, "!document.querySelector('.settings-mobile-menu') && document.querySelector('.settings-page')?.dataset.settingsPage === 'sending'");
@@ -2696,7 +2700,8 @@ async function main() {
 
     await assertSettingsPagesEnterable(cdp, 'settings-v2 五页可进入 1440x980', [
       { id: 'sending', label: '发送' },
-      { id: 'ai', label: 'AI 与集成' },
+      { id: 'ai', label: 'AI 接入' },
+      { id: 'mcp', label: 'MCP' },
       { id: 'accounts', label: '账号' },
       { id: 'providers', label: '服务器', tab: true },
       { id: 'auth', label: '登录与安全', tab: true },
@@ -2974,14 +2979,16 @@ async function main() {
 
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
-    await openSettingsSection(cdp, 'AI 与集成', 'ai', '.settings-page[data-settings-page="ai"]');
+    await openSettingsSection(cdp, 'AI 接入', 'ai', '.settings-page[data-settings-page="ai"]');
     await sleep(800);
     await evalInPage(cdp, "(() => { const checkbox = [...document.querySelectorAll('.settings-page[data-settings-page=\"ai\"] input[type=\"checkbox\"]')][0]; if (!checkbox) throw new Error('AI enable checkbox not found'); if (!checkbox.checked) checkbox.click(); })()");
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"ai\"] input[type=\"checkbox\"]')][0]?.checked");
-    await pickCustomSelect(cdp, '.settings-page[data-settings-page="ai"] .custom-select-summary', '本地演示');
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"ai\"] .custom-select-summary')?.innerText.includes('本地演示')");
-    await clickButton(cdp, '测试连接', "document.querySelector('.settings-page[data-settings-page=\"ai\"]')");
-    await waitForExpression(cdp, "document.querySelector('.settings-ai-test-result.ok')?.innerText.includes('模拟 AI 服务连接正常')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"ai\"]')?.innerText.includes('OpenAI 兼容 API') && !document.querySelector('.settings-page[data-settings-page=\"ai\"]')?.innerText.includes('本地演示') && !document.querySelector('.settings-page[data-settings-page=\"ai\"] .custom-select-summary')");
+    await openSettingsSection(cdp, 'MCP', 'mcp', '.settings-page[data-settings-page="mcp"]');
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"mcp\"]')?.innerText.includes('MCP 服务') && document.querySelector('.settings-page[data-settings-page=\"mcp\"]')?.innerText.includes('MCP 服务端点')");
+    await openSettingsSection(cdp, 'AI 接入', 'ai', '.settings-page[data-settings-page="ai"]');
+    // 浏览器冒烟测试只在内部注入 mock，不把“本地演示”作为用户可选的接入方式。
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
     await openSettingsSection(cdp, '模板', 'templates', '.settings-page[data-settings-page="templates"]');
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"templates\"] button')].some((item) => item.textContent.includes('新建模板'))");
     await clickButton(cdp, '新建模板', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");

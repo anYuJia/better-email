@@ -259,7 +259,7 @@ export default function AccountLoginDialog({
 
           {manualSettingsOpen && (
             <div className="account-login-manual-settings">
-              <label className="account-login-field">
+              <div className="account-login-field">
                 <span>收信协议</span>
                 <CustomSelect
                   className="account-login-select"
@@ -272,8 +272,8 @@ export default function AccountLoginDialog({
                     value as IncomingProtocol,
                   ))}
                 />
-              </label>
-              <label className="account-login-field">
+              </div>
+              <div className="account-login-field">
                 <span>登录方式</span>
                 <CustomSelect
                   className="account-login-select"
@@ -286,7 +286,7 @@ export default function AccountLoginDialog({
                     auth_type: value as AccountCreateInput['auth_type'],
                   })}
                 />
-              </label>
+              </div>
               <label className="account-login-field">
                 <span>收信服务器</span>
                 <input

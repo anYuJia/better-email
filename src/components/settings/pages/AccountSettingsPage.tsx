@@ -176,9 +176,10 @@ export default function AccountSettingsPage({
                 placeholder="默认使用邮箱地址"
               />
             </SettingsField>
-            <SettingsField label="获取新邮件" hint="控制后台检查频率">
+            <SettingsField label="获取新邮件" hint="控制后台检查频率" labelMode="static">
               <CustomSelect
                 dense
+                ariaLabel="获取新邮件"
                 value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
                 options={syncModeOptions}
                 onChange={(value) => onAccountFormChange({ ...accountForm, sync_mode: value })}

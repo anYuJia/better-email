@@ -704,3 +704,23 @@ pub async fn list_threads(
         )))
     })?
 }
+
+#[tauri::command]
+pub async fn get_message_count(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+    folder_id: Option<i64>,
+    query: Option<String>,
+    filter: Option<String>,
+) -> MailResult<i64> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store.count_messages_for_scope(account_id, folder_id.unwrap_or_default(), query, filter)
+    })
+    .await
+    .map_err(|error| {
+        MailError::Io(std::io::Error::other(format!(
+            "get_message_count task failed: {error}"
+        )))
+    })?
+}

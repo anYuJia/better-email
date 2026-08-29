@@ -944,6 +944,7 @@ pub fn run() {
             commands::update_label,
             commands::delete_label,
             commands::list_messages,
+            commands::get_message_count,
             commands::get_message_detail,
             commands::list_provider_write_validation_messages,
             commands::list_thread_messages,

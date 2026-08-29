@@ -2079,6 +2079,12 @@ mod tests {
         let unified_messages = store
             .list_messages_for_scope(None, unified_inbox.id, None, None, 50)
             .unwrap();
+        assert_eq!(
+            store
+                .count_messages_for_scope(None, unified_inbox.id, None, None)
+                .unwrap(),
+            unified_messages.len() as i64
+        );
         assert!(!unified_messages.is_empty());
         assert!(unified_messages
             .iter()

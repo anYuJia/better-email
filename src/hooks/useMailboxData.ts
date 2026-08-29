@@ -16,7 +16,13 @@ import {
   loadMailboxMessageLimit,
   saveMailboxListState,
 } from '../app/mailboxListState';
-import { buildMailboxRequests, checkHistoryIncomplete, mailboxFlowLog, mailboxFlowWarn } from './mailboxDataRequests';
+import {
+  buildMailboxCountRequest,
+  buildMailboxRequests,
+  checkHistoryIncomplete,
+  mailboxFlowLog,
+  mailboxFlowWarn,
+} from './mailboxDataRequests';
 import type {
   LoadMetaOptions,
   LoadMetaResult,
@@ -62,6 +68,7 @@ type UseMailboxDataOptions = {
   imapMailboxes: ImapMailboxState[];
   messages?: MessageSummary[];
   setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
+  setMessageCount?: Dispatch<SetStateAction<number | null>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
   setMessageLimit: Dispatch<SetStateAction<number>>;
   setHasMoreMessages: Dispatch<SetStateAction<boolean>>;
@@ -129,6 +136,7 @@ export default function useMailboxData({
   imapMailboxes,
   messages = [],
   setMessages,
+  setMessageCount,
   setThreads,
   setMessageLimit,
   setHasMoreMessages,
@@ -146,6 +154,7 @@ export default function useMailboxData({
   const threadCacheEpochRef = useRef(0);
   const threadRequestEpochRef = useRef(0);
   const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
+  const messageCountRequestRef = useRef(0);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
   activeMailboxScopeRef.current = accountScope;
@@ -184,6 +193,7 @@ export default function useMailboxData({
       });
       if (isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
         startTransition(() => {
+          setMessageCount?.(null);
           setMessages([]);
           setThreads([]);
           setHasMoreMessages(false);
@@ -223,6 +233,49 @@ export default function useMailboxData({
       effectiveLimit,
       nextOffset,
     );
+    const shouldLoadMessageCount = Boolean(setMessageCount)
+      && !nextReturnPageOnly
+      && !nextIncludeThreads;
+    const messageCountRequestId = shouldLoadMessageCount
+      ? messageCountRequestRef.current + 1
+      : messageCountRequestRef.current;
+    if (shouldLoadMessageCount) {
+      messageCountRequestRef.current = messageCountRequestId;
+      if (nextOffset === 0 && isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+        setMessageCount?.(null);
+      }
+      void invoke<number>(
+        IPC.GetMessageCount,
+        buildMailboxCountRequest(
+          nextScope,
+          currentAccountId,
+          nextFolderId ?? 0,
+          nextSearchScope,
+          nextQuery,
+          nextFilter,
+        ),
+      )
+        .then((count) => {
+          if (
+            typeof count !== 'number'
+            || !Number.isFinite(count)
+            || count < 0
+            || messageCountRequestId !== messageCountRequestRef.current
+            || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
+          ) return;
+          setMessageCount?.(Math.floor(count));
+        })
+        .catch((error) => {
+          // The list itself remains usable if a count query fails. The loaded
+          // row count is the safe fallback until the next successful refresh.
+          mailboxFlowWarn('message count query failed', {
+            scope: nextScope,
+            folderId: nextFolderId ?? 0,
+            searchScope: nextSearchScope,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
     mailboxFlowLog('loadMessages start', {
       scope: nextScope,
       currentAccountId,
@@ -419,6 +472,7 @@ export default function useMailboxData({
     threadInflightRef.current.clear();
     const mailboxRequest: MailboxRefreshRequest = { id: refreshId, scope: nextScope };
     setHasMoreMessages(false);
+    setMessageCount?.(null);
     setMessages([]);
     setThreads([]);
     setSelectedId(null);

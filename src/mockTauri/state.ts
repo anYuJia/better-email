@@ -655,6 +655,14 @@ export function listMessages(args: InvokeArgs) {
   });
 }
 
+export function countMessages(args: InvokeArgs) {
+  return listMessages({
+    ...(args ?? {}),
+    limit: Math.max(messages.length, 1),
+    offset: 0,
+  }).length;
+}
+
 export function listThreadMessages(args: InvokeArgs) {
   const threadKey = String(args?.threadKey ?? args?.thread_key ?? '').trim();
   const accountId = Number(args?.accountId ?? 0);

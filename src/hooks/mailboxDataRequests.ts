@@ -23,6 +23,8 @@ export type MailboxRequests = {
   threads: MailboxRequestArgs;
 };
 
+export type MailboxCountRequestArgs = Pick<MailboxRequestArgs, 'accountId' | 'folderId' | 'query' | 'filter'>;
+
 export function mailboxFlowLog(event: string, details: Record<string, unknown> = {}) {
   flowInfo('mailbox-flow', event, details);
 }
@@ -71,6 +73,28 @@ export function buildMailboxRequests(
       limit: 80,
     },
   };
+}
+
+/** Builds the unpaged scope shared by the exact result-count query. */
+export function buildMailboxCountRequest(
+  scope: AccountScope,
+  currentAccountId: number | null,
+  folderId: number,
+  searchScope: SearchScope,
+  query: string,
+  filter: FilterMode,
+): MailboxCountRequestArgs {
+  const { sort: _sort, limit: _limit, offset: _offset, ...countRequest } = buildMailboxRequests(
+    scope,
+    currentAccountId,
+    folderId,
+    searchScope,
+    query,
+    filter,
+    'newest',
+    1,
+  ).messages;
+  return countRequest;
 }
 
 export function checkHistoryIncomplete(

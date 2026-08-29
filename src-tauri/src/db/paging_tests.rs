@@ -69,6 +69,23 @@ fn message_scope_pages_cover_500_rows_without_duplicates() {
     let second = page(200);
     let third = page(400);
     let empty = page(500);
+    assert_eq!(
+        store
+            .count_messages_for_scope(Some(account.id), inbox.id, None, None)
+            .expect("exact inbox count loads"),
+        500
+    );
+    assert_eq!(
+        store
+            .count_messages_for_scope(
+                Some(account.id),
+                inbox.id,
+                Some("Paging".to_string()),
+                Some("unread".to_string()),
+            )
+            .expect("exact filtered inbox count loads"),
+        497
+    );
     assert_eq!(first.len(), 200);
     assert_eq!(second.len(), 200);
     assert_eq!(third.len(), 100);

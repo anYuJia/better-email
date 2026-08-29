@@ -164,6 +164,7 @@ function MailboxApp() {
   const [imapMailboxes, setImapMailboxes] = useState<ImapMailboxState[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageSummary[]>([]);
+  const [messageResultCount, setMessageResultCount] = useState<number | null>(null);
   useFirstMessageRowPaint(messages.length);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
@@ -576,6 +577,7 @@ function MailboxApp() {
     imapMailboxes,
     messages,
     setMessages,
+    setMessageCount: setMessageResultCount,
     setThreads,
     setMessageLimit,
     setHasMoreMessages,
@@ -835,8 +837,17 @@ function MailboxApp() {
   const messageListSummary = stats
     ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
     : `${messages.length} 封`;
-  const visibleListSummary = hasMoreMessages ? `${messages.length}+ 封` : `${messages.length} 封`;
-  const titlebarViewSummary = buildTitlebarViewSummary(listMode, stats, threads.length);
+  const visibleListSummary = messageResultCount !== null
+    ? `${messageResultCount} 封`
+    : hasMoreMessages
+      ? `${messages.length}+ 封`
+      : `${messages.length} 封`;
+  const titlebarViewSummary = buildTitlebarViewSummary(
+    listMode,
+    stats,
+    threads.length,
+    messageResultCount,
+  ) ?? (listMode === 'messages' ? visibleListSummary : undefined);
   const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
   const mailboxListScrollTop = useMemo(
     () => Math.max(0, loadMailboxListStates()[mailboxListStateKey]?.scrollTop ?? 0),

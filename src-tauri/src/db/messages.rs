@@ -156,6 +156,73 @@ impl MailStore {
             hydrate_message_summary_list_metadata(conn, rows)
         })
     }
+
+    /// Returns the exact number of messages for the same account/folder/search
+    /// scope used by `list_messages_for_scope_sorted_page`.
+    ///
+    /// Keep this query separate from the paged list query so the title bar can
+    /// show the full result count without loading every row into memory.
+    #[allow(clippy::too_many_arguments)]
+    pub fn count_messages_for_scope(
+        &self,
+        account_id: Option<i64>,
+        folder_id: i64,
+        query: Option<String>,
+        filter: Option<String>,
+    ) -> MailResult<i64> {
+        self.with_conn(|conn| {
+            let search = query
+                .map(|q| q.trim().to_string())
+                .filter(|q| !q.is_empty());
+            let filter = filter
+                .map(|q| q.trim().to_string())
+                .filter(|q| !q.is_empty())
+                .unwrap_or_else(|| "all".to_string());
+
+            let search_criteria = SearchCriteria::parse(search.as_deref());
+            let mut scope_conditions = Vec::new();
+            let mut query_params = Vec::new();
+            if folder_id > 0 {
+                scope_conditions.push("m.folder_id = ?".to_string());
+                query_params.push(Value::Integer(folder_id));
+            } else if folder_id < 0 {
+                let role = role_for_virtual_folder_id(folder_id)
+                    .ok_or_else(|| MailError::MissingFolderRole(folder_id.to_string()))?;
+                scope_conditions.push("f.role = ?".to_string());
+                query_params.push(Value::Text(role.to_string()));
+            }
+            if let Some(account_id) = account_id {
+                scope_conditions.push("m.account_id = ?".to_string());
+                query_params.push(Value::Integer(account_id));
+            }
+
+            let filter_clause = build_message_filter_clause(&search_criteria, &filter);
+            let mut conditions = Vec::new();
+            let scope = scope_conditions.join(" AND ");
+            if !scope.trim().is_empty() {
+                conditions.push(scope);
+            }
+            let filter = filter_clause.trim().trim_start_matches("AND").trim();
+            if !filter.is_empty() {
+                conditions.push(filter.to_string());
+            }
+            let sql = format!(
+                "SELECT COUNT(*)
+                 FROM messages m
+                 JOIN accounts a ON a.id = m.account_id
+                 JOIN folders f ON f.id = m.folder_id
+                 {}",
+                if conditions.is_empty() {
+                    String::new()
+                } else {
+                    format!("WHERE {}", conditions.join(" AND "))
+                },
+            );
+            query_params.extend(search_criteria.params().into_iter().map(Value::Text));
+            conn.query_row(&sql, params_from_iter(query_params), |row| row.get(0))
+                .map_err(Into::into)
+        })
+    }
     pub fn list_provider_write_validation_messages(
         &self,
         account_id: i64,

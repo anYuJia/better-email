@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { buildMailboxRequests } from './mailboxDataRequests';
+import { buildMailboxCountRequest, buildMailboxRequests } from './mailboxDataRequests';
 import useMailboxData from './useMailboxData';
 import { invoke } from '../tauriBridge';
 import type { MessageSummary, ThreadSummary } from '../app/types';
+import { IPC } from '../ipc/commands';
 
 vi.mock('../tauriBridge', () => ({
   invoke: vi.fn(),
@@ -158,9 +159,124 @@ describe('buildMailboxRequests', () => {
     expect(buildMailboxRequests(7, 7, 42, 'folder', '', 'all', 'newest', 199, 0).messages)
       .not.toHaveProperty('offset');
   });
+
+  it('builds an exact count request with the same scope as the list request', () => {
+    expect(buildMailboxCountRequest('all', 7, -1, 'folder', '  subject:Roadmap  ', 'unread'))
+      .toEqual({
+        accountId: null,
+        folderId: -1,
+        query: 'subject:Roadmap',
+        filter: 'unread',
+      });
+  });
 });
 
 describe('useMailboxData request guard', () => {
+  it('loads the exact scoped message count without delaying the list response', async () => {
+    const setMessageCount = vi.fn();
+    mockInvoke.mockImplementation((command) => {
+      if (command === IPC.ListMessages) {
+        return Promise.resolve([{ id: 1, subject: 'inbox' }] as MessageSummary[]) as never;
+      }
+      if (command === IPC.GetMessageCount) return Promise.resolve(1202) as never;
+      return Promise.resolve(undefined) as never;
+    });
+    const mailboxRefreshRef = { current: 4 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 'all',
+      currentAccountId: null,
+      folderId: -1,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: -1, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      setMessages: vi.fn(),
+      setMessageCount,
+      setThreads: vi.fn(),
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.loadMessages(-1, '', 'all', 'all', 4, 50, 'folder', false);
+      await Promise.resolve();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith(IPC.GetMessageCount, {
+      accountId: null,
+      folderId: -1,
+      query: null,
+      filter: 'all',
+    });
+    expect(setMessageCount).toHaveBeenLastCalledWith(1202);
+  });
+
+  it('does not commit a stale scoped count after the mailbox changes', async () => {
+    const firstCount = deferred<number>();
+    const secondCount = deferred<number>();
+    const setMessageCount = vi.fn();
+    mockInvoke.mockImplementation((command, args) => {
+      if (command === IPC.ListMessages) {
+        return Promise.resolve([{ id: Number(args?.folderId ?? 0) }] as MessageSummary[]) as never;
+      }
+      if (command === IPC.GetMessageCount) {
+        return (Number(args?.folderId) === 101 ? firstCount.promise : secondCount.promise) as never;
+      }
+      return Promise.resolve(undefined) as never;
+    });
+    const mailboxRefreshRef = { current: 1 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      setMessages: vi.fn(),
+      setMessageCount,
+      setThreads: vi.fn(),
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.loadMessages(101, '', 'all', 1, 1, 50, 'folder', false);
+    });
+    mailboxRefreshRef.current = 2;
+    await act(async () => {
+      await result.current.loadMessages(102, '', 'all', 1, 2, 50, 'folder', false);
+    });
+
+    firstCount.resolve(1202);
+    await act(async () => { await Promise.resolve(); });
+    expect(setMessageCount).not.toHaveBeenLastCalledWith(1202);
+
+    secondCount.resolve(4);
+    await act(async () => { await Promise.resolve(); });
+    expect(setMessageCount).toHaveBeenLastCalledWith(4);
+  });
+
   it('does not commit an A message response after the mailbox has switched to B', async () => {
     const messagesResponse = deferred<MessageSummary[]>();
     mockInvoke.mockImplementation((() => messagesResponse.promise) as never);

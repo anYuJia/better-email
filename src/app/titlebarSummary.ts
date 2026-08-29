@@ -10,11 +10,14 @@ import type { ListMode, MailStats } from './types';
  */
 export function buildTitlebarViewSummary(
   listMode: ListMode,
-  stats: MailStats | null,
+  _stats: MailStats | null,
   threadCount: number,
+  messageCount: number | null = null,
 ): string | undefined {
   if (listMode === 'messages') {
-    return stats ? `${stats.total_messages} 封` : undefined;
+    // The title bar must follow the selected folder/search scope. stats is
+    // account-wide and includes folders that are not present in the list.
+    return messageCount === null ? undefined : `${messageCount} 封`;
   }
   return `${threadCount} 个会话`;
 }

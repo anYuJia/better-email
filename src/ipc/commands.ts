@@ -43,6 +43,7 @@ export const IPC = {
   GetAccount: 'get_account',
   GetBackgroundTask: 'get_background_task',
   GetMessageDetail: 'get_message_detail',
+  GetMessageCount: 'get_message_count',
   GetStartupStatus: 'get_startup_status',
   GetStartupTimeline: 'get_startup_timeline',
   GetStats: 'get_stats',

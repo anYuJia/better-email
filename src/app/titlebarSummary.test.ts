@@ -11,12 +11,13 @@ const stats: MailStats = {
 };
 
 describe('buildTitlebarViewSummary', () => {
-  it('uses the account-scoped total instead of the selected folder list size', () => {
-    expect(buildTitlebarViewSummary('messages', stats, 1)).toBe('93 封');
+  it('uses the exact selected folder/search result count instead of account-wide stats', () => {
+    expect(buildTitlebarViewSummary('messages', stats, 1, 50)).toBe('50 封');
   });
 
-  it('does not show a folder-sized fallback while the account total is loading', () => {
+  it('does not use the account-wide total while the scoped count is loading', () => {
     expect(buildTitlebarViewSummary('messages', null, 1)).toBeUndefined();
+    expect(buildTitlebarViewSummary('messages', stats, 1)).toBeUndefined();
   });
 
   it('keeps the conversation summary for conversation mode', () => {

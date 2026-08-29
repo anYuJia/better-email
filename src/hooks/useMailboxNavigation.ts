@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { messagePageSize } from '../app/appConfig';
 import type {
   Account,
@@ -96,6 +96,7 @@ export default function useMailboxNavigation({
   setStatus,
   setThreadMessages,
 }: UseMailboxNavigationOptions) {
+  const [scopeRevision, setScopeRevision] = useState(0);
   const accountIdForScope = useCallback((scope: AccountScope): number | null => {
     return scope === 'all' ? null : scope;
   }, []);
@@ -323,6 +324,7 @@ export default function useMailboxNavigation({
 
   const changeAccountScope = useCallback((value: string) => {
     mailboxRefreshRef.current += 1;
+    setScopeRevision((current) => current + 1);
     const nextScope = value === 'all' ? 'all' : Number(value);
     setAccountScope(nextScope);
     resetSearch();
@@ -346,6 +348,7 @@ export default function useMailboxNavigation({
     setSelectedMessageIds,
     setStatus,
     setThreadMessages,
+    setScopeRevision,
   ]);
 
   const selectFolder = useCallback((nextFolderId: number) => {
@@ -356,6 +359,7 @@ export default function useMailboxNavigation({
   }, [mailboxRefreshRef, resetSearch, setFolderId, skipNextFolderEffectLoadRef]);
 
   return {
+    scopeRevision,
     accountIdForScope,
     scrollSettingsSection,
     openSettingsHome,

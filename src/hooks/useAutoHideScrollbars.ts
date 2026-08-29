@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { installScrollbarThumbDrag } from './scrollbarThumbDrag';
 
 const SCROLLBAR_HIDE_DELAY_MS = 1200;
 const SCROLLBAR_THUMB_SIZE_PX = 6;
@@ -12,6 +13,7 @@ type ScrollbarOverlay = {
   vertical: HTMLDivElement;
   horizontal: HTMLDivElement;
   timer: number | null;
+  dragCleanup: Array<() => void>;
 };
 
 function hasScrollableOverflow(element: HTMLElement): boolean {
@@ -40,6 +42,7 @@ function createOverlay(): ScrollbarOverlay {
     vertical: createThumb('vertical'),
     horizontal: createThumb('horizontal'),
     timer: null,
+    dragCleanup: [],
   };
   document.body.append(overlay.vertical, overlay.horizontal);
   return overlay;
@@ -118,6 +121,8 @@ function findScrollableAncestor(target: EventTarget | null, root: HTMLElement): 
 export default function useAutoHideScrollbars() {
   const timersRef = useRef<Map<HTMLElement, number>>(new Map());
   const overlaysRef = useRef<Map<HTMLElement, ScrollbarOverlay>>(new Map());
+  const draggingTargetsRef = useRef<Set<HTMLElement>>(new Set());
+  const disposingTargetsRef = useRef<Set<HTMLElement>>(new Set());
 
   useEffect(() => {
     const appDocument = document.body;
@@ -126,17 +131,26 @@ export default function useAutoHideScrollbars() {
     const disposeOverlay = (element: HTMLElement) => {
       const overlay = overlaysRef.current.get(element);
       if (!overlay) return;
+      // Drag cleanup invokes onDragEnd. Mark the target first so that ending
+      // a drag during unmount cannot schedule a new hide timer/recreate the
+      // overlay while it is being removed.
+      disposingTargetsRef.current.add(element);
       if (overlay.timer !== null) window.clearTimeout(overlay.timer);
+      overlay.dragCleanup.forEach((cleanup) => cleanup());
+      overlay.dragCleanup = [];
+      draggingTargetsRef.current.delete(element);
       overlay.vertical.remove();
       overlay.horizontal.remove();
       overlaysRef.current.delete(element);
       timersRef.current.delete(element);
       element.removeAttribute(SCROLLBAR_STATE_ATTRIBUTE);
+      disposingTargetsRef.current.delete(element);
     };
 
     const hideOverlay = (element: HTMLElement) => {
       const overlay = overlaysRef.current.get(element);
       if (!overlay) return;
+      if (draggingTargetsRef.current.has(element)) return;
       hideThumb(overlay.vertical);
       hideThumb(overlay.horizontal);
       element.removeAttribute(SCROLLBAR_STATE_ATTRIBUTE);
@@ -153,20 +167,63 @@ export default function useAutoHideScrollbars() {
       if (!overlay) {
         overlay = createOverlay();
         overlaysRef.current.set(target, overlay);
+        const createdOverlay = overlay;
+        const installDrag = (thumb: HTMLDivElement, axis: 'vertical' | 'horizontal') => (
+          installScrollbarThumbDrag({
+            thumb,
+            axis,
+            getTarget: () => target,
+            getMetrics: () => {
+              const isVertical = axis === 'vertical';
+              const viewportLength = isVertical ? target.clientHeight : target.clientWidth;
+              const contentLength = isVertical ? target.scrollHeight : target.scrollWidth;
+              const scrollOffset = isVertical ? target.scrollTop : target.scrollLeft;
+              const thumbLength = Number.parseFloat(
+                isVertical ? thumb.style.height : thumb.style.width,
+              ) || (isVertical ? thumb.getBoundingClientRect().height : thumb.getBoundingClientRect().width);
+              return {
+                viewportLength,
+                contentLength,
+                scrollOffset,
+                thumbLength,
+                thumbTravel: Math.max(0, viewportLength - thumbLength),
+              };
+            },
+            onDragStart: () => {
+              draggingTargetsRef.current.add(target);
+              if (createdOverlay.timer !== null) {
+                window.clearTimeout(createdOverlay.timer);
+                createdOverlay.timer = null;
+              }
+              target.setAttribute(SCROLLBAR_STATE_ATTRIBUTE, 'true');
+            },
+            onDrag: () => updateOverlay(target, createdOverlay),
+            onDragEnd: () => {
+              draggingTargetsRef.current.delete(target);
+              if (!disposingTargetsRef.current.has(target)) showOverlay(target);
+            },
+          })
+        );
+        createdOverlay.dragCleanup = [
+          installDrag(createdOverlay.vertical, 'vertical'),
+          installDrag(createdOverlay.horizontal, 'horizontal'),
+        ];
       }
 
       target.setAttribute(SCROLLBAR_STATE_ATTRIBUTE, 'true');
       updateOverlay(target, overlay);
 
-      if (overlay.timer !== null) window.clearTimeout(overlay.timer);
-      overlay.timer = window.setTimeout(() => {
-        if (!appDocument.contains(target)) {
-          disposeOverlay(target);
-          return;
-        }
-        hideOverlay(target);
-      }, SCROLLBAR_HIDE_DELAY_MS);
-      timersRef.current.set(target, overlay.timer);
+      if (!draggingTargetsRef.current.has(target)) {
+        if (overlay.timer !== null) window.clearTimeout(overlay.timer);
+        overlay.timer = window.setTimeout(() => {
+          if (!appDocument.contains(target)) {
+            disposeOverlay(target);
+            return;
+          }
+          hideOverlay(target);
+        }, SCROLLBAR_HIDE_DELAY_MS);
+        timersRef.current.set(target, overlay.timer);
+      }
     };
 
     const handleScroll = (event: Event) => {

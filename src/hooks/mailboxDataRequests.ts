@@ -15,6 +15,7 @@ export type MailboxRequestArgs = {
   filter: FilterMode;
   sort: ListSort;
   limit: number;
+  offset?: number;
 };
 
 export type MailboxRequests = {
@@ -39,6 +40,7 @@ export function buildMailboxRequests(
   filter: FilterMode,
   sort: ListSort,
   limit: number,
+  offset = 0,
 ): MailboxRequests {
   const trimmedQuery = query.trim();
   const effectiveSearchScope = trimmedQuery ? searchScope : 'folder';
@@ -57,10 +59,12 @@ export function buildMailboxRequests(
     filter,
     sort,
   };
+  const page = offset > 0 ? { offset } : {};
   return {
     messages: {
       ...common,
       limit: limit + 1,
+      ...page,
     },
     threads: {
       ...common,

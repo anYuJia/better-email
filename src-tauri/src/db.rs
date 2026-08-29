@@ -38,6 +38,8 @@ mod messages;
 mod migrations;
 mod oauth;
 mod outbox;
+#[cfg(test)]
+mod paging_tests;
 mod search;
 mod sync;
 

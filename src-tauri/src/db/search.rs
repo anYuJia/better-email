@@ -201,7 +201,7 @@ pub(super) fn build_message_summary_query(
     }
     sql.push_str("ORDER BY ");
     sql.push_str(message_order_clause(sort));
-    sql.push_str(" LIMIT ?");
+    sql.push_str(" LIMIT ? OFFSET ?");
     sql
 }
 pub(super) fn normalized_list_sort(sort: Option<&str>) -> &'static str {

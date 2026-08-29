@@ -15,6 +15,8 @@ import type { MailboxDataController } from './useMailboxData';
 
 type UseMailboxBootstrapOptions = {
   accountScope: AccountScope;
+  /** Increments for every explicit account-scope selection, including same-scope reselects. */
+  scopeRevision?: number;
   folderId: number | null;
   appliedQuery: string;
   filter: FilterMode;
@@ -40,6 +42,7 @@ type UseMailboxBootstrapOptions = {
  */
 export default function useMailboxBootstrap({
   accountScope,
+  scopeRevision = 0,
   folderId,
   appliedQuery,
   filter,
@@ -53,22 +56,35 @@ export default function useMailboxBootstrap({
   setAccountScope,
   setStatus,
 }: UseMailboxBootstrapOptions) {
-  const initializedScopeRef = useRef<AccountScope | null>(null);
+  const initializedScopeRef = useRef<{ scope: AccountScope; revision: number } | null>(null);
 
   useEffect(() => {
+    const bootstrapKey = { scope: accountScope, revision: scopeRevision };
     if (navigationScopeClaimRef.current === accountScope) {
-      initializedScopeRef.current = accountScope;
+      initializedScopeRef.current = bootstrapKey;
       return;
     }
-    if (initializedScopeRef.current === accountScope) return;
-    initializedScopeRef.current = accountScope;
+    const initializedScope = initializedScopeRef.current;
+    if (
+      initializedScope?.scope === accountScope
+      && initializedScope.revision === scopeRevision
+    ) {
+      return;
+    }
+    initializedScopeRef.current = bootstrapKey;
 
     // refreshMailbox explicitly loads the resolved folder. Keep this claim
     // until the folder effect observes loadMeta's setFolderId and consumes it.
     skipNextFolderEffectLoadRef.current = true;
     refreshMailbox(accountScope, null)
       .then((resolvedFolderId) => {
-        if (initializedScopeRef.current !== accountScope) return;
+        const currentBootstrap = initializedScopeRef.current;
+        if (
+          currentBootstrap?.scope !== accountScope
+          || currentBootstrap.revision !== scopeRevision
+        ) {
+          return;
+        }
         // A scope change can legitimately resolve to the folder that was
         // already selected. In that case React has no folder change to drive
         // the effect below, so release the claim here instead of letting the
@@ -81,7 +97,13 @@ export default function useMailboxBootstrap({
         }
       })
       .catch((error) => {
-        if (initializedScopeRef.current !== accountScope) return;
+        const currentBootstrap = initializedScopeRef.current;
+        if (
+          currentBootstrap?.scope !== accountScope
+          || currentBootstrap.revision !== scopeRevision
+        ) {
+          return;
+        }
         skipNextFolderEffectLoadRef.current = false;
         if (typeof accountScope === 'number') {
           // The remembered account may have been removed. The new scope owns
@@ -91,7 +113,7 @@ export default function useMailboxBootstrap({
         }
         setStatus(String(error));
       });
-  }, [accountScope]);
+  }, [accountScope, scopeRevision]);
 
   useEffect(() => {
     if (!folderId) return;

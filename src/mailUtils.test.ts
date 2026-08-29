@@ -4,6 +4,10 @@ import {
   formatBytes,
   formatDate,
   messageDateGroup,
+  localDateKey,
+  messageMatchesLocalDateRange,
+  messageMatchesLocalDateTimeRange,
+  resolveLocalDateTimeRange,
   mailboxListPreview,
   newMailNotificationDecision,
   newMailNotificationBody,
@@ -52,6 +56,32 @@ describe('mail UI utilities', () => {
     });
     expect(messageDateGroup(new Date(2026, 5, 30, 12, 0, 0).toString(), now)).toEqual({ id: 'earlier', label: '更早' });
     expect(messageDateGroup('not-a-date', now)).toEqual({ id: 'unknown', label: '时间未知' });
+  });
+
+  it('compares date ranges by local calendar dates, including both boundaries', () => {
+    const start = new Date(2026, 6, 11, 0, 5).toISOString();
+    const end = new Date(2026, 6, 12, 23, 55).toISOString();
+    expect(localDateKey(start)).toBe('2026-07-11');
+    expect(messageMatchesLocalDateRange(start, '2026-07-11', '2026-07-12')).toBe(true);
+    expect(messageMatchesLocalDateRange(end, '2026-07-11', '2026-07-12')).toBe(true);
+    expect(messageMatchesLocalDateRange(new Date(2026, 6, 10, 23, 59).toISOString(), '2026-07-11', '2026-07-12')).toBe(false);
+    expect(messageMatchesLocalDateRange('not-a-date', '2026-07-11', '2026-07-12')).toBe(false);
+  });
+
+  it('validates local date-time ranges, supports 24:00:00, and includes seconds', () => {
+    const range = {
+      startDate: '2026-12-31',
+      startTime: '24:00:00',
+      endDate: '2027-01-01',
+      endTime: '00:00:00',
+    };
+    expect(resolveLocalDateTimeRange(range).valid).toBe(true);
+    expect(messageMatchesLocalDateTimeRange(new Date(2026, 11, 31, 23, 59, 59).toISOString(), range)).toBe(false);
+    expect(messageMatchesLocalDateTimeRange(new Date(2027, 0, 1, 0, 0, 0).toISOString(), range)).toBe(true);
+    expect(messageMatchesLocalDateTimeRange(new Date(2027, 0, 1, 0, 0, 1).toISOString(), range)).toBe(false);
+    expect(resolveLocalDateTimeRange({ ...range, startTime: '24:00:01' }).valid).toBe(false);
+    expect(resolveLocalDateTimeRange({ ...range, startDate: '2026-02-30' }).valid).toBe(false);
+    expect(resolveLocalDateTimeRange({ ...range, startDate: '2027-01-02' }).valid).toBe(false);
   });
 
   it('formats attachment sizes for common mail UI ranges', () => {

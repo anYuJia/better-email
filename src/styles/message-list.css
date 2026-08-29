@@ -87,12 +87,20 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  cursor: grab;
+  touch-action: none;
   transition: opacity var(--ui-motion-fast) var(--ui-ease-standard), visibility var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .message-list-scrollbar-thumb.is-visible {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.message-list-scrollbar-thumb.is-dragging {
+  cursor: grabbing;
+  transition: none;
 }
 
 .message-list-viewport-wrapper,
@@ -806,6 +814,188 @@
  * no large letter-spacing, no independent card.
  * ------------------------------------------------------------------------- */
 
+.message-selection-strip {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  box-sizing: border-box;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 78%, transparent);
+  color: var(--ui-text-secondary);
+  background: var(--ui-list);
+}
+
+.message-list:has(.message-selection-strip) .message-date-header {
+  top: 32px;
+}
+
+.message-selection-all,
+.message-date-header-selection {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.message-selection-all {
+  position: absolute;
+  left: 12px;
+  top: 0;
+  width: auto;
+  height: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-self: start;
+}
+
+.message-selection-all-label {
+  color: var(--ui-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.message-selection-strip-summary {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  transform: translateX(-50%);
+  max-width: calc(100% - 180px);
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta);
+  font-weight: 500;
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.message-date-range-trigger {
+  position: absolute;
+  right: 12px;
+  top: 3px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 42%, transparent);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-accent-soft) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
+  backdrop-filter: blur(6px);
+  line-height: 1;
+}
+
+.message-date-range-trigger::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+.message-date-range-trigger:hover,
+.message-date-range-trigger[aria-expanded="true"] {
+  color: var(--ui-text-on-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+.message-date-range-trigger:active {
+  transform: translateY(1px);
+}
+
+.message-date-range-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.message-date-range-trigger:disabled::after {
+  pointer-events: none;
+}
+
+.message-selection-all input,
+.message-date-header-selection input {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+
+.message-selection-all input:disabled,
+.message-date-header-selection input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.message-selection-all input::before,
+.message-date-header-selection input::before {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border: solid var(--ui-accent);
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+}
+
+.message-selection-all input:checked,
+.message-date-header-selection input:checked {
+  border-color: var(--ui-accent);
+}
+
+.message-selection-all input:checked::before,
+.message-date-header-selection input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.message-selection-all input:indeterminate,
+.message-date-header-selection input:indeterminate {
+  border-color: var(--ui-accent);
+}
+
+.message-selection-all input:indeterminate::before,
+.message-date-header-selection input:indeterminate::before {
+  width: 8px;
+  height: 2px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ui-accent);
+  transform: none;
+}
+
+.message-selection-all input:focus-visible,
+.message-date-header-selection input:focus-visible,
+.message-date-range-trigger:focus-visible,
+.message-date-range-modal button:focus-visible,
+.message-date-range-modal input:focus-visible,
+.message-date-range-modal select:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.message-selection-all input:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .message-date-header {
   position: sticky;
   top: 0;
@@ -825,6 +1015,20 @@
   letter-spacing: 0;
   text-transform: none;
   border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 72%, transparent);
+}
+
+.message-date-header-selection {
+  min-width: 44px;
+  min-height: 30px;
+  margin-left: -6px;
+  padding: 0 6px;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 7px;
+}
+
+.message-date-header-selection > span {
+  color: var(--ui-text-tertiary);
 }
 
 .message-date-header em {
@@ -2242,4 +2446,241 @@
   .message-chips span {
     font-size: 12px;
   }
+}
+
+.message-date-range-backdrop {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.5);
+}
+
+.message-date-range-modal {
+  box-sizing: border-box;
+  width: min(760px, 100%);
+  max-height: min(720px, calc(100dvh - 32px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 82%, transparent);
+  border-radius: var(--ui-radius-modal);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-float);
+}
+
+.message-date-range-modal-header {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.message-date-range-modal-header h2 {
+  margin: 0;
+  font-size: var(--ui-font-size-section);
+  font-weight: 600;
+  text-align: center;
+}
+
+.message-date-range-modal-header button,
+.message-date-range-calendar-header button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.message-date-range-modal-header button:hover,
+.message-date-range-calendar-header button:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.message-date-range-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+  padding: 16px 20px;
+}
+
+.message-date-range-inputs label {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-date-range-inputs label > span {
+  grid-column: 1 / -1;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta);
+  font-weight: 600;
+}
+
+.message-date-range-inputs input,
+.message-date-range-calendar-selects select {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font: inherit;
+  font-size: 13px;
+}
+
+.message-date-range-input-separator {
+  padding-bottom: 9px;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-meta);
+  text-align: center;
+}
+
+.message-date-range-calendars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0 20px 16px;
+}
+
+.message-date-range-calendar {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+}
+
+.message-date-range-calendar-header {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 4px;
+}
+
+.message-date-range-calendar-selects {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.message-date-range-calendar-selects select {
+  min-height: 30px;
+  padding-inline: 5px;
+  font-size: 12px;
+}
+
+.message-date-range-weekdays,
+.message-date-range-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+
+.message-date-range-weekdays {
+  margin: 10px 0 4px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.message-date-range-days button,
+.message-date-range-day-empty {
+  min-width: 0;
+  min-height: 32px;
+}
+
+.message-date-range-days button {
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.message-date-range-days button:hover,
+.message-date-range-days button:focus-visible {
+  background: var(--quiet-row-hover);
+}
+
+.message-date-range-days button.is-selected,
+.message-date-range-days button[aria-pressed="true"] {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  font-weight: 600;
+}
+
+.message-date-range-modal .message-date-range-error {
+  margin: 0 20px 12px;
+}
+
+.message-date-range-modal .message-date-range-actions {
+  justify-content: flex-end;
+  margin: 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.message-date-range-modal .message-date-range-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+
+.message-date-range-modal .message-date-range-actions button:hover {
+  background: var(--quiet-row-hover);
+}
+
+.message-date-range-modal .message-date-range-actions .message-date-range-confirm {
+  border-color: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+  background: var(--ui-accent);
+}
+
+@media (max-width: 640px) {
+  .message-date-range-inputs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .message-date-range-input-separator { display: none; }
+  .message-date-range-calendars {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 0 16px 14px;
+  }
+  .message-date-range-modal .message-date-range-error { margin-inline: 16px; }
+  .message-date-range-modal .message-date-range-actions { padding-inline: 16px; }
+}
+
+:root[data-theme="dark"] .message-date-range-backdrop {
+  background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
 }

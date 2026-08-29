@@ -56,6 +56,108 @@ function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * Returns a stable YYYY-MM-DD key using the user's local calendar date.
+ * Mail timestamps are absolute instants, but date-range selection is a
+ * calendar operation and must not compare UTC date fragments directly.
+ */
+export function localDateKey(value: string | Date): string | null {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function messageMatchesLocalDateRange(
+  receivedAt: string,
+  startDate: string,
+  endDate: string,
+): boolean {
+  const key = localDateKey(receivedAt);
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return false;
+  }
+  return key >= startDate && key <= endDate;
+}
+
+export type LocalDateTimeRange = {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+};
+
+type LocalDateTimeRangeResult =
+  | { valid: true; startMs: number; endMs: number }
+  | { valid: false; error: string };
+
+function parseLocalDate(value: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) return null;
+  return { year, month, day };
+}
+
+function parseLocalTime(value: string): { hour: number; minute: number; second: number } | null {
+  const match = /^(\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const second = Number(match[3]);
+  if (hour > 24 || minute > 59 || second > 59 || (hour === 24 && (minute !== 0 || second !== 0))) {
+    return null;
+  }
+  return { hour, minute, second };
+}
+
+function localDateTimeMs(dateValue: string, timeValue: string): number | null {
+  const date = parseLocalDate(dateValue);
+  const time = parseLocalTime(timeValue);
+  if (!date || !time) return null;
+  const result = new Date(
+    date.year,
+    date.month - 1,
+    date.day + (time.hour === 24 ? 1 : 0),
+    time.hour === 24 ? 0 : time.hour,
+    time.minute,
+    time.second,
+    0,
+  );
+  return Number.isNaN(result.getTime()) ? null : result.getTime();
+}
+
+export function resolveLocalDateTimeRange(range: LocalDateTimeRange): LocalDateTimeRangeResult {
+  const startMs = localDateTimeMs(range.startDate, range.startTime);
+  const endMs = localDateTimeMs(range.endDate, range.endTime);
+  if (startMs === null || endMs === null) {
+    return { valid: false, error: '请输入有效的日期和时间（时间格式为 HH:MM:SS）' };
+  }
+  if (startMs > endMs) {
+    return { valid: false, error: '开始时间不能晚于结束时间' };
+  }
+  return { valid: true, startMs, endMs };
+}
+
+export function messageMatchesLocalDateTimeRange(
+  receivedAt: string,
+  range: LocalDateTimeRange,
+): boolean {
+  const resolved = resolveLocalDateTimeRange(range);
+  const messageMs = new Date(receivedAt).getTime();
+  return resolved.valid
+    && !Number.isNaN(messageMs)
+    && messageMs >= resolved.startMs
+    && messageMs <= resolved.endMs;
+}
+
 export function messageDateGroup(value: string, now = new Date()): MessageDateGroup {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {

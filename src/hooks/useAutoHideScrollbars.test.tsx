@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import useAutoHideScrollbars from './useAutoHideScrollbars';
 
 function Harness() {
@@ -77,5 +77,48 @@ describe('useAutoHideScrollbars', () => {
 
     expect(portalSurface.getAttribute('data-scrollbar-scrolling')).toBe('true');
     expect(staticSurface.hasAttribute('data-scrollbar-scrolling')).toBe(false);
+  });
+
+  it('maps pointer drag on the overlay thumb to scrollTop and cleans up on release', () => {
+    const appShell = document.createElement('main');
+    document.body.append(appShell);
+    render(<Harness />, { container: appShell });
+    const surface = createScrollableSurface(appShell);
+
+    act(() => surface.dispatchEvent(new Event('scroll')));
+    const thumb = document.querySelector('.auto-scrollbar-thumb--vertical') as HTMLElement;
+    expect(thumb).toBeTruthy();
+    expect(thumb.classList.contains('auto-scrollbar-thumb--visible')).toBe(true);
+
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    act(() => {
+      fireEvent.pointerDown(thumb, { button: 0, pointerId: 7, clientY: 10 });
+      fireEvent.pointerMove(document, { pointerId: 7, clientY: 50 });
+    });
+    expect(surface.scrollTop).toBeGreaterThan(0);
+    expect(thumb.classList.contains('is-dragging')).toBe(true);
+
+    act(() => fireEvent.pointerUp(document, { pointerId: 7, clientY: 50 }));
+    expect(thumb.classList.contains('is-dragging')).toBe(false);
+    expect(document.body.style.userSelect).toBe('');
+    raf.mockRestore();
+  });
+
+  it('does not recreate an overlay when an active drag is disposed', () => {
+    const appShell = document.createElement('main');
+    document.body.append(appShell);
+    const view = render(<Harness />, { container: appShell });
+    const surface = createScrollableSurface(appShell);
+
+    act(() => surface.dispatchEvent(new Event('scroll')));
+    const thumb = document.querySelector('.auto-scrollbar-thumb--vertical') as HTMLElement;
+    act(() => fireEvent.pointerDown(thumb, { button: 0, pointerId: 9, clientY: 10 }));
+    view.unmount();
+
+    expect(document.querySelector('.auto-scrollbar-thumb')).toBeNull();
+    expect(surface.hasAttribute('data-scrollbar-scrolling')).toBe(false);
   });
 });

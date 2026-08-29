@@ -75,7 +75,10 @@ export function CustomSelect({
   portalZIndex = customSelectPortalLayers.default,
   portalOwnerId,
 }: CustomSelectProps) {
-  const activeOption = options.find((o) => o.value === value) || options[0];
+  // An unmatched value is a real empty state. Falling back to the first
+  // option can silently present another account while the selected value is
+  // still loading or has just been removed.
+  const activeOption = options.find((o) => o.value === value);
   const [open, setOpen] = useState(false);
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);

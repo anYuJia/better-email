@@ -70,8 +70,12 @@ const incompleteMailbox: ImapMailboxState = {
 };
 
 function createLoaders() {
-  const loadMessagesWithVisibleFallback = vi.fn(async (): Promise<MessageSummary[]> => []);
+  const loadMessagesWithVisibleFallback = vi.fn<MailboxSearchLoaders['loadMessagesWithVisibleFallback']>(async (...args) => {
+    void args;
+    return [];
+  });
   const loadMessages = vi.fn(async (): Promise<MessageSummary[]> => []);
+  const loadThreads = vi.fn(async () => []);
   const loadMeta = vi.fn(async () => ({ folderId: 101, folders }));
   const syncImapHistoryPage = vi.fn(async () => ({
     id: 1,
@@ -85,9 +89,9 @@ function createLoaders() {
     message: '同步完成',
   }));
   const loadersRef: { current: MailboxSearchLoaders | null } = {
-    current: { loadMessagesWithVisibleFallback, loadMessages, loadMeta, syncImapHistoryPage },
+    current: { loadMessagesWithVisibleFallback, loadMessages, loadThreads, loadMeta, syncImapHistoryPage },
   };
-  return { loadMessagesWithVisibleFallback, loadMessages, loadMeta, syncImapHistoryPage, loadersRef };
+  return { loadMessagesWithVisibleFallback, loadMessages, loadThreads, loadMeta, syncImapHistoryPage, loadersRef };
 }
 
 function renderController({
@@ -282,7 +286,7 @@ describe('useMailboxSearchController', () => {
       await result.current.loadMoreMessages();
     });
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize + messagePageSize, 'folder', false,
+      101, '', 'all', 'all', 1, folders, messagePageSize, 'folder', false, undefined, 0,
     );
     expect(setStatus).toHaveBeenCalledWith('已加载 1 封邮件');
     expect(result.current.loadMoreStatus).toBeNull();
@@ -300,9 +304,29 @@ describe('useMailboxSearchController', () => {
     });
 
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 1, folders, 200, 'folder', false,
+      101, '', 'all', 'all', 1, folders, 199, 'folder', false, undefined, 0, true,
     );
     expect(result.current.loadMoreStatus).toBeNull();
+  });
+
+  it('loadAllMessages collects every stable page without relying on React rerenders', async () => {
+    const { result, loadMessagesWithVisibleFallback } = renderController();
+    const allMessages = Array.from({ length: 500 }, (_, id) => ({ id } as MessageSummary));
+    loadMessagesWithVisibleFallback.mockImplementation(async (...args: unknown[]) => {
+      const offset = Number(args[10] ?? 0);
+      return allMessages.slice(offset, offset + 199);
+    });
+
+    let loaded: MessageSummary[] = [];
+    await act(async () => {
+      loaded = await result.current.loadAllMessages();
+    });
+
+    expect(loaded).toHaveLength(500);
+    expect(new Set(loaded.map((message) => message.id)).size).toBe(500);
+    expect(loadMessagesWithVisibleFallback.mock.calls.map((call) => call[10])).toEqual([
+      0, 199, 398, 500,
+    ]);
   });
 
   it('loadMoreMessages ignores concurrent invocations', async () => {
@@ -339,7 +363,7 @@ describe('useMailboxSearchController', () => {
     expect(syncImapHistoryPage).toHaveBeenCalledWith(7);
     expect(loadMeta).toHaveBeenCalledWith(101, 'all', { mode: 'mailbox' });
     expect(loadMessagesWithVisibleFallback).toHaveBeenLastCalledWith(
-      101, '', 'all', 'all', 1, folders, messagePageSize + messagePageSize, 'folder', false,
+      101, '', 'all', 'all', 1, folders, messagePageSize, 'folder', false, undefined, 2,
     );
     expect(setStatus).toHaveBeenCalledWith('同步完成 · 已显示 1 封邮件');
   });
@@ -441,14 +465,12 @@ describe('useMailboxSearchController', () => {
   });
 
   it('handleShowThreads loads threads in the current scope', async () => {
-    const { result, loadMessagesWithVisibleFallback } = renderController();
+    const { result, loadThreads } = renderController();
     await act(async () => {
       await result.current.handleShowThreads();
     });
     expect(result.current.listMode).toBe('threads');
-    expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'all', 'all', 2, folders, messagePageSize, 'folder', true,
-    );
+    expect(loadThreads).toHaveBeenCalledWith(101, '', 'all', 'all', 2, 'folder');
   });
 
   it('resetSearch clears query filter scope and list mode', () => {

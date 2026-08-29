@@ -4,7 +4,10 @@ import type {
   FilterMode,
   MessageSummary,
 } from '../app/types';
+import { messageMatchesLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils';
 import MessageListCard from './MessageListCard';
+import MessageDateRangePicker from './MessageDateRangePicker';
+import { installScrollbarThumbDrag } from '../hooks/scrollbarThumbDrag';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
@@ -28,7 +31,7 @@ type MessageGroup = {
 };
 
 type FlatListItem =
-  | { type: 'header'; id: string; key: string; label: string; count: number }
+  | { type: 'header'; id: string; key: string; label: string; count: number; messageIds: number[] }
   | { type: 'message'; key: string; message: MessageSummary };
 
 type MessageListViewProps = {
@@ -47,6 +50,10 @@ type MessageListViewProps = {
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
   onToggleAllVisible: (checked: boolean) => void;
+  isSelectingAll?: boolean;
+  onToggleMessageGroup?: (groupId: string, messageIds: number[], checked: boolean) => void | Promise<void>;
+  isSelectingMessageGroup?: boolean;
+  onSelectMessageDateRange?: (range: LocalDateTimeRange) => void;
   onOpenMessageMenu: (message: MessageSummary, x: number, y: number, bulk: boolean) => void;
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
@@ -72,6 +79,10 @@ export default function MessageListView({
   onSelectMessage,
   onToggleMessageSelection,
   onToggleAllVisible,
+  isSelectingAll = false,
+  onToggleMessageGroup,
+  isSelectingMessageGroup = false,
+  onSelectMessageDateRange,
   onOpenMessageMenu,
   onCloseMessageMenu,
   onSetDraggingMessageIds,
@@ -86,6 +97,8 @@ export default function MessageListView({
   const latestScrollTopRef = useRef(initialScrollTop);
   const scrollSaveTimerRef = useRef<number | null>(null);
   const scrollbarHideTimerRef = useRef<number | null>(null);
+  const scrollbarThumbRef = useRef<HTMLDivElement | null>(null);
+  const scrollbarMetricsRef = useRef({ top: 0, height: 0 });
   const rafIdRef = useRef<number | null>(null);
   const listStateKeyRef = useRef<string | null>(null);
   const baselineMessageIdsRef = useRef<Set<number>>(new Set());
@@ -99,6 +112,7 @@ export default function MessageListView({
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const [scrollbarThumb, setScrollbarThumb] = useState({ top: 0, height: 0 });
+  scrollbarMetricsRef.current = scrollbarThumb;
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
   const itemNodeRefs = useRef<Map<string, HTMLElement | null>>(new Map());
   const [loadMoreFocusRequest, setLoadMoreFocusRequest] = useState<{
@@ -156,6 +170,41 @@ export default function MessageListView({
   }, [updateScrollbarThumb]);
 
   useEffect(() => {
+    const thumb = scrollbarThumbRef.current;
+    if (!thumb) return undefined;
+    return installScrollbarThumbDrag({
+      thumb,
+      axis: 'vertical',
+      getTarget: () => listRef.current,
+      getMetrics: () => {
+        const listElement = listRef.current;
+        const height = scrollbarMetricsRef.current.height
+          || Number.parseFloat(thumb.style.height)
+          || 0;
+        return {
+          viewportLength: listElement?.clientHeight ?? 0,
+          contentLength: listElement?.scrollHeight ?? 0,
+          scrollOffset: listElement?.scrollTop ?? 0,
+          thumbLength: height,
+          thumbTravel: Math.max(0, (listElement?.clientHeight ?? 0) - height - SCROLLBAR_INSET_PX * 2),
+        };
+      },
+      onDragStart: () => {
+        if (scrollbarHideTimerRef.current !== null) {
+          window.clearTimeout(scrollbarHideTimerRef.current);
+          scrollbarHideTimerRef.current = null;
+        }
+        setIsScrollbarVisible(true);
+      },
+      onDrag: (scrollTop) => {
+        latestScrollTopRef.current = scrollTop;
+        updateScrollbarThumb(scrollTop);
+      },
+      onDragEnd: () => revealScrollbar(latestScrollTopRef.current),
+    });
+  }, [revealScrollbar, updateScrollbarThumb]);
+
+  useEffect(() => {
     const handleViewportResize = () => {
       setIsMobileViewport(window.innerWidth <= 720);
     };
@@ -210,6 +259,7 @@ export default function MessageListView({
         key: `header-${group.id}`,
         label: group.label,
         count: group.messages.length,
+        messageIds: group.messages.map((message) => message.id),
       });
       for (const msg of group.messages) {
         list.push({ type: 'message', key: `message-${group.id}-${msg.id}`, message: msg });
@@ -217,6 +267,77 @@ export default function MessageListView({
     }
     return list;
   }, [groups]);
+
+  const selectedMessageSet = useMemo(
+    () => new Set(selectedMessageIds),
+    [selectedMessageIds],
+  );
+  const visibleMessageIds = useMemo(
+    () => messages.map((message) => message.id),
+    [messages],
+  );
+  const selectedVisibleMessageCount = useMemo(
+    () => visibleMessageIds.filter((id) => selectedMessageSet.has(id)).length,
+    [selectedMessageSet, visibleMessageIds],
+  );
+  const allVisibleSelected = visibleMessageIds.length > 0
+    && selectedVisibleMessageCount === visibleMessageIds.length;
+  const visibleSelectionIndeterminate = selectedVisibleMessageCount > 0 && !allVisibleSelected;
+  const visibleCheckboxRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (visibleCheckboxRef.current) {
+      visibleCheckboxRef.current.indeterminate = visibleSelectionIndeterminate;
+    }
+  }, [visibleSelectionIndeterminate]);
+
+  const toggleVisibleMessages = useCallback((checked: boolean) => {
+    // The list-level control means all messages in the current result, not
+    // merely the rows currently rendered by the virtual list. Reuse the
+    // existing controller so paginated results are expanded before selection.
+    onToggleAllVisible(checked);
+  }, [onToggleAllVisible]);
+
+  const toggleMessageGroup = useCallback((messageIds: number[], checked: boolean) => {
+    if (onToggleMessageGroup) {
+      // The group id is attached by the virtual header item at call time.
+      return;
+    }
+    messageIds.forEach((messageId) => onToggleMessageSelection(messageId, checked));
+  }, [onToggleMessageGroup, onToggleMessageSelection]);
+
+  const headerCheckboxState = useMemo(() => new Map(
+    groups.map((group) => {
+      const ids = group.messages.map((message) => message.id);
+      const selectedCount = ids.filter((id) => selectedMessageSet.has(id)).length;
+      return [group.id, {
+        checked: ids.length > 0 && selectedCount === ids.length,
+        indeterminate: selectedCount > 0 && selectedCount < ids.length,
+      }];
+    }),
+  ), [groups, selectedMessageSet]);
+  const headerCheckboxRefs = useRef(new Map<string, HTMLInputElement>());
+
+  useEffect(() => {
+    for (const group of groups) {
+      const state = headerCheckboxState.get(group.id);
+      const input = headerCheckboxRefs.current.get(group.id);
+      if (input) input.indeterminate = Boolean(state?.indeterminate);
+    }
+  }, [groups, headerCheckboxState]);
+
+  const handleDateRangeConfirm = useCallback((range: LocalDateTimeRange) => {
+    if (onSelectMessageDateRange) {
+      onSelectMessageDateRange(range);
+      return;
+    }
+    const matchingIds = new Set(
+      messages
+        .filter((message) => messageMatchesLocalDateTimeRange(message.received_at, range))
+        .map((message) => message.id),
+    );
+    messages.forEach((message) => onToggleMessageSelection(message.id, matchingIds.has(message.id)));
+  }, [messages, onSelectMessageDateRange, onToggleMessageSelection]);
 
   const { layout, totalHeight } = useMemo(() => {
     const getItemHeight = (item: FlatListItem) => {
@@ -350,10 +471,6 @@ export default function MessageListView({
     updateScrollbarThumb();
   }, [layout, updateScrollbarThumb]);
 
-  const selectedMessageSet = useMemo(
-    () => new Set(selectedMessageIds),
-    [selectedMessageIds],
-  );
   const messagePositionById = useMemo(
     () => new Map(messages.map((message, index) => [message.id, index + 1])),
     [messages],
@@ -468,6 +585,28 @@ export default function MessageListView({
         onScroll={handleListScroll}
       >
       {messages.length > 0 && (
+        <>
+        <div className="message-selection-strip" aria-label="邮件批量选择操作">
+          <label className="message-selection-all">
+            <input
+              ref={visibleCheckboxRef}
+              type="checkbox"
+              aria-label="选择当前列表中的全部可见邮件"
+              aria-checked={visibleSelectionIndeterminate ? 'mixed' : allVisibleSelected}
+              checked={allVisibleSelected}
+              disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
+              onChange={(event) => toggleVisibleMessages(event.target.checked)}
+            />
+            <span className="message-selection-all-label">全部</span>
+          </label>
+          <MessageDateRangePicker
+            onConfirm={handleDateRangeConfirm}
+            disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
+          />
+          <span className="message-selection-strip-summary" aria-live="polite">
+            {selectedVisibleMessageCount > 0 ? `已选 ${selectedVisibleMessageCount} 封` : '选择邮件'}
+          </span>
+        </div>
         <div
           className="message-list-viewport-wrapper"
           style={{
@@ -479,9 +618,10 @@ export default function MessageListView({
           {visibleItems.map(({ index, item, style }) => {
             const itemKey = item.key;
             if (item.type === 'header') {
+              const checkboxState = headerCheckboxState.get(item.id) ?? { checked: false, indeterminate: false };
               return (
-                <header
-                  role="separator"
+                <div
+                  role="group"
                   aria-label={`${item.label}，${item.count} 封`}
                   className={[
                     'message-date-header',
@@ -497,9 +637,29 @@ export default function MessageListView({
                     }
                   }}
                 >
-                  <span>{item.label}</span>
+                  <label className="message-date-header-selection">
+                    <input
+                      ref={(element) => {
+                        if (element) headerCheckboxRefs.current.set(item.id, element);
+                        else headerCheckboxRefs.current.delete(item.id);
+                      }}
+                      type="checkbox"
+                      aria-label={`选择${item.label}邮件`}
+                      aria-checked={checkboxState.indeterminate ? 'mixed' : checkboxState.checked}
+                      checked={checkboxState.checked}
+                      disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
+                      onChange={(event) => {
+                        if (onToggleMessageGroup) {
+                          void onToggleMessageGroup(item.id, item.messageIds, event.target.checked);
+                        } else {
+                          toggleMessageGroup(item.messageIds, event.target.checked);
+                        }
+                      }}
+                    />
+                    <span>{item.label}</span>
+                  </label>
                   <em>{item.count} 封</em>
-                </header>
+                </div>
               );
             } else {
               const message = item.message;
@@ -602,6 +762,7 @@ export default function MessageListView({
             </span>
           </div>
         </div>
+        </>
       )}
 
       {messages.length === 0 && (
@@ -632,6 +793,7 @@ export default function MessageListView({
       </div>
       <div
         className={`message-list-scrollbar-thumb${isScrollbarVisible && scrollbarThumb.height > 0 ? ' is-visible' : ''}`}
+        ref={scrollbarThumbRef}
         aria-hidden="true"
         role="presentation"
         style={{

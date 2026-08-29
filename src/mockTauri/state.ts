@@ -576,6 +576,7 @@ export function listMessages(args: InvokeArgs) {
   const filter = String(args?.filter ?? 'all');
   const sort = normalizeListSort(args?.sort);
   const limit = Math.max(1, Number(args?.limit ?? 80));
+  const offset = Math.max(0, Number(args?.offset ?? 0));
   const accountId = Number(args?.accountId ?? 0);
   const folderId = Number(args?.folderId ?? 0);
   const folder = folders.find((entry) => entry.id === folderId);
@@ -647,7 +648,7 @@ export function listMessages(args: InvokeArgs) {
       }
     }
     return true;
-  }).sort((left, right) => compareMessagesBySort(left, right, sort)).slice(0, limit);
+  }).sort((left, right) => compareMessagesBySort(left, right, sort)).slice(offset, offset + limit);
   return list.map((message: any) => {
     const { body, sanitized_html, ...rest } = message;
     return rest;

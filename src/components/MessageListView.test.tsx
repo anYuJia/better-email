@@ -155,6 +155,80 @@ describe('MessageListView theme-safe separators', () => {
     expect(list.scrollTop).toBe(136);
   });
 
+  it('exposes list and date-group selection controls with mixed states', () => {
+    const second = { ...message, id: 2, remote_uid: 2 };
+    const third = { ...message, id: 3, remote_uid: 3 };
+    const onToggleAllVisible = vi.fn();
+    const onToggleMessageGroup = vi.fn();
+    const onSelectMessageDateRange = vi.fn();
+    const { rerender } = render(
+      <MessageListView
+        groups={[
+          { id: 'today', label: '今天', messages: [message, second] },
+          { id: 'yesterday', label: '昨天', messages: [third] },
+        ]}
+        messages={[message, second, third]}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages={false}
+        listStateKey="selection-controls"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={onToggleAllVisible}
+        onToggleMessageGroup={onToggleMessageGroup}
+        onSelectMessageDateRange={onSelectMessageDateRange}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择当前列表中的全部可见邮件' }));
+    expect(onToggleAllVisible).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择今天邮件' }));
+    expect(onToggleMessageGroup).toHaveBeenCalledWith('today', [1, 2], true);
+    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.change(screen.getByLabelText('开始日期'), { target: { value: '2026-08-01' } });
+    fireEvent.change(screen.getByLabelText('结束日期'), { target: { value: '2026-08-09' } });
+    fireEvent.change(screen.getByLabelText('开始时间'), { target: { value: '00:00:00' } });
+    fireEvent.change(screen.getByLabelText('结束时间'), { target: { value: '24:00:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(onSelectMessageDateRange).toHaveBeenCalledWith({
+      startDate: '2026-08-01',
+      startTime: '00:00:00',
+      endDate: '2026-08-09',
+      endTime: '24:00:00',
+    });
+
+    rerender(
+      <MessageListView
+        groups={[
+          { id: 'today', label: '今天', messages: [message, second] },
+          { id: 'yesterday', label: '昨天', messages: [third] },
+        ]}
+        messages={[message, second, third]}
+        query="" filter="all" selectedId={null} hasMoreMessages={false}
+        listStateKey="selection-controls" initialScrollTop={0} selectedMessageIds={[1]}
+        draggingMessageIds={[]} onScrollTopChange={vi.fn()} onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()} onToggleAllVisible={onToggleAllVisible}
+        onToggleMessageGroup={onToggleMessageGroup} onSelectMessageDateRange={onSelectMessageDateRange}
+        onOpenMessageMenu={vi.fn()} onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()} onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()} onLoadMore={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: '选择今天邮件' }).getAttribute('aria-checked')).toBe('mixed');
+    expect(screen.getByRole('checkbox', { name: '选择当前列表中的全部可见邮件' }).getAttribute('aria-checked')).toBe('mixed');
+  });
+
   it('shows the overlay thumb during list scrolling without adding a track column', () => {
     vi.useFakeTimers();
     const messages = Array.from({ length: 8 }, (_, index) => ({
@@ -202,6 +276,63 @@ describe('MessageListView theme-safe separators', () => {
 
     act(() => vi.advanceTimersByTime(1200));
     expect(thumb.classList.contains('is-visible')).toBe(false);
+  });
+
+  it('drags the local thumb without disabling normal scrolling', () => {
+    const messages = Array.from({ length: 8 }, (_, index) => ({
+      ...message,
+      id: index + 1,
+      remote_uid: index + 1,
+    }));
+    const { container } = render(
+      <MessageListView
+        groups={[{ id: 'today', label: '今天', messages }]}
+        messages={messages}
+        query=""
+        filter="all"
+        selectedId={null}
+        hasMoreMessages={false}
+        listStateKey="local-scrollbar-drag"
+        initialScrollTop={0}
+        selectedMessageIds={[]}
+        draggingMessageIds={[]}
+        onScrollTopChange={vi.fn()}
+        onSelectMessage={vi.fn()}
+        onToggleMessageSelection={vi.fn()}
+        onToggleAllVisible={vi.fn()}
+        onOpenMessageMenu={vi.fn()}
+        onCloseMessageMenu={vi.fn()}
+        onSetDraggingMessageIds={vi.fn()}
+        onClearSearchAndFilter={vi.fn()}
+        onRefresh={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+    const list = container.querySelector('[role="list"]') as HTMLDivElement;
+    Object.defineProperties(list, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 736 },
+    });
+    fireEvent.scroll(list);
+    const thumb = container.querySelector('.message-list-scrollbar-thumb') as HTMLElement;
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    act(() => {
+      fireEvent.pointerDown(thumb, { button: 0, pointerId: 3, clientY: 8 });
+      expect(thumb.classList.contains('is-dragging')).toBe(true);
+      fireEvent.pointerMove(document, { pointerId: 3, clientY: 40 });
+    });
+    expect(list.scrollTop).toBeGreaterThan(0);
+    expect(thumb.classList.contains('is-dragging')).toBe(true);
+    act(() => fireEvent.pointerUp(document, { pointerId: 3, clientY: 40 }));
+    expect(thumb.classList.contains('is-dragging')).toBe(false);
+
+    list.scrollTop = 12;
+    fireEvent.scroll(list);
+    expect(list.scrollTop).toBe(12);
+    raf.mockRestore();
   });
 
   it('虚拟布局行高与单一事实来源常量完全一致', () => {

@@ -11,10 +11,12 @@ import type {
 } from '../app/types';
 import type { MailboxSearchLoaders } from './useMailboxSearchController';
 
-// The native list command clamps a request to 200 rows. This is large enough
-// to make “全选” cover the complete local result set without rendering a
-// second selection model for unloaded rows.
-const SELECT_ALL_MESSAGE_LIMIT = 200;
+// The native list command intentionally caps each page at 200 rows. Larger
+// result sets are read as stable offset pages so selection never silently
+// stops at the backend's per-request safety limit.
+// One extra row is requested by buildMailboxRequests to detect continuation;
+// keep the visible page below the Rust 200-row safety cap.
+const SELECT_ALL_PAGE_SIZE = 199;
 
 type UseMailboxLoadMoreOptions = {
   account: Account | null;
@@ -49,6 +51,7 @@ export default function useMailboxLoadMore({
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadMoreStatus, setLoadMoreStatus] = useState<string | null>(null);
   const loadingMoreRef = useRef(false);
+  const loadedCursorRef = useRef<{ key: string; count: number } | null>(null);
 
   const loadMoreMessages = useCallback(async () => {
     const loaders = loadersRef.current;
@@ -58,9 +61,15 @@ export default function useMailboxLoadMore({
     // 捕获发起时的 mailbox 世代：加载更多期间用户导航到别的视图时，
     // 慢响应不得把旧文件夹的追加结果写回新视图。
     const startedRefreshId = mailboxRefreshRef.current;
+    const cursorKey = `${accountScope}:${folderId ?? 0}:${query}:${filter}:${searchScope}:${startedRefreshId}`;
+    const previousCursor = loadedCursorRef.current;
+    if (!previousCursor || previousCursor.key !== cursorKey || messages.length < previousCursor.count) {
+      loadedCursorRef.current = { key: cursorKey, count: messages.length };
+    }
+    const requestOffset = loadedCursorRef.current?.count ?? messages.length;
     setLoadMoreStatus('正在读取本地缓存...');
     try {
-      const nextLimit = messageLimit + messagePageSize;
+      const nextLimit = messagePageSize;
       const nextMessages = await loaders.loadMessagesWithVisibleFallback(
         folderId,
         query,
@@ -71,7 +80,11 @@ export default function useMailboxLoadMore({
         nextLimit,
         searchScope,
         false,
+        undefined,
+        requestOffset,
       );
+      if (startedRefreshId !== mailboxRefreshRef.current) return nextMessages;
+      loadedCursorRef.current = { key: cursorKey, count: Math.max(requestOffset, nextMessages.length) };
       const folder = folders.find((f) => f.id === folderId);
       const targetAccountId = accountScope === 'all' ? null : account?.id ?? null;
       const scopeMailboxes = targetAccountId
@@ -89,7 +102,7 @@ export default function useMailboxLoadMore({
         targetMailbox = scopeMailboxes.find((m) => !m.history_complete);
       }
 
-      if (nextMessages.length <= messages.length && targetMailbox) {
+      if (nextMessages.length <= requestOffset && targetMailbox) {
         setStatus('正在从服务器同步历史邮件...');
         setLoadMoreStatus('正在从服务器拉取历史邮件...');
         const run = await loaders.syncImapHistoryPage(targetMailbox.account_id);
@@ -106,7 +119,10 @@ export default function useMailboxLoadMore({
           nextLimit,
           searchScope,
           false,
+          undefined,
+          requestOffset,
         );
+        loadedCursorRef.current = { key: cursorKey, count: Math.max(requestOffset, refreshedMessages.length) };
         setStatus(`${run.message} · 已显示 ${refreshedMessages.length} 封邮件`);
         return refreshedMessages;
       } else {
@@ -119,7 +135,6 @@ export default function useMailboxLoadMore({
     }
   }, [
     loadersRef,
-    messageLimit,
     folderId,
     query,
     filter,
@@ -141,24 +156,40 @@ export default function useMailboxLoadMore({
     const startedRefreshId = mailboxRefreshRef.current;
     setLoadMoreStatus('正在读取全部邮件...');
     try {
-      return await loaders.loadMessagesWithVisibleFallback(
-        folderId,
-        query,
-        filter,
-        accountScope,
-        startedRefreshId,
-        folders,
-        Math.max(messageLimit, SELECT_ALL_MESSAGE_LIMIT),
-        searchScope,
-        false,
-      );
+      let loadedMessages: MessageSummary[] = [];
+      let offset = 0;
+      while (true) {
+        const page = await loaders.loadMessagesWithVisibleFallback(
+          folderId,
+          query,
+          filter,
+          accountScope,
+          startedRefreshId,
+          folders,
+          SELECT_ALL_PAGE_SIZE,
+          searchScope,
+          false,
+          undefined,
+          offset,
+          true,
+        );
+        if (startedRefreshId !== mailboxRefreshRef.current) return page;
+        if (page.length === 0) return loadedMessages;
+        const knownIds = new Set(loadedMessages.map((message) => message.id));
+        const newMessages = page.filter((message) => !knownIds.has(message.id));
+        if (newMessages.length === 0) return loadedMessages;
+        loadedMessages = loadedMessages.concat(newMessages);
+        // Offset tracks rows returned by SQLite, not the React state. The
+        // backend returns at most one capped page, so this remains bounded
+        // and independent of transition scheduling.
+        offset += page.length;
+      }
     } finally {
       loadingMoreRef.current = false;
       setLoadMoreStatus(null);
     }
   }, [
     loadersRef,
-    messageLimit,
     folderId,
     query,
     filter,

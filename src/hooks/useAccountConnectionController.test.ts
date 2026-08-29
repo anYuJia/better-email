@@ -8,6 +8,7 @@ import {
   handleAccountDeleteFlow,
   formatInvokeError,
 } from '../app/accountConnectionFlows';
+import { connectionTestFeedbackForReport } from './useAccountConnectionController';
 
 describe('account connection controller helpers', () => {
   it('normalizes known and empty provider keys', () => {
@@ -66,6 +67,17 @@ describe('account connection controller helpers', () => {
     const record = providerVerificationRecordFor('Gmail', {});
     expect(record.provider_key).toBe('gmail');
     expect(record.status).toBe('untested');
+  });
+
+  it('maps connection reports to explicit success or failure feedback', () => {
+    expect(connectionTestFeedbackForReport({ ready_for_credentials: true })).toEqual({
+      tone: 'success',
+      message: '服务器连接成功；账号是否可登录仍需点击“验证登录”',
+    });
+    expect(connectionTestFeedbackForReport({ ready_for_credentials: false })).toEqual({
+      tone: 'error',
+      message: '服务器测试未通过，请查看网络结果',
+    });
   });
 
   it('formats Error objects without exposing a duplicate Error prefix', () => {

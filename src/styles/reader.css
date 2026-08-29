@@ -343,6 +343,35 @@
   left: auto;
 }
 
+/* Keep every reader overflow-menu label on one text column. Icon-bearing
+ * actions occupy the leading column; text-only actions intentionally keep the
+ * same inset so secondary labels and section titles stay left aligned. */
+.reader-more-menu > div {
+  text-align: left;
+}
+
+.reader-more-menu > div .menu-section-title {
+  text-align: left;
+}
+
+.reader-more-menu > div button {
+  position: relative;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 10px;
+  text-align: left;
+}
+
+.reader-more-menu > div button:has(> svg, > .label-dot) {
+  padding-left: 35px;
+}
+
+.reader-more-menu > div button:has(> svg) > svg,
+.reader-more-menu > div button:has(> .label-dot) > .label-dot {
+  position: absolute;
+  left: 10px;
+}
+
 /* The reader overflow menu is short enough to stay in the document flow of
  * the reader viewport. Do not create a second scroll container inside it. */
 .app-shell .reader-more-menu > div {

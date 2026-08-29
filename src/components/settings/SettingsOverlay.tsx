@@ -80,6 +80,8 @@ export type SettingsOverlayProps = {
   accountSettingsDirty: boolean;
   accountSettingsSaving: boolean;
   saveAndVerifyRunning: boolean;
+  connectionTestRunning?: boolean;
+  connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
   saveAndVerifyReport: SaveAndVerifyReport;
   providerVerifications: Record<string, ProviderVerificationRecord>;
   activeProviderVerification: ProviderVerificationRecord | null;
@@ -437,8 +439,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
         subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
         activeSection={activeSettingsSection}
         isDirty={accountSettingsDirty}
-        isBusy={accountSettingsSaving || saveAndVerifyRunning}
+        isBusy={accountSettingsSaving || saveAndVerifyRunning || Boolean(props.connectionTestRunning)}
+        isTestingConnection={props.connectionTestRunning}
         connectionSummary={props.saveAndVerifyReport.summary}
+        connectionTestFeedback={props.connectionTestFeedback}
         canSaveAndVerify={Boolean(accountForm) && Boolean(props.onSaveAndVerify)}
         {...handlers}
       >

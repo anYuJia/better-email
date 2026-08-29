@@ -25,6 +25,8 @@ describe('SettingsFrame dialog behavior', () => {
     activeSection = 'notifications',
     canSaveAndVerify = false,
     isDirty = false,
+    isTestingConnection = false,
+    connectionTestFeedback = null,
     onSave = () => undefined,
     onTestConnection = () => undefined,
     onNavigate = () => undefined,
@@ -33,6 +35,8 @@ describe('SettingsFrame dialog behavior', () => {
     activeSection?: Parameters<typeof SettingsFrame>[0]['activeSection'];
     canSaveAndVerify?: boolean;
     isDirty?: boolean;
+    isTestingConnection?: boolean;
+    connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
     onSave?: () => void;
     onTestConnection?: () => void;
     onNavigate?: (section: Parameters<typeof SettingsFrame>[0]['activeSection']) => void;
@@ -49,6 +53,8 @@ describe('SettingsFrame dialog behavior', () => {
           onSave={onSave}
           canSaveAndVerify={canSaveAndVerify}
           isDirty={isDirty}
+          isTestingConnection={isTestingConnection}
+          connectionTestFeedback={connectionTestFeedback}
           onClose={onClose}
         >
           <input placeholder="设置内输入框" />
@@ -220,6 +226,57 @@ describe('SettingsFrame dialog behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
     expect(onTestConnection).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: '保存账号设置' })).toBeNull();
+  });
+
+  it('shows connection test progress and result in the settings surface', () => {
+    const onTestConnection = vi.fn();
+    const { rerender } = renderFrame({
+      activeSection: 'sync',
+      canSaveAndVerify: true,
+      isTestingConnection: true,
+      onTestConnection,
+    });
+    const button = screen.getByRole('button', { name: '测试连接' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain('测试中…');
+
+    rerender(
+      <div data-testid="app-shell">
+        <SettingsFrame
+          title="设置"
+          subtitle="work@example.com"
+          activeSection="sync"
+          onNavigate={() => undefined}
+          onTestConnection={onTestConnection}
+          onSave={() => undefined}
+          canSaveAndVerify
+          connectionTestFeedback={{ tone: 'success', message: '服务器连接成功' }}
+          onClose={() => undefined}
+        >
+          <input placeholder="设置内输入框" />
+        </SettingsFrame>
+      </div>,
+    );
+    expect(screen.getByRole('status').textContent).toContain('服务器连接成功');
+
+    rerender(
+      <div data-testid="app-shell">
+        <SettingsFrame
+          title="设置"
+          subtitle="work@example.com"
+          activeSection="sync"
+          onNavigate={() => undefined}
+          onTestConnection={onTestConnection}
+          onSave={() => undefined}
+          canSaveAndVerify
+          connectionTestFeedback={{ tone: 'error', message: '测试连接失败：网络不可达' }}
+          onClose={() => undefined}
+        >
+          <input placeholder="设置内输入框" />
+        </SettingsFrame>
+      </div>,
+    );
+    expect(screen.getByRole('alert').textContent).toContain('测试连接失败：网络不可达');
   });
 
   it('keeps sending as a direct top-level navigation entry', () => {

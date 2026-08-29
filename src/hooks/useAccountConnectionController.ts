@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   authTypeChangeMessage,
   isAccountConnectionDirty,
@@ -78,6 +78,14 @@ type UseAccountConnectionControllerOptions = {
   /** 凭据验证成功后回调（登录遮罩关闭，同步转入绑定账号的后台任务）。 */
   onAccountCreated?: (account: Account) => void;
 };
+
+export function connectionTestFeedbackForReport(
+  report: Pick<ConnectionReport, 'ready_for_credentials'>,
+): { tone: 'success' | 'error'; message: string } {
+  return report.ready_for_credentials
+    ? { tone: 'success', message: '服务器连接成功；账号是否可登录仍需点击“验证登录”' }
+    : { tone: 'error', message: '服务器测试未通过，请查看网络结果' };
+}
 
 export default function useAccountConnectionController({
   accounts,
@@ -261,16 +269,49 @@ export default function useAccountConnectionController({
     setStatus('服务商兼容性验证记录已保存到本地');
   }, [accountForm, diagnosticExport, setStatus, updateProviderVerification]);
 
+  const [connectionTestRunning, setConnectionTestRunning] = useState(false);
+  const [connectionTestFeedback, setConnectionTestFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const connectionTestRequestRef = useRef(0);
+
+  useEffect(() => {
+    connectionTestRequestRef.current += 1;
+    setConnectionTestRunning(false);
+    setConnectionTestFeedback(null);
+  }, [accountForm?.id]);
+
   const testConnection = useCallback(async () => {
-    const report = await invoke<ConnectionReport>(IPC.TestConnection, { accountId: accountForm?.id });
-    setConnectionReport(report);
-    setStatus(
-      report.ready_for_credentials
-        ? '服务器连接成功；账号是否可登录仍需点击“验证登录”'
-        : '服务器测试完成，请查看网络结果',
-    );
-    return report;
-  }, [accountForm?.id, setConnectionReport, setStatus]);
+    const requestId = connectionTestRequestRef.current + 1;
+    connectionTestRequestRef.current = requestId;
+    if (!accountForm) {
+      const message = '请先添加邮箱账号';
+      setConnectionTestFeedback({ tone: 'error', message });
+      setStatus(message);
+      return null;
+    }
+    setConnectionTestRunning(true);
+    setConnectionTestFeedback(null);
+    try {
+      const report = await invoke<ConnectionReport>(IPC.TestConnection, { accountId: accountForm.id });
+      if (requestId !== connectionTestRequestRef.current) return report;
+      setConnectionReport(report);
+      const feedback = connectionTestFeedbackForReport(report);
+      setConnectionTestFeedback(feedback);
+      setStatus(feedback.message);
+      return report;
+    } catch (error) {
+      const message = `测试连接失败：${String(error)}`;
+      if (requestId === connectionTestRequestRef.current) {
+        setConnectionTestFeedback({ tone: 'error', message });
+        setStatus(message);
+      }
+      throw error;
+    } finally {
+      if (requestId === connectionTestRequestRef.current) setConnectionTestRunning(false);
+    }
+  }, [accountForm, setConnectionReport, setStatus]);
 
   const verifyAccountCredentials = useCallback(async () => {
     const report = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
@@ -313,6 +354,8 @@ export default function useAccountConnectionController({
     applyNewAccountPreset,
     saveProviderVerification,
     testConnection,
+    connectionTestRunning,
+    connectionTestFeedback,
     verifyAccountCredentials,
     discoverImapFolders,
     runReadOnlyProviderValidation,

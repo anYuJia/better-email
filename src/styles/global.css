@@ -117,6 +117,8 @@ body *::-webkit-resizer {
   z-index: 3200;
   display: block;
   pointer-events: none;
+  cursor: grab;
+  touch-action: none;
   border: 0;
   border-radius: var(--ui-radius-pill);
   background: var(--ui-scrollbar-thumb);
@@ -129,6 +131,12 @@ body *::-webkit-resizer {
 .auto-scrollbar-thumb--visible {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+.auto-scrollbar-thumb.is-dragging {
+  cursor: grabbing;
+  transition: none;
 }
 
 .app-error-boundary {

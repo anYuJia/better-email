@@ -15,6 +15,7 @@ import {
 } from '../app/appConfig';
 import useMailboxLoadMore from './useMailboxLoadMore';
 import useSavedSearches from './useSavedSearches';
+import type { MailboxRefreshRequest } from './useAppMetaLoader';
 import type {
   Account,
   AccountScope,
@@ -41,6 +42,9 @@ export type MailboxSearchLoaders = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
+    mailboxRequest?: MailboxRefreshRequest,
+    nextOffset?: number,
+    nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
   loadMessages: (
     nextFolderId?: number | null,
@@ -51,7 +55,18 @@ export type MailboxSearchLoaders = {
     nextLimit?: number,
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
+    mailboxRequest?: MailboxRefreshRequest,
+    nextOffset?: number,
+    nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
+  loadThreads: (
+    nextFolderId?: number | null,
+    nextQuery?: string,
+    nextFilter?: FilterMode,
+    nextScope?: AccountScope,
+    refreshId?: number,
+    nextSearchScope?: SearchScope,
+  ) => Promise<ThreadSummary[]>;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -71,6 +86,7 @@ type UseMailboxSearchControllerOptions = {
   loadersRef: MutableRefObject<MailboxSearchLoaders | null>;
   setActiveThread: Dispatch<SetStateAction<ThreadSummary | null>>;
   setThreadMessages: Dispatch<SetStateAction<MessageSummary[]>>;
+  setSelectedMessageIds?: Dispatch<SetStateAction<number[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
 };
 
@@ -85,6 +101,7 @@ export default function useMailboxSearchController({
   loadersRef,
   setActiveThread,
   setThreadMessages,
+  setSelectedMessageIds,
   setStatus,
 }: UseMailboxSearchControllerOptions) {
   const [queryState, setQueryState] = useState({
@@ -170,6 +187,7 @@ export default function useMailboxSearchController({
     event.preventDefault();
     const loaders = loadersRef.current;
     if (!loaders) return;
+    setSelectedMessageIds?.([]);
     applyQuery(queryDraft);
     await loaders.loadMessagesWithVisibleFallback(
       folderId,
@@ -194,12 +212,14 @@ export default function useMailboxSearchController({
     searchScope,
     listMode,
     applyQuery,
+    setSelectedMessageIds,
     setStatus,
   ]);
 
   const changeSearchScope = useCallback(async (nextScope: SearchScope) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
+    setSelectedMessageIds?.([]);
     setSearchScope(nextScope);
     setListMode('messages');
     setActiveThread(null);
@@ -227,12 +247,14 @@ export default function useMailboxSearchController({
     folders,
     setActiveThread,
     setThreadMessages,
+    setSelectedMessageIds,
     setStatus,
   ]);
 
   const applySearchShortcut = useCallback(async (shortcutQuery: string) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
+    setSelectedMessageIds?.([]);
     const nextQuery = shortcutQuery.endsWith(':')
       ? `${queryDraft.trim()} ${shortcutQuery}`.trim()
       : shortcutQuery;
@@ -270,6 +292,7 @@ export default function useMailboxSearchController({
     applyQuery,
     setActiveThread,
     setThreadMessages,
+    setSelectedMessageIds,
     setStatus,
   ]);
 
@@ -279,6 +302,7 @@ export default function useMailboxSearchController({
   ) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
+    setSelectedMessageIds?.([]);
     applyQuery('');
     setFilter(nextFilter);
     setSearchScope('folder');
@@ -309,6 +333,7 @@ export default function useMailboxSearchController({
     applyQuery,
     setActiveThread,
     setThreadMessages,
+    setSelectedMessageIds,
     setStatus,
   ]);
 
@@ -316,6 +341,7 @@ export default function useMailboxSearchController({
   const runSavedSearch = useCallback(async (savedSearch: SavedSearch) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
+    setSelectedMessageIds?.([]);
     applyQuery(savedSearch.query);
     setFilter(savedSearch.filter);
     setSearchScope(savedSearch.scope);
@@ -342,15 +368,17 @@ export default function useMailboxSearchController({
     applyQuery,
     setActiveThread,
     setThreadMessages,
+    setSelectedMessageIds,
     setStatus,
   ]);
 
   const resetSearch = useCallback(() => {
+    setSelectedMessageIds?.([]);
     applyQuery('');
     setFilter('all');
     setSearchScope('folder');
     setListMode('messages');
-  }, [applyQuery]);
+  }, [applyQuery, setSelectedMessageIds]);
 
   const handleQueryChange = useCallback((val: string) => {
     setQueryState((current) => (
@@ -388,30 +416,30 @@ export default function useMailboxSearchController({
   // 排序变更也是视图刷新：先自增世代使在途旧请求失效，再应用新排序并触发加载。
   const changeListSort = useCallback((nextSort: ListSort) => {
     mailboxRefreshRef.current += 1;
+    setSelectedMessageIds?.([]);
     setListSort(nextSort);
-  }, [mailboxRefreshRef]);
+  }, [mailboxRefreshRef, setSelectedMessageIds]);
 
   // 筛选变更同样生成独立请求 token：快速连续切换筛选时，旧筛选的在途响应
   // 不得覆盖新筛选的结果。兼容 Dispatch 语义（接受新值或更新函数）。
   const changeFilter = useCallback((nextFilter: SetStateAction<FilterMode>) => {
     mailboxRefreshRef.current += 1;
+    setSelectedMessageIds?.([]);
     setFilter(nextFilter);
-  }, [mailboxRefreshRef]);
+  }, [mailboxRefreshRef, setSelectedMessageIds]);
 
   const handleShowThreads = useCallback(() => {
     const loaders = loadersRef.current;
-    if (!loaders) return;
+    if (!loaders?.loadThreads) return;
+    setSelectedMessageIds?.([]);
     setListMode('threads');
-    loaders.loadMessagesWithVisibleFallback(
+    loaders.loadThreads(
       folderId,
       appliedQuery,
       filter,
       accountScope,
       nextSearchRefreshId(),
-      folders,
-      messageLimit,
       searchScope,
-      true,
     ).catch((error) => setStatus(String(error)));
   }, [
     loadersRef,
@@ -420,9 +448,8 @@ export default function useMailboxSearchController({
     filter,
     accountScope,
     nextSearchRefreshId,
-    folders,
-    messageLimit,
     searchScope,
+    setSelectedMessageIds,
     setStatus,
   ]);
 

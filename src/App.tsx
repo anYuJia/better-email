@@ -50,6 +50,7 @@ import useMailboxSync from './hooks/useMailboxSync';
 import useRuleManagement from './hooks/useRuleManagement';
 import useSnoozeController from './hooks/useSnoozeController';
 import useMessageUndoActions from './hooks/useMessageUndoActions';
+import useMessageSelectionControls from './hooks/useMessageSelectionControls';
 import useSelectedMessageActions from './hooks/useSelectedMessageActions';
 import useSingleMessageActions from './hooks/useSingleMessageActions';
 import useStorageManagement from './hooks/useStorageManagement';
@@ -380,6 +381,7 @@ function MailboxApp() {
     loadersRef: searchLoadersRef,
     setActiveThread,
     setThreadMessages,
+    setSelectedMessageIds,
     setStatus,
   });
   const [isSelectingAllMessages, setIsSelectingAllMessages] = useState(false);
@@ -560,6 +562,7 @@ function MailboxApp() {
   const {
     loadMessages,
     loadMessagesWithVisibleFallback,
+    loadThreads,
     refreshMailbox,
   } = useMailboxData({
     accountScope,
@@ -572,6 +575,7 @@ function MailboxApp() {
     listSort,
     folders,
     imapMailboxes,
+    messages,
     setMessages,
     setThreads,
     setMessageLimit,
@@ -651,6 +655,8 @@ function MailboxApp() {
     applyNewAccountPreset,
     saveProviderVerification,
     testConnection,
+    connectionTestRunning,
+    connectionTestFeedback,
     verifyAccountCredentials,
     discoverImapFolders,
     runReadOnlyProviderValidation,
@@ -686,8 +692,6 @@ function MailboxApp() {
     setImapMailboxes,
     setStatus,
     onAccountCreated: (created) => {
-      // 凭据验证通过：登录遮罩立即关闭；首次同步转入绑定该账号的后台任务，
-      // 与首次引导并行执行，失败可重试，且不会写入其他账号的界面。
       enqueueAccountInitialSync(created.id).catch((error) => {
         setStatus(`首次同步入队失败：${String(error)}，可在侧边栏手动同步`);
       });
@@ -698,6 +702,7 @@ function MailboxApp() {
   searchLoadersRef.current = {
     loadMessagesWithVisibleFallback,
     loadMessages,
+    loadThreads,
     loadMeta,
     syncImapHistoryPage,
   };
@@ -720,6 +725,7 @@ function MailboxApp() {
     openSettingsHome,
     locateProviderWriteValidation,
     focusMailboxRole,
+    scopeRevision,
     currentFolderAccountId,
     visibleFolderIdForRole,
     openThread,
@@ -803,6 +809,7 @@ function MailboxApp() {
 
   useMailboxBootstrap({
     accountScope,
+    scopeRevision,
     folderId,
     appliedQuery,
     filter,
@@ -904,7 +911,6 @@ function MailboxApp() {
     refreshStorageUsage(false).catch((error) => setStatus(String(error)));
     refreshAppSettings().catch((error) => setStatus(String(error)));
   }, [isSettingsOpen, activeSettingsSection]);
-
 
   const {
     isRefreshing,
@@ -1086,6 +1092,14 @@ function MailboxApp() {
       return current.filter((id) => id !== messageId);
     });
   }, []);
+
+  const { toggleGroup, groupSyncBusy, selectDateRange } = useMessageSelectionControls(
+    messages,
+    setSelectedMessageIds,
+    setStatus,
+    loadAllMessages,
+    mailboxRefreshRef,
+  );
 
   const toggleAllVisibleMessages = useCallback(async (checked: boolean): Promise<number | null> => {
     const requestId = selectAllRequestRef.current + 1;
@@ -1691,6 +1705,9 @@ function MailboxApp() {
         onToggleThreadMute={handleToggleThreadMute}
         onSelectMessage={showMessageInNarrowReader}
         onToggleMessageSelection={toggleMessageSelection}
+        onToggleMessageGroup={toggleGroup}
+        isSelectingMessageGroup={groupSyncBusy}
+        onSelectMessageDateRange={selectDateRange}
         onLoadMore={handleLoadMore}
         loadMoreStatus={loadMoreStatus}
       />
@@ -2058,6 +2075,8 @@ function MailboxApp() {
             accountSettingsDirty={accountSettingsDirty}
             accountSettingsSaving={accountSettingsSaving}
             saveAndVerifyRunning={saveAndVerifyRunning}
+            connectionTestRunning={connectionTestRunning}
+            connectionTestFeedback={connectionTestFeedback}
             saveAndVerifyReport={saveAndVerifyReport}
             providerVerifications={providerVerifications}
             activeProviderVerification={activeProviderVerification}
@@ -2118,11 +2137,7 @@ function MailboxApp() {
             onNavigate={scrollSettingsSection}
             onClose={closeSettingsSurface}
             onTestConnection={() => {
-              if (!accountForm) {
-                setStatus('请先添加邮箱账号');
-                return;
-              }
-              testConnection().catch((error) => setStatus(String(error)));
+              testConnection().catch(() => undefined);
             }}
             onSave={() => {
               if (!accountForm) {

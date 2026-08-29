@@ -17,14 +17,16 @@ pub fn list_messages(
     query: Option<String>,
     filter: Option<String>,
     sort: Option<String>,
+    offset: Option<i64>,
     limit: i64,
 ) -> MailResult<Vec<MessageSummary>> {
-    store.list_messages_for_scope_sorted(
+    store.list_messages_for_scope_sorted_page(
         account_id,
         folder_id.unwrap_or_default(),
         query,
         filter,
         sort,
+        offset.unwrap_or_default(),
         limit,
     )
 }

@@ -45,6 +45,20 @@ describe('CustomSelect', () => {
     expect(combobox.hasAttribute('aria-activedescendant')).toBe(false);
   });
 
+  it('shows an explicit empty state when the value is not in the options', () => {
+    render(
+      <CustomSelect
+        ariaLabel={ariaLabel}
+        value="missing"
+        options={options}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: ariaLabel }).textContent).toContain('未选择');
+    expect(screen.queryByText('5 秒')).toBeNull();
+  });
+
   it('wires aria-controls and aria-activedescendant to the portalled listbox', () => {
     render(
       <CustomSelect

@@ -160,7 +160,7 @@
   align-items: center;
   gap: 8px;
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .settings-account-picker .custom-select-menu {
@@ -171,20 +171,32 @@
 .settings-account-picker .custom-select-summary {
   height: 28px;
   min-height: 28px;
+  min-width: 0;
   padding-inline: 8px;
   border-radius: 7px;
   color: var(--st-text);
   background: var(--st-surface);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
+}
+
+.settings-account-picker .custom-select-summary > span {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .settings-account-picker .custom-select-summary strong {
-  font-size: 11px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-account-picker .custom-select-summary small {
-  font-size: 10px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-account-current {
@@ -197,25 +209,48 @@
 .settings-account-current small {
   flex: 0 0 auto;
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .settings-account-current strong {
+  min-width: 0;
   overflow: hidden;
   color: var(--st-text-secondary);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .settings-account-connection-state {
+  min-width: 0;
   max-width: 300px;
   overflow: hidden;
   color: var(--st-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-connection-feedback {
+  margin: 0 22px 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--st-border);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-connection-feedback--success {
+  color: var(--st-success, #16794a);
+  border-color: color-mix(in srgb, var(--st-success, #16794a) 35%, var(--st-border));
+  background: color-mix(in srgb, var(--st-success, #16794a) 8%, var(--st-surface));
+}
+
+.settings-connection-feedback--error {
+  color: var(--st-danger, #b42318);
+  border-color: color-mix(in srgb, var(--st-danger, #b42318) 35%, var(--st-border));
+  background: color-mix(in srgb, var(--st-danger, #b42318) 8%, var(--st-surface));
 }
 
 .settings-context-tabs {

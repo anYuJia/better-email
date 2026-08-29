@@ -15,7 +15,7 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
-import { messageDateGroup } from '../mailUtils';
+import { messageDateGroup, type LocalDateTimeRange } from '../mailUtils';
 import ContextMenu from './ContextMenu';
 import MessageListToolbar from './MessageListToolbar';
 import MessageListView from './MessageListView';
@@ -74,6 +74,9 @@ export type MessageListPaneProps = {
   onToggleThreadMute: (thread: ThreadSummary, messages: MessageSummary[]) => void;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
+  onToggleMessageGroup?: (groupId: string, messageIds: number[], checked: boolean) => void | Promise<void>;
+  isSelectingMessageGroup?: boolean;
+  onSelectMessageDateRange?: (range: LocalDateTimeRange) => void;
   onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
   onOpenNavigation?: () => void;
@@ -123,6 +126,9 @@ function MessageListPane({
   onToggleThreadMute,
   onSelectMessage,
   onToggleMessageSelection,
+  onToggleMessageGroup,
+  isSelectingMessageGroup,
+  onSelectMessageDateRange,
   onLoadMore,
   loadMoreStatus,
   onOpenNavigation,
@@ -332,6 +338,10 @@ function MessageListPane({
           onSelectMessage={onSelectMessage}
           onToggleMessageSelection={onToggleMessageSelection}
           onToggleAllVisible={onToggleAllVisible}
+          isSelectingAll={isSelectingAll}
+          onToggleMessageGroup={onToggleMessageGroup}
+          isSelectingMessageGroup={isSelectingMessageGroup}
+          onSelectMessageDateRange={onSelectMessageDateRange}
           onOpenMessageMenu={handleOpenMessageMenu}
           onCloseMessageMenu={handleCloseMessageMenu}
           onSetDraggingMessageIds={setDraggingMessageIds}

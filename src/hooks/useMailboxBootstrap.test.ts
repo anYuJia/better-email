@@ -7,6 +7,7 @@ import useMailboxBootstrap from './useMailboxBootstrap';
 
 type BootstrapProps = {
   accountScope: number | 'all';
+  scopeRevision?: number;
   folderId: number | null;
   filter: 'all' | 'unread';
   listSort: 'newest' | 'oldest';
@@ -69,6 +70,43 @@ describe('useMailboxBootstrap', () => {
     const { refreshMailbox } = renderBootstrap({ strict: true });
     expect(refreshMailbox).toHaveBeenCalledTimes(1);
     expect(refreshMailbox).toHaveBeenCalledWith('all', null);
+  });
+
+  it('restarts bootstrap when the same scope is explicitly selected again', () => {
+    const { rerender, refreshMailbox } = renderBootstrap();
+
+    rerender({
+      accountScope: 'all',
+      scopeRevision: 1,
+      folderId: null,
+      filter: 'all',
+      listSort: 'newest',
+    });
+
+    expect(refreshMailbox).toHaveBeenCalledTimes(2);
+    expect(refreshMailbox).toHaveBeenLastCalledWith('all', null);
+  });
+
+  it('bootstraps the final scope after rapid switches return to unified mail', () => {
+    const { rerender, refreshMailbox } = renderBootstrap();
+
+    rerender({
+      accountScope: 7,
+      scopeRevision: 1,
+      folderId: null,
+      filter: 'all',
+      listSort: 'newest',
+    });
+    rerender({
+      accountScope: 'all',
+      scopeRevision: 2,
+      folderId: null,
+      filter: 'all',
+      listSort: 'newest',
+    });
+
+    expect(refreshMailbox).toHaveBeenCalledTimes(3);
+    expect(refreshMailbox).toHaveBeenLastCalledWith('all', null);
   });
 
   it('lets refreshMailbox own the folder produced by bootstrap', () => {

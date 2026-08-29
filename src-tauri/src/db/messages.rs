@@ -35,8 +35,28 @@ impl MailStore {
         sort: Option<String>,
         limit: i64,
     ) -> MailResult<Vec<MessageSummary>> {
+        self.list_messages_for_scope_sorted_page(
+            account_id, folder_id, query, filter, sort, 0, limit,
+        )
+    }
+
+    /// Reads one stable page of a message scope. Keeping the page size capped
+    /// protects the renderer and SQLite memory use; callers can advance with
+    /// `offset` instead of repeatedly asking for a larger (and eventually
+    /// clamped) LIMIT.
+    pub fn list_messages_for_scope_sorted_page(
+        &self,
+        account_id: Option<i64>,
+        folder_id: i64,
+        query: Option<String>,
+        filter: Option<String>,
+        sort: Option<String>,
+        offset: i64,
+        limit: i64,
+    ) -> MailResult<Vec<MessageSummary>> {
         self.with_conn(|conn| {
             let limit = limit.clamp(1, 200);
+            let offset = offset.max(0);
             let search = query
                 .map(|q| q.trim().to_string())
                 .filter(|q| !q.is_empty());
@@ -69,6 +89,7 @@ impl MailStore {
             );
             query_params.extend(search_criteria.params().into_iter().map(Value::Text));
             query_params.push(Value::Integer(limit));
+            query_params.push(Value::Integer(offset));
             let mut stmt = conn.prepare(&sql)?;
             let rows = stmt
                 .query_map(params_from_iter(query_params), |row| {

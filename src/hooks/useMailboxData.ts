@@ -25,6 +25,17 @@ import type {
 import { IPC } from '../ipc/commands';
 import { reportStartupMilestone } from '../startupTelemetry';
 
+const THREAD_PAGE_LIMIT = 80;
+
+function mergeMessagePage(
+  current: MessageSummary[],
+  page: MessageSummary[],
+): MessageSummary[] {
+  if (page.length === 0) return current;
+  const knownIds = new Set(current.map((message) => message.id));
+  return current.concat(page.filter((message) => !knownIds.has(message.id)));
+}
+
 type UseMailboxDataOptions = {
   accountScope: AccountScope;
   currentAccountId: number | null;
@@ -36,6 +47,7 @@ type UseMailboxDataOptions = {
   listSort: ListSort;
   folders: Folder[];
   imapMailboxes: ImapMailboxState[];
+  messages?: MessageSummary[];
   setMessages: Dispatch<SetStateAction<MessageSummary[]>>;
   setThreads: Dispatch<SetStateAction<ThreadSummary[]>>;
   setMessageLimit: Dispatch<SetStateAction<number>>;
@@ -65,6 +77,8 @@ export type MailboxDataController = {
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
     mailboxRequest?: MailboxRefreshRequest,
+    nextOffset?: number,
+    nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
   loadMessagesWithVisibleFallback: (
     nextFolderId?: number | null,
@@ -77,7 +91,17 @@ export type MailboxDataController = {
     nextSearchScope?: SearchScope,
     nextIncludeThreads?: boolean,
     mailboxRequest?: MailboxRefreshRequest,
+    nextOffset?: number,
+    nextReturnPageOnly?: boolean,
   ) => Promise<MessageSummary[]>;
+  loadThreads: (
+    nextFolderId?: number | null,
+    nextQuery?: string,
+    nextFilter?: FilterMode,
+    nextScope?: AccountScope,
+    refreshId?: number,
+    nextSearchScope?: SearchScope,
+  ) => Promise<ThreadSummary[]>;
   refreshMailbox: (
     nextScope?: AccountScope,
     preferredFolderId?: number | null,
@@ -97,6 +121,7 @@ export default function useMailboxData({
   listSort,
   folders,
   imapMailboxes,
+  messages = [],
   setMessages,
   setThreads,
   setMessageLimit,
@@ -110,6 +135,8 @@ export default function useMailboxData({
   maybeRunBenchmarkSync,
 }: UseMailboxDataOptions): MailboxDataController {
   const frontendReadyRef = useRef(false);
+  const threadCacheRef = useRef<Map<string, ThreadSummary[]>>(new Map());
+  const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
   activeMailboxScopeRef.current = accountScope;
@@ -138,6 +165,8 @@ export default function useMailboxData({
     nextSearchScope = searchScope,
     nextIncludeThreads = listMode === 'threads',
     mailboxRequest?: MailboxRefreshRequest,
+    nextOffset = 0,
+    nextReturnPageOnly = false,
   ) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
@@ -156,6 +185,7 @@ export default function useMailboxData({
       return [];
     }
     const startedAt = performance.now();
+    if (nextOffset === 0) threadCacheRef.current.clear();
     const stateKey = buildMailboxListStateKey({
       accountScope: nextScope,
       folderId: nextFolderId,
@@ -174,6 +204,7 @@ export default function useMailboxData({
       nextFilter,
       listSort,
       effectiveLimit,
+      nextOffset,
     );
     mailboxFlowLog('loadMessages start', {
       scope: nextScope,
@@ -217,7 +248,16 @@ export default function useMailboxData({
       });
       return nextMessages;
     }
-    const visibleMessages = nextMessages.slice(0, effectiveLimit);
+    const pageMessages = nextMessages.slice(0, effectiveLimit);
+    const messageBuffer = messagePageBufferRef.current;
+    const pageBase = nextOffset > 0 && messageBuffer?.key === stateKey
+      ? messageBuffer.messages
+      : messages;
+    const visibleMessages = nextReturnPageOnly
+      ? pageMessages
+      : nextOffset > 0
+        ? mergeMessagePage(pageBase, pageMessages)
+        : pageMessages;
     const hasMoreRemote = checkHistoryIncomplete(
       nextFolderId,
       nextScope,
@@ -226,6 +266,8 @@ export default function useMailboxData({
       imapMailboxes
     );
     const visibleMessageIds = new Set(visibleMessages.map((message) => message.id));
+    if (nextReturnPageOnly) return visibleMessages;
+    messagePageBufferRef.current = { key: stateKey, messages: visibleMessages };
     // Persist the expanded page before the row transition commits.  A user
     // can invoke a bulk action immediately after loading more; its refresh
     // callback may still come from the previous render, so it must be able to
@@ -281,6 +323,8 @@ export default function useMailboxData({
     nextSearchScope = searchScope,
     nextIncludeThreads = listMode === 'threads',
     mailboxRequest?: MailboxRefreshRequest,
+    nextOffset = 0,
+    nextReturnPageOnly = false,
   ) {
     const nextMessages = await loadMessages(
       nextFolderId,
@@ -292,6 +336,8 @@ export default function useMailboxData({
       nextSearchScope,
       nextIncludeThreads,
       mailboxRequest,
+      nextOffset,
+      nextReturnPageOnly,
     );
     if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
       return nextMessages;
@@ -299,6 +345,8 @@ export default function useMailboxData({
     if (
       nextMessages.length > 0
       || nextSearchScope !== 'folder'
+      || nextOffset > 0
+      || nextReturnPageOnly
       || !nextFolderId
       || nextQuery.trim()
       || nextFilter !== 'all'
@@ -319,6 +367,8 @@ export default function useMailboxData({
       nextSearchScope,
       nextIncludeThreads,
       mailboxRequest,
+      nextOffset,
+      nextReturnPageOnly,
     );
     if (
       unreadMessages.length === 0
@@ -366,10 +416,51 @@ export default function useMailboxData({
     return nextFolderId;
   }
 
+  async function loadThreads(
+    nextFolderId = folderId,
+    nextQuery = query,
+    nextFilter = filter,
+    nextScope: AccountScope = accountScope,
+    refreshId = mailboxRefreshRef.current,
+    nextSearchScope = searchScope,
+  ) {
+    if (nextSearchScope === 'folder' && !nextFolderId) return [];
+    const cacheKey = JSON.stringify([
+      nextScope,
+      currentAccountId,
+      nextFolderId,
+      nextQuery.trim(),
+      nextFilter,
+      nextSearchScope,
+      listSort,
+    ]);
+    const cachedThreads = threadCacheRef.current.get(cacheKey);
+    if (cachedThreads) {
+      if (isMailboxRequestCurrent(nextScope, refreshId)) setThreads(cachedThreads);
+      return cachedThreads;
+    }
+    const requests = buildMailboxRequests(
+      nextScope,
+      currentAccountId,
+      nextFolderId ?? 0,
+      nextSearchScope,
+      nextQuery,
+      nextFilter,
+      listSort,
+      THREAD_PAGE_LIMIT,
+    );
+    const nextThreads = await invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads);
+    if (!isMailboxRequestCurrent(nextScope, refreshId)) return nextThreads;
+    threadCacheRef.current.set(cacheKey, nextThreads);
+    setThreads(nextThreads);
+    return nextThreads;
+  }
+
   return {
     mailboxRefreshRef,
     loadMessages,
     loadMessagesWithVisibleFallback,
+    loadThreads,
     refreshMailbox,
   };
 }

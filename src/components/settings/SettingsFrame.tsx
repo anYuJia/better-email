@@ -47,7 +47,9 @@ type SettingsFrameProps = {
   canSaveAndVerify?: boolean;
   isDirty?: boolean;
   isBusy?: boolean;
+  isTestingConnection?: boolean;
   connectionSummary?: string;
+  connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
   accountOptions?: SettingsAccountOption[];
   activeAccountId?: number | null;
   onSelectAccountId?: (accountId: number) => void;
@@ -164,7 +166,9 @@ export default function SettingsFrame({
   canSaveAndVerify = false,
   isDirty = false,
   isBusy = false,
+  isTestingConnection = false,
   connectionSummary,
+  connectionTestFeedback,
   accountOptions = [],
   activeAccountId = null,
   onSelectAccountId,
@@ -254,11 +258,12 @@ export default function SettingsFrame({
                 className="settings-header-button secondary"
                 aria-label="测试连接"
                 title="测试当前账号的 IMAP 与 SMTP 服务器连接"
-                disabled={isBusy}
+                aria-busy={isTestingConnection}
+                disabled={isBusy || isTestingConnection}
                 onClick={onTestConnection}
               >
-                <FlaskConical size={15} />
-                <span>测试连接</span>
+                {isTestingConnection ? <LoaderCircle className="settings-action-spinner" size={15} /> : <FlaskConical size={15} />}
+                <span>{isTestingConnection ? '测试中…' : '测试连接'}</span>
               </button>
             )}
             {showSaveAction && (
@@ -287,6 +292,15 @@ export default function SettingsFrame({
             </button>
           </div>
         </header>
+
+        {connectionTestFeedback && (
+          <div
+            className={`settings-connection-feedback settings-connection-feedback--${connectionTestFeedback.tone}`}
+            role={connectionTestFeedback.tone === 'error' ? 'alert' : 'status'}
+          >
+            {connectionTestFeedback.message}
+          </div>
+        )}
 
         {showDiscardConfirm && (
           <div className="settings-discard-confirm" role="alertdialog" aria-label="放弃未保存的修改">

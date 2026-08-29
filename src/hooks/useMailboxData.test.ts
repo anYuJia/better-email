@@ -151,6 +151,13 @@ describe('buildMailboxRequests', () => {
       },
     });
   });
+
+  it('adds an offset only for subsequent stable pages', () => {
+    expect(buildMailboxRequests(7, 7, 42, 'folder', '', 'all', 'newest', 199, 199).messages)
+      .toMatchObject({ limit: 200, offset: 199 });
+    expect(buildMailboxRequests(7, 7, 42, 'folder', '', 'all', 'newest', 199, 0).messages)
+      .not.toHaveProperty('offset');
+  });
 });
 
 describe('useMailboxData request guard', () => {
@@ -286,5 +293,90 @@ describe('useMailboxData request guard', () => {
     expect(setters.setSelectedId).not.toHaveBeenCalled();
     expect(setters.setSelectedMessageIds).not.toHaveBeenCalled();
     expect(setters.setThreads).not.toHaveBeenCalled();
+  });
+
+  it('reuses cached threads for repeated toggles in one mailbox context', async () => {
+    mockInvoke.mockResolvedValue([{ thread_key: 'thread-1' }] as never);
+    const setThreads = vi.fn();
+    const mailboxRefreshRef = { current: 3 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      setMessages: vi.fn(),
+      setThreads,
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.loadThreads();
+      for (let index = 0; index < 30; index += 1) {
+        await result.current.loadThreads();
+      }
+    });
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(setThreads).toHaveBeenCalledTimes(31);
+  });
+
+  it('merges a subsequent page from an imperative buffer before React commits', async () => {
+    const setMessages = vi.fn();
+    mockInvoke.mockImplementation((command, args) => {
+      if (command !== 'list_messages') return Promise.resolve(undefined) as never;
+      const offset = Number(args?.offset ?? 0);
+      return Promise.resolve([
+        { id: offset + 1, received_at: `2026-08-09T00:00:0${offset}Z` },
+        { id: offset + 2, received_at: `2026-08-08T00:00:0${offset}Z` },
+      ] as MessageSummary[]) as never;
+    });
+    const mailboxRefreshRef = { current: 9 };
+    const { result } = renderHook(() => useMailboxData({
+      accountScope: 1,
+      currentAccountId: 1,
+      folderId: 101,
+      searchScope: 'folder',
+      query: '',
+      filter: 'all',
+      listMode: 'messages',
+      listSort: 'newest',
+      folders: [],
+      imapMailboxes: [],
+      mailboxRefreshRef,
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+      messages: [],
+      setMessages,
+      setThreads: vi.fn(),
+      setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(),
+      setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(),
+      setStatus: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.loadMessages(101, '', 'all', 1, 9, 1, 'folder', false);
+      await result.current.loadMessages(101, '', 'all', 1, 9, 1, 'folder', false, undefined, 1);
+    });
+    expect(setMessages).toHaveBeenNthCalledWith(1, [{ id: 1, received_at: '2026-08-09T00:00:00Z' }]);
+    expect(setMessages).toHaveBeenNthCalledWith(2, [
+      { id: 1, received_at: '2026-08-09T00:00:00Z' },
+      { id: 2, received_at: '2026-08-09T00:00:01Z' },
+    ]);
   });
 });

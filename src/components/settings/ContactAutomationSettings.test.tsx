@@ -87,6 +87,8 @@ describe('ContactAutomationSettings', () => {
     renderSettings();
 
     expect(screen.getByRole('button', { name: '添加联系人' })).not.toBeNull();
+    expect(screen.getByRole('group', { name: '联系人导入与导出' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '查看导入记录' }).textContent).toContain('导入记录');
     expect(screen.queryByRole('textbox', { name: '联系人名称' })).toBeNull();
     expect(screen.queryByText('合并联系人')).toBeNull();
 

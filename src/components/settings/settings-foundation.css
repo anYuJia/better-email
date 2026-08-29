@@ -94,7 +94,7 @@
 
 /* ── Buttons (base) ─────────────────────────────────────────────── */
 
-.settings-modal :is(.settings-page-content, .settings-account-add-dialog) button {
+.settings-modal :where(.settings-page-content, .settings-account-add-dialog) button {
   min-height: var(--st-control-height);
   border: 1px solid transparent;
   border-radius: var(--st-radius-sm);

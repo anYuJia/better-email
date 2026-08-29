@@ -282,29 +282,8 @@ export default function ContactAutomationSettings({
       title="联系人管理"
       description="别名、VIP和快捷写信"
       actions={
-        <div className="contact-transfer-actions">
+        <div className="contact-primary-actions">
           <SettingsBadge tone="neutral">{contacts.length} 位联系人</SettingsBadge>
-          <SettingsButton
-            size="sm"
-            disabled={transferBusy}
-            title="导入联系人"
-            icon={<FileUp size={14} />}
-            onClick={() => setImportDialogOpen(true)}
-          >
-            导入联系人
-          </SettingsButton>
-          <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
-            导出 vCard
-          </SettingsButton>
-          <SettingsButton
-            size="sm"
-            variant="ghost"
-            className="contact-history-toggle"
-            aria-label="最近导入记录"
-            title="最近导入记录"
-            icon={<History size={14} />}
-            onClick={() => setHistoryDialogOpen(true)}
-          />
           <SettingsButton size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => { triggerRef.current = document.activeElement as HTMLElement; setDialog('create'); }}>
             添加联系人
           </SettingsButton>
@@ -312,6 +291,30 @@ export default function ContactAutomationSettings({
       }
       dataSection="contacts"
     >
+      <div className="contact-transfer-actions" role="group" aria-label="联系人导入与导出">
+        <SettingsButton
+          size="sm"
+          disabled={transferBusy}
+          title="导入联系人"
+          icon={<FileUp size={14} />}
+          onClick={() => setImportDialogOpen(true)}
+        >
+          导入联系人
+        </SettingsButton>
+        <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
+          导出 vCard
+        </SettingsButton>
+        <SettingsButton
+          size="sm"
+          className="contact-history-toggle"
+          aria-label="查看导入记录"
+          title="查看导入记录"
+          icon={<History size={14} />}
+          onClick={() => setHistoryDialogOpen(true)}
+        >
+          导入记录
+        </SettingsButton>
+      </div>
 
       {contacts.length === 0 ? (
         <SettingsEmptyState className="settings-contacts-empty">

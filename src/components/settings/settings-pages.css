@@ -2188,11 +2188,21 @@
  * Contacts & rules pages.
  * ===================================================================== */
 
+.settings-modal .contact-primary-actions,
 .settings-modal .contact-transfer-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.settings-modal .contact-transfer-actions {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal [data-settings-section="contacts"] > .st-section-body {
+  gap: 14px;
 }
 
 .settings-modal .settings-contact-create {
@@ -4530,22 +4540,18 @@
   .settings-modal .contact-transfer-actions {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
-  .settings-modal .contact-transfer-actions .st-badge {
-    grid-column: 1 / -1;
-    justify-self: start;
+  .settings-modal .contact-primary-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .settings-modal .contact-transfer-actions .st-btn {
     width: 100%;
     min-width: 0;
-  }
-
-  .settings-modal .contact-transfer-actions .st-btn-primary {
-    grid-column: 1 / -1;
   }
 
   .settings-modal .settings-contact-list-summary {

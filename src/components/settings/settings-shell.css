@@ -506,6 +506,27 @@
   background: transparent;
 }
 
+.settings-account-picker .custom-select-summary > span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.settings-account-picker .custom-select-summary strong {
+  flex: 0 1 auto;
+}
+
+.settings-account-picker .custom-select-summary small {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-account-picker .custom-select-summary small::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--st-text-tertiary);
+}
+
 .settings-account-picker .custom-select-summary:hover {
   border-color: var(--st-border);
   background: var(--st-surface);

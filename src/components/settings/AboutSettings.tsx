@@ -68,7 +68,6 @@ export default function AboutSettings() {
   return (
     <div className="settings-about-stack">
       <SettingsSection
-        title="Better Email"
         className="settings-about-hero"
       >
         <div className="settings-about-brand">

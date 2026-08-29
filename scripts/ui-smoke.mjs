@@ -606,7 +606,7 @@ async function openContactCreateDialog(cdp) {
     await clickButton(
       cdp,
       '添加联系人',
-      "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions')",
+      "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-primary-actions')",
     );
     await waitForExpression(cdp, "document.querySelector('.contact-create-form[role=\"dialog\"]')");
   });
@@ -2331,6 +2331,20 @@ async function main() {
       if (!transparent(style.borderTopColor) || !transparent(style.backgroundColor)) {
         throw new Error('Settings account context picker is rendered as a form control');
       }
+      const pickerLabel = picker.querySelector('strong')?.getBoundingClientRect();
+      const pickerMeta = picker.querySelector('small')?.getBoundingClientRect();
+      if (
+        picker.getBoundingClientRect().height > 36
+        || !pickerLabel
+        || !pickerMeta
+        || Math.abs((pickerLabel.top + pickerLabel.height / 2) - (pickerMeta.top + pickerMeta.height / 2)) > 2
+      ) {
+        throw new Error('Settings account context picker does not keep account identity on one compact line');
+      }
+      const primaryAction = document.querySelector('.settings-page[data-settings-page="accounts"] .st-btn-primary');
+      if (!primaryAction || transparent(getComputedStyle(primaryAction).backgroundColor)) {
+        throw new Error('Settings primary actions lost their semantic visual hierarchy');
+      }
       const controlSignatures = summaries.map((control) => {
         const controlStyle = getComputedStyle(control);
         return controlStyle.borderTopColor + '|' + controlStyle.backgroundColor;
@@ -2481,6 +2495,18 @@ async function main() {
 
     await openSettingsSection(cdp, '通讯录', 'contacts', '.settings-page[data-settings-page="contacts"]');
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions') && (document.querySelectorAll('.contact-tool-row').length > 0 || document.querySelector('.settings-page[data-settings-page=\"contacts\"]')?.innerText.includes('还没有联系人'))");
+    await evalInPage(cdp, `(() => {
+      const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
+      const transferLabels = [...document.querySelectorAll('.contact-transfer-actions button')]
+        .map((button) => button.textContent.trim());
+      if (JSON.stringify(transferLabels) !== JSON.stringify(['导入联系人', '导出 vCard', '导入记录'])) {
+        throw new Error('Contact transfer actions are incomplete or unlabeled');
+      }
+      const addButton = document.querySelector('.contact-primary-actions .st-btn-primary');
+      if (!addButton || transparent(getComputedStyle(addButton).backgroundColor)) {
+        throw new Error('Contact primary action is not visually distinct');
+      }
+    })()`);
     const contactsNeedSeed = await evalInPage(cdp, "![...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('ada@example.com'))");
     if (contactsNeedSeed) {
       await openContactCreateDialog(cdp);
@@ -2611,7 +2637,9 @@ async function main() {
       { id: 'accounts', label: '邮箱账号' },
       { id: 'providers', label: '服务器' },
       { id: 'auth', label: '登录与安全' },
+      { id: 'about', label: '关于' },
     ]);
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"about\"] .settings-about-brand') && !document.querySelector('.settings-about-hero .st-section-header')");
     await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     // 账号页头部为独立设置外壳契约：无旧版保存动作栏，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");

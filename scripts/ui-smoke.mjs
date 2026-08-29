@@ -2079,12 +2079,12 @@ async function main() {
       cdp,
       "(() => { const footerText = document.querySelector('.message-list-footer')?.textContent || ''; const match = footerText.match(/已显示 (\\d+) 封/); window.__bulkShortcutVisibleCount = match ? Number(match[1]) : 0; window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })); })()",
     );
-    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; const match = status.match(/已选择当前列表 (\\d+) 封邮件/); const selected = document.querySelector('.bulk-selection span')?.innerText || ''; return Boolean(match) && selected === `已选 ${match[1]}` && Number(match[1]) >= (window.__bulkShortcutVisibleCount || 0); })()");
+    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; const match = status.match(/已选择当前列表\\s*(\\d+)\\s*封邮件/); const selected = document.querySelector('.message-selection-strip-summary')?.innerText || ''; const selectedMatch = selected.match(/已选\\s*(\\d+)/); return Boolean(match && selectedMatch) && selectedMatch[1] === match[1] && Number(match[1]) >= (window.__bulkShortcutVisibleCount || 0); })()");
     await evalInPage(cdp, "(() => { const match = (document.querySelector('.status-line')?.innerText || '').match(/已选择当前列表 (\\d+) 封邮件/); if (!match) throw new Error('Keyboard select-all count not found'); window.__bulkShortcutCount = Number(match[1]); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; return !document.querySelector('.bulk-toolbar') && status.includes(`${window.__bulkShortcutCount} 封邮件`) && (status.includes('已批量添加星标') || status.includes('已批量取消星标')); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true }))");
-    await waitForExpression(cdp, "document.querySelector('.bulk-selection span')?.innerText === `已选 ${window.__bulkShortcutCount}`");
+    await waitForExpression(cdp, "(() => { const selected = document.querySelector('.message-selection-strip-summary')?.innerText || ''; return selected.includes(`已选 ${window.__bulkShortcutCount}`); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.bulk-toolbar') && document.body.innerText.includes('已取消邮件选择')");
 
@@ -2305,6 +2305,38 @@ async function main() {
     // 账号页头部为干净的 v2 头：只保留关闭按钮，不再有旧版保存动作栏。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await waitForExpression(cdp, "!document.querySelector('.add-account-disclosure')?.open");
+    await evalInPage(cdp, `(() => {
+      const picker = document.querySelector('.settings-account-picker .custom-select-summary');
+      if (!picker) throw new Error('Settings account picker not found');
+      const style = getComputedStyle(picker);
+      const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
+      const summaries = [...document.querySelectorAll('.settings-modal[data-ui="settings-v3"] .settings-page-content .custom-select-summary')];
+      const controls = [picker, ...summaries];
+      if (summaries.length === 0 || controls.some((control) => getComputedStyle(control).boxShadow !== 'none')) {
+        throw new Error('Settings select controls are rendered with elevation');
+      }
+      const controlSignatures = controls.map((control) => {
+        const controlStyle = getComputedStyle(control);
+        return controlStyle.borderTopColor + '|' + controlStyle.backgroundColor;
+      });
+      if (new Set(controlSignatures).size !== 1 || transparent(style.borderTopColor) || transparent(style.backgroundColor)) {
+        throw new Error('Settings select controls do not share the embedded control treatment');
+      }
+      const wrappers = [...document.querySelectorAll('.settings-modal[data-ui="settings-v3"] .custom-select-menu')];
+      if (wrappers.some((wrapper) => {
+        const wrapperStyle = getComputedStyle(wrapper);
+        return wrapperStyle.boxShadow !== 'none'
+          || wrapperStyle.borderTopStyle !== 'none'
+          || wrapperStyle.borderTopWidth !== '0px'
+          || !transparent(wrapperStyle.backgroundColor);
+      })) {
+        throw new Error('Settings select wrapper is rendered as a floating surface');
+      }
+    })()`);
+    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"true\"]') && document.querySelector('.custom-select-dropdown')");
+    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"false\"]') && !document.querySelector('.custom-select-dropdown')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-account-desktop');
     // 账号列表呈现 3 个种子账号（保存与验证动作在账号配置/认证页内）。

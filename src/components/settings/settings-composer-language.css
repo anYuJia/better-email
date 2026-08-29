@@ -260,21 +260,41 @@
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker {
-  gap: 7px;
+  gap: 8px;
   color: var(--ui-text-tertiary);
   font-size: var(--ui-font-size-aux);
 }
 
-.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary {
-  height: 27px;
-  min-height: 27px;
-  padding-inline: 7px;
+.settings-modal[data-ui="settings-v3"] .settings-account-picker > span:first-child {
+  flex: 0 0 auto;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-aux);
+  font-weight: 500;
+}
+
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-account-picker,
+  .settings-page-content,
+  .settings-account-add-dialog
+) .custom-select-summary {
+  height: 32px;
+  min-height: 32px;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 8px 6px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: none;
   font-size: var(--ui-font-size-body);
+  font-weight: 500;
+  transition: var(--ui-transition-short-bg-border-box-shadow);
+}
+
+.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary {
+  display: inline-flex;
+  align-items: center;
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary :is(strong, small) {
@@ -290,12 +310,19 @@
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > strong {
+  min-width: 0;
   flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--ui-text);
+  text-overflow: ellipsis;
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > small {
   min-width: 0;
   flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  text-overflow: ellipsis;
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary > span > small::before {
@@ -304,8 +331,41 @@
   color: var(--ui-text-tertiary);
 }
 
-.settings-modal[data-ui="settings-v3"] .settings-account-picker .custom-select-summary:hover {
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-account-picker,
+  .settings-page-content,
+  .settings-account-add-dialog
+) .custom-select-summary:hover {
   border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-account-picker,
+  .settings-page-content,
+  .settings-account-add-dialog
+) .custom-select-summary[aria-expanded="true"] {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-account-picker,
+  .settings-page-content,
+  .settings-account-add-dialog
+) .custom-select-summary:focus-visible {
+  border-color: var(--ui-accent);
+}
+
+.settings-modal[data-ui="settings-v3"] :is(
+  .settings-account-picker,
+  .settings-page-content,
+  .settings-account-add-dialog
+) .custom-select-summary:disabled {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-muted);
 }
 
 .settings-modal[data-ui="settings-v3"] .settings-context-tabs {
@@ -419,10 +479,10 @@
   line-height: 1.4;
 }
 
-/* Controls use the same border/radius/focus language as composer search. */
+/* Text fields and selects share one embedded control treatment across the
+ * Settings pages: a quiet hairline, no elevation and the same geometry. */
 
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea),
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary {
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea) {
   min-height: 32px;
   padding-inline: 10px;
   border: 1px solid var(--ui-border);
@@ -434,14 +494,12 @@
   transition: var(--ui-transition-short-bg-border-box-shadow);
 }
 
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):hover,
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:hover {
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):hover {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface);
 }
 
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):focus,
-.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary[aria-expanded="true"] {
+.settings-modal[data-ui="settings-v3"] :is(.settings-page-content, .settings-account-add-dialog) :is(input, select, textarea):focus {
   border-color: var(--ui-accent);
   outline: none;
   box-shadow: none;
@@ -586,13 +644,12 @@
   outline-offset: 1px;
 }
 
-/* Transient layers keep elevation; permanent settings sections do not. */
+/* Transient layers keep elevation; select wrappers are not transient layers. */
 
 .settings-modal[data-ui="settings-v3"] :is(
   .settings-discard-confirm,
   .settings-mobile-menu,
-  .custom-select-options,
-  .custom-select-menu
+  .custom-select-options
 ) {
   border-color: var(--ui-border);
   border-radius: var(--ui-radius-popover);

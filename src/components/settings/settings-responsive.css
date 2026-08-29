@@ -79,10 +79,9 @@
     width: 100%;
   }
 
-  .settings-account-workspace-topline {
-    min-height: 52px;
+  .settings-page-context,
+  .settings-account-context {
     width: 100%;
-    padding: 6px 16px;
   }
 
   .settings-account-picker {
@@ -91,8 +90,9 @@
   }
 
   .settings-account-picker .custom-select-menu {
-    min-width: min(280px, calc(100vw - 32px));
-    max-width: calc(100vw - 32px);
+    width: min(300px, calc(100% - 58px));
+    min-width: 0;
+    max-width: 300px;
   }
 
   .settings-account-picker .custom-select-summary {
@@ -116,16 +116,20 @@
 
   .settings-page-header {
     min-height: auto;
+    display: grid;
+    gap: 10px;
     position: relative;
     top: auto;
     padding: 12px 16px;
   }
 
-  .settings-page-heading h2 {
-    display: none;
+  .settings-page-header.has-context {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
   }
 
-  .settings-page-eyebrow {
+  .settings-page-heading h2 {
     display: none;
   }
 
@@ -138,6 +142,10 @@
   .settings-page-content {
     gap: 20px;
     padding: 16px 16px 32px;
+  }
+
+  .settings-mobile-detail-navigation {
+    display: block;
   }
 
   .settings-shell :is(.st-row, .st-switch) {

@@ -165,6 +165,21 @@ export default function AccountSettingsPage({
 
       {accountForm && (
         <SettingsSection
+          title="账号设置"
+          description="服务器、登录、发件身份、同步与隐私。"
+          className="settings-mobile-detail-navigation"
+          dataSection="account-details"
+        >
+          <SettingsDestinationList
+            ariaLabel="账号详细设置"
+            items={settingsAccountDetailItems}
+            onNavigate={onNavigate}
+          />
+        </SettingsSection>
+      )}
+
+      {accountForm && (
+        <SettingsSection
           title="账号偏好"
           description={accountForm.email}
           className="settings-account-overview"
@@ -209,20 +224,6 @@ export default function AccountSettingsPage({
               ...accountForm,
               auto_download_attachments: checked,
             })}
-          />
-        </SettingsSection>
-      )}
-
-      {accountForm && (
-        <SettingsSection
-          title="详细设置"
-          description="服务器、登录、发件身份、同步与隐私按需打开。"
-          dataSection="account-details"
-        >
-          <SettingsDestinationList
-            ariaLabel="账号详细设置"
-            items={settingsAccountDetailItems}
-            onNavigate={onNavigate}
           />
         </SettingsSection>
       )}

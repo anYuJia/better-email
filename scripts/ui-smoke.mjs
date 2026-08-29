@@ -572,11 +572,17 @@ async function openSettingsSection(cdp, label, section, expectedSelector) {
     if (parent) {
       await waitForExpression(
         cdp,
-        `document.querySelector('.settings-page')?.dataset.settingsPage === ${JSON.stringify(parent.id)}
-          && [...document.querySelectorAll('.settings-destination-list button')]
-            .some((item) => item.querySelector('strong')?.textContent.trim() === ${JSON.stringify(label)})`,
+        `(() => {
+          const group = document.querySelector('.settings-nav-subsection[aria-label="${parent.label}详细设置"]');
+          const labels = group ? [...group.querySelectorAll('.settings-nav-subitem')].map((item) => item.textContent.trim()) : [];
+          return group && JSON.stringify(labels) === ${JSON.stringify(JSON.stringify(parent.details))};
+        })()`,
       );
-      await clickButton(cdp, label, "document.querySelector('.settings-destination-list')");
+      await clickButton(
+        cdp,
+        label,
+        `document.querySelector('.settings-nav-subsection[aria-label="${parent.label}详细设置"]')`,
+      );
     }
     await waitForExpression(
       cdp,
@@ -2253,7 +2259,7 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelectorAll('.settings-search-results > button').length === 1 && document.querySelector('.settings-search-results > button')?.innerText.includes('隐私')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-list button').length === 7");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-branch > button').length === 7 && document.querySelectorAll('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5");
     await openSettingsSection(cdp, '通用', 'general', '.settings-page[data-settings-page="general"]');
     await waitForExpression(cdp, "['appearance', 'sending', 'notifications'].every((section) => document.querySelector(`[data-settings-section=\"${section}\"]`))");
     await openSettingsSection(cdp, '登录与安全', 'auth', '.settings-page[data-settings-page="auth"]');
@@ -2316,30 +2322,15 @@ async function main() {
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]')");
+    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5 && getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display === 'none' && !document.querySelector('.settings-account-picker')");
     // 账号页头部只保留设置外壳操作，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await waitForExpression(cdp, "!document.querySelector('.add-account-disclosure')?.open");
     await evalInPage(cdp, `(() => {
-      const picker = document.querySelector('.settings-account-picker .custom-select-summary');
-      if (!picker) throw new Error('Settings account picker not found');
-      const style = getComputedStyle(picker);
       const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
       const summaries = [...document.querySelectorAll('.settings-modal[data-ui="settings-app"] .settings-page-content .custom-select-summary')];
-      if (summaries.length === 0 || [picker, ...summaries].some((control) => getComputedStyle(control).boxShadow !== 'none')) {
+      if (summaries.length === 0 || summaries.some((control) => getComputedStyle(control).boxShadow !== 'none')) {
         throw new Error('Settings select controls are rendered with elevation');
-      }
-      if (!transparent(style.borderTopColor) || !transparent(style.backgroundColor)) {
-        throw new Error('Settings account context picker is rendered as a form control');
-      }
-      const pickerLabel = picker.querySelector('strong')?.getBoundingClientRect();
-      const pickerMeta = picker.querySelector('small')?.getBoundingClientRect();
-      if (
-        picker.getBoundingClientRect().height > 36
-        || !pickerLabel
-        || !pickerMeta
-        || Math.abs((pickerLabel.top + pickerLabel.height / 2) - (pickerMeta.top + pickerMeta.height / 2)) > 2
-      ) {
-        throw new Error('Settings account context picker does not keep account identity on one compact line');
       }
       const primaryAction = document.querySelector('.settings-page[data-settings-page="accounts"] .st-btn-primary');
       if (!primaryAction || transparent(getComputedStyle(primaryAction).backgroundColor)) {
@@ -2364,10 +2355,6 @@ async function main() {
         throw new Error('Settings select wrapper is rendered as a floating surface');
       }
     })()`);
-    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"true\"]') && document.querySelector('.custom-select-dropdown')");
-    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"false\"]') && !document.querySelector('.custom-select-dropdown')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-account-desktop');
     // 账号列表呈现 3 个种子账号（保存与验证动作在账号配置/认证页内）。
@@ -2390,6 +2377,7 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.querySelector('.mobile-settings-root')");
     await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.textContent.includes('邮箱账号'))?.click()");
     await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-app\"]') && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs')");
+    await waitForExpression(cdp, "getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display !== 'none' && !document.querySelector('.settings-account-picker')");
     await captureScreenshot(cdp, 'settings-account-narrow');
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
@@ -2404,12 +2392,35 @@ async function main() {
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('[data-settings-section=\"sending\"]')?.innerText.includes('5 秒')");
     await openSettingsSection(cdp, '服务器', 'providers', '.settings-page[data-settings-page="providers"]');
     await waitForExpression(cdp, "document.querySelector('.settings-provider-advanced')");
+    await evalInPage(cdp, `(() => {
+      const picker = document.querySelector('.settings-page-header .settings-account-picker .custom-select-summary');
+      if (!picker) throw new Error('Settings detail account picker not found in the page header');
+      const style = getComputedStyle(picker);
+      const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
+      const pickerLabel = picker.querySelector('strong')?.getBoundingClientRect();
+      const pickerMeta = picker.querySelector('small')?.getBoundingClientRect();
+      if (
+        picker.getBoundingClientRect().height > 36
+        || style.boxShadow !== 'none'
+        || !transparent(style.borderTopColor)
+        || !transparent(style.backgroundColor)
+        || !pickerLabel
+        || !pickerMeta
+        || Math.abs((pickerLabel.top + pickerLabel.height / 2) - (pickerMeta.top + pickerMeta.height / 2)) > 2
+      ) {
+        throw new Error('Settings detail account picker is not a compact inline context control');
+      }
+    })()`);
+    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"true\"]') && document.querySelector('.custom-select-dropdown')");
+    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"false\"]') && !document.querySelector('.custom-select-dropdown')");
     await waitForExpression(cdp, "!document.querySelector('details[data-settings-section=\"providers\"]')?.open && [...document.querySelectorAll('.settings-nav button')].some((item) => item.textContent.trim() === '通用')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-closed-desktop');
     await openDetails(cdp, 'details[data-settings-section=\"providers\"]');
     await waitForExpression(cdp, "document.querySelector('details[data-settings-section=\"providers\"]')?.open && document.querySelector('details[data-settings-section=\"providers\"]')?.textContent.includes('真实账号已验证') && document.body.innerText.includes('兼容性矩阵')");
-    await waitForExpression(cdp, "(() => { const workspace = document.querySelector('.settings-account-workspace')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return workspace && content && workspace.bottom <= content.top + 1; })()");
+    await waitForExpression(cdp, "(() => { const context = document.querySelector('.settings-page-header .settings-account-context')?.getBoundingClientRect(); const header = document.querySelector('.settings-page-header')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return context && header && content && context.top >= header.top && context.bottom <= header.bottom + 1 && header.bottom <= content.top + 1 && !document.querySelector('.settings-account-workspace'); })()");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-desktop');
     await assertSettingsProvidersGeometry(cdp, '服务器页 1440x980');

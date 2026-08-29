@@ -14,6 +14,7 @@ type SettingsPageShellProps = {
   activeSection: SettingsSectionId;
   group: SettingsNavigationGroup;
   item: SettingsNavigationItem;
+  context?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -21,12 +22,12 @@ export default function SettingsPageShell({
   activeSection,
   group,
   item,
+  context,
   children,
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
   const presentation = getSettingsSectionPresentation(activeSection) ?? item;
   const accountWorkspace = accountScopedSections.has(activeSection);
-  const isNestedPage = item.id !== activeSection;
 
   useEffect(() => {
     if (pageRef.current) {
@@ -45,12 +46,12 @@ export default function SettingsPageShell({
       aria-labelledby={accountWorkspace ? undefined : `settings-page-${activeSection}`}
       aria-describedby={accountWorkspace ? undefined : `settings-page-description-${activeSection}`}
     >
-      <header className="settings-page-header">
+      <header className={`settings-page-header${context ? ' has-context' : ''}`}>
         <div className="settings-page-heading">
-          {isNestedPage && <span className="settings-page-eyebrow">{item.label}</span>}
           <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
           <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
         </div>
+        {context && <div className="settings-page-context">{context}</div>}
       </header>
       <div className="settings-page-content">{children}</div>
     </section>

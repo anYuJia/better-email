@@ -386,6 +386,20 @@
   min-width: 0;
 }
 
+.settings-nav-copy {
+  flex: 1 1 auto;
+}
+
+.settings-nav-disclosure {
+  flex: 0 0 auto;
+  color: var(--st-text-tertiary);
+  transition: var(--ui-transition-transform-fast);
+}
+
+.settings-nav-branch > button[aria-expanded='true'] .settings-nav-disclosure {
+  transform: rotate(90deg);
+}
+
 .settings-nav-label {
   display: block;
   overflow: hidden;
@@ -462,27 +476,27 @@
   background: var(--st-canvas);
 }
 
-.settings-account-workspace {
-  flex: 0 0 auto;
-  border-bottom: 1px solid var(--st-border);
-  background: var(--st-surface-subtle);
-}
-
-.settings-account-workspace-topline {
-  min-height: 44px;
+.settings-page-context {
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: min(100%, var(--st-content-max-width));
-  margin: 0 auto;
-  padding: 5px 24px;
+  justify-content: flex-end;
+}
+
+.settings-account-context {
+  min-width: 0;
+  width: min(100%, 360px);
+  display: grid;
+  justify-items: end;
+  gap: 2px;
 }
 
 .settings-account-picker {
   min-width: 0;
+  width: 100%;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   color: var(--st-text-tertiary);
   font-size: var(--st-font-size-aux);
@@ -493,13 +507,14 @@
 }
 
 .settings-account-picker .custom-select-menu {
-  min-width: 190px;
-  max-width: 340px;
+  min-width: 0;
+  width: min(300px, calc(100% - 58px));
+  max-width: 300px;
 }
 
 .settings-account-picker .custom-select-summary {
   min-height: 32px;
-  max-width: 330px;
+  max-width: 300px;
   padding-inline: 8px;
   border-color: transparent;
   color: var(--st-text);
@@ -541,6 +556,7 @@
   min-width: 0;
   display: flex;
   align-items: baseline;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -561,7 +577,7 @@
 
 .settings-account-connection-state {
   min-width: 0;
-  max-width: 300px;
+  max-width: 360px;
   overflow: hidden;
   color: var(--st-text-tertiary);
   font-size: 11px;
@@ -600,18 +616,17 @@
   background: var(--st-canvas);
 }
 
+.settings-page-header.has-context {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(280px, 360px);
+  align-items: center;
+  gap: 20px;
+}
+
 .settings-page-heading {
   min-width: 0;
   display: grid;
   gap: 3px;
-}
-
-.settings-page-eyebrow {
-  margin-bottom: 1px;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  font-weight: 600;
-  line-height: 1.2;
 }
 
 .settings-page-heading h2 {
@@ -638,6 +653,10 @@
   display: grid;
   gap: 24px;
   padding: 22px 24px 36px;
+}
+
+.settings-mobile-detail-navigation {
+  display: none;
 }
 
 .settings-page-loading {

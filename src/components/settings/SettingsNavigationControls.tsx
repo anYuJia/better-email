@@ -1,4 +1,5 @@
 import {
+  ChevronRight,
   Search,
   X,
 } from 'lucide-react';
@@ -62,6 +63,8 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
+  const showsDetailNavigation = getSettingsDetailItems(resolvedActiveSection).length > 0
+    && (resolvedActiveSection !== 'accounts' || accountSectionsEnabled);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -93,7 +96,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   return (
     <nav
-      className={`settings-nav${resolvedActiveSection !== activeSection ? ' has-detail-navigation' : ''}`}
+      className={`settings-nav${showsDetailNavigation ? ' has-detail-navigation' : ''}`}
       aria-label="设置分类"
     >
       <div className="settings-nav-search" role="search">
@@ -166,7 +169,12 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                   const active = activeSection === item.id;
                   const contextActive = resolvedActiveSection === item.id;
                   const detailItems = getSettingsDetailItems(item.id);
-                  const showDetailItems = contextActive && !active && detailItems.length > 0;
+                  const exposesDetailItems = detailItems.length > 0
+                    && (item.id !== 'accounts' || accountSectionsEnabled);
+                  const showDetailItems = contextActive && exposesDetailItems;
+                  const destination = item.id === 'tools' && detailItems.length > 0
+                    ? detailItems[0].id
+                    : item.id;
                   const detailGroupId = `settings-nav-${item.id}-details`;
                   const disabled = requiresAccount(item.id) && !accountSectionsEnabled;
                   return (
@@ -175,12 +183,12 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                         type="button"
                         className={`${active ? 'active' : ''}${showDetailItems ? ' context-active' : ''}`.trim()}
                         aria-current={active ? 'page' : undefined}
-                        aria-expanded={showDetailItems ? true : undefined}
-                        aria-controls={showDetailItems ? detailGroupId : undefined}
+                        aria-expanded={exposesDetailItems ? showDetailItems : undefined}
+                        aria-controls={exposesDetailItems ? detailGroupId : undefined}
                         aria-label={`${item.label}设置`}
                         disabled={disabled}
                         title={disabled ? '请先添加或选择邮箱账号' : item.description}
-                        onClick={() => onNavigate(item.id)}
+                        onClick={() => onNavigate(destination)}
                       >
                         <span className="settings-nav-icon">
                           <Icon size={15} aria-hidden="true" />
@@ -188,6 +196,9 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                         <span className="settings-nav-copy">
                           <span className="settings-nav-label">{item.label}</span>
                         </span>
+                        {exposesDetailItems && (
+                          <ChevronRight className="settings-nav-disclosure" size={14} aria-hidden="true" />
+                        )}
                       </button>
                       {showDetailItems && (
                         <div

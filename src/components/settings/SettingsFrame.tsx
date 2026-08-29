@@ -84,7 +84,6 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
 ]);
 
 function SettingsAccountContext({
-  activeSection,
   accountSwitchDisabled,
   currentAccountLabel,
   accountOptions,
@@ -92,7 +91,6 @@ function SettingsAccountContext({
   connectionSummary,
   onSelectAccountId,
 }: {
-  activeSection: SettingsSectionId;
   accountSwitchDisabled: boolean;
   currentAccountLabel: string;
   accountOptions: SettingsAccountOption[];
@@ -100,46 +98,42 @@ function SettingsAccountContext({
   connectionSummary?: string;
   onSelectAccountId?: (accountId: number) => void;
 }) {
-  if (!accountScopedSections.has(activeSection)) return null;
-
   const hasConnectionSummary = Boolean(connectionSummary)
     && connectionSummary !== '尚未开始验证';
   const canSwitchAccount = accountOptions.length > 0 && Boolean(onSelectAccountId);
 
   return (
-    <div className="settings-account-workspace" aria-label="当前账号">
-      <div className="settings-account-workspace-topline">
-        {canSwitchAccount ? (
-          <div
-            className="settings-account-picker"
-            title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
-          >
-            <span>当前账号</span>
-            <CustomSelect
-              dense
-              ariaLabel="切换当前设置账号"
-              value={String(activeAccountId ?? '')}
-              options={accountOptions.map((account) => ({
-                value: String(account.id),
-                label: account.label,
-                meta: account.email,
-              }))}
-              disabled={accountSwitchDisabled}
-              onChange={(nextValue) => onSelectAccountId?.(Number(nextValue))}
-            />
-          </div>
-        ) : (
-          <span className="settings-account-current">
-            <small>当前账号</small>
-            <strong>{currentAccountLabel || '尚未添加账号'}</strong>
-          </span>
-        )}
-        {hasConnectionSummary && (
-          <span className="settings-account-connection-state" title={connectionSummary}>
-            {connectionSummary}
-          </span>
-        )}
-      </div>
+    <div className="settings-account-context" aria-label="当前账号">
+      {canSwitchAccount ? (
+        <div
+          className="settings-account-picker"
+          title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
+        >
+          <span>当前账号</span>
+          <CustomSelect
+            dense
+            ariaLabel="切换当前设置账号"
+            value={String(activeAccountId ?? '')}
+            options={accountOptions.map((account) => ({
+              value: String(account.id),
+              label: account.label,
+              meta: account.email,
+            }))}
+            disabled={accountSwitchDisabled}
+            onChange={(nextValue) => onSelectAccountId?.(Number(nextValue))}
+          />
+        </div>
+      ) : (
+        <span className="settings-account-current">
+          <small>当前账号</small>
+          <strong>{currentAccountLabel || '尚未添加账号'}</strong>
+        </span>
+      )}
+      {hasConnectionSummary && (
+        <span className="settings-account-connection-state" title={connectionSummary}>
+          {connectionSummary}
+        </span>
+      )}
     </div>
   );
 }
@@ -174,6 +168,16 @@ export default function SettingsFrame({
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
+  const accountContext = activeSection !== 'accounts' && accountScopedSections.has(activeSection) ? (
+    <SettingsAccountContext
+      accountSwitchDisabled={isDirty}
+      currentAccountLabel={subtitle}
+      accountOptions={accountOptions}
+      activeAccountId={activeAccountId}
+      connectionSummary={connectionSummary}
+      onSelectAccountId={onSelectAccountId}
+    />
+  ) : null;
   const isMobileViewport = useSettingsMobileViewport();
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
@@ -320,19 +324,11 @@ export default function SettingsFrame({
             onNavigate={onNavigate}
           />
           <div className="settings-content">
-            <SettingsAccountContext
-              activeSection={activeSection}
-              accountSwitchDisabled={isDirty}
-              currentAccountLabel={subtitle}
-              accountOptions={accountOptions}
-              activeAccountId={activeAccountId}
-              connectionSummary={connectionSummary}
-              onSelectAccountId={onSelectAccountId}
-            />
             <SettingsPageShell
               activeSection={activeSection}
               group={activeGroup}
               item={activeItem}
+              context={accountContext}
             >
               {children}
             </SettingsPageShell>

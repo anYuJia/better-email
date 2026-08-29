@@ -98,21 +98,41 @@ describe('SettingsFrame application shell', () => {
     expect(onNavigate).toHaveBeenCalledWith('accounts');
   });
 
+  it('keeps account destinations visible before entering a detail page', () => {
+    renderFrame({ activeSection: 'accounts', canSaveAndVerify: true });
+    const navigation = screen.getByRole('navigation', { name: '设置分类' });
+    expect(navigation.querySelectorAll('.settings-nav-subitem')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('button', { name: '邮箱账号设置' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: '服务器设置' }).getAttribute('aria-current')).toBeNull();
+    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  });
+
   it('exposes tool siblings and marks only the current nested tool page', () => {
-    renderFrame({ activeSection: 'templates' });
+    const onNavigate = vi.fn();
+    renderFrame({ activeSection: 'templates', onNavigate });
     expect(screen.getByRole('button', { name: '效率工具设置' }).getAttribute('aria-current')).toBeNull();
     expect(screen.getByRole('button', { name: '效率工具设置' }).getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '模板设置' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('button', { name: '通讯录设置' }).getAttribute('aria-current')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '效率工具设置' }));
+    expect(onNavigate).toHaveBeenCalledWith('contacts');
   });
 
   it('shows account context only on account-scoped pages', () => {
-    const { unmount } = renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
+    const { container, unmount } = renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
     expect(screen.getByText('work@example.com')).not.toBeNull();
+    expect(container.querySelector('.settings-page-header .settings-account-context')).not.toBeNull();
+    expect(container.querySelector('.settings-account-workspace')).toBeNull();
     unmount();
     renderFrame({ activeSection: 'general' });
     expect(screen.queryByText('work@example.com')).toBeNull();
+  });
+
+  it('uses the account list as the account hub switcher instead of duplicating header context', () => {
+    const { container } = renderFrame({ activeSection: 'accounts', canSaveAndVerify: true });
+    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
   });
 
   it('switches the scoped account and locks the switcher while edits are dirty', () => {

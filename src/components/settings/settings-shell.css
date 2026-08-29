@@ -183,6 +183,12 @@
   font-size: 13px;
 }
 
+.settings-nav-search input:focus,
+.settings-nav-search input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
 .settings-nav-search > button {
   width: 26px;
   min-width: 26px;
@@ -522,15 +528,15 @@
 }
 
 .settings-connection-feedback--success {
-  color: var(--st-success, #16794a);
-  border-color: color-mix(in srgb, var(--st-success, #16794a) 35%, var(--st-border));
-  background: color-mix(in srgb, var(--st-success, #16794a) 8%, var(--st-surface));
+  color: var(--st-success);
+  border-color: color-mix(in srgb, var(--st-success) 35%, var(--st-border));
+  background: color-mix(in srgb, var(--st-success) 8%, var(--st-surface));
 }
 
 .settings-connection-feedback--error {
-  color: var(--st-danger, #b42318);
-  border-color: color-mix(in srgb, var(--st-danger, #b42318) 35%, var(--st-border));
-  background: color-mix(in srgb, var(--st-danger, #b42318) 8%, var(--st-surface));
+  color: var(--st-danger);
+  border-color: color-mix(in srgb, var(--st-danger) 35%, var(--st-border));
+  background: color-mix(in srgb, var(--st-danger) 8%, var(--st-surface));
 }
 
 .settings-discard-confirm {
@@ -547,7 +553,7 @@
   border: 1px solid var(--st-border);
   border-radius: 8px;
   background: var(--st-surface);
-  box-shadow: 0 12px 32px rgb(0 0 0 / .15);
+  box-shadow: var(--st-shadow-float);
 }
 
 .settings-discard-confirm > span {

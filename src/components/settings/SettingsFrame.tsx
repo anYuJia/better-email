@@ -53,6 +53,27 @@ type SettingsFrameProps = {
   onClose: () => void;
 };
 
+const SETTINGS_MOBILE_MEDIA_QUERY = '(max-width: 720px)';
+
+function useSettingsMobileViewport() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia(SETTINGS_MOBILE_MEDIA_QUERY).matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia(SETTINGS_MOBILE_MEDIA_QUERY);
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
+
+  return isMobile;
+}
+
 const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'accounts',
   'providers',
@@ -147,6 +168,7 @@ export default function SettingsFrame({
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
+  const isMobileViewport = useSettingsMobileViewport();
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -211,6 +233,8 @@ export default function SettingsFrame({
               type="button"
               className="settings-mobile-back"
               aria-label="返回设置"
+              aria-hidden={isMobileViewport ? undefined : true}
+              tabIndex={isMobileViewport ? undefined : -1}
               onClick={requestClose}
             >
               <ChevronLeft size={20} aria-hidden="true" />

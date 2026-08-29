@@ -173,7 +173,7 @@ describe('AddAccountDialog', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
 
     expect(screen.queryByRole('dialog', { name: '添加邮箱' })).toBeNull();
-    expect(screen.getByRole('dialog', { name: '设置' })).not.toBeNull();
+    expect(screen.getByRole('region', { name: '设置' })).not.toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 });

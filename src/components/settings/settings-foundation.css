@@ -134,7 +134,7 @@
 
 /* ── Focus visibility ───────────────────────────────────────────── */
 
-.settings-modal :is(button, summary, input, select, textarea, [tabindex]):focus-visible {
+.settings-modal :where(button, summary, input, select, textarea, [tabindex]):focus-visible {
   outline: var(--st-focus-outline);
   outline-offset: 2px;
   box-shadow: var(--ui-focus-ring);

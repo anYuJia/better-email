@@ -16,7 +16,7 @@
   box-shadow: none;
 }
 
-.settings-shell :is(
+.settings-shell :where(
   input[type='text'],
   input[type='email'],
   input[type='password'],
@@ -58,7 +58,7 @@
   box-shadow: none;
 }
 
-.settings-shell :is(
+.settings-shell :where(
   button,
   input,
   select,
@@ -70,12 +70,11 @@
   box-shadow: none;
 }
 
-.settings-shell .custom-select-menu,
 .settings-shell [role='menu'] {
   border: 1px solid var(--st-border);
   border-radius: 8px;
   background: var(--st-surface);
-  box-shadow: 0 10px 28px rgb(0 0 0 / .12);
+  box-shadow: var(--st-shadow-float);
 }
 
 .settings-shell .settings-disclosure {

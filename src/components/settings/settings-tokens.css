@@ -5,6 +5,7 @@
  * same palette as the three-pane workspace and dark mode is automatic.
  */
 
+.settings-workspace,
 .settings-backdrop {
   /* Surfaces */
   --st-canvas: var(--ui-bg);

@@ -7,7 +7,7 @@
 .settings-shell {
   --settings-control-height: 34px;
   --settings-icon-control-size: 32px;
-  --settings-control-radius: 7px;
+  --settings-control-radius: var(--ui-radius-control);
 }
 
 .settings-shell :is(.settings-header-button, .st-btn) {
@@ -72,7 +72,7 @@
 
 .settings-shell [role='menu'] {
   border: 1px solid var(--st-border);
-  border-radius: 8px;
+  border-radius: var(--st-radius-lg);
   background: var(--st-surface);
   box-shadow: var(--st-shadow-float);
 }

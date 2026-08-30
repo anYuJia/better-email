@@ -92,13 +92,9 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   const normalizedQuery = query.trim().toLowerCase();
   const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
   const manuallyCollapsedSectionsRef = useRef<Set<SettingsSectionId>>(new Set());
-  const [expandedSections, setExpandedSections] = useState<Set<SettingsSectionId>>(() => {
-    const initialSections = new Set<SettingsSectionId>();
-    if (exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)) {
-      initialSections.add(resolvedActiveSection);
-    }
-    return initialSections;
-  });
+  const [expandedSections, setExpandedSections] = useState<Set<SettingsSectionId>>(
+    () => new Set(),
+  );
   useEffect(() => {
     setExpandedSections((currentSections) => {
       const nextSections = new Set(currentSections);
@@ -115,7 +111,8 @@ export const SettingsSidebar = memo(function SettingsSidebar({
       }
 
       if (
-        exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)
+        activeSectionIsNested
+        && exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)
         && !manuallyCollapsedSectionsRef.current.has(resolvedActiveSection)
         && !nextSections.has(resolvedActiveSection)
       ) {

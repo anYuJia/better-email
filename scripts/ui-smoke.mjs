@@ -962,7 +962,7 @@ async function assertSettingsLayoutContract(cdp, label, viewport) {
   if (viewport === 'desktop') {
     if (data.nav && style('nav', 'display') !== 'flex') failures.push(`nav display=${style('nav', 'display')}`);
     if (data.mainHeader && style('mainHeader', 'minHeight') !== '48px') failures.push(`mainHeader minHeight=${style('mainHeader', 'minHeight')}`);
-    if (data.shell && style('shell', 'borderRadius') !== '10px') failures.push(`shell borderRadius=${style('shell', 'borderRadius')}`);
+    if (data.shell && style('shell', 'borderRadius') !== '12px') failures.push(`shell borderRadius=${style('shell', 'borderRadius')}`);
     if (data.shell && style('shell', 'boxShadow') !== 'none') failures.push(`shell boxShadow=${style('shell', 'boxShadow')}`);
     if (data.pageHeader && style('pageHeader', 'minHeight') !== '76px') failures.push(`pageHeader minHeight=${style('pageHeader', 'minHeight')}`);
     if (data.content && style('content', 'paddingTop') !== '0px') failures.push(`content paddingTop=${style('content', 'paddingTop')}`);
@@ -2320,7 +2320,9 @@ async function main() {
     );
     await waitForExpression(cdp, "document.querySelectorAll('.settings-search-results > button').length === 1 && document.querySelector('.settings-search-results > button')?.innerText.includes('隐私')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-parent').length === 7 && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5");
+    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"]')?.getAttribute('aria-hidden') === 'true' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]')");
+    await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"]')?.getAttribute('aria-hidden') === 'true' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
@@ -2394,7 +2396,7 @@ async function main() {
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]')");
-    await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5 && getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display === 'none' && !document.querySelector('.settings-account-picker')");
+    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]') && getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display === 'none' && !document.querySelector('.settings-account-picker')");
     // 账号页头部只保留设置外壳操作，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await waitForExpression(cdp, "!document.querySelector('.add-account-disclosure')?.open");
@@ -2571,6 +2573,28 @@ async function main() {
     await captureScreenshot(cdp, 'settings-storage-desktop');
     await clickButton(cdp, '清理缓存', "document.querySelector('.settings-storage-actions')");
     await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm[role=\"dialog\"]')?.innerText.includes('本地导入且没有远端副本的附件不会被清理') && document.querySelector('.settings-cache-confirm-summary')?.innerText.includes('MB')");
+    await evalInPage(cdp, `(() => {
+      const backdrop = document.querySelector('.settings-cache-confirm-backdrop');
+      const dialog = backdrop?.querySelector('.settings-cache-confirm[role="dialog"]');
+      const workspace = document.querySelector('.settings-workspace');
+      if (!backdrop || !dialog || !workspace) {
+        throw new Error('Storage confirmation portal is incomplete');
+      }
+      const backdropZIndex = Number.parseInt(getComputedStyle(backdrop).zIndex, 10);
+      const workspaceZIndex = Number.parseInt(getComputedStyle(workspace).zIndex, 10);
+      if (!Number.isFinite(backdropZIndex) || backdropZIndex <= workspaceZIndex) {
+        throw new Error('Storage confirmation portal is hidden behind Settings');
+      }
+      const bounds = dialog.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0
+        || bounds.right <= 0 || bounds.bottom <= 0
+        || bounds.left >= window.innerWidth || bounds.top >= window.innerHeight) {
+        throw new Error('Storage confirmation dialog is outside the visible viewport');
+      }
+      if (getComputedStyle(dialog).borderRadius !== '12px') {
+        throw new Error('Storage confirmation dialog does not use the shared modal radius');
+      }
+    })()`);
     await captureScreenshot(cdp, 'settings-storage-confirm');
     await clickButton(cdp, '确认清理', "document.querySelector('.settings-cache-confirm')");
     await waitForExpression(cdp, "!document.querySelector('.settings-cache-confirm') && document.querySelector('[data-storage-reclaimable]')?.textContent === '0 B' && [...document.querySelectorAll('.settings-storage-actions button')].find((item) => item.textContent.includes('清理缓存'))?.disabled && document.querySelector('.status-line')?.textContent.includes('已释放')");

@@ -202,7 +202,7 @@ body[data-settings-window-platform='macos']
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--st-radius-md);
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: none;
@@ -242,7 +242,7 @@ body[data-settings-window-platform='macos']
   margin: 0 2px 10px;
   padding: 0 9px;
   border: 1px solid var(--st-border);
-  border-radius: 7px;
+  border-radius: var(--st-radius-md);
   color: var(--st-text-tertiary);
   background: var(--st-surface);
 }
@@ -278,7 +278,7 @@ body[data-settings-window-platform='macos']
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--st-radius-sm);
   color: var(--st-text-tertiary);
   background: transparent;
 }
@@ -343,7 +343,7 @@ body[data-settings-window-platform='macos']
   gap: 9px;
   padding: 0 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--st-radius-sm);
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: none;
@@ -436,7 +436,7 @@ body[data-settings-window-platform='macos']
   align-items: center;
   padding: 0 9px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--st-radius-sm);
   color: var(--st-text-secondary);
   background: transparent;
   box-shadow: none;
@@ -501,7 +501,7 @@ body[data-settings-window-platform='macos']
   width: 100%;
   padding: 8px 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--st-radius-sm);
   color: var(--st-text);
   background: transparent;
   text-align: left;
@@ -754,7 +754,7 @@ body[data-settings-window-platform='macos']
   width: min(calc(100% - 48px), var(--st-content-max-width));
   padding: 7px 10px;
   border: 1px solid var(--st-border);
-  border-radius: 7px;
+  border-radius: var(--st-radius-md);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -783,7 +783,7 @@ body[data-settings-window-platform='macos']
   gap: 12px;
   padding: 10px 10px 10px 12px;
   border: 1px solid var(--st-border);
-  border-radius: 8px;
+  border-radius: var(--st-radius-lg);
   background: var(--st-surface);
   box-shadow: var(--st-shadow-float);
 }
@@ -814,7 +814,7 @@ body[data-settings-window-platform='macos']
   min-height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--st-radius-md);
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   font-size: 11px;

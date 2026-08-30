@@ -40,7 +40,7 @@
     gap: 2px;
     padding: 0 6px 0 2px;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--st-radius-md);
     color: var(--st-accent);
     background: transparent;
     box-shadow: none;

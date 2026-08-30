@@ -80,7 +80,7 @@ function findRules(css, selectorSubstr) {
  *  4. No persistent backdrop-filter blur in settings CSS.
  *  5. .st-section is not a card (no border, radius, shadow, hover-shadow).
  *  6. Toggle is 36x20px (not 44x24px).
- *  7. Radius tokens are small (sm<=8, modal<=10).
+ *  7. Radius tokens reuse the application geometry scale.
  *  8. No gradient hero in onboarding CSS.
  *  9. No persistent blur in onboarding (transient backdrop <=2px ok).
  * 10. No hardcoded colours in onboarding/notifications/account-login/shared-dialogs.
@@ -182,16 +182,31 @@ describe('settings de-AI contract — toggle is compact 36x20px', () => {
   });
 });
 
-describe('settings de-AI contract — radius tokens are small', () => {
-  it('--st-radius-sm is <= 8px', () => {
-    const m = settingsTokensCss.match(/--st-radius-sm:\s*(\d+)px/);
-    expect(m).not.toBeNull();
-    expect(parseInt(m[1], 10)).toBeLessThanOrEqual(8);
+describe('settings de-AI contract — radius tokens share application geometry', () => {
+  it('aliases every settings radius level to its application semantic token', () => {
+    expect(settingsTokensCss).toMatch(/--st-radius-sm:\s*var\(--ui-radius-sm\)/);
+    expect(settingsTokensCss).toMatch(/--st-radius-md:\s*var\(--ui-radius-control\)/);
+    expect(settingsTokensCss).toMatch(/--st-radius-lg:\s*var\(--ui-radius-panel\)/);
+    expect(settingsTokensCss).toMatch(/--st-radius-modal:\s*var\(--ui-radius-modal\)/);
+    expect(settingsTokensCss).toMatch(/--st-radius-pill:\s*var\(--ui-radius-pill\)/);
   });
-  it('--st-radius-modal is <= 10px', () => {
-    const m = settingsTokensCss.match(/--st-radius-modal:\s*(\d+)px/);
-    expect(m).not.toBeNull();
-    expect(parseInt(m[1], 10)).toBeLessThanOrEqual(10);
+
+  it('uses the shared control radius and does not reintroduce 7px or 8px radius values', () => {
+    expect(settingsPrimitivesCss).toMatch(
+      /--settings-control-radius:\s*var\(--ui-radius-control\)/,
+    );
+    expect(allSettingsCss).not.toMatch(/border-radius:\s*(?:7|8)px/);
+  });
+});
+
+describe('settings portal contract — confirmation stays above the workspace', () => {
+  it('uses the application dialog layer for the portaled cache confirmation', () => {
+    const rules = findRules(settingsPagesCss, '.settings-cache-confirm-backdrop');
+    const portalRule = rules.find((rule) => (
+      rule.selector === '.settings-cache-confirm-backdrop'
+    ));
+    expect(portalRule).toBeDefined();
+    expect(portalRule.body).toMatch(/z-index:\s*var\(--ui-z-dialog,\s*10000\)/);
   });
 });
 

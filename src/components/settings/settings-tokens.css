@@ -6,7 +6,8 @@
  */
 
 .settings-workspace,
-.settings-backdrop {
+.settings-backdrop,
+.settings-cache-confirm-backdrop {
   /* Surfaces */
   --st-canvas: var(--ui-bg);
   --st-surface: var(--ui-surface);
@@ -56,11 +57,13 @@
   --st-space-6: 24px;
   --st-space-7: 32px;
 
-  /* Geometry: permanent content has 0 radius; controls use small radius */
-  --st-radius-sm: 6px;
-  --st-radius-md: 8px;
-  --st-radius-lg: 8px;
-  --st-radius-modal: 10px;
+  /* Geometry follows the application scale instead of maintaining a second
+     Settings-only radius system. */
+  --st-radius-sm: var(--ui-radius-sm);
+  --st-radius-md: var(--ui-radius-control);
+  --st-radius-lg: var(--ui-radius-panel);
+  --st-radius-modal: var(--ui-radius-modal);
+  --st-radius-pill: var(--ui-radius-pill);
   /* Settings popovers follow the global panel radius; the alias remains
      scoped to Settings so the application radius scale stays authoritative. */
   --ui-radius-popover: var(--ui-radius-panel);
@@ -90,22 +93,6 @@
  */
 :root[data-theme="dark"] .settings-backdrop {
   background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
-}
-
-/*
- * The cache-clear confirm dialog portals into <body>, outside the modal,
- * so it re-declares the small token set it needs.
- */
-.settings-cache-confirm-backdrop {
-  --st-text: var(--ui-text);
-  --st-text-secondary: var(--ui-text-secondary);
-  --st-text-tertiary: var(--ui-text-tertiary);
-  --st-surface: var(--ui-surface);
-  --st-surface-muted: var(--ui-surface-muted);
-  --st-border-strong: var(--ui-border-strong);
-  --st-accent: var(--ui-accent);
-  --st-danger: var(--ui-danger);
-  --st-danger-hover: var(--ui-danger-hover);
 }
 
 :root[data-theme="dark"] .settings-cache-confirm-backdrop {

@@ -119,22 +119,23 @@ describe('SettingsFrame application shell', () => {
     expect(onNavigate).toHaveBeenCalledWith('accounts');
   });
 
-  it('keeps account destinations visible before entering a detail page', () => {
+  it('keeps account details collapsed until the account parent is expanded', () => {
     const onNavigate = vi.fn();
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: true, onNavigate });
     const navigation = screen.getByRole('navigation', { name: '设置分类' });
-    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(5);
     const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
     expect(accountParent.getAttribute('aria-current')).toBe('page');
+    expect(accountParent.getAttribute('aria-expanded')).toBe('false');
+    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
+    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    fireEvent.click(accountParent);
+    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(5);
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('button', { name: '服务器设置' }).getAttribute('aria-current')).toBeNull();
-    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     fireEvent.click(accountParent);
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(accountParent);
-    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(5);
-    expect(accountParent.getAttribute('aria-expanded')).toBe('true');
     expect(onNavigate).not.toHaveBeenCalled();
   });
 

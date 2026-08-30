@@ -395,7 +395,7 @@
 .settings-modal .settings-account-row-meta em {
   padding: 1px 6px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-info);
   background: var(--st-info-soft);
   font-size: var(--st-font-size-aux);
@@ -870,7 +870,7 @@
   flex: 0 0 auto;
   padding: 3px 9px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
@@ -1317,6 +1317,7 @@
 .settings-cache-confirm-backdrop {
   position: fixed;
   inset: 0;
+  z-index: var(--ui-z-dialog, 10000);
   background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.45);
   display: flex;
   align-items: center;
@@ -1368,7 +1369,7 @@
 
 .settings-cache-confirm-backdrop > .settings-cache-confirm > .settings-cache-confirm-summary {
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--st-radius-md);
   margin-bottom: 12px;
 }
 
@@ -1686,7 +1687,7 @@
   flex: 0 0 auto;
   padding: 3px 9px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   font-size: var(--st-font-size-aux);
@@ -1788,7 +1789,7 @@
 .settings-modal .sync-schedule-metrics span {
   padding: 3px 9px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface);
   font-size: var(--st-font-size-aux);
@@ -1810,7 +1811,7 @@
 .settings-modal .sync-account-strip span {
   padding: 3px 9px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface);
   font-size: var(--st-font-size-aux);
@@ -1863,7 +1864,7 @@
 .settings-modal .mailbox-map-title > span {
   flex: 0 0 auto;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   font-size: var(--st-font-size-aux);
   font-weight: 500;
 }
@@ -2232,7 +2233,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface-muted);
   cursor: pointer;
@@ -2518,7 +2519,7 @@
   min-height: 32px;
   padding: 0 10px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface);
   box-shadow: var(--ui-box-shadow-none);
@@ -2674,7 +2675,7 @@
   gap: 4px;
   padding: 10px 12px;
   border: 1px solid var(--st-danger);
-  border-radius: 8px;
+  border-radius: var(--st-radius-md);
   color: var(--st-danger);
   background: var(--st-danger-soft);
 }
@@ -2824,7 +2825,7 @@
   padding: 0;
   appearance: none;
   border: 1px solid var(--st-border-strong);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   background: var(--st-border-strong);
   cursor: pointer;
 }
@@ -2979,7 +2980,7 @@
 
 .contact-import-counts em {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   font-size: var(--st-font-size-aux);
   font-style: normal;
   font-weight: 500;
@@ -3040,7 +3041,7 @@
 
 .contact-import-status {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   font-size: var(--st-font-size-aux);
   font-weight: 500;
 }
@@ -3115,7 +3116,7 @@
   content: "已修改";
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-info);
   background: var(--st-info-soft);
   font-size: 12px;
@@ -3156,7 +3157,7 @@
   overflow: hidden;
   padding: 1px 7px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text-secondary);
   background: var(--st-surface-subtle);
   font-size: 12px;
@@ -3372,7 +3373,7 @@
 
 .settings-modal .ai-service-badge {
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-warning);
   background: var(--st-warning-soft);
   font-size: var(--st-font-size-aux);
@@ -4025,7 +4026,7 @@
   gap: 6px;
   padding: 0 10px;
   border: 1px solid var(--st-border);
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   color: var(--st-text);
   background: var(--st-surface);
   font-size: var(--st-font-size-secondary);
@@ -4144,7 +4145,7 @@
 .settings-modal .template-category,
 .settings-modal .template-tag {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   font-size: var(--st-font-size-aux);
   font-style: normal;
   font-weight: 500;
@@ -4182,7 +4183,7 @@
 
 .settings-modal .privacy-trust-scope {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--st-radius-pill);
   font-size: var(--st-font-size-aux);
   font-weight: 500;
 }

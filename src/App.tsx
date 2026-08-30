@@ -118,6 +118,8 @@ import './ui-2026.css';
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
+import useGlobalAccountPreferences from './hooks/useGlobalAccountPreferences';
+import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
 const SettingsOverlay = lazy(() => import('./components/settings/SettingsOverlay'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
 const FirstRunOnboarding = lazy(() => import('./components/FirstRunOnboarding'));
@@ -673,7 +675,6 @@ function MailboxApp({
     authTypeChanged,
     authTypeChangeNotice,
     accountSettingsSaving,
-    saveAndVerifyReport,
     saveAndVerifyRunning,
     resetSaveAndVerifyReport,
     saveSettings,
@@ -1394,12 +1395,30 @@ function MailboxApp({
     storeAndVerifyCredential,
     deleteCredential,
   } = useCredentialManagement({
-    account,
+    account: accountForm,
     credentialStatus,
     setCredentialStatus,
     setCredentialVerification,
     setStatus,
     verifyAccountCredentials,
+  });
+  const selectSettingsAccount = useSettingsAccountSelection({
+    setAccountForm,
+    setIdentityForm,
+    setCredentialSecret,
+    setCredentialStatus,
+    setCredentialVerification,
+    setRemoteImageTrusts,
+    setIdentities,
+    setFolders,
+    setStatus,
+  });
+  const globalAccountPreferences = useGlobalAccountPreferences({
+    accounts,
+    setAccount,
+    setAccountForm,
+    setAccounts,
+    setStatus,
   });
   const {
     localBackupSummary,
@@ -2097,7 +2116,6 @@ function MailboxApp({
             saveAndVerifyRunning={saveAndVerifyRunning}
             connectionTestRunning={connectionTestRunning}
             connectionTestFeedback={connectionTestFeedback}
-            saveAndVerifyReport={saveAndVerifyReport}
             oauthClientId={oauthClientId}
             oauthClientSecret={oauthClientSecret}
             oauthRedirectUri={oauthRedirectUri}
@@ -2114,6 +2132,7 @@ function MailboxApp({
             credentialStatus={credentialStatus}
             notificationPolicy={notificationPolicy}
             sendUndoDelaySeconds={sendUndoDelaySeconds}
+            {...globalAccountPreferences}
             remoteImageTrusts={remoteImageTrusts}
             identities={identities}
             identityForm={identityForm}
@@ -2161,12 +2180,7 @@ function MailboxApp({
               saveAndVerify().catch((error) => setStatus(String(error)));
             } : undefined}
             onAccountFormChange={setAccountForm}
-            onSelectAccount={(next) => {
-              setAccountForm(next);
-              invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: next.id })
-                .then(setRemoteImageTrusts)
-                .catch((error) => setStatus(String(error)));
-            }}
+            onSelectAccount={selectSettingsAccount}
             onNewAccountFormChange={setNewAccountForm}
             onApplyProviderPreset={applyProviderPreset}
             onApplyNewAccountPreset={applyNewAccountPreset}
@@ -2184,7 +2198,9 @@ function MailboxApp({
                 accountId: updatedAccount.id,
                 input: updatedAccount,
               });
-              setAccount(updated);
+              setAccount((current) => (
+                current === null || current.id === updated.id ? updated : current
+              ));
               setAccountForm(updated);
               setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
               setStatus('账号配置已保存');

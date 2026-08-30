@@ -68,6 +68,17 @@ export function isAccountConnectionDirty(
   return !accountConnectionSettingsEqual(persisted, draft);
 }
 
+export function replaceAccountScopedItems<T extends { account_id: number | null }>(
+  current: T[],
+  incoming: T[],
+  accountId: number,
+): T[] {
+  return [
+    ...current.filter((item) => item.account_id !== accountId),
+    ...incoming.filter((item) => item.account_id === accountId),
+  ];
+}
+
 export type SaveAndVerifyStageId =
   | 'save'
   | 'server'

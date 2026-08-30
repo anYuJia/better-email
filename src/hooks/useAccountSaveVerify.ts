@@ -76,7 +76,9 @@ export default function useAccountSaveVerify({
   }, [authTypeChanged, setCredentialVerification]);
 
   const applySavedAccount = useCallback((updated: Account) => {
-    setAccount(updated);
+    setAccount((current) => (
+      current === null || current.id === updated.id ? updated : current
+    ));
     setAccountForm(updated);
     setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }, [setAccount, setAccountForm, setAccounts]);

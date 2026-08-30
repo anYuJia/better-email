@@ -31,7 +31,6 @@ describe('AccountList semantics', () => {
         accountCount={accounts.length}
         onAdd={() => undefined}
         onSelect={() => undefined}
-        onDelete={() => undefined}
       />,
     );
 
@@ -45,9 +44,8 @@ describe('AccountList semantics', () => {
     expect(screen.queryByRole('option')).toBeNull();
   });
 
-  it('selects a row without opening a nested config dialog and keeps delete independent', () => {
+  it('selects an account row without opening a nested dialog', () => {
     const onSelect = vi.fn();
-    const onDelete = vi.fn();
     render(
       <AccountList
         accounts={accounts}
@@ -55,15 +53,30 @@ describe('AccountList semantics', () => {
         accountCount={accounts.length}
         onAdd={() => undefined}
         onSelect={onSelect}
-        onDelete={onDelete}
       />,
     );
 
     const personalRow = screen.getAllByRole('listitem')[1];
     fireEvent.click(within(personalRow).getByRole('button', { name: /个人邮箱/ }));
-    fireEvent.click(within(personalRow).getByRole('button', { name: '删除' }));
 
     expect(onSelect).toHaveBeenCalledWith(accounts[1]);
-    expect(onDelete).toHaveBeenCalledWith(accounts[1]);
+    expect(screen.queryByRole('button', { name: '删除' })).toBeNull();
+  });
+
+  it('locks account switching and adding while the current account has unsaved changes', () => {
+    render(
+      <AccountList
+        accounts={accounts}
+        activeAccountId={1}
+        accountCount={accounts.length}
+        switchDisabled
+        onAdd={() => undefined}
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect((screen.getByRole('button', { name: /工作邮箱/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: /个人邮箱/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /添加账号/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

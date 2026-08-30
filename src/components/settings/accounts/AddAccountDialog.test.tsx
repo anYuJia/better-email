@@ -139,7 +139,6 @@ describe('AddAccountDialog', () => {
       return settingsOpen ? (
         <SettingsFrame
           title="设置"
-          subtitle="work@example.com"
           activeSection="accounts"
           onNavigate={vi.fn()}
           onTestConnection={vi.fn()}

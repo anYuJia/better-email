@@ -11,6 +11,7 @@ import {
   userFacingVerifyMessage,
   resolveOrdinaryProviderOption,
   isCustomProvider,
+  replaceAccountScopedItems,
 } from './accountConnectionSettings';
 
 describe('accountConnectionSettings pure functions', () => {
@@ -129,6 +130,24 @@ describe('accountConnectionSettings pure functions', () => {
     expect(isAccountConnectionDirty(null, baseAccount)).toBe(false);
     expect(isAccountConnectionDirty(baseAccount, null)).toBe(false);
     expect(isAccountConnectionDirty(null, null)).toBe(false);
+  });
+
+  it('replaces only data belonging to the selected account', () => {
+    const current = [
+      { id: 'global', account_id: null },
+      { id: 'one-old', account_id: 1 },
+      { id: 'two-old', account_id: 2 },
+    ];
+    const incoming = [
+      { id: 'one-stale', account_id: 1 },
+      { id: 'two-new', account_id: 2 },
+    ];
+
+    expect(replaceAccountScopedItems(current, incoming, 2)).toEqual([
+      { id: 'global', account_id: null },
+      { id: 'one-old', account_id: 1 },
+      { id: 'two-new', account_id: 2 },
+    ]);
   });
 
   describe('authTypeChangeMessage', () => {

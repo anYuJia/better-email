@@ -66,11 +66,11 @@ export const accountScopedSections = new Set<SettingsSectionId>([
 const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem, 'label' | 'description'>> = {
   general: {
     label: '通用',
-    description: '管理界面、发送与通知偏好。',
+    description: '管理界面、发送、通知与全局偏好。',
   },
   accounts: {
-    label: '邮箱账号',
-    description: '添加、切换账号并管理常用账号设置。',
+    label: '账号',
+    description: '添加、切换并管理邮箱账号。',
   },
   providers: {
     label: '服务器',
@@ -90,7 +90,7 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
   },
   privacy: {
     label: '隐私',
-    description: '控制远程图片、外部发件人提示与信任列表。',
+    description: '控制当前账号的远程图片、外部发件人提示与信任列表。',
   },
   ai: {
     label: 'AI 接入',
@@ -134,7 +134,7 @@ export function isSettingsSectionId(value: unknown): value is SettingsSectionId 
   return typeof value === 'string' && value in sectionPresentation;
 }
 
-export const settingsAccountDetailItems: SettingsNavigationItem[] = [
+export const settingsAccountConfigurationItems: SettingsNavigationItem[] = [
   {
     id: 'providers',
     label: '服务器',
@@ -166,10 +166,21 @@ export const settingsAccountDetailItems: SettingsNavigationItem[] = [
   {
     id: 'privacy',
     label: '隐私',
-    description: '远程图片、外部发件人与信任列表',
+    description: '当前账号的远程图片与信任列表',
     keywords: ['隐私', '远程图片', '信任', '外部发件人'],
     icon: ShieldCheck,
   },
+];
+
+export const settingsAccountDetailItems: SettingsNavigationItem[] = [
+  {
+    id: 'accounts',
+    label: '账号',
+    description: '添加、切换与移除邮箱账号',
+    keywords: ['账号', '邮箱', '添加账号', '切换账号', '移除账号'],
+    icon: UserRound,
+  },
+  ...settingsAccountConfigurationItems,
 ];
 
 export const settingsToolDetailItems: SettingsNavigationItem[] = [
@@ -221,14 +232,14 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       {
         id: 'general',
         label: '通用',
-        description: '界面、发送与通知偏好。',
+        description: '界面、发送、通知与全局偏好。',
         keywords: ['通用', '外观', '主题', '发送', '通知', 'general', 'appearance'],
         icon: Settings2,
       },
       {
         id: 'accounts',
         label: '邮箱账号',
-        description: '添加、切换与管理邮箱账号。',
+        description: '管理账号、服务器、身份与同步。',
         keywords: ['账号', '邮箱', '添加账号', '切换账号', 'account'],
         icon: UserRound,
       },

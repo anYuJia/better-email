@@ -6,16 +6,23 @@ import { CustomSelect } from '../accounts/CustomSelect';
 import {
   SettingsRow,
   SettingsSection,
+  SettingsSwitch,
 } from '../shared';
 
 type SendingSettingsPageProps = {
   sendUndoDelaySeconds: SendUndoDelaySeconds;
+  crossAccountRiskWarning: boolean;
+  accountPreferenceBusy: boolean;
   onSendUndoDelayChange: (seconds: SendUndoDelaySeconds) => void;
+  onCrossAccountRiskWarningChange: (checked: boolean) => void;
 };
 
 export default function SendingSettingsPage({
   sendUndoDelaySeconds,
+  crossAccountRiskWarning,
+  accountPreferenceBusy,
   onSendUndoDelayChange,
+  onCrossAccountRiskWarningChange,
 }: SendingSettingsPageProps) {
   return (
     <SettingsSection dataSection="sending">
@@ -36,6 +43,13 @@ export default function SendingSettingsPage({
             />
           </div>
         }
+      />
+      <SettingsSwitch
+        label="跨邮箱发送提醒"
+        description="发件账号与当前邮件所属账号不一致时提醒；该偏好适用于所有邮箱账号。"
+        checked={crossAccountRiskWarning}
+        disabled={accountPreferenceBusy}
+        onChange={onCrossAccountRiskWarningChange}
       />
     </SettingsSection>
   );

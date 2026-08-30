@@ -364,6 +364,24 @@ async function openAccountSwitcherMenu(cdp, expectSelector) {
   });
 }
 
+async function selectSettingsAccountTab(cdp, accountLabel) {
+  return withStep(`selectSettingsAccountTab ${accountLabel}`, async () => {
+    await evalInPage(
+      cdp,
+      `(() => {
+        const tab = [...document.querySelectorAll('.settings-account-tab')]
+          .find((item) => item.textContent.includes(${JSON.stringify(accountLabel)}));
+        if (!tab) throw new Error('Settings account tab not found: ' + ${JSON.stringify(accountLabel)});
+        tab.click();
+      })()`,
+    );
+    await waitForExpression(
+      cdp,
+      `[...document.querySelectorAll('.settings-account-tab')].some((item) => item.textContent.includes(${JSON.stringify(accountLabel)}) && item.getAttribute('aria-current') === 'true')`,
+    );
+  });
+}
+
 async function captureScreenshot(cdp, name) {
   return withStep(`captureScreenshot ${name}`, async () => {
     if (!captureDir) return;
@@ -565,11 +583,12 @@ async function clickContextSubmenuItem(cdp, branchText, itemText) {
 async function openSettingsSection(cdp, label, section, expectedSelector) {
   return withStep(`openSettingsSection ${label}`, async () => {
     const nestedParents = {
-      providers: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
-      auth: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
-      identities: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
-      sync: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
-      privacy: { id: 'accounts', label: '邮箱账号', details: ['服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      accounts: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      providers: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      auth: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      identities: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      sync: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
+      privacy: { id: 'accounts', label: '邮箱账号', details: ['账号', '服务器', '登录与安全', '发件身份与标签', '同步', '隐私'] },
       contacts: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
       templates: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
       rules: { id: 'tools', label: '效率工具', details: ['通讯录', '模板', '自动化'] },
@@ -913,7 +932,25 @@ async function assertSettingsNoHorizontalOverflow(cdp, label) {
     `(() => {
       const content = document.querySelector('.settings-content');
       if (!content) throw new Error('Settings content not found');
-      return { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth };
+      const contentRect = content.getBoundingClientRect();
+      const overflowing = [...content.querySelectorAll('*')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            element: element.tagName.toLowerCase()
+              + (element.className && typeof element.className === 'string'
+                ? '.' + element.className.trim().replace(/\s+/g, '.')
+                : ''),
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            scrollWidth: element.scrollWidth,
+            clientWidth: element.clientWidth,
+          };
+        })
+        .filter((entry) => entry.right > Math.ceil(contentRect.right) || entry.scrollWidth > entry.clientWidth + 1)
+        .slice(0, 12);
+      return { scrollWidth: content.scrollWidth, clientWidth: content.clientWidth, overflowing };
     })()`,
   );
   console.log(`${label}: settings-content scrollWidth=${metrics.scrollWidth} clientWidth=${metrics.clientWidth}`);
@@ -2301,7 +2338,7 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('[data-context-item=\"account-scope-3\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.account-switcher[data-account-scope=\"3\"]')?.innerText.includes('archive@better-email.local')");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.body.innerText.includes('OAuth2 向导')");
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && !document.body.innerText.includes('OAuth2 向导')");
     await waitForExpression(cdp, "(() => { const labels = [...document.querySelectorAll('.settings-nav-list .settings-nav-label')].map((item) => item.textContent.trim()); return document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelectorAll('.settings-page').length === 1 && labels.length === 7 && ['通用', '邮箱账号', 'AI 接入', 'MCP', '效率工具', '数据与存储', '关于'].every((label) => labels.includes(label)) && !labels.includes('安全预览') && document.querySelector('.settings-nav-search input[aria-label=\"搜索设置\"]') && !document.querySelector('.settings-context-tabs'); })()");
     await evalInPage(
       cdp,
@@ -2322,11 +2359,11 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('.settings-nav-search button[aria-label=\"清空设置搜索\"]').click()");
     await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"]')?.getAttribute('aria-hidden') === 'true' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-current') === null && document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 6 && document.querySelector('.settings-nav-subitem[aria-label=\"账号设置\"]')?.getAttribute('aria-current') === 'page'");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"]')?.getAttribute('aria-hidden') === 'true' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page')?.dataset.settingsPage === 'accounts' && document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && document.querySelector('.settings-nav-subsection[aria-label=\"邮箱账号详细设置\"]')?.getAttribute('aria-hidden') === 'true' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 5");
+    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"] .settings-nav-subitem').length === 6");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"效率工具设置\"]').click()");
     await waitForExpression(cdp, "document.querySelectorAll('.settings-nav-subsection.is-open').length === 2 && document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]') && document.querySelector('.settings-nav-subsection.is-open[aria-label=\"效率工具详细设置\"]')");
     await evalInPage(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]').click()");
@@ -2395,8 +2432,8 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('[data-context-item=\"account-scope-2\"]')?.innerText.includes('默认发件') && document.querySelector('[data-context-item=\"set-default-account\"]').disabled");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
     await clickButton(cdp, '设置');
-    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]')");
-    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]') && getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display === 'none' && !document.querySelector('.settings-account-picker')");
+    await waitForExpression(cdp, "document.querySelector('.settings-title strong')?.textContent.trim() === '设置' && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && document.querySelector('.settings-page[data-settings-page=\"accounts\"] [data-settings-section=\"account-overview\"]') && document.querySelector('.settings-account-stack [data-current-account-id]') && !document.querySelector('.settings-account-workspace') && !document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.innerText.includes('跨邮箱发送风险提示') && !document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.innerText.includes('自动下载新邮件附件')");
+    await waitForExpression(cdp, "document.querySelector('.settings-nav-parent[aria-label=\"邮箱账号设置\"]')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('.settings-nav-subsection.is-open[aria-label=\"邮箱账号详细设置\"]') && getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display === 'none' && document.querySelectorAll('.settings-account-tab').length === 3 && !document.querySelector('.settings-account-picker')");
     // 账号页头部只保留设置外壳操作，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await waitForExpression(cdp, "!document.querySelector('.add-account-disclosure')?.open");
@@ -2431,12 +2468,85 @@ async function main() {
     })()`);
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-account-desktop');
-    // 账号列表呈现 3 个种子账号（保存与验证动作在账号配置/认证页内）。
-    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-account-row')].filter((row) => row.innerText.includes('@better-email.local')).length === 3");
+    // 多账号桌面端使用内容顶部的轻量 Tab；不再制造第三列账号栏。
+    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-account-tab')].filter((tab) => tab.innerText.includes('@better-email.local')).length === 3 && getComputedStyle(document.querySelector('.settings-account-tabs')).display !== 'none' && getComputedStyle(document.querySelector('.settings-mobile-account-list')).display === 'none'");
+    await evalInPage(cdp, `(() => {
+      const area = document.querySelector('.settings-content-area');
+      const tabs = document.querySelector('.settings-account-tabs');
+      const content = document.querySelector('.settings-content');
+      const active = document.querySelector('.settings-account-tab[aria-current="true"]');
+      if (!area || !tabs || !content || !active) throw new Error('Settings account tabs are incomplete');
+      const tabsRect = tabs.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const tabsStyle = getComputedStyle(tabs);
+      const activeStyle = getComputedStyle(active);
+      const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
+      if (
+        Math.abs(tabsRect.bottom - contentRect.top) > 1
+        || tabsRect.height > 54
+        || tabsStyle.boxShadow !== 'none'
+        || tabsStyle.borderBottomWidth !== '1px'
+        || !transparent(activeStyle.backgroundColor)
+        || transparent(activeStyle.borderBottomColor)
+        || document.querySelector('.settings-account-tabs-header, .settings-account-tabs-status')
+      ) {
+        throw new Error('Settings account tabs do not use the flat horizontal layout');
+      }
+    })()`);
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 820,
+      height: 760,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 820 && document.querySelector('.settings-account-tabs')");
+    const mediumAccountTabsGeometry = await evalInPage(cdp, `(() => {
+      const area = document.querySelector('.settings-content-area');
+      const tabs = document.querySelector('.settings-account-tabs');
+      const tabsList = document.querySelector('.settings-account-tabs-list');
+      const content = document.querySelector('.settings-content');
+      const rect = (element) => {
+        const value = element.getBoundingClientRect();
+        return { left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height };
+      };
+      return {
+        area: rect(area),
+        tabs: rect(tabs),
+        content: rect(content),
+        areaOverflow: { scrollWidth: area.scrollWidth, clientWidth: area.clientWidth },
+        listOverflow: { scrollWidth: tabsList.scrollWidth, clientWidth: tabsList.clientWidth },
+        tabsDisplay: getComputedStyle(tabs).display,
+        listDisplay: getComputedStyle(tabsList).display,
+        columns: getComputedStyle(area).gridTemplateColumns,
+        rows: getComputedStyle(area).gridTemplateRows,
+      };
+    })()`);
+    console.log('账号页 820x760 Tab geometry', JSON.stringify(mediumAccountTabsGeometry));
+    if (
+      mediumAccountTabsGeometry.tabsDisplay !== 'block'
+      || mediumAccountTabsGeometry.listDisplay !== 'flex'
+      || mediumAccountTabsGeometry.tabs.bottom > mediumAccountTabsGeometry.content.top + 1
+      || mediumAccountTabsGeometry.tabs.height > 46
+      || mediumAccountTabsGeometry.areaOverflow.scrollWidth > mediumAccountTabsGeometry.areaOverflow.clientWidth + 1
+      || mediumAccountTabsGeometry.listOverflow.scrollWidth > mediumAccountTabsGeometry.listOverflow.clientWidth + 1
+    ) {
+      throw new Error(`账号页 820x760 Tab 布局异常：${JSON.stringify(mediumAccountTabsGeometry)}`);
+    }
+    await assertSettingsNoHorizontalOverflow(cdp, '账号页 820x760 横向账号 Tab');
+    await waitForSettingsPageStable(cdp);
+    await captureScreenshot(cdp, 'settings-account-tabs-820');
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 980,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await waitForExpression(cdp, "window.innerWidth === 1440 && document.querySelector('.settings-account-tabs')?.getBoundingClientRect().height <= 54");
     await openSettingsSection(cdp, '数据与存储', 'backup', '.settings-page[data-settings-page="backup"]');
     // 备份页核心内容：本地存储统计（连接端点/凭据验证在认证页单独断言）。
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"backup\"]') && document.querySelector('[data-storage-total]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"backup\"]') && document.querySelector('[data-storage-total]') && [...document.querySelectorAll('.settings-page[data-settings-page=\"backup\"] .st-switch')].some((item) => item.textContent.includes('自动下载新邮件附件')) && !document.querySelector('.settings-account-tabs')");
     await openSettingsSection(cdp, '通用', 'general', '.settings-page[data-settings-page="general"]');
+    await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"general\"] .st-switch')].some((item) => item.textContent.includes('跨邮箱发送提醒')) && !document.querySelector('.settings-account-tabs')");
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 430,
       height: 780,
@@ -2450,8 +2560,8 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('.settings-mobile-back').click()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal') && document.querySelector('.mobile-settings-root')");
     await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.textContent.includes('邮箱账号'))?.click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-app\"]') && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '邮箱账号' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs')");
-    await waitForExpression(cdp, "getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display !== 'none' && !document.querySelector('.settings-account-picker')");
+    await waitForExpression(cdp, "document.querySelector('.settings-modal[data-ui=\"settings-app\"]') && document.querySelector('.settings-page[data-settings-page=\"accounts\"]')?.getAttribute('aria-label') === '账号' && !document.querySelector('.settings-page-picker, .settings-mobile-menu, .settings-context-tabs')");
+    await waitForExpression(cdp, "getComputedStyle(document.querySelector('.settings-mobile-detail-navigation')).display !== 'none' && getComputedStyle(document.querySelector('.settings-mobile-account-list')).display !== 'none' && getComputedStyle(document.querySelector('.settings-account-tabs')).display === 'none' && !document.querySelector('.settings-account-picker')");
     await captureScreenshot(cdp, 'settings-account-narrow');
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,
@@ -2476,37 +2586,36 @@ async function main() {
     await pickCustomSelect(cdp, '.settings-page[data-settings-page="general"] [data-settings-section="sending"] .custom-select-summary', '5 秒');
     await waitForExpression(cdp, "localStorage.getItem('better-email.sendUndoDelaySeconds') === '5' && document.querySelector('[data-settings-section=\"sending\"]')?.innerText.includes('5 秒')");
     await openSettingsSection(cdp, '服务器', 'providers', '.settings-page[data-settings-page="providers"]');
-    await pickCustomSelect(cdp, '.settings-account-picker .custom-select-summary', 'Demo User');
+    await selectSettingsAccountTab(cdp, 'Demo User');
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"providers\"]')?.innerText.includes('demo@better-email.local') && document.querySelector('.settings-provider-advanced')");
     await evalInPage(cdp, `(() => {
-      const picker = document.querySelector('.settings-page-header .settings-account-picker .custom-select-summary');
-      if (!picker) throw new Error('Settings detail account picker not found in the page header');
-      const style = getComputedStyle(picker);
+      const tabs = document.querySelector('.settings-account-tabs');
+      const content = document.querySelector('.settings-content');
+      const activeTab = document.querySelector('.settings-account-tab[aria-current="true"]');
+      if (!tabs || !content || !activeTab) throw new Error('Settings account tabs are incomplete');
+      const tabsStyle = getComputedStyle(tabs);
+      const activeStyle = getComputedStyle(activeTab);
       const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
-      const pickerLabel = picker.querySelector('strong')?.getBoundingClientRect();
-      const pickerMeta = picker.querySelector('small')?.getBoundingClientRect();
+      const tabsRect = tabs.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
       if (
-        picker.getBoundingClientRect().height > 36
-        || style.boxShadow !== 'none'
-        || !transparent(style.borderTopColor)
-        || !transparent(style.backgroundColor)
-        || !pickerLabel
-        || !pickerMeta
-        || Math.abs((pickerLabel.top + pickerLabel.height / 2) - (pickerMeta.top + pickerMeta.height / 2)) > 2
+        Math.abs(tabsRect.bottom - contentRect.top) > 1
+        || tabsRect.height > 54
+        || tabsStyle.boxShadow !== 'none'
+        || tabsStyle.borderBottomWidth !== '1px'
+        || !transparent(activeStyle.backgroundColor)
+        || transparent(activeStyle.borderBottomColor)
+        || document.querySelector('.settings-account-picker')
       ) {
-        throw new Error('Settings detail account picker is not a compact inline context control');
+        throw new Error('Settings account tabs do not own the flat horizontal account context');
       }
     })()`);
-    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"true\"]') && document.querySelector('.custom-select-dropdown')");
-    await evalInPage(cdp, "document.querySelector('.settings-account-picker .custom-select-summary').click()");
-    await waitForExpression(cdp, "document.querySelector('.settings-account-picker .custom-select-summary[aria-expanded=\"false\"]') && !document.querySelector('.custom-select-dropdown')");
     await waitForExpression(cdp, "document.querySelector('.settings-provider-server-advanced > .settings-animated-disclosure-trigger')?.getAttribute('aria-expanded') === 'false' && !document.body.innerText.includes('兼容性验证') && [...document.querySelectorAll('.settings-nav button')].some((item) => item.textContent.trim() === '通用')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-closed-desktop');
     await openDetails(cdp, '.settings-provider-server-advanced');
     await waitForExpression(cdp, "document.querySelector('.settings-provider-server-advanced > .settings-animated-disclosure-trigger')?.getAttribute('aria-expanded') === 'true' && document.querySelector('.settings-provider-server-advanced')?.textContent.includes('IMAP 与 SMTP 地址') && !document.body.innerText.includes('兼容性矩阵')");
-    await waitForExpression(cdp, "(() => { const context = document.querySelector('.settings-page-header .settings-account-context')?.getBoundingClientRect(); const header = document.querySelector('.settings-page-header')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return context && header && content && context.top >= header.top && context.bottom <= header.bottom + 1 && header.bottom <= content.top + 1 && !document.querySelector('.settings-account-workspace'); })()");
+    await waitForExpression(cdp, "(() => { const tabs = document.querySelector('.settings-account-tabs')?.getBoundingClientRect(); const page = document.querySelector('.settings-page')?.getBoundingClientRect(); const header = document.querySelector('.settings-page-header')?.getBoundingClientRect(); const content = document.querySelector('.settings-page-content')?.getBoundingClientRect(); return tabs && page && header && content && tabs.bottom <= page.top + 1 && header.bottom <= content.top + 1 && !document.querySelector('.settings-account-context, .settings-account-workspace'); })()");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-providers-desktop');
     await assertSettingsProvidersGeometry(cdp, '服务器页 1440x980');
@@ -2553,8 +2662,8 @@ async function main() {
     await clickButton(cdp, '验证登录', "document.querySelector('.settings-credential-panel')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('登录验证通过') && !document.querySelector('[data-connection-diagnostics]') && !document.body.innerText.includes('只读验收')");
     await openSettingsSection(cdp, '同步', 'sync', '.settings-page[data-settings-page="sync"]');
-    await pickCustomSelect(cdp, '.settings-account-picker .custom-select-summary', 'Design Studio');
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')?.innerText.includes('design@better-email.local')");
+    await selectSettingsAccountTab(cdp, 'Design Studio');
+    await waitForExpression(cdp, "(() => { const activeTab = document.querySelector('.settings-account-tab[aria-current=\"true\"]'); const page = document.querySelector('.settings-page[data-settings-page=\"sync\"]'); return activeTab?.innerText.includes('design@better-email.local') && page?.innerText.includes('Projects/Alpha'); })()");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')?.innerText.includes('查看文件夹状态并手动刷新邮件') && [...document.querySelectorAll('.settings-page[data-settings-page=\"sync\"] button')].some((item) => item.textContent.includes('同步邮件')) && !document.body.innerText.includes('同步调度与限流')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-sync-desktop');
@@ -2740,13 +2849,13 @@ async function main() {
       { id: 'general', label: '通用' },
       { id: 'ai', label: 'AI 接入' },
       { id: 'mcp', label: 'MCP' },
-      { id: 'accounts', label: '邮箱账号' },
+      { id: 'accounts', label: '账号' },
       { id: 'providers', label: '服务器' },
       { id: 'auth', label: '登录与安全' },
       { id: 'about', label: '关于' },
     ]);
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"about\"] .settings-about-brand') && !document.querySelector('.settings-about-hero .st-section-header')");
-    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     // 账号页头部为独立设置外壳契约：无旧版保存动作栏，保存与验证在账号配置/认证页内。
     await waitForExpression(cdp, "document.querySelector('.settings-header-actions button[aria-label=\"关闭设置\"]') && !document.querySelector('.settings-action-bar')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
@@ -2764,7 +2873,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.undo-snackbar')?.innerText.includes('远端邮件已移动到 Projects/Alpha')");
     await clickButton(cdp, '设置');
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
-    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     await clickButton(cdp, '添加账号', "document.querySelector('.settings-page[data-settings-page=\"accounts\"]')");
     await waitForExpression(cdp, "document.querySelector('.settings-account-add-dialog')");
     await fillInput(cdp, '.settings-account-add-dialog input[placeholder="name@example.com"]', 'qa-new@better-email.local');
@@ -2783,12 +2892,14 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.account-switcher')?.innerText.includes('qa-new@better-email.local') && document.querySelector('.folder-list')?.innerText.includes('收件箱') && document.querySelector('.folder-list')?.innerText.includes('已发送') && document.querySelector('.folder-list')?.innerText.includes('草稿箱') && document.querySelector('.folder-list')?.innerText.includes('归档')");
     await openSettingsSection(cdp, '发件身份与标签', 'identities', '.settings-page[data-settings-page="identities"]');
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"identities\"]')?.innerText.includes('QA New') && document.querySelector('.settings-page[data-settings-page=\"identities\"]')?.innerText.includes('1 个')");
-    await openSettingsSection(cdp, '邮箱账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
+    await openSettingsSection(cdp, '账号', 'accounts', '.settings-page[data-settings-page="accounts"]');
     await clickButton(cdp, '会话', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.thread-list') && document.querySelectorAll('.thread-card').length === 0");
     await clickButton(cdp, '邮件', "document.querySelector('.list-control-actions')");
     await waitForExpression(cdp, "document.querySelector('.message-list')");
-    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.settings-account-row')].find((r) => r.innerText.includes('qa-new@better-email.local')); const deleteBtn = row && [...row.querySelectorAll('.settings-account-row-actions button')].find((button) => button.textContent.includes('删除')); if (!deleteBtn) throw new Error('Delete button for qa-new@better-email.local not found'); deleteBtn.click(); })()");
+    await evalInPage(cdp, "(() => { const row = [...document.querySelectorAll('.settings-account-row')].find((r) => r.innerText.includes('qa-new@better-email.local')); const accountButton = row?.querySelector('.settings-account-row-main'); if (!accountButton) throw new Error('Account row for qa-new@better-email.local not found'); accountButton.click(); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-account-detail[data-current-account-id]')?.innerText.includes('qa-new@better-email.local')");
+    await clickButton(cdp, '移除账号', "document.querySelector('.settings-account-detail[data-current-account-id]')");
     await waitForExpression(cdp, "document.querySelector('[data-account-remove-dialog]') && document.querySelector('[data-account-remove-confirm]').disabled");
     const removalDialogGeometry = await evalInPage(cdp, `(() => {
       const manageDialog = document.querySelector('.settings-account-manage-dialog');

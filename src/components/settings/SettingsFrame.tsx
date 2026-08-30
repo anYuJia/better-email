@@ -8,7 +8,9 @@ import {
   X,
 } from 'lucide-react';
 import SettingsPageShell from './SettingsPageShell';
-import { CustomSelect } from './accounts/CustomSelect';
+import SettingsAccountTabs, {
+  type SettingsAccountTabOption,
+} from './accounts/SettingsAccountTabs';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 import { SettingsSidebar } from './SettingsNavigationControls';
 import {
@@ -29,18 +31,11 @@ import './settings-responsive.css';
 
 export type { SettingsSectionId } from './settingsNavigation';
 
-type SettingsAccountOption = {
-  id: number;
-  label: string;
-  email: string;
-};
-
 type SettingsFrameProps = {
   standalone?: boolean;
   nativeCloseRequestVersion?: number;
   onReady?: () => void;
   title: string;
-  subtitle?: string;
   activeSection: SettingsSectionId;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
@@ -50,9 +45,8 @@ type SettingsFrameProps = {
   isDirty?: boolean;
   isBusy?: boolean;
   isTestingConnection?: boolean;
-  connectionSummary?: string;
   connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
-  accountOptions?: SettingsAccountOption[];
+  accountOptions?: SettingsAccountTabOption[];
   activeAccountId?: number | null;
   onSelectAccountId?: (accountId: number) => void;
   onClose: () => void;
@@ -93,67 +87,11 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'privacy',
 ]);
 
-function SettingsAccountContext({
-  accountSwitchDisabled,
-  currentAccountLabel,
-  accountOptions,
-  activeAccountId,
-  connectionSummary,
-  onSelectAccountId,
-}: {
-  accountSwitchDisabled: boolean;
-  currentAccountLabel: string;
-  accountOptions: SettingsAccountOption[];
-  activeAccountId: number | null;
-  connectionSummary?: string;
-  onSelectAccountId?: (accountId: number) => void;
-}) {
-  const hasConnectionSummary = Boolean(connectionSummary)
-    && connectionSummary !== '尚未开始验证';
-  const canSwitchAccount = accountOptions.length > 0 && Boolean(onSelectAccountId);
-
-  return (
-    <div className="settings-account-context" aria-label="当前账号">
-      {canSwitchAccount ? (
-        <div
-          className="settings-account-picker"
-          title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '切换当前设置账号'}
-        >
-          <span>当前账号</span>
-          <CustomSelect
-            dense
-            ariaLabel="切换当前设置账号"
-            value={String(activeAccountId ?? '')}
-            options={accountOptions.map((account) => ({
-              value: String(account.id),
-              label: account.label,
-              meta: account.email,
-            }))}
-            disabled={accountSwitchDisabled}
-            onChange={(nextValue) => onSelectAccountId?.(Number(nextValue))}
-          />
-        </div>
-      ) : (
-        <span className="settings-account-current">
-          <small>当前账号</small>
-          <strong>{currentAccountLabel || '尚未添加账号'}</strong>
-        </span>
-      )}
-      {hasConnectionSummary && (
-        <span className="settings-account-connection-state" title={connectionSummary}>
-          {connectionSummary}
-        </span>
-      )}
-    </div>
-  );
-}
-
 export default function SettingsFrame({
   standalone = false,
   nativeCloseRequestVersion = 0,
   onReady,
   title,
-  subtitle = '',
   activeSection,
   children,
   onNavigate,
@@ -163,7 +101,6 @@ export default function SettingsFrame({
   isDirty = false,
   isBusy = false,
   isTestingConnection = false,
-  connectionSummary,
   connectionTestFeedback,
   accountOptions = [],
   activeAccountId = null,
@@ -181,19 +118,8 @@ export default function SettingsFrame({
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
-  const showAccountContext = activeSection !== 'accounts'
-    && accountScopedSections.has(activeSection)
+  const showAccountTabs = accountScopedSections.has(activeSection)
     && accountOptions.length > 1;
-  const accountContext = showAccountContext ? (
-    <SettingsAccountContext
-      accountSwitchDisabled={isDirty}
-      currentAccountLabel={subtitle}
-      accountOptions={accountOptions}
-      activeAccountId={activeAccountId}
-      connectionSummary={connectionSummary}
-      onSelectAccountId={onSelectAccountId}
-    />
-  ) : null;
   const isMobileViewport = useSettingsMobileViewport();
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -415,15 +341,24 @@ export default function SettingsFrame({
             accountSectionsEnabled={canSaveAndVerify}
             onNavigate={onNavigate}
           />
-          <div className="settings-content">
-            <SettingsPageShell
-              activeSection={activeSection}
-              group={activeGroup}
-              item={activeItem}
-              context={accountContext}
-            >
-              {children}
-            </SettingsPageShell>
+          <div className={`settings-content-area${showAccountTabs ? ' has-account-tabs' : ''}`}>
+            {showAccountTabs && (
+              <SettingsAccountTabs
+                accounts={accountOptions}
+                activeAccountId={activeAccountId}
+                switchDisabled={isDirty}
+                onSelect={(accountId) => onSelectAccountId?.(accountId)}
+              />
+            )}
+            <div className="settings-content">
+              <SettingsPageShell
+                activeSection={activeSection}
+                group={activeGroup}
+                item={activeItem}
+              >
+                {children}
+              </SettingsPageShell>
+            </div>
           </div>
         </div>
       </section>

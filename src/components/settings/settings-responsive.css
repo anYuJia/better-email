@@ -1,4 +1,26 @@
-/* Settings responsive contract: desktop sidebar, mobile native push page. */
+/* Settings responsive contract: desktop sidebar, compact account tabs, mobile native push page. */
+
+@media (min-width: 721px) and (max-width: 900px) {
+  .settings-account-tabs {
+    min-height: 44px;
+  }
+
+  .settings-account-tabs-list {
+    gap: 8px;
+    padding-inline: 16px;
+  }
+
+  .settings-account-tab {
+    min-width: 104px;
+    height: 44px;
+    flex: 1 0 104px;
+  }
+
+  .settings-account-tab-copy small,
+  .settings-account-tab em {
+    display: none;
+  }
+}
 
 @media (max-width: 720px) {
   .settings-workspace {
@@ -80,37 +102,16 @@
     display: none;
   }
 
+  .settings-content-area,
   .settings-content {
     width: 100%;
   }
 
-  .settings-page-context,
-  .settings-account-context {
-    width: 100%;
+  .settings-content-area.has-account-tabs {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .settings-account-picker {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .settings-account-picker .custom-select-menu {
-    width: min(300px, calc(100% - 58px));
-    min-width: 0;
-    max-width: 300px;
-  }
-
-  .settings-account-picker .custom-select-summary {
-    min-height: 44px;
-    max-width: min(72vw, 320px);
-  }
-
-  .settings-account-current {
-    min-height: 44px;
-    align-items: center;
-  }
-
-  .settings-account-connection-state {
+  .settings-account-tabs {
     display: none;
   }
 
@@ -144,12 +145,6 @@
     padding: 12px 16px;
   }
 
-  .settings-page-header.has-context {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-    gap: 10px;
-  }
-
   .settings-page-heading h2 {
     display: none;
   }
@@ -167,6 +162,18 @@
 
   .settings-mobile-detail-navigation {
     display: block;
+  }
+
+  .settings-modal .settings-mobile-account-list {
+    display: block;
+  }
+
+  .settings-modal .settings-desktop-account-add {
+    display: none;
+  }
+
+  .settings-modal .settings-account-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-shell :is(.st-row, .st-switch) {

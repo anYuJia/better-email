@@ -74,12 +74,8 @@ function requiresAccount(section: SettingsSectionId) {
   return section !== 'accounts' && accountScopedSections.has(section);
 }
 
-function exposesAvailableDetails(
-  section: SettingsSectionId,
-  accountSectionsEnabled: boolean,
-) {
-  return getSettingsDetailItems(section).length > 0
-    && (section !== 'accounts' || accountSectionsEnabled);
+function exposesAvailableDetails(section: SettingsSectionId) {
+  return getSettingsDetailItems(section).length > 0;
 }
 
 export const SettingsSidebar = memo(function SettingsSidebar({
@@ -100,11 +96,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
       const nextSections = new Set(currentSections);
       let changed = false;
 
-      if (!accountSectionsEnabled) {
-        manuallyCollapsedSectionsRef.current.delete('accounts');
-        if (nextSections.delete('accounts')) changed = true;
-      }
-
       const activeSectionIsNested = activeSection !== resolvedActiveSection;
       if (activeSectionIsNested) {
         manuallyCollapsedSectionsRef.current.delete(resolvedActiveSection);
@@ -112,7 +103,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
       if (
         activeSectionIsNested
-        && exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)
+        && exposesAvailableDetails(resolvedActiveSection)
         && !manuallyCollapsedSectionsRef.current.has(resolvedActiveSection)
         && !nextSections.has(resolvedActiveSection)
       ) {
@@ -122,7 +113,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
       return changed ? nextSections : currentSections;
     });
-  }, [accountSectionsEnabled, activeSection, resolvedActiveSection]);
+  }, [activeSection, resolvedActiveSection]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -148,7 +139,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   const navigateToSearchResult = (entry: SettingsSearchEntry) => {
     if (requiresAccount(entry.section) && !accountSectionsEnabled) return;
     const parentSection = resolveSettingsNavigationSectionId(entry.section);
-    if (exposesAvailableDetails(parentSection, accountSectionsEnabled)) {
+    if (exposesAvailableDetails(parentSection)) {
       manuallyCollapsedSectionsRef.current.delete(parentSection);
       setExpandedSections((currentSections) => {
         if (currentSections.has(parentSection)) return currentSections;
@@ -234,11 +225,10 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                 <span className="settings-nav-group">{group.label}</span>
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = activeSection === item.id;
-                  const contextActive = resolvedActiveSection === item.id;
                   const detailItems = getSettingsDetailItems(item.id);
-                  const exposesDetailItems = detailItems.length > 0
-                    && (item.id !== 'accounts' || accountSectionsEnabled);
+                  const exposesDetailItems = detailItems.length > 0;
+                  const active = !exposesDetailItems && activeSection === item.id;
+                  const contextActive = resolvedActiveSection === item.id;
                   const showDetailItems = expandedSections.has(item.id) && exposesDetailItems;
                   const detailGroupId = `settings-nav-${item.id}-details`;
                   const disabled = requiresAccount(item.id) && !accountSectionsEnabled;
@@ -264,9 +254,6 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                       return nextSections;
                     });
 
-                    if (activeSection !== item.id) {
-                      onNavigate(item.id);
-                    }
                   };
                   return (
                     <div className="settings-nav-branch" key={item.id}>

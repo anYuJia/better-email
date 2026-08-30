@@ -19,6 +19,7 @@ export type AccountConnectionSettingsProps = {
   accounts: Account[];
   accountForm: Account | null;
   accountCount: number;
+  accountSwitchDisabled?: boolean;
   newAccountForm: AccountCreateInput;
   oauthClientId: string;
   oauthClientSecret: string;
@@ -33,6 +34,7 @@ export type AccountConnectionSettingsProps = {
   authTypeChanged: boolean;
   authTypeChangeNotice: string | null;
   onAccountFormChange: (account: Account) => void;
+  onSelectAccount: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
@@ -61,8 +63,10 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         accounts={props.accounts}
         accountForm={props.accountForm}
         accountCount={props.accountCount}
+        accountSwitchDisabled={props.accountSwitchDisabled}
         newAccountForm={props.newAccountForm}
         onAccountFormChange={props.onAccountFormChange}
+        onSelectAccount={props.onSelectAccount}
         onNewAccountFormChange={props.onNewAccountFormChange}
         onApplyNewAccountPreset={props.onApplyNewAccountPreset}
         onCreateNewAccount={props.onCreateNewAccount}

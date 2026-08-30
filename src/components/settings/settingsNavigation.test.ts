@@ -4,6 +4,7 @@ import {
   getSettingsDetailItems,
   getSettingsSectionPresentation,
   resolveSettingsNavigationSectionId,
+  settingsAccountConfigurationItems,
   settingsAccountDetailItems,
   settingsNavigationGroups,
   settingsNavigationItems,
@@ -14,6 +15,14 @@ import {
 describe('settingsNavigation information architecture', () => {
   it('places technical account destinations behind the account hub', () => {
     expect(settingsAccountDetailItems.map((item) => item.id)).toEqual([
+      'accounts',
+      'providers',
+      'auth',
+      'identities',
+      'sync',
+      'privacy',
+    ]);
+    expect(settingsAccountConfigurationItems.map((item) => item.id)).toEqual([
       'providers',
       'auth',
       'identities',
@@ -47,7 +56,7 @@ describe('settingsNavigation information architecture', () => {
 
   it('uses explicit labels for the consolidated destinations', () => {
     expect(getSettingsSectionPresentation('general').label).toBe('通用');
-    expect(getSettingsSectionPresentation('accounts').label).toBe('邮箱账号');
+    expect(getSettingsSectionPresentation('accounts').label).toBe('账号');
     expect(getSettingsSectionPresentation('identities').label).toBe('发件身份与标签');
   });
 

@@ -16,7 +16,12 @@ import type { RuleConditionField, SendUndoDelaySeconds } from '../../app/appConf
  * actually change instead of on every application tick.
  */
 export type SettingsHandlers = {
-  readonly accountOptions: Array<{ id: number; label: string; email: string }>;
+  readonly accountOptions: Array<{
+    id: number;
+    label: string;
+    email: string;
+    isDefault: boolean;
+  }>;
   readonly activeAccountId: number | null;
   onSelectAccountId: (accountId: number) => void;
   onNavigate: (section: SettingsSectionId) => void;
@@ -97,6 +102,7 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
         id: account.id,
         label: account.display_name || account.email,
         email: account.email,
+        isDefault: account.is_default,
       }));
     },
     get activeAccountId() {

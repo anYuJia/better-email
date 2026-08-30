@@ -58,7 +58,6 @@ describe('SettingsFrame application shell', () => {
           standalone={standalone}
           nativeCloseRequestVersion={nativeCloseRequestVersion}
           title="设置"
-          subtitle="work@example.com"
           activeSection={activeSection}
           onNavigate={onNavigate}
           onTestConnection={onTestConnection}
@@ -101,7 +100,7 @@ describe('SettingsFrame application shell', () => {
     expect(screen.getByText('偏好')).not.toBeNull();
     expect(screen.getByText('工具与数据')).not.toBeNull();
     expect(navigation.querySelectorAll('.settings-nav-parent')).toHaveLength(7);
-    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(5);
+    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(6);
     const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
     expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
@@ -115,28 +114,34 @@ describe('SettingsFrame application shell', () => {
     fireEvent.click(accountParent);
     expect(screen.queryByRole('group', { name: '邮箱账号详细设置' })).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
-    expect(onNavigate).toHaveBeenCalledTimes(2);
-    expect(onNavigate).toHaveBeenCalledWith('accounts');
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).not.toHaveBeenCalledWith('accounts');
   });
 
-  it('keeps account details collapsed until the account parent is expanded', () => {
+  it('uses the account parent only as a disclosure and exposes account management as a child page', () => {
     const onNavigate = vi.fn();
-    renderFrame({ activeSection: 'accounts', canSaveAndVerify: true, onNavigate });
+    renderFrame({ activeSection: 'general', canSaveAndVerify: true, onNavigate });
     const navigation = screen.getByRole('navigation', { name: '设置分类' });
     const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
-    expect(accountParent.getAttribute('aria-current')).toBe('page');
+    expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
+    expect(screen.getByRole('heading', { name: '通用' })).not.toBeNull();
     expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+
     fireEvent.click(accountParent);
-    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(5);
+    expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(6);
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('button', { name: '服务器设置' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('button', { name: '账号设置' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('heading', { name: '通用' })).not.toBeNull();
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '账号设置' }));
+    expect(onNavigate).toHaveBeenCalledWith('accounts');
     fireEvent.click(accountParent);
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
-    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onNavigate).toHaveBeenCalledTimes(1);
   });
 
   it('exposes tool siblings and marks only the current nested tool page', () => {
@@ -151,17 +156,16 @@ describe('SettingsFrame application shell', () => {
     fireEvent.click(toolsParent);
     expect(screen.queryByRole('group', { name: '效率工具详细设置' })).toBeNull();
     expect(toolsParent.getAttribute('aria-expanded')).toBe('false');
-    expect(onNavigate).toHaveBeenCalledWith('tools');
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('opens and closes account and tool detail groups independently without route sync reopening them', () => {
     function InteractiveFrame() {
       const [activeSection, setActiveSection] = useState<Parameters<typeof SettingsFrame>[0]['activeSection']>('privacy');
       return (
-        <SettingsFrame
-          title="设置"
-          subtitle="work@example.com"
-          activeSection={activeSection}
+          <SettingsFrame
+            title="设置"
+            activeSection={activeSection}
           onNavigate={setActiveSection}
           canSaveAndVerify
           onTestConnection={() => undefined}
@@ -177,32 +181,28 @@ describe('SettingsFrame application shell', () => {
     const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
     const toolsParent = screen.getByRole('button', { name: '效率工具设置' });
 
-    fireEvent.click(accountParent);
-    expect(accountParent.getAttribute('aria-current')).toBe('page');
-    expect(accountParent.getAttribute('aria-expanded')).toBe('false');
-    expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(0);
-
-    fireEvent.click(accountParent);
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('heading', { name: '隐私' })).not.toBeNull();
     fireEvent.click(toolsParent);
     expect(screen.getByRole('group', { name: '邮箱账号详细设置' })).not.toBeNull();
     expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(2);
 
     fireEvent.click(accountParent);
-    expect(accountParent.getAttribute('aria-current')).toBe('page');
+    expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('group', { name: '邮箱账号详细设置' })).toBeNull();
     expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(1);
 
     fireEvent.click(toolsParent);
-    expect(toolsParent.getAttribute('aria-current')).toBe('page');
+    expect(toolsParent.getAttribute('aria-current')).toBeNull();
     expect(toolsParent.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(0);
+    expect(screen.getByRole('heading', { name: '隐私' })).not.toBeNull();
   });
 
-  it('shows account context only on multi-account scoped pages', () => {
+  it('shows the account switch tabs on every desktop account-scoped page', () => {
     const accountOptions = [
       { id: 1, label: '工作邮箱', email: 'work@example.com' },
       { id: 2, label: '个人邮箱', email: 'personal@example.com' },
@@ -213,8 +213,11 @@ describe('SettingsFrame application shell', () => {
       accountOptions,
       activeAccountId: 1,
     });
-    expect(screen.getByRole('combobox', { name: '切换当前设置账号' })).not.toBeNull();
-    expect(container.querySelector('.settings-page-header .settings-account-context')).not.toBeNull();
+    expect(screen.getByRole('navigation', { name: '切换设置账号' })).not.toBeNull();
+    expect(screen.getByRole('tab', { name: /工作邮箱/ }).getAttribute('aria-current')).toBe('true');
+    expect(screen.getByRole('tab', { name: /个人邮箱/ }).getAttribute('aria-current')).toBeNull();
+    expect(container.querySelector('.settings-account-tabs')).not.toBeNull();
+    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
     expect(container.querySelector('.settings-account-workspace')).toBeNull();
     unmount();
 
@@ -224,19 +227,27 @@ describe('SettingsFrame application shell', () => {
       accountOptions: [accountOptions[0]],
       activeAccountId: 1,
     });
-    expect(singleAccount.container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
+    expect(singleAccount.container.querySelector('.settings-account-tabs')).toBeNull();
+    expect(screen.queryByRole('tab', { name: /工作邮箱/ })).toBeNull();
     singleAccount.unmount();
 
     renderFrame({ activeSection: 'general' });
+    expect(screen.queryByRole('navigation', { name: '切换设置账号' })).toBeNull();
+  });
+
+  it('keeps the single-account hub full-width without a redundant switch strip', () => {
+    const { container } = renderFrame({
+      activeSection: 'accounts',
+      canSaveAndVerify: true,
+      accountOptions: [{ id: 1, label: '工作邮箱', email: 'work@example.com' }],
+      activeAccountId: 1,
+    });
+    expect(container.querySelector('.settings-account-tabs')).toBeNull();
+    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
     expect(screen.queryByRole('combobox', { name: '切换当前设置账号' })).toBeNull();
   });
 
-  it('uses the account list as the account hub switcher instead of duplicating header context', () => {
-    const { container } = renderFrame({ activeSection: 'accounts', canSaveAndVerify: true });
-    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
-  });
-
-  it('switches the scoped account and locks the switcher while edits are dirty', () => {
+  it('switches the scoped account from tabs and locks other tabs while edits are dirty', () => {
     const onSelectAccountId = vi.fn();
     const accountOptions = [
       { id: 1, label: '工作邮箱', email: 'work@example.com' },
@@ -250,10 +261,9 @@ describe('SettingsFrame application shell', () => {
       onSelectAccountId,
     });
 
-    const picker = screen.getByRole('combobox', { name: '切换当前设置账号' });
-    expect((picker as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(picker);
-    fireEvent.click(screen.getByRole('option', { name: /个人邮箱/ }));
+    const personalTab = screen.getByRole('tab', { name: /个人邮箱/ });
+    expect((personalTab as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(personalTab);
     expect(onSelectAccountId).toHaveBeenCalledWith(2);
 
     cleanup();
@@ -265,13 +275,19 @@ describe('SettingsFrame application shell', () => {
       activeAccountId: 1,
       onSelectAccountId,
     });
-    expect((screen.getByRole('combobox', { name: '切换当前设置账号' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('tab', { name: /个人邮箱/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('tab', { name: /工作邮箱/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('keeps the account hub reachable when no account exists', () => {
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
-    expect((screen.getByRole('button', { name: '邮箱账号设置' }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.queryByRole('button', { name: '服务器设置' })).toBeNull();
+    const accountParent = screen.getByRole('button', { name: '邮箱账号设置' }) as HTMLButtonElement;
+    expect(accountParent.disabled).toBe(false);
+    expect(accountParent.getAttribute('aria-current')).toBeNull();
+    fireEvent.click(accountParent);
+    expect((screen.getByRole('button', { name: '账号设置' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: '账号设置' }).getAttribute('aria-current')).toBe('page');
+    expect((screen.getByRole('button', { name: '服务器设置' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('keeps the mail workspace inaccessible while settings owns the application surface', () => {
@@ -345,7 +361,7 @@ describe('SettingsFrame application shell', () => {
     const onNavigate = vi.fn();
     const { container } = renderFrame({ activeSection: 'providers', onClose, onNavigate });
     const mobileBack = container.querySelector<HTMLButtonElement>('.settings-mobile-back');
-    expect(mobileBack?.getAttribute('aria-label')).toBe('返回邮箱账号');
+    expect(mobileBack?.getAttribute('aria-label')).toBe('返回账号');
     fireEvent.click(mobileBack!);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalled();

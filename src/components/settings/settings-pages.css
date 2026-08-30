@@ -8,7 +8,6 @@
 .settings-modal .settings-page-content > .settings-experience-stack,
 .settings-modal .settings-page-content > .settings-sync-stack,
 .settings-modal .settings-page-content > .settings-security-stack,
-.settings-modal .settings-page-content > .settings-account-stack,
 .settings-modal .settings-page-content > .settings-data-safety,
 .settings-modal .settings-page-content > .settings-connection-shell,
 .settings-modal .settings-page-content .settings-provider-stack {
@@ -280,6 +279,41 @@
  * ===================================================================== */
 
 /* --- Account list --- */
+.settings-modal .settings-account-stack {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 28px;
+}
+
+.settings-modal .settings-mobile-account-list {
+  display: none;
+}
+
+.settings-modal .settings-account-detail {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+}
+
+.settings-modal .settings-account-detail-empty {
+  align-self: start;
+}
+
+.settings-modal .settings-account-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  align-items: start;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+.settings-modal .settings-account-remove-row .st-btn {
+  white-space: nowrap;
+}
+
 .settings-modal .settings-account-list {
   display: grid;
   gap: 0;
@@ -290,7 +324,7 @@
 .settings-modal .settings-account-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   min-height: 60px;
@@ -383,6 +417,7 @@
 .settings-modal .settings-account-row-meta {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   flex: 0 0 auto;
 }
@@ -403,21 +438,9 @@
   font-weight: 500;
 }
 
-.settings-modal .settings-account-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-.settings-modal .settings-account-delete-button {
-  color: var(--st-text-tertiary);
-}
-
-.settings-modal .settings-account-delete-button:hover:not(:disabled),
-.settings-modal .settings-account-delete-button:focus-visible {
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
+.settings-modal .settings-account-row-main:disabled {
+  cursor: not-allowed;
+  opacity: .56;
 }
 
 /* --- Account dialogs --- */
@@ -4390,10 +4413,6 @@
 
   .settings-modal .settings-contact-create-footer .st-btn {
     align-self: flex-end;
-  }
-
-  .settings-modal .settings-account-row {
-    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .settings-modal .settings-account-row-meta {

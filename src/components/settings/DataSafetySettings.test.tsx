@@ -25,13 +25,17 @@ type Overrides = Partial<{
   appSettings: AppSettingsReport | null;
   downloadDirBusy: boolean;
   downloadDirError: string | null;
+  autoDownloadAttachments: boolean;
+  accountPreferenceBusy: boolean;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
+  onAutoDownloadAttachmentsChange: (checked: boolean) => void;
 }>;
 
 function renderPage(overrides: Overrides = {}) {
   const pickDownloadDir = overrides.onPickDownloadDir ?? vi.fn();
   const resetDownloadDir = overrides.onResetDownloadDir ?? vi.fn();
+  const autoDownloadAttachmentsChange = overrides.onAutoDownloadAttachmentsChange ?? vi.fn();
   render(
     <DataSafetySettings
       localBackupSummary={null}
@@ -40,14 +44,17 @@ function renderPage(overrides: Overrides = {}) {
       appSettings={overrides.appSettings ?? defaultReport}
       downloadDirBusy={overrides.downloadDirBusy ?? false}
       downloadDirError={overrides.downloadDirError ?? null}
+      autoDownloadAttachments={overrides.autoDownloadAttachments ?? false}
+      accountPreferenceBusy={overrides.accountPreferenceBusy ?? false}
       onImportBackup={vi.fn()}
       onExportBackup={vi.fn()}
       onClearAttachmentCache={() => Promise.resolve()}
       onPickDownloadDir={pickDownloadDir}
       onResetDownloadDir={resetDownloadDir}
+      onAutoDownloadAttachmentsChange={autoDownloadAttachmentsChange}
     />,
   );
-  return { pickDownloadDir, resetDownloadDir };
+  return { pickDownloadDir, resetDownloadDir, autoDownloadAttachmentsChange };
 }
 
 describe('DataSafetySettings 默认下载位置', () => {
@@ -62,6 +69,15 @@ describe('DataSafetySettings 默认下载位置', () => {
     expect(screen.getByTestId('download-dir-path').textContent).toContain('/Users/demo/Downloads/better-email');
     expect(screen.getByRole('button', { name: '选择文件夹' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '恢复默认位置' })).not.toBeNull();
+    expect(screen.getByRole('checkbox', { name: /自动下载新邮件附件/ })).not.toBeNull();
+  });
+
+  it('附件自动下载作为全局存储偏好统一切换', () => {
+    const { autoDownloadAttachmentsChange } = renderPage({ autoDownloadAttachments: true });
+    const toggle = screen.getByRole('checkbox', { name: /自动下载新邮件附件/ });
+    expect((toggle as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(toggle);
+    expect(autoDownloadAttachmentsChange).toHaveBeenCalledWith(false);
   });
 
   it('不再暴露技术统计、EML 导入与备份预览入口', () => {

@@ -1,9 +1,10 @@
+import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import {
-  settingsAccountDetailItems,
+  settingsAccountConfigurationItems,
   type SettingsSectionId,
 } from '../settingsNavigation';
 import AccountList from '../accounts/AccountList';
@@ -15,8 +16,10 @@ import { CustomSelect } from '../accounts/CustomSelect';
 import SettingsDestinationList from '../SettingsDestinationList';
 import {
   SettingsField,
+  SettingsButton,
+  SettingsEmptyState,
+  SettingsRow,
   SettingsSection,
-  SettingsSwitch,
 } from '../shared';
 
 function errorMessage(error: unknown) {
@@ -29,8 +32,10 @@ type AccountSettingsPageProps = {
   accounts: Account[];
   accountForm: Account | null;
   accountCount: number;
+  accountSwitchDisabled?: boolean;
   newAccountForm: AccountCreateInput;
   onAccountFormChange: (account: Account) => void;
+  onSelectAccount: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
@@ -43,8 +48,10 @@ export default function AccountSettingsPage({
   accounts,
   accountForm,
   accountCount,
+  accountSwitchDisabled = false,
   newAccountForm,
   onAccountFormChange,
+  onSelectAccount,
   onNewAccountFormChange,
   onApplyNewAccountPreset,
   onCreateNewAccount,
@@ -145,92 +152,132 @@ export default function AccountSettingsPage({
     });
   }
 
+  const activeProviderLabel = accountForm
+    ? providerPresetFor(accountForm.provider)?.label ?? accountForm.provider
+    : '';
+
+  const openAddAccount = () => {
+    setDeleteDialogOpen(false);
+    setAddDialogOpen(true);
+  };
+
+  const addAccountAction = (
+    <SettingsButton
+      variant="primary"
+      size="sm"
+      className="settings-desktop-account-add"
+      icon={<Plus size={14} />}
+      disabled={accountSwitchDisabled}
+      title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : undefined}
+      onClick={openAddAccount}
+    >
+      添加账号
+    </SettingsButton>
+  );
+
   return (
     <>
-      <AccountList
-        accounts={accounts}
-        activeAccountId={accountForm?.id ?? null}
-        accountCount={accountCount}
-        onAdd={() => {
-          setDeleteDialogOpen(false);
-          setAddDialogOpen(true);
-        }}
-        onSelect={onAccountFormChange}
-        onDelete={(account) => {
-          setAddDialogOpen(false);
-          onAccountFormChange(account);
-          setDeleteDialogOpen(true);
-        }}
-      />
-
-      {accountForm && (
-        <SettingsSection
-          title="账号设置"
-          description="服务器、登录、发件身份、同步与隐私。"
-          className="settings-mobile-detail-navigation"
-          dataSection="account-details"
-        >
-          <SettingsDestinationList
-            ariaLabel="账号详细设置"
-            items={settingsAccountDetailItems}
-            onNavigate={onNavigate}
+      <div className="settings-account-stack">
+        <div className="settings-mobile-account-list">
+          <AccountList
+            accounts={accounts}
+            activeAccountId={accountForm?.id ?? null}
+            accountCount={accountCount}
+            switchDisabled={accountSwitchDisabled}
+            onAdd={openAddAccount}
+            onSelect={(account) => {
+              setDeleteDialogOpen(false);
+              onSelectAccount(account);
+            }}
           />
-        </SettingsSection>
-      )}
+        </div>
 
-      {accountForm && (
-        <SettingsSection
-          title="账号偏好"
-          description={accountForm.email}
-          className="settings-account-overview"
-          dataSection="account-overview"
-        >
-          <div className="settings-account-overview-grid">
-            <SettingsField label="显示名" hint="仅用于 Better Email 内识别此账号">
-              <input
-                value={accountForm.display_name}
-                onChange={(event) => onAccountFormChange({
-                  ...accountForm,
-                  display_name: event.target.value,
-                })}
-                placeholder="默认使用邮箱地址"
+        {accountForm ? (
+          <div
+            className="settings-account-detail"
+            data-current-account-id={accountForm.id}
+          >
+            <SettingsSection
+              title="账号设置"
+              description="服务器、登录、发件身份、同步与隐私。"
+              className="settings-mobile-detail-navigation"
+              dataSection="account-details"
+            >
+              <SettingsDestinationList
+                ariaLabel="账号详细设置"
+                items={settingsAccountConfigurationItems}
+                onNavigate={onNavigate}
               />
-            </SettingsField>
-            <SettingsField label="获取新邮件" hint="控制后台检查频率" labelMode="static">
-              <CustomSelect
-                dense
-                ariaLabel="获取新邮件"
-                value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
-                options={syncModeOptions}
-                onChange={(value) => onAccountFormChange({ ...accountForm, sync_mode: value })}
+            </SettingsSection>
+
+            <SettingsSection
+              title={accountForm.display_name || accountForm.email}
+              description={[
+                accountForm.email,
+                activeProviderLabel,
+                accountForm.is_default ? '默认发件账号' : '',
+              ].filter(Boolean).join(' · ')}
+              actions={addAccountAction}
+              className="settings-account-overview"
+              dataSection="account-overview"
+            >
+              <div className="settings-account-overview-grid">
+                <SettingsField label="显示名" hint="仅用于 Better Email 内识别此账号">
+                  <input
+                    value={accountForm.display_name}
+                    onChange={(event) => onAccountFormChange({
+                      ...accountForm,
+                      display_name: event.target.value,
+                    })}
+                    placeholder="默认使用邮箱地址"
+                  />
+                </SettingsField>
+                <SettingsField label="获取新邮件" hint="控制此账号的后台检查频率" labelMode="static">
+                  <CustomSelect
+                    dense
+                    ariaLabel="获取新邮件"
+                    value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
+                    options={syncModeOptions}
+                    onChange={(value) => onAccountFormChange({ ...accountForm, sync_mode: value })}
+                  />
+                </SettingsField>
+              </div>
+
+              <SettingsRow
+                title="移除账号"
+                description="停止在 Better Email 中管理此账号。"
+                className="settings-account-remove-row"
+                control={(
+                  <SettingsButton
+                    variant="danger-secondary"
+                    size="sm"
+                    icon={<Trash2 size={13} />}
+                    disabled={accountSwitchDisabled}
+                    title={accountSwitchDisabled ? '请先保存或放弃当前账号的修改' : '移除此邮箱账号'}
+                    onClick={() => {
+                      setAddDialogOpen(false);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    移除账号
+                  </SettingsButton>
+                )}
               />
-            </SettingsField>
+            </SettingsSection>
           </div>
-
-          <SettingsSwitch
-            label="跨邮箱发送风险提示"
-            description="发件账号与当前邮件不一致时，在发送前提醒。"
-            checked={accountForm.cross_account_risk_warning !== false}
-            onChange={(checked) => onAccountFormChange({
-              ...accountForm,
-              cross_account_risk_warning: checked,
-            })}
-          />
-          <SettingsSwitch
-            label="自动下载新邮件附件"
-            description="收到新邮件时自动将附件保存到本地下载位置。"
-            checked={accountForm.auto_download_attachments}
-            onChange={(checked) => onAccountFormChange({
-              ...accountForm,
-              auto_download_attachments: checked,
-            })}
-          />
-        </SettingsSection>
-      )}
-
-      {!accountForm && accounts.length === 0 && (
-        <div className="settings-inline-status">添加第一个邮箱账号后，即可配置服务器、登录、身份、同步和隐私。</div>
-      )}
+        ) : (
+          <SettingsSection
+            title="邮箱账号"
+            description="添加账号后，每个账号都拥有独立的连接与偏好设置。"
+            actions={addAccountAction}
+            className="settings-account-detail-empty"
+          >
+            <SettingsEmptyState>
+              添加第一个邮箱账号后，即可配置服务器、登录、身份、同步和隐私。
+            </SettingsEmptyState>
+          </SettingsSection>
+        )}
+      </div>
 
       {addDialogOpen && (
         <AddAccountDialog

@@ -36,7 +36,6 @@ import type {
   SendUndoDelaySeconds,
 } from '../../app/appConfig';
 import type { AccountProviderPreset } from '../../providerCatalog';
-import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
@@ -73,7 +72,6 @@ export type SettingsOverlayProps = {
   saveAndVerifyRunning: boolean;
   connectionTestRunning?: boolean;
   connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
-  saveAndVerifyReport: SaveAndVerifyReport;
   oauthClientId: string;
   oauthClientSecret: string;
   oauthRedirectUri: string;
@@ -90,6 +88,9 @@ export type SettingsOverlayProps = {
   credentialStatus: CredentialStatus | null;
   notificationPolicy: NotificationPolicy;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
+  globalCrossAccountRiskWarning: boolean;
+  globalAutoDownloadAttachments: boolean;
+  globalAccountPreferenceBusy: boolean;
   remoteImageTrusts: RemoteImageTrust[];
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
@@ -144,6 +145,8 @@ export type SettingsOverlayProps = {
   onStoreAndVerifyCredential: () => void;
   onNotificationPolicyChange: Dispatch<SetStateAction<NotificationPolicy>>;
   onSendUndoDelayChange: Dispatch<SetStateAction<SendUndoDelaySeconds>>;
+  onGlobalCrossAccountRiskWarningChange: (checked: boolean) => void;
+  onGlobalAutoDownloadAttachmentsChange: (checked: boolean) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onIdentityFormChange: Dispatch<SetStateAction<MailIdentityInput>>;
   onEditIdentity: (identity: MailIdentity) => void;
@@ -216,6 +219,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     accounts: props.accounts,
     accountForm: props.accountForm,
     accountCount: props.accounts.length,
+    accountSwitchDisabled: props.accountSettingsDirty,
     newAccountForm: props.newAccountForm,
     oauthClientId: props.oauthClientId,
     oauthClientSecret: props.oauthClientSecret,
@@ -232,6 +236,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   }), [
     props.accounts,
     props.accountForm,
+    props.accountSettingsDirty,
     props.newAccountForm,
     props.oauthClientId,
     props.oauthClientSecret,
@@ -342,12 +347,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
         standalone={props.standalone}
         nativeCloseRequestVersion={props.nativeCloseRequestVersion}
         onReady={props.onReady}
-        subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
         activeSection={activeSettingsSection}
         isDirty={accountSettingsDirty}
         isBusy={accountSettingsSaving || saveAndVerifyRunning || Boolean(props.connectionTestRunning)}
         isTestingConnection={props.connectionTestRunning}
-        connectionSummary={props.saveAndVerifyReport.summary}
         connectionTestFeedback={props.connectionTestFeedback}
         canSaveAndVerify={Boolean(accountForm) && Boolean(props.onSaveAndVerify)}
         {...handlers}
@@ -383,14 +386,20 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               themeMode={props.themeMode}
               notificationPolicy={props.notificationPolicy}
               sendUndoDelaySeconds={props.sendUndoDelaySeconds}
+              crossAccountRiskWarning={props.globalCrossAccountRiskWarning}
+              accountPreferenceBusy={props.globalAccountPreferenceBusy}
               onThemeModeChange={props.onThemeModeChange}
               onNotificationPolicyChange={handlers.onNotificationPolicyChange}
               onSendUndoDelayChange={handlers.onSendUndoDelayChange}
+              onCrossAccountRiskWarningChange={props.onGlobalCrossAccountRiskWarningChange}
             />
           )}
           {activeSettingsSection === 'backup' && (
             <MemoizedDataSafety
               {...backupProps}
+              autoDownloadAttachments={props.globalAutoDownloadAttachments}
+              accountPreferenceBusy={props.globalAccountPreferenceBusy}
+              onAutoDownloadAttachmentsChange={props.onGlobalAutoDownloadAttachmentsChange}
               {...handlers}
             />
           )}

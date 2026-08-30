@@ -548,6 +548,19 @@ body[data-settings-window-platform='macos']
   font-size: 11px;
 }
 
+.settings-content-area {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--st-canvas);
+}
+
+.settings-content-area.has-account-tabs {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .settings-content {
   min-width: 0;
   min-height: 0;
@@ -557,113 +570,116 @@ body[data-settings-window-platform='macos']
   background: var(--st-canvas);
 }
 
-.settings-page-context {
+.settings-account-tabs {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  min-height: 52px;
+  display: block;
+  overflow: hidden;
+  border-bottom: 1px solid var(--st-border);
+  background: var(--st-canvas);
 }
 
-.settings-account-context {
+.settings-account-tabs-list {
+  width: min(100%, var(--st-content-max-width));
   min-width: 0;
-  width: min(100%, 360px);
+  display: flex;
+  gap: 12px;
+  margin: 0 auto;
+  padding: 0 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.settings-account-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-account-tab {
+  min-width: 0;
+  height: 52px;
+  flex: 1 1 0;
+  max-width: 240px;
   display: grid;
-  justify-items: end;
-  gap: 2px;
-}
-
-.settings-account-picker {
-  min-width: 0;
-  width: 100%;
-  display: flex;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
+  gap: 7px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--st-text-secondary);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
-.settings-account-picker > span:first-child {
-  flex: 0 0 auto;
-}
-
-.settings-account-picker .custom-select-menu {
-  min-width: 0;
-  width: min(300px, calc(100% - 58px));
-  max-width: 300px;
-}
-
-.settings-account-picker .custom-select-summary {
-  min-height: 32px;
-  max-width: 300px;
-  padding-inline: 8px;
-  border-color: transparent;
+.settings-account-tab:hover:not(:disabled) {
   color: var(--st-text);
   background: transparent;
 }
 
-.settings-account-picker .custom-select-summary > span {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+.settings-account-tab:active:not(:disabled) {
+  color: var(--st-accent);
+  background: transparent;
 }
 
-.settings-account-picker .custom-select-summary strong {
-  flex: 0 1 auto;
+.settings-account-tab.active {
+  color: var(--st-text);
+  border-bottom-color: var(--st-accent);
+  background: transparent;
 }
 
-.settings-account-picker .custom-select-summary small {
-  min-width: 0;
-  flex: 1 1 auto;
+.settings-account-tab:focus-visible {
+  outline: var(--st-focus-outline);
+  outline-offset: -2px;
 }
 
-.settings-account-picker .custom-select-summary small::before {
-  content: '·';
-  margin-right: 6px;
+.settings-account-tab-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
   color: var(--st-text-tertiary);
 }
 
-.settings-account-picker .custom-select-summary:hover {
-  border-color: var(--st-border);
-  background: var(--st-surface);
+.settings-account-tab.active .settings-account-tab-icon {
+  color: var(--st-accent);
 }
 
-.settings-account-picker .custom-select-summary[aria-expanded="true"] {
-  border-color: var(--st-border-strong);
-  background: var(--st-surface);
-}
-
-.settings-account-current {
+.settings-account-tab-copy {
   min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 8px;
+  display: grid;
+  gap: 2px;
 }
 
-.settings-account-current small {
-  color: var(--st-text-tertiary);
-  font-size: 11px;
-}
-
-.settings-account-current strong {
+.settings-account-tab-copy strong,
+.settings-account-tab-copy small {
   min-width: 0;
   overflow: hidden;
-  color: var(--st-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-account-tab-copy strong {
+  color: inherit;
   font-size: 13px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
 }
 
-.settings-account-connection-state {
-  min-width: 0;
-  max-width: 360px;
-  overflow: hidden;
+.settings-account-tab-copy small {
   color: var(--st-text-tertiary);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 10.5px;
+}
+
+.settings-account-tab em {
+  justify-self: end;
+  color: var(--st-accent);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .settings-page {
@@ -695,13 +711,6 @@ body[data-settings-window-platform='macos']
   z-index: 3;
   border-bottom: 1px solid var(--st-header-border);
   background: var(--st-canvas);
-}
-
-.settings-page-header.has-context {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 360px);
-  align-items: center;
-  gap: 20px;
 }
 
 .settings-page-heading {

@@ -91,6 +91,7 @@ describe('SettingsFrame application shell', () => {
     expect(container.querySelector('.settings-workspace')?.classList.contains('is-standalone')).toBe(true);
     expect(screen.getByRole('region', { name: '设置' }).getAttribute('data-standalone')).toBe('true');
     expect(screen.queryByRole('button', { name: '关闭设置' })).toBeNull();
+    expect(container.querySelector('.settings-titlebar-drag-region')?.hasAttribute('data-tauri-drag-region')).toBe(true);
   });
 
   it('keeps top-level navigation compact and exposes sibling destinations on nested account pages', () => {

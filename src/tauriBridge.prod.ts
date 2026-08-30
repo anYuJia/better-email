@@ -19,6 +19,7 @@ import { IPC } from './ipc/commands';
 
 type InvokeArgs = Record<string, unknown> | undefined;
 type TauriCore = typeof import('@tauri-apps/api/core');
+type TauriDpi = typeof import('@tauri-apps/api/dpi');
 type TauriWindow = typeof import('@tauri-apps/api/window');
 type TauriWebviewWindow = typeof import('@tauri-apps/api/webviewWindow');
 type TauriNotification = typeof import('@tauri-apps/plugin-notification');
@@ -30,6 +31,7 @@ type DesktopFileDropEvent =
 type DesktopFileDropHandler = (event: DesktopFileDropEvent) => void;
 
 let coreModule: Promise<TauriCore> | null = null;
+let dpiModule: Promise<TauriDpi> | null = null;
 let windowModule: Promise<TauriWindow> | null = null;
 let webviewWindowModule: Promise<TauriWebviewWindow> | null = null;
 let notificationModule: Promise<TauriNotification> | null = null;
@@ -37,6 +39,11 @@ let notificationModule: Promise<TauriNotification> | null = null;
 function loadCore() {
   coreModule ??= import('@tauri-apps/api/core');
   return coreModule;
+}
+
+function loadDpi() {
+  dpiModule ??= import('@tauri-apps/api/dpi');
+  return dpiModule;
 }
 
 function loadWindow() {
@@ -267,7 +274,10 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
   }
 
   const creation = (async () => {
-    const { WebviewWindow } = await loadWebviewWindow();
+    const [{ WebviewWindow }, { LogicalPosition }] = await Promise.all([
+      loadWebviewWindow(),
+      loadDpi(),
+    ]);
     const existing = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
     if (existing) return;
 
@@ -287,8 +297,9 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
       center: true,
       resizable: true,
       decorations: true,
-      titleBarStyle: 'visible',
-      hiddenTitle: false,
+      titleBarStyle: 'overlay',
+      trafficLightPosition: new LogicalPosition(16, 18),
+      hiddenTitle: true,
       focus: false,
       visible: false,
       skipTaskbar: false,

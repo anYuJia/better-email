@@ -5,10 +5,12 @@ import {
   SETTINGS_READY_EVENT,
   SETTINGS_READY_QUERY_EVENT,
   emitToMain,
+  invoke,
   listenCurrentWindow,
   onCurrentWindowCloseRequested,
   type SettingsWindowRequest,
 } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 import {
   isSettingsSectionId,
   type SettingsSectionId,
@@ -24,10 +26,16 @@ export default function StandaloneSettingsApp() {
   const [nativeCloseRequestVersion, setNativeCloseRequestVersion] = useState(0);
   const readyRef = useRef(false);
   const lifecycleReadyRef = useRef(false);
+  const platformReadyRef = useRef(false);
   const surfaceReadyRef = useRef(false);
 
   const announceReady = useCallback(() => {
-    if (readyRef.current || !lifecycleReadyRef.current || !surfaceReadyRef.current) return;
+    if (
+      readyRef.current
+      || !lifecycleReadyRef.current
+      || !platformReadyRef.current
+      || !surfaceReadyRef.current
+    ) return;
     readyRef.current = true;
     void emitToMain(SETTINGS_READY_EVENT).catch(() => {
       readyRef.current = false;
@@ -37,6 +45,30 @@ export default function StandaloneSettingsApp() {
   const handleSurfaceReady = useCallback(() => {
     surfaceReadyRef.current = true;
     announceReady();
+  }, [announceReady]);
+
+  useEffect(() => {
+    let active = true;
+    const body = document.body;
+
+    void invoke<string>(IPC.GetPlatform)
+      .catch(() => 'web')
+      .then((platform) => {
+        if (!active) return;
+        body.dataset.settingsWindowPlatform = (
+          platform === 'macos' || platform === 'windows' || platform === 'linux'
+            ? platform
+            : 'web'
+        );
+        platformReadyRef.current = true;
+        announceReady();
+      });
+
+    return () => {
+      active = false;
+      platformReadyRef.current = false;
+      delete body.dataset.settingsWindowPlatform;
+    };
   }, [announceReady]);
 
   useEffect(() => {

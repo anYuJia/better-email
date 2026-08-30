@@ -3029,14 +3029,25 @@ async function main() {
       `location.href = ${JSON.stringify(`${url}/?window=settings&section=mcp`)}`,
     );
     await waitForExpression(cdp, "document.querySelector('.app-shell.standalone-settings-window .settings-workspace.is-standalone') && document.querySelector('.settings-page[data-settings-page=\"mcp\"]')");
+    await evalInPage(cdp, "document.body.dataset.settingsWindowPlatform = 'macos'");
     const standaloneSettingsSnapshot = await evalInPage(cdp, `(() => {
       const workspace = document.querySelector('.settings-workspace.is-standalone');
       const shell = document.querySelector('.settings-shell[data-standalone="true"]');
+      const header = document.querySelector('.settings-main-header');
+      const title = document.querySelector('.settings-main-header .settings-title');
+      const dragRegion = document.querySelector('.settings-titlebar-drag-region[data-tauri-drag-region]');
+      const sidebar = document.querySelector('.settings-nav');
       const workspaceRect = workspace?.getBoundingClientRect();
       const shellRect = shell?.getBoundingClientRect();
+      const headerRect = header?.getBoundingClientRect();
+      const titleRect = title?.getBoundingClientRect();
+      const dragRect = dragRegion?.getBoundingClientRect();
+      const sidebarRect = sidebar?.getBoundingClientRect();
       const shellStyle = shell ? getComputedStyle(shell) : null;
+      const titlebarSidebarStyle = header ? getComputedStyle(header, '::before') : null;
       return {
         hasMailChrome: Boolean(document.querySelector('.app-titlebar, .app-shell > .sidebar, .message-list-panel, .reader-panel')),
+        hasDuplicateClose: Boolean(document.querySelector('.settings-main-header [aria-label="关闭设置"]')),
         workspaceFillsViewport: Boolean(workspaceRect)
           && Math.abs(workspaceRect.width - window.innerWidth) <= 1
           && Math.abs(workspaceRect.height - window.innerHeight) <= 1,
@@ -3046,6 +3057,14 @@ async function main() {
         borderWidth: shellStyle?.borderWidth ?? null,
         borderRadius: shellStyle?.borderRadius ?? null,
         boxShadow: shellStyle?.boxShadow ?? null,
+        macTrafficLightsSafe: Boolean(titleRect) && titleRect.left >= 84,
+        dragRegionFillsHeader: Boolean(dragRect && headerRect)
+          && Math.abs(dragRect.left - headerRect.left) <= 1
+          && Math.abs(dragRect.right - headerRect.right) <= 1
+          && Math.abs(dragRect.height - headerRect.height) <= 1,
+        sidebarPlaneContinuesThroughTitlebar: Boolean(sidebarRect && titlebarSidebarStyle)
+          && Math.abs(parseFloat(titlebarSidebarStyle.width) - sidebarRect.width) <= 1
+          && titlebarSidebarStyle.backgroundColor === getComputedStyle(sidebar).backgroundColor,
         noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1
           && document.body.scrollWidth <= window.innerWidth + 1,
       };
@@ -3053,11 +3072,15 @@ async function main() {
     console.log(`[ui-smoke] standalone-settings geometry ${JSON.stringify(standaloneSettingsSnapshot)}`);
     if (
       standaloneSettingsSnapshot.hasMailChrome
+      || standaloneSettingsSnapshot.hasDuplicateClose
       || !standaloneSettingsSnapshot.workspaceFillsViewport
       || !standaloneSettingsSnapshot.shellFillsViewport
       || standaloneSettingsSnapshot.borderWidth !== '0px'
       || standaloneSettingsSnapshot.borderRadius !== '0px'
       || standaloneSettingsSnapshot.boxShadow !== 'none'
+      || !standaloneSettingsSnapshot.macTrafficLightsSafe
+      || !standaloneSettingsSnapshot.dragRegionFillsHeader
+      || !standaloneSettingsSnapshot.sidebarPlaneContinuesThroughTitlebar
       || !standaloneSettingsSnapshot.noHorizontalScroll
     ) {
       throw new Error(`Standalone settings geometry contract failed: ${JSON.stringify(standaloneSettingsSnapshot)}`);
@@ -3131,6 +3154,7 @@ async function main() {
         'outbox queue and cancel works',
         'settings application surface opens',
         'standalone settings renderer fills its native window without mail chrome',
+        'standalone settings uses a unified transparent macOS titlebar with safe traffic-light spacing',
         'settings navigation renders one page at a time',
         'settings desktop sidebar switches standalone pages',
         'settings narrow layout uses native root and detail navigation',

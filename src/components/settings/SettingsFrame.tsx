@@ -317,6 +317,13 @@ export default function SettingsFrame({
         tabIndex={-1}
       >
         <header className="settings-main-header">
+          {standalone && (
+            <div
+              className="settings-titlebar-drag-region"
+              data-tauri-drag-region
+              aria-hidden="true"
+            />
+          )}
           <div className="settings-title">
             <button
               type="button"

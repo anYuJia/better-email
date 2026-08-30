@@ -11,6 +11,7 @@ const standaloneSource = readFileSync(
   'utf8',
 );
 const appSource = readFileSync(join(repoRoot, 'src/App.tsx'), 'utf8');
+const rustAppSource = readFileSync(join(repoRoot, 'src-tauri/src/lib.rs'), 'utf8');
 const capability = JSON.parse(
   readFileSync(join(repoRoot, 'src-tauri/capabilities/default.json'), 'utf8'),
 );
@@ -33,6 +34,9 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('window', 'settings')");
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('section', request.section || 'accounts')");
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?visible: false/);
+    expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?titleBarStyle: 'overlay'/);
+    expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?hiddenTitle: true/);
+    expect(bridgeSource).toContain('trafficLightPosition: new LogicalPosition(16, 18)');
 
     const openSettings = exportedFunction(bridgeSource, 'prodOpenSettingsWindow');
     expect(openSettings).toContain('waitForSettingsWindowReady(settingsWindow)');
@@ -54,6 +58,13 @@ describe('standalone settings native-window lifecycle contract', () => {
     const handler = standaloneSource.slice(handlerStart, handlerEnd);
     expect(handler).toContain('event.preventDefault()');
     expect(handler).toContain('setNativeCloseRequestVersion');
+    expect(rustAppSource).toContain('window.label() == "composer" || window.label() == "settings"');
+  });
+
+  it('waits for platform chrome resolution before revealing the renderer', () => {
+    expect(standaloneSource).toContain('platformReadyRef.current = true');
+    expect(standaloneSource).toContain("body.dataset.settingsWindowPlatform");
+    expect(standaloneSource).toMatch(/!platformReadyRef\.current[\s\S]*?!surfaceReadyRef\.current/);
   });
 
   it('suppresses mailbox bootstrap and automatic background work in settings', () => {

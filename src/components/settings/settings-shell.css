@@ -67,6 +67,7 @@
 }
 
 .settings-main-header {
+  position: relative;
   min-height: 48px;
   height: 48px;
   flex: 0 0 48px;
@@ -78,6 +79,42 @@
   border-bottom: 1px solid var(--st-header-border);
   background: var(--st-canvas);
   color: var(--st-text);
+}
+
+/* Standalone Settings uses the same unified macOS titlebar contract as the
+ * main application: native traffic lights sit above the sidebar plane while
+ * the web toolbar owns the remaining titlebar surface. */
+.settings-workspace.is-standalone .settings-main-header::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--st-sidebar-width);
+  border-right: 1px solid var(--st-border);
+  background: var(--st-sidebar);
+  content: '';
+  pointer-events: none;
+}
+
+.settings-titlebar-drag-region {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.settings-main-header > :not(.settings-titlebar-drag-region) {
+  position: relative;
+  z-index: 2;
+}
+
+.settings-workspace.is-standalone .settings-title {
+  pointer-events: none;
+}
+
+body[data-settings-window-platform='macos']
+  .settings-workspace.is-standalone
+  .settings-main-header {
+  padding-left: 88px;
 }
 
 .settings-title {

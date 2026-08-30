@@ -883,9 +883,10 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             #[cfg(desktop)]
-            if window.label() == "composer" {
-                // The composer renderer installs its unsaved-draft guard before
-                // revealing the window and owns close-to-hide behavior.
+            if window.label() == "composer" || window.label() == "settings" {
+                // Standalone child renderers install their unsaved-change guard
+                // before revealing the window and own their close lifecycle.
+                // They must not inherit the main window's close-to-tray rule.
                 return;
             }
             #[cfg(desktop)]

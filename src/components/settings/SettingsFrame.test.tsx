@@ -202,14 +202,33 @@ describe('SettingsFrame application shell', () => {
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(0);
   });
 
-  it('shows account context only on account-scoped pages', () => {
-    const { container, unmount } = renderFrame({ activeSection: 'privacy', canSaveAndVerify: true });
-    expect(screen.getByText('work@example.com')).not.toBeNull();
+  it('shows account context only on multi-account scoped pages', () => {
+    const accountOptions = [
+      { id: 1, label: '工作邮箱', email: 'work@example.com' },
+      { id: 2, label: '个人邮箱', email: 'personal@example.com' },
+    ];
+    const { container, unmount } = renderFrame({
+      activeSection: 'privacy',
+      canSaveAndVerify: true,
+      accountOptions,
+      activeAccountId: 1,
+    });
+    expect(screen.getByRole('combobox', { name: '切换当前设置账号' })).not.toBeNull();
     expect(container.querySelector('.settings-page-header .settings-account-context')).not.toBeNull();
     expect(container.querySelector('.settings-account-workspace')).toBeNull();
     unmount();
+
+    const singleAccount = renderFrame({
+      activeSection: 'privacy',
+      canSaveAndVerify: true,
+      accountOptions: [accountOptions[0]],
+      activeAccountId: 1,
+    });
+    expect(singleAccount.container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
+    singleAccount.unmount();
+
     renderFrame({ activeSection: 'general' });
-    expect(screen.queryByText('work@example.com')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: '切换当前设置账号' })).toBeNull();
   });
 
   it('uses the account list as the account hub switcher instead of duplicating header context', () => {

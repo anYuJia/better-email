@@ -181,7 +181,10 @@ export default function SettingsFrame({
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
   const showSaveAction = isAccountEditingSection && canSaveAndVerify;
-  const accountContext = activeSection !== 'accounts' && accountScopedSections.has(activeSection) ? (
+  const showAccountContext = activeSection !== 'accounts'
+    && accountScopedSections.has(activeSection)
+    && accountOptions.length > 1;
+  const accountContext = showAccountContext ? (
     <SettingsAccountContext
       accountSwitchDisabled={isDirty}
       currentAccountLabel={subtitle}

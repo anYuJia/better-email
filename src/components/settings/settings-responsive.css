@@ -203,6 +203,20 @@
     white-space: normal;
   }
 
+  .settings-modal .settings-mailbox-row.is-custom {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-modal .settings-mailbox-row.is-custom .settings-mailbox-map-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .settings-modal .settings-mailbox-row.is-custom .settings-mailbox-status {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .settings-connection-feedback {
     width: calc(100% - 32px);
   }
@@ -247,6 +261,15 @@
 
   .settings-mobile-page-title {
     max-width: 38vw;
+  }
+
+  .settings-modal .settings-mailbox-map-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-mailbox-create-map {
+    width: 100%;
+    justify-content: center;
   }
 }
 

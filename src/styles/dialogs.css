@@ -13,32 +13,7 @@
   width: auto;
 }
 
-/* --- Non-composer utility styles (settings / sync / notifications) --- */
-
-.mailbox-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--ui-space-2);
-}
-
-.mailbox-grid div {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  padding: var(--ui-space-2);
-  display: grid;
-  gap: 4px;
-}
-
-.mailbox-grid strong {
-  color: var(--ui-text);
-  overflow-wrap: anywhere;
-}
-
-.mailbox-grid span {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-}
+/* --- Non-composer utility styles (sync / notifications) --- */
 
 .sync-schedule-card {
   border: 1px solid var(--ui-border);

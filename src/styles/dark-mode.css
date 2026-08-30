@@ -382,7 +382,6 @@
   border-color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .mailbox-grid div,
 :root[data-theme="dark"] .sync-schedule-card {
   background: var(--ui-surface);
   border-color: var(--ui-border);

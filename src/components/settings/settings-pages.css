@@ -1823,77 +1823,132 @@
   background: var(--st-info-soft);
 }
 
-.settings-modal .mailbox-grid {
+.settings-modal .settings-mailbox-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 8px;
+  gap: 20px;
 }
 
-.settings-modal .mailbox-map-card {
+.settings-modal .settings-mailbox-group {
   min-width: 0;
   display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
+  gap: 10px;
 }
 
-.settings-modal .mailbox-map-card.custom {
-  border-style: dashed;
+.settings-modal .settings-mailbox-group + .settings-mailbox-group {
+  padding-top: 20px;
+  border-top: 1px solid var(--st-border);
 }
 
-.settings-modal .mailbox-map-title {
+.settings-modal .settings-mailbox-group-header {
   min-width: 0;
-  display: flex;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-mailbox-group-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mailbox-group-header small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-mailbox-list {
+  min-width: 0;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mailbox-row {
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--st-border);
 }
 
-.settings-modal .mailbox-map-title strong {
+.settings-modal .settings-mailbox-row.is-system {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.settings-modal .settings-mailbox-row.is-custom {
+  grid-template-columns: minmax(128px, 1fr) minmax(250px, auto) auto;
+}
+
+.settings-modal .settings-mailbox-row.is-custom.has-create-only {
+  grid-template-columns: minmax(128px, 1fr) auto auto;
+}
+
+.settings-modal .settings-mailbox-name {
   min-width: 0;
   overflow: hidden;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
-  font-weight: 600;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.settings-modal .mailbox-map-title > span {
+.settings-modal .settings-mailbox-status {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 7px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  white-space: nowrap;
+}
+
+.settings-modal .settings-mailbox-status::before {
+  width: 6px;
+  height: 6px;
   flex: 0 0 auto;
-  padding: 2px 8px;
   border-radius: var(--st-radius-pill);
-  font-size: var(--st-font-size-aux);
-  font-weight: 500;
+  background: var(--st-text-tertiary);
+  content: '';
 }
 
-.settings-modal .mailbox-map-title > span.mapped {
-  color: var(--st-success);
-  background: var(--st-success-soft);
+.settings-modal .settings-mailbox-status[data-state='success']::before {
+  background: var(--st-success);
 }
 
-.settings-modal .mailbox-map-title > span.pending {
-  color: var(--st-warning);
-  background: var(--st-warning-soft);
+.settings-modal .settings-mailbox-status[data-state='progress']::before {
+  background: var(--st-accent);
 }
 
-.settings-modal .mailbox-map-controls {
+.settings-modal .settings-mailbox-status[data-state='pending']::before {
+  background: var(--st-warning);
+}
+
+.settings-modal .settings-mailbox-map-actions {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(142px, 1fr) auto;
+  align-items: center;
   gap: 8px;
 }
 
-.settings-modal .mailbox-map-controls .custom-select-menu {
+.settings-modal .settings-mailbox-row.has-create-only .settings-mailbox-map-actions {
+  grid-template-columns: auto;
+  justify-self: end;
+}
+
+.settings-modal .settings-mailbox-target-select {
+  width: 100%;
   min-width: 0;
 }
 
-.settings-modal .mailbox-map-card > span,
-.settings-modal .mailbox-map-card > small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.45;
+.settings-modal .settings-mailbox-target-select .custom-select-summary {
+  width: 100%;
+}
+
+.settings-modal .settings-mailbox-create-map {
+  white-space: nowrap;
 }
 
 /* =====================================================================

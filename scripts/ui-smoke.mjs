@@ -2558,9 +2558,9 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"sync\"]')?.innerText.includes('查看文件夹状态并手动刷新邮件') && [...document.querySelectorAll('.settings-page[data-settings-page=\"sync\"] button')].some((item) => item.textContent.includes('同步邮件')) && !document.body.innerText.includes('同步调度与限流')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-sync-desktop');
-    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未映射')");
-    await clickButton(cdp, '新建同名', "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')");
-    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('已映射') && document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('等待首次同步') && document.querySelector('.custom-select-summary[aria-label=\"映射远端目录 Projects/Alpha\"]')");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('未同步') && !document.querySelector('.mailbox-grid, .mailbox-map-card')");
+    await clickButton(cdp, '创建并同步', "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')");
+    await waitForExpression(cdp, "document.querySelector('[data-imap-mailbox=\"Projects/Alpha\"]')?.innerText.includes('等待同步') && document.querySelector('.custom-select-summary[aria-label=\"选择 Projects/Alpha 的本地文件夹\"]')");
     await clickButton(cdp, '同步邮件', "document.querySelector('.settings-page[data-settings-page=\"sync\"]')");
     await waitForExpression(cdp, "document.body.innerText.includes('4 个已映射文件夹')");
     await openSettingsSection(cdp, '通用', 'general', '.settings-page[data-settings-page="general"]');

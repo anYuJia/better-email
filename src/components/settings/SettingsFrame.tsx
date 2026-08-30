@@ -56,6 +56,13 @@ type SettingsFrameProps = {
 };
 
 const SETTINGS_MOBILE_MEDIA_QUERY = '(max-width: 720px)';
+const SETTINGS_EXIT_MS = 180;
+
+function canAnimateSettingsExit() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 function useSettingsMobileViewport() {
   const [isMobile, setIsMobile] = useState(
@@ -180,8 +187,12 @@ export default function SettingsFrame({
   ) : null;
   const isMobileViewport = useSettingsMobileViewport();
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [inputModality, setInputModality] = useState<'keyboard' | 'pointer'>('keyboard');
   const shellRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const closingRef = useRef(false);
 
   useModalAccessibility({
     dialogRef: shellRef,
@@ -193,12 +204,42 @@ export default function SettingsFrame({
     if (!isDirty) setShowDiscardConfirm(false);
   }, [isDirty]);
 
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+  }, []);
+
+  const finishClose = () => {
+    if (closingRef.current) return;
+    if (!canAnimateSettingsExit()) {
+      onClose();
+      return;
+    }
+    closingRef.current = true;
+    setIsClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      onClose();
+    }, SETTINGS_EXIT_MS);
+  };
+
+  const performClose = () => {
+    setShowDiscardConfirm(false);
+    if (isMobileViewport && isNestedSection) {
+      onClose();
+      return;
+    }
+    finishClose();
+  };
+
   const requestClose = () => {
+    if (closingRef.current) return;
     if (isDirty) {
       setShowDiscardConfirm(true);
       return;
     }
-    onClose();
+    performClose();
   };
 
   useEffect(() => {
@@ -223,10 +264,28 @@ export default function SettingsFrame({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDirty, onClose, showDiscardConfirm]);
+  }, [isClosing, isDirty, isMobileViewport, isNestedSection, onClose, showDiscardConfirm]);
 
   return (
-    <div className="settings-workspace" ref={workspaceRef}>
+    <div
+      className={`settings-workspace${isClosing ? ' is-closing' : ''}`}
+      data-input-modality={inputModality}
+      ref={workspaceRef}
+      onPointerDownCapture={() => setInputModality('pointer')}
+      onKeyDownCapture={(event) => {
+        if (
+          event.key === 'Tab'
+          || event.key === 'Enter'
+          || event.key === ' '
+          || event.key === 'Escape'
+          || event.key === 'Home'
+          || event.key === 'End'
+          || event.key.startsWith('Arrow')
+        ) {
+          setInputModality('keyboard');
+        }
+      }}
+    >
       <section
         className="settings-modal settings-shell"
         data-ui="settings-app"
@@ -312,7 +371,7 @@ export default function SettingsFrame({
             </span>
             <div>
               <button type="button" onClick={() => setShowDiscardConfirm(false)}>继续编辑</button>
-              <button type="button" className="danger" onClick={onClose}>放弃修改</button>
+              <button type="button" className="danger" onClick={performClose}>放弃修改</button>
             </div>
           </div>
         )}

@@ -2,7 +2,6 @@ import type { SettingsSectionId } from './SettingsFrame';
 import type { SetStateAction } from 'react';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { AccountProviderPreset } from '../../providerCatalog';
-import type { ProviderVerificationRecord } from '../../app/types';
 import type { SettingsOverlayProps } from './SettingsOverlay';
 import type { BackgroundTaskKind, Account, AccountCreateInput, Contact, ContactCreateInput, ImapMailboxState, MailIdentity, MailIdentityInput, MailRule, MailRuleInput, RemoteImageTrust } from '../../app/types';
 import type { RuleConditionField, SendUndoDelaySeconds } from '../../app/appConfig';
@@ -32,8 +31,6 @@ export type SettingsHandlers = {
   onApplyNewAccountPreset: SettingsOverlayProps['onApplyNewAccountPreset'];
   onCreateNewAccount: SettingsOverlayProps['onCreateNewAccount'];
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
-  onUpdateProviderVerification: SettingsOverlayProps['onUpdateProviderVerification'];
-  onSaveProviderVerification: () => void;
   onSaveAccountSettings: (updatedAccount: NonNullable<SettingsOverlayProps['accountForm']>) => Promise<void>;
   onOauthClientIdChange: (value: SetStateAction<string>) => void;
   onOauthClientSecretChange: (value: SetStateAction<string>) => void;
@@ -46,11 +43,8 @@ export type SettingsHandlers = {
   onWaitForOAuth2Callback: () => void;
   onExchangeOAuth2Token: (sessionId: number) => void;
   onCredentialSecretChange: (value: SetStateAction<string>) => void;
-  onCheckCredential: () => void;
   onVerifyCredential: () => void;
-  onRunProviderValidation: () => void;
   onDeleteCredential: () => void;
-  onStoreCredential: () => void;
   onStoreAndVerifyCredential: () => void;
   onNotificationPolicyChange: SettingsOverlayProps['onNotificationPolicyChange'];
   onSendUndoDelayChange: SettingsOverlayProps['onSendUndoDelayChange'];
@@ -59,11 +53,8 @@ export type SettingsHandlers = {
   onEditIdentity: SettingsOverlayProps['onEditIdentity'];
   onDeleteIdentity: SettingsOverlayProps['onDeleteIdentity'];
   onSaveIdentity: () => Promise<void>;
-  onImportEml: () => void;
-  onPreviewBackup: () => void;
   onImportBackup: () => void;
   onExportBackup: () => void;
-  onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
@@ -127,8 +118,6 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onApplyNewAccountPreset: (preset: AccountProviderPreset) => latest().onApplyNewAccountPreset(preset),
     onCreateNewAccount: (secret, onProgress) => latest().onCreateNewAccount(secret, onProgress),
     onRemoveAccount: (deleteSecret) => latest().onRemoveAccount(deleteSecret),
-    onUpdateProviderVerification: (providerName: string, patch: Partial<ProviderVerificationRecord>) => latest().onUpdateProviderVerification(providerName, patch),
-    onSaveProviderVerification: () => latest().onSaveProviderVerification(),
     onSaveAccountSettings: (updatedAccount) => latest().onSaveAccountSettings(updatedAccount),
     onOauthClientIdChange: (value) => latest().onOauthClientIdChange(value),
     onOauthClientSecretChange: (value) => latest().onOauthClientSecretChange(value),
@@ -141,11 +130,8 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onWaitForOAuth2Callback: () => latest().onWaitForOAuth2Callback(),
     onExchangeOAuth2Token: (sessionId) => latest().onExchangeOAuth2Token(sessionId),
     onCredentialSecretChange: (value) => latest().onCredentialSecretChange(value),
-    onCheckCredential: () => latest().onCheckCredential(),
     onVerifyCredential: () => latest().onVerifyCredential(),
-    onRunProviderValidation: () => latest().onRunProviderValidation(),
     onDeleteCredential: () => latest().onDeleteCredential(),
-    onStoreCredential: () => latest().onStoreCredential(),
     onStoreAndVerifyCredential: () => latest().onStoreAndVerifyCredential(),
     onNotificationPolicyChange: (policy: SetStateAction<NotificationPolicy>) => latest().onNotificationPolicyChange(policy),
     onSendUndoDelayChange: (seconds: SetStateAction<SendUndoDelaySeconds>) => latest().onSendUndoDelayChange(seconds),
@@ -154,11 +140,8 @@ export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
     onEditIdentity: (identity: MailIdentity) => latest().onEditIdentity(identity),
     onDeleteIdentity: (identity: MailIdentity) => latest().onDeleteIdentity(identity),
     onSaveIdentity: () => latest().onSaveIdentity(),
-    onImportEml: () => latest().onImportEml(),
-    onPreviewBackup: () => latest().onPreviewBackup(),
     onImportBackup: () => latest().onImportBackup(),
     onExportBackup: () => latest().onExportBackup(),
-    onRefreshStorage: () => latest().onRefreshStorage(),
     onClearAttachmentCache: () => latest().onClearAttachmentCache(),
     onPickDownloadDir: () => latest().onPickDownloadDir(),
     onResetDownloadDir: () => latest().onResetDownloadDir(),

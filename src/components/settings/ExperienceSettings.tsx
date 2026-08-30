@@ -4,26 +4,16 @@ import type {
   MailIdentityInput,
   RemoteImageTrust,
 } from '../../app/types';
-import type { SendUndoDelaySeconds } from '../../app/appConfig';
-import type { NotificationPolicy } from '../../mailUtils';
 import IdentitySettingsPage from './pages/IdentitySettingsPage';
-import NotificationSettingsPage from './pages/NotificationSettingsPage';
 import PrivacySettingsPage from './pages/PrivacySettingsPage';
-import SendingSettingsPage from './pages/SendingSettingsPage';
 
 export type ExperienceSettingsProps = {
-  section: 'sending' | 'notifications' | 'privacy' | 'identities';
+  section: 'privacy' | 'identities';
   accountForm: Account | null;
-  accounts: Account[];
-  notificationPolicy: NotificationPolicy;
-  sendUndoDelaySeconds: SendUndoDelaySeconds;
   remoteImageTrusts: RemoteImageTrust[];
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
   onAccountFormChange: (account: Account) => void;
-  onSelectAccount: (account: Account) => void;
-  onNotificationPolicyChange: (policy: NotificationPolicy) => void;
-  onSendUndoDelayChange: (seconds: SendUndoDelaySeconds) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onIdentityFormChange: (identity: MailIdentityInput) => void;
   onEditIdentity: (identity: MailIdentity) => void;
@@ -35,35 +25,14 @@ export type ExperienceSettingsProps = {
 export default function ExperienceSettings(props: ExperienceSettingsProps) {
   const { section } = props;
 
-  if (section === 'sending') {
-    return (
-      <SendingSettingsPage
-        sendUndoDelaySeconds={props.sendUndoDelaySeconds}
-        onSendUndoDelayChange={props.onSendUndoDelayChange}
-      />
-    );
-  }
-
-  if (section === 'notifications') {
-    return (
-      <NotificationSettingsPage
-        accounts={props.accounts}
-        notificationPolicy={props.notificationPolicy}
-        onNotificationPolicyChange={props.onNotificationPolicyChange}
-      />
-    );
-  }
-
   if (!props.accountForm) return null;
 
   if (section === 'privacy') {
     return (
       <PrivacySettingsPage
-        accounts={props.accounts}
         accountForm={props.accountForm}
         remoteImageTrusts={props.remoteImageTrusts}
         onAccountFormChange={props.onAccountFormChange}
-        onSelectAccount={props.onSelectAccount}
         onDeleteRemoteImageTrust={props.onDeleteRemoteImageTrust}
         onNavigateToAi={props.onNavigateToAi}
       />

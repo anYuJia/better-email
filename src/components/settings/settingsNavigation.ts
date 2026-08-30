@@ -291,8 +291,6 @@ export const settingsSearchEntries: SettingsSearchEntry[] = [
   { label: '撤销发送', path: '偏好 › 通用', section: 'general', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
   { label: '只提醒 VIP', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['vip', '只提醒', '重点联系人'] },
   { label: '免打扰时段', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['免打扰', '静音', '时间', 'dnd'] },
-  { label: '账号通知优先级', path: '偏好 › 通用 › 通知', section: 'general', target: 'notification-account-rules', keywords: ['重点账号', '静音账号', '优先提醒'] },
-  { label: 'VIP 发件人', path: '偏好 › 通用 › 通知', section: 'general', target: 'notification-vip-rules', keywords: ['发件人', 'vip', '域名'] },
   { label: '邮箱账号', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
   { label: '获取新邮件', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['同步频率', '后台检查', 'sync'] },
   { label: '自动下载附件', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['附件', '自动下载', 'download'] },
@@ -316,10 +314,8 @@ export const settingsSearchEntries: SettingsSearchEntry[] = [
 ];
 
 export const connectionSettingsSections = new Set<SettingsSectionId>([
-  'accounts',
   'providers',
   'auth',
-  'sync',
 ]);
 
 export function getSettingsNavigationContext(activeSection: SettingsSectionId) {

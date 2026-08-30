@@ -3,16 +3,13 @@ import {
   CheckCircle2,
   ExternalLink,
   Github,
-  KeyRound,
   RefreshCw,
-  ShieldCheck,
 } from 'lucide-react';
 import { check } from '@tauri-apps/plugin-updater';
 import packageJson from '../../../package.json';
 import SettingsSection from './shared/SettingsSection';
 import SettingsRow from './shared/SettingsRow';
 import SettingsButton from './shared/SettingsButton';
-import SettingsNotice from './shared/SettingsNotice';
 
 const repositoryUrl = 'https://github.com/anYuJia/better-email';
 const releasesUrl = `${repositoryUrl}/releases`;
@@ -48,7 +45,7 @@ export default function AboutSettings() {
     try {
       const update = await check();
       if (!update) {
-        setStatus('当前已是最新版本，更新签名校验正常。');
+        setStatus('当前已是最新版本。');
         return;
       }
       setAvailableUpdate({
@@ -56,10 +53,10 @@ export default function AboutSettings() {
         date: update.date,
         body: update.body,
       });
-      setStatus(`发现新版本 ${update.version}，签名校验已通过。`);
+      setStatus(`发现新版本 ${update.version}。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`更新检查失败：${message}。仅接受带有效签名的更新包。`);
+      setStatus(`更新检查失败：${message}。`);
     } finally {
       setChecking(false);
     }
@@ -114,7 +111,7 @@ export default function AboutSettings() {
 
       <SettingsSection
         title="软件更新"
-        description="从 GitHub Releases 获取并验证更新"
+        description="从 GitHub Releases 检查新版本"
         actions={(
           <SettingsButton
             variant="primary"
@@ -126,11 +123,6 @@ export default function AboutSettings() {
           </SettingsButton>
         )}
       >
-        <SettingsNotice tone="info" icon={ShieldCheck} title="签名更新保护">
-          <span>
-            只有签名校验通过的更新包才会被接受；签名缺失、来源不符或文件被篡改时会拒绝更新。
-          </span>
-        </SettingsNotice>
         {status && (
           <p className="settings-about-update-status" role="status" aria-live="polite">{status}</p>
         )}
@@ -146,9 +138,6 @@ export default function AboutSettings() {
             </a>
           </div>
         )}
-        <p className="settings-about-update-footnote">
-          <KeyRound size={13} /> 更新公钥内置于应用，发布私钥不会进入客户端。
-        </p>
       </SettingsSection>
     </div>
   );

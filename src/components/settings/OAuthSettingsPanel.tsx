@@ -7,7 +7,7 @@ import type {
   OAuthTokenExchangeReport,
 } from '../../app/types';
 import { formatDate } from '../../mailUtils';
-import { SettingsButton, SettingsSection } from './shared';
+import { AnimatedDisclosure, SettingsButton, SettingsSection } from './shared';
 
 type OAuthSettingsPanelProps = {
   authType: string;
@@ -94,14 +94,18 @@ export default function OAuthSettingsPanel({
             </SettingsButton>
             {!clientId.trim() && <em>开始前需要在高级设置中填写 OAuth2 Client ID</em>}
           </section>
-          <details className="settings-provider-advanced settings-oauth-advanced">
-            <summary>
-              <span>
-                <strong>自带 OAuth 客户端（高级）</strong>
-                <em>Client ID 仅保留到本次应用运行结束，Client Secret 不会持久化</em>
-              </span>
-              <b>{clientId.trim() ? '已配置 Client ID' : '等待配置'}</b>
-            </summary>
+          <AnimatedDisclosure
+            className="settings-provider-advanced settings-oauth-advanced"
+            summary={(
+              <>
+                <span>
+                  <strong>自带 OAuth 客户端（高级）</strong>
+                  <em>Client ID 仅保留到本次应用运行结束，Client Secret 不会持久化</em>
+                </span>
+                <b>{clientId.trim() ? '已配置 Client ID' : '等待配置'}</b>
+              </>
+            )}
+          >
             <div className="settings-provider-advanced-content">
               <SettingsSection
                 title="OAuth2 连接流程"
@@ -206,7 +210,7 @@ export default function OAuthSettingsPanel({
                 )}
               </SettingsSection>
             </div>
-          </details>
+          </AnimatedDisclosure>
         </>
       )}
     </>

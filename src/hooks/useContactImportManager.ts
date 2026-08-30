@@ -1,11 +1,9 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
-  ContactImportBatch,
   ContactImportCommitSummary,
   ContactImportEntryEdit,
   ContactImportEntryInput,
   ContactImportPreview,
-  ContactImportUndoReport,
 } from '../app/types/contact';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
@@ -44,9 +42,6 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
   const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [batches, setBatches] = useState<ContactImportBatch[]>([]);
-  const [undoingBatchId, setUndoingBatchId] = useState<number | null>(null);
-  const [confirmUndoBatch, setConfirmUndoBatch] = useState<ContactImportBatch | null>(null);
   /**
    * 文件选择的 generation token：每次 startImport 与 cancelImport 都递增。
    * 旧的「选择文件 / 解析文件」Promise 在返回后必须校验 token，
@@ -154,7 +149,6 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
       setPreview(null);
       setEntryEdits({});
       setCommitResult(summary);
-      await refreshBatches();
       setStatus(`联系人导入完成：新增 ${summary.created}、合并 ${summary.merged}、跳过 ${summary.skipped}`);
     } catch (error) {
       const message = formatContactImportError(error, '联系人导入失败，请在导入对话框内重试。');
@@ -176,29 +170,6 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
     setImportError(null);
   }, []);
 
-  const refreshBatches = useCallback(async () => {
-    try {
-      const next = await invoke<ContactImportBatch[]>(IPC.ListContactImportBatches);
-      setBatches(next);
-    } catch {
-      setBatches([]);
-    }
-  }, []);
-
-  const undoBatch = useCallback(async (batchId: number) => {
-    setUndoingBatchId(batchId);
-    try {
-      const report = await invoke<ContactImportUndoReport>(IPC.UndoContactImportBatch, { batchId });
-      setConfirmUndoBatch(null);
-      await refreshBatches();
-      setStatus(`已撤销导入批次：删除 ${report.removed} 位新增联系人。${report.note}`);
-    } catch (error) {
-      setStatus(String(error));
-    } finally {
-      setUndoingBatchId(null);
-    }
-  }, [refreshBatches, setStatus]);
-
   return {
     preview,
     setPreview,
@@ -215,11 +186,5 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
     startImport,
     commitImport,
     cancelImport,
-    batches,
-    refreshBatches,
-    undoBatch,
-    undoingBatchId,
-    confirmUndoBatch,
-    setConfirmUndoBatch,
   };
 }

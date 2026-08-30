@@ -97,59 +97,6 @@
   color: var(--ui-accent);
 }
 
-.notification-account-grid {
-  display: grid;
-  gap: var(--ui-space-2);
-}
-
-.notification-account-grid > div {
-  align-items: center;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
-  display: grid;
-  gap: 4px 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: 9px 10px;
-}
-
-.notification-account-grid strong,
-.notification-account-grid span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.notification-account-grid span {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-}
-
-.notification-account-grid > div > div {
-  display: flex;
-  gap: 6px;
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.notification-account-grid button {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  color: var(--ui-text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 9px;
-}
-
-.notification-account-grid button.active {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-}
-
 .raw-preview textarea {
   width: 100%;
   min-height: 120px;

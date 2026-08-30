@@ -59,6 +59,7 @@
 
 .custom-select-summary > svg {
   color: var(--ui-text-tertiary);
+  transition: transform var(--ui-motion-normal) var(--ui-ease-standard);
 }
 
 .custom-select-summary.dense {
@@ -83,6 +84,15 @@
   background: var(--ui-surface-muted);
 }
 
+.custom-select-summary[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.custom-select-summary:active:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--surface-active);
+}
+
 .custom-select-summary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -105,6 +115,23 @@
   background: var(--ui-surface);
   color: var(--ui-text);
   box-shadow: var(--ui-shadow-popover);
+  opacity: 0;
+  transform: translateY(-3px);
+  transform-origin: top center;
+  transition:
+    opacity var(--ui-motion-fast) var(--ui-ease-standard),
+    transform var(--ui-motion-fast) var(--ui-ease-standard);
+  will-change: opacity, transform;
+}
+
+.custom-select-dropdown[data-side="top"] {
+  transform: translateY(3px);
+  transform-origin: bottom center;
+}
+
+.custom-select-dropdown.is-open {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .custom-select-dropdown button {
@@ -163,6 +190,10 @@
   background: var(--ui-surface-muted);
 }
 
+.custom-select-dropdown button:active:not(:disabled) {
+  background: var(--surface-active);
+}
+
 .custom-select-dropdown button[aria-selected="true"],
 .custom-select-dropdown button[aria-selected="true"]:hover,
 .custom-select-dropdown button[aria-selected="true"].active {
@@ -204,6 +235,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .custom-select-summary,
+  .custom-select-summary > svg,
+  .custom-select-dropdown,
   .custom-select-dropdown button {
     transition: var(--ui-transition-none);
   }

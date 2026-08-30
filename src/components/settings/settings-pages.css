@@ -159,14 +159,6 @@
   white-space: nowrap;
 }
 
-.settings-modal .settings-about-update-footnote {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-}
 
 @media (max-width: 640px) {
   .settings-modal .settings-about-update-result {
@@ -286,182 +278,6 @@
  * Account pages: connection flow, account list, dialogs, provider matrix,
  * OAuth flows and custom select.
  * ===================================================================== */
-
-/* --- Account configuration tabs --- */
-.settings-modal .settings-connection-tabs {
-  display: flex;
-  align-items: end;
-  gap: 2px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--st-border);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.settings-modal .settings-connection-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-modal .settings-page-content .settings-connection-tab {
-  min-height: 38px;
-  flex: 0 0 auto;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 0;
-  color: var(--st-text);
-  background: transparent;
-  box-shadow: inset 0 -2px 0 transparent;
-  font-size: var(--st-font-size-secondary);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.settings-modal .settings-page-content .settings-connection-tab:hover {
-  color: var(--st-text);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .settings-page-content .settings-connection-tab.active {
-  color: var(--st-accent);
-  box-shadow: inset 0 -2px 0 var(--st-accent);
-  font-weight: 600;
-}
-
-/* --- Save & verify status --- */
-.settings-modal .settings-save-verify-status {
-  min-width: 0;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-lg);
-  background: var(--st-surface);
-  box-shadow: none;
-  overflow: hidden;
-}
-
-.settings-modal .settings-save-verify-status > header {
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--st-border);
-}
-
-.settings-modal .settings-save-verify-status > header > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .settings-save-verify-status > header strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-card-title);
-  font-weight: 600;
-}
-
-.settings-modal .settings-save-verify-status > header small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-modal .settings-save-verify-status > header > em {
-  flex: 0 0 auto;
-  padding: 3px 9px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--st-text-secondary);
-  background: var(--st-surface-muted);
-  font-size: var(--st-font-size-aux);
-  font-style: normal;
-  font-weight: 500;
-}
-
-.settings-modal .settings-save-verify-status.success > header > em {
-  color: var(--st-success);
-  background: var(--st-success-soft);
-}
-
-.settings-modal .settings-save-verify-status.error > header > em {
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .settings-save-verify-status.partial > header > em,
-.settings-modal .settings-save-verify-status.needs_auth > header > em {
-  color: var(--st-warning);
-  background: var(--st-warning-soft);
-}
-
-.settings-modal .settings-save-verify-stages {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  padding: 12px 16px;
-}
-
-.settings-modal .settings-save-verify-stages > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .settings-save-verify-stages > span b {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .settings-save-verify-stages > span small {
-  overflow: hidden;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-modal .settings-save-verify-stages > span.running b {
-  color: var(--st-accent);
-}
-
-.settings-modal .settings-save-verify-stages > span.success b {
-  color: var(--st-success);
-}
-
-.settings-modal .settings-save-verify-stages > span.error b {
-  color: var(--st-danger);
-}
-
-.settings-modal .settings-save-verify-stages > span.partial b,
-.settings-modal .settings-save-verify-stages > span.needs_auth b {
-  color: var(--st-warning);
-}
-
-.settings-modal .settings-save-verify-status details {
-  padding: 10px 16px 14px;
-}
-
-.settings-modal .settings-save-verify-status summary {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  cursor: pointer;
-}
-
-.settings-modal .settings-save-verify-status pre {
-  margin: 8px 0 0;
-  padding: 10px 12px;
-  overflow-x: auto;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-sm);
-  background: var(--st-surface-subtle);
-  color: var(--st-text-secondary);
-  font-size: 12px;
-  white-space: pre-wrap;
-}
 
 /* --- Account list --- */
 .settings-modal .settings-account-list {
@@ -1004,66 +820,7 @@
   white-space: nowrap;
 }
 
-.settings-modal .settings-provider-matrix {
-  display: grid;
-  gap: 8px;
-}
-
-.settings-modal .settings-provider-matrix > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 2px 2px;
-  min-height: 48px;
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: var(--st-surface);
-  color: var(--st-text);
-}
-
-.settings-modal .settings-provider-matrix > header strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .settings-provider-matrix > header span {
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-}
-
-.settings-modal .settings-provider-matrix > button {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-secondary);
-  background: var(--st-surface-subtle);
-  box-shadow: none;
-  text-align: left;
-}
-
-.settings-modal .settings-provider-matrix > button:hover {
-  border-color: var(--st-border-strong);
-  background: var(--st-surface);
-}
-
-.settings-modal .settings-provider-matrix > button.active {
-  border-color: var(--st-accent);
-  background: var(--st-accent-soft);
-}
-
-.settings-modal .settings-provider-matrix > button strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-/* --- Provider advanced (details disclosure) --- */
+/* --- Provider advanced disclosure --- */
 .settings-modal .settings-provider-advanced {
   width: 100%;
   border: 1px solid var(--st-border);
@@ -1078,60 +835,38 @@
   border-color: var(--st-border-strong);
 }
 
-.settings-modal .settings-provider-advanced > summary {
+.settings-modal .settings-provider-advanced > .settings-animated-disclosure-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 14px 18px;
-  list-style: none;
-  cursor: pointer;
   background: var(--st-surface);
 }
 
-.settings-modal .settings-provider-advanced > summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-modal .settings-provider-advanced > summary::after {
-  content: '';
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-right: 2px;
-  border-right: 1.5px solid var(--st-text-tertiary);
-  border-bottom: 1.5px solid var(--st-text-tertiary);
-  transform: rotate(45deg) translate(-1px, -1px);
-  transition: var(--ui-transition-transform-fast);
-}
-
-.settings-modal .settings-provider-advanced[open] > summary::after {
-  transform: rotate(225deg) translate(-1px, -1px);
-}
-
-.settings-modal .settings-provider-advanced[open] > summary {
+.settings-modal .settings-provider-advanced.is-open > .settings-animated-disclosure-trigger {
   border-bottom: 1px solid var(--st-border);
 }
 
-.settings-modal .settings-provider-advanced > summary > span {
+.settings-modal .settings-provider-advanced > .settings-animated-disclosure-trigger > span {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
-.settings-modal .settings-provider-advanced > summary strong {
+.settings-modal .settings-provider-advanced > .settings-animated-disclosure-trigger strong {
   color: var(--st-text);
   font-size: var(--st-font-size-card-title);
   font-weight: 600;
 }
 
-.settings-modal .settings-provider-advanced > summary em {
+.settings-modal .settings-provider-advanced > .settings-animated-disclosure-trigger em {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   font-style: normal;
 }
 
-.settings-modal .settings-provider-advanced > summary > b {
+.settings-modal .settings-provider-advanced > .settings-animated-disclosure-trigger > b {
   flex: 0 0 auto;
   padding: 3px 9px;
   border: 1px solid transparent;
@@ -1158,12 +893,12 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.settings-modal .st-section-body > .settings-provider-server-advanced > summary {
+.settings-modal .st-section-body > .settings-provider-server-advanced > .settings-animated-disclosure-trigger {
   padding: 10px 14px;
   background: transparent;
 }
 
-.settings-modal .st-section-body > .settings-provider-server-advanced[open] > summary {
+.settings-modal .st-section-body > .settings-provider-server-advanced.is-open > .settings-animated-disclosure-trigger {
   border-bottom: 1px solid var(--st-border);
 }
 
@@ -1171,32 +906,13 @@
   margin: 0;
 }
 
-/* =====================================================================
- * Settings v2 isolation.
- * The v2 shell (data-ui="settings-v2") has explicit ownership of these
- * dimensions, keeping top-level cards and the compatibility matrix
- * edge-aligned with the surrounding st-section cards inside the page content
- * column.
- * ===================================================================== */
-
-.settings-modal[data-ui="settings-v2"] .settings-provider-advanced:not(.settings-provider-server-advanced),
+/* Keep authentication cards aligned with the surrounding page sections. */
 .settings-modal[data-ui="settings-v2"] .settings-auth-guide,
 .settings-modal[data-ui="settings-v2"] .settings-oauth-primary {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
   margin: 0;
-}
-
-.settings-modal[data-ui="settings-v2"] .settings-provider-matrix {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
 }
 
 /* --- Auth & OAuth --- */
@@ -1384,11 +1100,6 @@
   background: var(--st-warning-soft);
 }
 
-.settings-modal .settings-storage-metrics > div.protected {
-  color: var(--st-success);
-  border-color: var(--st-success);
-  background: var(--st-success-soft);
-}
 
 .settings-modal .settings-storage-metrics > div > span {
   min-width: 0;
@@ -2837,7 +2548,7 @@
   background: transparent;
 }
 
-.settings-modal .settings-rule-advanced summary {
+.settings-modal .settings-rule-advanced > .settings-animated-disclosure-trigger {
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -2857,6 +2568,13 @@
 
 .settings-modal .settings-rule-advanced :is(input, textarea) {
   margin-bottom: 6px;
+}
+
+.settings-modal .settings-rule-advanced
+  > .settings-animated-disclosure-region
+  > .settings-animated-disclosure-content {
+  display: grid;
+  gap: 6px;
 }
 
 .settings-modal .settings-rule-save-error {
@@ -3175,9 +2893,6 @@
   box-shadow: var(--st-shadow-modal);
 }
 
-.contact-import-history-dialog {
-  width: min(560px, 100%);
-}
 
 .contact-import-step {
   min-height: 0;
@@ -3483,63 +3198,6 @@
   justify-content: center;
 }
 
-.contact-import-history-list {
-  display: grid;
-  gap: 0;
-  overflow-y: auto;
-  max-height: 52vh;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-}
-
-.contact-import-history-row {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--st-border);
-}
-
-.contact-import-history-row:first-child {
-  border-top: 0;
-}
-
-.contact-import-history-row > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.contact-import-history-row strong,
-.contact-import-history-row em {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.contact-import-history-row strong {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.contact-import-history-row em {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  font-style: normal;
-}
-
-.contact-import-history-empty {
-  margin: 0;
-  padding: 20px 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  text-align: center;
-}
-
 /* =====================================================================
  * AI service & templates pages.
  * ===================================================================== */
@@ -3587,6 +3245,44 @@
   display: grid;
   gap: 12px;
   transition: var(--ui-transition-opacity-fast);
+}
+
+.settings-modal .settings-ai-advanced > .settings-animated-disclosure-trigger {
+  min-height: 48px;
+  padding: 8px 0;
+}
+
+.settings-modal .settings-ai-advanced > .settings-animated-disclosure-trigger > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-ai-advanced > .settings-animated-disclosure-trigger strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-ai-advanced > .settings-animated-disclosure-trigger small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 400;
+}
+
+.settings-modal .settings-ai-advanced > .settings-animated-disclosure-trigger > em {
+  flex: 0 0 auto;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.settings-modal .settings-ai-advanced
+  > .settings-animated-disclosure-region
+  > .settings-animated-disclosure-content
+  > .settings-disclosure-body {
+  padding: 4px 0 14px;
 }
 
 .settings-modal .settings-ai-provider-value {
@@ -4045,434 +3741,7 @@
   color: var(--st-text-tertiary);
 }
 
-/* =====================================================================
- * Connection diagnostics.
- * ===================================================================== */
-
-.settings-modal .connection-diagnostics {
-  display: grid;
-  gap: 10px;
-  margin-top: 4px;
-  padding: 14px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .connection-diagnostics > header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.settings-modal .connection-diagnostics-icon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: var(--st-radius-sm);
-  color: var(--st-info);
-  background: var(--st-info-soft);
-}
-
-.settings-modal .connection-diagnostics-title {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .connection-diagnostics-title strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .connection-diagnostics-title p {
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.45;
-}
-
-.settings-modal .connection-diagnostics-actions {
-  flex: 0 0 auto;
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-}
-
-.settings-modal .connection-diagnostic-steps {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-}
-
-.settings-modal .connection-diagnostic-steps > div {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--st-border);
-}
-
-.settings-modal .connection-diagnostic-steps > div:first-child {
-  border-top: 0;
-}
-
-.settings-modal .connection-step-kind {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--st-radius-sm);
-  color: var(--st-text-tertiary);
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .connection-diagnostic-steps > div > span:nth-child(2) {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.settings-modal .connection-diagnostic-steps strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .connection-diagnostic-steps small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.4;
-}
-
-.settings-modal .connection-step-state {
-  color: var(--st-text-secondary);
-}
-
-.settings-modal .connection-diagnostic-steps > div.success .connection-step-state {
-  color: var(--st-success);
-}
-
-.settings-modal .connection-diagnostic-steps > div.warning .connection-step-state {
-  color: var(--st-warning);
-}
-
-.settings-modal .connection-diagnostic-steps > div.error .connection-step-state {
-  color: var(--st-danger);
-}
-
-.settings-modal .connection-recommendations {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px dashed var(--st-border-strong);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-}
-
-.settings-modal .connection-recommendations > strong {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .connection-recommendations ol {
-  margin: 0;
-  padding: 0 0 0 18px;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.55;
-}
-
-.settings-modal .provider-validation {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-}
-
-.settings-modal .provider-validation > p {
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
-}
-
-.settings-modal .provider-validation-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.settings-modal .provider-validation-stages span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px solid var(--st-border);
-  border-radius: 999px;
-  color: var(--st-text-secondary);
-  background: var(--st-surface-subtle);
-  font-size: var(--st-font-size-aux);
-}
-
-.settings-modal .provider-validation-stages span.success {
-  color: var(--st-success);
-  background: var(--st-success-soft);
-}
-
-.settings-modal .provider-validation-stages span.running {
-  color: var(--st-info);
-  background: var(--st-info-soft);
-}
-
-.settings-modal .provider-validation-stages span.error {
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .provider-validation-stages span.skipped {
-  color: var(--st-text-tertiary);
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .connection-technical-details {
-  padding-top: 4px;
-}
-
-.settings-modal .connection-technical-details > summary {
-  color: var(--st-accent);
-  font-size: var(--st-font-size-secondary);
-  cursor: pointer;
-}
-
-.settings-modal .connection-technical-details > div {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface);
-}
-
-.settings-modal .connection-technical-details p {
-  margin: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 4px 10px;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.4;
-}
-
-.settings-modal .connection-technical-details p strong {
-  color: var(--st-text);
-  font-weight: 600;
-}
-
-.settings-modal .connection-technical-details p small {
-  grid-column: 1 / -1;
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-}
-
-.settings-modal .connection-technical-details footer {
-  color: var(--st-text-tertiary);
-  font-size: var(--st-font-size-aux);
-}
-
-/* =====================================================================
- * Notification & privacy page specifics.
- * ===================================================================== */
-
-.settings-modal .notification-account-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.settings-modal .notification-account-grid > div {
-  min-width: 0;
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .notification-account-grid > div > span {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-modal .notification-account-grid strong,
-.settings-modal .notification-account-grid small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-modal .notification-account-grid strong {
-  color: var(--st-text);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .notification-account-grid small {
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-modal .notification-account-grid > div > div {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--st-border);
-  border-radius: 999px;
-  background: var(--st-surface-muted);
-}
-
-.settings-modal .notification-account-grid button {
-  min-width: 44px;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 999px;
-  color: var(--st-text);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: var(--st-font-size-aux);
-  font-weight: 500;
-}
-
-.settings-modal .notification-account-grid button:hover,
-.settings-modal .notification-account-grid button.active {
-  color: var(--st-accent);
-  background: var(--st-surface);
-  box-shadow: none;
-}
-
-.settings-modal .notification-account-grid button.active[data-mode="muted"] {
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .notification-quiet-times.is-dimmed {
-  opacity: 0.45;
-}
-
-.settings-modal .vip-sender-editor {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .vip-sender-input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.settings-modal .vip-sender-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.settings-modal .vip-sender-chip {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 6px 4px 10px;
-  border: 1px solid var(--st-border);
-  border-radius: 999px;
-  color: var(--st-text);
-  background: var(--st-surface);
-  font-size: var(--st-font-size-secondary);
-  font-weight: 500;
-}
-
-.settings-modal .vip-sender-chip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-modal .vip-sender-chip button {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: var(--st-text-secondary);
-  background: var(--st-surface-muted);
-  font-size: 12px;
-  line-height: 1;
-}
-
-.settings-modal .vip-sender-chip button:hover {
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .notification-rule-order {
-  padding: 10px 12px;
-  border: 1px dashed var(--st-border-strong);
-  border-radius: var(--st-radius-md);
-  background: var(--st-surface-subtle);
-}
-
-.settings-modal .notification-rule-order > strong {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-body);
-  font-weight: 600;
-}
-
-.settings-modal .notification-rule-order ol {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0 0 0 16px;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.55;
-}
-
-.settings-modal .notification-rule-order li span {
-  color: var(--st-text);
-  font-weight: 500;
-}
+/* Privacy page specifics. */
 
 .settings-modal .privacy-trust-scope {
   padding: 2px 8px;
@@ -4512,10 +3781,6 @@
     justify-content: flex-end;
   }
 
-  .settings-modal .notification-account-grid {
-    grid-template-columns: 1fr;
-  }
-
   .settings-modal .settings-oauth-callback {
     grid-template-columns: 1fr 1fr;
   }
@@ -4540,7 +3805,7 @@
   .settings-modal .contact-transfer-actions {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -4659,7 +3924,6 @@
     grid-template-columns: 1fr;
   }
 
-  .settings-modal .contact-import-history-row,
   .settings-modal .settings-storage-actions {
     align-items: stretch;
     flex-direction: column;
@@ -4699,7 +3963,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .settings-modal .settings-provider-advanced > summary::after,
+  .settings-modal .settings-animated-disclosure-region,
+  .settings-modal .settings-animated-disclosure-chevron,
   .settings-modal .settings-ai-config-area,
   .settings-modal .template-ai-chevron,
   .settings-modal .template-ai-generator {

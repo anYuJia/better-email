@@ -44,14 +44,42 @@ function focusSearchTarget(entry: SettingsSearchEntry) {
     }
     disclosures.forEach((details) => { details.open = true; });
 
-    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const closestAnimatedDisclosure = target.closest<HTMLElement>('.settings-animated-disclosure');
+    const animatedDisclosures = new Set<HTMLElement>([
+      ...(target.matches('.settings-animated-disclosure') ? [target] : []),
+      ...Array.from(target.querySelectorAll<HTMLElement>('.settings-animated-disclosure')),
+      ...(closestAnimatedDisclosure ? [closestAnimatedDisclosure] : []),
+    ]);
+    animatedDisclosures.forEach((disclosure) => {
+      const trigger = disclosure.querySelector<HTMLButtonElement>(
+        ':scope > .settings-animated-disclosure-trigger',
+      );
+      if (trigger?.getAttribute('aria-expanded') === 'false') trigger.click();
+    });
+
+    const prefersReducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({
+      block: 'center',
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    });
+    target.classList.remove('settings-search-hit');
+    void target.offsetWidth;
     target.classList.add('settings-search-hit');
-    window.setTimeout(() => target.classList.remove('settings-search-hit'), 1200);
+    window.setTimeout(() => target.classList.remove('settings-search-hit'), 650);
   }, 80);
 }
 
 function requiresAccount(section: SettingsSectionId) {
   return section !== 'accounts' && accountScopedSections.has(section);
+}
+
+function exposesAvailableDetails(
+  section: SettingsSectionId,
+  accountSectionsEnabled: boolean,
+) {
+  return getSettingsDetailItems(section).length > 0
+    && (section !== 'accounts' || accountSectionsEnabled);
 }
 
 export const SettingsSidebar = memo(function SettingsSidebar({
@@ -63,8 +91,41 @@ export const SettingsSidebar = memo(function SettingsSidebar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const resolvedActiveSection = resolveSettingsNavigationSectionId(activeSection);
-  const showsDetailNavigation = getSettingsDetailItems(resolvedActiveSection).length > 0
-    && (resolvedActiveSection !== 'accounts' || accountSectionsEnabled);
+  const manuallyCollapsedSectionsRef = useRef<Set<SettingsSectionId>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<SettingsSectionId>>(() => {
+    const initialSections = new Set<SettingsSectionId>();
+    if (exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)) {
+      initialSections.add(resolvedActiveSection);
+    }
+    return initialSections;
+  });
+  useEffect(() => {
+    setExpandedSections((currentSections) => {
+      const nextSections = new Set(currentSections);
+      let changed = false;
+
+      if (!accountSectionsEnabled) {
+        manuallyCollapsedSectionsRef.current.delete('accounts');
+        if (nextSections.delete('accounts')) changed = true;
+      }
+
+      const activeSectionIsNested = activeSection !== resolvedActiveSection;
+      if (activeSectionIsNested) {
+        manuallyCollapsedSectionsRef.current.delete(resolvedActiveSection);
+      }
+
+      if (
+        exposesAvailableDetails(resolvedActiveSection, accountSectionsEnabled)
+        && !manuallyCollapsedSectionsRef.current.has(resolvedActiveSection)
+        && !nextSections.has(resolvedActiveSection)
+      ) {
+        nextSections.add(resolvedActiveSection);
+        changed = true;
+      }
+
+      return changed ? nextSections : currentSections;
+    });
+  }, [accountSectionsEnabled, activeSection, resolvedActiveSection]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -89,6 +150,16 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   const navigateToSearchResult = (entry: SettingsSearchEntry) => {
     if (requiresAccount(entry.section) && !accountSectionsEnabled) return;
+    const parentSection = resolveSettingsNavigationSectionId(entry.section);
+    if (exposesAvailableDetails(parentSection, accountSectionsEnabled)) {
+      manuallyCollapsedSectionsRef.current.delete(parentSection);
+      setExpandedSections((currentSections) => {
+        if (currentSections.has(parentSection)) return currentSections;
+        const nextSections = new Set(currentSections);
+        nextSections.add(parentSection);
+        return nextSections;
+      });
+    }
     onNavigate(entry.section);
     setQuery('');
     focusSearchTarget(entry);
@@ -96,7 +167,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   return (
     <nav
-      className={`settings-nav${showsDetailNavigation ? ' has-detail-navigation' : ''}`}
+      className="settings-nav"
       aria-label="设置分类"
     >
       <div className="settings-nav-search" role="search">
@@ -171,24 +242,51 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                   const detailItems = getSettingsDetailItems(item.id);
                   const exposesDetailItems = detailItems.length > 0
                     && (item.id !== 'accounts' || accountSectionsEnabled);
-                  const showDetailItems = contextActive && exposesDetailItems;
-                  const destination = item.id === 'tools' && detailItems.length > 0
-                    ? detailItems[0].id
-                    : item.id;
+                  const showDetailItems = expandedSections.has(item.id) && exposesDetailItems;
                   const detailGroupId = `settings-nav-${item.id}-details`;
                   const disabled = requiresAccount(item.id) && !accountSectionsEnabled;
+                  const parentClassName = [
+                    'settings-nav-parent',
+                    active ? 'active' : '',
+                    contextActive ? 'context-active' : '',
+                    exposesDetailItems ? 'has-disclosure' : '',
+                  ].filter(Boolean).join(' ');
+                  const activateParent = () => {
+                    if (!exposesDetailItems) {
+                      onNavigate(item.id);
+                      return;
+                    }
+
+                    const nextExpanded = !showDetailItems;
+                    if (nextExpanded) manuallyCollapsedSectionsRef.current.delete(item.id);
+                    else manuallyCollapsedSectionsRef.current.add(item.id);
+                    setExpandedSections((currentSections) => {
+                      const nextSections = new Set(currentSections);
+                      if (nextExpanded) nextSections.add(item.id);
+                      else nextSections.delete(item.id);
+                      return nextSections;
+                    });
+
+                    if (activeSection !== item.id) {
+                      onNavigate(item.id);
+                    }
+                  };
                   return (
                     <div className="settings-nav-branch" key={item.id}>
                       <button
                         type="button"
-                        className={`${active ? 'active' : ''}${showDetailItems ? ' context-active' : ''}`.trim()}
+                        className={parentClassName}
                         aria-current={active ? 'page' : undefined}
                         aria-expanded={exposesDetailItems ? showDetailItems : undefined}
                         aria-controls={exposesDetailItems ? detailGroupId : undefined}
                         aria-label={`${item.label}设置`}
                         disabled={disabled}
-                        title={disabled ? '请先添加或选择邮箱账号' : item.description}
-                        onClick={() => onNavigate(destination)}
+                        title={disabled
+                          ? '请先添加或选择邮箱账号'
+                          : exposesDetailItems
+                            ? `${showDetailItems ? '收起' : '展开'}${item.label}详细设置`
+                            : item.description}
+                        onClick={activateParent}
                       >
                         <span className="settings-nav-icon">
                           <Icon size={15} aria-hidden="true" />
@@ -200,31 +298,35 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                           <ChevronRight className="settings-nav-disclosure" size={14} aria-hidden="true" />
                         )}
                       </button>
-                      {showDetailItems && (
+                      {exposesDetailItems && (
                         <div
-                          className="settings-nav-subsection"
+                          className={`settings-nav-subsection${showDetailItems ? ' is-open' : ''}`}
                           id={detailGroupId}
                           role="group"
                           aria-label={`${item.label}详细设置`}
+                          aria-hidden={!showDetailItems}
                         >
-                          {detailItems.map((detailItem) => {
-                            const detailActive = activeSection === detailItem.id;
-                            const detailDisabled = requiresAccount(detailItem.id) && !accountSectionsEnabled;
-                            return (
-                              <button
-                                type="button"
-                                className={`settings-nav-subitem${detailActive ? ' active' : ''}`}
-                                key={detailItem.id}
-                                aria-current={detailActive ? 'page' : undefined}
-                                aria-label={`${detailItem.label}设置`}
-                                disabled={detailDisabled}
-                                title={detailDisabled ? '请先添加或选择邮箱账号' : detailItem.description}
-                                onClick={() => onNavigate(detailItem.id)}
-                              >
-                                <span className="settings-nav-subitem-label">{detailItem.label}</span>
-                              </button>
-                            );
-                          })}
+                          <div className="settings-nav-subsection-content">
+                            {detailItems.map((detailItem) => {
+                              const detailActive = activeSection === detailItem.id;
+                              const detailDisabled = requiresAccount(detailItem.id) && !accountSectionsEnabled;
+                              return (
+                                <button
+                                  type="button"
+                                  className={`settings-nav-subitem${detailActive ? ' active' : ''}`}
+                                  key={detailItem.id}
+                                  aria-current={detailActive ? 'page' : undefined}
+                                  aria-label={`${detailItem.label}设置`}
+                                  disabled={detailDisabled}
+                                  tabIndex={showDetailItems ? undefined : -1}
+                                  title={detailDisabled ? '请先添加或选择邮箱账号' : detailItem.description}
+                                  onClick={() => onNavigate(detailItem.id)}
+                                >
+                                  <span className="settings-nav-subitem-label">{detailItem.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>

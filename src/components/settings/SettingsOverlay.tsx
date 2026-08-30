@@ -14,9 +14,7 @@ import type {
   BackgroundTaskKind,
   Contact,
   ContactCreateInput,
-  ConnectionReport,
   CredentialStatus,
-  CredentialVerificationReport,
   Folder,
   ImapMailboxState,
   Label,
@@ -30,7 +28,6 @@ import type {
   OAuthSession,
   OAuthStartReport,
   OAuthTokenExchangeReport,
-  ProviderVerificationRecord,
   RemoteImageTrust,
   StorageUsage,
 } from '../../app/types';
@@ -39,7 +36,6 @@ import type {
   SendUndoDelaySeconds,
 } from '../../app/appConfig';
 import type { AccountProviderPreset } from '../../providerCatalog';
-import type { ProviderValidationReport } from '../../app/providerValidation';
 import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
@@ -75,8 +71,6 @@ export type SettingsOverlayProps = {
   connectionTestRunning?: boolean;
   connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
   saveAndVerifyReport: SaveAndVerifyReport;
-  providerVerifications: Record<string, ProviderVerificationRecord>;
-  activeProviderVerification: ProviderVerificationRecord | null;
   oauthClientId: string;
   oauthClientSecret: string;
   oauthRedirectUri: string;
@@ -89,10 +83,6 @@ export type SettingsOverlayProps = {
   oauthSessions: OAuthSession[];
   authTypeChanged: boolean;
   authTypeChangeNotice: string | null;
-  connectionReport: ConnectionReport | null;
-  credentialVerification: CredentialVerificationReport | null;
-  providerValidationReport: ProviderValidationReport | null;
-  providerValidationRunning: boolean;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
   notificationPolicy: NotificationPolicy;
@@ -134,11 +124,6 @@ export type SettingsOverlayProps = {
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
-  onUpdateProviderVerification: (
-    providerName: string,
-    patch: Partial<ProviderVerificationRecord>,
-  ) => void;
-  onSaveProviderVerification: () => void;
   onSaveAccountSettings: (updatedAccount: Account) => Promise<void>;
   onOauthClientIdChange: Dispatch<SetStateAction<string>>;
   onOauthClientSecretChange: Dispatch<SetStateAction<string>>;
@@ -151,11 +136,8 @@ export type SettingsOverlayProps = {
   onWaitForOAuth2Callback: () => void;
   onExchangeOAuth2Token: (sessionId: number) => void;
   onCredentialSecretChange: Dispatch<SetStateAction<string>>;
-  onCheckCredential: () => void;
   onVerifyCredential: () => void;
-  onRunProviderValidation: () => void;
   onDeleteCredential: () => void;
-  onStoreCredential: () => void;
   onStoreAndVerifyCredential: () => void;
   onNotificationPolicyChange: Dispatch<SetStateAction<NotificationPolicy>>;
   onSendUndoDelayChange: Dispatch<SetStateAction<SendUndoDelaySeconds>>;
@@ -164,11 +146,8 @@ export type SettingsOverlayProps = {
   onEditIdentity: (identity: MailIdentity) => void;
   onDeleteIdentity: (identity: MailIdentity) => void;
   onSaveIdentity: () => Promise<void>;
-  onImportEml: () => void;
-  onPreviewBackup: () => void;
   onImportBackup: () => void;
   onExportBackup: () => void;
-  onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
@@ -235,8 +214,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     accountForm: props.accountForm,
     accountCount: props.accounts.length,
     newAccountForm: props.newAccountForm,
-    providerVerifications: props.providerVerifications,
-    activeProviderVerification: props.activeProviderVerification,
     oauthClientId: props.oauthClientId,
     oauthClientSecret: props.oauthClientSecret,
     oauthRedirectUri: props.oauthRedirectUri,
@@ -249,13 +226,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     oauthSessions: props.oauthSessions,
     authTypeChanged: props.authTypeChanged,
     authTypeChangeNotice: props.authTypeChangeNotice,
-    saveAndVerifyReport: props.saveAndVerifyReport,
   }), [
     props.accounts,
     props.accountForm,
     props.newAccountForm,
-    props.providerVerifications,
-    props.activeProviderVerification,
     props.oauthClientId,
     props.oauthClientSecret,
     props.oauthRedirectUri,
@@ -268,32 +242,23 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.oauthSessions,
     props.authTypeChanged,
     props.authTypeChangeNotice,
-    props.saveAndVerifyReport,
   ]);
 
   const credentialProps = useMemo(() => ({
     credentialSecret: props.credentialSecret,
     credentialStatus: props.credentialStatus,
     authTypeChangeNotice: props.authTypeChangeNotice,
-    providerValidationRunning: props.providerValidationRunning,
   }), [
     props.credentialSecret,
     props.credentialStatus,
     props.authTypeChangeNotice,
-    props.providerValidationRunning,
   ]);
 
   const experienceProps = useMemo(() => ({
-    accounts: props.accounts,
-    notificationPolicy: props.notificationPolicy,
-    sendUndoDelaySeconds: props.sendUndoDelaySeconds,
     remoteImageTrusts: props.remoteImageTrusts,
     identities: props.identities,
     identityForm: props.identityForm,
   }), [
-    props.accounts,
-    props.notificationPolicy,
-    props.sendUndoDelaySeconds,
     props.remoteImageTrusts,
     props.identities,
     props.identityForm,
@@ -367,20 +332,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   const isExperienceSection = activeSettingsSection === 'privacy'
     || activeSettingsSection === 'identities';
 
-  const connectionReportForAccount = accountForm
-    && props.connectionReport?.account_email === accountForm.email
-    ? props.connectionReport
-    : null;
-  const credentialVerificationForAccount = accountForm
-    && !props.authTypeChanged
-    && props.credentialVerification?.account_email === accountForm.email
-    ? props.credentialVerification
-    : null;
-  const providerValidationForAccount = accountForm
-    && props.providerValidationReport?.account_email === accountForm.email
-    ? props.providerValidationReport
-    : null;
-
   return (
     <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
       <SettingsFrame
@@ -406,9 +357,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               {activeSettingsSection === 'auth' && accountForm && (
                 <MemoizedCredentialSecurity
                   account={accountForm}
-                  connectionReport={connectionReportForAccount}
-                  credentialVerification={credentialVerificationForAccount}
-                  providerValidationReport={providerValidationForAccount}
                   {...credentialProps}
                   {...handlers}
                 />
@@ -426,7 +374,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
           )}
           {activeSettingsSection === 'general' && (
             <MemoizedGeneral
-              accounts={props.accounts}
               themeMode={props.themeMode}
               notificationPolicy={props.notificationPolicy}
               sendUndoDelaySeconds={props.sendUndoDelaySeconds}

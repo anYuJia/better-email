@@ -51,12 +51,20 @@ type MenuPlacement = {
   left: number;
   width: number;
   maxHeight: number;
+  opensAbove: boolean;
 };
 
 const TYPEAHEAD_RESET_MS = 700;
 const MENU_GAP = 4;
 const VIEWPORT_GUTTER = 12;
 const MENU_MAX_HEIGHT = 280;
+const MENU_EXIT_MS = 120;
+
+function prefersReducedMotion() {
+  return typeof window === 'undefined'
+    || typeof window.matchMedia !== 'function'
+    || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 /**
  * Shared dropdown control used across the settings workspace and the
@@ -80,6 +88,8 @@ export function CustomSelect({
   // still loading or has just been removed.
   const activeOption = options.find((o) => o.value === value);
   const [open, setOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -87,6 +97,7 @@ export function CustomSelect({
   const comboboxId = useId();
   const listboxId = useId();
   const typeaheadRef = useRef({ query: '', updatedAt: 0 });
+  const closeTimerRef = useRef<number | null>(null);
 
   const isOptionDisabled = (option: Option) => disabledValues.includes(option.value);
   const selectedIndex = options.findIndex((option) => option.value === value);
@@ -114,22 +125,48 @@ export function CustomSelect({
     typeaheadRef.current = { query: '', updatedAt: 0 };
   }
 
-  function closeMenu({ restoreFocus = false } = {}) {
-    setOpen(false);
+  function finishMenuClose() {
+    setMenuMounted(false);
     setActiveValue(null);
     setPlacement(null);
+    closeTimerRef.current = null;
+  }
+
+  function closeMenu({ restoreFocus = false } = {}) {
+    setOpen(false);
+    setMenuVisible(false);
     resetTypeahead();
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    if (prefersReducedMotion()) {
+      finishMenuClose();
+    } else {
+      closeTimerRef.current = window.setTimeout(finishMenuClose, MENU_EXIT_MS);
+    }
     if (restoreFocus) {
       triggerRef.current?.focus();
     }
+  }
+
+  function prepareMenuOpen() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (!open) {
+      if (!menuMounted) setPlacement(null);
+      setMenuVisible(false);
+    }
+    setMenuMounted(true);
+    setOpen(true);
   }
 
   function openMenu(index = selectedIndex >= 0 && !isOptionDisabled(options[selectedIndex])
     ? selectedIndex
     : firstEnabledIndex) {
     setActiveValue(index >= 0 ? options[index].value : null);
-    if (!open) setPlacement(null);
-    setOpen(true);
+    prepareMenuOpen();
   }
 
   function moveActive(direction: 1 | -1) {
@@ -167,8 +204,7 @@ export function CustomSelect({
     const continuing = now - typeaheadRef.current.updatedAt <= TYPEAHEAD_RESET_MS;
     const query = `${continuing ? typeaheadRef.current.query : ''}${normalizedKey}`;
     typeaheadRef.current = { query, updatedAt: now };
-    if (!open) setPlacement(null);
-    setOpen(true);
+    prepareMenuOpen();
 
     const repeatedCharacter = query.length > 1
       && Array.from(query).every((character) => character === Array.from(query)[0]);
@@ -305,6 +341,7 @@ export function CustomSelect({
         left,
         width,
         maxHeight,
+        opensAbove,
       });
     };
     measure();
@@ -315,6 +352,23 @@ export function CustomSelect({
       window.removeEventListener('scroll', measure, true);
     };
   }, [dense, open, optionContentSignature]);
+
+  useEffect(() => {
+    if (!open || !menuMounted || !placement) return undefined;
+    const show = () => setMenuVisible(true);
+    if (typeof window.requestAnimationFrame === 'function') {
+      const frame = window.requestAnimationFrame(show);
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const timer = window.setTimeout(show, 0);
+    return () => window.clearTimeout(timer);
+  }, [menuMounted, open, placement]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (disabled && open) {
@@ -362,17 +416,19 @@ export function CustomSelect({
     }
   }, [activeIndex, listboxId, open, placement]);
 
-  const menu = open
+  const menu = menuMounted
     ? createPortal(
         <div
           ref={menuRef}
           id={listboxId}
-          className={`custom-select-dropdown ${dense ? 'dense' : ''}`.trim()}
+          className={`custom-select-dropdown${dense ? ' dense' : ''}${menuVisible ? ' is-open' : ''}`}
           role="listbox"
+          aria-hidden={!open}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabel ? undefined : comboboxId}
           data-portal-layer={portalZIndex}
           data-portal-owner={portalOwnerId}
+          data-side={placement?.opensAbove ? 'top' : 'bottom'}
           style={{
             position: 'fixed',
             top: placement?.top ?? -10000,
@@ -381,7 +437,7 @@ export function CustomSelect({
             maxHeight: placement?.maxHeight,
             zIndex: portalZIndex,
             visibility: placement ? 'visible' : 'hidden',
-            pointerEvents: placement ? undefined : 'none',
+            pointerEvents: placement && open ? undefined : 'none',
           }}
         >
           {options.map((option, index) => {

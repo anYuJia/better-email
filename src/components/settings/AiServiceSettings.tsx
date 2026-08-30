@@ -9,6 +9,7 @@ import {
 import type { AiServiceType } from '../../app/types/ai';
 import useAiService from '../../hooks/useAiService';
 import {
+  AnimatedDisclosure,
   SettingsBadge,
   SettingsButton,
   SettingsField,
@@ -114,17 +115,19 @@ export default function AiServiceSettings({ mode = 'ai' }: AiServiceSettingsProp
             onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
           />
 
-          <details
+          <AnimatedDisclosure
             className="settings-disclosure settings-ai-advanced"
-            data-settings-section={isMcp ? 'mcp-advanced' : 'ai-advanced'}
+            dataSection={isMcp ? 'mcp-advanced' : 'ai-advanced'}
+            summary={(
+              <>
+                <span>
+                  <strong>{isMcp ? '服务凭据' : '高级连接'}</strong>
+                  <small>{isMcp ? '端点与访问 Token' : '端点、密钥与超时时间'}</small>
+                </span>
+                <em>{providerEndpoint ? '已配置' : '待配置'}</em>
+              </>
+            )}
           >
-            <summary>
-              <span>
-                <strong>{isMcp ? '服务凭据' : '高级连接'}</strong>
-                <small>{isMcp ? '端点与访问 Token' : '端点、密钥与超时时间'}</small>
-              </span>
-              <em>{providerEndpoint ? '已配置' : '待配置'}</em>
-            </summary>
             <div className="settings-disclosure-body st-field-grid">
               <SettingsField label={isMcp ? 'MCP 服务端点' : 'API 服务端点'}>
                 <input
@@ -182,7 +185,7 @@ export default function AiServiceSettings({ mode = 'ai' }: AiServiceSettingsProp
                 />
               </SettingsField>
             </div>
-          </details>
+          </AnimatedDisclosure>
 
           <div className="st-actions settings-ai-actions">
             <SettingsButton

@@ -1,4 +1,3 @@
-import type { Account } from '../../app/types';
 import type { SendUndoDelaySeconds } from '../../app/appConfig';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { NotificationPolicy } from '../../mailUtils';
@@ -7,7 +6,6 @@ import NotificationSettingsPage from './pages/NotificationSettingsPage';
 import SendingSettingsPage from './pages/SendingSettingsPage';
 
 type GeneralSettingsProps = {
-  accounts: Account[];
   themeMode: ThemeMode;
   notificationPolicy: NotificationPolicy;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
@@ -17,7 +15,6 @@ type GeneralSettingsProps = {
 };
 
 export default function GeneralSettings({
-  accounts,
   themeMode,
   notificationPolicy,
   sendUndoDelaySeconds,
@@ -36,7 +33,6 @@ export default function GeneralSettings({
         onSendUndoDelayChange={onSendUndoDelayChange}
       />
       <NotificationSettingsPage
-        accounts={accounts}
         notificationPolicy={notificationPolicy}
         onNotificationPolicyChange={onNotificationPolicyChange}
       />

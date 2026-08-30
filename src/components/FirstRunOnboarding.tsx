@@ -582,10 +582,6 @@ export default function FirstRunOnboarding({
             onPickFile={() => { void startImport(); }}
             onConfirm={() => { void commitImport(); }}
             onCancel={handleCloseImport}
-            onOpenHistory={() => {
-              handleCloseImport();
-              onStatus('导入记录可在「设置 → 效率工具 → 通讯录」中查看');
-            }}
           />
         )}
       </section>

@@ -40,11 +40,8 @@ function renderPage(overrides: Overrides = {}) {
       appSettings={overrides.appSettings ?? defaultReport}
       downloadDirBusy={overrides.downloadDirBusy ?? false}
       downloadDirError={overrides.downloadDirError ?? null}
-      onImportEml={vi.fn()}
-      onPreviewBackup={vi.fn()}
       onImportBackup={vi.fn()}
       onExportBackup={vi.fn()}
-      onRefreshStorage={() => Promise.resolve()}
       onClearAttachmentCache={() => Promise.resolve()}
       onPickDownloadDir={pickDownloadDir}
       onResetDownloadDir={resetDownloadDir}
@@ -65,6 +62,14 @@ describe('DataSafetySettings 默认下载位置', () => {
     expect(screen.getByTestId('download-dir-path').textContent).toContain('/Users/demo/Downloads/better-email');
     expect(screen.getByRole('button', { name: '选择文件夹' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '恢复默认位置' })).not.toBeNull();
+  });
+
+  it('不再暴露技术统计、EML 导入与备份预览入口', () => {
+    renderPage();
+    expect(screen.queryByText('邮件数据库')).toBeNull();
+    expect(screen.queryByText('本地唯一附件')).toBeNull();
+    expect(screen.queryByRole('button', { name: '导入 EML' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '预览备份' })).toBeNull();
   });
 
   it('默认位置时禁用「恢复默认位置」按钮', () => {

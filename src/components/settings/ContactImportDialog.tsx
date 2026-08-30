@@ -2,7 +2,6 @@ import { createPortal } from 'react-dom';
 import {
   Check,
   FileUp,
-  History,
   LoaderCircle,
   Pencil,
   X,
@@ -47,7 +46,6 @@ type ContactImportDialogProps = {
   onPickFile: () => void;
   onConfirm: () => void;
   onCancel: () => void;
-  onOpenHistory: () => void;
 };
 
 type DraftEdit = {
@@ -100,7 +98,6 @@ export default function ContactImportDialog({
   onPickFile,
   onConfirm,
   onCancel,
-  onOpenHistory,
 }: ContactImportDialogProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftEdit | null>(null);
@@ -470,11 +467,7 @@ export default function ContactImportDialog({
               跳过 {commitResult.skipped} 位。
             </p>
             <p>标记为“重复”的条目已跳过，原有联系人不会重复创建；联系人列表按最近导入/使用时间排序，不按文件原始顺序显示。</p>
-            <p>新增的联系人可在「最近导入记录」中一键撤销。</p>
             <div className="contact-import-dialog-actions">
-              <SettingsButton icon={<History size={14} />} onClick={onOpenHistory}>
-                查看导入记录
-              </SettingsButton>
               <SettingsButton variant="primary" onClick={onCancel}>
                 完成
               </SettingsButton>

@@ -3,14 +3,10 @@ import { createPortal } from 'react-dom';
 import {
   Check,
   Copy,
-  Database,
   Download,
-  FileInput,
   FolderOpen,
   HardDrive,
-  RefreshCw,
   RotateCcw,
-  ShieldCheck,
   Trash2,
   Upload,
   X,
@@ -25,7 +21,6 @@ import { copyTextToClipboard } from '../../app/clipboard';
 import {
   SettingsBadge,
   SettingsButton,
-  SettingsNotice,
   SettingsRow,
   SettingsSection,
 } from './shared';
@@ -37,11 +32,8 @@ type DataSafetySettingsProps = {
   appSettings: AppSettingsReport | null;
   downloadDirBusy: boolean;
   downloadDirError: string | null;
-  onImportEml: () => void;
-  onPreviewBackup: () => void;
   onImportBackup: () => void;
   onExportBackup: () => void;
-  onRefreshStorage: () => Promise<void>;
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
@@ -54,11 +46,8 @@ export default function DataSafetySettings({
   appSettings,
   downloadDirBusy,
   downloadDirError,
-  onImportEml,
-  onPreviewBackup,
   onImportBackup,
   onExportBackup,
-  onRefreshStorage,
   onClearAttachmentCache,
   onPickDownloadDir,
   onResetDownloadDir,
@@ -113,28 +102,13 @@ export default function DataSafetySettings({
 
   return (
     <div className="settings-data-safety">
-      <SettingsNotice tone="info">
-        <p>敏感凭据只写入本地凭据表，本地数据库仅保存非敏感配置。</p>
-      </SettingsNotice>
-
       <SettingsSection
         title="本地存储"
-        description="数据库、远端附件缓存与本地唯一附件分开统计"
+        description="查看本地占用并清理可重新下载的附件缓存。"
         badge={
           <SettingsBadge tone="neutral">
             {storageUsage ? formatBytes(storageUsage.total_managed_bytes) : '读取中'}
           </SettingsBadge>
-        }
-        actions={
-          <SettingsButton
-            size="sm"
-            disabled={storageBusy}
-            aria-busy={storageBusy}
-            icon={<RefreshCw size={14} />}
-            onClick={() => { onRefreshStorage().catch(() => undefined); }}
-          >
-            {storageBusy ? '读取中' : '刷新'}
-          </SettingsButton>
         }
         dataSection="backup"
       >
@@ -146,13 +120,6 @@ export default function DataSafetySettings({
               <strong data-storage-total>{storageUsage ? formatBytes(storageUsage.total_managed_bytes) : '—'}</strong>
             </span>
           </div>
-          <div>
-            <Database size={16} />
-            <span>
-              <small>邮件数据库</small>
-              <strong>{storageUsage ? formatBytes(storageUsage.database_bytes) : '—'}</strong>
-            </span>
-          </div>
           <div className="reclaimable">
             <Trash2 size={16} />
             <span>
@@ -160,13 +127,6 @@ export default function DataSafetySettings({
               <strong data-storage-reclaimable>
                 {storageUsage ? formatBytes(storageUsage.reclaimable_cache_bytes) : '—'}
               </strong>
-            </span>
-          </div>
-          <div className="protected">
-            <ShieldCheck size={16} />
-            <span>
-              <small>本地唯一附件</small>
-              <strong>{storageUsage ? formatBytes(storageUsage.local_attachment_bytes) : '—'}</strong>
             </span>
           </div>
         </div>
@@ -177,7 +137,7 @@ export default function DataSafetySettings({
                 ? `${storageUsage.cached_attachment_count} 个远端附件 · ${storageUsage.partial_download_count} 个断点文件`
                 : '正在读取附件缓存'}
             </strong>
-            <small>清理后远端附件可再次下载；导入 EML 和本地唯一附件不会删除。</small>
+            <small>清理后，远端附件会在再次打开时重新下载。</small>
           </span>
           <SettingsButton
             variant="danger-secondary"
@@ -253,16 +213,13 @@ export default function DataSafetySettings({
           </SettingsBadge>
         }
       >
-        <p className="st-field-hint">密码与 OAuth Token 始终保留在本地凭据中，不会写入备份文件。</p>
+        <p className="st-field-hint">备份不包含密码和 OAuth Token。</p>
         <div className="st-actions">
-          <SettingsButton icon={<FileInput size={14} />} onClick={onImportEml}>导入 EML</SettingsButton>
-          <SettingsButton onClick={onPreviewBackup}>预览备份</SettingsButton>
           <SettingsButton icon={<Upload size={14} />} onClick={onImportBackup}>恢复备份</SettingsButton>
           <SettingsButton variant="primary" icon={<Download size={14} />} onClick={onExportBackup}>
             导出本地备份
           </SettingsButton>
         </div>
-        <p className="st-field-hint">单个 EML 上限 25 MB；正文会安全清洗，内嵌附件保存到本地应用数据目录。</p>
         {localBackupSummary && (
           <div className="st-data-row ok settings-backup-summary">
             <span>v{localBackupSummary.schema_version}</span>

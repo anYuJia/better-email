@@ -1056,13 +1056,27 @@
     color: var(--ui-text-secondary);
     background: var(--ui-surface);
     text-align: left;
+    transition: var(--ui-transition-fast-color-background);
   }
 
-  .mobile-settings-row:hover,
-  .mobile-settings-row:focus-visible,
-  .mobile-settings-row:active {
+  .mobile-settings-row:hover {
     color: var(--ui-text);
     background: var(--quiet-row-hover);
+  }
+
+  .mobile-settings-row:active {
+    color: var(--ui-text);
+    background: var(--surface-active);
+  }
+
+  .mobile-settings-row:focus-visible {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
+  }
+
+  .mobile-settings-row:focus:not(:focus-visible) {
     outline: none;
   }
 

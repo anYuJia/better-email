@@ -3,21 +3,15 @@ import {
   BadgeCheck,
   Eye,
   EyeOff,
-  KeyRound,
-  Search,
   ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
 import { buildProviderCredentialGuidance } from '../../app/providerCredentialGuidance';
-import type { ProviderValidationReport } from '../../app/providerValidation';
 import type {
   Account,
-  ConnectionReport,
   CredentialStatus,
-  CredentialVerificationReport,
 } from '../../app/types';
-import ConnectionDiagnosticsPanel from './ConnectionDiagnosticsPanel';
 import {
   SettingsBadge,
   SettingsButton,
@@ -29,17 +23,10 @@ type CredentialSecuritySettingsProps = {
   account: Account;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
-  connectionReport: ConnectionReport | null;
-  credentialVerification: CredentialVerificationReport | null;
   authTypeChangeNotice?: string | null;
-  providerValidationReport: ProviderValidationReport | null;
-  providerValidationRunning: boolean;
   onCredentialSecretChange: (value: string) => void;
-  onCheckCredential: () => void;
   onVerifyCredential: () => void;
-  onRunProviderValidation: () => void;
   onDeleteCredential: () => void;
-  onStoreCredential: () => void;
   onStoreAndVerifyCredential: () => void;
 };
 
@@ -47,17 +34,10 @@ export default function CredentialSecuritySettings({
   account,
   credentialSecret,
   credentialStatus,
-  connectionReport,
-  credentialVerification,
   authTypeChangeNotice,
-  providerValidationReport,
-  providerValidationRunning,
   onCredentialSecretChange,
-  onCheckCredential,
   onVerifyCredential,
-  onRunProviderValidation,
   onDeleteCredential,
-  onStoreCredential,
   onStoreAndVerifyCredential,
 }: CredentialSecuritySettingsProps) {
   const [secretVisible, setSecretVisible] = useState(false);
@@ -154,9 +134,6 @@ export default function CredentialSecuritySettings({
       </ul>
 
       <div className="st-actions">
-        <SettingsButton icon={<Search size={14} />} onClick={onCheckCredential}>
-          检查存储
-        </SettingsButton>
         <SettingsButton
           variant="danger-secondary"
           disabled={activeCredentialStatus?.exists === false}
@@ -164,9 +141,6 @@ export default function CredentialSecuritySettings({
           onClick={onDeleteCredential}
         >
           删除
-        </SettingsButton>
-        <SettingsButton disabled={!hasSecret} icon={<KeyRound size={14} />} onClick={onStoreCredential}>
-          仅保存
         </SettingsButton>
         <SettingsButton
           variant="primary"
@@ -177,16 +151,6 @@ export default function CredentialSecuritySettings({
           {hasSecret ? '保存并验证' : '验证登录'}
         </SettingsButton>
       </div>
-
-      <ConnectionDiagnosticsPanel
-        account={account}
-        credentialStatus={activeCredentialStatus}
-        connectionReport={connectionReport}
-        credentialVerification={credentialVerification}
-        providerValidationReport={providerValidationReport}
-        providerValidationRunning={providerValidationRunning}
-        onRunProviderValidation={onRunProviderValidation}
-      />
     </SettingsSection>
   );
 }

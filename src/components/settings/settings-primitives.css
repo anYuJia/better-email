@@ -87,3 +87,67 @@
 .settings-shell .settings-disclosure:last-child {
   border-bottom: 1px solid var(--st-border);
 }
+
+/* Shared animated disclosure. Keeping the region mounted makes rapid
+   direction changes smooth and avoids native <details> content jumps. */
+.settings-shell .settings-animated-disclosure {
+  min-width: 0;
+}
+
+.settings-shell .settings-animated-disclosure-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.settings-shell .settings-animated-disclosure-trigger:hover:not(:disabled) {
+  background: transparent;
+}
+
+.settings-shell .settings-animated-disclosure-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--st-text-tertiary);
+  transition: transform var(--ui-motion-normal) var(--ui-ease-standard);
+}
+
+.settings-shell .settings-animated-disclosure.is-open
+  > .settings-animated-disclosure-trigger
+  .settings-animated-disclosure-chevron {
+  transform: rotate(90deg);
+}
+
+.settings-shell .settings-animated-disclosure-region {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--ui-motion-normal) var(--ui-ease-standard),
+    opacity var(--ui-motion-fast) var(--ui-ease-standard),
+    visibility 0s linear var(--ui-motion-normal);
+}
+
+.settings-shell .settings-animated-disclosure.is-open
+  > .settings-animated-disclosure-region {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.settings-shell .settings-animated-disclosure-content {
+  min-height: 0;
+  overflow: hidden;
+}

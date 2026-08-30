@@ -18,11 +18,7 @@ export default function SendingSettingsPage({
   onSendUndoDelayChange,
 }: SendingSettingsPageProps) {
   return (
-    <SettingsSection
-      title="发送"
-      description="减少误发，不增加额外操作。"
-      dataSection="sending"
-    >
+    <SettingsSection dataSection="sending">
       <SettingsRow
         title="撤销发送"
         description="发送后保留一小段时间，期间可撤回到草稿。"
@@ -30,6 +26,7 @@ export default function SendingSettingsPage({
           <div className="settings-inline-select" aria-label="撤销发送延迟">
             <CustomSelect
               dense
+              ariaLabel="撤销发送延迟"
               value={String(sendUndoDelaySeconds)}
               options={sendUndoDelayOptions.map((option) => ({
                 value: String(option.value),

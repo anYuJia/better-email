@@ -12,6 +12,7 @@
   --st-surface: var(--ui-surface);
   --st-surface-subtle: var(--ui-surface-muted);
   --st-surface-muted: var(--ui-surface-muted);
+  --st-surface-pressed: var(--surface-active);
   --st-sidebar: var(--ui-sidebar);
 
   /* Borders */
@@ -28,6 +29,7 @@
   /* Semantic interaction colors */
   --st-accent: var(--ui-accent);
   --st-accent-hover: var(--ui-accent-hover);
+  --st-accent-pressed: var(--ui-accent-pressed);
   --st-accent-soft: var(--ui-accent-soft);
   --st-on-accent: var(--color-text-on-accent);
   --st-danger: var(--ui-danger);

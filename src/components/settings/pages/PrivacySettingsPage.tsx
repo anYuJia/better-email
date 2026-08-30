@@ -11,11 +11,9 @@ import {
 } from '../shared';
 
 type PrivacySettingsPageProps = {
-  accounts: Account[];
   accountForm: Account;
   remoteImageTrusts: RemoteImageTrust[];
   onAccountFormChange: (account: Account) => void;
-  onSelectAccount: (account: Account) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onNavigateToAi?: () => void;
 };
@@ -29,9 +27,7 @@ export default function PrivacySettingsPage({
 }: PrivacySettingsPageProps) {
   const accountTrusts = remoteImageTrusts.filter((trust) => trust.account_id === accountForm.id);
   const remoteImagesAllowed = accountForm.remote_images_allowed;
-  const externalBlocked = accountForm.block_external_mailboxes === true;
   const warnExternalSenders = accountForm.warn_external_senders === true;
-  const interceptsHttps = accountForm.intercept_https_links !== false;
 
   return (
     <SettingsSection
@@ -53,20 +49,6 @@ export default function PrivacySettingsPage({
       />
 
       <SettingsSwitch
-        label="拦截外部邮箱邮件"
-        description={
-          externalBlocked
-            ? '域名与当前账号不同的邮件会显示拦截提示，并阻止其中的远程图片。'
-            : '关闭后，外部发件人的邮件按普通策略处理。'
-        }
-        checked={externalBlocked}
-        onChange={(checked) => onAccountFormChange({
-          ...accountForm,
-          block_external_mailboxes: checked,
-        })}
-      />
-
-      <SettingsSwitch
         label="提示外部发件人"
         description={
           warnExternalSenders
@@ -77,20 +59,6 @@ export default function PrivacySettingsPage({
         onChange={(checked) => onAccountFormChange({
           ...accountForm,
           warn_external_senders: checked,
-        })}
-      />
-
-      <SettingsSwitch
-        label="隐藏邮件中的链接"
-        description={
-          interceptsHttps
-            ? '正文链接默认隐藏，确认查看后才显示真实地址并允许打开。'
-            : '邮件中的链接直接显示并可直接打开。'
-        }
-        checked={interceptsHttps}
-        onChange={(checked) => onAccountFormChange({
-          ...accountForm,
-          intercept_https_links: checked,
         })}
       />
 

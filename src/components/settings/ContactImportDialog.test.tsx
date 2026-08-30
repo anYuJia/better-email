@@ -48,7 +48,6 @@ describe('ContactImportDialog error handling', () => {
         onPickFile={onPickFile}
         onConfirm={onConfirm}
         onCancel={onCancel}
-        onOpenHistory={() => undefined}
         {...props}
       />,
     );
@@ -92,6 +91,7 @@ describe('ContactImportDialog error handling', () => {
 
     expect(screen.getByText(/重复.*跳过/)).toBeTruthy();
     expect(screen.getByText(/不按文件原始顺序显示/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '查看导入记录' })).toBeNull();
   });
 
   it('gives initial focus inside the dialog and restores it on close', () => {

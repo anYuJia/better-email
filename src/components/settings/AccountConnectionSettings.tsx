@@ -7,9 +7,7 @@ import type {
   OAuthSession,
   OAuthStartReport,
   OAuthTokenExchangeReport,
-  ProviderVerificationRecord,
 } from '../../app/types';
-import type { SaveAndVerifyReport } from '../../app/accountConnectionSettings';
 import type { AccountProviderPreset } from '../../providerCatalog';
 import type { SettingsSectionId } from './SettingsFrame';
 import AccountSettingsPage from './pages/AccountSettingsPage';
@@ -22,8 +20,6 @@ export type AccountConnectionSettingsProps = {
   accountForm: Account | null;
   accountCount: number;
   newAccountForm: AccountCreateInput;
-  providerVerifications: Record<string, ProviderVerificationRecord>;
-  activeProviderVerification: ProviderVerificationRecord | null;
   oauthClientId: string;
   oauthClientSecret: string;
   oauthRedirectUri: string;
@@ -36,18 +32,12 @@ export type AccountConnectionSettingsProps = {
   oauthSessions: OAuthSession[];
   authTypeChanged: boolean;
   authTypeChangeNotice: string | null;
-  saveAndVerifyReport: SaveAndVerifyReport;
   onAccountFormChange: (account: Account) => void;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
   onRemoveAccount: (deleteSecret: boolean) => Promise<void>;
-  onUpdateProviderVerification: (
-    providerName: string,
-    patch: Partial<ProviderVerificationRecord>,
-  ) => void;
-  onSaveProviderVerification: () => void;
   onSaveAccountSettings?: (account: Account) => Promise<void>;
   onNavigate: (section: SettingsSectionId) => void;
   onOauthClientIdChange: (value: string) => void;
@@ -62,19 +52,7 @@ export type AccountConnectionSettingsProps = {
   onExchangeOAuth2Token: (sessionId: number) => void;
 };
 
-const saveAndVerifyStateLabels = {
-  pending: '等待',
-  running: '验证中',
-  success: '连接正常',
-  partial: '部分通过',
-  error: '连接失败',
-  needs_auth: '需要认证',
-} as const;
-
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
-  const showDiagnostics = Boolean(props.accountForm)
-    && props.section !== 'accounts'
-    && props.saveAndVerifyReport.overall !== 'pending';
   let page: React.ReactNode;
 
   if (props.section === 'accounts' || !props.accountForm) {
@@ -97,12 +75,8 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
     page = (
       <ProviderSettingsPage
         accountForm={props.accountForm}
-        providerVerifications={props.providerVerifications}
-        activeProviderVerification={props.activeProviderVerification}
         onAccountFormChange={props.onAccountFormChange}
         onApplyProviderPreset={props.onApplyProviderPreset}
-        onUpdateProviderVerification={props.onUpdateProviderVerification}
-        onSaveProviderVerification={props.onSaveProviderVerification}
       />
     );
   } else {
@@ -136,36 +110,5 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
     );
   }
 
-  return (
-    <div className="settings-connection-shell">
-      {page}
-      {showDiagnostics && (
-        <details className="settings-disclosure settings-connection-diagnostics">
-          <summary>
-            <span>
-              <strong>连接诊断</strong>
-              <small>{props.saveAndVerifyReport.summary}</small>
-            </span>
-            <em>{saveAndVerifyStateLabels[props.saveAndVerifyReport.overall]}</em>
-          </summary>
-          <div className="settings-disclosure-body">
-            <div className="settings-save-verify-stages">
-              {props.saveAndVerifyReport.stages.map((stage) => (
-                <span className={stage.state} key={stage.id}>
-                  <b>{stage.label}</b>
-                  <small>{stage.detail}</small>
-                </span>
-              ))}
-            </div>
-            {props.saveAndVerifyReport.technicalDetails.length > 0 && (
-              <details className="settings-technical-details">
-                <summary>技术详情</summary>
-                <pre>{props.saveAndVerifyReport.technicalDetails.join('\n')}</pre>
-              </details>
-            )}
-          </div>
-        </details>
-      )}
-    </div>
-  );
+  return <div className="settings-connection-shell">{page}</div>;
 }

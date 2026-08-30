@@ -14,8 +14,6 @@ import { IPC } from '../ipc/commands';
 
 type StorageManagementOptions = {
   selected: MessageSummary | null;
-  diagnosticExport: string | null;
-  setDiagnosticExport: Dispatch<SetStateAction<string | null>>;
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   loadMeta: (folderId?: number | null) => Promise<{ folderId: number | null }>;
   loadMessages: (folderId: number | null) => Promise<unknown>;
@@ -24,8 +22,6 @@ type StorageManagementOptions = {
 
 export default function useStorageManagement({
   selected,
-  diagnosticExport,
-  setDiagnosticExport,
   setAttachments,
   loadMeta,
   loadMessages,
@@ -38,31 +34,10 @@ export default function useStorageManagement({
   const [downloadDirBusy, setDownloadDirBusy] = useState(false);
   const [downloadDirError, setDownloadDirError] = useState<string | null>(null);
 
-  async function exportDiagnostics() {
-    const payload = await invoke<string>(IPC.ExportDiagnostics);
-    setDiagnosticExport(payload);
-    try {
-      await navigator.clipboard.writeText(payload);
-      setStatus('脱敏诊断 JSON 已生成并复制到剪贴板');
-    } catch {
-      setStatus('脱敏诊断 JSON 已生成，当前环境无法自动复制');
-    }
-  }
-
   async function exportLocalBackup() {
     const summary = await invoke<LocalBackupSummary>(IPC.ExportLocalBackup);
     setLocalBackupSummary(summary);
     setStatus(`本地备份已导出：${summary.messages} 封邮件，${summary.accounts} 个账号`);
-  }
-
-  async function previewLocalBackup() {
-    const summary = await invoke<LocalBackupSummary | null>(IPC.PreviewLocalBackup);
-    if (!summary) {
-      setStatus('已取消选择备份文件');
-      return;
-    }
-    setLocalBackupSummary(summary);
-    setStatus(`已读取备份预览：${summary.messages} 封邮件，${summary.accounts} 个账号`);
   }
 
   async function importLocalBackup() {
@@ -172,16 +147,13 @@ export default function useStorageManagement({
   }
 
   return {
-    diagnosticExport,
     localBackupSummary,
     storageUsage,
     storageBusy,
     appSettings,
     downloadDirBusy,
     downloadDirError,
-    exportDiagnostics,
     exportLocalBackup,
-    previewLocalBackup,
     importLocalBackup,
     refreshStorageUsage,
     clearAttachmentCache,

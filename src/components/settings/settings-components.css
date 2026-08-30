@@ -77,37 +77,6 @@
   margin-top: 14px;
 }
 
-/* ── Disclosure section (details/summary) ────────────────────────── */
-
-.settings-modal .st-section.st-disclosure > summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.settings-modal .st-section.st-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-modal .st-section.st-disclosure > summary::after {
-  content: '';
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-right: 2px;
-  border-right: 1.5px solid var(--st-text-tertiary);
-  border-bottom: 1.5px solid var(--st-text-tertiary);
-  transform: rotate(45deg) translate(-1px, -1px);
-  transition: var(--ui-transition-transform-fast);
-}
-
-.settings-modal .st-section.st-disclosure[open] > summary::after {
-  transform: rotate(225deg) translate(-1px, -1px);
-}
-
-.settings-modal .st-section.st-disclosure[open] > .st-section-header {
-  border-bottom: 0;
-}
-
 /* ── Subsection (group inside a section body) ───────────────────── */
 
 .settings-modal .st-subsection {
@@ -409,6 +378,11 @@
   box-shadow: none;
 }
 
+.settings-modal .st-btn-primary:active:not(:disabled) {
+  border-color: var(--st-accent-pressed);
+  background: var(--st-accent-pressed);
+}
+
 .settings-modal .st-btn-secondary {
   color: var(--st-text);
   border-color: transparent;
@@ -419,6 +393,12 @@
   color: var(--st-accent);
   border-color: transparent;
   background: var(--st-accent-soft);
+}
+
+.settings-modal .st-btn-secondary:active:not(:disabled),
+.settings-modal .st-btn-ghost:active:not(:disabled) {
+  color: var(--st-text);
+  background: var(--st-surface-pressed);
 }
 
 .settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary {
@@ -779,7 +759,7 @@
 
 /* ── Provider/OAuth metadata text ───────────────────────────────── */
 
-.settings-modal :is(.settings-provider-matrix > button, .settings-oauth-result, .settings-oauth-sessions) :is(span, small, em) {
+.settings-modal :is(.settings-oauth-result, .settings-oauth-sessions) :is(span, small, em) {
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   font-style: normal;

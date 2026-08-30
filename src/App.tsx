@@ -76,7 +76,6 @@ import type {
   Folder,
   Label,
   Attachment,
-  Message,
   MessageSummary,
   UndoMessageSnapshot,
   RemoteImageTrust,
@@ -146,13 +145,12 @@ function MailboxApp() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [stats, setStats] = useState<MailStats | null>(null);
-  const [connectionReport, setConnectionReport] = useState<ConnectionReport | null>(null);
-  const [credentialVerification, setCredentialVerification] = useState<CredentialVerificationReport | null>(null);
+  const [, setConnectionReport] = useState<ConnectionReport | null>(null);
+  const [, setCredentialVerification] = useState<CredentialVerificationReport | null>(null);
   const [identities, setIdentities] = useState<MailIdentity[]>([]);
   const [rules, setRules] = useState<MailRule[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
-  const [diagnosticExport, setDiagnosticExport] = useState<string | null>(null);
   const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | null>(null);
   const [providerVerifications, setProviderVerifications] = useState<Record<string, ProviderVerificationRecord>>(loadProviderVerifications);
   const [, setImapProbe] = useState<ImapProbeReport | null>(null);
@@ -284,7 +282,12 @@ function MailboxApp() {
     setMobileSearchOpen(false);
     if (!isMobileApp) return;
     const currentState = window.history.state ?? {};
-    const { betterEmailSettingsSection: _settingsSection, betterEmailSearch: _search, ...baseState } = currentState;
+    const {
+      betterEmailSettingsSection: _settingsSection,
+      betterEmailSettingsDirection: _settingsDirection,
+      betterEmailSearch: _search,
+      ...baseState
+    } = currentState;
     if (currentState.betterEmailScreen === nextScreen) {
       if (currentState.betterEmailSearch) {
         window.history.replaceState({ ...baseState, betterEmailScreen: nextScreen }, '');
@@ -335,12 +338,10 @@ function MailboxApp() {
   const {
     queryDraft,
     appliedQuery,
-    setQuery,
     searchScope,
     filter,
     setFilter,
     listMode,
-    setListMode,
     listSort,
     setListSort,
     savedSearches,
@@ -631,9 +632,6 @@ function MailboxApp() {
     releaseDueSnoozedMessages,
   });
   const {
-    activeProviderVerification,
-    providerValidationReport,
-    providerValidationRunning,
     isDirty: accountSettingsDirty,
     authTypeChanged,
     authTypeChangeNotice,
@@ -641,7 +639,6 @@ function MailboxApp() {
     saveAndVerifyReport,
     saveAndVerifyRunning,
     resetSaveAndVerifyReport,
-    updateProviderVerification,
     saveSettings,
     saveAndVerify,
     createNewAccount,
@@ -649,12 +646,10 @@ function MailboxApp() {
     setDefaultAccount,
     applyProviderPreset,
     applyNewAccountPreset,
-    saveProviderVerification,
     testConnection,
     connectionTestRunning,
     connectionTestFeedback,
     verifyAccountCredentials,
-    runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
     runSyncDryRun,
@@ -664,7 +659,6 @@ function MailboxApp() {
     accountForm,
     newAccountForm,
     providerVerifications,
-    diagnosticExport,
     folderId,
     query: appliedQuery,
     filter,
@@ -746,12 +740,21 @@ function MailboxApp() {
 
   const openMobileSettingsSection = useCallback((section: SettingsSectionId) => {
     if (isMobileApp && window.history.state?.betterEmailSettingsSection !== section) {
+      const currentState = window.history.state ?? {};
+      const enteringFromSettingsPage = typeof currentState.betterEmailSettingsSection === 'string';
+      if (enteringFromSettingsPage) {
+        window.history.replaceState(
+          { ...currentState, betterEmailSettingsDirection: 'backward' },
+          '',
+        );
+      }
       const { betterEmailSearch: _search, ...baseState } = window.history.state ?? {};
       window.history.pushState(
         {
           ...baseState,
           betterEmailScreen: 'settings',
           betterEmailSettingsSection: section,
+          betterEmailSettingsDirection: enteringFromSettingsPage ? 'forward' : 'none',
         },
         '',
       );
@@ -1277,9 +1280,7 @@ function MailboxApp() {
   const {
     credentialSecret,
     setCredentialSecret,
-    storeCredential,
     storeAndVerifyCredential,
-    checkCredential,
     deleteCredential,
   } = useCredentialManagement({
     account,
@@ -1297,7 +1298,6 @@ function MailboxApp() {
     downloadDirBusy,
     downloadDirError,
     exportLocalBackup,
-    previewLocalBackup,
     importLocalBackup,
     refreshStorageUsage,
     clearAttachmentCache,
@@ -1306,43 +1306,11 @@ function MailboxApp() {
     resetDownloadDir,
   } = useStorageManagement({
     selected,
-    diagnosticExport,
-    setDiagnosticExport,
     setAttachments,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
     loadMessages: (nextFolderId) => loadMessages(nextFolderId),
     setStatus,
   });
-
-  async function importEmlFile() {
-    const imported = await invoke<Message | null>(IPC.ImportEmlFile, {
-      accountId: currentFolderAccountId(),
-    });
-    if (!imported) {
-      setStatus('已取消导入 EML');
-      return;
-    }
-    setQuery('');
-    setFilter('all');
-    setListMode('messages');
-    setActiveThread(null);
-    setThreadMessages([]);
-    const meta = await loadMeta(null, accountScope, { mode: 'mailbox' });
-    const inboxFolderId =
-      meta.folders.find(
-        (folder) =>
-          folder.role === 'inbox' &&
-          (folder.is_virtual || folder.account_id === imported.account_id),
-      )?.id ?? meta.folderId;
-    const nextMessages = await loadMessages(inboxFolderId, '', 'all');
-    if (!nextMessages.some((message) => message.id === imported.id)) {
-      setMessages((current) => [imported, ...current.filter((message) => message.id !== imported.id)]);
-    }
-    skipNextFolderEffectLoadRef.current = true;
-    setFolderId(inboxFolderId);
-    setSelectedId(imported.id);
-    setStatus(`已导入 EML：${imported.subject || '(无主题)'}`);
-  }
 
   async function deleteRemoteImageTrust(trust: RemoteImageTrust) {
     await invoke(IPC.DeleteRemoteImageTrust, { trustId: trust.id });
@@ -1791,7 +1759,7 @@ function MailboxApp() {
               onOpenSettings={openMobileSettings}
             />
           )}
-          {mobileScreen === 'settings' && !isSettingsOpen && (
+          {mobileScreen === 'settings' && (
             <MobileSettingsRoot
               account={account}
               accounts={accounts}
@@ -2016,8 +1984,6 @@ function MailboxApp() {
             connectionTestRunning={connectionTestRunning}
             connectionTestFeedback={connectionTestFeedback}
             saveAndVerifyReport={saveAndVerifyReport}
-            providerVerifications={providerVerifications}
-            activeProviderVerification={activeProviderVerification}
             oauthClientId={oauthClientId}
             oauthClientSecret={oauthClientSecret}
             oauthRedirectUri={oauthRedirectUri}
@@ -2030,10 +1996,6 @@ function MailboxApp() {
             oauthSessions={oauthSessions}
             authTypeChanged={authTypeChanged}
             authTypeChangeNotice={authTypeChangeNotice}
-            connectionReport={connectionReport}
-            credentialVerification={credentialVerification}
-            providerValidationReport={providerValidationReport}
-            providerValidationRunning={providerValidationRunning}
             credentialSecret={credentialSecret}
             credentialStatus={credentialStatus}
             notificationPolicy={notificationPolicy}
@@ -2103,8 +2065,6 @@ function MailboxApp() {
               }
             }}
             onRemoveAccount={(deleteSecret) => removeCurrentAccount(deleteSecret)}
-            onUpdateProviderVerification={updateProviderVerification}
-            onSaveProviderVerification={saveProviderVerification}
             onSaveAccountSettings={async (updatedAccount) => {
               const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
                 accountId: updatedAccount.id,
@@ -2126,13 +2086,8 @@ function MailboxApp() {
             onWaitForOAuth2Callback={() => { waitForOAuth2Callback().catch((error) => setStatus(String(error))); }}
             onExchangeOAuth2Token={(sessionId) => { exchangeOAuth2Token(sessionId).catch((error) => setStatus(String(error))); }}
             onCredentialSecretChange={setCredentialSecret}
-            onCheckCredential={() => { checkCredential().catch((error) => setStatus(String(error))); }}
             onVerifyCredential={() => { verifyAccountCredentials().catch((error) => setStatus(String(error))); }}
-            onRunProviderValidation={() => {
-              runReadOnlyProviderValidation().catch((error) => setStatus(String(error)));
-            }}
             onDeleteCredential={() => { deleteCredential().catch((error) => setStatus(String(error))); }}
-            onStoreCredential={() => { storeCredential().catch((error) => setStatus(String(error))); }}
             onStoreAndVerifyCredential={() => {
               storeAndVerifyCredential().catch((error) => setStatus(String(error)));
             }}
@@ -2143,11 +2098,8 @@ function MailboxApp() {
             onEditIdentity={editIdentity}
             onDeleteIdentity={deleteIdentity}
             onSaveIdentity={() => saveIdentity()}
-            onImportEml={() => { importEmlFile().catch((error) => setStatus(String(error))); }}
-            onPreviewBackup={() => { previewLocalBackup().catch((error) => setStatus(String(error))); }}
             onImportBackup={() => { importLocalBackup().catch((error) => setStatus(String(error))); }}
             onExportBackup={() => { exportLocalBackup().catch((error) => setStatus(String(error))); }}
-            onRefreshStorage={() => refreshStorageUsage()}
             onClearAttachmentCache={() => clearAttachmentCache()}
             onPickDownloadDir={() => pickDownloadDir()}
             onResetDownloadDir={() => resetDownloadDir()}

@@ -22,15 +22,12 @@ function renderPage(
   account: Account,
   trusts: RemoteImageTrust[],
   onNavigateToAi: () => void = () => undefined,
-  accounts: Account[] = [account],
 ) {
   return render(
     <PrivacySettingsPage
-      accounts={accounts}
       accountForm={account}
       remoteImageTrusts={trusts}
       onAccountFormChange={() => undefined}
-      onSelectAccount={() => undefined}
       onDeleteRemoteImageTrust={() => undefined}
       onNavigateToAi={onNavigateToAi}
     />,
@@ -45,7 +42,7 @@ describe('PrivacySettingsPage', () => {
   it('renders the remote image policy toggle with risk-aware copy', () => {
     renderPage(makeAccount({ remote_images_allowed: false }), []);
     const toggles = screen.getAllByRole('checkbox');
-    expect(toggles.length).toBe(4);
+    expect(toggles.length).toBe(2);
     expect(screen.getByText('默认阻止远程图片与追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
     expect((toggles[0] as HTMLInputElement).checked).toBe(false);
   });
@@ -56,11 +53,11 @@ describe('PrivacySettingsPage', () => {
     expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(true);
   });
 
-  it('offers external mailbox and link hiding toggles', () => {
+  it('只保留远程图片与外部发件人提示', () => {
     renderPage(makeAccount(), []);
-    expect(screen.getByText('拦截外部邮箱邮件')).not.toBeNull();
-    expect(screen.getByText('隐藏邮件中的链接')).not.toBeNull();
     expect(screen.getByText('提示外部发件人')).not.toBeNull();
+    expect(screen.queryByText('拦截外部邮箱邮件')).toBeNull();
+    expect(screen.queryByText('隐藏邮件中的链接')).toBeNull();
   });
 
   it('shows an explicit empty state for the trust list', () => {
@@ -69,9 +66,7 @@ describe('PrivacySettingsPage', () => {
   });
 
   it('does not duplicate the account selector inside the privacy page', () => {
-    const second = makeAccount({ id: 2, email: 'home@example.com' });
-    const first = makeAccount();
-    renderPage(first, [], undefined, [first, second]);
+    renderPage(makeAccount(), []);
     expect(screen.queryByLabelText('配置账号')).toBeNull();
   });
 

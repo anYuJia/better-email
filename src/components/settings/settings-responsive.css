@@ -4,7 +4,8 @@
   .settings-workspace {
     --st-content-max-width: 100%;
     padding: 0;
-    background: var(--st-canvas);
+    background: transparent;
+    animation: none;
   }
 
   .settings-shell.settings-modal {
@@ -49,6 +50,10 @@
 
   .settings-mobile-back:hover {
     background: var(--st-surface-muted);
+  }
+
+  .settings-mobile-back:active:not(:disabled) {
+    background: var(--st-surface-pressed);
   }
 
   .settings-mobile-page-title {
@@ -112,6 +117,22 @@
   .settings-page {
     width: 100%;
     scrollbar-gutter: auto;
+  }
+
+  .settings-page-motion-forward {
+    animation: settings-mobile-page-forward var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+  }
+
+  .settings-page-motion-backward {
+    animation: settings-mobile-page-backward var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+  }
+
+  .settings-shell.settings-modal {
+    animation: settings-mobile-shell-enter var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+  }
+
+  .settings-workspace.is-closing .settings-shell.settings-modal {
+    animation: settings-mobile-shell-exit var(--ui-motion-normal) var(--ui-ease-standard) forwards;
   }
 
   .settings-page-header {
@@ -192,6 +213,26 @@
     left: 8px;
     width: auto;
   }
+}
+
+@keyframes settings-mobile-shell-enter {
+  from { transform: translateX(18px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes settings-mobile-shell-exit {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes settings-mobile-page-forward {
+  from { transform: translateX(12px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes settings-mobile-page-backward {
+  from { transform: translateX(-12px); }
+  to { transform: translateX(0); }
 }
 
 @media (max-width: 420px) {

@@ -95,15 +95,15 @@ export default function SyncOperationsSettings({
                     )}
                   </div>
                 ) : (
-                  <span>{mailbox.local_role} · 最新 UID {mailbox.highest_uid || 0}</span>
+                  <span>已加入同步</span>
                 )}
                 <small>
                   {mailbox.local_role === 'custom' && !mailbox.local_folder_name
                     ? '选择本地文件夹后加入同步'
                     : mailbox.history_complete
-                      ? `历史已完整 · 最早 UID ${mailbox.lowest_uid || 0}`
+                      ? '邮件已同步'
                       : mailbox.lowest_uid > 0
-                        ? `历史已回填至 UID ${mailbox.lowest_uid}`
+                        ? '正在同步历史邮件'
                         : '等待首次同步'}
                 </small>
               </div>

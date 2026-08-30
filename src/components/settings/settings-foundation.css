@@ -105,6 +105,10 @@
   transition: var(--ui-transition-fast-color-background-border);
 }
 
+.settings-modal :where(.settings-page-content, .settings-account-add-dialog) button:active:not(:disabled) {
+  background-color: var(--st-surface-pressed);
+}
+
 /* CustomSelect keeps its own border; do not collapse it to transparent. */
 .settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary {
   border: 1px solid var(--st-border);
@@ -121,6 +125,11 @@
   border-color: var(--st-border-strong);
   background: var(--st-surface-subtle);
   box-shadow: none;
+}
+
+.settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:active:not(:disabled) {
+  border-color: var(--st-border-strong);
+  background: var(--st-surface-pressed);
 }
 
 .settings-modal :is(.settings-page-content, .settings-account-add-dialog) .custom-select-summary:disabled {

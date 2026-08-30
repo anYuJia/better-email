@@ -12,6 +12,7 @@ import type {
   MailRuleInput,
 } from '../../app/types';
 import {
+  AnimatedDisclosure,
   SettingsBadge,
   SettingsButton,
   SettingsEmptyState,
@@ -196,8 +197,7 @@ export default function RuleAutomationSettings({
             </div>
           </section>
         </div>
-        <details className="settings-rule-advanced">
-          <summary>规则语法</summary>
+        <AnimatedDisclosure className="settings-rule-advanced" summary="规则语法">
           <small>可手动组合多个动作，用分号分隔。</small>
           <input
             value={ruleForm.condition}
@@ -217,7 +217,7 @@ export default function RuleAutomationSettings({
             placeholder="动作，如 apply label 重要客户; mark read; star; stop processing"
             aria-label="规则动作语法"
           />
-        </details>
+        </AnimatedDisclosure>
         {saveIssue?.field === 'save' && (
           <p className="settings-rule-save-error" role="alert">无法保存规则：{saveIssue.message}</p>
         )}

@@ -1,7 +1,6 @@
 import {
   FileDown,
   FileUp,
-  History,
   Pencil,
   Search,
   Send,
@@ -24,7 +23,6 @@ import {
 } from '../../app/uiConfig';
 import useContactImportManager from '../../hooks/useContactImportManager';
 import ContactImportDialog from './ContactImportDialog';
-import ContactImportHistoryDialog from './ContactImportHistoryDialog';
 import {
   SettingsBadge,
   SettingsButton,
@@ -108,15 +106,8 @@ export default function ContactAutomationSettings({
     commitImport,
     cancelImport,
     importError,
-    batches,
-    refreshBatches,
-    undoBatch,
-    undoingBatchId,
-    confirmUndoBatch,
-    setConfirmUndoBatch,
   } = useContactImportManager({ setStatus: onStatus });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [dialog, setDialog] = useState<'create' | 'details' | 'edit' | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -124,10 +115,6 @@ export default function ContactAutomationSettings({
   const dialogRef = useRef<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const pageSize = 8;
-
-  useEffect(() => {
-    void refreshBatches();
-  }, [refreshBatches]);
 
   useEffect(() => {
     setPage(1);
@@ -190,11 +177,6 @@ export default function ContactAutomationSettings({
   function handleCloseImport() {
     cancelImport();
     setImportDialogOpen(false);
-  }
-
-  function handleCloseHistory() {
-    setHistoryDialogOpen(false);
-    void refreshBatches();
   }
 
   const contactAliasIssues = useMemo(() => {
@@ -304,16 +286,6 @@ export default function ContactAutomationSettings({
         <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
           导出 vCard
         </SettingsButton>
-        <SettingsButton
-          size="sm"
-          className="contact-history-toggle"
-          aria-label="查看导入记录"
-          title="查看导入记录"
-          icon={<History size={14} />}
-          onClick={() => setHistoryDialogOpen(true)}
-        >
-          导入记录
-        </SettingsButton>
       </div>
 
       {contacts.length === 0 ? (
@@ -329,6 +301,7 @@ export default function ContactAutomationSettings({
               <div className="settings-contact-search">
                 <Search size={14} aria-hidden="true" />
                 <input
+                  aria-label="搜索联系人"
                   value={contactQuery}
                   onChange={(event) => onContactQueryChange(event.target.value)}
                   placeholder="名称、邮箱或别名"
@@ -487,28 +460,6 @@ export default function ContactAutomationSettings({
         </div>
       )}
 
-      {confirmUndoBatch && (
-        <div className="settings-cache-confirm-backdrop">
-          <div className="settings-cache-confirm" role="dialog" aria-modal="true">
-            <strong>撤销导入批次</strong>
-            <p>
-              将删除「{confirmUndoBatch.file_name}」批次新增的 {confirmUndoBatch.created_count} 位联系人。
-              合并/更新已有联系人的变更不可回滚。
-            </p>
-            <div className="st-actions">
-              <SettingsButton onClick={() => setConfirmUndoBatch(null)}>取消</SettingsButton>
-              <SettingsButton
-                variant="danger"
-                disabled={undoingBatchId === confirmUndoBatch.id}
-                onClick={() => { void undoBatch(confirmUndoBatch.id); void onRefreshContacts(); }}
-              >
-                {undoingBatchId === confirmUndoBatch.id ? '撤销中…' : '确认撤销'}
-              </SettingsButton>
-            </div>
-          </div>
-        </div>
-      )}
-
       <ContactImportDialog
         open={importDialogOpen}
         preview={preview}
@@ -524,20 +475,6 @@ export default function ContactAutomationSettings({
         onPickFile={() => { void startImport(); }}
         onConfirm={() => { void handleCommitImport(); }}
         onCancel={handleCloseImport}
-        onOpenHistory={() => {
-          cancelImport();
-          setImportDialogOpen(false);
-          setHistoryDialogOpen(true);
-          void refreshBatches();
-        }}
-      />
-
-      <ContactImportHistoryDialog
-        open={historyDialogOpen}
-        batches={batches}
-        undoingBatchId={undoingBatchId}
-        onUndo={(batch) => setConfirmUndoBatch(batch)}
-        onClose={handleCloseHistory}
       />
     </SettingsSection>
   );

@@ -43,7 +43,6 @@ type UseAccountConnectionControllerOptions = {
   accountForm: Account | null;
   newAccountForm: AccountCreateInput;
   providerVerifications: Record<string, ProviderVerificationRecord>;
-  diagnosticExport: string | null;
   folderId: number | null;
   query: string;
   filter: FilterMode;
@@ -92,7 +91,6 @@ export default function useAccountConnectionController({
   accountForm,
   newAccountForm,
   providerVerifications,
-  diagnosticExport,
   folderId,
   query,
   filter,
@@ -156,11 +154,6 @@ export default function useAccountConnectionController({
     }));
   }, [providerVerificationFor, setProviderVerifications]);
 
-  const activeProviderVerification = useMemo(
-    () => (accountForm ? providerVerificationFor(accountForm.provider) : null),
-    [accountForm, providerVerificationFor],
-  );
-
   const {
     saveAndVerifyReport,
     saveAndVerifyRunning,
@@ -211,10 +204,7 @@ export default function useAccountConnectionController({
     loadMessages,
   });
   const {
-    providerValidationReport,
-    providerValidationRunning,
     discoverImapFolders,
-    runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
     runSyncDryRun,
@@ -224,12 +214,9 @@ export default function useAccountConnectionController({
     folderId,
     query,
     filter,
-    setConnectionReport,
-    setCredentialVerification,
     setImapProbe,
     setImapMailboxes,
     setStatus,
-    updateProviderVerification,
     loadMeta,
     loadMessages,
   });
@@ -259,15 +246,6 @@ export default function useAccountConnectionController({
     }));
     setStatus(`${preset.label} 预设已填入新账号表单`);
   }, [setNewAccountForm, setStatus]);
-
-  const saveProviderVerification = useCallback(() => {
-    if (!accountForm) return;
-    updateProviderVerification(accountForm.provider, {
-      checked_at: new Date().toISOString(),
-      diagnostic_exported: Boolean(diagnosticExport),
-    });
-    setStatus('服务商兼容性验证记录已保存到本地');
-  }, [accountForm, diagnosticExport, setStatus, updateProviderVerification]);
 
   const [connectionTestRunning, setConnectionTestRunning] = useState(false);
   const [connectionTestFeedback, setConnectionTestFeedback] = useState<{
@@ -334,9 +312,6 @@ export default function useAccountConnectionController({
   ]);
 
   return {
-    activeProviderVerification,
-    providerValidationReport,
-    providerValidationRunning,
     isDirty,
     authTypeChanged,
     authTypeChangeNotice,
@@ -352,13 +327,11 @@ export default function useAccountConnectionController({
     setDefaultAccount,
     applyProviderPreset,
     applyNewAccountPreset,
-    saveProviderVerification,
     testConnection,
     connectionTestRunning,
     connectionTestFeedback,
     verifyAccountCredentials,
     discoverImapFolders,
-    runReadOnlyProviderValidation,
     mapImapMailbox,
     createAndMapImapMailbox,
     runSyncDryRun,

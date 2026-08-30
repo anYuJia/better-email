@@ -47,15 +47,6 @@ export default function useCredentialManagement({
     await verifyAccountCredentials();
   }
 
-  async function checkCredential() {
-    if (!account?.email) return;
-    const result = await invoke<CredentialStatus>(IPC.CheckAccountSecret, {
-      accountEmail: account.email,
-    });
-    setCredentialStatus(result);
-    setStatus(result.message);
-  }
-
   async function deleteCredential() {
     if (!account?.email) return;
     const result = await invoke<CredentialStatus>(IPC.DeleteAccountSecret, {
@@ -74,7 +65,6 @@ export default function useCredentialManagement({
     setCredentialStatus,
     storeCredential,
     storeAndVerifyCredential,
-    checkCredential,
     deleteCredential,
   };
 }

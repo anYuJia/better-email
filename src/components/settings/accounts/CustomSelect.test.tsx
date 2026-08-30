@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { CustomSelect, customSelectPortalLayers } from './CustomSelect';
 
 describe('CustomSelect', () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   const options = [
@@ -318,5 +320,27 @@ describe('CustomSelect', () => {
 
   it('exposes the login gate portal layer above the login backdrop', () => {
     expect(customSelectPortalLayers.accountLogin).toBeGreaterThan(2000);
+  });
+
+  it('keeps the visual exit frame mounted after semantic dismissal', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    render(
+      <CustomSelect
+        ariaLabel={ariaLabel}
+        value="5"
+        options={options}
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(getCombobox());
+    expect(document.querySelector('.custom-select-dropdown')).not.toBeNull();
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(document.querySelector('.custom-select-dropdown')).not.toBeNull();
+    act(() => vi.advanceTimersByTime(120));
+    expect(document.querySelector('.custom-select-dropdown')).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import { syncRetryDelayMs } from '../app/syncRetryPolicy';
 import { isPermissionGranted } from '../tauriBridge';
 
 type BackgroundSchedulerOptions = {
+  enabled?: boolean;
   account: Account | null;
   outbox: OutboxItem[];
   setOutbox: Dispatch<SetStateAction<OutboxItem[]>>;
@@ -26,6 +27,7 @@ type BackgroundSchedulerOptions = {
 };
 
 export default function useBackgroundScheduler({
+  enabled = true,
   account,
   outbox,
   setOutbox,
@@ -43,12 +45,14 @@ export default function useBackgroundScheduler({
   enqueueBackgroundTaskRef.current = enqueueBackgroundTask;
 
   useEffect(() => {
+    if (!enabled) return;
     isPermissionGranted()
       .then((granted) => setNotificationStatus(granted ? '系统提醒已启用' : '系统提醒待授权'))
       .catch(() => setNotificationStatus('系统提醒不可用'));
-  }, [setNotificationStatus]);
+  }, [enabled, setNotificationStatus]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (outboxScheduleTimerRef.current) {
       window.clearTimeout(outboxScheduleTimerRef.current);
       outboxScheduleTimerRef.current = null;
@@ -93,6 +97,7 @@ export default function useBackgroundScheduler({
       }
     };
   }, [
+    enabled,
     outbox,
     sendDueOutboxItems,
     setOutbox,
@@ -102,6 +107,7 @@ export default function useBackgroundScheduler({
   ]);
 
   useEffect(() => {
+    if (!enabled) return;
     const intervalMs = syncIntervalMs(account?.sync_mode ?? 'manual');
     if (syncScheduleTimerRef.current) {
       window.clearTimeout(syncScheduleTimerRef.current);
@@ -182,6 +188,7 @@ export default function useBackgroundScheduler({
     account?.email,
     account?.id,
     account?.sync_mode,
+    enabled,
     setBackgroundSyncStatus,
     setStatus,
   ]);

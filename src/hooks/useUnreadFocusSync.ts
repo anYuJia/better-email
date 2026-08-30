@@ -18,8 +18,10 @@ type UnreadRefreshFn = (scope?: AccountScope) => Promise<void>;
 export default function useUnreadFocusSync(
   refreshUnreadIndicators: UnreadRefreshFn,
   accountScope: AccountScope,
+  enabled = true,
 ) {
   useEffect(() => {
+    if (!enabled) return undefined;
     const syncIndicators = () => {
       void refreshUnreadIndicators(accountScope);
     };
@@ -31,5 +33,5 @@ export default function useUnreadFocusSync(
     return () => {
       void unlistenPromise.then((unlisten) => unlisten?.());
     };
-  }, [refreshUnreadIndicators, accountScope]);
+  }, [refreshUnreadIndicators, accountScope, enabled]);
 }

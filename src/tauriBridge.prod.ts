@@ -8,6 +8,13 @@ import {
   COMPOSER_READY_QUERY_EVENT,
   COMPOSER_WINDOW_LABEL,
 } from './app/composerWindow';
+import type { SettingsWindowRequest } from './app/settingsWindow';
+import {
+  SETTINGS_OPEN_EVENT,
+  SETTINGS_READY_EVENT,
+  SETTINGS_READY_QUERY_EVENT,
+  SETTINGS_WINDOW_LABEL,
+} from './app/settingsWindow';
 import { IPC } from './ipc/commands';
 
 type InvokeArgs = Record<string, unknown> | undefined;
@@ -111,7 +118,7 @@ let composerWindowReady: Promise<void> | null = null;
 const COMPOSER_READY_TIMEOUT_MS = 15_000;
 
 type ComposerNativeWindow = {
-  emit: (event: string) => Promise<void>;
+  emit: (event: string, payload?: unknown) => Promise<void>;
   show: () => Promise<void>;
   unminimize: () => Promise<void>;
   setFocus: () => Promise<void>;
@@ -247,6 +254,117 @@ export async function prodOpenComposerWindow(request: ComposerWindowRequest): Pr
   // The composer reveals itself only after its UI and close handler are ready,
   // so the main window never exposes a blank WebView.
   await composerWindow.emit(COMPOSER_OPEN_EVENT);
+}
+
+let settingsWindowCreation: Promise<void> | null = null;
+let settingsWindowReady: Promise<void> | null = null;
+const SETTINGS_READY_TIMEOUT_MS = 15_000;
+
+async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<void> {
+  if (settingsWindowCreation) {
+    await settingsWindowCreation;
+    return;
+  }
+
+  const creation = (async () => {
+    const { WebviewWindow } = await loadWebviewWindow();
+    const existing = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
+    if (existing) return;
+
+    settingsWindowReady = null;
+    const settingsUrl = new URL(window.location.href);
+    settingsUrl.search = '';
+    settingsUrl.searchParams.set('window', 'settings');
+    settingsUrl.searchParams.set('section', request.section || 'accounts');
+    settingsUrl.hash = '';
+    const child = new WebviewWindow(SETTINGS_WINDOW_LABEL, {
+      url: settingsUrl.toString(),
+      title: '设置',
+      width: 1040,
+      height: 720,
+      minWidth: 840,
+      minHeight: 600,
+      center: true,
+      resizable: true,
+      decorations: true,
+      titleBarStyle: 'visible',
+      hiddenTitle: false,
+      focus: false,
+      visible: false,
+      skipTaskbar: false,
+    });
+    await new Promise<void>((resolve, reject) => {
+      void child.once('tauri://created', () => resolve());
+      void child.once('tauri://error', (event) => {
+        reject(new Error(`无法创建独立设置窗口：${String(event.payload)}`));
+      });
+    });
+  })();
+  settingsWindowCreation = creation;
+
+  try {
+    await creation;
+  } finally {
+    if (settingsWindowCreation === creation) settingsWindowCreation = null;
+  }
+}
+
+async function getSettingsWindow(): Promise<ComposerNativeWindow> {
+  const { WebviewWindow } = await loadWebviewWindow();
+  const settingsWindow = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
+  if (!settingsWindow) {
+    throw new Error('独立设置窗口创建完成后仍不可用');
+  }
+  return settingsWindow;
+}
+
+async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow): Promise<void> {
+  if (!settingsWindowReady) {
+    const readyWait = (async () => {
+      const { listen: tauriListen } = await loadEvent();
+      let resolveReady: (() => void) | undefined;
+      let timeoutId: number | undefined;
+      const readySignal = new Promise<void>((resolve) => {
+        resolveReady = resolve;
+      });
+      const unlisten = await tauriListen<void>(SETTINGS_READY_EVENT, () => {
+        resolveReady?.();
+      });
+
+      try {
+        await settingsWindow.emit(SETTINGS_READY_QUERY_EVENT);
+        await Promise.race([
+          readySignal,
+          new Promise<never>((_resolve, reject) => {
+            timeoutId = window.setTimeout(() => {
+              reject(new Error('设置窗口初始化超时，请重试'));
+            }, SETTINGS_READY_TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+        unlisten();
+      }
+    })();
+    settingsWindowReady = readyWait;
+  }
+
+  const currentReadyWait = settingsWindowReady;
+  try {
+    await currentReadyWait;
+  } catch (error) {
+    if (settingsWindowReady === currentReadyWait) settingsWindowReady = null;
+    throw error;
+  }
+}
+
+export async function prodOpenSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
+  await ensureSettingsWindow(request);
+  const settingsWindow = await getSettingsWindow();
+  await settingsWindow.emit(SETTINGS_OPEN_EVENT, request);
+  await waitForSettingsWindowReady(settingsWindow);
+  await settingsWindow.emit(SETTINGS_OPEN_EVENT, request);
+  await focusComposerWindow(settingsWindow);
 }
 
 export async function prodShowCurrentWindow(): Promise<void> {

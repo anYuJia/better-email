@@ -59,6 +59,9 @@ const TemplateSettings = lazy(() => import('./TemplateSettings'));
 const AboutSettings = lazy(() => import('./AboutSettings'));
 
 export type SettingsOverlayProps = {
+  standalone?: boolean;
+  nativeCloseRequestVersion?: number;
+  onReady?: () => void;
   accountForm: Account | null;
   accounts: Account[];
   newAccountForm: AccountCreateInput;
@@ -336,6 +339,9 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
       <SettingsFrame
         title="设置"
+        standalone={props.standalone}
+        nativeCloseRequestVersion={props.nativeCloseRequestVersion}
+        onReady={props.onReady}
         subtitle={accountForm ? `${accountForm.email} · ${accountForm.provider}` : '未添加账号'}
         activeSection={activeSettingsSection}
         isDirty={accountSettingsDirty}

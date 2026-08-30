@@ -63,10 +63,14 @@ import {
 import {
   COMPOSER_CLOSED_EVENT,
   COMPOSER_CONTACTS_SETTINGS_EVENT,
+  SETTINGS_CLOSED_EVENT,
+  closeCurrentWindow,
+  emitToMain,
   invoke,
   listen,
   mockMode,
   openComposerWindow,
+  openSettingsWindow,
   prewarmComposerWindow,
 } from './tauriBridge';
 import type {
@@ -132,11 +136,35 @@ import {
 import { accountScopeStorageKey } from './app/storageConfig';
 import { IPC } from './ipc/commands';
 
-export default function App() {
-  return <MailboxApp />;
+type AppProps = {
+  standaloneSettingsWindow?: boolean;
+  requestedSettingsSection?: SettingsSectionId;
+  nativeSettingsCloseRequestVersion?: number;
+  onStandaloneSettingsReady?: () => void;
+};
+
+export default function App({
+  standaloneSettingsWindow = false,
+  requestedSettingsSection = 'accounts',
+  nativeSettingsCloseRequestVersion = 0,
+  onStandaloneSettingsReady,
+}: AppProps) {
+  return (
+    <MailboxApp
+      standaloneSettingsWindow={standaloneSettingsWindow}
+      requestedSettingsSection={requestedSettingsSection}
+      nativeSettingsCloseRequestVersion={nativeSettingsCloseRequestVersion}
+      onStandaloneSettingsReady={onStandaloneSettingsReady}
+    />
+  );
 }
 
-function MailboxApp() {
+function MailboxApp({
+  standaloneSettingsWindow,
+  requestedSettingsSection,
+  nativeSettingsCloseRequestVersion,
+  onStandaloneSettingsReady,
+}: AppProps & { standaloneSettingsWindow: boolean; requestedSettingsSection: SettingsSectionId }) {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountScope, setAccountScope] = useState<AccountScope>(loadAccountScope);
@@ -168,7 +196,7 @@ function MailboxApp() {
   const navigationScopeClaimRef = useRef<number | 'all' | null>(null);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
-  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(standaloneSettingsWindow);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
   const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>(
@@ -181,7 +209,7 @@ function MailboxApp() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const themeMode = useThemeMode();
   useAutoHideScrollbars();
-  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>('accounts');
+  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(requestedSettingsSection);
   const [status, setStatus] = useState('本地原型已就绪');
   const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
   const messageToastIdRef = useRef(0);
@@ -211,15 +239,23 @@ function MailboxApp() {
     || nativePlatform === 'ios'
     || (nativePlatform === 'web' && isViewportMobile);
   const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';
+  const useNativeSettingsWindow = !mockMode
+    && nativePlatform === 'desktop'
+    && !standaloneSettingsWindow;
 
   useEffect(() => {
-    if (!useNativeComposerWindow || !initialAccountListLoaded || accounts.length === 0) return undefined;
+    if (
+      standaloneSettingsWindow
+      || !useNativeComposerWindow
+      || !initialAccountListLoaded
+      || accounts.length === 0
+    ) return undefined;
     // The composer is a separate native WebView. Start its full boot while
     // the mailbox is settling so the first explicit compose action can reuse
     // an already-ready window instead of paying the startup cost.
     void prewarmComposerWindow().catch(() => undefined);
     return undefined;
-  }, [accounts.length, initialAccountListLoaded, useNativeComposerWindow]);
+  }, [accounts.length, initialAccountListLoaded, standaloneSettingsWindow, useNativeComposerWindow]);
 
   useEffect(() => {
     let active = true;
@@ -425,7 +461,7 @@ function MailboxApp() {
   } = useRecentContactSync({
     accountsLength: accounts.length,
     initialAccountListLoaded,
-    gateActive: isAccountLoginActive,
+    gateActive: isAccountLoginActive || standaloneSettingsWindow,
     onboardingActive: Boolean(pendingOnboardingAccount),
     refreshContacts: refreshManagedContacts,
     setStatus,
@@ -609,6 +645,7 @@ function MailboxApp() {
     enqueueManualSync,
     enqueueAccountInitialSync,
   } = useBackgroundTaskCoordinator({
+    automaticProcessingEnabled: !standaloneSettingsWindow,
     account,
     accountScope,
     mailboxRefreshRef,
@@ -730,15 +767,30 @@ function MailboxApp() {
     navigationScopeClaimRef,
   });
 
+  const openDesktopSettingsWindow = useCallback((section: SettingsSectionId = 'accounts') => {
+    setStatus('正在打开设置窗口…');
+    void openSettingsWindow({ section })
+      .then(() => setStatus('设置窗口已就绪'))
+      .catch((error) => setStatus(`无法打开独立设置窗口：${String(error)}`));
+  }, []);
+
   const openMobileSettings = useCallback(() => {
     if (isMobileApp) {
       navigateMobileScreen('settings');
       return;
     }
+    if (useNativeSettingsWindow) {
+      openDesktopSettingsWindow('accounts');
+      return;
+    }
     openSettingsHome();
-  }, [isMobileApp, navigateMobileScreen, openSettingsHome]);
+  }, [isMobileApp, navigateMobileScreen, openDesktopSettingsWindow, openSettingsHome, useNativeSettingsWindow]);
 
   const openMobileSettingsSection = useCallback((section: SettingsSectionId) => {
+    if (useNativeSettingsWindow) {
+      openDesktopSettingsWindow(section);
+      return;
+    }
     if (isMobileApp && window.history.state?.betterEmailSettingsSection !== section) {
       const currentState = window.history.state ?? {};
       const enteringFromSettingsPage = typeof currentState.betterEmailSettingsSection === 'string';
@@ -762,7 +814,7 @@ function MailboxApp() {
     setActiveSettingsSection(section);
     setSettingsOpen(true);
     loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
-  }, [accountScope, folderId, isMobileApp, loadMeta, setStatus]);
+  }, [accountScope, folderId, isMobileApp, loadMeta, openDesktopSettingsWindow, setStatus, useNativeSettingsWindow]);
 
   const closeSettingsSurface = useCallback(() => {
     resetSaveAndVerifyReport();
@@ -774,7 +826,40 @@ function MailboxApp() {
     if (isMobileApp) setMobileScreen('settings');
   }, [isMobileApp, resetSaveAndVerifyReport]);
 
+  const standaloneSettingsBootstrappedRef = useRef(false);
+  useEffect(() => {
+    if (!standaloneSettingsWindow) return;
+    setActiveSettingsSection(requestedSettingsSection);
+  }, [requestedSettingsSection, standaloneSettingsWindow]);
+
+  useEffect(() => {
+    if (!standaloneSettingsWindow) return;
+    if (standaloneSettingsBootstrappedRef.current) return;
+    standaloneSettingsBootstrappedRef.current = true;
+    loadMeta(folderId, accountScope, { mode: 'full' })
+      .catch((error) => setStatus(String(error)));
+  }, [
+    accountScope,
+    folderId,
+    loadMeta,
+    standaloneSettingsWindow,
+  ]);
+
+  const standaloneSettingsCloseStartedRef = useRef(false);
+  useEffect(() => {
+    if (!standaloneSettingsWindow || isSettingsOpen || standaloneSettingsCloseStartedRef.current) return;
+    standaloneSettingsCloseStartedRef.current = true;
+    void emitToMain(SETTINGS_CLOSED_EVENT)
+      .catch(() => undefined)
+      .then(() => closeCurrentWindow())
+      .catch((error) => {
+        standaloneSettingsCloseStartedRef.current = false;
+        setStatus(`无法关闭设置窗口：${String(error)}`);
+      });
+  }, [isSettingsOpen, standaloneSettingsWindow]);
+
   useMailboxBootstrap({
+    enabled: !standaloneSettingsWindow,
     accountScope,
     scopeRevision,
     folderId,
@@ -797,7 +882,7 @@ function MailboxApp() {
 
   // 焦点监听：只在挂载与账号 scope 切换时订阅，聚焦时刷新未读角标/托盘。
   // refreshUnreadIndicators 是稳定 useCallback，任何无关渲染都不会重新订阅或触发 GetStats。
-  useUnreadFocusSync(refreshUnreadIndicators, accountScope);
+  useUnreadFocusSync(refreshUnreadIndicators, accountScope, !standaloneSettingsWindow);
 
   const unreadTotal = stats?.unread_messages ?? 0;
   const messageListSummary = stats
@@ -990,6 +1075,7 @@ function MailboxApp() {
   });
 
   useEffect(() => {
+    if (standaloneSettingsWindow) return undefined;
     let active = true;
     const unlisteners: Array<() => void> = [];
 
@@ -1014,6 +1100,31 @@ function MailboxApp() {
           openMobileSettingsSection('contacts');
         });
         unlisteners.push(unlistenComposerContactsSettings);
+
+        const unlistenSettingsClosed = await listen(SETTINGS_CLOSED_EVENT, () => {
+          if (!active) return;
+          void (async () => {
+            const latestAccounts = await invoke<Account[]>(IPC.ListAccounts);
+            const nextScope = accountScope === 'all' || latestAccounts.some((item) => item.id === accountScope)
+              ? accountScope
+              : latestAccounts.find((item) => item.is_default)?.id ?? latestAccounts[0]?.id ?? 'all';
+            if (nextScope !== accountScope) setAccountScope(nextScope);
+            mailboxRefreshRef.current += 1;
+            const refreshId = mailboxRefreshRef.current;
+            const meta = await loadMeta(null, nextScope, { mode: 'full' });
+            await loadMessages(
+              meta.folderId,
+              appliedQuery,
+              filter,
+              nextScope,
+              refreshId,
+            );
+            if (active) setStatus('设置已更新');
+          })().catch((error) => {
+            if (active) setStatus(`设置已保存，但主界面刷新失败：${String(error)}`);
+          });
+        });
+        unlisteners.push(unlistenSettingsClosed);
 
         const unlistenSync = await listen('tray://sync', () => {
           if (!active || isModalGateActive) return;
@@ -1040,7 +1151,7 @@ function MailboxApp() {
 
         const unlistenSettings = await listen('tray://settings', () => {
           if (!active || isModalGateActive) return;
-          setSettingsOpen(true);
+          openMobileSettings();
         });
         unlisteners.push(unlistenSettings);
       } catch (error) {
@@ -1054,7 +1165,7 @@ function MailboxApp() {
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [openComposer, enqueueManualSync, folders, setFilter, setFolderId, setActiveThread, setThreadMessages, setSettingsOpen, setRichComposer, setStatus, isModalGateActive, resetSearch, setSelectedId, setSelectedMessageIds, refreshAll, openMobileSettingsSection]);
+  }, [accountScope, appliedQuery, enqueueManualSync, filter, folders, isModalGateActive, loadMessages, loadMeta, openComposer, openMobileSettings, openMobileSettingsSection, refreshAll, resetSearch, setActiveThread, setFilter, setFolderId, setRichComposer, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages, standaloneSettingsWindow]);
 
   const {
     toggleGroup,
@@ -1687,7 +1798,7 @@ function MailboxApp() {
 
   return (
     <main
-      className={`app-shell narrow-view-${narrowView}${isMobileApp ? ' is-mobile-app' : ''}`}
+      className={`app-shell narrow-view-${narrowView}${isMobileApp ? ' is-mobile-app' : ''}${standaloneSettingsWindow ? ' standalone-settings-window' : ''}`}
       style={{
         '--app-sidebar-width-preferred': `${appLayout.sidebar}px`,
         '--app-list-width-preferred': `${appLayout.list}px`,
@@ -1699,7 +1810,7 @@ function MailboxApp() {
       onMouseUp={endLayoutMouseResize}
       onMouseLeave={endLayoutMouseResize}
     >
-      {isMobileApp ? (
+      {standaloneSettingsWindow ? null : isMobileApp ? (
         <div className={`mobile-app-surface mobile-screen-${mobileScreen}`}>
           {mobileScreen === 'mail' && (
             <>
@@ -1964,7 +2075,7 @@ function MailboxApp() {
         <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
           <AppErrorBoundary
             title="设置界面渲染失败"
-            description="设置弹窗发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置界面回到主界面；如果问题持续，尝试刷新应用。"
+            description="设置窗口发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置窗口；如果问题持续，尝试刷新应用。"
             primaryLabel="返回主视图"
             secondaryLabel="刷新应用"
             onPrimaryAction={() => {
@@ -1972,6 +2083,9 @@ function MailboxApp() {
             }}
           >
             <SettingsOverlay
+            standalone={standaloneSettingsWindow}
+            nativeCloseRequestVersion={nativeSettingsCloseRequestVersion}
+            onReady={onStandaloneSettingsReady}
             accountForm={accountForm}
             accounts={accounts}
             newAccountForm={newAccountForm}

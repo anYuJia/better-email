@@ -14,6 +14,7 @@ import type {
 import type { MailboxDataController } from './useMailboxData';
 
 type UseMailboxBootstrapOptions = {
+  enabled?: boolean;
   accountScope: AccountScope;
   /** Increments for every explicit account-scope selection, including same-scope reselects. */
   scopeRevision?: number;
@@ -41,6 +42,7 @@ type UseMailboxBootstrapOptions = {
  * request after refreshMailbox has already loaded that same folder.
  */
 export default function useMailboxBootstrap({
+  enabled = true,
   accountScope,
   scopeRevision = 0,
   folderId,
@@ -59,6 +61,10 @@ export default function useMailboxBootstrap({
   const initializedScopeRef = useRef<{ scope: AccountScope; revision: number } | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      initializedScopeRef.current = null;
+      return;
+    }
     const bootstrapKey = { scope: accountScope, revision: scopeRevision };
     if (navigationScopeClaimRef.current === accountScope) {
       initializedScopeRef.current = bootstrapKey;
@@ -113,9 +119,10 @@ export default function useMailboxBootstrap({
         }
         setStatus(String(error));
       });
-  }, [accountScope, scopeRevision]);
+  }, [accountScope, enabled, scopeRevision]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!folderId) return;
     if (skipNextFolderEffectLoadRef.current) {
       skipNextFolderEffectLoadRef.current = false;
@@ -151,5 +158,5 @@ export default function useMailboxBootstrap({
     return () => {
       active = false;
     };
-  }, [folderId, filter, listSort]);
+  }, [enabled, folderId, filter, listSort]);
 }

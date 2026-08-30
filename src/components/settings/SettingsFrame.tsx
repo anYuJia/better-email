@@ -36,6 +36,9 @@ type SettingsAccountOption = {
 };
 
 type SettingsFrameProps = {
+  standalone?: boolean;
+  nativeCloseRequestVersion?: number;
+  onReady?: () => void;
   title: string;
   subtitle?: string;
   activeSection: SettingsSectionId;
@@ -146,6 +149,9 @@ function SettingsAccountContext({
 }
 
 export default function SettingsFrame({
+  standalone = false,
+  nativeCloseRequestVersion = 0,
+  onReady,
   title,
   subtitle = '',
   activeSection,
@@ -193,12 +199,17 @@ export default function SettingsFrame({
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const closingRef = useRef(false);
+  const handledNativeCloseRequestRef = useRef(0);
 
   useModalAccessibility({
     dialogRef: shellRef,
     backdropRef: workspaceRef,
     initialFocusRef: shellRef,
   });
+
+  useEffect(() => {
+    onReady?.();
+  }, [onReady]);
 
   useEffect(() => {
     if (!isDirty) setShowDiscardConfirm(false);
@@ -212,7 +223,7 @@ export default function SettingsFrame({
 
   const finishClose = () => {
     if (closingRef.current) return;
-    if (!canAnimateSettingsExit()) {
+    if (standalone || !canAnimateSettingsExit()) {
       onClose();
       return;
     }
@@ -243,6 +254,15 @@ export default function SettingsFrame({
   };
 
   useEffect(() => {
+    if (
+      nativeCloseRequestVersion <= 0
+      || nativeCloseRequestVersion <= handledNativeCloseRequestRef.current
+    ) return;
+    handledNativeCloseRequestRef.current = nativeCloseRequestVersion;
+    requestClose();
+  }, [nativeCloseRequestVersion]);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.key !== 'Escape') return;
       const settingsShell = shellRef.current;
@@ -268,7 +288,7 @@ export default function SettingsFrame({
 
   return (
     <div
-      className={`settings-workspace${isClosing ? ' is-closing' : ''}`}
+      className={`settings-workspace${standalone ? ' is-standalone' : ''}${isClosing ? ' is-closing' : ''}`}
       data-input-modality={inputModality}
       ref={workspaceRef}
       onPointerDownCapture={() => setInputModality('pointer')}
@@ -289,6 +309,7 @@ export default function SettingsFrame({
       <section
         className="settings-modal settings-shell"
         data-ui="settings-app"
+        data-standalone={standalone ? 'true' : 'false'}
         data-page-layout="standard"
         role="region"
         aria-label={title}
@@ -341,16 +362,18 @@ export default function SettingsFrame({
                 <span>{isBusy ? '保存中' : '保存修改'}</span>
               </button>
             )}
-            <button
-              type="button"
-              className="settings-close-button"
-              aria-label="关闭设置"
-              title="关闭设置"
-              data-no-tooltip
-              onClick={requestClose}
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
+            {!standalone && (
+              <button
+                type="button"
+                className="settings-close-button"
+                aria-label="关闭设置"
+                title="关闭设置"
+                data-no-tooltip
+                onClick={requestClose}
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            )}
           </div>
         </header>
 

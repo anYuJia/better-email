@@ -6,6 +6,7 @@ import { importNativeDroppedAttachmentPaths } from './nativeDroppedAttachments';
 import {
   getCurrentWindow,
   isStandaloneComposerWindow,
+  isStandaloneSettingsWindow,
   mockMode,
   openComposerWindow,
   invoke,
@@ -15,8 +16,10 @@ import { reportStartupMilestone } from '../startupTelemetry';
 
 const loadMailboxApp = () => import('../App');
 const loadStandaloneComposerApp = () => import('../components/StandaloneComposerApp');
+const loadStandaloneSettingsApp = () => import('../components/StandaloneSettingsApp');
 const MailboxApp = lazy(loadMailboxApp);
 const StandaloneComposerApp = lazy(loadStandaloneComposerApp);
+const StandaloneSettingsApp = lazy(loadStandaloneSettingsApp);
 const STARTUP_POLL_INTERVAL_MS = 32;
 
 type StartupStatus = {
@@ -62,11 +65,11 @@ function useBackendStartupStatus(): StartupStatus {
   return status;
 }
 
-function MainShellReadySignal({ standaloneComposer }: { standaloneComposer: boolean }) {
+function MainShellReadySignal({ standaloneWindow }: { standaloneWindow: boolean }) {
   const revealPromiseRef = useRef<Promise<void> | null>(null);
 
   useLayoutEffect(() => {
-    if (standaloneComposer) return undefined;
+    if (standaloneWindow) return undefined;
 
     let active = true;
     let firstFrame = 0;
@@ -103,7 +106,7 @@ function MainShellReadySignal({ standaloneComposer }: { standaloneComposer: bool
       window.cancelAnimationFrame(firstFrame);
       window.cancelAnimationFrame(switchFrame);
     };
-  }, [standaloneComposer]);
+  }, [standaloneWindow]);
 
   return null;
 }
@@ -194,16 +197,21 @@ function MainWindowFileDropBridge() {
 export default function AppRoot() {
   const startup = useBackendStartupStatus();
   const standaloneComposer = isStandaloneComposerWindow();
-  const Surface = standaloneComposer ? StandaloneComposerApp : MailboxApp;
+  const standaloneSettings = isStandaloneSettingsWindow();
+  const standaloneWindow = standaloneComposer || standaloneSettings;
 
   useLayoutEffect(() => {
     void reportStartupMilestone('app_root_mount');
   }, []);
 
   useEffect(() => {
-    const preloadSurface = standaloneComposer ? loadStandaloneComposerApp : loadMailboxApp;
+    const preloadSurface = standaloneComposer
+      ? loadStandaloneComposerApp
+      : standaloneSettings
+        ? loadStandaloneSettingsApp
+        : loadMailboxApp;
     void preloadSurface().catch(() => undefined);
-  }, [standaloneComposer]);
+  }, [standaloneComposer, standaloneSettings]);
 
   if (startup.state === 'starting') return null;
 
@@ -211,19 +219,27 @@ export default function AppRoot() {
     return (
       <>
         <StartupFailure message={startup.error || '本地数据库初始化失败。'} />
-        <MainShellReadySignal standaloneComposer={standaloneComposer} />
+        <MainShellReadySignal standaloneWindow={standaloneWindow} />
       </>
     );
   }
 
   return (
     <>
-      {!standaloneComposer ? <MainWindowFileDropBridge /> : null}
+      {!standaloneWindow ? <MainWindowFileDropBridge /> : null}
       <Suspense
-        fallback={standaloneComposer ? <DeferredSurface label="正在准备写信窗口" /> : null}
+        fallback={standaloneComposer
+          ? <DeferredSurface label="正在准备写信窗口" />
+          : standaloneSettings
+            ? <DeferredSurface label="正在准备设置窗口" />
+            : null}
       >
-        <Surface />
-        <MainShellReadySignal standaloneComposer={standaloneComposer} />
+        {standaloneComposer
+          ? <StandaloneComposerApp />
+          : standaloneSettings
+            ? <StandaloneSettingsApp />
+            : <MailboxApp />}
+        <MainShellReadySignal standaloneWindow={standaloneWindow} />
       </Suspense>
     </>
   );

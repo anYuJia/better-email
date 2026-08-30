@@ -4,6 +4,11 @@ import {
   COMPOSER_READY_EVENT,
   COMPOSER_READY_QUERY_EVENT,
 } from './app/composerWindow';
+import {
+  SETTINGS_OPEN_EVENT,
+  SETTINGS_READY_EVENT,
+  SETTINGS_READY_QUERY_EVENT,
+} from './app/settingsWindow';
 
 const mocks = vi.hoisted(() => ({
   coreInvoke: vi.fn(),
@@ -18,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   unlisten: vi.fn(),
   unminimize: vi.fn(),
   readyHandler: undefined as undefined | ((event: { payload: void }) => void),
+  settingsReadyHandler: undefined as undefined | ((event: { payload: void }) => void),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -43,6 +49,7 @@ vi.mock('@tauri-apps/api/webviewWindow', () => ({
 import {
   prodCloseCurrentWindow,
   prodOpenComposerWindow,
+  prodOpenSettingsWindow,
   prodPrewarmComposerWindow,
 } from './tauriBridge.prod';
 
@@ -57,15 +64,20 @@ describe('production composer window bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.readyHandler = undefined;
+    mocks.settingsReadyHandler = undefined;
     mocks.coreInvoke.mockResolvedValue(undefined);
     mocks.getByLabel.mockResolvedValue(composerWindow);
     mocks.eventListen.mockImplementation(async (event, handler) => {
       if (event === COMPOSER_READY_EVENT) mocks.readyHandler = handler;
+      if (event === SETTINGS_READY_EVENT) mocks.settingsReadyHandler = handler;
       return mocks.unlisten;
     });
     mocks.emit.mockImplementation(async (event) => {
       if (event === COMPOSER_READY_QUERY_EVENT) {
         mocks.readyHandler?.({ payload: undefined });
+      }
+      if (event === SETTINGS_READY_QUERY_EVENT) {
+        mocks.settingsReadyHandler?.({ payload: undefined });
       }
     });
   });
@@ -96,6 +108,35 @@ describe('production composer window bridge', () => {
 
     await expect(prodCloseCurrentWindow()).resolves.toBeUndefined();
     expect(mocks.hide).toHaveBeenCalledOnce();
+    expect(mocks.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('shows and focuses settings only after its renderer is ready', async () => {
+    await prodOpenSettingsWindow({ section: 'mcp' });
+
+    expect(mocks.emit.mock.calls.map(([event]) => event)).toEqual([
+      SETTINGS_OPEN_EVENT,
+      SETTINGS_READY_QUERY_EVENT,
+      SETTINGS_OPEN_EVENT,
+    ]);
+    expect(mocks.emit.mock.calls[0]?.[1]).toEqual({ section: 'mcp' });
+    expect(mocks.emit.mock.calls[2]?.[1]).toEqual({ section: 'mcp' });
+    expect(mocks.unlisten).toHaveBeenCalledOnce();
+    expect(mocks.show).toHaveBeenCalledOnce();
+    expect(mocks.unminimize).toHaveBeenCalledOnce();
+    expect(mocks.setFocus).toHaveBeenCalledOnce();
+  });
+
+  it('destroys settings instead of retaining hidden stale state', async () => {
+    mocks.destroy.mockResolvedValueOnce(undefined);
+    mocks.getCurrentWindow.mockReturnValue({
+      label: 'settings',
+      hide: mocks.hide,
+      destroy: mocks.destroy,
+    });
+
+    await expect(prodCloseCurrentWindow()).resolves.toBeUndefined();
+    expect(mocks.hide).not.toHaveBeenCalled();
     expect(mocks.destroy).toHaveBeenCalledOnce();
   });
 });

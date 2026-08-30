@@ -54,6 +54,14 @@ describe('useUnreadFocusSync 焦点订阅', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('独立设置窗口不订阅主邮箱未读刷新', () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    renderHook(() => useUnreadFocusSync(refresh, 1, false));
+
+    expect(onFocusChanged).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it('无关状态更新不会重新订阅，也不会触发额外 GetStats', async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     const { rerender } = renderFocus(refresh, 1);

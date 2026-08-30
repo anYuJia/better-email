@@ -3023,6 +3023,47 @@ async function main() {
 
     await captureComposeReferenceFixture(cdp);
 
+    await setUiViewport(cdp, 1040, 720);
+    await evalInPage(
+      cdp,
+      `location.href = ${JSON.stringify(`${url}/?window=settings&section=mcp`)}`,
+    );
+    await waitForExpression(cdp, "document.querySelector('.app-shell.standalone-settings-window .settings-workspace.is-standalone') && document.querySelector('.settings-page[data-settings-page=\"mcp\"]')");
+    const standaloneSettingsSnapshot = await evalInPage(cdp, `(() => {
+      const workspace = document.querySelector('.settings-workspace.is-standalone');
+      const shell = document.querySelector('.settings-shell[data-standalone="true"]');
+      const workspaceRect = workspace?.getBoundingClientRect();
+      const shellRect = shell?.getBoundingClientRect();
+      const shellStyle = shell ? getComputedStyle(shell) : null;
+      return {
+        hasMailChrome: Boolean(document.querySelector('.app-titlebar, .app-shell > .sidebar, .message-list-panel, .reader-panel')),
+        workspaceFillsViewport: Boolean(workspaceRect)
+          && Math.abs(workspaceRect.width - window.innerWidth) <= 1
+          && Math.abs(workspaceRect.height - window.innerHeight) <= 1,
+        shellFillsViewport: Boolean(shellRect)
+          && Math.abs(shellRect.width - window.innerWidth) <= 1
+          && Math.abs(shellRect.height - window.innerHeight) <= 1,
+        borderWidth: shellStyle?.borderWidth ?? null,
+        borderRadius: shellStyle?.borderRadius ?? null,
+        boxShadow: shellStyle?.boxShadow ?? null,
+        noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1
+          && document.body.scrollWidth <= window.innerWidth + 1,
+      };
+    })()`);
+    console.log(`[ui-smoke] standalone-settings geometry ${JSON.stringify(standaloneSettingsSnapshot)}`);
+    if (
+      standaloneSettingsSnapshot.hasMailChrome
+      || !standaloneSettingsSnapshot.workspaceFillsViewport
+      || !standaloneSettingsSnapshot.shellFillsViewport
+      || standaloneSettingsSnapshot.borderWidth !== '0px'
+      || standaloneSettingsSnapshot.borderRadius !== '0px'
+      || standaloneSettingsSnapshot.boxShadow !== 'none'
+      || !standaloneSettingsSnapshot.noHorizontalScroll
+    ) {
+      throw new Error(`Standalone settings geometry contract failed: ${JSON.stringify(standaloneSettingsSnapshot)}`);
+    }
+    await captureScreenshot(cdp, 'settings-standalone-window-1040');
+
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);
 
     const report = {
@@ -3089,6 +3130,7 @@ async function main() {
         'template settings manage and ai-generate templates',
         'outbox queue and cancel works',
         'settings application surface opens',
+        'standalone settings renderer fills its native window without mail chrome',
         'settings navigation renders one page at a time',
         'settings desktop sidebar switches standalone pages',
         'settings narrow layout uses native root and detail navigation',

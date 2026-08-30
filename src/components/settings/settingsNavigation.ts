@@ -130,6 +130,10 @@ export function getSettingsSectionPresentation(section: SettingsSectionId) {
   return sectionPresentation[section];
 }
 
+export function isSettingsSectionId(value: unknown): value is SettingsSectionId {
+  return typeof value === 'string' && value in sectionPresentation;
+}
+
 export const settingsAccountDetailItems: SettingsNavigationItem[] = [
   {
     id: 'providers',

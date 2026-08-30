@@ -21,6 +21,8 @@ describe('SettingsFrame application shell', () => {
   });
 
   function renderFrame({
+    standalone = false,
+    nativeCloseRequestVersion = 0,
     onClose = () => undefined,
     activeSection = 'general',
     canSaveAndVerify = false,
@@ -34,6 +36,8 @@ describe('SettingsFrame application shell', () => {
     activeAccountId = null,
     onSelectAccountId = () => undefined,
   }: {
+    standalone?: boolean;
+    nativeCloseRequestVersion?: number;
     onClose?: () => void;
     activeSection?: Parameters<typeof SettingsFrame>[0]['activeSection'];
     canSaveAndVerify?: boolean;
@@ -51,6 +55,8 @@ describe('SettingsFrame application shell', () => {
       <div data-testid="app-shell">
         <button type="button">后台按钮</button>
         <SettingsFrame
+          standalone={standalone}
+          nativeCloseRequestVersion={nativeCloseRequestVersion}
           title="设置"
           subtitle="work@example.com"
           activeSection={activeSection}
@@ -78,6 +84,13 @@ describe('SettingsFrame application shell', () => {
     expect(container.querySelector('.settings-workspace')).not.toBeNull();
     expect(container.querySelector('.settings-backdrop')).toBeNull();
     expect(screen.queryByRole('dialog', { name: '设置' })).toBeNull();
+  });
+
+  it('fills a standalone native window without modal entrance state', () => {
+    const { container } = renderFrame({ standalone: true });
+    expect(container.querySelector('.settings-workspace')?.classList.contains('is-standalone')).toBe(true);
+    expect(screen.getByRole('region', { name: '设置' }).getAttribute('data-standalone')).toBe('true');
+    expect(screen.queryByRole('button', { name: '关闭设置' })).toBeNull();
   });
 
   it('keeps top-level navigation compact and exposes sibling destinations on nested account pages', () => {
@@ -267,6 +280,33 @@ describe('SettingsFrame application shell', () => {
     renderFrame({ onClose });
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes a native titlebar close through the unsaved-changes confirmation', () => {
+    const onClose = vi.fn();
+    renderFrame({
+      standalone: true,
+      nativeCloseRequestVersion: 1,
+      isDirty: true,
+      onClose,
+    });
+
+    expect(screen.getByRole('alertdialog', { name: '放弃未保存的修改' })).not.toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a clean standalone window immediately without overlay exit animation', () => {
+    const onClose = vi.fn();
+    const { container } = renderFrame({
+      standalone: true,
+      nativeCloseRequestVersion: 1,
+      onClose,
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.settings-workspace')?.classList.contains('is-closing')).toBe(false);
   });
 
   it('uses the mobile back action instead of a category dropdown', () => {

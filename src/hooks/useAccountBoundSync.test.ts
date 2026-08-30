@@ -77,6 +77,7 @@ function renderCoordinator(
   accountScope: number | 'all',
   loadMeta = vi.fn().mockResolvedValue({ folderId: 101, folders: [{ id: 101 }] }),
   loadMessages = vi.fn().mockResolvedValue([]),
+  automaticProcessingEnabled = true,
 ) {
   const mailboxRefreshRef = { current: 0 };
   const setOutbox = vi.fn();
@@ -219,6 +220,7 @@ function renderCoordinator(
 
   const utils = renderHook(({ activeAccountScope }: { activeAccountScope: number | 'all' }) => (
     useBackgroundTaskCoordinator({
+      automaticProcessingEnabled,
       account: activeAccountScope === accountB.id ? accountB : accountA,
       accountScope: activeAccountScope,
       mailboxRefreshRef,
@@ -277,6 +279,14 @@ describe('useBackgroundTaskCoordinator account-bound sync', () => {
       expect(scenario.tasks[0]?.status).toBe('done');
     });
     expect(scenario.syncCommand).toBe(String(accountA.id));
+  });
+
+  it('does not drain tasks, schedule sync, or request notifications in standalone settings', async () => {
+    renderCoordinator(accountA.id, undefined, undefined, false);
+    await act(async () => undefined);
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(isPermissionGranted).not.toHaveBeenCalled();
   });
 
   it('does not write the synced account data into another account interface after an account switch', async () => {

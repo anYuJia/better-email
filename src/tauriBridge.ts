@@ -3,6 +3,7 @@ import {
   type ComposerWindowRequest,
   type NativeCloseRequestEvent,
 } from './app/composerWindow';
+import type { SettingsWindowRequest } from './app/settingsWindow';
 
 export type {
   ComposerWindowRequest,
@@ -16,6 +17,14 @@ export {
   COMPOSER_READY_QUERY_EVENT,
   COMPOSER_WINDOW_LABEL,
 } from './app/composerWindow';
+export type { SettingsWindowRequest } from './app/settingsWindow';
+export {
+  SETTINGS_CLOSED_EVENT,
+  SETTINGS_OPEN_EVENT,
+  SETTINGS_READY_EVENT,
+  SETTINGS_READY_QUERY_EVENT,
+  SETTINGS_WINDOW_LABEL,
+} from './app/settingsWindow';
 
 export type InvokeArgs = Record<string, unknown> | undefined;
 export type MockMessage = Omit<Message, 'folder_role'> & { folder_role: string };
@@ -135,6 +144,11 @@ export function isStandaloneComposerWindow() {
   return new URLSearchParams(window.location.search).get('window') === 'compose';
 }
 
+export function isStandaloneSettingsWindow() {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('window') === 'settings';
+}
+
 export function openComposerWindow(request: ComposerWindowRequest = {}): Promise<void> {
   if (mockMode) return Promise.resolve();
   return loadProdBridge().then(({ prodOpenComposerWindow }) => prodOpenComposerWindow(request));
@@ -143,6 +157,11 @@ export function openComposerWindow(request: ComposerWindowRequest = {}): Promise
 export function prewarmComposerWindow(): Promise<void> {
   if (mockMode) return Promise.resolve();
   return loadProdBridge().then(({ prodPrewarmComposerWindow }) => prodPrewarmComposerWindow());
+}
+
+export function openSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodOpenSettingsWindow }) => prodOpenSettingsWindow(request));
 }
 
 export function showCurrentWindow(): Promise<void> {

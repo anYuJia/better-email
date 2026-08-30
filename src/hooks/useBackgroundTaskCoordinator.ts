@@ -43,6 +43,7 @@ type LoadMetaResult = {
 };
 
 type UseBackgroundTaskCoordinatorOptions = {
+  automaticProcessingEnabled?: boolean;
   account: Account | null;
   accountScope: AccountScope;
   mailboxRefreshRef: MutableRefObject<number>;
@@ -103,6 +104,7 @@ const PROGRESS_POLL_INTERVAL_MS = 1000;
 const PROGRESS_REFRESH_MIN_INTERVAL_MS = 1200;
 
 export default function useBackgroundTaskCoordinator({
+  automaticProcessingEnabled = true,
   account,
   accountScope,
   mailboxRefreshRef,
@@ -679,8 +681,9 @@ export default function useBackgroundTaskCoordinator({
 
   // 应用重启恢复：drain 残留的排队任务（运行中任务已在 Rust 迁移时标为失败）。
   useEffect(() => {
+    if (!automaticProcessingEnabled) return;
     void drainBackgroundTaskQueue();
-  }, [drainBackgroundTaskQueue]);
+  }, [automaticProcessingEnabled, drainBackgroundTaskQueue]);
 
   const enqueueBackgroundTask = useCallback(async (
     kind: BackgroundTaskKind,
@@ -767,6 +770,7 @@ export default function useBackgroundTaskCoordinator({
 
 
   useBackgroundScheduler({
+    enabled: automaticProcessingEnabled,
     account,
     outbox,
     setOutbox,

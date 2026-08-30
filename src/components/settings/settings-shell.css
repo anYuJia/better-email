@@ -1,8 +1,8 @@
 /*
  * Application-level Settings shell.
- * Desktop uses a compact centered window on a quiet application backdrop;
- * mobile remains a native full-screen surface. The shell deliberately keeps
- * a flat border and no shadow.
+ * Native desktop Settings fills its own application window. Browser/mock
+ * desktop keeps the compact centered fallback and mobile remains a native
+ * full-screen surface. Every form stays flat, bordered and shadow-free.
  */
 
 .settings-workspace {
@@ -36,6 +36,22 @@
   background: var(--st-canvas);
   box-shadow: none;
   animation: settings-shell-enter var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+}
+
+.settings-workspace.is-standalone {
+  place-items: stretch;
+  padding: 0;
+  background: var(--st-canvas);
+}
+
+.settings-workspace.is-standalone .settings-shell.settings-modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  animation: none;
 }
 
 .settings-workspace.is-closing {

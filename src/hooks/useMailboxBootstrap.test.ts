@@ -6,6 +6,7 @@ import type { MessageSummary } from '../app/types';
 import useMailboxBootstrap from './useMailboxBootstrap';
 
 type BootstrapProps = {
+  enabled?: boolean;
   accountScope: number | 'all';
   scopeRevision?: number;
   folderId: number | null;
@@ -70,6 +71,29 @@ describe('useMailboxBootstrap', () => {
     const { refreshMailbox } = renderBootstrap({ strict: true });
     expect(refreshMailbox).toHaveBeenCalledTimes(1);
     expect(refreshMailbox).toHaveBeenCalledWith('all', null);
+  });
+
+  it('does not load mailbox data when the host is a standalone settings window', () => {
+    const { rerender, refreshMailbox, loadMessages } = renderBootstrap({
+      initialProps: {
+        enabled: false,
+        accountScope: 'all',
+        folderId: null,
+        filter: 'all',
+        listSort: 'newest',
+      },
+    });
+
+    rerender({
+      enabled: false,
+      accountScope: 'all',
+      folderId: 101,
+      filter: 'unread',
+      listSort: 'oldest',
+    });
+
+    expect(refreshMailbox).not.toHaveBeenCalled();
+    expect(loadMessages).not.toHaveBeenCalled();
   });
 
   it('restarts bootstrap when the same scope is explicitly selected again', () => {

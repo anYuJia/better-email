@@ -14,7 +14,7 @@ export const defaultAiServiceConfig: AiServiceConfig = {
   timeoutSeconds: 30,
   privacyAcknowledged: false,
   mcpEnabled: false,
-  mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+  mcpEndpoint: '',
   mcpApiKey: '',
 };
 

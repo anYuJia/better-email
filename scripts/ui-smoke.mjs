@@ -2976,6 +2976,28 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"ai\"]')?.innerText.includes('OpenAI 兼容 API') && !document.querySelector('.settings-page[data-settings-page=\"ai\"]')?.innerText.includes('本地演示') && !document.querySelector('.settings-page[data-settings-page=\"ai\"] .custom-select-summary')");
     await openSettingsSection(cdp, 'MCP', 'mcp', '.settings-page[data-settings-page="mcp"]');
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"mcp\"]')?.innerText.includes('MCP 服务') && document.querySelector('.settings-page[data-settings-page=\"mcp\"]')?.innerText.includes('MCP 服务端点')");
+    await evalInPage(cdp, "document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide[role=\"dialog\"]') && document.querySelector('.settings-mcp-guide #settings-mcp-endpoint')");
+    await fillInput(cdp, '#settings-mcp-endpoint', 'https://mcp.smoke.example/mcp');
+    await fillInput(cdp, '#settings-mcp-token', 'smoke-token');
+    await clickButton(cdp, '初始化与提示词', "document.querySelector('.settings-mcp-guide')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] textarea[aria-label=\"初始化连接提示词\"]')?.value.includes('notifications/initialized')");
+    await captureScreenshot(cdp, 'settings-mcp-guide-prompts');
+    await clickButton(cdp, '连接信息', "document.querySelector('.settings-mcp-guide')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] #settings-mcp-endpoint')?.value === 'https://mcp.smoke.example/mcp'");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide-footer button[aria-label=\"保存并启用\"]') && !document.querySelector('.settings-mcp-guide-footer button[aria-label=\"保存并启用\"]')?.disabled");
+    await clickButton(cdp, '保存并启用', "document.querySelector('.settings-mcp-guide')");
+    await waitForExpression(cdp, "!document.querySelector('.settings-mcp-guide') && document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.checked");
+    await clickButton(cdp, '查看连接信息', "document.querySelector('.settings-page[data-settings-page=\"mcp\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide')");
+    await evalInPage(cdp, "(() => { const input = document.querySelector('.settings-mcp-guide #settings-mcp-endpoint'); if (!input) throw new Error('MCP endpoint input not found'); input.click(); input.focus(); })()");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide') && document.activeElement?.id === 'settings-mcp-endpoint'");
+    await evalInPage(cdp, "document.querySelector('.settings-mcp-guide-backdrop')?.click()");
+    await waitForExpression(cdp, "!document.querySelector('.settings-mcp-guide') && document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.checked");
+    await clickButton(cdp, '查看连接信息', "document.querySelector('.settings-page[data-settings-page=\"mcp\"]')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide')");
+    await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
+    await waitForExpression(cdp, "!document.querySelector('.settings-mcp-guide') && document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.checked");
     await openSettingsSection(cdp, 'AI 接入', 'ai', '.settings-page[data-settings-page="ai"]');
     // 浏览器冒烟测试只在内部注入 mock，不把“本地演示”作为用户可选的接入方式。
     await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
@@ -3079,6 +3101,8 @@ async function main() {
         'settings low-frequency account creation stays folded and background feedback stays hidden',
         'settings connection test only appears on relevant pages',
         'settings primary sections open without redundant disclosure',
+        'MCP enable opens a connection guide with initialization prompts',
+        'MCP guide saves connection details and closes safely on backdrop or Escape',
         'settings primary actions stay visible in header',
         'settings header save completes update flow',
         'storage management presents total usage and reclaimable attachment cache',

@@ -21,43 +21,11 @@ describe('AiServiceSettings', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 
-  it('renders MCP as a separate settings surface', () => {
-    seedConfig({
-      enabled: true,
-      serviceType: 'mcp',
-      mcpEnabled: true,
-      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
-      privacyAcknowledged: true,
-    });
-    render(<AiServiceSettings mode="mcp" />);
-    expect(screen.getByText('MCP 服务')).not.toBeNull();
-    expect(screen.getByDisplayValue('http://127.0.0.1:8080/mcp')).not.toBeNull();
-    expect(screen.getByText('访问 Token')).not.toBeNull();
-    expect(screen.queryByText('OpenAI 兼容 API')).toBeNull();
-  });
-
   it('does not expose MCP or local demo as AI access options', () => {
     seedConfig({ enabled: true, serviceType: 'http', endpoint: 'https://api.example.com/v1' });
     render(<AiServiceSettings />);
     expect(screen.queryByText('MCP 服务')).toBeNull();
     expect(screen.queryByText('本地演示')).toBeNull();
-  });
-
-  it('configures MCP as a client endpoint rather than a local gateway', () => {
-    seedConfig({
-      enabled: true,
-      serviceType: 'mcp',
-      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
-      privacyAcknowledged: true,
-    });
-    render(<AiServiceSettings mode="mcp" />);
-    // 不再宣称本地暴露 MCP HTTP 服务（无 listener）。
-    expect(screen.queryByText('开启 MCP 网关服务')).toBeNull();
-    expect(screen.queryByText(/本地暴露/)).toBeNull();
-    expect(screen.queryByText('MCP 网关地址')).toBeNull();
-    // 保留实际存在的 MCP 客户端端点配置。
-    expect(screen.getByText('MCP 服务端点')).not.toBeNull();
-    expect(screen.getByText('访问 Token')).not.toBeNull();
   });
 
   it('shows the status with 未启用 when the service is off', () => {

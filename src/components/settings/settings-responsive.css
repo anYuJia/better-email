@@ -250,6 +250,79 @@
   }
 }
 
+@media (max-width: 720px) {
+  .settings-modal .settings-mcp-summary,
+  .settings-modal .settings-mcp-setup-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-modal .settings-mcp-summary > .st-btn,
+  .settings-modal .settings-mcp-setup-row > .st-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .settings-modal .settings-mcp-summary-copy strong,
+  .settings-modal .settings-mcp-summary-copy small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .settings-modal .settings-mcp-token-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-mcp-token-row > .st-btn {
+    justify-self: start;
+  }
+
+  .settings-modal .settings-mcp-guide-backdrop {
+    padding: 0;
+  }
+
+  .settings-modal .settings-mcp-guide {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation-name: settings-mcp-guide-mobile-enter;
+  }
+
+  .settings-modal .settings-mcp-guide-header {
+    padding: 12px 16px;
+  }
+
+  .settings-modal .settings-mcp-guide-tabs {
+    padding-inline: 16px;
+  }
+
+  .settings-modal .settings-mcp-guide-panel {
+    padding: 16px;
+  }
+
+  .settings-modal .settings-mcp-guide-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px 16px 16px;
+  }
+
+  .settings-modal .settings-mcp-guide-footer > div {
+    width: 100%;
+  }
+
+  .settings-modal .settings-mcp-guide-footer > div .st-btn {
+    flex: 1 1 0;
+  }
+}
+
+@keyframes settings-mcp-guide-mobile-enter {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .settings-workspace *,
   .settings-workspace *::before,

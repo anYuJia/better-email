@@ -11,7 +11,7 @@ const mockAiSettingsState = {
   timeout_seconds: 30,
   privacy_acknowledged: false,
   mcp_enabled: false,
-  mcp_endpoint: 'http://127.0.0.1:8080/mcp',
+  mcp_endpoint: '',
   mcp_api_key: '',
 };
 

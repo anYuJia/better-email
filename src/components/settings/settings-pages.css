@@ -3427,6 +3427,443 @@
   font-weight: 500;
 }
 
+/* --- MCP connection page and setup guide --- */
+.settings-modal .settings-mcp-page-stack {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+  align-content: start;
+}
+
+.settings-modal .settings-mcp-summary,
+.settings-modal .settings-mcp-setup-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--st-border);
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mcp-summary-mark {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-mcp-summary-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-mcp-summary-copy strong,
+.settings-modal .settings-mcp-summary-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .settings-mcp-summary-copy strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-summary-copy small,
+.settings-modal .settings-mcp-action-hint {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-mcp-setup-row .st-btn {
+  flex: 0 0 auto;
+}
+
+.settings-modal .settings-mcp-page-stack > .st-section:first-child .settings-ai-gated-note {
+  margin: 0;
+  color: var(--st-warning);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.5;
+}
+
+.settings-modal .settings-mcp-guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 430;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.35);
+  overscroll-behavior: contain;
+}
+
+.settings-modal .settings-mcp-guide {
+  width: min(620px, 100%);
+  max-height: min(calc(100dvh - 32px), 760px);
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--st-border-strong);
+  border-radius: var(--st-radius-modal);
+  background: var(--st-canvas);
+  box-shadow: var(--st-shadow-float);
+  animation: settings-mcp-guide-enter var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+}
+
+.settings-modal .settings-mcp-guide-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mcp-guide-mark {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-accent);
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .settings-mcp-guide-heading {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-mcp-guide-heading strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-card-title);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-guide-heading small {
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-mcp-guide-close {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-modal .settings-mcp-guide-close:hover {
+  color: var(--st-text);
+  background: var(--st-surface-muted);
+}
+
+.settings-modal .settings-mcp-guide-tabs {
+  min-width: 0;
+  display: flex;
+  gap: 18px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mcp-guide-tabs button {
+  min-height: 42px;
+  position: relative;
+  padding: 0 0 1px;
+  border: 0;
+  border-radius: 0;
+  color: var(--st-text-secondary);
+  background: transparent;
+  font-size: var(--st-font-size-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-modal .settings-mcp-guide-tabs button::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.settings-modal .settings-mcp-guide-tabs button:hover {
+  color: var(--st-text);
+}
+
+.settings-modal .settings-mcp-guide-tabs button.is-active {
+  color: var(--st-accent);
+}
+
+.settings-modal .settings-mcp-guide-tabs button.is-active::after {
+  background: var(--st-accent);
+}
+
+.settings-modal .settings-mcp-guide-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.settings-modal .settings-mcp-guide-panel {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  padding: 18px;
+}
+
+.settings-modal .settings-mcp-guide-intro {
+  display: grid;
+  gap: 3px;
+}
+
+.settings-modal .settings-mcp-guide-intro strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-body);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-guide-intro p {
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.55;
+}
+
+.settings-modal .settings-mcp-guide-direction {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-secondary);
+  background: var(--st-surface-subtle);
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-modal .settings-mcp-guide-direction svg {
+  flex: 0 0 auto;
+  color: var(--st-accent);
+}
+
+.settings-modal .settings-mcp-guide-direction strong {
+  color: var(--st-text);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-guide .st-field {
+  padding: 0;
+}
+
+.settings-modal .settings-mcp-guide .st-field-static-label {
+  padding: 0;
+}
+
+.settings-modal .settings-mcp-token-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-modal .settings-mcp-token-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  white-space: nowrap;
+}
+
+.settings-modal .settings-mcp-privacy-switch {
+  margin-top: -4px;
+  padding-block: 8px;
+}
+
+.settings-modal .settings-mcp-connection-preview,
+.settings-modal .settings-mcp-prompt-block {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-surface-subtle);
+}
+
+.settings-modal .settings-mcp-preview-header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-modal .settings-mcp-preview-header > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-modal .settings-mcp-preview-header strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-preview-header small,
+.settings-modal .settings-mcp-connection-preview > small {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-mcp-connection-preview pre {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text);
+  background: var(--st-canvas);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings-modal .settings-mcp-guide-actions {
+  min-width: 0;
+}
+
+.settings-modal .settings-mcp-action-hint {
+  align-self: center;
+}
+
+.settings-modal .settings-mcp-prompt-panel {
+  gap: 18px;
+}
+
+.settings-modal .settings-mcp-prompt-block textarea {
+  min-height: 164px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.settings-modal .settings-mcp-reference-prompts {
+  min-width: 0;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mcp-prompt-heading {
+  display: grid;
+  gap: 2px;
+  padding: 12px 0 8px;
+}
+
+.settings-modal .settings-mcp-prompt-heading strong {
+  color: var(--st-text);
+  font-size: var(--st-font-size-secondary);
+  font-weight: 600;
+}
+
+.settings-modal .settings-mcp-prompt-heading small {
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+}
+
+.settings-modal .settings-mcp-reference-prompt {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--st-border);
+}
+
+.settings-modal .settings-mcp-reference-prompt p {
+  min-width: 0;
+  margin: 0;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.55;
+}
+
+.settings-modal .settings-mcp-guide-footer {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--st-border);
+  background: var(--st-canvas);
+}
+
+.settings-modal .settings-mcp-guide-footer > span {
+  min-width: 0;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  line-height: 1.45;
+}
+
+.settings-modal .settings-mcp-guide-footer > div {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+}
+
+.settings-modal .settings-mcp-copy-error {
+  margin: 0;
+  color: var(--st-danger);
+  font-size: var(--st-font-size-aux);
+}
+
+@keyframes settings-mcp-guide-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* --- Template pages --- */
 .settings-modal .template-toolbar {
   display: flex;

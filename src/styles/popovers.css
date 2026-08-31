@@ -31,6 +31,14 @@ details[data-floating-menu="true"].compact-dropdown[open] > div {
   visibility: hidden;
 }
 
+/* Native popovers are promoted into the browser top layer. Reset the user
+ * agent's centering margin so the shared viewport coordinates stay exact.
+ * The details/fixed-position rules above remain the compatibility fallback
+ * for older WebViews without the Popover API. */
+details[data-floating-menu="true"] > [data-floating-menu-panel="true"] {
+  margin: 0;
+}
+
 details[data-floating-menu="true"][data-menu-positioned="true"].compact-menu > div,
 details[data-floating-menu="true"][data-menu-positioned="true"].compact-dropdown > div {
   visibility: visible;

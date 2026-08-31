@@ -689,6 +689,29 @@ async function openDetails(cdp, selector) {
   });
 }
 
+async function assertFloatingMenuTopLayer(cdp, selector) {
+  return withStep(`assertFloatingMenuTopLayer ${selector}`, async () => {
+    await waitForExpression(
+      cdp,
+      `(() => {
+        const details = document.querySelector(${JSON.stringify(selector)});
+        const panel = details?.querySelector(':scope > [data-floating-menu-panel="true"]');
+        if (!details || !panel || !panel.matches(':popover-open')) return false;
+        const rect = panel.getBoundingClientRect();
+        const probe = document.elementFromPoint(
+          Math.min(rect.right - 12, rect.left + 24),
+          Math.min(rect.bottom - 12, rect.top + 24),
+        );
+        return rect.left >= 8
+          && rect.top >= 8
+          && rect.right <= window.innerWidth - 8
+          && rect.bottom <= window.innerHeight - 8
+          && panel.contains(probe);
+      })()`,
+    );
+  });
+}
+
 async function assertAnimatedDisclosureMotion(cdp, selector, label) {
   const initialExpanded = await evalInPage(
     cdp,
@@ -2226,6 +2249,7 @@ async function main() {
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.context-menu')");
     await openDetails(cdp, '.bulk-more-menu');
+    await assertFloatingMenuTopLayer(cdp, '.bulk-more-menu');
     await clickButton(cdp, '添加星标', "document.querySelector('.bulk-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已批量添加星标 2 封邮件')");
 
@@ -2270,6 +2294,7 @@ async function main() {
     await clickButton(cdp, '静音会话', "document.querySelector('.context-menu')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已静音会话') && document.querySelector('.thread-card .thread-muted-indicator')?.innerText.includes('静音')");
     await openDetails(cdp, '.reader-more-menu');
+    await assertFloatingMenuTopLayer(cdp, '.reader-more-menu');
     await clickButton(cdp, '取消静音会话', "document.querySelector('.reader-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.status-line')?.innerText.includes('已取消静音会话') && !document.querySelector('.thread-card .thread-muted-indicator')");
     await fillInput(cdp, '.search-box input', '安全检查清单');

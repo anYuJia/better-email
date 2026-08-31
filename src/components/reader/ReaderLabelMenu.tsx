@@ -66,7 +66,10 @@ export default function ReaderLabelMenu({
         data-floating-menu="true"
       >
         <summary><Tag size={15} /> 标签</summary>
-        <div className="label-menu-container">
+        <div
+          className="label-menu-container"
+          data-floating-menu-panel="true"
+        >
           <div className="label-menu-add-section">
             <input
               type="text"

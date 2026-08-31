@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import { useDetailsMenu } from './useDetailsMenu';
 
@@ -7,14 +7,20 @@ afterEach(() => {
   cleanup();
 });
 
-function MenuHarness({ onCommand }: { onCommand?: () => void }) {
+function MenuHarness({
+  onCommand,
+  floating = false,
+}: {
+  onCommand?: () => void;
+  floating?: boolean;
+}) {
   const ref = useRef<HTMLDetailsElement>(null);
-  const menu = useDetailsMenu(ref);
+  const menu = useDetailsMenu(ref, { floating });
   return (
     <div>
       <details ref={ref}>
         <summary>菜单</summary>
-        <div>
+        <div data-floating-menu-panel="true">
           <button type="button" onClick={() => { onCommand?.(); menu.closeMenu(); }}>命令A</button>
           <button type="button">命令B</button>
         </div>
@@ -110,5 +116,39 @@ describe('useDetailsMenu', () => {
     expect(wheel.defaultPrevented).toBe(false);
     expect(outsideWheel).not.toHaveBeenCalled();
     document.body.removeEventListener('wheel', outsideWheel);
+  });
+
+  it('promotes floating panels to the browser top layer and hides them on close', async () => {
+    const { rerender } = render(<MenuHarness floating />);
+    const panel = screen.getByRole('button', { name: '命令A' }).parentElement as HTMLElement & {
+      showPopover?: () => void;
+      hidePopover?: () => void;
+    };
+    let popoverOpen = false;
+    const showPopover = vi.fn(() => { popoverOpen = true; });
+    const hidePopover = vi.fn(() => { popoverOpen = false; });
+    Object.defineProperties(panel, {
+      showPopover: { configurable: true, value: showPopover },
+      hidePopover: { configurable: true, value: hidePopover },
+    });
+    const nativeMatches = panel.matches.bind(panel);
+    vi.spyOn(panel, 'matches').mockImplementation((selector) => (
+      selector === ':popover-open' ? popoverOpen : nativeMatches(selector)
+    ));
+
+    const { details } = openDetails();
+    fireEvent(details, new Event('toggle'));
+
+    await waitFor(() => expect(showPopover).toHaveBeenCalledTimes(1));
+    expect(panel.getAttribute('popover')).toBe('manual');
+
+    rerender(<MenuHarness floating />);
+    await waitFor(() => expect(details.hasAttribute('open')).toBe(true));
+    expect(showPopover).toHaveBeenCalledTimes(1);
+    expect(hidePopover).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: '外部按钮' }));
+    expect(hidePopover).toHaveBeenCalledTimes(1);
+    expect(details.hasAttribute('open')).toBe(false);
   });
 });

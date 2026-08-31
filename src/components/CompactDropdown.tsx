@@ -132,7 +132,11 @@ export default function CompactDropdown<Value extends string>({
         <strong>{currentLabel}</strong>
         <ChevronDown size={14} aria-hidden="true" />
       </summary>
-      <div role="menu" aria-label={`${label}选项`}>
+      <div
+        role="menu"
+        aria-label={`${label}选项`}
+        data-floating-menu-panel="true"
+      >
         {options.map((option, index) => {
           const selected = option.id === value;
           return (

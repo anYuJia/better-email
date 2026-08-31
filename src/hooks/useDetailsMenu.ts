@@ -10,6 +10,49 @@ type UseDetailsMenuOptions = {
 const VIEWPORT_GAP = 8;
 const ANCHOR_GAP = 6;
 
+type PopoverPanel = HTMLElement & {
+  showPopover?: () => void;
+  hidePopover?: () => void;
+};
+
+function getFloatingPanel(menu: HTMLElement) {
+  return menu.querySelector<PopoverPanel>(
+    ':scope > [data-floating-menu-panel="true"], :scope > div',
+  );
+}
+
+function showInTopLayer(panel: PopoverPanel) {
+  if (typeof panel.showPopover !== 'function') return;
+  if (!panel.hasAttribute('popover')) panel.setAttribute('popover', 'manual');
+  try {
+    if (!panel.matches(':popover-open')) panel.showPopover();
+  } catch {
+    // Older DOM implementations may expose showPopover without supporting
+    // :popover-open in matches(). Calling showPopover is still safe; an
+    // already-open popover simply stays open.
+    try {
+      panel.showPopover();
+    } catch {
+      // Keep the fixed-position fallback when the native top layer is not
+      // available in the host WebView.
+    }
+  }
+}
+
+function hideFromTopLayer(panel: PopoverPanel | null) {
+  if (!panel || typeof panel.hidePopover !== 'function') return;
+  try {
+    if (panel.matches(':popover-open')) panel.hidePopover();
+  } catch {
+    try {
+      panel.hidePopover();
+    } catch {
+      // The panel is already closed or the host only partially implements
+      // the Popover API. The details/fixed-position fallback remains valid.
+    }
+  }
+}
+
 /**
  * 原生 <details> 菜单的统一行为辅助：
  *
@@ -27,6 +70,7 @@ export function useDetailsMenu(
   const closeMenu = useCallback(() => {
     const details = ref.current;
     if (!details) return;
+    hideFromTopLayer(getFloatingPanel(details));
     if (details.hasAttribute('open')) {
       details.removeAttribute('open');
     }
@@ -52,8 +96,14 @@ export function useDetailsMenu(
     function positionFloatingMenu() {
       if (!floating || !menu.hasAttribute('open')) return;
       const summary = menu.querySelector<HTMLElement>('summary');
-      const panel = menu.querySelector<HTMLElement>(':scope > div');
+      const panel = getFloatingPanel(menu);
       if (!summary || !panel) return;
+
+      // A native popover participates in the browser top layer, so pane
+      // containment, overflow clipping and local stacking contexts cannot
+      // cover it. Hosts without the Popover API keep using the existing
+      // fixed-position path below.
+      showInTopLayer(panel);
 
       const summaryRect = summary.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
@@ -100,6 +150,7 @@ export function useDetailsMenu(
       if (!menu.hasAttribute('open')) {
         clearPositionFrame();
         menu.removeAttribute('data-menu-positioned');
+        hideFromTopLayer(getFloatingPanel(menu));
         return;
       }
       scheduleFloatingPosition();
@@ -134,7 +185,7 @@ export function useDetailsMenu(
 
     function handleWheel(event: WheelEvent) {
       if (!menu.hasAttribute('open')) return;
-      const panel = menu.querySelector<HTMLElement>(':scope > div');
+      const panel = getFloatingPanel(menu);
       if (panel) containWheelWithin(panel, event);
     }
 

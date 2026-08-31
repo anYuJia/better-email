@@ -171,7 +171,7 @@ export default function GlobalSearch({
           <span>{activeSearchScope.shortLabel}</span>
           <ChevronDown size={13} aria-hidden="true" />
         </summary>
-        <div>
+        <div data-floating-menu-panel="true">
           <span className="menu-section-title">搜索范围</span>
           {searchScopeOptions.map((item) => (
             <button

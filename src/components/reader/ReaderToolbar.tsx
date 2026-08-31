@@ -314,7 +314,10 @@ function ReaderToolbar({
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
             <MoreHorizontal size={17} />
           </summary>
-          <div className="context-menu-surface context-menu--anchored reader-more-menu-panel">
+          <div
+            className="context-menu-surface context-menu--anchored reader-more-menu-panel"
+            data-floating-menu-panel="true"
+          >
             <ContextMenuContent
               items={readerMenuItems}
               onClose={moreMenu.closeMenu}

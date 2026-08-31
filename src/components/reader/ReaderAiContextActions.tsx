@@ -110,7 +110,10 @@ export default function ReaderAiContextActions({
           <Sparkles size={15} aria-hidden="true" />
           <span>AI</span>
         </summary>
-        <div className="context-menu-surface context-menu--anchored reader-ai-menu-panel">
+        <div
+          className="context-menu-surface context-menu--anchored reader-ai-menu-panel"
+          data-floating-menu-panel="true"
+        >
           <ContextMenuContent
             items={menuItems}
             onClose={menu.closeMenu}

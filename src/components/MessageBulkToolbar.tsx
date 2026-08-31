@@ -101,7 +101,10 @@ export default function MessageBulkToolbar({
           <MoreHorizontal size={15} aria-hidden="true" />
           更多
         </summary>
-        <div className="context-menu-surface context-menu--anchored">
+        <div
+          className="context-menu-surface context-menu--anchored"
+          data-floating-menu-panel="true"
+        >
           <ContextMenuContent
             title={`已选 ${selectedMessageIds.length} 封邮件`}
             detail="更多批量操作"

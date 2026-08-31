@@ -119,7 +119,7 @@ export default function ReaderSecurityBanner({
               <summary aria-label="更多安全选项" title="更多安全选项">
                 <MoreHorizontal size={16} aria-hidden="true" />
               </summary>
-              <div>
+              <div data-floating-menu-panel="true">
                 {showLinkAction && (
                   <button
                     type="button"

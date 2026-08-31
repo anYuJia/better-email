@@ -150,7 +150,7 @@ type AppProps = {
 
 export default function App({
   standaloneSettingsWindow = false,
-  requestedSettingsSection = 'accounts',
+  requestedSettingsSection = 'general',
   requestedSettingsAccountScope,
   onSettingsScopeChange,
   nativeSettingsCloseRequestVersion = 0,
@@ -779,7 +779,7 @@ function MailboxApp({
     navigationScopeClaimRef,
   });
 
-  const openDesktopSettingsWindow = useCallback((section: SettingsSectionId = 'accounts') => {
+  const openDesktopSettingsWindow = useCallback((section: SettingsSectionId = 'general') => {
     setStatus('正在打开设置窗口…');
     void openSettingsWindow({ section, accountScope })
       .then(() => setStatus('设置窗口已就绪'))
@@ -792,7 +792,7 @@ function MailboxApp({
       return;
     }
     if (useNativeSettingsWindow) {
-      openDesktopSettingsWindow('accounts');
+      openDesktopSettingsWindow('general');
       return;
     }
     openSettingsHome();

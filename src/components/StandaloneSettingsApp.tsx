@@ -11,6 +11,7 @@ import {
   type SettingsWindowRequest,
 } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { DEFAULT_SETTINGS_SECTION } from '../app/settingsWindow';
 import type { AccountScope } from '../app/types';
 import {
   isSettingsSectionId,
@@ -19,7 +20,7 @@ import {
 
 function initialSettingsSection(): SettingsSectionId {
   const requested = new URLSearchParams(window.location.search).get('section');
-  return isSettingsSectionId(requested) ? requested : 'accounts';
+  return isSettingsSectionId(requested) ? requested : DEFAULT_SETTINGS_SECTION;
 }
 
 function settingsScopeFromValue(value: unknown): AccountScope | undefined {

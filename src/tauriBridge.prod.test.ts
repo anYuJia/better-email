@@ -128,6 +128,12 @@ describe('production composer window bridge', () => {
     expect(mocks.setFocus).toHaveBeenCalledOnce();
   });
 
+  it('opens the general settings page when no destination is provided', async () => {
+    await prodOpenSettingsWindow();
+
+    expect(mocks.emit).toHaveBeenCalledWith(SETTINGS_OPEN_EVENT, { section: 'general' });
+  });
+
   it('updates an already-open settings window when the mailbox scope changes', async () => {
     await prodSyncSettingsWindowAccountScope(2);
 

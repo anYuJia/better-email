@@ -9,6 +9,7 @@ import type {
   MessageSummary,
   ThreadSummary,
 } from '../app/types';
+import { DEFAULT_SETTINGS_SECTION } from '../app/settingsWindow';
 import type { SettingsSectionId } from '../components/settings/SettingsFrame';
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
@@ -96,7 +97,7 @@ export default function useMailboxNavigation({
   }, [setActiveSettingsSection]);
 
   const openSettingsHome = useCallback(() => {
-    setActiveSettingsSection('accounts');
+    setActiveSettingsSection(DEFAULT_SETTINGS_SECTION);
     setSettingsOpen(true);
     loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
   }, [folderId, accountScope, loadMeta, setActiveSettingsSection, setSettingsOpen, setStatus]);

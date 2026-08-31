@@ -1,5 +1,7 @@
 import type { AccountScope } from './types';
 
+export const DEFAULT_SETTINGS_SECTION = 'general';
+
 export type SettingsWindowRequest = {
   section?: string;
   accountScope?: AccountScope;

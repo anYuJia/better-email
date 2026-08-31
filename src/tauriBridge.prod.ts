@@ -9,6 +9,7 @@ import {
   COMPOSER_WINDOW_LABEL,
 } from './app/composerWindow';
 import type { SettingsWindowRequest } from './app/settingsWindow';
+import { DEFAULT_SETTINGS_SECTION } from './app/settingsWindow';
 import {
   SETTINGS_OPEN_EVENT,
   SETTINGS_READY_EVENT,
@@ -286,7 +287,7 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     const settingsUrl = new URL(window.location.href);
     settingsUrl.search = '';
     settingsUrl.searchParams.set('window', 'settings');
-    settingsUrl.searchParams.set('section', request.section || 'accounts');
+    settingsUrl.searchParams.set('section', request.section || DEFAULT_SETTINGS_SECTION);
     if (request.accountScope !== undefined) {
       settingsUrl.searchParams.set('scope', String(request.accountScope));
     }
@@ -374,11 +375,15 @@ async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow):
 }
 
 export async function prodOpenSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
-  await ensureSettingsWindow(request);
+  const normalizedRequest: SettingsWindowRequest = {
+    ...request,
+    section: request.section || DEFAULT_SETTINGS_SECTION,
+  };
+  await ensureSettingsWindow(normalizedRequest);
   const settingsWindow = await getSettingsWindow();
-  await settingsWindow.emit(SETTINGS_OPEN_EVENT, request);
+  await settingsWindow.emit(SETTINGS_OPEN_EVENT, normalizedRequest);
   await waitForSettingsWindowReady(settingsWindow);
-  await settingsWindow.emit(SETTINGS_OPEN_EVENT, request);
+  await settingsWindow.emit(SETTINGS_OPEN_EVENT, normalizedRequest);
   await focusComposerWindow(settingsWindow);
 }
 

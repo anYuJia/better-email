@@ -74,6 +74,7 @@ import {
   openComposerWindow,
   openSettingsWindow,
   prewarmComposerWindow,
+  prewarmSettingsWindow,
 } from './tauriBridge';
 import type {
   AccountScope,
@@ -267,6 +268,7 @@ function MailboxApp({
     // the mailbox is settling so the first explicit compose action can reuse
     // an already-ready window instead of paying the startup cost.
     void prewarmComposerWindow().catch(() => undefined);
+    void prewarmSettingsWindow().catch(() => undefined);
     return undefined;
   }, [accounts.length, initialAccountListLoaded, standaloneSettingsWindow, useNativeComposerWindow]);
 

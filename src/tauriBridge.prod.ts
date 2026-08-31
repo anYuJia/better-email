@@ -374,11 +374,21 @@ async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow):
   }
 }
 
-export async function prodOpenSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
-  const normalizedRequest: SettingsWindowRequest = {
+function normalizeSettingsWindowRequest(request: SettingsWindowRequest = {}): SettingsWindowRequest {
+  return {
     ...request,
     section: request.section || DEFAULT_SETTINGS_SECTION,
   };
+}
+
+export async function prodPrewarmSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
+  const normalizedRequest = normalizeSettingsWindowRequest(request);
+  await ensureSettingsWindow(normalizedRequest);
+  await waitForSettingsWindowReady(await getSettingsWindow());
+}
+
+export async function prodOpenSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
+  const normalizedRequest = normalizeSettingsWindowRequest(request);
   await ensureSettingsWindow(normalizedRequest);
   const settingsWindow = await getSettingsWindow();
   await settingsWindow.emit(SETTINGS_OPEN_EVENT, normalizedRequest);
@@ -436,6 +446,7 @@ export async function prodCloseCurrentWindow(): Promise<void> {
     }
     return;
   }
+  if (currentWindow.label === SETTINGS_WINDOW_LABEL) settingsWindowReady = null;
   await currentWindow.destroy();
 }
 

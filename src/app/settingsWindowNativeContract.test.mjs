@@ -47,6 +47,9 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(openSettings).toContain('waitForSettingsWindowReady(settingsWindow)');
     expect(openSettings).toContain('focusComposerWindow(settingsWindow)');
     expect(openSettings.match(/settingsWindow\.emit\(SETTINGS_OPEN_EVENT, normalizedRequest\)/g)).toHaveLength(2);
+
+    const prewarmSettings = exportedFunction(bridgeSource, 'prodPrewarmSettingsWindow');
+    expect(prewarmSettings).toContain('waitForSettingsWindowReady(await getSettingsWindow())');
   });
 
   it('mounts a dedicated settings renderer instead of mailbox chrome', () => {
@@ -60,6 +63,7 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(appSource).toContain("requestedSettingsSection = 'general'");
     expect(appSource).toContain("useCallback((section: SettingsSectionId = 'general')");
     expect(appSource).toContain("openDesktopSettingsWindow('general')");
+    expect(appSource).toContain('prewarmSettingsWindow');
     expect(navigationSource).toContain('setActiveSettingsSection(DEFAULT_SETTINGS_SECTION)');
     expect(standaloneSource).toContain('return isSettingsSectionId(requested) ? requested : DEFAULT_SETTINGS_SECTION');
   });

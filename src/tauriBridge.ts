@@ -166,6 +166,11 @@ export function openSettingsWindow(request: SettingsWindowRequest = {}): Promise
   return loadProdBridge().then(({ prodOpenSettingsWindow }) => prodOpenSettingsWindow(request));
 }
 
+export function prewarmSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodPrewarmSettingsWindow }) => prodPrewarmSettingsWindow(request));
+}
+
 export function syncSettingsWindowAccountScope(scope: import('./app/types').AccountScope): Promise<void> {
   if (mockMode) return Promise.resolve();
   return loadProdBridge().then(({ prodSyncSettingsWindowAccountScope }) => prodSyncSettingsWindowAccountScope(scope));

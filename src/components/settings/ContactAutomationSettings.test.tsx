@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { Contact, ContactCreateInput } from '../../app/types';
+import type { AccountScope, Contact, ContactCreateInput } from '../../app/types';
 import ContactAutomationSettings from './ContactAutomationSettings';
 
 const contactForm: ContactCreateInput = {
@@ -12,6 +12,7 @@ const contactForm: ContactCreateInput = {
 
 const contact: Contact = {
   id: 1,
+  account_id: 1,
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   aliases: ['ada@work.example'],
@@ -21,6 +22,7 @@ const contact: Contact = {
 };
 
 type RenderOptions = {
+  accountScope?: AccountScope;
   editingContactId?: number | null;
   allContacts?: Contact[];
   editName?: string;
@@ -34,6 +36,7 @@ type RenderOptions = {
 
 function renderSettings(options: RenderOptions = {}) {
   const {
+    accountScope = 1,
     editingContactId = null,
     allContacts = [contact],
     editName = contact.name,
@@ -46,6 +49,7 @@ function renderSettings(options: RenderOptions = {}) {
   } = options;
   return render(
     <ContactAutomationSettings
+      accountScope={accountScope}
       contactForm={contactForm}
       contactFormAliases=""
       contacts={allContacts}
@@ -280,5 +284,20 @@ describe('ContactAutomationSettings', () => {
     expect(screen.queryByText('Contact 9')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '下一页' }));
     expect(screen.getByText('Contact 9')).not.toBeNull();
+  });
+
+  it('only shows contacts belonging to the selected account', () => {
+    const otherAccountContact = {
+      ...contact,
+      id: 2,
+      account_id: 2,
+      name: 'Grace Hopper',
+      email: 'grace@example.com',
+    };
+    renderSettings({ allContacts: [contact, otherAccountContact] });
+
+    expect(screen.getByText('Ada Lovelace')).not.toBeNull();
+    expect(screen.queryByText('Grace Hopper')).toBeNull();
+    expect(screen.getByText('1 位联系人')).not.toBeNull();
   });
 });

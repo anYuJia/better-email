@@ -139,12 +139,14 @@ impl MailStore {
 
                 CREATE TABLE IF NOT EXISTS contacts (
                     id INTEGER PRIMARY KEY,
+                    account_id INTEGER NOT NULL DEFAULT 1 REFERENCES accounts(id) ON DELETE CASCADE,
                     name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL,
                     aliases TEXT NOT NULL DEFAULT '',
                     vip INTEGER NOT NULL DEFAULT 0,
                     message_count INTEGER NOT NULL DEFAULT 0,
-                    last_seen_at TEXT NOT NULL
+                    last_seen_at TEXT NOT NULL,
+                    UNIQUE(account_id, email)
                 );
 
                 CREATE TABLE IF NOT EXISTS contact_sent_messages (
@@ -162,6 +164,7 @@ impl MailStore {
 
                 CREATE TABLE IF NOT EXISTS mail_rules (
                     id INTEGER PRIMARY KEY,
+                    account_id INTEGER NOT NULL DEFAULT 1 REFERENCES accounts(id) ON DELETE CASCADE,
                     name TEXT NOT NULL,
                     condition TEXT NOT NULL,
                     action TEXT NOT NULL,
@@ -225,6 +228,7 @@ impl MailStore {
                 );
                 CREATE TABLE IF NOT EXISTS contact_import_batches (
                     id INTEGER PRIMARY KEY,
+                    account_id INTEGER NOT NULL DEFAULT 1 REFERENCES accounts(id) ON DELETE CASCADE,
                     file_name TEXT NOT NULL,
                     total_count INTEGER NOT NULL,
                     created_count INTEGER NOT NULL,
@@ -502,6 +506,21 @@ impl MailStore {
             add_column_if_missing(conn, "contacts", "vip", "INTEGER NOT NULL DEFAULT 0")?;
             add_column_if_missing(
                 conn,
+                "mail_rules",
+                "account_id",
+                "INTEGER REFERENCES accounts(id) ON DELETE CASCADE",
+            )?;
+            ensure_account_scoped_rules(conn)?;
+            add_column_if_missing(
+                conn,
+                "contact_import_batches",
+                "account_id",
+                "INTEGER REFERENCES accounts(id) ON DELETE CASCADE",
+            )?;
+            ensure_account_scoped_import_batches(conn)?;
+            migrate_account_scoped_contacts_if_needed(conn)?;
+            add_column_if_missing(
+                conn,
                 "imap_mailboxes",
                 "local_folder_id",
                 "INTEGER REFERENCES folders(id) ON DELETE SET NULL",
@@ -544,7 +563,7 @@ impl MailStore {
                 CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
                 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
                 CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+                CREATE INDEX IF NOT EXISTS idx_contacts_account_email ON contacts(account_id, email);
                 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);
                 CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
@@ -669,6 +688,199 @@ pub(super) fn add_column_if_missing(
     }
     Ok(())
 }
+
+fn table_has_column(conn: &Connection, table: &str, column: &str) -> MailResult<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(columns.iter().any(|name| name == column))
+}
+
+fn default_account_id_optional(conn: &Connection) -> MailResult<Option<i64>> {
+    conn.query_row(
+        "SELECT id FROM accounts ORDER BY is_default DESC, id LIMIT 1",
+        [],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// 为旧数据库中的规则补齐账号归属。规则没有复杂外键关系，只需补列并把
+/// 历史全局规则归到默认账号；新建规则由命令层显式写入账号 ID。
+fn ensure_account_scoped_rules(conn: &Connection) -> MailResult<()> {
+    if !table_has_column(conn, "mail_rules", "account_id")? {
+        return Ok(());
+    }
+    let Some(account_id) = default_account_id_optional(conn)? else {
+        // A brand-new database is migrated before demo data is seeded, so there
+        // is intentionally no account at this point.
+        return Ok(());
+    };
+    conn.execute(
+        "UPDATE mail_rules
+         SET account_id = ?1
+         WHERE account_id IS NULL
+            OR NOT EXISTS (SELECT 1 FROM accounts WHERE accounts.id = mail_rules.account_id)",
+        params![account_id],
+    )?;
+    Ok(())
+}
+
+fn ensure_account_scoped_import_batches(conn: &Connection) -> MailResult<()> {
+    if !table_has_column(conn, "contact_import_batches", "account_id")? {
+        return Ok(());
+    }
+    let Some(account_id) = default_account_id_optional(conn)? else {
+        return Ok(());
+    };
+    conn.execute(
+        "UPDATE contact_import_batches
+         SET account_id = ?1
+         WHERE account_id IS NULL
+            OR NOT EXISTS (SELECT 1 FROM accounts WHERE accounts.id = contact_import_batches.account_id)",
+        params![account_id],
+    )?;
+    Ok(())
+}
+
+/// 联系人旧表使用 email 全局唯一，无法通过简单 ADD COLUMN 实现账号隔离。
+/// 这里重建表并根据已发送邮件的 account_id 复制历史联系人；没有关联邮件的
+/// 手动/导入联系人归入默认账号。旧联系人 ID 会保留给第一个账号，保证导入
+/// 撤销记录仍然有效，额外账号使用新的自增 ID。
+fn migrate_account_scoped_contacts_if_needed(conn: &Connection) -> MailResult<()> {
+    if table_has_column(conn, "contacts", "account_id")? {
+        return Ok(());
+    }
+
+    let Some(default_account_id) = default_account_id_optional(conn)? else {
+        // A brand-new database is migrated before demo data is seeded. There is
+        // no legacy contact to migrate until an account exists.
+        return Ok(());
+    };
+    let legacy_contacts = {
+        let mut stmt = conn.prepare(
+            "SELECT id, name, email, aliases, vip, message_count, last_seen_at FROM contacts ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, i64>(5)?,
+                row.get::<_, String>(6)?,
+            ))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    conn.execute_batch("PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE TRANSACTION;")?;
+    let result = (|| -> MailResult<()> {
+        conn.execute_batch(
+            "
+            CREATE TABLE contacts_account_scoped_new (
+                id INTEGER PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                aliases TEXT NOT NULL DEFAULT '',
+                vip INTEGER NOT NULL DEFAULT 0,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                last_seen_at TEXT NOT NULL,
+                UNIQUE(account_id, email)
+            );
+            CREATE TABLE contact_import_entries_account_scoped_new (
+                id INTEGER PRIMARY KEY,
+                batch_id INTEGER NOT NULL REFERENCES contact_import_batches(id) ON DELETE CASCADE,
+                contact_id INTEGER REFERENCES contacts_account_scoped_new(id) ON DELETE CASCADE,
+                email TEXT NOT NULL,
+                action TEXT NOT NULL
+            );
+            INSERT INTO contact_import_entries_account_scoped_new(id, batch_id, contact_id, email, action)
+                SELECT id, batch_id, contact_id, email, action FROM contact_import_entries;
+            ",
+        )?;
+
+        for (contact_id, name, email, aliases, vip, message_count, last_seen_at) in legacy_contacts
+        {
+            let account_ids = {
+                let mut stmt = conn.prepare(
+                    "SELECT DISTINCT m.account_id
+                     FROM contact_sent_messages sent
+                     JOIN messages m ON m.id = sent.message_id
+                     WHERE lower(sent.email) = lower(?1)
+                     ORDER BY m.account_id",
+                )?;
+                let rows = stmt.query_map(params![email.as_str()], |row| row.get::<_, i64>(0))?;
+                rows.collect::<Result<Vec<_>, _>>()?
+            };
+            let account_ids = if account_ids.is_empty() {
+                vec![default_account_id]
+            } else {
+                account_ids
+            };
+
+            for (index, account_id) in account_ids.iter().enumerate() {
+                let (derived_count, derived_last_seen): (i64, String) = conn.query_row(
+                    "SELECT COUNT(DISTINCT sent.message_id), COALESCE(MAX(m.received_at), '')
+                     FROM contact_sent_messages sent
+                     JOIN messages m ON m.id = sent.message_id
+                     WHERE m.account_id = ?1 AND lower(sent.email) = lower(?2)",
+                    params![account_id, email.as_str()],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+                let scoped_count = if derived_count > 0 || account_ids.len() > 1 {
+                    derived_count
+                } else {
+                    message_count
+                };
+                let scoped_last_seen = if derived_last_seen.is_empty() {
+                    last_seen_at.as_str()
+                } else {
+                    derived_last_seen.as_str()
+                };
+                let preserved_id = (index == 0).then_some(contact_id);
+                conn.execute(
+                    "INSERT INTO contacts_account_scoped_new(
+                        id, account_id, name, email, aliases, vip, message_count, last_seen_at
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![
+                        preserved_id,
+                        account_id,
+                        name.as_str(),
+                        email.as_str(),
+                        aliases.as_str(),
+                        vip,
+                        scoped_count,
+                        scoped_last_seen,
+                    ],
+                )?;
+            }
+        }
+
+        conn.execute_batch(
+            "
+            DROP TABLE contact_import_entries;
+            DROP TABLE contacts;
+            ALTER TABLE contacts_account_scoped_new RENAME TO contacts;
+            ALTER TABLE contact_import_entries_account_scoped_new RENAME TO contact_import_entries;
+            ",
+        )?;
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = conn.execute_batch("ROLLBACK;");
+    } else {
+        conn.execute_batch("COMMIT;")?;
+    }
+    let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
+    result
+}
+
 pub(super) fn migrate_thread_keys_if_needed(conn: &Connection) -> MailResult<()> {
     let current_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
     if current_version >= THREAD_KEY_SCHEMA_VERSION {

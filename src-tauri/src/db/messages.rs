@@ -806,6 +806,7 @@ impl MailStore {
             }
             upsert_contact(
                 conn,
+                account.id,
                 &imported.sender_name,
                 &imported.sender_email,
                 &imported.received_at,
@@ -953,6 +954,7 @@ impl MailStore {
                 apply_enabled_rules_for_message(conn, message_id)?;
                 upsert_contact(
                     conn,
+                    account_id,
                     &imported.sender_name,
                     &imported.sender_email,
                     &imported.received_at,

@@ -54,6 +54,7 @@ const stats: MailStats = {
 
 const contact: Contact = {
   id: 7,
+  account_id: 1,
   name: '联系人示例',
   email: 'contact@example.com',
   aliases: [],

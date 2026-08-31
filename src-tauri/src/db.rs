@@ -308,8 +308,9 @@ impl MailStore {
                 ("新闻邮件稍后处理", "from contains updates", "apply label 稍后处理"),
             ] {
                 conn.execute(
-                    "INSERT INTO mail_rules(name, condition, action, enabled) VALUES (?1, ?2, ?3, 1)",
-                    params![name, condition, action],
+                    "INSERT INTO mail_rules(account_id, name, condition, action, enabled)
+                     VALUES (?1, ?2, ?3, ?4, 1)",
+                    params![account_id, name, condition, action],
                 )?;
             }
 
@@ -428,7 +429,7 @@ impl MailStore {
                     )?;
                 }
                 #[cfg(test)]
-                upsert_contact(conn, sender_name, sender_email, &received_at.to_rfc3339())?;
+                upsert_contact(conn, account_id, sender_name, sender_email, &received_at.to_rfc3339())?;
             }
             db_info(format!(
                 "[better-email][db] seed demo data ok account_id={account_id}"
@@ -479,11 +480,12 @@ fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
     conn.execute(
         "
         DELETE FROM mail_rules
-        WHERE (name = '重要客户置顶' AND condition = 'from contains customer' AND action = 'apply label 重要客户')
+        WHERE (?1 IS NULL OR account_id = ?1)
+          AND ((name = '重要客户置顶' AND condition = 'from contains customer' AND action = 'apply label 重要客户')
            OR (name = '安全提醒标记' AND condition = 'subject contains 安全' AND action = 'apply label 工作')
-           OR (name = '新闻邮件稍后处理' AND condition = 'from contains updates' AND action = 'apply label 稍后处理')
+           OR (name = '新闻邮件稍后处理' AND condition = 'from contains updates' AND action = 'apply label 稍后处理'))
         ",
-        [],
+        params![demo_account_id],
     )?;
     conn.execute(
         "
@@ -502,8 +504,8 @@ fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
     conn.execute(
         "
         DELETE FROM contacts
-        WHERE
-          (lower(email) = 'ada@example.com'
+        WHERE (?1 IS NULL OR account_id = ?1)
+          AND ((lower(email) = 'ada@example.com'
             AND lower(name) IN ('ada', 'ada chen', 'ada@example.com'))
           OR (lower(email) = 'updates@example.com'
             AND lower(name) IN ('product robot', 'updates@example.com'))
@@ -512,9 +514,9 @@ fn remove_demo_seed_data_for_conn(conn: &Connection) -> MailResult<()> {
           OR (lower(email) = 'demo@better-email.local'
             AND lower(name) IN ('better email demo', 'demo@better-email.local'))
           OR (lower(email) = 'demo@swiftmail.local'
-            AND lower(name) = lower(email))
+            AND lower(name) = lower(email)))
         ",
-        [],
+        params![demo_account_id],
     )?;
 
     Ok(())
@@ -5114,6 +5116,7 @@ mod tests {
         let store =
             MailStore::open_at_with_seed(test_database_path("better-email-contact-list"), false)
                 .expect("empty contact store opens");
+        create_additional_account(&store, "contacts-list@example.com");
         for index in 0..125 {
             store
                 .create_contact(ContactCreateInput {
@@ -5133,6 +5136,7 @@ mod tests {
         let store =
             MailStore::open_at_with_seed(test_database_path("better-email-contact-order"), false)
                 .expect("empty contact store opens");
+        create_additional_account(&store, "contacts-order@example.com");
         let older = store
             .create_contact(ContactCreateInput {
                 name: "Older Contact".to_string(),
@@ -6780,6 +6784,7 @@ mod tests {
         // 这里在独立线程执行撤销，主线程用 recv_timeout 断言它必须在合理时间内返回。
         let db_path = test_database_path("better-email-undo-import");
         let store = MailStore::open_at(db_path.clone()).expect("store opens");
+        create_additional_account(&store, "contacts-undo@example.com");
         store
             .create_contact(ContactCreateInput {
                 name: "Existing".into(),

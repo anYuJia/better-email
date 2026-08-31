@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { cloneElement } from 'react';
 import { emptyDraft } from '../app/composerConfig';
+import type { Account, Contact } from '../app/types';
 import ComposerWindow from './ComposerWindow';
 
 afterEach(cleanup);
@@ -55,6 +56,65 @@ function composer() {
 }
 
 describe('ComposerWindow focus lifecycle', () => {
+  it('only exposes contacts belonging to the draft sending account', () => {
+    const account = (id: number, email: string): Account => ({
+      id,
+      email,
+      display_name: `账号 ${id}`,
+      provider: 'custom',
+      imap_host: '',
+      smtp_host: '',
+      incoming_protocol: 'imap',
+      auth_type: 'password',
+      sync_mode: 'manual',
+      remote_images_allowed: false,
+      signature: '',
+      cross_account_risk_warning: true,
+      block_external_mailboxes: false,
+      intercept_https_links: false,
+      auto_download_attachments: false,
+      fetch_history_attachments: false,
+      warn_external_senders: false,
+      onboarding_completed: true,
+      is_default: id === 1,
+    });
+    const contact = (id: number, accountId: number, name: string, email: string): Contact => ({
+      id,
+      account_id: accountId,
+      name,
+      email,
+      aliases: [],
+      vip: false,
+      message_count: 1,
+      last_seen_at: '2026-08-30T10:00:00Z',
+    });
+    const contactsPanel = () => screen.getByRole('complementary', { name: '联系人' });
+
+    const { rerender } = render(cloneElement(composer(), {
+      accounts: [account(1, 'one@example.com'), account(2, 'two@example.com')],
+      draft: { ...emptyDraft, account_id: 1 },
+      contacts: [
+        contact(11, 1, '账号一联系人', 'one-contact@example.com'),
+        contact(22, 2, '账号二联系人', 'two-contact@example.com'),
+      ],
+    }));
+
+    expect(contactsPanel().textContent).toContain('账号一联系人');
+    expect(contactsPanel().textContent).not.toContain('账号二联系人');
+
+    rerender(cloneElement(composer(), {
+      accounts: [account(1, 'one@example.com'), account(2, 'two@example.com')],
+      draft: { ...emptyDraft, account_id: 2 },
+      contacts: [
+        contact(11, 1, '账号一联系人', 'one-contact@example.com'),
+        contact(22, 2, '账号二联系人', 'two-contact@example.com'),
+      ],
+    }));
+
+    expect(contactsPanel().textContent).not.toContain('账号一联系人');
+    expect(contactsPanel().textContent).toContain('账号二联系人');
+  });
+
   it('keeps the contact picker reachable on a phone-sized viewport', () => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });

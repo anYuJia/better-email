@@ -1,7 +1,7 @@
 import type { MockCommandHandler } from './types';
 import {
-  contacts,
-  rules,
+  mockContactsForAccount,
+  mockRulesForAccount,
   remoteImageTrusts,
   renderMessageWithPolicy,
   createMockContact,
@@ -24,13 +24,13 @@ import {
 } from './state';
 
 export const handlers: Record<string, MockCommandHandler> = {
-  'list_contacts': () => contacts,
+  'list_contacts': (args) => mockContactsForAccount(args),
   'should_auto_scan_recent_contacts': () => false,
-  'scan_recent_contacts': () => ({
+  'scan_recent_contacts': (args) => ({
     scanned_messages: 3,
-    discovered_contacts: contacts.length,
+    discovered_contacts: mockContactsForAccount(args).length,
     created: 0,
-    updated: contacts.length,
+    updated: mockContactsForAccount(args).length,
     skipped: false,
   }),
   'create_contact': createMockContact,
@@ -44,12 +44,12 @@ export const handlers: Record<string, MockCommandHandler> = {
   'commit_contact_import_entries': mockCommitContactImportEntries,
   'list_contact_import_batches': mockListContactImportBatches,
   'undo_contact_import_batch': mockUndoContactImportBatch,
-  'export_contacts_vcard': () => ({
+  'export_contacts_vcard': (args) => ({
     path: '/tmp/better-email-contacts.vcf',
-    contacts: contacts.length,
-    size_bytes: contacts.length * 180,
+    contacts: mockContactsForAccount(args).length,
+    size_bytes: mockContactsForAccount(args).length * 180,
   }),
-  'list_rules': () => rules,
+  'list_rules': (args) => mockRulesForAccount(args),
   'upsert_rule': upsertMockRule,
   'set_rule_enabled': setMockRuleEnabled,
   'delete_rule': deleteMockRule,

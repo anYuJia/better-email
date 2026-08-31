@@ -199,6 +199,7 @@ export default function useReaderActions({
     const sender = selected.sender_email.trim().toLowerCase();
     const saved = await invoke<MailRule>(IPC.UpsertRule, {
       ruleId: null,
+      accountId: selected.account_id,
       input: {
         name: `阻止 ${sender}`,
         condition: `from contains ${sender}`,

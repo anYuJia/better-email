@@ -59,6 +59,7 @@ export type MockOutboundAttachmentInput = {
 
 export type MockContact = {
   id: number;
+  account_id: number;
   name: string;
   email: string;
   aliases: string[];

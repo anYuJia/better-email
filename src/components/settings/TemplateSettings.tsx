@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { ComposeTemplate } from '../../app/types/composer';
 import type { Account } from '../../app/types/account';
+import type { AccountScope } from '../../app/types';
 import { invoke } from '../../tauriBridge';
 import {
   TEMPLATE_VARIABLES,
@@ -21,6 +22,7 @@ import {
   loadTemplates,
   parseAiGeneratedTemplate,
   saveTemplate,
+  templatesForAccount,
 } from '../../app/templateStore';
 import { aiErrorMessage, generateTemplate } from '../../app/aiService';
 import { loadAiServiceConfig } from '../../app/aiServiceConfig';
@@ -49,6 +51,8 @@ type TemplateEditor = {
 };
 
 type TemplateSettingsProps = {
+  accountScope?: AccountScope;
+  accounts?: Account[];
   onNavigateToAi?: () => void;
 };
 
@@ -91,9 +95,13 @@ function editorFromTemplate(template: ComposeTemplate): TemplateEditor {
   };
 }
 
-export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsProps) {
+export default function TemplateSettings({
+  accountScope = 'all',
+  accounts: accountOptions,
+  onNavigateToAi,
+}: TemplateSettingsProps) {
   const [templates, setTemplates] = useState<ComposeTemplate[]>(() => loadTemplates());
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loadedAccounts, setLoadedAccounts] = useState<Account[]>([]);
   const [query, setQuery] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editor, setEditor] = useState<TemplateEditor>(emptyEditor);
@@ -108,14 +116,21 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
   const [aiEnabled] = useState(() => loadAiServiceConfig().enabled);
 
   useEffect(() => {
-    void invoke<Account[]>(IPC.ListAccounts).then(setAccounts).catch(() => undefined);
-  }, []);
+    if (accountOptions) return;
+    void invoke<Account[]>(IPC.ListAccounts).then(setLoadedAccounts).catch(() => undefined);
+  }, [accountOptions]);
+
+  const accounts = accountOptions ?? loadedAccounts;
+  const visibleTemplates = useMemo(
+    () => templatesForAccount(templates, accountScope === 'all' ? null : accountScope),
+    [accountScope, templates],
+  );
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     const candidates = favoritesOnly
-      ? templates.filter((template) => template.is_favorite)
-      : templates;
+      ? visibleTemplates.filter((template) => template.is_favorite)
+      : visibleTemplates;
     if (!term) return candidates;
     return candidates.filter((template) => (
       [template.name, template.subject, template.category, template.tags.join(' ')]
@@ -123,9 +138,9 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
         .toLowerCase()
         .includes(term)
     ));
-  }, [templates, query, favoritesOnly]);
+  }, [query, favoritesOnly, visibleTemplates]);
 
-  const isEmptyList = templates.length === 0 && !query && !favoritesOnly;
+  const isEmptyList = visibleTemplates.length === 0 && !query && !favoritesOnly;
 
   function refresh(next: ComposeTemplate[]) {
     setTemplates(next);
@@ -133,7 +148,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
   }
 
   function startCreate() {
-    setEditor(emptyEditor);
+    setEditor({ ...emptyEditor, account_id: accountScope === 'all' ? 0 : accountScope });
     setEditing(true);
     setStatus('');
   }
@@ -150,6 +165,11 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
       return;
     }
     const existing = editor.id ? loadTemplates().find((template) => template.id === editor.id) : null;
+    const templateAccountId = editor.id
+      ? editor.account_id
+      : accountScope === 'all'
+        ? 0
+        : accountScope;
     const next = saveTemplate({
       id: editor.id || crypto.randomUUID(),
       name: editor.name,
@@ -158,7 +178,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
       html_body: existing?.html_body ?? '',
       category: editor.category.trim(),
       tags: editor.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean),
-      account_id: editor.account_id,
+      account_id: templateAccountId,
       is_favorite: editor.is_favorite,
       created_at: existing?.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -213,7 +233,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
       html_body: '',
       category: editor.category.trim(),
       tags: editor.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean),
-      account_id: editor.account_id,
+      account_id: editor.account_id || (accountScope === 'all' ? 0 : accountScope),
       is_favorite: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -231,11 +251,27 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
     }));
   }
 
+  function accountLabel(accountId: number): string {
+    if (accountId === 0) return '所有账号';
+    const account = accounts.find((entry) => entry.id === accountId);
+    if (!account) return `账号 #${accountId}`;
+    const displayName = account.display_name.trim();
+    return displayName && displayName !== account.email
+      ? `${displayName} · ${account.email}`
+      : account.email;
+  }
+
+  useEffect(() => {
+    setEditing(false);
+    setEditor(emptyEditor);
+    setConfirmDeleteId(null);
+  }, [accountScope]);
+
   return (
     <SettingsSection
       title="模板管理"
       description="维护常用写信模板，支持变量与 AI 辅助生成。"
-      badge={<SettingsBadge tone="neutral">{templates.length} 个模板</SettingsBadge>}
+      badge={<SettingsBadge tone="neutral">{visibleTemplates.length} 个模板</SettingsBadge>}
       dataSection="templates"
     >
       <div className="template-toolbar">
@@ -490,6 +526,7 @@ export default function TemplateSettings({ onNavigateToAi }: TemplateSettingsPro
                 <small>{template.subject || '（无主题）'}</small>
                 {template.category && <em className="template-category">{template.category}</em>}
                 {template.tags.map((tag) => <em key={tag} className="template-tag">{tag}</em>)}
+                <SettingsBadge tone="neutral">适用：{accountLabel(template.account_id)}</SettingsBadge>
                 <span className="template-updated">更新于 {new Date(template.updated_at).toLocaleDateString()}</span>
               </div>
               <div className="template-row-actions">

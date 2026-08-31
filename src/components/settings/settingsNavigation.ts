@@ -61,6 +61,9 @@ export const accountScopedSections = new Set<SettingsSectionId>([
   'identities',
   'sync',
   'privacy',
+  'contacts',
+  'rules',
+  'templates',
 ]);
 
 const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem, 'label' | 'description'>> = {

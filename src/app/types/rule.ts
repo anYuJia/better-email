@@ -1,5 +1,6 @@
 export type MailRule = {
   id: number;
+  account_id: number;
   name: string;
   condition: string;
   action: string;
@@ -13,4 +14,3 @@ export type MailRuleInput = {
   action: string;
   enabled: boolean;
 };
-

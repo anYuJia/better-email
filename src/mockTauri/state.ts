@@ -369,6 +369,33 @@ export let labels = [
 
 export let contacts: MockContact[] = [];
 
+function accountIdFromArgs(args: InvokeArgs, fallbackToCurrent: boolean): number | null {
+  if (args?.accountId === undefined) return fallbackToCurrent ? account.id : null;
+  const accountId = Number(args.accountId);
+  return accountId > 0 ? accountId : null;
+}
+
+function requireContactAccountId(args?: InvokeArgs): number {
+  const accountId = accountIdFromArgs(args, true);
+  if (!accountId) throw new Error('请先选择具体邮箱账号');
+  if (!mockAccounts.some((item) => item.id === accountId)) throw new Error('邮箱账号不存在或已被移除');
+  return accountId;
+}
+
+export function mockContactsForAccount(args?: InvokeArgs): MockContact[] {
+  const accountId = accountIdFromArgs(args, false);
+  return accountId === null
+    ? contacts
+    : contacts.filter((contact) => contact.account_id === accountId);
+}
+
+export function mockRulesForAccount(args?: InvokeArgs) {
+  const accountId = accountIdFromArgs(args, false);
+  return accountId === null
+    ? rules
+    : rules.filter((rule) => rule.account_id === accountId);
+}
+
 export let attachments = [
   {
     id: 1,
@@ -417,9 +444,9 @@ export function mockStorageUsage() {
 }
 
 export let rules = [
-  { id: 1, name: '客户邮件标记', condition: 'from contains customer', action: 'apply label 重要客户', enabled: true },
-  { id: 2, name: '安全邮件标记', condition: 'subject contains 安全', action: 'apply label 重要', enabled: true },
-  { id: 3, name: '工作邮件标记', condition: 'from contains ada', action: 'apply label 工作', enabled: false },
+  { id: 1, account_id: 1, name: '客户邮件标记', condition: 'from contains customer', action: 'apply label 重要客户', enabled: true },
+  { id: 2, account_id: 1, name: '安全邮件标记', condition: 'subject contains 安全', action: 'apply label 重要', enabled: true },
+  { id: 3, account_id: 1, name: '工作邮件标记', condition: 'from contains ada', action: 'apply label 工作', enabled: false },
 ];
 
 export let outbox: Array<{
@@ -448,6 +475,7 @@ export let syncRuns: MockSyncRun[] = [];
 export let oauthSessions: MockOAuthSession[] = [];
 export let contactImportBatches: Array<{
   id: number;
+  account_id: number;
   file_name: string;
   total_count: number;
   created_count: number;
@@ -874,6 +902,9 @@ export function removeMockAccount(args?: InvokeArgs) {
   outbox = outbox.filter((item) => !removedMessageIds.has(item.message_id));
   remoteImageTrusts = remoteImageTrusts.filter((trust) => trust.account_id !== accountId);
   oauthSessions = oauthSessions.filter((session) => session.account_id !== accountId);
+  contacts = contacts.filter((contact) => contact.account_id !== accountId);
+  rules = rules.filter((rule) => rule.account_id !== accountId);
+  contactImportBatches = contactImportBatches.filter((batch) => batch.account_id !== accountId);
   if (removedAccount.is_default) {
     mockAccounts = mockAccounts.map((item, index) => ({ ...item, is_default: index === 0 }));
   }
@@ -1843,10 +1874,16 @@ export function retryMockBackgroundTask(args?: InvokeArgs) {
 }
 
 export function upsertMockRule(args?: InvokeArgs) {
+  const accountId = requireContactAccountId(args);
   const input = args?.input as { name?: string; condition?: string; action?: string; enabled?: boolean };
   const ruleId = args?.ruleId == null ? null : Number(args.ruleId);
+  const existing = ruleId == null ? undefined : rules.find((item) => item.id === ruleId);
+  if (ruleId != null && (!existing || existing.account_id !== accountId)) {
+    throw new Error('规则不存在或不属于当前邮箱账号');
+  }
   const rule = {
     id: ruleId ?? nextRuleId++,
+    account_id: accountId,
     name: input.name?.trim() || '未命名规则',
     condition: input.condition?.trim() || 'subject contains Better Email',
     action: input.action?.trim() || 'apply label 重要',
@@ -1857,8 +1894,9 @@ export function upsertMockRule(args?: InvokeArgs) {
 }
 
 export function setMockRuleEnabled(args?: InvokeArgs) {
+  const accountId = requireContactAccountId(args);
   const ruleId = Number(args?.ruleId);
-  const updated = rules.find((rule) => rule.id === ruleId);
+  const updated = rules.find((rule) => rule.id === ruleId && rule.account_id === accountId);
   if (!updated) throw new Error('rule not found');
   const rule = { ...updated, enabled: Boolean(args?.enabled) };
   rules = rules.map((item) => (item.id === ruleId ? rule : item));
@@ -1866,15 +1904,21 @@ export function setMockRuleEnabled(args?: InvokeArgs) {
 }
 
 export function deleteMockRule(args?: InvokeArgs) {
-  rules = rules.filter((rule) => rule.id !== args?.ruleId);
+  const accountId = requireContactAccountId(args);
+  const ruleId = Number(args?.ruleId);
+  if (!rules.some((rule) => rule.id === ruleId && rule.account_id === accountId)) {
+    throw new Error('规则不存在或不属于当前邮箱账号');
+  }
+  rules = rules.filter((rule) => !(rule.id === ruleId && rule.account_id === accountId));
   return undefined;
 }
 
 export function createMockContact(args?: InvokeArgs) {
   const input = args?.input as { name?: string; email?: string; aliases?: string[]; vip?: boolean };
+  const accountId = requireContactAccountId(args);
   const email = String(input.email ?? '').trim().toLowerCase();
   if (!email) throw new Error('联系人邮箱不能为空');
-  if (contacts.some((contact) => contact.email.toLowerCase() === email)) {
+  if (contacts.some((contact) => contact.account_id === accountId && contact.email.toLowerCase() === email)) {
     throw new Error('联系人邮箱已存在');
   }
   const aliases = [...new Set((input.aliases ?? [])
@@ -1882,6 +1926,7 @@ export function createMockContact(args?: InvokeArgs) {
     .filter((alias) => alias && alias !== email))];
   const created = {
     id: nextContactId++,
+    account_id: accountId,
     name: input.name?.trim() || email,
     email,
     aliases,
@@ -1895,8 +1940,9 @@ export function createMockContact(args?: InvokeArgs) {
 
 export function updateMockContact(args?: InvokeArgs) {
   const contactId = Number(args?.contactId);
+  const accountId = requireContactAccountId(args);
   const input = args?.input as { name?: string; aliases?: string[]; vip?: boolean };
-  const existing = contacts.find((contact) => contact.id === contactId);
+  const existing = contacts.find((contact) => contact.id === contactId && contact.account_id === accountId);
   if (!existing) throw new Error('contact not found');
   const aliases = [...new Set((input.aliases ?? [])
     .map((alias) => String(alias).trim().toLowerCase())
@@ -1913,16 +1959,21 @@ export function updateMockContact(args?: InvokeArgs) {
 
 export function deleteMockContact(args?: InvokeArgs) {
   const contactId = Number(args?.contactId);
-  contacts = contacts.filter((contact) => contact.id !== contactId);
+  const accountId = requireContactAccountId(args);
+  if (!contacts.some((contact) => contact.id === contactId && contact.account_id === accountId)) {
+    throw new Error('联系人不存在或不属于当前邮箱账号');
+  }
+  contacts = contacts.filter((contact) => !(contact.id === contactId && contact.account_id === accountId));
   return undefined;
 }
 
 export function mergeMockContacts(args?: InvokeArgs) {
   const targetContactId = Number(args?.targetContactId);
   const sourceContactId = Number(args?.sourceContactId);
+  const accountId = requireContactAccountId(args);
   if (targetContactId === sourceContactId) throw new Error('请选择两个不同联系人进行合并');
-  const target = contacts.find((contact) => contact.id === targetContactId);
-  const source = contacts.find((contact) => contact.id === sourceContactId);
+  const target = contacts.find((contact) => contact.id === targetContactId && contact.account_id === accountId);
+  const source = contacts.find((contact) => contact.id === sourceContactId && contact.account_id === accountId);
   if (!target || !source) throw new Error('contact not found');
   const aliases = [...new Set([...target.aliases, source.email, ...source.aliases]
     .map((alias) => alias.trim().toLowerCase())
@@ -1939,11 +1990,13 @@ export function mergeMockContacts(args?: InvokeArgs) {
   return merged;
 }
 
-export function importMockContactsVCard(_args?: InvokeArgs) {
+export function importMockContactsVCard(args?: InvokeArgs) {
+  const accountId = requireContactAccountId(args);
   const importedEmail = 'vcard.person@example.com';
-  const existingImported = contacts.find((contact) => contact.email === importedEmail);
+  const existingImported = contacts.find((contact) => contact.account_id === accountId && contact.email === importedEmail);
   const importedContact = existingImported ?? {
     id: nextContactId++,
+    account_id: accountId,
     name: 'vCard Person',
     email: importedEmail,
     aliases: ['vcard.alias@example.com'],
@@ -1951,7 +2004,9 @@ export function importMockContactsVCard(_args?: InvokeArgs) {
     message_count: 0,
     last_seen_at: now,
   };
-  contacts = [importedContact, ...contacts];
+  contacts = existingImported
+    ? contacts.map((contact) => contact.id === existingImported.id ? importedContact : contact)
+    : [importedContact, ...contacts];
   return {
     path: '/tmp/imported-contacts.vcf',
     total_cards: 1,
@@ -1969,18 +2024,25 @@ export function mockPickContactImportFile(args?: InvokeArgs) {
 
 export function mockPreviewContactImport(args?: InvokeArgs) {
   const path = String(args?.path ?? '/mock/import-contacts.vcf');
+  const accountId = accountIdFromArgs(args, false);
   const file_name = path.split('/').pop() || 'import-contacts.vcf';
   const lowerName = file_name.toLowerCase();
+  const importedAlready = accountId !== null
+    && contacts.some((contact) => contact.account_id === accountId && contact.email === 'import.new@example.com');
   const seeded = [
     {
       email: 'import.new@example.com',
       name: 'Import New',
       aliases: [] as string[],
       vip: false,
-      status: 'new',
-      existing_contact_id: null,
-      existing_name: '',
-      reason: '新联系人',
+      status: importedAlready ? 'duplicate' : 'new',
+      existing_contact_id: importedAlready
+        ? contacts.find((contact) => contact.account_id === accountId && contact.email === 'import.new@example.com')?.id ?? null
+        : null,
+      existing_name: importedAlready
+        ? contacts.find((contact) => contact.account_id === accountId && contact.email === 'import.new@example.com')?.name ?? ''
+        : '',
+      reason: importedAlready ? '与已有联系人完全相同' : '新联系人',
     },
     {
       email: 'not-an-email',
@@ -1998,9 +2060,9 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
     path,
     format: lowerName.endsWith('.csv') ? 'csv' : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? 'xlsx' : 'vcard',
     total_count: 2,
-    new_count: 1,
+    new_count: importedAlready ? 0 : 1,
     merge_count: 0,
-    duplicate_count: 0,
+    duplicate_count: importedAlready ? 1 : 0,
     invalid_count: 1,
     entries: seeded,
   };
@@ -2008,6 +2070,7 @@ export function mockPreviewContactImport(args?: InvokeArgs) {
 
 export function mockCommitContactImport(args?: InvokeArgs) {
   const path = String(args?.path ?? '/mock/import-contacts.vcf');
+  const accountId = requireContactAccountId(args);
   const file_name = path.split('/').pop() || 'import-contacts.vcf';
   const selections = Array.isArray(args?.selections) ? (args.selections as Array<{ email: string; action: string }>) : [];
   const actionByEmail = new Map(selections.map((item) => [item.email.toLowerCase(), item.action]));
@@ -2020,7 +2083,7 @@ export function mockCommitContactImport(args?: InvokeArgs) {
       skipped += 1;
       return;
     }
-    const existing = contacts.find((contact) => contact.email === email);
+    const existing = contacts.find((contact) => contact.account_id === accountId && contact.email === email);
     if (action === 'merge' && existing) {
       contacts = contacts.map((contact) => (
         contact.id === existing.id
@@ -2030,7 +2093,7 @@ export function mockCommitContactImport(args?: InvokeArgs) {
       merged += 1;
     } else if (!existing) {
       contacts = [
-        { id: nextContactId++, name: 'Import New', email, aliases: ['import.alias@example.com'], vip: false, message_count: 0, last_seen_at: now },
+        { id: nextContactId++, account_id: accountId, name: 'Import New', email, aliases: ['import.alias@example.com'], vip: false, message_count: 0, last_seen_at: now },
         ...contacts,
       ];
       created += 1;
@@ -2041,6 +2104,7 @@ export function mockCommitContactImport(args?: InvokeArgs) {
   contactImportBatches = [
     {
       id: batchId,
+      account_id: accountId,
       file_name,
       total_count: 1,
       created_count: created,
@@ -2055,6 +2119,7 @@ export function mockCommitContactImport(args?: InvokeArgs) {
 }
 
 export function mockCommitContactImportEntries(args?: InvokeArgs) {
+  const accountId = requireContactAccountId(args);
   const file_name = String(args?.fileName ?? 'import-contacts.vcf');
   const rawEntries = Array.isArray(args?.entries)
     ? (args.entries as Array<{
@@ -2074,7 +2139,7 @@ export function mockCommitContactImportEntries(args?: InvokeArgs) {
       skipped += 1;
       continue;
     }
-    const existing = contacts.find((contact) => contact.email === email);
+    const existing = contacts.find((contact) => contact.account_id === accountId && contact.email === email);
     if (existing) {
       contacts = contacts.map((contact) => (
         contact.id === existing.id
@@ -2091,6 +2156,7 @@ export function mockCommitContactImportEntries(args?: InvokeArgs) {
       contacts = [
         {
           id: nextContactId++,
+          account_id: accountId,
           name: entry.name.trim() || email,
           email,
           aliases: [...entry.aliases],
@@ -2107,6 +2173,7 @@ export function mockCommitContactImportEntries(args?: InvokeArgs) {
   contactImportBatches = [
     {
       id: batchId,
+      account_id: accountId,
       file_name,
       total_count: rawEntries.length,
       created_count: created,
@@ -2120,17 +2187,24 @@ export function mockCommitContactImportEntries(args?: InvokeArgs) {
   return { batch_id: batchId, created, merged, skipped };
 }
 
-export function mockListContactImportBatches() {
-  return contactImportBatches.map((batch) => ({ ...batch }));
+export function mockListContactImportBatches(args?: InvokeArgs) {
+  const accountId = accountIdFromArgs(args, false);
+  return contactImportBatches
+    .filter((batch) => accountId === null || batch.account_id === accountId)
+    .map((batch) => ({ ...batch }));
 }
 
 export function mockUndoContactImportBatch(args?: InvokeArgs) {
   const batchId = Number(args?.batchId ?? 0);
+  const accountId = accountIdFromArgs(args, false);
   const batch = contactImportBatches.find((item) => item.id === batchId);
   if (!batch) throw new Error('未找到该导入批次。');
+  if (accountId !== null && batch.account_id !== accountId) {
+    throw new Error('导入批次不属于当前邮箱账号');
+  }
   const removed = batch.created_count;
   const importEmail = 'import.new@example.com';
-  contacts = contacts.filter((contact) => contact.email !== importEmail);
+  contacts = contacts.filter((contact) => !(contact.account_id === batch.account_id && contact.email === importEmail));
   batch.created_count = 0;
   return {
     removed,

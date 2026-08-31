@@ -634,6 +634,7 @@ mod tests {
     fn rendered_contacts_round_trip_names_aliases_and_vip() {
         let payload = render_contacts(&[Contact {
             id: 1,
+            account_id: 1,
             name: "Ada, Lovelace".to_string(),
             email: "ada@example.com".to_string(),
             aliases: vec!["ada@work.example.com".to_string()],

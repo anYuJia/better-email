@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
+  AccountScope,
   Contact,
   ContactCreateInput,
 } from '../../app/types';
@@ -26,6 +27,7 @@ import ContactImportDialog from './ContactImportDialog';
 import {
   SettingsBadge,
   SettingsButton,
+  AccountScopeRequired,
   SettingsEmptyState,
   SettingsField,
   SettingsSection,
@@ -40,6 +42,7 @@ function contactInitial(contact: Contact) {
 }
 
 type ContactAutomationSettingsProps = {
+  accountScope?: AccountScope;
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
@@ -67,6 +70,7 @@ type ContactAutomationSettingsProps = {
 };
 
 export default function ContactAutomationSettings({
+  accountScope = 1,
   contactForm,
   contactFormAliases,
   contacts,
@@ -106,7 +110,10 @@ export default function ContactAutomationSettings({
     commitImport,
     cancelImport,
     importError,
-  } = useContactImportManager({ setStatus: onStatus });
+  } = useContactImportManager({
+    setStatus: onStatus,
+    accountId: accountScope === 'all' ? null : accountScope,
+  });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [dialog, setDialog] = useState<'create' | 'details' | 'edit' | null>(null);
@@ -115,6 +122,18 @@ export default function ContactAutomationSettings({
   const dialogRef = useRef<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const pageSize = 8;
+  const visibleContacts = useMemo(
+    () => typeof accountScope === 'number'
+      ? contacts.filter((contact) => contact.account_id === accountScope)
+      : contacts,
+    [accountScope, contacts],
+  );
+  const visibleFilteredContacts = useMemo(
+    () => typeof accountScope === 'number'
+      ? filteredContacts.filter((contact) => contact.account_id === accountScope)
+      : filteredContacts,
+    [accountScope, filteredContacts],
+  );
 
   useEffect(() => {
     setPage(1);
@@ -164,10 +183,10 @@ export default function ContactAutomationSettings({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [dialog]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredContacts.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(visibleFilteredContacts.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const visibleContacts = filteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const vipCount = contacts.filter((contact) => contact.vip).length;
+  const pagedContacts = visibleFilteredContacts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const vipCount = visibleContacts.filter((contact) => contact.vip).length;
 
   async function handleCommitImport() {
     await commitImport();
@@ -181,27 +200,37 @@ export default function ContactAutomationSettings({
 
   const contactAliasIssues = useMemo(() => {
     const takenByOther = new Set<string>();
-    for (const contact of contacts) {
+    for (const contact of visibleContacts) {
       takenByOther.add(contact.email.trim().toLowerCase());
       for (const alias of contact.aliases) takenByOther.add(alias.trim().toLowerCase());
     }
     return validateContactAliases(contactFormAliases, contactForm.email, takenByOther);
-  }, [contactFormAliases, contactForm.email, contacts]);
+  }, [contactFormAliases, contactForm.email, visibleContacts]);
 
   const editAliasIssues = useMemo(() => {
-    const editing = contacts.find((contact) => contact.id === editingContactId);
+    const editing = visibleContacts.find((contact) => contact.id === editingContactId);
     if (!editing) return emptyContactAliasIssues;
     const takenByOther = new Set<string>();
-    for (const contact of contacts) {
+    for (const contact of visibleContacts) {
       if (contact.id === editing.id) continue;
       takenByOther.add(contact.email.trim().toLowerCase());
       for (const alias of contact.aliases) takenByOther.add(alias.trim().toLowerCase());
     }
     return validateContactAliases(editAliases, editing.email, takenByOther);
-  }, [editAliases, editingContactId, contacts]);
+  }, [editAliases, editingContactId, visibleContacts]);
 
   const aliasIssueText = formatContactAliasIssues(contactAliasIssues);
   const editAliasIssueText = formatContactAliasIssues(editAliasIssues);
+
+  if (accountScope === 'all') {
+    return (
+      <AccountScopeRequired
+        accountScope={accountScope}
+        title="请选择具体邮箱账号"
+        description="联系人、VIP、别名和导入记录都属于单独邮箱账号。请使用顶部的邮箱范围选择器选择一个账号后继续。"
+      />
+    );
+  }
 
   async function handleCreateContact() {
     const email = contactForm.email.trim();
@@ -265,7 +294,7 @@ export default function ContactAutomationSettings({
       description="别名、VIP和快捷写信"
       actions={
         <div className="contact-primary-actions">
-          <SettingsBadge tone="neutral">{contacts.length} 位联系人</SettingsBadge>
+          <SettingsBadge tone="neutral">{visibleContacts.length} 位联系人</SettingsBadge>
           <SettingsButton size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => { triggerRef.current = document.activeElement as HTMLElement; setDialog('create'); }}>
             添加联系人
           </SettingsButton>
@@ -283,12 +312,12 @@ export default function ContactAutomationSettings({
         >
           导入联系人
         </SettingsButton>
-        <SettingsButton size="sm" disabled={transferBusy || contacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
+        <SettingsButton size="sm" disabled={transferBusy || visibleContacts.length === 0} icon={<FileDown size={14} />} onClick={onExportContacts}>
           导出 vCard
         </SettingsButton>
       </div>
 
-      {contacts.length === 0 ? (
+      {visibleContacts.length === 0 ? (
         <SettingsEmptyState className="settings-contacts-empty">
           <span className="settings-contacts-empty-mark" aria-hidden="true"><Users size={22} /></span>
           <strong>还没有联系人</strong>
@@ -321,7 +350,7 @@ export default function ContactAutomationSettings({
             </SettingsField>
             <div className="settings-contact-list-summary" role="status" aria-live="polite">
               <span>{contactQuery ? '搜索结果' : '全部联系人'}</span>
-              <strong>{filteredContacts.length}</strong>
+              <strong>{visibleFilteredContacts.length}</strong>
               <span>位</span>
               {vipCount > 0 && (
                 <>
@@ -331,7 +360,7 @@ export default function ContactAutomationSettings({
               )}
             </div>
           </div>
-          {visibleContacts.map((contact) => {
+          {pagedContacts.map((contact) => {
             const displayName = contact.name.trim() || contact.email;
             const hasDisplayName = Boolean(contact.name.trim());
             return (
@@ -359,12 +388,12 @@ export default function ContactAutomationSettings({
               </div>
             );
           })}
-          {filteredContacts.length === 0 && contactQuery && (
+          {visibleFilteredContacts.length === 0 && contactQuery && (
             <p className="settings-empty-hint">没有匹配「{contactQuery}」的联系人。</p>
           )}
-          {filteredContacts.length > pageSize && (
+          {visibleFilteredContacts.length > pageSize && (
             <nav className="settings-contact-pagination" aria-label="联系人分页">
-              <span>第 {currentPage} / {pageCount} 页，共 {filteredContacts.length} 位</span>
+              <span>第 {currentPage} / {pageCount} 页，共 {visibleFilteredContacts.length} 位</span>
               <div>
                 <SettingsButton size="sm" variant="ghost" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>上一页</SettingsButton>
                 <SettingsButton size="sm" variant="ghost" disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>下一页</SettingsButton>

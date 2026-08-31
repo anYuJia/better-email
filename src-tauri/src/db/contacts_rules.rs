@@ -5,23 +5,29 @@ use super::*;
 
 impl MailStore {
     pub fn list_contacts(&self) -> MailResult<Vec<Contact>> {
+        self.list_contacts_for_account(None)
+    }
+
+    pub fn list_contacts_for_account(&self, account_id: Option<i64>) -> MailResult<Vec<Contact>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, name, email, aliases, vip, message_count, last_seen_at
+                "SELECT id, account_id, name, email, aliases, vip, message_count, last_seen_at
                  FROM contacts
+                 WHERE (?1 IS NULL OR account_id = ?1)
                  ORDER BY CASE WHEN julianday(last_seen_at) IS NULL THEN 1 ELSE 0 END,
                           julianday(last_seen_at) DESC, last_seen_at DESC, name COLLATE NOCASE",
             )?;
             let contacts = stmt
-                .query_map([], |row| {
+                .query_map(params![account_id], |row| {
                     Ok(Contact {
                         id: row.get(0)?,
-                        name: row.get(1)?,
-                        email: row.get(2)?,
-                        aliases: contact_aliases_from_text(row.get(3)?),
-                        vip: row.get::<_, i64>(4)? != 0,
-                        message_count: row.get(5)?,
-                        last_seen_at: row.get(6)?,
+                        account_id: row.get(1)?,
+                        name: row.get(2)?,
+                        email: row.get(3)?,
+                        aliases: contact_aliases_from_text(row.get(4)?),
+                        vip: row.get::<_, i64>(5)? != 0,
+                        message_count: row.get(6)?,
+                        last_seen_at: row.get(7)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -29,21 +35,31 @@ impl MailStore {
         })
     }
     pub fn list_all_contacts(&self) -> MailResult<Vec<Contact>> {
+        self.list_all_contacts_for_account(None)
+    }
+
+    pub fn list_all_contacts_for_account(
+        &self,
+        account_id: Option<i64>,
+    ) -> MailResult<Vec<Contact>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-                 FROM contacts ORDER BY name COLLATE NOCASE, email COLLATE NOCASE",
+                "SELECT id, account_id, name, email, aliases, vip, message_count, last_seen_at
+                 FROM contacts
+                 WHERE (?1 IS NULL OR account_id = ?1)
+                 ORDER BY name COLLATE NOCASE, email COLLATE NOCASE",
             )?;
             let contacts = stmt
-                .query_map([], |row| {
+                .query_map(params![account_id], |row| {
                     Ok(Contact {
                         id: row.get(0)?,
-                        name: row.get(1)?,
-                        email: row.get(2)?,
-                        aliases: contact_aliases_from_text(row.get(3)?),
-                        vip: row.get::<_, i64>(4)? != 0,
-                        message_count: row.get(5)?,
-                        last_seen_at: row.get(6)?,
+                        account_id: row.get(1)?,
+                        name: row.get(2)?,
+                        email: row.get(3)?,
+                        aliases: contact_aliases_from_text(row.get(4)?),
+                        vip: row.get::<_, i64>(5)? != 0,
+                        message_count: row.get(6)?,
+                        last_seen_at: row.get(7)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -64,6 +80,14 @@ impl MailStore {
         })
     }
     pub fn scan_recent_contacts(&self, initial_only: bool) -> MailResult<RecentContactSyncReport> {
+        self.scan_recent_contacts_for_account(initial_only, None)
+    }
+
+    pub fn scan_recent_contacts_for_account(
+        &self,
+        initial_only: bool,
+        account_id: Option<i64>,
+    ) -> MailResult<RecentContactSyncReport> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
             if initial_only {
@@ -87,28 +111,30 @@ impl MailStore {
             }
 
             let own_addresses = own_email_addresses_for_conn(&transaction)?;
-            let mut aggregates = BTreeMap::<String, SentContactAggregate>::new();
+            let mut aggregates = BTreeMap::<(i64, String), SentContactAggregate>::new();
             let mut scanned_messages = 0_i64;
             {
                 let mut stmt = transaction.prepare(
-                    "SELECT m.id, m.recipients, m.cc, m.bcc, m.received_at
+                    "SELECT m.id, m.account_id, m.recipients, m.cc, m.bcc, m.received_at
                      FROM messages m
                      JOIN folders f ON f.id = m.folder_id
                      WHERE f.role = 'sent'
+                       AND (?1 IS NULL OR m.account_id = ?1)
                      ORDER BY CASE WHEN julianday(m.received_at) IS NULL THEN 1 ELSE 0 END,
                               julianday(m.received_at) DESC, m.received_at DESC, m.id DESC",
                 )?;
-                let rows = stmt.query_map([], |row| {
+                let rows = stmt.query_map(params![account_id], |row| {
                     Ok((
                         row.get::<_, i64>(0)?,
-                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
                         row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
                     ))
                 })?;
                 for row in rows {
-                    let (message_id, to, cc, bcc, seen_at) = row?;
+                    let (message_id, message_account_id, to, cc, bcc, seen_at) = row?;
                     scanned_messages += 1;
                     let mut message_addresses = BTreeMap::<String, String>::new();
                     for header in [to, cc, bcc] {
@@ -119,7 +145,9 @@ impl MailStore {
                         }
                     }
                     for (email, name) in message_addresses {
-                        let aggregate = aggregates.entry(email.clone()).or_default();
+                        let aggregate = aggregates
+                            .entry((message_account_id, email.clone()))
+                            .or_default();
                         aggregate.message_count += 1;
                         if aggregate.name.is_empty() && !name.is_empty() && name != email {
                             aggregate.name = name;
@@ -138,11 +166,12 @@ impl MailStore {
 
             let mut created = 0_i64;
             let mut updated = 0_i64;
-            for (email, aggregate) in &aggregates {
+            for ((message_account_id, email), aggregate) in &aggregates {
                 let existing: Option<(i64, String, i64, String)> = transaction
                     .query_row(
-                        "SELECT id, name, message_count, last_seen_at FROM contacts WHERE lower(email) = lower(?1)",
-                        params![email],
+                        "SELECT id, name, message_count, last_seen_at
+                         FROM contacts WHERE account_id = ?1 AND lower(email) = lower(?2)",
+                        params![message_account_id, email],
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )
                     .optional()?;
@@ -164,15 +193,16 @@ impl MailStore {
                         current_seen_at.as_str()
                     };
                     transaction.execute(
-                        "UPDATE contacts SET name = ?2, message_count = ?3, last_seen_at = ?4 WHERE id = ?1",
-                        params![id, next_name, next_count, next_seen_at],
+                        "UPDATE contacts SET name = ?2, message_count = ?3, last_seen_at = ?4
+                         WHERE id = ?1 AND account_id = ?5",
+                        params![id, next_name, next_count, next_seen_at, message_account_id],
                     )?;
                     updated += 1;
                 } else {
                     transaction.execute(
-                        "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                         VALUES (?1, ?2, '', 0, ?3, ?4)",
-                        params![display_name, email, aggregate.message_count, aggregate.last_seen_at],
+                        "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+                         VALUES (?1, ?2, ?3, '', 0, ?4, ?5)",
+                        params![message_account_id, display_name, email, aggregate.message_count, aggregate.last_seen_at],
                     )?;
                     created += 1;
                 }
@@ -201,10 +231,10 @@ impl MailStore {
     pub fn sync_contacts_from_sent_message(&self, message_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
-            let (to, cc, bcc, seen_at): (String, String, String, String) = transaction.query_row(
-                "SELECT recipients, cc, bcc, received_at FROM messages WHERE id = ?1",
+            let (message_account_id, to, cc, bcc, seen_at): (i64, String, String, String, String) = transaction.query_row(
+                "SELECT account_id, recipients, cc, bcc, received_at FROM messages WHERE id = ?1",
                 params![message_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )?;
             let own_addresses = own_email_addresses_for_conn(&transaction)?;
             let mut addresses = BTreeMap::<String, String>::new();
@@ -226,9 +256,9 @@ impl MailStore {
                 }
                 let display_name = if name.trim().is_empty() { email.as_str() } else { name.as_str() };
                 transaction.execute(
-                    "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                     VALUES (?1, ?2, '', 0, 1, ?3)
-                     ON CONFLICT(email) DO UPDATE SET
+                    "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+                     VALUES (?1, ?2, ?3, '', 0, 1, ?4)
+                     ON CONFLICT(account_id, email) DO UPDATE SET
                         name = CASE WHEN contacts.name = '' OR lower(contacts.name) = lower(contacts.email)
                                     THEN excluded.name ELSE contacts.name END,
                         message_count = contacts.message_count + 1,
@@ -241,7 +271,7 @@ impl MailStore {
                                  AND excluded.last_seen_at > contacts.last_seen_at
                                 THEN excluded.last_seen_at
                             ELSE contacts.last_seen_at END",
-                    params![display_name, email, seen_at],
+                    params![message_account_id, display_name, email, seen_at],
                 )?;
             }
             transaction.commit()?;
@@ -250,174 +280,33 @@ impl MailStore {
     }
     pub fn import_contacts(&self, inputs: Vec<ContactCreateInput>) -> MailResult<(i64, i64)> {
         self.with_conn(|conn| {
-            let transaction = conn.unchecked_transaction()?;
-            let now = Utc::now().to_rfc3339();
-            let mut created = 0_i64;
-            let mut updated = 0_i64;
-
-            for input in inputs {
-                let email = normalize_email(&input.email);
-                if email.is_empty() {
-                    continue;
-                }
-                let existing = transaction
-                    .query_row(
-                        "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-                         FROM contacts WHERE lower(email) = lower(?1)",
-                        params![email],
-                        |row| {
-                            Ok(Contact {
-                                id: row.get(0)?,
-                                name: row.get(1)?,
-                                email: row.get(2)?,
-                                aliases: contact_aliases_from_text(row.get(3)?),
-                                vip: row.get::<_, i64>(4)? != 0,
-                                message_count: row.get(5)?,
-                                last_seen_at: row.get(6)?,
-                            })
-                        },
-                    )
-                    .optional()?;
-                let imported_name = input.name.trim();
-
-                if let Some(existing) = existing {
-                    let mut aliases = existing.aliases.clone();
-                    aliases.extend(input.aliases);
-                    let aliases = normalize_contact_aliases(aliases, &existing.email);
-                    let name = if (existing.name.trim().is_empty() || existing.name == existing.email)
-                        && !imported_name.is_empty()
-                    {
-                        imported_name
-                    } else {
-                        existing.name.as_str()
-                    };
-                    transaction.execute(
-                        "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1",
-                        params![
-                            existing.id,
-                            name,
-                            contact_aliases_to_text(&aliases),
-                            if existing.vip || input.vip { 1 } else { 0 },
-                        ],
-                    )?;
-                    updated += 1;
-                } else {
-                    let display_name = if imported_name.is_empty() {
-                        email.as_str()
-                    } else {
-                        imported_name
-                    };
-                    let aliases = normalize_contact_aliases(input.aliases, &email);
-                    transaction.execute(
-                        "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                         VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                        params![
-                            display_name,
-                            email,
-                            contact_aliases_to_text(&aliases),
-                            if input.vip { 1 } else { 0 },
-                            now,
-                        ],
-                    )?;
-                    created += 1;
-                }
-            }
-
-            transaction.commit()?;
-            Ok((created, updated))
+            let account_id = default_account_id_for_conn(conn)?;
+            import_contacts_for_conn(conn, account_id, inputs)
         })
+    }
+
+    pub fn import_contacts_for_account(
+        &self,
+        account_id: i64,
+        inputs: Vec<ContactCreateInput>,
+    ) -> MailResult<(i64, i64)> {
+        self.with_conn(|conn| import_contacts_for_conn(conn, account_id, inputs))
     }
     pub fn classify_contact_import(
         &self,
         inputs: Vec<ContactCreateInput>,
     ) -> MailResult<Vec<ContactImportPreviewEntry>> {
         self.with_conn(|conn| {
-            let mut entries = Vec::new();
-            for input in inputs {
-                let email = normalize_email(&input.email);
-                if email.is_empty() || !email.contains('@') {
-                    entries.push(ContactImportPreviewEntry {
-                        email,
-                        name: input.name,
-                        aliases: input.aliases,
-                        vip: input.vip,
-                        status: "invalid".to_string(),
-                        existing_contact_id: None,
-                        existing_name: String::new(),
-                        reason: "邮箱地址无效".to_string(),
-                    });
-                    continue;
-                }
-                let existing = conn
-                    .query_row(
-                        "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-                         FROM contacts WHERE lower(email) = lower(?1)",
-                        params![email],
-                        |row| {
-                            Ok(Contact {
-                                id: row.get(0)?,
-                                name: row.get(1)?,
-                                email: row.get(2)?,
-                                aliases: contact_aliases_from_text(row.get(3)?),
-                                vip: row.get::<_, i64>(4)? != 0,
-                                message_count: row.get(5)?,
-                                last_seen_at: row.get(6)?,
-                            })
-                        },
-                    )
-                    .optional()?;
-                if let Some(existing) = existing {
-                    let new_aliases = input
-                        .aliases
-                        .iter()
-                        .filter(|alias| {
-                            let normalized = normalize_email(alias);
-                            !normalized.is_empty()
-                                && normalized != existing.email
-                                && !existing.aliases.contains(&normalized)
-                        })
-                        .count();
-                    let same_name = input.name.trim().eq_ignore_ascii_case(existing.name.trim())
-                        || existing.name.trim().is_empty()
-                        || existing.name == existing.email;
-                    if same_name && new_aliases == 0 && !input.vip {
-                        entries.push(ContactImportPreviewEntry {
-                            email: existing.email.clone(),
-                            name: existing.name.clone(),
-                            aliases: Vec::new(),
-                            vip: existing.vip,
-                            status: "duplicate".to_string(),
-                            existing_contact_id: Some(existing.id),
-                            existing_name: existing.name,
-                            reason: "与已有联系人完全相同".to_string(),
-                        });
-                    } else {
-                        entries.push(ContactImportPreviewEntry {
-                            email: existing.email.clone(),
-                            name: input.name,
-                            aliases: input.aliases,
-                            vip: input.vip,
-                            status: "merge".to_string(),
-                            existing_contact_id: Some(existing.id),
-                            existing_name: existing.name,
-                            reason: "已有联系人，可合并补充字段".to_string(),
-                        });
-                    }
-                } else {
-                    entries.push(ContactImportPreviewEntry {
-                        email: email.clone(),
-                        name: input.name,
-                        aliases: input.aliases,
-                        vip: input.vip,
-                        status: "new".to_string(),
-                        existing_contact_id: None,
-                        existing_name: String::new(),
-                        reason: "新联系人".to_string(),
-                    });
-                }
-            }
-            Ok(entries)
+            let account_id = default_account_id_for_conn(conn)?;
+            classify_contact_import_for_conn(conn, account_id, inputs)
         })
+    }
+    pub fn classify_contact_import_for_account(
+        &self,
+        account_id: i64,
+        inputs: Vec<ContactCreateInput>,
+    ) -> MailResult<Vec<ContactImportPreviewEntry>> {
+        self.with_conn(|conn| classify_contact_import_for_conn(conn, account_id, inputs))
     }
     pub fn commit_contact_import(
         &self,
@@ -425,7 +314,19 @@ impl MailStore {
         file_name: &str,
         scope: &str,
     ) -> MailResult<ContactImportCommitSummary> {
-        self.with_conn(|conn| commit_import_inputs(conn, inputs, file_name, scope))
+        self.with_conn(|conn| {
+            let account_id = default_account_id_for_conn(conn)?;
+            commit_import_inputs(conn, account_id, inputs, file_name, scope)
+        })
+    }
+    pub fn commit_contact_import_for_account(
+        &self,
+        account_id: i64,
+        inputs: Vec<(ContactCreateInput, String)>,
+        file_name: &str,
+        scope: &str,
+    ) -> MailResult<ContactImportCommitSummary> {
+        self.with_conn(|conn| commit_import_inputs(conn, account_id, inputs, file_name, scope))
     }
     pub fn commit_contact_import_entries(
         &self,
@@ -433,25 +334,46 @@ impl MailStore {
         file_name: &str,
         scope: &str,
     ) -> MailResult<ContactImportCommitSummary> {
-        self.with_conn(|conn| commit_import_inputs(conn, inputs, file_name, scope))
+        self.with_conn(|conn| {
+            let account_id = default_account_id_for_conn(conn)?;
+            commit_import_inputs(conn, account_id, inputs, file_name, scope)
+        })
+    }
+    pub fn commit_contact_import_entries_for_account(
+        &self,
+        account_id: i64,
+        inputs: Vec<(ContactCreateInput, String)>,
+        file_name: &str,
+        scope: &str,
+    ) -> MailResult<ContactImportCommitSummary> {
+        self.with_conn(|conn| commit_import_inputs(conn, account_id, inputs, file_name, scope))
     }
     pub fn list_contact_import_batches(&self) -> MailResult<Vec<ContactImportBatch>> {
+        self.list_contact_import_batches_for_account(None)
+    }
+    pub fn list_contact_import_batches_for_account(
+        &self,
+        account_id: Option<i64>,
+    ) -> MailResult<Vec<ContactImportBatch>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, file_name, total_count, created_count, merged_count, skipped_count, scope, created_at
-                 FROM contact_import_batches ORDER BY id DESC LIMIT 50",
+                "SELECT id, account_id, file_name, total_count, created_count, merged_count, skipped_count, scope, created_at
+                 FROM contact_import_batches
+                 WHERE (?1 IS NULL OR account_id = ?1)
+                 ORDER BY id DESC LIMIT 50",
             )?;
             let batches = stmt
-                .query_map([], |row| {
+                .query_map(params![account_id], |row| {
                     Ok(ContactImportBatch {
                         id: row.get(0)?,
-                        file_name: row.get(1)?,
-                        total_count: row.get(2)?,
-                        created_count: row.get(3)?,
-                        merged_count: row.get(4)?,
-                        skipped_count: row.get(5)?,
-                        scope: row.get(6)?,
-                        created_at: row.get(7)?,
+                        account_id: row.get(1)?,
+                        file_name: row.get(2)?,
+                        total_count: row.get(3)?,
+                        created_count: row.get(4)?,
+                        merged_count: row.get(5)?,
+                        skipped_count: row.get(6)?,
+                        scope: row.get(7)?,
+                        created_at: row.get(8)?,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -459,113 +381,56 @@ impl MailStore {
         })
     }
     pub fn undo_contact_import_batch(&self, batch_id: i64) -> MailResult<ContactImportUndoReport> {
-        self.with_conn(|conn| {
-            let transaction = conn.unchecked_transaction()?;
-            let created_contact_ids: Vec<i64> = {
-                let mut stmt = transaction.prepare(
-                    "SELECT contact_id FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create' AND contact_id IS NOT NULL",
-                )?;
-                let rows = stmt
-                    .query_map(params![batch_id], |row| row.get::<_, i64>(0))?
-                    .collect::<Result<Vec<_>, _>>()?;
-                rows
-            };
-            let mut removed = 0_i64;
-            for contact_id in created_contact_ids {
-                let changed = transaction.execute(
-                    "DELETE FROM contacts WHERE id = ?1",
-                    params![contact_id],
-                )?;
-                if changed > 0 {
-                    removed += 1;
-                }
-            }
-            transaction.execute(
-                "DELETE FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
-                params![batch_id],
-            )?;
-            transaction.commit()?;
-            // 事务已提交，复用外层 with_conn 的连接查询剩余条数；
-            // 不能再嵌套调用 self.with_conn，否则非重入 Mutex 会永久阻塞。
-            let remaining_created = conn.query_row(
-                "SELECT COUNT(*) FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
-                params![batch_id],
-                |row| row.get::<_, i64>(0),
-            )?;
-            Ok(ContactImportUndoReport {
-                removed,
-                remaining_created,
-                note: "已删除该批次新增的联系人；合并/更新已有联系人的变更不可回滚。".to_string(),
-            })
-        })
+        self.with_conn(|conn| undo_contact_import_batch_for_conn(conn, None, batch_id))
+    }
+    pub fn undo_contact_import_batch_for_account(
+        &self,
+        account_id: i64,
+        batch_id: i64,
+    ) -> MailResult<ContactImportUndoReport> {
+        self.with_conn(|conn| undo_contact_import_batch_for_conn(conn, Some(account_id), batch_id))
     }
     pub fn create_contact(&self, input: ContactCreateInput) -> MailResult<Contact> {
         self.with_conn(|conn| {
-            let email = normalize_email(&input.email);
-            if email.is_empty() {
-                return Err(MailError::Imap("联系人邮箱不能为空".to_string()));
-            }
-            let name = input.name.trim();
-            let display_name = if name.is_empty() {
-                email.as_str()
-            } else {
-                name
-            };
-            let aliases = normalize_contact_aliases(input.aliases, &email);
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-                params![
-                    display_name,
-                    email,
-                    contact_aliases_to_text(&aliases),
-                    if input.vip { 1 } else { 0 },
-                    now,
-                ],
-            )?;
-            get_contact_for_conn(conn, conn.last_insert_rowid())
+            let account_id = default_account_id_for_conn(conn)?;
+            create_contact_for_conn(conn, account_id, input)
         })
     }
+    pub fn create_contact_for_account(
+        &self,
+        account_id: i64,
+        input: ContactCreateInput,
+    ) -> MailResult<Contact> {
+        self.with_conn(|conn| create_contact_for_conn(conn, account_id, input))
+    }
     pub fn update_contact(&self, contact_id: i64, input: ContactInput) -> MailResult<Contact> {
-        self.with_conn(|conn| {
-            let existing = conn.query_row(
-                "SELECT id, name, email, aliases, vip, message_count, last_seen_at FROM contacts WHERE id = ?1",
-                params![contact_id],
-                |row| {
-                    Ok(Contact {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        email: row.get(2)?,
-                        aliases: contact_aliases_from_text(row.get(3)?),
-                        vip: row.get::<_, i64>(4)? != 0,
-                        message_count: row.get(5)?,
-                        last_seen_at: row.get(6)?,
-                    })
-                },
-            )?;
-            let name = input.name.trim();
-            let aliases = normalize_contact_aliases(input.aliases, &existing.email);
-            conn.execute(
-                "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1",
-                params![
-                    contact_id,
-                    if name.is_empty() { existing.name.as_str() } else { name },
-                    contact_aliases_to_text(&aliases),
-                    if input.vip { 1 } else { 0 },
-                ],
-            )?;
-            Ok(Contact {
-                aliases,
-                vip: input.vip,
-                name: if name.is_empty() { existing.name } else { name.to_string() },
-                ..existing
-            })
-        })
+        self.with_conn(|conn| update_contact_for_conn(conn, None, contact_id, input))
+    }
+    pub fn update_contact_for_account(
+        &self,
+        account_id: i64,
+        contact_id: i64,
+        input: ContactInput,
+    ) -> MailResult<Contact> {
+        self.with_conn(|conn| update_contact_for_conn(conn, Some(account_id), contact_id, input))
     }
     pub fn delete_contact(&self, contact_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute("DELETE FROM contacts WHERE id = ?1", params![contact_id])?;
+            Ok(())
+        })
+    }
+    pub fn delete_contact_for_account(&self, account_id: i64, contact_id: i64) -> MailResult<()> {
+        self.with_conn(|conn| {
+            let changed = conn.execute(
+                "DELETE FROM contacts WHERE id = ?1 AND account_id = ?2",
+                params![contact_id, account_id],
+            )?;
+            if changed == 0 {
+                return Err(MailError::Imap(
+                    "联系人不存在或不属于当前邮箱账号".to_string(),
+                ));
+            }
             Ok(())
         })
     }
@@ -578,51 +443,40 @@ impl MailStore {
             return Err(MailError::Imap("请选择两个不同联系人进行合并".to_string()));
         }
         self.with_conn(|conn| {
-            let target = get_contact_for_conn(conn, target_contact_id)?;
-            let source = get_contact_for_conn(conn, source_contact_id)?;
-            let mut aliases = target.aliases.clone();
-            aliases.push(source.email.clone());
-            aliases.extend(source.aliases.clone());
-            let aliases = normalize_contact_aliases(aliases, &target.email);
-            let name = if target.name.trim().is_empty() || target.name == target.email {
-                source.name.as_str()
-            } else {
-                target.name.as_str()
-            };
-            let message_count = target.message_count + source.message_count;
-            let last_seen_at = if source.last_seen_at > target.last_seen_at {
-                source.last_seen_at.as_str()
-            } else {
-                target.last_seen_at.as_str()
-            };
-            conn.execute(
-                "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4, message_count = ?5, last_seen_at = ?6 WHERE id = ?1",
-                params![
-                    target_contact_id,
-                    name,
-                    contact_aliases_to_text(&aliases),
-                    if target.vip || source.vip { 1 } else { 0 },
-                    message_count,
-                    last_seen_at,
-                ],
-            )?;
-            conn.execute("DELETE FROM contacts WHERE id = ?1", params![source_contact_id])?;
-            get_contact_for_conn(conn, target_contact_id)
+            merge_contacts_for_conn(conn, None, target_contact_id, source_contact_id)
+        })
+    }
+    pub fn merge_contacts_for_account(
+        &self,
+        account_id: i64,
+        target_contact_id: i64,
+        source_contact_id: i64,
+    ) -> MailResult<Contact> {
+        if target_contact_id == source_contact_id {
+            return Err(MailError::Imap("请选择两个不同联系人进行合并".to_string()));
+        }
+        self.with_conn(|conn| {
+            merge_contacts_for_conn(conn, Some(account_id), target_contact_id, source_contact_id)
         })
     }
     pub fn list_rules(&self) -> MailResult<Vec<MailRule>> {
+        self.list_rules_for_account(None)
+    }
+    pub fn list_rules_for_account(&self, account_id: Option<i64>) -> MailResult<Vec<MailRule>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, name, condition, action, enabled FROM mail_rules ORDER BY id",
+                "SELECT id, account_id, name, condition, action, enabled FROM mail_rules
+                 WHERE (?1 IS NULL OR account_id = ?1) ORDER BY id",
             )?;
             let rules = stmt
-                .query_map([], |row| {
+                .query_map(params![account_id], |row| {
                     Ok(MailRule {
                         id: row.get(0)?,
-                        name: row.get(1)?,
-                        condition: row.get(2)?,
-                        action: row.get(3)?,
-                        enabled: row.get::<_, i64>(4)? != 0,
+                        account_id: row.get(1)?,
+                        name: row.get(2)?,
+                        condition: row.get(3)?,
+                        action: row.get(4)?,
+                        enabled: row.get::<_, i64>(5)? != 0,
                     })
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -631,37 +485,17 @@ impl MailStore {
     }
     pub fn upsert_rule(&self, rule_id: Option<i64>, input: MailRuleInput) -> MailResult<MailRule> {
         self.with_conn(|conn| {
-            let name = input.name.trim();
-            let condition = input.condition.trim();
-            let action = input.action.trim();
-            if name.is_empty() || condition.is_empty() || action.is_empty() {
-                return Err(crate::db::MailError::Imap(
-                    "规则名称、条件和动作都不能为空。".to_string(),
-                ));
-            }
-            let enabled = bool_to_int(input.enabled);
-            let id = if let Some(id) = rule_id {
-                conn.execute(
-                    "
-                    UPDATE mail_rules
-                    SET name = ?2, condition = ?3, action = ?4, enabled = ?5
-                    WHERE id = ?1
-                    ",
-                    params![id, name, condition, action, enabled],
-                )?;
-                id
-            } else {
-                conn.execute(
-                    "
-                    INSERT INTO mail_rules(name, condition, action, enabled)
-                    VALUES (?1, ?2, ?3, ?4)
-                    ",
-                    params![name, condition, action, enabled],
-                )?;
-                conn.last_insert_rowid()
-            };
-            rule_for_conn(conn, id)
+            let account_id = default_account_id_for_conn(conn)?;
+            upsert_rule_for_conn(conn, account_id, rule_id, input)
         })
+    }
+    pub fn upsert_rule_for_account(
+        &self,
+        account_id: i64,
+        rule_id: Option<i64>,
+        input: MailRuleInput,
+    ) -> MailResult<MailRule> {
+        self.with_conn(|conn| upsert_rule_for_conn(conn, account_id, rule_id, input))
     }
     pub fn set_rule_enabled(&self, rule_id: i64, enabled: bool) -> MailResult<MailRule> {
         self.with_conn(|conn| {
@@ -672,9 +506,42 @@ impl MailStore {
             rule_for_conn(conn, rule_id)
         })
     }
+    pub fn set_rule_enabled_for_account(
+        &self,
+        account_id: i64,
+        rule_id: i64,
+        enabled: bool,
+    ) -> MailResult<MailRule> {
+        self.with_conn(|conn| {
+            let changed = conn.execute(
+                "UPDATE mail_rules SET enabled = ?2 WHERE id = ?1 AND account_id = ?3",
+                params![rule_id, bool_to_int(enabled), account_id],
+            )?;
+            if changed == 0 {
+                return Err(MailError::Imap(
+                    "规则不存在或不属于当前邮箱账号".to_string(),
+                ));
+            }
+            rule_for_conn_for_account(conn, Some(account_id), rule_id)
+        })
+    }
     pub fn delete_rule(&self, rule_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute("DELETE FROM mail_rules WHERE id = ?1", params![rule_id])?;
+            Ok(())
+        })
+    }
+    pub fn delete_rule_for_account(&self, account_id: i64, rule_id: i64) -> MailResult<()> {
+        self.with_conn(|conn| {
+            let changed = conn.execute(
+                "DELETE FROM mail_rules WHERE id = ?1 AND account_id = ?2",
+                params![rule_id, account_id],
+            )?;
+            if changed == 0 {
+                return Err(MailError::Imap(
+                    "规则不存在或不属于当前邮箱账号".to_string(),
+                ));
+            }
             Ok(())
         })
     }
@@ -689,25 +556,353 @@ pub(super) fn contact_aliases_to_text(aliases: &[String]) -> String {
         .join("\n")
 }
 
-fn contact_row_for_conn(conn: &Connection, email: &str) -> MailResult<Option<Contact>> {
+fn default_account_id_for_conn(conn: &Connection) -> MailResult<i64> {
     conn.query_row(
-        "SELECT id, name, email, aliases, vip, message_count, last_seen_at
-         FROM contacts WHERE lower(email) = lower(?1)",
-        params![email],
+        "SELECT id FROM accounts ORDER BY is_default DESC, id LIMIT 1",
+        [],
+        |row| row.get(0),
+    )
+    .map_err(|error| MailError::Imap(format!("没有可用邮箱账号：{error}")))
+}
+
+fn undo_contact_import_batch_for_conn(
+    conn: &Connection,
+    account_id: Option<i64>,
+    batch_id: i64,
+) -> MailResult<ContactImportUndoReport> {
+    let batch_account_id: i64 = conn.query_row(
+        "SELECT account_id FROM contact_import_batches
+         WHERE id = ?1 AND (?2 IS NULL OR account_id = ?2)",
+        params![batch_id, account_id],
+        |row| row.get(0),
+    )?;
+    let transaction = conn.unchecked_transaction()?;
+    let created_contact_ids: Vec<i64> = {
+        let mut stmt = transaction.prepare(
+            "SELECT contact_id FROM contact_import_entries
+             WHERE batch_id = ?1 AND action = 'create' AND contact_id IS NOT NULL",
+        )?;
+        let rows = stmt.query_map(params![batch_id], |row| row.get::<_, i64>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    let mut removed = 0_i64;
+    for contact_id in created_contact_ids {
+        let changed = transaction.execute(
+            "DELETE FROM contacts WHERE id = ?1 AND account_id = ?2",
+            params![contact_id, batch_account_id],
+        )?;
+        if changed > 0 {
+            removed += 1;
+        }
+    }
+    transaction.execute(
+        "DELETE FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
+        params![batch_id],
+    )?;
+    transaction.commit()?;
+    // 事务已提交，复用外层 with_conn 的连接查询剩余条数；不能再次进入
+    // self.with_conn，否则非重入 Mutex 会永久阻塞。
+    let remaining_created = conn.query_row(
+        "SELECT COUNT(*) FROM contact_import_entries WHERE batch_id = ?1 AND action = 'create'",
+        params![batch_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    Ok(ContactImportUndoReport {
+        removed,
+        remaining_created,
+        note: "已删除该批次新增的联系人；合并/更新已有联系人的变更不可回滚。".to_string(),
+    })
+}
+
+fn create_contact_for_conn(
+    conn: &Connection,
+    account_id: i64,
+    input: ContactCreateInput,
+) -> MailResult<Contact> {
+    let email = normalize_email(&input.email);
+    if email.is_empty() {
+        return Err(MailError::Imap("联系人邮箱不能为空".to_string()));
+    }
+    let name = input.name.trim();
+    let display_name = if name.is_empty() {
+        email.as_str()
+    } else {
+        name
+    };
+    let aliases = normalize_contact_aliases(input.aliases, &email);
+    let now = Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+        params![
+            account_id,
+            display_name,
+            email,
+            contact_aliases_to_text(&aliases),
+            if input.vip { 1 } else { 0 },
+            now,
+        ],
+    )?;
+    get_contact_for_conn_and_account(conn, Some(account_id), conn.last_insert_rowid())
+}
+
+fn update_contact_for_conn(
+    conn: &Connection,
+    account_id: Option<i64>,
+    contact_id: i64,
+    input: ContactInput,
+) -> MailResult<Contact> {
+    let existing = get_contact_for_conn_and_account(conn, account_id, contact_id)?;
+    let name = input.name.trim();
+    let aliases = normalize_contact_aliases(input.aliases, &existing.email);
+    conn.execute(
+        "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4 WHERE id = ?1
+         AND (?5 IS NULL OR account_id = ?5)",
+        params![
+            contact_id,
+            if name.is_empty() {
+                existing.name.as_str()
+            } else {
+                name
+            },
+            contact_aliases_to_text(&aliases),
+            if input.vip { 1 } else { 0 },
+            account_id,
+        ],
+    )?;
+    Ok(Contact {
+        aliases,
+        vip: input.vip,
+        name: if name.is_empty() {
+            existing.name
+        } else {
+            name.to_string()
+        },
+        ..existing
+    })
+}
+
+fn merge_contacts_for_conn(
+    conn: &Connection,
+    account_id: Option<i64>,
+    target_contact_id: i64,
+    source_contact_id: i64,
+) -> MailResult<Contact> {
+    let target = get_contact_for_conn_and_account(conn, account_id, target_contact_id)?;
+    let source = get_contact_for_conn_and_account(conn, account_id, source_contact_id)?;
+    if target.account_id != source.account_id {
+        return Err(MailError::Imap(
+            "只能合并同一邮箱账号下的联系人".to_string(),
+        ));
+    }
+    let mut aliases = target.aliases.clone();
+    aliases.push(source.email.clone());
+    aliases.extend(source.aliases.clone());
+    let aliases = normalize_contact_aliases(aliases, &target.email);
+    let name = if target.name.trim().is_empty() || target.name == target.email {
+        source.name.as_str()
+    } else {
+        target.name.as_str()
+    };
+    let message_count = target.message_count + source.message_count;
+    let last_seen_at = if source.last_seen_at > target.last_seen_at {
+        source.last_seen_at.as_str()
+    } else {
+        target.last_seen_at.as_str()
+    };
+    conn.execute(
+        "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4, message_count = ?5, last_seen_at = ?6
+         WHERE id = ?1 AND account_id = ?7",
+        params![
+            target_contact_id,
+            name,
+            contact_aliases_to_text(&aliases),
+            if target.vip || source.vip { 1 } else { 0 },
+            message_count,
+            last_seen_at,
+            target.account_id,
+        ],
+    )?;
+    conn.execute(
+        "DELETE FROM contacts WHERE id = ?1 AND account_id = ?2",
+        params![source_contact_id, target.account_id],
+    )?;
+    get_contact_for_conn_and_account(conn, Some(target.account_id), target_contact_id)
+}
+
+fn contact_row_for_conn(conn: &Connection, email: &str) -> MailResult<Option<Contact>> {
+    contact_row_for_account_conn(conn, None, email)
+}
+
+fn contact_row_for_account_conn(
+    conn: &Connection,
+    account_id: Option<i64>,
+    email: &str,
+) -> MailResult<Option<Contact>> {
+    conn.query_row(
+        "SELECT id, account_id, name, email, aliases, vip, message_count, last_seen_at
+         FROM contacts
+         WHERE lower(email) = lower(?1) AND (?2 IS NULL OR account_id = ?2)
+         ORDER BY id LIMIT 1",
+        params![email, account_id],
         |row| {
             Ok(Contact {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                email: row.get(2)?,
-                aliases: contact_aliases_from_text(row.get(3)?),
-                vip: row.get::<_, i64>(4)? != 0,
-                message_count: row.get(5)?,
-                last_seen_at: row.get(6)?,
+                account_id: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                aliases: contact_aliases_from_text(row.get(4)?),
+                vip: row.get::<_, i64>(5)? != 0,
+                message_count: row.get(6)?,
+                last_seen_at: row.get(7)?,
             })
         },
     )
     .optional()
     .map_err(Into::into)
+}
+
+fn import_contacts_for_conn(
+    conn: &Connection,
+    account_id: i64,
+    inputs: Vec<ContactCreateInput>,
+) -> MailResult<(i64, i64)> {
+    let transaction = conn.unchecked_transaction()?;
+    let now = Utc::now().to_rfc3339();
+    let mut created = 0_i64;
+    let mut updated = 0_i64;
+
+    for input in inputs {
+        let email = normalize_email(&input.email);
+        if email.is_empty() {
+            continue;
+        }
+        let existing = contact_row_for_account_conn(&transaction, Some(account_id), &email)?;
+        let imported_name = input.name.trim();
+
+        if let Some(existing) = existing {
+            let mut aliases = existing.aliases.clone();
+            aliases.extend(input.aliases);
+            let aliases = normalize_contact_aliases(aliases, &existing.email);
+            let name = if (existing.name.trim().is_empty() || existing.name == existing.email)
+                && !imported_name.is_empty()
+            {
+                imported_name
+            } else {
+                existing.name.as_str()
+            };
+            transaction.execute(
+                "UPDATE contacts SET name = ?2, aliases = ?3, vip = ?4
+                 WHERE id = ?1 AND account_id = ?5",
+                params![
+                    existing.id,
+                    name,
+                    contact_aliases_to_text(&aliases),
+                    if existing.vip || input.vip { 1 } else { 0 },
+                    account_id,
+                ],
+            )?;
+            updated += 1;
+        } else {
+            let display_name = if imported_name.is_empty() {
+                email.as_str()
+            } else {
+                imported_name
+            };
+            let aliases = normalize_contact_aliases(input.aliases, &email);
+            transaction.execute(
+                "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+                params![
+                    account_id,
+                    display_name,
+                    email,
+                    contact_aliases_to_text(&aliases),
+                    if input.vip { 1 } else { 0 },
+                    now,
+                ],
+            )?;
+            created += 1;
+        }
+    }
+
+    transaction.commit()?;
+    Ok((created, updated))
+}
+
+fn classify_contact_import_for_conn(
+    conn: &Connection,
+    account_id: i64,
+    inputs: Vec<ContactCreateInput>,
+) -> MailResult<Vec<ContactImportPreviewEntry>> {
+    let mut entries = Vec::new();
+    for input in inputs {
+        let email = normalize_email(&input.email);
+        if email.is_empty() || !email.contains('@') {
+            entries.push(ContactImportPreviewEntry {
+                email,
+                name: input.name,
+                aliases: input.aliases,
+                vip: input.vip,
+                status: "invalid".to_string(),
+                existing_contact_id: None,
+                existing_name: String::new(),
+                reason: "邮箱地址无效".to_string(),
+            });
+            continue;
+        }
+        let existing = contact_row_for_account_conn(conn, Some(account_id), &email)?;
+        if let Some(existing) = existing {
+            let new_aliases = input
+                .aliases
+                .iter()
+                .filter(|alias| {
+                    let normalized = normalize_email(alias);
+                    !normalized.is_empty()
+                        && normalized != existing.email
+                        && !existing.aliases.contains(&normalized)
+                })
+                .count();
+            let same_name = input.name.trim().eq_ignore_ascii_case(existing.name.trim())
+                || existing.name.trim().is_empty()
+                || existing.name == existing.email;
+            if same_name && new_aliases == 0 && !input.vip {
+                entries.push(ContactImportPreviewEntry {
+                    email: existing.email.clone(),
+                    name: existing.name.clone(),
+                    aliases: Vec::new(),
+                    vip: existing.vip,
+                    status: "duplicate".to_string(),
+                    existing_contact_id: Some(existing.id),
+                    existing_name: existing.name,
+                    reason: "与已有联系人完全相同".to_string(),
+                });
+            } else {
+                entries.push(ContactImportPreviewEntry {
+                    email: existing.email.clone(),
+                    name: input.name,
+                    aliases: input.aliases,
+                    vip: input.vip,
+                    status: "merge".to_string(),
+                    existing_contact_id: Some(existing.id),
+                    existing_name: existing.name,
+                    reason: "已有联系人，可合并补充字段".to_string(),
+                });
+            }
+        } else {
+            entries.push(ContactImportPreviewEntry {
+                email: email.clone(),
+                name: input.name,
+                aliases: input.aliases,
+                vip: input.vip,
+                status: "new".to_string(),
+                existing_contact_id: None,
+                existing_name: String::new(),
+                reason: "新联系人".to_string(),
+            });
+        }
+    }
+    Ok(entries)
 }
 
 fn merge_imported_contact(
@@ -743,6 +938,7 @@ fn merge_imported_contact(
 
 fn commit_import_inputs(
     conn: &Connection,
+    account_id: i64,
     inputs: Vec<(ContactCreateInput, String)>,
     file_name: &str,
     scope: &str,
@@ -763,7 +959,7 @@ fn commit_import_inputs(
             skipped += 1;
             continue;
         }
-        let existing = contact_row_for_conn(&transaction, &email)?;
+        let existing = contact_row_for_account_conn(&transaction, Some(account_id), &email)?;
         if let Some(existing) = existing {
             merge_imported_contact(&transaction, &existing, &input)?;
             entries.push((existing.id, email, "merge".to_string()));
@@ -776,9 +972,10 @@ fn commit_import_inputs(
             };
             let aliases = normalize_contact_aliases(input.aliases, &email);
             transaction.execute(
-                "INSERT INTO contacts(name, email, aliases, vip, message_count, last_seen_at)
-                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
                 params![
+                    account_id,
                     display_name,
                     email,
                     contact_aliases_to_text(&aliases),
@@ -793,16 +990,17 @@ fn commit_import_inputs(
     }
     let total_count = created + merged + skipped;
     transaction.execute(
-        "INSERT INTO contact_import_batches(file_name, total_count, created_count, merged_count, skipped_count, scope, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO contact_import_batches(account_id, file_name, total_count, created_count, merged_count, skipped_count, scope, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
+            account_id,
             file_name,
             total_count,
             created,
             merged,
             skipped,
             scope,
-            now
+            now,
         ],
     )?;
     let batch_id = transaction.last_insert_rowid();
@@ -961,25 +1159,38 @@ fn parse_contact_address(value: &str) -> Option<(String, String)> {
 }
 
 pub(super) fn get_contact_for_conn(conn: &Connection, contact_id: i64) -> MailResult<Contact> {
+    get_contact_for_conn_and_account(conn, None, contact_id)
+}
+
+fn get_contact_for_conn_and_account(
+    conn: &Connection,
+    account_id: Option<i64>,
+    contact_id: i64,
+) -> MailResult<Contact> {
     conn.query_row(
-        "SELECT id, name, email, aliases, vip, message_count, last_seen_at FROM contacts WHERE id = ?1",
-        params![contact_id],
+        "SELECT id, account_id, name, email, aliases, vip, message_count, last_seen_at
+         FROM contacts
+         WHERE id = ?1 AND (?2 IS NULL OR account_id = ?2)",
+        params![contact_id, account_id],
         |row| {
             Ok(Contact {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                email: row.get(2)?,
-                aliases: contact_aliases_from_text(row.get(3)?),
-                vip: row.get::<_, i64>(4)? != 0,
-                message_count: row.get(5)?,
-                last_seen_at: row.get(6)?,
+                account_id: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                aliases: contact_aliases_from_text(row.get(4)?),
+                vip: row.get::<_, i64>(5)? != 0,
+                message_count: row.get(6)?,
+                last_seen_at: row.get(7)?,
             })
         },
     )
     .map_err(Into::into)
 }
+
 pub(super) fn upsert_contact(
     conn: &Connection,
+    account_id: i64,
     name: &str,
     email: &str,
     seen_at: &str,
@@ -989,42 +1200,96 @@ pub(super) fn upsert_contact(
     }
     conn.execute(
         "
-        INSERT INTO contacts(name, email, message_count, last_seen_at)
-        VALUES (?1, ?2, 1, ?3)
-        ON CONFLICT(email) DO UPDATE SET
+        INSERT INTO contacts(account_id, name, email, message_count, last_seen_at)
+        VALUES (?1, ?2, ?3, 1, ?4)
+        ON CONFLICT(account_id, email) DO UPDATE SET
             name = CASE WHEN contacts.name = '' THEN excluded.name ELSE contacts.name END,
             message_count = contacts.message_count + 1,
             last_seen_at = excluded.last_seen_at
         ",
-        params![name.trim(), email.trim(), seen_at],
+        params![account_id, name.trim(), email.trim(), seen_at],
     )?;
     Ok(())
 }
+
 pub(super) fn rule_for_conn(conn: &Connection, rule_id: i64) -> MailResult<MailRule> {
+    rule_for_conn_for_account(conn, None, rule_id)
+}
+
+fn rule_for_conn_for_account(
+    conn: &Connection,
+    account_id: Option<i64>,
+    rule_id: i64,
+) -> MailResult<MailRule> {
     conn.query_row(
-        "SELECT id, name, condition, action, enabled FROM mail_rules WHERE id = ?1",
-        params![rule_id],
+        "SELECT id, account_id, name, condition, action, enabled
+         FROM mail_rules
+         WHERE id = ?1 AND (?2 IS NULL OR account_id = ?2)",
+        params![rule_id, account_id],
         |row| {
             Ok(MailRule {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                condition: row.get(2)?,
-                action: row.get(3)?,
-                enabled: row.get::<_, i64>(4)? != 0,
+                account_id: row.get(1)?,
+                name: row.get(2)?,
+                condition: row.get(3)?,
+                action: row.get(4)?,
+                enabled: row.get::<_, i64>(5)? != 0,
             })
         },
     )
     .map_err(Into::into)
 }
+
+fn upsert_rule_for_conn(
+    conn: &Connection,
+    account_id: i64,
+    rule_id: Option<i64>,
+    input: MailRuleInput,
+) -> MailResult<MailRule> {
+    let name = input.name.trim();
+    let condition = input.condition.trim();
+    let action = input.action.trim();
+    if name.is_empty() || condition.is_empty() || action.is_empty() {
+        return Err(MailError::Imap(
+            "规则名称、条件和动作都不能为空。".to_string(),
+        ));
+    }
+    let enabled = bool_to_int(input.enabled);
+    let id = if let Some(id) = rule_id {
+        let changed = conn.execute(
+            "UPDATE mail_rules
+             SET name = ?2, condition = ?3, action = ?4, enabled = ?5
+             WHERE id = ?1 AND account_id = ?6",
+            params![id, name, condition, action, enabled, account_id],
+        )?;
+        if changed == 0 {
+            return Err(MailError::Imap(
+                "规则不存在或不属于当前邮箱账号".to_string(),
+            ));
+        }
+        id
+    } else {
+        conn.execute(
+            "INSERT INTO mail_rules(account_id, name, condition, action, enabled)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![account_id, name, condition, action, enabled],
+        )?;
+        conn.last_insert_rowid()
+    };
+    rule_for_conn_for_account(conn, Some(account_id), id)
+}
+
 pub(super) fn apply_enabled_rules_for_message(
     conn: &Connection,
     message_id: i64,
 ) -> MailResult<i64> {
     let message = message_for_conn(conn, message_id)?;
-    let mut stmt =
-        conn.prepare("SELECT condition, action FROM mail_rules WHERE enabled = 1 ORDER BY id")?;
+    let mut stmt = conn.prepare(
+        "SELECT condition, action FROM mail_rules
+         WHERE enabled = 1 AND account_id = ?1 ORDER BY id",
+    )?;
     let rules = stmt
-        .query_map([], |row| {
+        .query_map(params![message.account_id], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1167,5 +1432,105 @@ mod recent_contact_tests {
             2
         );
         assert!(parse_contact_address_list("not-an-email, missing@, @missing.com").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod account_scope_tests {
+    use super::{create_contact_for_conn, upsert_rule_for_conn};
+    use crate::models::{ContactCreateInput, MailRuleInput};
+    use rusqlite::{params, Connection};
+
+    fn scoped_test_connection() -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory database opens");
+        conn.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+            CREATE TABLE accounts (id INTEGER PRIMARY KEY);
+            INSERT INTO accounts(id) VALUES (1), (2);
+            CREATE TABLE contacts (
+                id INTEGER PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                aliases TEXT NOT NULL DEFAULT '',
+                vip INTEGER NOT NULL DEFAULT 0,
+                message_count INTEGER NOT NULL DEFAULT 0,
+                last_seen_at TEXT NOT NULL,
+                UNIQUE(account_id, email)
+            );
+            CREATE TABLE mail_rules (
+                id INTEGER PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                condition TEXT NOT NULL,
+                action TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1
+            );
+            ",
+        )
+        .expect("scoped schema creates");
+        conn
+    }
+
+    #[test]
+    fn keeps_same_contact_and_rule_data_separate_per_account() {
+        let conn = scoped_test_connection();
+        let contact_input = || ContactCreateInput {
+            name: "同名联系人".to_string(),
+            email: "person@example.com".to_string(),
+            aliases: Vec::new(),
+            vip: false,
+        };
+        let account_one_contact = create_contact_for_conn(&conn, 1, contact_input())
+            .expect("account one contact creates");
+        let account_two_contact = create_contact_for_conn(&conn, 2, contact_input())
+            .expect("account two contact creates");
+
+        assert_ne!(account_one_contact.id, account_two_contact.id);
+        assert_eq!(account_one_contact.account_id, 1);
+        assert_eq!(account_two_contact.account_id, 2);
+        assert!(create_contact_for_conn(&conn, 1, contact_input()).is_err());
+        assert!(super::update_contact_for_conn(
+            &conn,
+            Some(2),
+            account_one_contact.id,
+            crate::models::ContactInput {
+                name: "不应跨账号修改".to_string(),
+                aliases: Vec::new(),
+                vip: false,
+            },
+        )
+        .is_err());
+
+        let rule_input = || MailRuleInput {
+            name: "账号规则".to_string(),
+            condition: "subject contains test".to_string(),
+            action: "mark read".to_string(),
+            enabled: true,
+        };
+        let account_one_rule =
+            upsert_rule_for_conn(&conn, 1, None, rule_input()).expect("account one rule creates");
+        let account_two_rule =
+            upsert_rule_for_conn(&conn, 2, None, rule_input()).expect("account two rule creates");
+        assert_eq!(account_one_rule.account_id, 1);
+        assert_eq!(account_two_rule.account_id, 2);
+
+        let account_one_contact_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM contacts WHERE account_id = ?1",
+                params![1],
+                |row| row.get(0),
+            )
+            .expect("account one contact count");
+        let account_two_contact_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM contacts WHERE account_id = ?1",
+                params![2],
+                |row| row.get(0),
+            )
+            .expect("account two contact count");
+        assert_eq!(account_one_contact_count, 1);
+        assert_eq!(account_two_contact_count, 1);
     }
 }

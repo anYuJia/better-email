@@ -6,6 +6,7 @@ import { invoke } from '../tauriBridge';
 
 type RecentContactSyncOptions = {
   accountsLength: number;
+  accountId?: number | null;
   initialAccountListLoaded: boolean;
   gateActive: boolean;
   onboardingActive: boolean;
@@ -16,6 +17,7 @@ type RecentContactSyncOptions = {
 
 export default function useRecentContactSync({
   accountsLength,
+  accountId,
   initialAccountListLoaded,
   gateActive,
   onboardingActive,
@@ -33,7 +35,10 @@ export default function useRecentContactSync({
     setScanBusy(true);
     setStatus('正在扫描已发送邮件头并同步最近联系人…');
     try {
-      const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, { initialOnly: false });
+      const scanArgs = accountId === undefined
+        ? { initialOnly: false }
+        : { initialOnly: false, accountId };
+      const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, scanArgs);
       await refreshContacts();
       setStatus(`最近联系人同步完成：发现 ${report.discovered_contacts} 位，新增 ${report.created} 位`);
       showToast?.(`最近联系人同步成功：新增 ${report.created} 位`);
@@ -44,7 +49,7 @@ export default function useRecentContactSync({
       scanBusyRef.current = false;
       setScanBusy(false);
     }
-  }, [refreshContacts, setStatus, showToast]);
+  }, [accountId, refreshContacts, setStatus, showToast]);
 
   useEffect(() => {
     if (
@@ -63,7 +68,10 @@ export default function useRecentContactSync({
         scanBusyRef.current = true;
         setScanBusy(true);
         try {
-          await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, { initialOnly: true });
+          const scanArgs = accountId === undefined
+            ? { initialOnly: true }
+            : { initialOnly: true, accountId };
+          await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, scanArgs);
           if (active) await refreshContacts();
         } catch (error) {
           logError(error);
@@ -78,7 +86,7 @@ export default function useRecentContactSync({
         if (active) setStatus(`无法检查首次联系人同步状态：${String(error)}`);
       });
     return () => { active = false; };
-  }, [accountsLength, gateActive, initialAccountListLoaded, onboardingActive, refreshContacts, setStatus]);
+  }, [accountId, accountsLength, gateActive, initialAccountListLoaded, onboardingActive, refreshContacts, setStatus]);
 
   return { scanBusy, initialScanBusy: scanBusy, scanRecentContacts };
 }

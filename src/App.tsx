@@ -182,6 +182,7 @@ function MailboxApp({
   const [accountScope, setAccountScope] = useState<AccountScope>(
     () => requestedSettingsAccountScope ?? loadAccountScope(),
   );
+  const scopedAccountId = accountScope === 'all' ? null : accountScope;
   const [accountForm, setAccountForm] = useState<Account | null>(null);
   const [newAccountForm, setNewAccountForm] = useState<AccountCreateInput>(emptyAccountCreateForm);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -204,9 +205,7 @@ function MailboxApp({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedMessageIds, setSelectedMessageIds] = useState<number[]>([]);
   const skipNextFolderEffectLoadRef = useRef(false);
-  // 导航动作（focusMailboxRole）主动切换账号 scope
-  // 时，由导航动作自己驱动加载；accountScope effect 读到这个标记就跳过 refreshMailbox，
-  // 避免两个异步流程并发写 folderId/messages 造成「先导航后刷新覆盖」竞态。
+  // 导航负责的账号加载不可被 refreshMailbox 覆盖。
   const navigationScopeClaimRef = useRef<number | 'all' | null>(null);
   const [activeThread, setActiveThread] = useState<ThreadSummary | null>(null);
   const [threadMessages, setThreadMessages] = useState<MessageSummary[]>([]);
@@ -469,12 +468,13 @@ function MailboxApp({
     refreshManagedContacts,
     confirmDeleteContact: contactToDeleteFromHook,
     setConfirmDeleteContact: setContactToDeleteFromHook,
-  } = useContactManagement({ setStatus, setNotificationPolicy });
+  } = useContactManagement({ setStatus, setNotificationPolicy, accountId: scopedAccountId });
   const {
     scanBusy: contactScanBusy,
     scanRecentContacts,
   } = useRecentContactSync({
     accountsLength: accounts.length,
+    accountId: scopedAccountId,
     initialAccountListLoaded,
     gateActive: isAccountLoginActive || standaloneSettingsWindow,
     onboardingActive: Boolean(pendingOnboardingAccount),
@@ -1401,7 +1401,7 @@ function MailboxApp({
     updateRuleConditionValue,
     toggleRuleAction,
     updateRuleLabelAction,
-  } = useRuleManagement({ rules, setRules, setStatus });
+  } = useRuleManagement({ rules, setRules, setStatus, accountId: scopedAccountId });
   const {
     credentialSecret,
     setCredentialSecret,
@@ -1506,8 +1506,7 @@ function MailboxApp({
     enqueueManualSync().catch((error) => setStatus(String(error)));
   }, [enqueueManualSync, setStatus]);
 
-  // 首次引导的所有保存回调显式绑定引导账号 ID：
-  // 即使后台状态切换，也不能把设置误写到另一个账号。
+  // 首次引导保存绑定账号 ID，避免后台刷新覆盖最新状态。
   const handleOnboardingAccountPatch = useCallback(async (accountId: number, patch: Partial<Account>) => {
     const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
       accountId,
@@ -1519,6 +1518,8 @@ function MailboxApp({
   }, [account, accounts, setAccount, setAccountForm, setAccounts]);
 
   const completeOnboarding = useCallback(async (accountId: number) => {
+    // 让旧元数据请求失效，避免向导重新出现。
+    mailboxRefreshRef.current += 1;
     const updated = await invoke<Account>(IPC.SetAccountOnboardingCompleted, {
       accountId,
       completed: true,
@@ -1527,7 +1528,7 @@ function MailboxApp({
     setAccountForm(updated);
     setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setStatus('首次引导已完成，可随时在设置页调整');
-  }, [setAccount, setAccountForm, setAccounts, setStatus]);
+  }, [mailboxRefreshRef, setAccount, setAccountForm, setAccounts, setStatus]);
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));

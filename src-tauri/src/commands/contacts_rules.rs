@@ -50,12 +50,18 @@ fn read_contact_file_by_path(path: &str) -> MailResult<(String, Vec<u8>, usize)>
 #[tauri::command]
 pub async fn preview_contact_import(
     path: String,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportPreview> {
     let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
     let parsed = vcard::parse_contact_import_bytes(&payload, &file_name)
         .map_err(crate::db::MailError::Imap)?;
-    let entries = store.classify_contact_import(parsed.contacts)?;
+    let entries = match account_id {
+        Some(account_id) => {
+            store.classify_contact_import_for_account(account_id, parsed.contacts)?
+        }
+        None => store.classify_contact_import(parsed.contacts)?,
+    };
     let mut new_count = 0_i64;
     let mut merge_count = 0_i64;
     let mut duplicate_count = 0_i64;
@@ -86,6 +92,7 @@ pub fn commit_contact_import(
     path: String,
     selections: Vec<ContactImportSelection>,
     scope: Option<String>,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
     let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
@@ -111,11 +118,13 @@ pub fn commit_contact_import(
             (contact, action)
         })
         .collect();
-    store.commit_contact_import(
-        inputs,
-        &file_name,
-        scope.unwrap_or_else(|| "global".to_string()).as_str(),
-    )
+    let scope = scope.unwrap_or_else(|| "global".to_string());
+    match account_id {
+        Some(account_id) => {
+            store.commit_contact_import_for_account(account_id, inputs, &file_name, &scope)
+        }
+        None => store.commit_contact_import(inputs, &file_name, &scope),
+    }
 }
 
 #[tauri::command]
@@ -123,6 +132,7 @@ pub fn commit_contact_import_entries(
     file_name: String,
     entries: Vec<ContactImportEntryInput>,
     scope: Option<String>,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
     let inputs: Vec<(ContactCreateInput, String)> = entries
@@ -139,31 +149,41 @@ pub fn commit_contact_import_entries(
             )
         })
         .collect();
-    store.commit_contact_import_entries(
-        inputs,
-        &file_name,
-        scope.unwrap_or_else(|| "global".to_string()).as_str(),
-    )
+    let scope = scope.unwrap_or_else(|| "global".to_string());
+    match account_id {
+        Some(account_id) => {
+            store.commit_contact_import_entries_for_account(account_id, inputs, &file_name, &scope)
+        }
+        None => store.commit_contact_import_entries(inputs, &file_name, &scope),
+    }
 }
 
 #[tauri::command]
 pub fn list_contact_import_batches(
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<ContactImportBatch>> {
-    store.list_contact_import_batches()
+    store.list_contact_import_batches_for_account(account_id)
 }
 
 #[tauri::command]
 pub fn undo_contact_import_batch(
     batch_id: i64,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportUndoReport> {
-    store.undo_contact_import_batch(batch_id)
+    match account_id {
+        Some(account_id) => store.undo_contact_import_batch_for_account(account_id, batch_id),
+        None => store.undo_contact_import_batch(batch_id),
+    }
 }
 
 #[tauri::command]
-pub fn list_contacts(store: State<'_, MailStore>) -> MailResult<Vec<Contact>> {
-    store.list_contacts()
+pub fn list_contacts(
+    account_id: Option<i64>,
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<Contact>> {
+    store.list_contacts_for_account(account_id)
 }
 
 #[tauri::command]
@@ -174,17 +194,22 @@ pub fn should_auto_scan_recent_contacts(store: State<'_, MailStore>) -> MailResu
 #[tauri::command]
 pub fn scan_recent_contacts(
     initial_only: Option<bool>,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<RecentContactSyncReport> {
-    store.scan_recent_contacts(initial_only.unwrap_or(false))
+    store.scan_recent_contacts_for_account(initial_only.unwrap_or(false), account_id)
 }
 
 #[tauri::command]
 pub fn create_contact(
     store: State<'_, MailStore>,
     input: ContactCreateInput,
+    account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    store.create_contact(input)
+    match account_id {
+        Some(account_id) => store.create_contact_for_account(account_id, input),
+        None => store.create_contact(input),
+    }
 }
 
 #[tauri::command]
@@ -192,13 +217,24 @@ pub fn update_contact(
     store: State<'_, MailStore>,
     contact_id: i64,
     input: ContactInput,
+    account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    store.update_contact(contact_id, input)
+    match account_id {
+        Some(account_id) => store.update_contact_for_account(account_id, contact_id, input),
+        None => store.update_contact(contact_id, input),
+    }
 }
 
 #[tauri::command]
-pub fn delete_contact(store: State<'_, MailStore>, contact_id: i64) -> MailResult<()> {
-    store.delete_contact(contact_id)
+pub fn delete_contact(
+    store: State<'_, MailStore>,
+    contact_id: i64,
+    account_id: Option<i64>,
+) -> MailResult<()> {
+    match account_id {
+        Some(account_id) => store.delete_contact_for_account(account_id, contact_id),
+        None => store.delete_contact(contact_id),
+    }
 }
 
 #[tauri::command]
@@ -206,16 +242,23 @@ pub fn merge_contacts(
     store: State<'_, MailStore>,
     target_contact_id: i64,
     source_contact_id: i64,
+    account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    store.merge_contacts(target_contact_id, source_contact_id)
+    match account_id {
+        Some(account_id) => {
+            store.merge_contacts_for_account(account_id, target_contact_id, source_contact_id)
+        }
+        None => store.merge_contacts(target_contact_id, source_contact_id),
+    }
 }
 
 #[tauri::command]
 pub async fn export_contacts_vcard(
     app: AppHandle,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Option<ContactExportSummary>> {
-    let contacts = store.list_all_contacts()?;
+    let contacts = store.list_all_contacts_for_account(account_id)?;
     let payload = vcard::render_contacts(&contacts);
     let Some(target_path) = app
         .dialog()
@@ -274,6 +317,7 @@ async fn read_contact_import_file(
 #[tauri::command]
 pub async fn import_contacts_vcard(
     app: AppHandle,
+    account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Option<ContactImportSummary>> {
     let Some((source_path, raw, size_bytes)) = read_contact_import_file(&app).await? else {
@@ -285,7 +329,10 @@ pub async fn import_contacts_vcard(
             "vCard 中没有可导入的有效邮箱联系人。".to_string(),
         ));
     }
-    let (created, updated) = store.import_contacts(parsed.contacts)?;
+    let (created, updated) = match account_id {
+        Some(account_id) => store.import_contacts_for_account(account_id, parsed.contacts)?,
+        None => store.import_contacts(parsed.contacts)?,
+    };
     Ok(Some(ContactImportSummary {
         path: source_path.to_string_lossy().into_owned(),
         total_cards: parsed.total_cards,
@@ -297,8 +344,11 @@ pub async fn import_contacts_vcard(
 }
 
 #[tauri::command]
-pub fn list_rules(store: State<'_, MailStore>) -> MailResult<Vec<MailRule>> {
-    store.list_rules()
+pub fn list_rules(
+    account_id: Option<i64>,
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<MailRule>> {
+    store.list_rules_for_account(account_id)
 }
 
 #[tauri::command]
@@ -306,8 +356,12 @@ pub fn upsert_rule(
     store: State<'_, MailStore>,
     rule_id: Option<i64>,
     input: MailRuleInput,
+    account_id: Option<i64>,
 ) -> MailResult<MailRule> {
-    store.upsert_rule(rule_id, input)
+    match account_id {
+        Some(account_id) => store.upsert_rule_for_account(account_id, rule_id, input),
+        None => store.upsert_rule(rule_id, input),
+    }
 }
 
 #[tauri::command]
@@ -315,11 +369,22 @@ pub fn set_rule_enabled(
     store: State<'_, MailStore>,
     rule_id: i64,
     enabled: bool,
+    account_id: Option<i64>,
 ) -> MailResult<MailRule> {
-    store.set_rule_enabled(rule_id, enabled)
+    match account_id {
+        Some(account_id) => store.set_rule_enabled_for_account(account_id, rule_id, enabled),
+        None => store.set_rule_enabled(rule_id, enabled),
+    }
 }
 
 #[tauri::command]
-pub fn delete_rule(store: State<'_, MailStore>, rule_id: i64) -> MailResult<()> {
-    store.delete_rule(rule_id)
+pub fn delete_rule(
+    store: State<'_, MailStore>,
+    rule_id: i64,
+    account_id: Option<i64>,
+) -> MailResult<()> {
+    match account_id {
+        Some(account_id) => store.delete_rule_for_account(account_id, rule_id),
+        None => store.delete_rule(rule_id),
+    }
 }

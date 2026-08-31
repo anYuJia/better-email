@@ -33,6 +33,7 @@ describe('standalone settings native-window lifecycle contract', () => {
   it('creates a hidden settings WebView and reveals it only after readiness', () => {
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('window', 'settings')");
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('section', request.section || 'accounts')");
+    expect(bridgeSource).toContain("settingsUrl.searchParams.set('scope', String(request.accountScope))");
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?visible: false/);
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?titleBarStyle: 'overlay'/);
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?hiddenTitle: true/);
@@ -71,5 +72,6 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(appSource).toContain('enabled: !standaloneSettingsWindow');
     expect(appSource).toContain('automaticProcessingEnabled: !standaloneSettingsWindow');
     expect(appSource).toContain('useUnreadFocusSync(refreshUnreadIndicators, accountScope, !standaloneSettingsWindow)');
+    expect(appSource).toContain('handleMailboxAccountScopeChange');
   });
 });

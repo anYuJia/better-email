@@ -8,13 +8,11 @@ import {
   X,
 } from 'lucide-react';
 import SettingsPageShell from './SettingsPageShell';
-import SettingsAccountTabs, {
-  type SettingsAccountTabOption,
-} from './accounts/SettingsAccountTabs';
+import AccountSwitcher from '../AccountSwitcher';
+import type { Account, AccountScope } from '../../app/types';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
-import { SettingsSidebar } from './SettingsNavigationControls';
+import { SettingsSearch, SettingsSidebar } from './SettingsNavigationControls';
 import {
-  accountScopedSections,
   connectionSettingsSections,
   getSettingsNavigationContext,
   getSettingsSectionPresentation,
@@ -41,13 +39,23 @@ type SettingsFrameProps = {
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
   onSave: () => void;
+  onDiscardChanges?: () => void;
   canSaveAndVerify?: boolean;
   isDirty?: boolean;
   isBusy?: boolean;
   isTestingConnection?: boolean;
   connectionTestFeedback?: { tone: 'success' | 'error'; message: string } | null;
-  accountOptions?: SettingsAccountTabOption[];
+  accounts?: Account[];
+  accountScope?: AccountScope;
+  onAccountScopeChange?: (value: string) => void;
+  onSetDefaultAccount?: (accountId: number) => void;
+  onAddAccount?: () => void;
+  canSave?: boolean;
+  /** @deprecated Settings account tabs were replaced by the shared header scope picker. */
+  accountOptions?: Array<{ id: number; label: string; email: string; isDefault?: boolean }>;
+  /** @deprecated Settings account tabs were replaced by the shared header scope picker. */
   activeAccountId?: number | null;
+  /** @deprecated Settings account tabs were replaced by the shared header scope picker. */
   onSelectAccountId?: (accountId: number) => void;
   onClose: () => void;
 };
@@ -85,6 +93,8 @@ const saveAndVerifySettingsSections = new Set<SettingsSectionId>([
   'providers',
   'auth',
   'privacy',
+  'identities',
+  'sync',
 ]);
 
 export default function SettingsFrame({
@@ -97,14 +107,18 @@ export default function SettingsFrame({
   onNavigate,
   onTestConnection,
   onSave,
+  onDiscardChanges = () => undefined,
   canSaveAndVerify = false,
   isDirty = false,
   isBusy = false,
   isTestingConnection = false,
   connectionTestFeedback,
-  accountOptions = [],
-  activeAccountId = null,
-  onSelectAccountId,
+  accounts = [],
+  accountScope = 'all',
+  onAccountScopeChange = () => undefined,
+  onSetDefaultAccount = () => undefined,
+  onAddAccount = () => undefined,
+  canSave,
   onClose,
 }: SettingsFrameProps) {
   const {
@@ -117,11 +131,11 @@ export default function SettingsFrame({
   const parentPresentation = getSettingsSectionPresentation(parentSection);
   const isAccountEditingSection = saveAndVerifySettingsSections.has(activeSection);
   const canActOnConnection = connectionSettingsSections.has(activeSection) && canSaveAndVerify;
-  const showSaveAction = isAccountEditingSection && canSaveAndVerify;
-  const showAccountTabs = accountScopedSections.has(activeSection)
-    && accountOptions.length > 1;
+  const showSaveAction = canSave ?? (isAccountEditingSection && canSaveAndVerify);
+  const accountSectionsEnabled = accounts.length > 0 || canSaveAndVerify;
   const isMobileViewport = useSettingsMobileViewport();
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [pendingAccountScope, setPendingAccountScope] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [inputModality, setInputModality] = useState<'keyboard' | 'pointer'>('keyboard');
   const shellRef = useRef<HTMLElement | null>(null);
@@ -164,7 +178,8 @@ export default function SettingsFrame({
     }, SETTINGS_EXIT_MS);
   };
 
-  const performClose = () => {
+  const performClose = (discardChanges = false) => {
+    if (discardChanges) onDiscardChanges();
     setShowDiscardConfirm(false);
     if (isMobileViewport && isNestedSection) {
       onClose();
@@ -176,11 +191,41 @@ export default function SettingsFrame({
   const requestClose = () => {
     if (closingRef.current) return;
     if (isDirty) {
+      setPendingAccountScope(null);
       setShowDiscardConfirm(true);
       return;
     }
     performClose();
   };
+
+  const requestAccountScopeChange = (value: string) => {
+    if (isDirty) {
+      setPendingAccountScope(value);
+      setShowDiscardConfirm(false);
+      return;
+    }
+    onAccountScopeChange(value);
+  };
+
+  const discardAndSwitchAccountScope = () => {
+    if (pendingAccountScope === null) return;
+    const nextScope = pendingAccountScope;
+    setPendingAccountScope(null);
+    onDiscardChanges();
+    onAccountScopeChange(nextScope);
+  };
+
+  const saveAndSwitchAccountScope = () => {
+    if (pendingAccountScope === null) return;
+    onSave();
+  };
+
+  useEffect(() => {
+    if (pendingAccountScope === null || isDirty || isBusy) return;
+    const nextScope = pendingAccountScope;
+    setPendingAccountScope(null);
+    onAccountScopeChange(nextScope);
+  }, [isBusy, isDirty, onAccountScopeChange, pendingAccountScope]);
 
   useEffect(() => {
     if (
@@ -253,23 +298,38 @@ export default function SettingsFrame({
               aria-hidden="true"
             />
           )}
-          <div className="settings-title">
-            <button
-              type="button"
-              className="settings-mobile-back"
-              aria-label={isNestedSection ? `返回${parentPresentation.label}` : '返回设置'}
-              aria-hidden={isMobileViewport ? undefined : true}
-              tabIndex={isMobileViewport ? undefined : -1}
-              onClick={requestClose}
-            >
-              <ChevronLeft size={20} aria-hidden="true" />
-              <span>{isNestedSection ? parentPresentation.label : '设置'}</span>
-            </button>
-            <span className="settings-title-copy">
-              <strong className="settings-desktop-title">{title}</strong>
-              <strong className="settings-mobile-page-title">{activePresentation.label}</strong>
-            </span>
+          <div className="settings-header-leading">
+            <div className="settings-title">
+              <button
+                type="button"
+                className="settings-mobile-back"
+                aria-label={isNestedSection ? `返回${parentPresentation.label}` : '返回设置'}
+                aria-hidden={isMobileViewport ? undefined : true}
+                tabIndex={isMobileViewport ? undefined : -1}
+                onClick={requestClose}
+              >
+                <ChevronLeft size={20} aria-hidden="true" />
+                <span>{isNestedSection ? parentPresentation.label : '设置'}</span>
+              </button>
+              <span className="settings-title-copy">
+                <strong className="settings-desktop-title">{title}</strong>
+                <strong className="settings-mobile-page-title">{activePresentation.label}</strong>
+              </span>
+            </div>
+            <AccountSwitcher
+              className="settings-header-account-switcher"
+              accountScope={accountScope}
+              accounts={accounts}
+              disabled={isBusy}
+              onChange={requestAccountScopeChange}
+              onSetDefault={onSetDefaultAccount}
+              onAddAccount={onAddAccount}
+            />
           </div>
+          <SettingsSearch
+            accountSectionsEnabled={accountSectionsEnabled}
+            onNavigate={onNavigate}
+          />
           <div className="settings-header-actions">
             {canActOnConnection && (
               <button
@@ -326,11 +386,29 @@ export default function SettingsFrame({
           <div className="settings-discard-confirm" role="alertdialog" aria-label="放弃未保存的修改">
             <span>
               <strong>放弃未保存的修改？</strong>
-              <small>当前账号的修改还没有保存。</small>
+              <small>当前设置的修改还没有保存。</small>
             </span>
             <div>
               <button type="button" onClick={() => setShowDiscardConfirm(false)}>继续编辑</button>
-              <button type="button" className="danger" onClick={performClose}>放弃修改</button>
+              <button type="button" className="danger" onClick={() => performClose(true)}>放弃修改</button>
+            </div>
+          </div>
+        )}
+
+        {pendingAccountScope !== null && (
+          <div
+            className="settings-discard-confirm settings-scope-switch-confirm"
+            role="alertdialog"
+            aria-label="切换邮箱范围前处理未保存修改"
+          >
+            <span>
+              <strong>当前有未保存修改</strong>
+              <small>切换邮箱范围前请选择如何处理。</small>
+            </span>
+            <div>
+              <button type="button" onClick={() => setPendingAccountScope(null)}>取消</button>
+              <button type="button" className="danger" onClick={discardAndSwitchAccountScope}>放弃并切换</button>
+              <button type="button" className="primary" onClick={saveAndSwitchAccountScope}>保存并切换</button>
             </div>
           </div>
         )}
@@ -338,23 +416,17 @@ export default function SettingsFrame({
         <div className="settings-body">
           <SettingsSidebar
             activeSection={activeSection}
-            accountSectionsEnabled={canSaveAndVerify}
+            accountSectionsEnabled={accountSectionsEnabled}
             onNavigate={onNavigate}
           />
-          <div className={`settings-content-area${showAccountTabs ? ' has-account-tabs' : ''}`}>
-            {showAccountTabs && (
-              <SettingsAccountTabs
-                accounts={accountOptions}
-                activeAccountId={activeAccountId}
-                switchDisabled={isDirty}
-                onSelect={(accountId) => onSelectAccountId?.(accountId)}
-              />
-            )}
+          <div className="settings-content-area">
             <div className="settings-content">
               <SettingsPageShell
                 activeSection={activeSection}
                 group={activeGroup}
                 item={activeItem}
+                accountScope={accountScope}
+                accounts={accounts}
               >
                 {children}
               </SettingsPageShell>

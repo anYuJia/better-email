@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, Folder, ImapMailboxState } from '../../app/types';
+import type { SettingsAccountValues } from './accountScopeTypes';
 import SyncOperationsSettings from './SyncOperationsSettings';
 
 const account: Account = {
@@ -57,6 +58,16 @@ const folders: Folder[] = [
   },
 ];
 
+const accountValues: SettingsAccountValues = {
+  sync_mode: 'manual',
+  remote_images_allowed: false,
+  warn_external_senders: false,
+  cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
+  auto_download_attachments: false,
+};
+
 const mailboxes: ImapMailboxState[] = [
   mailbox({ id: 1, remote_name: 'INBOX', local_role: 'inbox', local_folder_name: '收件箱' }),
   mailbox({ id: 2, remote_name: 'Sent Messages', local_role: 'sent', local_folder_id: 2, local_folder_name: '已发送' }),
@@ -86,9 +97,14 @@ function renderSettings() {
   const onEnqueueBackgroundTask = vi.fn();
   const result = render(
     <SyncOperationsSettings
+      accountScope={account.id}
+      accounts={[account]}
       accountForm={account}
+      accountValues={accountValues}
       imapMailboxes={mailboxes}
       folders={folders}
+      onAccountValueChange={() => undefined}
+      onAccountFormChange={() => undefined}
       onMapImapMailbox={onMapImapMailbox}
       onCreateAndMapImapMailbox={onCreateAndMapImapMailbox}
       onEnqueueBackgroundTask={onEnqueueBackgroundTask}
@@ -136,9 +152,14 @@ describe('SyncOperationsSettings', () => {
   it('removes the no-op selector when there is no local custom folder to choose', () => {
     render(
       <SyncOperationsSettings
+        accountScope={account.id}
+        accounts={[account]}
         accountForm={account}
+        accountValues={accountValues}
         imapMailboxes={mailboxes}
         folders={[]}
+        onAccountValueChange={() => undefined}
+        onAccountFormChange={() => undefined}
         onMapImapMailbox={() => undefined}
         onCreateAndMapImapMailbox={() => undefined}
         onEnqueueBackgroundTask={() => undefined}

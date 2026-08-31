@@ -287,10 +287,6 @@
   gap: 28px;
 }
 
-.settings-modal .settings-mobile-account-list {
-  display: none;
-}
-
 .settings-modal .settings-account-detail {
   min-width: 0;
   display: grid;

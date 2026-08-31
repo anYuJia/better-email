@@ -10,6 +10,8 @@ type AccountSwitcherProps = {
   onChange: (value: string) => void;
   onSetDefault: (accountId: number) => void;
   onAddAccount: () => void;
+  disabled?: boolean;
+  className?: string;
 };
 
 function providerLabel(provider: string) {
@@ -35,6 +37,8 @@ export default function AccountSwitcher({
   onChange,
   onSetDefault,
   onAddAccount,
+  disabled = false,
+  className = '',
 }: AccountSwitcherProps) {
   const [menu, setMenu] = React.useState<{ x: number; y: number } | null>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
@@ -112,7 +116,7 @@ export default function AccountSwitcher({
 
   return (
     <section
-      className="account-switcher"
+      className={`account-switcher ${className}`.trim()}
       data-account-scope={String(accountScope)}
       aria-label="邮箱范围"
     >
@@ -122,6 +126,7 @@ export default function AccountSwitcher({
         className="account-switcher-trigger"
         aria-haspopup="menu"
         aria-expanded={Boolean(menu)}
+        disabled={disabled}
         onPointerDown={(event) => {
           // 开关交给 onClick 统一处理，但保留按钮的标准聚焦行为。
           event.stopPropagation();
@@ -149,7 +154,7 @@ export default function AccountSwitcher({
         <ChevronDown className="account-switcher-chevron" size={16} aria-hidden="true" />
       </button>
 
-      {menu && (
+      {menu && !disabled && (
         <ContextMenu
           x={menu.x}
           y={menu.y}

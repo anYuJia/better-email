@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
+import type { Account, AccountScope } from '../../app/types';
 import type {
   SettingsNavigationGroup,
   SettingsNavigationItem,
@@ -15,6 +16,8 @@ type SettingsPageShellProps = {
   activeSection: SettingsSectionId;
   group: SettingsNavigationGroup;
   item: SettingsNavigationItem;
+  accountScope?: AccountScope;
+  accounts?: Account[];
   children: React.ReactNode;
 };
 
@@ -22,6 +25,8 @@ export default function SettingsPageShell({
   activeSection,
   group,
   item,
+  accountScope = 'all',
+  accounts = [],
   children,
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
@@ -29,6 +34,18 @@ export default function SettingsPageShell({
   const [settledSection, setSettledSection] = useState<SettingsSectionId | null>(null);
   const presentation = getSettingsSectionPresentation(activeSection) ?? item;
   const accountWorkspace = accountScopedSections.has(activeSection);
+  const scopedAccount = accountScope === 'all'
+    ? null
+    : accounts.find((account) => account.id === accountScope) ?? null;
+  const accountContext = accountWorkspace
+    ? accountScope === 'all'
+      ? accounts.length > 0 ? `所有邮箱账号 · ${accounts.length} 个账号` : '所有邮箱账号'
+      : scopedAccount
+        ? scopedAccount.display_name.trim() && scopedAccount.display_name.trim() !== scopedAccount.email
+          ? `${scopedAccount.display_name.trim()} · ${scopedAccount.email}`
+          : scopedAccount.email
+        : '当前邮箱账号'
+    : null;
   const previousSection = previousSectionRef.current;
   const relationshipMotion = previousSection === activeSection
     ? 'none'
@@ -80,6 +97,11 @@ export default function SettingsPageShell({
         <div className="settings-page-heading">
           <h2 id={`settings-page-${activeSection}`}>{presentation.label}</h2>
           <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
+          {accountContext && (
+            <span className="settings-account-context" data-settings-account-context>
+              {accountContext}
+            </span>
+          )}
         </div>
       </header>
       <div className="settings-page-content">{children}</div>

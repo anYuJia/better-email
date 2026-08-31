@@ -1,25 +1,29 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { Account, AccountCreateInput, IncomingProtocol } from '../../../app/types';
+import type { Account, AccountCreateInput, AccountScope, IncomingProtocol } from '../../../app/types';
+import {
+  MIXED_ACCOUNT_SETTING_VALUE,
+  type AccountScopedSettingKey,
+} from '../../../app/accountScopedSettings';
+import type { SettingsAccountValueChange, SettingsAccountValues } from '../accountScopeTypes';
 import { incomingHostForProtocol, providerPresetForEmail, providerPresets } from '../../../providerCatalog';
 import type { AccountProviderPreset } from '../../../providerCatalog';
 import {
   settingsAccountConfigurationItems,
   type SettingsSectionId,
 } from '../settingsNavigation';
-import AccountList from '../accounts/AccountList';
 import AddAccountDialog from '../accounts/AddAccountDialog';
 import AccountManageDialog from '../accounts/AccountManageDialog';
-import { syncModeOptions } from '../accounts/accountSettingsShared';
 import { accountFormForEmail, accountFormForIncomingProtocol } from '../accounts/accountSetupForm';
-import { CustomSelect } from '../accounts/CustomSelect';
 import SettingsDestinationList from '../SettingsDestinationList';
 import {
   SettingsField,
   SettingsButton,
   SettingsEmptyState,
+  SettingsNotice,
   SettingsRow,
   SettingsSection,
+  SettingsSwitch,
 } from '../shared';
 
 function errorMessage(error: unknown) {
@@ -30,12 +34,14 @@ function errorMessage(error: unknown) {
 
 type AccountSettingsPageProps = {
   accounts: Account[];
+  accountScope: AccountScope;
   accountForm: Account | null;
+  accountValues: SettingsAccountValues;
   accountCount: number;
   accountSwitchDisabled?: boolean;
   newAccountForm: AccountCreateInput;
   onAccountFormChange: (account: Account) => void;
-  onSelectAccount: (account: Account) => void;
+  onAccountValueChange: SettingsAccountValueChange;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
   onCreateNewAccount: (secret?: string, onProgress?: (stage: string) => void) => Promise<void>;
@@ -46,12 +52,14 @@ type AccountSettingsPageProps = {
 
 export default function AccountSettingsPage({
   accounts,
+  accountScope,
   accountForm,
   accountCount,
+  accountValues,
   accountSwitchDisabled = false,
   newAccountForm,
   onAccountFormChange,
-  onSelectAccount,
+  onAccountValueChange,
   onNewAccountFormChange,
   onApplyNewAccountPreset,
   onCreateNewAccount,
@@ -156,6 +164,21 @@ export default function AccountSettingsPage({
     ? providerPresetFor(accountForm.provider)?.label ?? accountForm.provider
     : '';
 
+  const updateBooleanSetting = (key: AccountScopedSettingKey, checked: boolean) => {
+    if (accountScope === 'all') {
+      onAccountValueChange(key, checked);
+      return;
+    }
+    if (accountForm) onAccountFormChange({ ...accountForm, [key]: checked });
+  };
+
+  const readBooleanSetting = (key: AccountScopedSettingKey) => (
+    accountScope === 'all' ? accountValues[key] : accountForm?.[key]
+  );
+
+  const crossAccountRiskWarning = readBooleanSetting('cross_account_risk_warning');
+  const autoDownloadAttachments = readBooleanSetting('auto_download_attachments');
+
   const openAddAccount = () => {
     setDeleteDialogOpen(false);
     setAddDialogOpen(true);
@@ -178,21 +201,54 @@ export default function AccountSettingsPage({
   return (
     <>
       <div className="settings-account-stack">
-        <div className="settings-mobile-account-list">
-          <AccountList
-            accounts={accounts}
-            activeAccountId={accountForm?.id ?? null}
-            accountCount={accountCount}
-            switchDisabled={accountSwitchDisabled}
-            onAdd={openAddAccount}
-            onSelect={(account) => {
-              setDeleteDialogOpen(false);
-              onSelectAccount(account);
-            }}
-          />
-        </div>
+        {accountScope === 'all' ? (
+          <>
+            <SettingsSection
+              title="所有邮箱账号"
+              description="统一范围用于批量编辑账号偏好；服务器、认证、身份和文件夹映射请先选择具体账号。"
+              actions={addAccountAction}
+              className="settings-account-overview"
+              dataSection="account-overview"
+            >
+              {accounts.length === 0 ? (
+                <SettingsEmptyState>
+                  添加第一个邮箱账号后，即可配置服务器、登录、身份、同步和隐私。
+                </SettingsEmptyState>
+              ) : (
+                <SettingsNotice tone="info" title="顶部已统一管理邮箱范围">
+                  <p>切换邮箱账号、设为默认或添加账号都在页面顶部完成。下面的账号偏好会在保存后应用到所有支持的账号。</p>
+                </SettingsNotice>
+              )}
+            </SettingsSection>
 
-        {accountForm ? (
+            {accounts.length > 0 && (
+              <SettingsSection
+                title="账号偏好"
+                description="只修改你主动调整的项目；未修改的账号字段会保持原值。"
+                dataSection="account-preferences"
+              >
+                <SettingsSwitch
+                  label="跨邮箱发送提醒"
+                  description={crossAccountRiskWarning === MIXED_ACCOUNT_SETTING_VALUE
+                    ? '不同邮箱账号当前设置不同。修改后会统一应用。'
+                    : '发件账号与当前邮件所属账号不一致时提醒。'}
+                  checked={crossAccountRiskWarning === true}
+                  indeterminate={crossAccountRiskWarning === MIXED_ACCOUNT_SETTING_VALUE}
+                  onChange={(checked) => updateBooleanSetting('cross_account_risk_warning', checked)}
+                />
+                <SettingsSwitch
+                  label="自动下载新邮件附件"
+                  description={autoDownloadAttachments === MIXED_ACCOUNT_SETTING_VALUE
+                    ? '不同邮箱账号当前设置不同。修改后会统一应用。'
+                    : '新附件保存到默认下载位置，邮件正文仍按需加载。'}
+                  checked={autoDownloadAttachments === true}
+                  indeterminate={autoDownloadAttachments === MIXED_ACCOUNT_SETTING_VALUE}
+                  onChange={(checked) => updateBooleanSetting('auto_download_attachments', checked)}
+                />
+              </SettingsSection>
+            )}
+          </>
+        ) : accountForm ? (
           <div
             className="settings-account-detail"
             data-current-account-id={accountForm.id}
@@ -232,16 +288,26 @@ export default function AccountSettingsPage({
                     placeholder="默认使用邮箱地址"
                   />
                 </SettingsField>
-                <SettingsField label="获取新邮件" hint="控制此账号的后台检查频率" labelMode="static">
-                  <CustomSelect
-                    dense
-                    ariaLabel="获取新邮件"
-                    value={accountForm.sync_mode === 'push' ? '5min' : accountForm.sync_mode}
-                    options={syncModeOptions}
-                    onChange={(value) => onAccountFormChange({ ...accountForm, sync_mode: value })}
-                  />
-                </SettingsField>
               </div>
+
+              <SettingsSection
+                title="账号偏好"
+                description="影响当前邮箱账号的发送与附件处理。"
+                dataSection="account-preferences"
+              >
+                <SettingsSwitch
+                  label="跨邮箱发送提醒"
+                  description="发件账号与当前邮件所属账号不一致时提醒。"
+                  checked={crossAccountRiskWarning === true}
+                  onChange={(checked) => updateBooleanSetting('cross_account_risk_warning', checked)}
+                />
+                <SettingsSwitch
+                  label="自动下载新邮件附件"
+                  description="新附件保存到默认下载位置，邮件正文仍按需加载。"
+                  checked={autoDownloadAttachments === true}
+                  onChange={(checked) => updateBooleanSetting('auto_download_attachments', checked)}
+                />
+              </SettingsSection>
 
               <SettingsRow
                 title="移除账号"
@@ -267,7 +333,7 @@ export default function AccountSettingsPage({
           </div>
         ) : (
           <SettingsSection
-            title="邮箱账号"
+            title="账户信息"
             description="添加账号后，每个账号都拥有独立的连接与偏好设置。"
             actions={addAccountAction}
             className="settings-account-detail-empty"

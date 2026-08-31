@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
+import type { Account } from '../../app/types';
 import SettingsFrame from './SettingsFrame';
 
 describe('SettingsFrame application shell', () => {
@@ -32,6 +33,10 @@ describe('SettingsFrame application shell', () => {
     onSave = () => undefined,
     onTestConnection = () => undefined,
     onNavigate = () => undefined,
+    accounts = [],
+    accountScope = 'all',
+    onAccountScopeChange = () => undefined,
+    onDiscardChanges = () => undefined,
     accountOptions = [],
     activeAccountId = null,
     onSelectAccountId = () => undefined,
@@ -47,6 +52,10 @@ describe('SettingsFrame application shell', () => {
     onSave?: () => void;
     onTestConnection?: () => void;
     onNavigate?: (section: Parameters<typeof SettingsFrame>[0]['activeSection']) => void;
+    accounts?: Account[];
+    accountScope?: Account['id'] | 'all';
+    onAccountScopeChange?: (value: string) => void;
+    onDiscardChanges?: () => void;
     accountOptions?: Array<{ id: number; label: string; email: string }>;
     activeAccountId?: number | null;
     onSelectAccountId?: (accountId: number) => void;
@@ -66,6 +75,10 @@ describe('SettingsFrame application shell', () => {
           isDirty={isDirty}
           isTestingConnection={isTestingConnection}
           connectionTestFeedback={connectionTestFeedback}
+          accounts={accounts}
+          accountScope={accountScope}
+          onAccountScopeChange={onAccountScopeChange}
+          onDiscardChanges={onDiscardChanges}
           accountOptions={accountOptions}
           activeAccountId={activeAccountId}
           onSelectAccountId={onSelectAccountId}
@@ -101,18 +114,18 @@ describe('SettingsFrame application shell', () => {
     expect(screen.getByText('工具与数据')).not.toBeNull();
     expect(navigation.querySelectorAll('.settings-nav-parent')).toHaveLength(7);
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(6);
-    const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
+    const accountParent = screen.getByRole('button', { name: '邮箱账户设置' });
     expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('group', { name: '邮箱账号详细设置' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '隐私设置' }).getAttribute('aria-current')).toBe('page');
-    expect(screen.getByRole('button', { name: '服务器设置' })).not.toBeNull();
-    expect(screen.getByRole('button', { name: '发件身份与标签设置' })).not.toBeNull();
+    expect(screen.getByRole('group', { name: '邮箱账户详细设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '隐私与安全设置' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('button', { name: '服务器与协议设置' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '发件身份设置' })).not.toBeNull();
     expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: '服务器设置' }));
+    fireEvent.click(screen.getByRole('button', { name: '服务器与协议设置' }));
     expect(onNavigate).toHaveBeenCalledWith('providers');
     fireEvent.click(accountParent);
-    expect(screen.queryByRole('group', { name: '邮箱账号详细设置' })).toBeNull();
+    expect(screen.queryByRole('group', { name: '邮箱账户详细设置' })).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalledWith('accounts');
@@ -122,7 +135,7 @@ describe('SettingsFrame application shell', () => {
     const onNavigate = vi.fn();
     renderFrame({ activeSection: 'general', canSaveAndVerify: true, onNavigate });
     const navigation = screen.getByRole('navigation', { name: '设置分类' });
-    const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
+    const accountParent = screen.getByRole('button', { name: '邮箱账户设置' });
     expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
@@ -132,11 +145,11 @@ describe('SettingsFrame application shell', () => {
     fireEvent.click(accountParent);
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(6);
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('button', { name: '账号设置' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('button', { name: '账户信息设置' }).getAttribute('aria-current')).toBeNull();
     expect(screen.getByRole('heading', { name: '通用' })).not.toBeNull();
     expect(onNavigate).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '账号设置' }));
+    fireEvent.click(screen.getByRole('button', { name: '账户信息设置' }));
     expect(onNavigate).toHaveBeenCalledWith('accounts');
     fireEvent.click(accountParent);
     expect(navigation.querySelectorAll('.settings-nav-subsection.is-open .settings-nav-subitem')).toHaveLength(0);
@@ -178,20 +191,20 @@ describe('SettingsFrame application shell', () => {
     }
 
     const { container } = render(<InteractiveFrame />);
-    const accountParent = screen.getByRole('button', { name: '邮箱账号设置' });
+    const accountParent = screen.getByRole('button', { name: '邮箱账户设置' });
     const toolsParent = screen.getByRole('button', { name: '效率工具设置' });
 
     expect(accountParent.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('heading', { name: '隐私' })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: '隐私与安全' })).not.toBeNull();
     fireEvent.click(toolsParent);
-    expect(screen.getByRole('group', { name: '邮箱账号详细设置' })).not.toBeNull();
+    expect(screen.getByRole('group', { name: '邮箱账户详细设置' })).not.toBeNull();
     expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(2);
 
     fireEvent.click(accountParent);
     expect(accountParent.getAttribute('aria-current')).toBeNull();
     expect(accountParent.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('group', { name: '邮箱账号详细设置' })).toBeNull();
+    expect(screen.queryByRole('group', { name: '邮箱账户详细设置' })).toBeNull();
     expect(screen.getByRole('group', { name: '效率工具详细设置' })).not.toBeNull();
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(1);
 
@@ -199,95 +212,56 @@ describe('SettingsFrame application shell', () => {
     expect(toolsParent.getAttribute('aria-current')).toBeNull();
     expect(toolsParent.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelectorAll('.settings-nav-subsection.is-open')).toHaveLength(0);
-    expect(screen.getByRole('heading', { name: '隐私' })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: '隐私与安全' })).not.toBeNull();
   });
 
-  it('shows the account switch tabs on every desktop account-scoped page', () => {
-    const accountOptions = [
-      { id: 1, label: '工作邮箱', email: 'work@example.com' },
-      { id: 2, label: '个人邮箱', email: 'personal@example.com' },
-    ];
-    const { container, unmount } = renderFrame({
-      activeSection: 'privacy',
-      canSaveAndVerify: true,
-      accountOptions,
-      activeAccountId: 1,
-    });
-    expect(screen.getByRole('navigation', { name: '切换设置账号' })).not.toBeNull();
-    expect(screen.getByRole('tab', { name: /工作邮箱/ }).getAttribute('aria-current')).toBe('true');
-    expect(screen.getByRole('tab', { name: /个人邮箱/ }).getAttribute('aria-current')).toBeNull();
-    expect(container.querySelector('.settings-account-tabs')).not.toBeNull();
-    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
-    expect(container.querySelector('.settings-account-workspace')).toBeNull();
-    unmount();
-
-    const singleAccount = renderFrame({
-      activeSection: 'privacy',
-      canSaveAndVerify: true,
-      accountOptions: [accountOptions[0]],
-      activeAccountId: 1,
-    });
-    expect(singleAccount.container.querySelector('.settings-account-tabs')).toBeNull();
-    expect(screen.queryByRole('tab', { name: /工作邮箱/ })).toBeNull();
-    singleAccount.unmount();
-
-    renderFrame({ activeSection: 'general' });
-    expect(screen.queryByRole('navigation', { name: '切换设置账号' })).toBeNull();
-  });
-
-  it('keeps the single-account hub full-width without a redundant switch strip', () => {
-    const { container } = renderFrame({
-      activeSection: 'accounts',
-      canSaveAndVerify: true,
-      accountOptions: [{ id: 1, label: '工作邮箱', email: 'work@example.com' }],
-      activeAccountId: 1,
-    });
+  it('uses the shared account scope picker in the settings header', () => {
+    const { container } = renderFrame({ activeSection: 'privacy' });
+    const scope = screen.getByRole('region', { name: '邮箱范围' });
+    expect(scope).not.toBeNull();
+    expect(scope.getAttribute('data-account-scope')).toBe('all');
     expect(container.querySelector('.settings-account-tabs')).toBeNull();
-    expect(container.querySelector('.settings-page-header .settings-account-context')).toBeNull();
-    expect(screen.queryByRole('combobox', { name: '切换当前设置账号' })).toBeNull();
+    expect(container.querySelector('.settings-page-header .settings-account-context')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /统一邮箱/ }));
+    expect(screen.getByRole('menu', { name: '邮箱范围选择' })).not.toBeNull();
+    expect(screen.getByRole('menuitemradio', { name: '统一邮箱' })).not.toBeNull();
   });
 
-  it('switches the scoped account from tabs and locks other tabs while edits are dirty', () => {
-    const onSelectAccountId = vi.fn();
-    const accountOptions = [
-      { id: 1, label: '工作邮箱', email: 'work@example.com' },
-      { id: 2, label: '个人邮箱', email: 'personal@example.com' },
+  it('guards a scope change while settings are dirty', () => {
+    const onScopeChange = vi.fn();
+    const onDiscardChanges = vi.fn();
+    const accounts = [
+      { id: 1, email: 'one@example.com', display_name: '账号一', provider: 'imap' } as Account,
+      { id: 2, email: 'two@example.com', display_name: '账号二', provider: 'imap' } as Account,
     ];
     renderFrame({
-      activeSection: 'privacy',
-      canSaveAndVerify: true,
-      accountOptions,
-      activeAccountId: 1,
-      onSelectAccountId,
-    });
-
-    const personalTab = screen.getByRole('tab', { name: /个人邮箱/ });
-    expect((personalTab as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(personalTab);
-    expect(onSelectAccountId).toHaveBeenCalledWith(2);
-
-    cleanup();
-    renderFrame({
-      activeSection: 'privacy',
-      canSaveAndVerify: true,
+      activeSection: 'sync',
+      accounts,
       isDirty: true,
-      accountOptions,
-      activeAccountId: 1,
-      onSelectAccountId,
+      onAccountScopeChange: onScopeChange,
+      onDiscardChanges,
     });
-    expect((screen.getByRole('tab', { name: /个人邮箱/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('tab', { name: /工作邮箱/ }) as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /统一邮箱/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /账号二/ }));
+    expect(screen.getByRole('alertdialog', { name: '切换邮箱范围前处理未保存修改' })).not.toBeNull();
+    expect(onScopeChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '放弃并切换' }));
+    expect(onDiscardChanges).toHaveBeenCalledOnce();
+    expect(onScopeChange).toHaveBeenCalledWith('2');
   });
 
   it('keeps the account hub reachable when no account exists', () => {
     renderFrame({ activeSection: 'accounts', canSaveAndVerify: false });
-    const accountParent = screen.getByRole('button', { name: '邮箱账号设置' }) as HTMLButtonElement;
+    const accountParent = screen.getByRole('button', { name: '邮箱账户设置' }) as HTMLButtonElement;
     expect(accountParent.disabled).toBe(false);
     expect(accountParent.getAttribute('aria-current')).toBeNull();
     fireEvent.click(accountParent);
-    expect((screen.getByRole('button', { name: '账号设置' }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByRole('button', { name: '账号设置' }).getAttribute('aria-current')).toBe('page');
-    expect((screen.getByRole('button', { name: '服务器设置' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '账户信息设置' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: '账户信息设置' }).getAttribute('aria-current')).toBe('page');
+    expect((screen.getByRole('button', { name: '服务器与协议设置' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('keeps the mail workspace inaccessible while settings owns the application surface', () => {
@@ -361,7 +335,7 @@ describe('SettingsFrame application shell', () => {
     const onNavigate = vi.fn();
     const { container } = renderFrame({ activeSection: 'providers', onClose, onNavigate });
     const mobileBack = container.querySelector<HTMLButtonElement>('.settings-mobile-back');
-    expect(mobileBack?.getAttribute('aria-label')).toBe('返回账号');
+    expect(mobileBack?.getAttribute('aria-label')).toBe('返回账户信息');
     fireEvent.click(mobileBack!);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalled();
@@ -369,14 +343,14 @@ describe('SettingsFrame application shell', () => {
 
   it('keeps Tab focus inside the settings surface', () => {
     renderFrame();
-    const close = screen.getByRole('button', { name: '关闭设置' });
+    const accountScope = screen.getByRole('button', { name: /统一邮箱/ });
     const pageInput = screen.getByPlaceholderText('设置内输入框');
 
     pageInput.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
-    expect(document.activeElement).toBe(close);
+    expect(document.activeElement).toBe(accountScope);
 
-    close.focus();
+    accountScope.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(pageInput);
   });

@@ -69,11 +69,11 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
     description: '管理界面、发送、通知与全局偏好。',
   },
   accounts: {
-    label: '账号',
-    description: '添加、切换并管理邮箱账号。',
+    label: '账户信息',
+    description: '查看账号信息、添加或移除邮箱账号。',
   },
   providers: {
-    label: '服务器',
+    label: '服务器与协议',
     description: '配置收信与发信服务器。',
   },
   auth: {
@@ -81,7 +81,7 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
     description: '管理授权码、OAuth2 与登录凭据。',
   },
   identities: {
-    label: '发件身份与标签',
+    label: '发件身份',
     description: '管理发件身份、别名、回复地址与签名。',
   },
   sync: {
@@ -89,8 +89,8 @@ const sectionPresentation: Record<SettingsSectionId, Pick<SettingsNavigationItem
     description: '管理同步状态、文件夹映射与后台同步。',
   },
   privacy: {
-    label: '隐私',
-    description: '控制当前账号的远程图片、外部发件人提示与信任列表。',
+    label: '隐私与安全',
+    description: '控制远程图片、外部发件人提示与账号安全策略。',
   },
   ai: {
     label: 'AI 接入',
@@ -137,7 +137,7 @@ export function isSettingsSectionId(value: unknown): value is SettingsSectionId 
 export const settingsAccountConfigurationItems: SettingsNavigationItem[] = [
   {
     id: 'providers',
-    label: '服务器',
+    label: '服务器与协议',
     description: 'IMAP、POP3 与 SMTP 连接',
     keywords: ['服务商', '服务器', 'imap', 'pop3', 'smtp', '端口', 'tls', 'ssl'],
     icon: Server,
@@ -151,7 +151,7 @@ export const settingsAccountConfigurationItems: SettingsNavigationItem[] = [
   },
   {
     id: 'identities',
-    label: '发件身份与标签',
+    label: '发件身份',
     description: '发件身份、别名、回复地址与签名',
     keywords: ['身份', '别名', '签名', 'reply-to', '回复地址'],
     icon: Signature,
@@ -165,8 +165,8 @@ export const settingsAccountConfigurationItems: SettingsNavigationItem[] = [
   },
   {
     id: 'privacy',
-    label: '隐私',
-    description: '当前账号的远程图片与信任列表',
+    label: '隐私与安全',
+    description: '远程图片、外部发件人提示与账号安全策略',
     keywords: ['隐私', '远程图片', '信任', '外部发件人'],
     icon: ShieldCheck,
   },
@@ -175,8 +175,8 @@ export const settingsAccountConfigurationItems: SettingsNavigationItem[] = [
 export const settingsAccountDetailItems: SettingsNavigationItem[] = [
   {
     id: 'accounts',
-    label: '账号',
-    description: '添加、切换与移除邮箱账号',
+    label: '账户信息',
+    description: '查看、添加与移除邮箱账号',
     keywords: ['账号', '邮箱', '添加账号', '切换账号', '移除账号'],
     icon: UserRound,
   },
@@ -238,8 +238,8 @@ export const settingsNavigationGroups: SettingsNavigationGroup[] = [
       },
       {
         id: 'accounts',
-        label: '邮箱账号',
-        description: '管理账号、服务器、身份与同步。',
+        label: '邮箱账户',
+        description: '管理账号信息、服务器、身份与同步。',
         keywords: ['账号', '邮箱', '添加账号', '切换账号', 'account'],
         icon: UserRound,
       },
@@ -306,15 +306,15 @@ export const settingsSearchEntries: SettingsSearchEntry[] = [
   { label: '撤销发送', path: '偏好 › 通用', section: 'general', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
   { label: '只提醒 VIP', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['vip', '只提醒', '重点联系人'] },
   { label: '免打扰时段', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['免打扰', '静音', '时间', 'dnd'] },
-  { label: '邮箱账号', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
-  { label: '获取新邮件', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['同步频率', '后台检查', 'sync'] },
-  { label: '自动下载附件', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['附件', '自动下载', 'download'] },
-  { label: '跨邮箱发送风险提示', path: '偏好 › 邮箱账号', section: 'accounts', target: 'account-overview', keywords: ['发送提醒', '跨账号', 'risk'] },
-  { label: '收信与发信服务器', path: '邮箱账号 › 服务器', section: 'providers', keywords: ['imap', 'pop3', 'smtp', '端口', 'ssl', 'tls'] },
-  { label: '登录凭据与授权码', path: '邮箱账号 › 登录与安全', section: 'auth', keywords: ['密码', '授权码', 'oauth', 'token'] },
-  { label: '发件身份与标签', path: '邮箱账号 › 发件身份与标签', section: 'identities', keywords: ['签名', '别名', 'reply-to', '回复地址', '显示名'] },
-  { label: '同步与文件夹映射', path: '邮箱账号 › 同步', section: 'sync', keywords: ['文件夹', '同步', 'imap folder'] },
-  { label: '远程图片与信任列表', path: '邮箱账号 › 隐私', section: 'privacy', keywords: ['图片', '隐私', '信任', '外部发件人'] },
+  { label: '账户信息', path: '偏好 › 邮箱账户', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
+  { label: '同步频率', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['获取新邮件', '后台检查', 'sync'] },
+  { label: '自动下载附件', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['附件', '自动下载', 'download'] },
+  { label: '跨邮箱发送风险提示', path: '邮箱账户 › 账户信息', section: 'accounts', target: 'account-preferences', keywords: ['发送提醒', '跨账号', 'risk'] },
+  { label: '收信与发信服务器', path: '邮箱账户 › 服务器与协议', section: 'providers', keywords: ['imap', 'pop3', 'smtp', '端口', 'ssl', 'tls'] },
+  { label: '登录凭据与授权码', path: '邮箱账户 › 登录与安全', section: 'auth', keywords: ['密码', '授权码', 'oauth', 'token'] },
+  { label: '发件身份', path: '邮箱账户 › 发件身份', section: 'identities', keywords: ['签名', '别名', 'reply-to', '回复地址', '显示名'] },
+  { label: '同步与文件夹映射', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-mailboxes', keywords: ['文件夹', '同步', 'imap folder'] },
+  { label: '远程图片与账号安全', path: '邮箱账户 › 隐私与安全', section: 'privacy', keywords: ['图片', '隐私', '信任', '外部发件人', '安全'] },
   { label: 'AI 功能', path: '智能与集成 › AI 接入', section: 'ai', target: 'ai', keywords: ['翻译', '摘要', '模板生成', '人工智能'] },
   { label: 'AI 服务与模型', path: '智能与集成 › AI 接入', section: 'ai', target: 'ai-llm-provider', keywords: ['openai', '模型', 'api', 'llm'] },
   { label: 'AI 连接参数', path: '智能与集成 › AI 接入 › 高级连接', section: 'ai', target: 'ai-advanced', keywords: ['endpoint', 'api key', 'token', 'timeout', '端点'] },

@@ -20,6 +20,8 @@ export {
 export type { SettingsWindowRequest } from './app/settingsWindow';
 export {
   SETTINGS_CLOSED_EVENT,
+  SETTINGS_ACCOUNT_SCOPE_EVENT,
+  SETTINGS_ACCOUNTS_UPDATED_EVENT,
   SETTINGS_OPEN_EVENT,
   SETTINGS_READY_EVENT,
   SETTINGS_READY_QUERY_EVENT,
@@ -162,6 +164,11 @@ export function prewarmComposerWindow(): Promise<void> {
 export function openSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
   if (mockMode) return Promise.resolve();
   return loadProdBridge().then(({ prodOpenSettingsWindow }) => prodOpenSettingsWindow(request));
+}
+
+export function syncSettingsWindowAccountScope(scope: import('./app/types').AccountScope): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodSyncSettingsWindowAccountScope }) => prodSyncSettingsWindowAccountScope(scope));
 }
 
 export function showCurrentWindow(): Promise<void> {

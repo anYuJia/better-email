@@ -57,6 +57,8 @@ import useTrashController from './hooks/useTrashController';
 import useThemeMode from './hooks/useThemeMode';
 import useAutoHideScrollbars from './hooks/useAutoHideScrollbars';
 import useFirstMessageRowPaint from './hooks/useFirstMessageRowPaint';
+import useAccountScopedSettings from './hooks/useAccountScopedSettings';
+import useSettingsAccountScope from './hooks/useSettingsAccountScope';
 import {
   type NotificationPolicy,
 } from './mailUtils';
@@ -118,7 +120,6 @@ import './ui-2026.css';
 const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
-import useGlobalAccountPreferences from './hooks/useGlobalAccountPreferences';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
 const SettingsOverlay = lazy(() => import('./components/settings/SettingsOverlay'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
@@ -141,6 +142,7 @@ import { IPC } from './ipc/commands';
 type AppProps = {
   standaloneSettingsWindow?: boolean;
   requestedSettingsSection?: SettingsSectionId;
+  requestedSettingsAccountScope?: AccountScope;
   nativeSettingsCloseRequestVersion?: number;
   onStandaloneSettingsReady?: () => void;
 };
@@ -148,6 +150,7 @@ type AppProps = {
 export default function App({
   standaloneSettingsWindow = false,
   requestedSettingsSection = 'accounts',
+  requestedSettingsAccountScope,
   nativeSettingsCloseRequestVersion = 0,
   onStandaloneSettingsReady,
 }: AppProps) {
@@ -155,6 +158,7 @@ export default function App({
     <MailboxApp
       standaloneSettingsWindow={standaloneSettingsWindow}
       requestedSettingsSection={requestedSettingsSection}
+      requestedSettingsAccountScope={requestedSettingsAccountScope}
       nativeSettingsCloseRequestVersion={nativeSettingsCloseRequestVersion}
       onStandaloneSettingsReady={onStandaloneSettingsReady}
     />
@@ -164,12 +168,15 @@ export default function App({
 function MailboxApp({
   standaloneSettingsWindow,
   requestedSettingsSection,
+  requestedSettingsAccountScope,
   nativeSettingsCloseRequestVersion,
   onStandaloneSettingsReady,
 }: AppProps & { standaloneSettingsWindow: boolean; requestedSettingsSection: SettingsSectionId }) {
   const [account, setAccount] = useState<Account | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountScope, setAccountScope] = useState<AccountScope>(loadAccountScope);
+  const [accountScope, setAccountScope] = useState<AccountScope>(
+    () => requestedSettingsAccountScope ?? loadAccountScope(),
+  );
   const [accountForm, setAccountForm] = useState<Account | null>(null);
   const [newAccountForm, setNewAccountForm] = useState<AccountCreateInput>(emptyAccountCreateForm);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -770,10 +777,10 @@ function MailboxApp({
 
   const openDesktopSettingsWindow = useCallback((section: SettingsSectionId = 'accounts') => {
     setStatus('正在打开设置窗口…');
-    void openSettingsWindow({ section })
+    void openSettingsWindow({ section, accountScope })
       .then(() => setStatus('设置窗口已就绪'))
       .catch((error) => setStatus(`无法打开独立设置窗口：${String(error)}`));
-  }, []);
+  }, [accountScope]);
 
   const openMobileSettings = useCallback(() => {
     if (isMobileApp) {
@@ -1412,12 +1419,14 @@ function MailboxApp({
     setIdentities,
     setFolders,
     setStatus,
+    onScopeChange: (scope) => changeAccountScope(String(scope)),
   });
-  const globalAccountPreferences = useGlobalAccountPreferences({
+  const accountScopedPreferences = useAccountScopedSettings({
+    accountScope,
     accounts,
     setAccount,
-    setAccountForm,
     setAccounts,
+    setAccountForm,
     setStatus,
   });
   const {
@@ -1652,6 +1661,24 @@ function MailboxApp({
     setNarrowView('list');
     focusNarrowNavigationControl('[data-narrow-sidebar-open]');
   }, [backMobileScreen, focusNarrowNavigationControl, isMobileApp]);
+
+  const {
+    handleSettingsAccountScopeChange,
+    handleMailboxAccountScopeChange,
+  } = useSettingsAccountScope({
+    accountScope,
+    accounts,
+    requestedAccountScope: requestedSettingsAccountScope,
+    accountsLoaded: initialAccountListLoaded,
+    standaloneSettingsWindow,
+    useNativeSettingsWindow,
+    setAccount,
+    setAccounts,
+    setAccountForm,
+    changeAccountScope,
+    selectSettingsAccount,
+    showNarrowList,
+  });
 
   const showMessageInNarrowReader = useCallback((messageId: number) => {
     if (isMobileApp) navigateMobileScreen('reader');
@@ -1929,10 +1956,7 @@ function MailboxApp({
         savedSearchName={savedSearchName}
         savedSearches={savedSearches}
         customFolderName={customFolderName}
-        onAccountScopeChange={(value) => {
-          showNarrowList();
-          changeAccountScope(value);
-        }}
+        onAccountScopeChange={handleMailboxAccountScopeChange}
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
@@ -2107,6 +2131,10 @@ function MailboxApp({
             onReady={onStandaloneSettingsReady}
             accountForm={accountForm}
             accounts={accounts}
+            accountScope={accountScope}
+            accountValues={accountScopedPreferences.values}
+            unifiedAccountSettingsDirty={accountScopedPreferences.isDirty}
+            unifiedAccountSettingsSaving={accountScopedPreferences.saving}
             newAccountForm={newAccountForm}
             themeMode={themeMode.mode}
             onThemeModeChange={themeMode.setMode}
@@ -2132,7 +2160,6 @@ function MailboxApp({
             credentialStatus={credentialStatus}
             notificationPolicy={notificationPolicy}
             sendUndoDelaySeconds={sendUndoDelaySeconds}
-            {...globalAccountPreferences}
             remoteImageTrusts={remoteImageTrusts}
             identities={identities}
             identityForm={identityForm}
@@ -2164,6 +2191,10 @@ function MailboxApp({
               testConnection().catch(() => undefined);
             }}
             onSave={() => {
+              if (accountScope === 'all') {
+                accountScopedPreferences.save().catch((error) => setStatus(String(error)));
+                return;
+              }
               if (!accountForm) {
                 setStatus('请先添加邮箱账号');
                 return;
@@ -2176,11 +2207,14 @@ function MailboxApp({
                 })
                 .catch((error) => setStatus(String(error)));
             }}
+            onDiscardUnifiedSettings={accountScopedPreferences.discardChanges}
             onSaveAndVerify={accountForm ? () => {
               saveAndVerify().catch((error) => setStatus(String(error)));
             } : undefined}
             onAccountFormChange={setAccountForm}
-            onSelectAccount={selectSettingsAccount}
+            onAccountValueChange={accountScopedPreferences.updateSetting}
+            onAccountScopeChange={handleSettingsAccountScopeChange}
+            onSetDefaultAccount={(accountId) => { setDefaultAccount(accountId).catch((error) => setStatus(String(error))); }}
             onNewAccountFormChange={setNewAccountForm}
             onApplyProviderPreset={applyProviderPreset}
             onApplyNewAccountPreset={applyNewAccountPreset}

@@ -65,6 +65,22 @@ describe('shared settings components', () => {
     expect(checked).toBe(true);
   });
 
+  it('SettingsSwitch exposes a mixed state without choosing either value', () => {
+    const { container } = render(
+      <SettingsSwitch
+        label="统一偏好"
+        checked={false}
+        indeterminate
+        onChange={() => undefined}
+      />,
+    );
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.getAttribute('aria-checked')).toBe('mixed');
+    expect(checkbox.getAttribute('data-indeterminate')).toBe('true');
+    expect(checkbox.indeterminate).toBe(true);
+    expect(container.querySelector('.st-switch.is-indeterminate')).not.toBeNull();
+  });
+
   it('SettingsSwitch renders copy before the checkbox so the switch sits at the row end', () => {
     const { container } = render(
       <SettingsSwitch label="只提醒 VIP" description="其余静默" checked={false} onChange={() => undefined} />,

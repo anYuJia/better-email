@@ -1,26 +1,4 @@
-/* Settings responsive contract: desktop sidebar, compact account tabs, mobile native push page. */
-
-@media (min-width: 721px) and (max-width: 900px) {
-  .settings-account-tabs {
-    min-height: 44px;
-  }
-
-  .settings-account-tabs-list {
-    gap: 8px;
-    padding-inline: 16px;
-  }
-
-  .settings-account-tab {
-    min-width: 104px;
-    height: 44px;
-    flex: 1 0 104px;
-  }
-
-  .settings-account-tab-copy small,
-  .settings-account-tab em {
-    display: none;
-  }
-}
+/* Settings responsive contract: desktop sidebar, shared header scope picker, mobile native push page. */
 
 @media (max-width: 720px) {
   .settings-workspace {
@@ -45,6 +23,8 @@
     min-height: 52px;
     height: 52px;
     flex-basis: 52px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 8px;
     padding: 0 8px 0 4px;
   }
@@ -84,6 +64,87 @@
     font-size: 16px;
   }
 
+  .settings-header-leading {
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .settings-header-leading .settings-title {
+    flex: 0 0 auto;
+  }
+
+  .settings-header-account-switcher {
+    width: min(180px, 100%);
+    max-width: 180px;
+  }
+
+  .settings-header-account-switcher .account-switcher-trigger {
+    min-height: 44px;
+    padding-inline: 6px;
+  }
+
+  .settings-header-account-switcher .account-switcher-copy strong {
+    font-size: 13px;
+  }
+
+  .settings-header-account-switcher .account-switcher-copy > span {
+    font-size: 10px;
+  }
+
+  .settings-header-search {
+    width: 40px;
+    min-width: 40px;
+    justify-self: end;
+  }
+
+  .settings-search-toggle {
+    width: 40px;
+    min-width: 40px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--st-radius-md);
+    color: var(--st-text-secondary);
+    background: transparent;
+  }
+
+  .settings-search-toggle:hover,
+  .settings-search-toggle:active:not(:disabled) {
+    color: var(--st-text);
+    background: var(--st-surface-muted);
+  }
+
+  .settings-search-field {
+    display: none;
+  }
+
+  .settings-header-search.is-mobile-expanded {
+    position: absolute;
+    right: 8px;
+    left: 54px;
+    width: auto;
+  }
+
+  .settings-header-search.is-mobile-expanded .settings-search-toggle {
+    display: none;
+  }
+
+  .settings-header-search.is-mobile-expanded .settings-search-field {
+    min-height: 44px;
+    display: flex;
+    background: var(--st-surface);
+  }
+
+  .settings-header-search.is-mobile-expanded .settings-search-field input {
+    min-height: 42px;
+  }
+
+  .settings-search-popover {
+    max-height: calc(100dvh - 72px);
+  }
+
   .settings-header-actions {
     margin-left: auto;
     gap: 4px;
@@ -105,14 +166,6 @@
   .settings-content-area,
   .settings-content {
     width: 100%;
-  }
-
-  .settings-content-area.has-account-tabs {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-account-tabs {
-    display: none;
   }
 
   .settings-page {
@@ -155,16 +208,16 @@
     line-height: 1.45;
   }
 
+  .settings-account-context {
+    font-size: 12px;
+  }
+
   .settings-page-content {
     gap: 20px;
     padding: 16px 16px 32px;
   }
 
   .settings-mobile-detail-navigation {
-    display: block;
-  }
-
-  .settings-modal .settings-mobile-account-list {
     display: block;
   }
 

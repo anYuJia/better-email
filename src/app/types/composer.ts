@@ -60,4 +60,3 @@ export type OutboxItem = {
   queued_at: string;
   next_attempt_at: string;
 };
-

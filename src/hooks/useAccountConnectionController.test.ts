@@ -122,4 +122,3 @@ describe('account connection controller helpers', () => {
     });
   });
 });
-

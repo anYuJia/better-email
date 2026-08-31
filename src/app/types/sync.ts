@@ -93,4 +93,3 @@ export type BackgroundTask = {
   /** 文件夹/批次级进度（0-100），由 Rust 同步流程在安全检查点写入。 */
   progress: number;
 };
-

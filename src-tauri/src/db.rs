@@ -1034,7 +1034,7 @@ mod tests {
         assert_eq!(normalized_list_sort(Some("unknown")), "newest");
         assert_eq!(
             message_order_clause(Some("oldest")),
-            "m.received_at ASC, m.id ASC"
+            "julianday(m.received_at) ASC, m.id ASC"
         );
         assert_eq!(
             thread_order_clause(Some("oldest")),

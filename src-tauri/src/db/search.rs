@@ -213,13 +213,16 @@ pub(super) fn normalized_list_sort(sort: Option<&str>) -> &'static str {
     }
 }
 pub(super) fn message_order_clause(sort: Option<&str>) -> &'static str {
+    // Providers retain different RFC3339 offsets. Comparing the stored text
+    // interleaves local dates in unified mailboxes; sort absolute instants
+    // before LIMIT/OFFSET so date groups and subsequent pages stay ordered.
     match normalized_list_sort(sort) {
-        "oldest" => "m.received_at ASC, m.id ASC",
+        "oldest" => "julianday(m.received_at) ASC, m.id ASC",
         "sender" => {
-            "lower(m.sender_name) ASC, lower(m.sender_email) ASC, m.received_at DESC, m.id DESC"
+            "lower(m.sender_name) ASC, lower(m.sender_email) ASC, julianday(m.received_at) DESC, m.id DESC"
         }
-        "subject" => "lower(m.subject) ASC, m.received_at DESC, m.id DESC",
-        _ => "m.received_at DESC, m.id DESC",
+        "subject" => "lower(m.subject) ASC, julianday(m.received_at) DESC, m.id DESC",
+        _ => "julianday(m.received_at) DESC, m.id DESC",
     }
 }
 pub(super) fn thread_order_clause(sort: Option<&str>) -> &'static str {

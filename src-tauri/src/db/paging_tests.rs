@@ -7,6 +7,123 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static PAGING_TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn message_pages_sort_mixed_timezones_before_pagination() {
+    let data_dir = tempfile::tempdir().expect("temporary database directory");
+    let store = MailStore::open_at_with_seed(data_dir.path().join(DATABASE_FILENAME), false)
+        .expect("empty store opens");
+    // Lexical sorting interleaves local calendar days when providers use
+    // different offsets. Include equal instants and fractional seconds too.
+    let timestamps = [
+        "2026-08-30T01:00:00+08:00",
+        "2026-08-29T23:00:00+08:00",
+        "2026-08-29T18:00:00+00:00",
+        "2026-08-29T16:00:00Z",
+        "2026-08-24T23:00:00+08:00",
+        "2026-08-24T18:00:00+00:00",
+        "2026-08-29T10:00:00-07:00",
+        "2026-08-30T01:00:00.500+08:00",
+    ];
+    store
+        .with_conn(|conn| {
+            for account_id in [9101, 9102] {
+                conn.execute(
+                    "INSERT INTO accounts(id, email, display_name, provider, created_at)
+                     VALUES (?1, ?2, 'Timezone test', 'custom', '2026-08-31T00:00:00Z')",
+                    params![account_id, format!("timezone-{account_id}@example.com")],
+                )?;
+                conn.execute(
+                    "INSERT INTO folders(id, account_id, name, role)
+                     VALUES (?1, ?1, 'Inbox', 'inbox')",
+                    [account_id],
+                )?;
+            }
+            for (index, timestamp) in timestamps.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO messages(
+                        id, account_id, folder_id, sender_name, sender_email,
+                        recipients, subject, snippet, body, received_at
+                     ) VALUES (?1, ?2, ?2, 'Sender', 'sender@example.com',
+                               'recipient@example.com', 'Subject', '', '', ?3)",
+                    params![index as i64 + 1, 9101 + index as i64 % 2, timestamp],
+                )?;
+            }
+            Ok(())
+        })
+        .expect("mixed timezone messages inserted");
+
+    let newest_ids = vec![3, 8, 7, 1, 4, 2, 6, 5];
+    for (account_id, folder_id) in [(None, -1), (None, 0), (Some(9101), 0), (Some(9102), 9102)] {
+        for sort in ["newest", "oldest", "sender", "subject", "unknown"] {
+            let mut expected = newest_ids.clone();
+            expected.retain(|id| account_id.is_none_or(|account| 9101 + (id - 1) % 2 == account));
+            if sort == "oldest" {
+                expected.reverse();
+            }
+            let actual = (0..=expected.len())
+                .step_by(2)
+                .flat_map(|offset| {
+                    store
+                        .list_messages_for_scope_sorted_page(
+                            account_id,
+                            folder_id,
+                            None,
+                            None,
+                            Some(sort.to_string()),
+                            offset as i64,
+                            2,
+                        )
+                        .expect("timezone message page loads")
+                })
+                .map(|message| message.id)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                actual, expected,
+                "scope={account_id:?}/{folder_id}, sort={sort}"
+            );
+        }
+    }
+}
+
+#[test]
+fn chronological_message_pages_use_time_indexes() {
+    let data_dir = tempfile::tempdir().expect("temporary database directory");
+    let store = MailStore::open_at_with_seed(data_dir.path().join(DATABASE_FILENAME), false)
+        .expect("empty store opens");
+    // Exercise the real query, including joins and pagination, in the global,
+    // single-account and single-folder scopes. Both directions use the index.
+    store
+        .with_conn(|conn| {
+            for scope in [
+                "",
+                "m.account_id = 9101",
+                "m.folder_id = 9101",
+                "f.role = 'inbox'",
+            ] {
+                for sort in ["newest", "oldest"] {
+                    let query = super::search::build_message_summary_query(
+                        &super::search::SearchCriteria::parse(None),
+                        "all",
+                        scope,
+                        Some(sort),
+                    );
+                    let mut statement = conn.prepare(&format!("EXPLAIN QUERY PLAN {query}"))?;
+                    let details = statement
+                        .query_map(params![40, 0], |row| row.get::<_, String>(3))?
+                        .collect::<Result<Vec<_>, _>>()?;
+                    assert!(
+                        details
+                            .iter()
+                            .all(|detail| !detail.contains("TEMP B-TREE FOR ORDER BY")),
+                        "chronological paging must not sort the entire scope: {details:?}"
+                    );
+                }
+            }
+            Ok(())
+        })
+        .expect("chronological query plans inspected");
+}
+
+#[test]
 fn message_scope_pages_cover_500_rows_without_duplicates() {
     let unique = PAGING_TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let data_dir = std::env::temp_dir().join(format!(

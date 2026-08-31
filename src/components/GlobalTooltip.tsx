@@ -23,6 +23,7 @@ const TOOLTIP_SELECTOR = [
 const OPEN_OVERLAY_SELECTOR = [
   'details[open]',
   '.context-menu',
+  '.context-menu-surface',
   '.context-submenu',
   '.search-suggestion-panel',
   '.custom-select-dropdown',

@@ -68,4 +68,47 @@ describe('useDetailsMenu', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(details.hasAttribute('open')).toBe(true);
   });
+
+  it('contains wheel gestures when the menu has no remaining scroll range', () => {
+    render(<MenuHarness />);
+    openDetails();
+    const panel = screen.getByRole('button', { name: '命令A' }).parentElement as HTMLElement;
+    const outsideWheel = vi.fn();
+    document.body.addEventListener('wheel', outsideWheel);
+
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+    });
+    panel.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(outsideWheel).not.toHaveBeenCalled();
+    document.body.removeEventListener('wheel', outsideWheel);
+  });
+
+  it('lets the menu scroll internally without bubbling the gesture outside', () => {
+    render(<MenuHarness />);
+    openDetails();
+    const panel = screen.getByRole('button', { name: '命令A' }).parentElement as HTMLElement;
+    Object.defineProperties(panel, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 240 },
+      scrollTop: { configurable: true, value: 20, writable: true },
+    });
+    const outsideWheel = vi.fn();
+    document.body.addEventListener('wheel', outsideWheel);
+
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+    });
+    panel.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(outsideWheel).not.toHaveBeenCalled();
+    document.body.removeEventListener('wheel', outsideWheel);
+  });
 });

@@ -18,8 +18,6 @@ type SelectedMessageActionOptions = {
   selected: MessageSummary | null;
   /** 当前列表的可见顺序，用于操作后把阅读器移动到原位置附近。 */
   messages: MessageSummary[];
-  folders: Folder[];
-  labels: Label[];
   folderId: number | null;
   refreshAll: () => Promise<void>;
   loadMeta: (folderId: number | null) => Promise<LoadMetaResult>;
@@ -37,17 +35,11 @@ type SelectedMessageActionOptions = {
     messageId: number,
     patch: Partial<MessageSummary>,
   ) => void;
-  visibleFolderIdForRole: (
-    role: FolderRole,
-    accountId?: number | null,
-  ) => number | null;
 };
 
 export default function useSelectedMessageActions({
   selected,
   messages,
-  folders,
-  labels,
   folderId,
   refreshAll,
   loadMeta,
@@ -58,7 +50,6 @@ export default function useSelectedMessageActions({
   queueUndoAction,
   clearSelectedDetailIf,
   patchSelectedDetailMetadata,
-  visibleFolderIdForRole,
 }: SelectedMessageActionOptions) {
   const selectedRef = useRef<MessageSummary | null>(null);
   const labelActionInFlightRef = useRef(new Set<string>());
@@ -94,7 +85,7 @@ export default function useSelectedMessageActions({
       patchSelectedDetailMetadata(selected.id, { folder_role: role });
       await refreshSourceAndSelectNeighbor(selected.id);
       setStatus(report.message);
-      queueUndoAction(role === 'trash' ? '删除' : role === 'archive' ? '归档' : `移动到 ${role}`, undoSnapshots);
+      queueUndoAction(role === 'trash' ? '移到废纸篓' : role === 'archive' ? '归档' : `移动到 ${role}`, undoSnapshots);
     }
 
     async function moveSelectedToFolder(folder: Folder) {
@@ -155,12 +146,6 @@ export default function useSelectedMessageActions({
       queueUndoAction('恢复到收件箱', undoSnapshots, result.remote.message);
     }
 
-    async function permanentlyDeleteMessageConfirmed(message: MessageSummary) {
-      const report = await invoke<RemoteActionReport>(IPC.DeleteMessagePermanently, { messageId: message.id });
-      await refreshSourceAndSelectNeighbor(message.id);
-      setStatus(report.message);
-    }
-
     async function unsnoozeSelected() {
       if (!selected) return;
       const undoSnapshots = snapshotMessages([selected]);
@@ -209,15 +194,12 @@ export default function useSelectedMessageActions({
       markSelectedAsSpam,
       markSelectedNotSpam,
       restoreSelectedFromTrash,
-      permanentlyDeleteMessageConfirmed,
       unsnoozeSelected,
       toggleLabel,
     };
   }, [
     selected,
     messages,
-    folders,
-    labels,
     folderId,
     refreshAll,
     loadMeta,
@@ -228,6 +210,5 @@ export default function useSelectedMessageActions({
     queueUndoAction,
     clearSelectedDetailIf,
     patchSelectedDetailMetadata,
-    visibleFolderIdForRole,
   ]);
 }

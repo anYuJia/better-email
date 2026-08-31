@@ -272,8 +272,8 @@
   gap: 2px;
   padding: var(--ui-space-1);
   overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
   isolation: isolate;
@@ -1156,7 +1156,7 @@
   padding: 4px;
   overflow: auto;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
@@ -1425,7 +1425,7 @@
   border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+  box-shadow: var(--ui-shadow-popover);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2989,7 +2989,7 @@
   padding: 12px;
   overflow: auto;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 9px;
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
@@ -3290,16 +3290,16 @@
   gap: 2px;
   padding: 5px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 9px;
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
 
 .composer-send-menu button {
-  min-height: 36px;
+  min-height: var(--ui-menu-item-height);
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--ui-menu-item-radius);
   color: var(--ui-text);
   background: transparent;
   font-size: 13px;

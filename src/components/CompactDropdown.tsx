@@ -36,7 +36,10 @@ export default function CompactDropdown<Value extends string>({
   const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const [isOpen, setIsOpen] = React.useState(false);
   const selectedIndex = Math.max(0, options.findIndex((option) => option.id === value));
-  const menu = useDetailsMenu(menuRef);
+  const menu = useDetailsMenu(menuRef, {
+    floating: true,
+    align: className.split(/\s+/).includes('sort-menu') ? 'end' : 'start',
+  });
 
   const focusOption = React.useCallback((index: number) => {
     const nextIndex = Math.max(0, Math.min(index, options.length - 1));
@@ -104,6 +107,7 @@ export default function CompactDropdown<Value extends string>({
     <details
       className={`compact-dropdown ${className}`.trim()}
       ref={menuRef}
+      data-floating-menu="true"
       onToggle={(event) => {
         const nextOpen = event.currentTarget.open;
         setIsOpen(nextOpen);

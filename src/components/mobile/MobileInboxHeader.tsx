@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { filters } from '../../app/appConfig';
 import type { FilterMode, ListMode } from '../../app/types';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 
 type MobileInboxHeaderProps = {
   currentViewLabel: string;
@@ -53,7 +54,9 @@ export default function MobileInboxHeader({
   searchOpen,
 }: MobileInboxHeaderProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const listModeMenuRef = useRef<HTMLDivElement | null>(null);
   const [showListModeMenu, setShowListModeMenu] = useState(false);
+  useWheelContainment(listModeMenuRef, showListModeMenu);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -170,7 +173,11 @@ export default function MobileInboxHeader({
             <ChevronDown size={13} aria-hidden="true" />
           </button>
           {showListModeMenu && (
-            <div className="mobile-inbox-filter-popover" role="menu">
+            <div
+              ref={listModeMenuRef}
+              className="mobile-inbox-filter-popover"
+              role="menu"
+            >
               <button
                 type="button"
                 role="menuitemradio"

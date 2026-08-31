@@ -183,7 +183,7 @@
     min-width: 148px;
     padding: 5px;
     border: 1px solid var(--ui-border-strong);
-    border-radius: var(--ui-radius-control);
+    border-radius: var(--ui-radius-panel);
     background: var(--ui-surface);
     box-shadow: var(--ui-shadow-popover);
   }
@@ -744,6 +744,7 @@
   .mobile-app-surface .reader-actions button,
   .mobile-app-surface .reader-actions .reader-more-menu summary,
   .mobile-app-surface .reader-actions .reader-reply-menu summary,
+  .mobile-app-surface .reader-actions .reader-ai-trigger,
   .mobile-app-surface .reader-actions select {
     min-width: 44px;
     min-height: 44px;

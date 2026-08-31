@@ -249,11 +249,11 @@ body[data-settings-window-platform='macos']
   left: 0;
   max-height: min(420px, calc(100vh - 78px));
   overflow: auto;
-  padding: 5px;
+  padding: var(--ui-menu-padding);
   border: 1px solid var(--st-border-strong);
-  border-radius: var(--st-radius-md);
+  border-radius: var(--ui-radius-panel);
   background: var(--st-surface);
-  box-shadow: var(--st-shadow-float);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .settings-header-button {

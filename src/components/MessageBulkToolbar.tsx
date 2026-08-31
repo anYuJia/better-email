@@ -2,14 +2,22 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { useRef } from 'react';
-import { movableFoldersForBulk } from '../app/appConfig';
-import { canSnoozeRole } from '../app/snooze';
+import {
+  buildMessageCollectionActionState,
+  collectionActionDetail,
+  primaryMessageCollectionActions,
+  type MessageCollectionActionEntry,
+} from '../app/messageActionState';
 import type {
   Folder,
   Label,
   MessageSummary,
 } from '../app/types';
-import type { BulkMessageAction } from './messageContextMenu';
+import {
+  buildBulkMessageContextItems,
+  type BulkMessageAction,
+} from './messageContextMenu';
+import { ContextMenuContent } from './ContextMenu';
 import { useDetailsMenu } from '../hooks/useDetailsMenu';
 
 type MessageBulkToolbarProps = {
@@ -39,26 +47,48 @@ export default function MessageBulkToolbar({
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
   if (selectedMessageIds.length === 0) return null;
 
-  const snoozableSelectedMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
+  const actionState = buildMessageCollectionActionState(selectedMessages);
+  const primaryActions = primaryMessageCollectionActions(actionState);
+  const primaryContextItemIds = new Set(primaryActions.map((item) => {
+    if (item.action === 'read' || item.action === 'unread') return 'bulk-read-state';
+    if (item.action === 'star' || item.action === 'unstar') return 'bulk-star-state';
+    return `bulk-${item.action}`;
+  }));
+  const moreMenuItems = buildBulkMessageContextItems({
+    selectedMessages,
+    folders,
+    labels,
+    onRunBulkAction,
+    onRequestSnooze,
+    onMoveBulkToFolder,
+    onToggleBulkLabel,
+  }).filter((item) => !primaryContextItemIds.has(item.id));
+
+  const runAction = (item: MessageCollectionActionEntry) => {
+    if (item.action === 'snooze') {
+      onRequestSnooze(item.messages);
+    } else {
+      onRunBulkAction(item.action);
+    }
+  };
+  const actionTitle = (item: MessageCollectionActionEntry) => (
+    `${item.label} · ${collectionActionDetail(item.messages.length, actionState.totalCount)}`
+  );
 
   return (
     <div className={`bulk-toolbar active${inline ? ' bulk-toolbar-inline' : ''}`}>
-      <button
-        type="button"
-        className="bulk-primary-action"
-        aria-label="归档选中的邮件"
-        onClick={() => onRunBulkAction('archive')}
-      >
-        归档
-      </button>
-      <button
-        type="button"
-        className="bulk-delete-action"
-        aria-label="删除选中的邮件"
-        onClick={() => onRunBulkAction('trash')}
-      >
-        删除
-      </button>
+      {primaryActions.map((item) => (
+        <button
+          key={item.action}
+          type="button"
+          className={item.danger ? 'bulk-delete-action' : 'bulk-primary-action'}
+          aria-label={`对选中的邮件执行：${item.label}`}
+          title={actionTitle(item)}
+          onClick={() => runAction(item)}
+        >
+          {item.label}
+        </button>
+      ))}
       <details
         className="compact-menu bulk-more-menu"
         ref={moreMenuRef}
@@ -71,35 +101,14 @@ export default function MessageBulkToolbar({
           <MoreHorizontal size={15} aria-hidden="true" />
           更多
         </summary>
-        <div>
-          <button type="button" onClick={() => { onRunBulkAction('star'); moreMenu.closeMenu(); }}>星标</button>
-          <button type="button" onClick={() => { onRunBulkAction('read'); moreMenu.closeMenu(); }}>标为已读</button>
-          <button type="button" onClick={() => { onRunBulkAction('unread'); moreMenu.closeMenu(); }}>标为未读</button>
-          <button
-            type="button"
-            disabled={snoozableSelectedMessages.length === 0}
-            onClick={() => { onRequestSnooze(snoozableSelectedMessages); moreMenu.closeMenu(); }}
-          >
-            稍后处理
-          </button>
-          <span className="menu-section-title">移动到</span>
-          {movableFoldersForBulk(folders, selectedMessages).map((folder) => (
-            <button
-              type="button"
-              key={folder.id}
-              disabled={selectedMessages.length === 0}
-              onClick={() => { onMoveBulkToFolder(folder); moreMenu.closeMenu(); }}
-            >
-              {folder.name}
-            </button>
-          ))}
-          <span className="menu-section-title">打标签</span>
-          {labels.map((label) => (
-            <button type="button" key={label.id} onClick={() => { onToggleBulkLabel(label); moreMenu.closeMenu(); }}>
-              <span className="label-dot" style={{ background: label.color }} />
-              {label.name}
-            </button>
-          ))}
+        <div className="context-menu-surface context-menu--anchored">
+          <ContextMenuContent
+            title={`已选 ${selectedMessageIds.length} 封邮件`}
+            detail="更多批量操作"
+            ariaLabel="更多批量操作"
+            items={moreMenuItems}
+            onClose={moreMenu.closeMenu}
+          />
         </div>
       </details>
     </div>

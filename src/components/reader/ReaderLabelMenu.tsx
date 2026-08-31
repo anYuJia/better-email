@@ -27,7 +27,7 @@ export default function ReaderLabelMenu({
   const [editingLabelName, setEditingLabelName] = useState('');
   const labelMenuRef = useRef<HTMLDetailsElement>(null);
   // 标签菜单支持连续选择/编辑，选中后保持打开；外部点击与 Escape 仍会关闭。
-  useDetailsMenu(labelMenuRef);
+  useDetailsMenu(labelMenuRef, { floating: true, align: 'start' });
 
   async function handleCreateLabel() {
     if (!newLabelName.trim() || !onCreateLabel) return;
@@ -60,7 +60,11 @@ export default function ReaderLabelMenu({
           </span>
         );
       })}
-      <details className="compact-menu label-menu" ref={labelMenuRef}>
+      <details
+        className="compact-menu label-menu"
+        ref={labelMenuRef}
+        data-floating-menu="true"
+      >
         <summary><Tag size={15} /> 标签</summary>
         <div className="label-menu-container">
           <div className="label-menu-add-section">

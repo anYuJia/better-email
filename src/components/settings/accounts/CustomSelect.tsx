@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
+import { useWheelContainment } from '../../../hooks/useWheelContainment';
 
 type Option = {
   value: string;
@@ -98,6 +99,7 @@ export function CustomSelect({
   const listboxId = useId();
   const typeaheadRef = useRef({ query: '', updatedAt: 0 });
   const closeTimerRef = useRef<number | null>(null);
+  useWheelContainment(menuRef, menuMounted);
 
   const isOptionDisabled = (option: Option) => disabledValues.includes(option.value);
   const selectedIndex = options.findIndex((option) => option.value === value);

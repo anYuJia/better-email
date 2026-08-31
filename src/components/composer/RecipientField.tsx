@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { X } from 'lucide-react';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 import type { ContactSearchEntry } from './contactSuggestions';
 import { matchingContacts } from './contactSuggestions';
 import {
@@ -108,6 +109,7 @@ export default function RecipientField({
   const chipLabelsRef = useRef(chipLabels);
   const queryRef = useRef(query);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionMenuRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const compositionEndedAtRef = useRef(0);
   const blockedEmailSet = useMemo(
@@ -130,6 +132,7 @@ export default function RecipientField({
       .slice(0, suggestionLimit);
   }, [blockedEmailSet, chips, contactSearchEntries, query]);
   const menuOpen = focused && Boolean(query.trim()) && matches.length > 0 && !suggestionsDismissed;
+  useWheelContainment(suggestionMenuRef, menuOpen);
   const activeMatch = matches[highlight] ?? matches[0];
   const activeSuggestionId = menuOpen && activeMatch
     ? `${suggestionListId}-option-${activeMatch.id}`
@@ -366,7 +369,13 @@ export default function RecipientField({
       {actions ? <div className="composer-recipient-actions">{actions}</div> : null}
 
       {menuOpen && (
-        <div className="recipient-suggestions" id={suggestionListId} role="listbox" aria-label={`${label}匹配联系人`}>
+        <div
+          ref={suggestionMenuRef}
+          className="recipient-suggestions"
+          id={suggestionListId}
+          role="listbox"
+          aria-label={`${label}匹配联系人`}
+        >
           <span aria-hidden="true">匹配联系人</span>
           {matches.map((contact, index) => (
             <button

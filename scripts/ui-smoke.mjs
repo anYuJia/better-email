@@ -574,12 +574,12 @@ async function clickContextSubmenuItem(cdp, branchText, itemText) {
     );
     await waitForExpression(
       cdp,
-      `[...document.querySelectorAll('.context-submenu button')].some((item) => item.textContent.includes(${JSON.stringify(itemText)}))`,
+      `[...document.querySelectorAll('.context-menu .context-submenu button')].some((item) => item.textContent.includes(${JSON.stringify(itemText)}))`,
     );
     await evalInPage(
       cdp,
       `(() => {
-        const button = [...document.querySelectorAll('.context-submenu button')].find((item) => item.textContent.includes(${JSON.stringify(itemText)}));
+        const button = [...document.querySelectorAll('.context-menu .context-submenu button')].find((item) => item.textContent.includes(${JSON.stringify(itemText)}));
         if (!button) throw new Error('Context submenu item not found: ${itemText}');
         button.click();
       })()`,
@@ -1637,8 +1637,8 @@ async function main() {
     await waitForExpression(cdp, "window.innerWidth === 1440 && !document.querySelector('.app-shell.is-mobile-app')");
     await clickButton(cdp, '加载更多', "document.querySelector('.message-list-footer')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length < 50 && document.body.innerText.includes('已显示 50 封') && document.body.innerText.includes('已到底')");
-    await waitForExpression(cdp, "document.body.innerText.includes('远程图片默认阻止')");
-    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示图片')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('信任发件人')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接')) && document.body.innerText.includes('网页链接已隐藏，查看后可确认目标地址。')");
+    await waitForExpression(cdp, "document.body.innerText.includes('远程图片已拦截')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('显示图片')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('信任发件人')) && [...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('查看链接')) && document.body.innerText.includes('图片未自动加载，网页链接也保持隐藏，以减少追踪和误触。')");
     await clickButton(cdp, '查看链接', "document.querySelector('.reader-warning-panel')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.reader-warning-panel button')].some((item) => item.textContent.includes('隐藏链接'))");
     const checks = [true, true, true];
@@ -2182,10 +2182,10 @@ async function main() {
     await waitForExpression(cdp, "(() => { const menu = document.querySelector('.context-menu'); return menu && menu.innerText.includes('回复') && menu.innerText.includes('转发') && menu.innerText.includes('稍后处理') && menu.innerText.includes('移动到') && menu.innerText.includes('标签') && menu.innerText.includes('复制信息') && menu.textContent.includes('发件人邮箱') && menu.textContent.includes('邮件主题'); })()");
     await evalInPage(
       cdp,
-      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+      "(() => { const button = document.querySelector('.context-menu [data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
     await waitForExpression(cdp, "(document.activeElement ?? window.__focusedElement)?.getAttribute('data-context-item') === 'copy-sender'");
-    await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-sender\"]').click()");
+    await evalInPage(cdp, "document.querySelector('.context-menu [data-context-item=\"copy-sender\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制发件人邮箱') && window.__copiedText?.includes('@')");
     await evalInPage(
       cdp,
@@ -2194,10 +2194,10 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.context-menu')?.textContent.includes('邮件主题')");
     await evalInPage(
       cdp,
-      "(() => { const button = document.querySelector('[data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+      "(() => { const button = document.querySelector('.context-menu [data-context-item=\"copy-message-info\"]'); if (!button) throw new Error('Copy submenu not found'); button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
     await waitForExpression(cdp, "(document.activeElement ?? window.__focusedElement)?.getAttribute('data-context-item') === 'copy-sender'");
-    await evalInPage(cdp, "document.querySelector('[data-context-item=\"copy-subject\"]').click()");
+    await evalInPage(cdp, "document.querySelector('.context-menu [data-context-item=\"copy-subject\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已复制邮件主题') && window.__copiedText?.includes('Low memory digest')");
     await evalInPage(
       cdp,
@@ -2217,16 +2217,16 @@ async function main() {
       cdp,
       "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.querySelector('input[type=\"checkbox\"]:checked')); if (!card) throw new Error('Bulk context target not found'); card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 540, clientY: 350, button: 2 })); })()",
     );
-    await waitForExpression(cdp, "document.querySelector('.context-menu-heading')?.innerText.includes('已选择 2 封邮件') && document.querySelector('.context-menu')?.innerText.includes('批量归档') && document.querySelector('.context-menu')?.innerText.includes('批量移动到')");
+    await waitForExpression(cdp, "document.querySelector('.context-menu > .context-menu-heading')?.innerText.includes('已选 2 封邮件') && document.querySelector('.context-menu [data-context-item=\"bulk-archive\"]')?.innerText.includes('归档') && document.querySelector('.context-menu [data-context-item=\"bulk-move\"]')?.innerText.includes('移动到')");
     await evalInPage(
       cdp,
-      "(() => { const labels = [...document.querySelectorAll('.context-menu button')].find((item) => item.textContent.includes('批量标签')); if (!labels) throw new Error('Bulk labels submenu not found'); labels.focus(); labels.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
+      "(() => { const labels = document.querySelector('.context-menu [data-context-item=\"bulk-labels\"]'); if (!labels) throw new Error('Bulk labels submenu not found'); labels.focus(); labels.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); })()",
     );
     await waitForExpression(cdp, "((document.activeElement ?? window.__focusedElement)?.closest('.context-submenu')) && ((document.activeElement ?? window.__focusedElement)?.textContent?.trim().length > 0)");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.context-menu')");
     await openDetails(cdp, '.bulk-more-menu');
-    await clickButton(cdp, '星标', "document.querySelector('.bulk-more-menu')");
+    await clickButton(cdp, '添加星标', "document.querySelector('.bulk-more-menu')");
     await waitForExpression(cdp, "document.body.innerText.includes('已批量添加星标 2 封邮件')");
 
     await evalInPage(cdp, "(() => { const cards = [...document.querySelectorAll('.message-card')].filter((card) => card.textContent.includes('Low memory digest')).slice(2, 4); cards.forEach((card) => card.querySelector('input[type=\"checkbox\"]').click()); })()");
@@ -2241,8 +2241,8 @@ async function main() {
     );
     await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; const match = status.match(/已选择当前列表\\s*(\\d+)\\s*封邮件/); const selected = document.querySelector('.message-selection-strip-summary')?.innerText || ''; const selectedMatch = selected.match(/已选\\s*(\\d+)/); return Boolean(match && selectedMatch) && selectedMatch[1] === match[1] && Number(match[1]) >= (window.__bulkShortcutVisibleCount || 0); })()");
     await evalInPage(cdp, "(() => { const match = (document.querySelector('.status-line')?.innerText || '').match(/已选择当前列表 (\\d+) 封邮件/); if (!match) throw new Error('Keyboard select-all count not found'); window.__bulkShortcutCount = Number(match[1]); })()");
-    await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))");
-    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; return !document.querySelector('.bulk-toolbar') && status.includes(`${window.__bulkShortcutCount} 封邮件`) && (status.includes('已批量添加星标') || status.includes('已批量取消星标')); })()");
+    await evalInPage(cdp, "(() => { const action = [...document.querySelectorAll('.bulk-more-menu button')].find((button) => button.textContent.includes('星标')); const match = action?.title.match(/(\\d+)(?:\\/\\d+)?\\s*封/); if (!match) throw new Error('Bulk star target count not found'); window.__bulkShortcutActionCount = Number(match[1]); window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true })); })()");
+    await waitForExpression(cdp, "(() => { const status = document.querySelector('.status-line')?.innerText || ''; return !document.querySelector('.bulk-toolbar') && status.includes(`${window.__bulkShortcutActionCount} 封邮件`) && (status.includes('已批量添加星标') || status.includes('已批量取消星标')); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "(() => { const selected = document.querySelector('.message-selection-strip-summary')?.innerText || ''; return selected.includes(`已选 ${window.__bulkShortcutCount}`); })()");
     await evalInPage(cdp, "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
@@ -2259,8 +2259,8 @@ async function main() {
       cdp,
       "document.querySelector('.thread-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 360, button: 2 }))",
     );
-    await waitForExpression(cdp, "document.querySelector('.context-menu') && document.querySelector('.context-menu').innerText.includes('会话操作') && document.querySelector('[data-context-item=\"bulk-read-state\"]')");
-    await evalInPage(cdp, "document.querySelector('[data-context-item=\"bulk-read-state\"]').click()");
+    await waitForExpression(cdp, "document.querySelector('.context-menu [role=\"menu\"][aria-label=\"会话操作\"]') && document.querySelector('.context-menu [data-context-item=\"thread-read-state\"]')");
+    await evalInPage(cdp, "document.querySelector('.context-menu [data-context-item=\"thread-read-state\"]').click()");
     await waitForExpression(cdp, "!document.querySelector('.context-menu') && document.querySelector('.status-line')?.innerText.includes('已对会话') && document.querySelector('.status-line')?.innerText.includes('标为')");
     await evalInPage(
       cdp,

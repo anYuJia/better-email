@@ -1,25 +1,34 @@
 import {
   Archive,
   Clock,
-  Forward,
+  Download,
   Languages,
   Loader2,
-  Mail,
   MailOpen,
   MoreHorizontal,
+  RefreshCw,
   Reply,
-  ReplyAll,
   RotateCcw,
+  ShieldCheck,
+  ShieldOff,
   Star,
   Trash2,
 } from 'lucide-react';
-import { movableFoldersForMessage } from '../../app/appConfig';
 import { canSnoozeRole } from '../../app/snooze';
+import {
+  canArchiveMessageRole,
+  canReplyToMessageRole,
+} from '../../app/messageActionState';
 import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
 import ReaderAiContextActions from './ReaderAiContextActions';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useRef } from 'react';
+import {
+  buildSingleMessageContextItems,
+  type MessageContextAction,
+} from '../messageContextMenu';
+import { ContextMenuContent, type ContextMenuItem } from '../ContextMenu';
 
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
@@ -90,12 +99,128 @@ function ReaderToolbar({
 }: ReaderToolbarProps) {
   const isDraft = selected.folder_role === 'drafts';
   const isTrash = selected.folder_role === 'trash';
+  const canReply = canReplyToMessageRole(selected.folder_role);
+  const canArchive = canArchiveMessageRole(selected.folder_role);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const moreMenu = useDetailsMenu(moreMenuRef);
-  const movableFolders = useMemo(
-    () => movableFoldersForMessage(folders, selected),
-    [folders, selected],
-  );
+  const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
+  const runContextAction = (action: MessageContextAction) => {
+    switch (action) {
+      case 'read':
+      case 'unread':
+        onToggleRead(selected);
+        break;
+      case 'star':
+      case 'unstar':
+        onToggleStar(selected);
+        break;
+      case 'archive':
+        onMoveArchive();
+        break;
+      case 'trash':
+        onMoveTrash();
+        break;
+      case 'restore':
+        onRestoreFromTrash();
+        break;
+      case 'snooze':
+        onSnooze();
+        break;
+      case 'unsnooze':
+        onUnsnooze();
+        break;
+      case 'spam':
+        onMarkAsSpam();
+        break;
+      case 'not-spam':
+        onMarkNotSpam();
+        break;
+      case 'permanent-delete':
+        onPermanentlyDelete();
+        break;
+      case 'copy-sender':
+      case 'copy-subject':
+        break;
+    }
+  };
+  const readerMenuItems = buildSingleMessageContextItems({
+    message: selected,
+    folders,
+    labels: [],
+    onSelectMessage: () => {},
+    onComposeFromMessage: (_message, mode) => onComposeFromMessage(selected, mode),
+    onRunMessageAction: (_message, action) => runContextAction(action),
+    onMoveMessageToFolder: (_message, folder) => onMoveToFolder(folder),
+    onToggleMessageLabel: () => {},
+  }).filter((item) => ![
+    'open',
+    'reply',
+    'star-state',
+    'snooze',
+    'unsnooze',
+    'archive',
+    'restore',
+    'copy-message-info',
+  ].includes(item.id));
+  const extraItems: ContextMenuItem[] = [
+    {
+      id: 'export-eml',
+      label: '导出 EML',
+      icon: <Download size={15} />,
+      separatorBefore: true,
+      onSelect: onExportMessage,
+    },
+    ...(selected.remote_uid > 0 && !selected.body.trim()
+      ? [{
+          id: 'fetch-body',
+          label: '重新获取正文',
+          icon: <RefreshCw size={15} />,
+          onSelect: () => void onFetchBody(false),
+        }]
+      : []),
+    ...(!isDraft && selected.sender_email.trim()
+      ? [{
+          id: 'sender-safety',
+          label: '发件人安全',
+          icon: <ShieldCheck size={15} />,
+          separatorBefore: true,
+          children: [
+            ...(!selectedSenderTrusted && !selectedExternalBlocked
+              ? [{
+                  id: 'trust-sender',
+                  label: '信任发件人',
+                  icon: <ShieldCheck size={15} />,
+                  onSelect: () => onTrustRemoteImages('sender'),
+                }]
+              : []),
+            ...(selectedSenderDomain && !selectedSenderTrusted && !selectedExternalBlocked
+              ? [{
+                  id: 'trust-domain',
+                  label: `信任 ${selectedSenderDomain}`,
+                  icon: <ShieldCheck size={15} />,
+                  onSelect: () => onTrustRemoteImages('domain'),
+                }]
+              : []),
+            {
+              id: 'block-sender',
+              label: '阻止该发件人',
+              icon: <ShieldOff size={15} />,
+              onSelect: onBlockSender,
+            },
+          ],
+        }]
+      : []),
+  ];
+  const dangerIndex = readerMenuItems.findIndex((item) => item.danger);
+  readerMenuItems.splice(dangerIndex < 0 ? readerMenuItems.length : dangerIndex, 0, ...extraItems);
+  if (isTrash) {
+    readerMenuItems.push({
+      id: 'empty-trash',
+      label: '清空废纸篓',
+      icon: <Trash2 size={15} />,
+      danger: true,
+      onSelect: onEmptyTrash,
+    });
+  }
 
   return (
     <header className="reader-header">
@@ -111,14 +236,14 @@ function ReaderToolbar({
               <span>继续编辑</span>
             </button>
           </div>
-        ) : (
+        ) : canReply ? (
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
             <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
               <Reply size={16} />
               <span>回复</span>
             </button>
           </div>
-        )}
+        ) : null}
         <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
           <button
             className="icon-only-action"
@@ -129,11 +254,11 @@ function ReaderToolbar({
             <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
           </button>
           {isTrash ? (
-            <button title="恢复邮件" onClick={onRestoreFromTrash}>
+            <button title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
               <RotateCcw size={16} />
-              <span>恢复</span>
+              <span>恢复到收件箱</span>
             </button>
-          ) : !isDraft && (
+          ) : canArchive && (
             <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
               <Archive size={16} />
             </button>
@@ -181,74 +306,22 @@ function ReaderToolbar({
             onComposeFromMessage={onComposeFromMessage}
           />
         )}
-        <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
+        <details
+          className="reader-more-menu compact-menu"
+          ref={moreMenuRef}
+          data-floating-menu="true"
+        >
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
             <MoreHorizontal size={17} />
           </summary>
-          <div onClick={() => moreMenu.closeMenu()}>
-            {!isDraft && (
-              <>
-                <span className="menu-section-title">回复</span>
-                <button onClick={() => onComposeFromMessage(selected, 'replyAll')}>
-                  <ReplyAll size={16} /> 回复全部
-                </button>
-                <button onClick={() => onComposeFromMessage(selected, 'forward')}>
-                  <Forward size={16} /> 转发
-                </button>
-              </>
-            )}
-            <span className="menu-section-title">整理</span>
-            {!isDraft && (
-              <button onClick={() => onToggleRead(selected)}>
-                <Mail size={16} />
-                {selected.is_read ? '标为未读' : '标为已读'}
-              </button>
-            )}
-            {!isTrash && (
-              <button className="danger-menu-item" onClick={onMoveTrash}>
-                <Trash2 size={16} /> 删除
-              </button>
-            )}
-            <button onClick={onExportMessage}>导出 EML</button>
-            {selected.remote_uid > 0 && !selected.body.trim() && (
-              <button onClick={() => onFetchBody(false)}>拉取正文</button>
-            )}
-            {selected.folder_role === 'spam' ? (
-              <button onClick={onMarkNotSpam}>不是垃圾邮件</button>
-            ) : (
-              <button onClick={onMarkAsSpam}>标为垃圾邮件</button>
-            )}
-
-            {!isDraft && selected.sender_email.trim() && (
-              <>
-                <span className="menu-section-title">安全</span>
-                {!selectedSenderTrusted && !selectedExternalBlocked && (
-                  <button onClick={() => onTrustRemoteImages('sender')}>信任发件人</button>
-                )}
-                {selectedSenderDomain && !selectedSenderTrusted && !selectedExternalBlocked && (
-                  <button onClick={() => onTrustRemoteImages('domain')}>
-                    信任 {selectedSenderDomain}
-                  </button>
-                )}
-                <button onClick={onBlockSender}>阻止该发件人</button>
-              </>
-            )}
-
-            {isTrash && (
-              <>
-                <span className="menu-section-title">删除</span>
-                <button className="danger-menu-item" onClick={onPermanentlyDelete}>
-                  <Trash2 size={16} /> 永久删除
-                </button>
-                <button className="danger-menu-item" onClick={onEmptyTrash}>清空废纸篓</button>
-              </>
-            )}
-            <span className="menu-section-title">移动到</span>
-            {movableFolders.map((folder) => (
-              <button type="button" key={folder.id} onClick={() => onMoveToFolder(folder)}>
-                {folder.name}
-              </button>
-            ))}
+          <div className="context-menu-surface context-menu--anchored reader-more-menu-panel">
+            <ContextMenuContent
+              items={readerMenuItems}
+              onClose={moreMenu.closeMenu}
+              ariaLabel="邮件操作"
+              title={selected.subject || '(无主题)'}
+              detail={selected.sender_name || selected.sender_email}
+            />
           </div>
         </details>
       </div>

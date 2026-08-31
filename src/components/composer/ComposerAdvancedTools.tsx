@@ -7,6 +7,7 @@ import type {
   DraftInput,
   MailIdentity,
 } from '../../app/types';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
 
 export type ComposerPopoverMode = 'templates' | 'more' | null;
@@ -128,6 +129,7 @@ export default function ComposerAdvancedTools({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const menuItemsRef = useRef<HTMLButtonElement[]>([]);
+  useWheelContainment(popoverRef, Boolean(mode));
 
   useLayoutEffect(() => {
     if (!mode) return undefined;

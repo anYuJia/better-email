@@ -28,24 +28,30 @@
 }
 
 .snackbar-stack {
-  left: 12px;
+  box-sizing: border-box;
+  position: fixed;
+  left: 16px;
   right: auto;
-  bottom: 76px;
-  width: min(264px, calc(100vw - 24px));
+  bottom: 16px;
+  display: grid;
+  width: min(264px, calc(100vw - 32px));
   gap: 8px;
   transform: none;
   z-index: 10000;
+  pointer-events: none;
 }
 
 .undo-snackbar {
+  box-sizing: border-box;
   min-width: 0;
   width: 100%;
+  display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
   border: 0;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   background: var(--notification-surface);
   box-shadow:
@@ -54,6 +60,11 @@
   overflow: hidden;
   transition: var(--ui-transition-transform-pop);
   animation: var(--ui-animation-message-toast-in);
+  pointer-events: auto;
+}
+
+.undo-snackbar > div {
+  min-width: 0;
 }
 
 .message-toast-progress {
@@ -176,7 +187,7 @@
   padding: 9px 12px;
   background: var(--notification-surface);
   border: 0;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
   font-size: 13px;
   box-shadow:
@@ -235,7 +246,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 10px 13px;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   pointer-events: auto;
 }
 
@@ -282,5 +293,11 @@
   .undo-snackbar {
     animation-duration: var(--ui-motion-none);
     animation-iteration-count: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell.is-mobile-app:has(.mobile-screen-mail) .snackbar-stack {
+    bottom: calc(76px + env(safe-area-inset-bottom));
   }
 }

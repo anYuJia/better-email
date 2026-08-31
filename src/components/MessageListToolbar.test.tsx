@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
 import GlobalSearch from './GlobalSearch';
+import MessageBulkToolbar from './MessageBulkToolbar';
 import MessageListToolbar from './MessageListToolbar';
 
 afterEach(cleanup);
@@ -194,8 +195,8 @@ describe('Inbox toolbar selection mode', () => {
     expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('52');
     expect(view.container.querySelector('.list-control-row')?.querySelector('.bulk-toolbar')).not.toBeNull();
     expect(view.container.querySelector('.list-control-row')?.querySelector('.list-control-actions')).toBeNull();
-    expect(screen.getByRole('button', { name: '归档选中的邮件' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '删除选中的邮件' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：归档' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：移到废纸篓' })).toBeDefined();
     expect(screen.getByRole('button', { name: '更多批量操作，已选 1 封' })).toBeDefined();
   });
 
@@ -230,5 +231,63 @@ describe('Inbox toolbar selection mode', () => {
     expect(summary.closest('details')?.hasAttribute('open')).toBe(true);
     fireEvent.keyDown(summary, { key: 'Escape' });
     expect(summary.closest('details')?.hasAttribute('open')).toBe(false);
+  });
+
+  it('shows only the aggregate read and star transitions', () => {
+    render(
+      <MessageBulkToolbar
+        selectedMessageIds={[1, 2]}
+        selectedMessages={[
+          message,
+          { ...message, id: 2, is_read: true, is_starred: true },
+        ]}
+        folders={[]}
+        labels={[]}
+        onRunBulkAction={vi.fn()}
+        onRequestSnooze={vi.fn()}
+        onMoveBulkToFolder={vi.fn()}
+        onToggleBulkLabel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '更多批量操作，已选 2 封' }));
+    expect(screen.getByRole('menuitem', { name: '标为已读' })).toBeDefined();
+    expect(screen.queryByRole('menuitem', { name: '标为未读' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: '添加星标' })).toBeDefined();
+    expect(screen.queryByRole('menuitem', { name: '取消星标' })).toBeNull();
+  });
+
+  it('switches the primary actions for trash and spam selections', () => {
+    const view = render(
+      <MessageBulkToolbar
+        selectedMessageIds={[1]}
+        selectedMessages={[{ ...message, folder_role: 'trash' }]}
+        folders={[]}
+        labels={[]}
+        onRunBulkAction={vi.fn()}
+        onRequestSnooze={vi.fn()}
+        onMoveBulkToFolder={vi.fn()}
+        onToggleBulkLabel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：恢复到收件箱' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：永久删除' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: '对选中的邮件执行：归档' })).toBeNull();
+
+    view.rerender(
+      <MessageBulkToolbar
+        selectedMessageIds={[1]}
+        selectedMessages={[{ ...message, folder_role: 'spam' }]}
+        folders={[]}
+        labels={[]}
+        onRunBulkAction={vi.fn()}
+        onRequestSnooze={vi.fn()}
+        onMoveBulkToFolder={vi.fn()}
+        onToggleBulkLabel={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：不是垃圾邮件' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '对选中的邮件执行：移到废纸篓' })).toBeDefined();
   });
 });

@@ -2,20 +2,25 @@ import {
   Archive,
   File,
   Forward,
-  Mail,
-  MailOpen,
   MoreHorizontal,
   Reply,
   ReplyAll,
   Star,
-  Trash2,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { movableFoldersForBulk } from '../../app/appConfig';
+import {
+  buildMessageCollectionActionState,
+  collectionActionDetail,
+  type MessageCollectionActionEntry,
+} from '../../app/messageActionState';
 import type { Folder, Label, Message, MessageSummary, ThreadSummary } from '../../app/types';
 import { formatDate } from '../../mailUtils';
-import type { BulkMessageAction } from '../messageContextMenu';
+import {
+  buildBulkMessageContextItems,
+  type BulkMessageAction,
+} from '../messageContextMenu';
+import { ContextMenuContent, type ContextMenuItem } from '../ContextMenu';
 import SenderIdentity from './SenderIdentity';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 import { memo, useMemo, useRef } from 'react';
@@ -31,6 +36,7 @@ type ThreadReaderListProps = {
   labels: Label[];
   onSelectMessage: (messageId: number) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
   onToggleThreadLabel: (label: Label) => void;
@@ -46,43 +52,69 @@ function ThreadReaderList({
   labels,
   onSelectMessage,
   onRunThreadAction,
+  onRequestSnooze,
   onComposeFromMessage,
   onMoveThreadToFolder,
   onToggleThreadLabel,
   onToggleThreadMute,
 }: ThreadReaderListProps) {
   const threadStates = useMemo(() => {
-    const allThreadRead = threadMessages.every((message) => message.is_read);
-    const allThreadStarred = threadMessages.every((message) => message.is_starred);
+    const actionState = buildMessageCollectionActionState(threadMessages, 'thread');
     const threadMovableMessages = threadMessages.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
-    );
-    const threadArchiveCount = threadMessages.filter(
-      (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
-    ).length;
-    const threadTrashCount = threadMessages.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
-    ).length;
-    const threadMoveFolders = movableFoldersForBulk(folders, threadMovableMessages);
-    const labelStateByName = new Map<string, boolean>(
-      labels.map((label) => [
-        label.name,
-        threadMessages.every((message) => message.labels.includes(label.name)),
-      ]),
+      (message) => !['drafts', 'outbox', 'sent'].includes(message.folder_role),
     );
 
     return {
-      allThreadRead,
-      allThreadStarred,
-      threadArchiveCount,
-      threadTrashCount,
-      threadMoveFolders,
-      labelStateByName,
+      actionState,
+      threadMovableMessages,
     };
-  }, [threadMessages, folders, labels]);
+  }, [threadMessages]);
 
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
-  const moreMenu = useDetailsMenu(moreMenuRef);
+  const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
+  const entryByAction = new Map(threadStates.actionState.entries.map((item) => [item.action, item]));
+  const starEntry = entryByAction.get(threadStates.actionState.allStarred ? 'unstar' : 'star');
+  const archiveEntry = entryByAction.get('archive');
+  const runEntry = (item: MessageCollectionActionEntry) => {
+    if (item.action === 'snooze') onRequestSnooze(item.messages);
+    else onRunThreadAction(item.action);
+  };
+  const contextItems = buildBulkMessageContextItems({
+    selectedMessages: threadMessages,
+    movableMessages: threadStates.threadMovableMessages,
+    scope: 'thread',
+    folders,
+    labels,
+    onRunBulkAction: onRunThreadAction,
+    onRequestSnooze,
+    onMoveBulkToFolder: onMoveThreadToFolder,
+    onToggleBulkLabel: onToggleThreadLabel,
+  }).filter((item) => !['thread-star-state', 'thread-archive'].includes(item.id));
+  if (contextItems[0]) contextItems[0].separatorBefore = true;
+  contextItems.splice(Math.min(2, contextItems.length), 0, {
+    id: 'thread-mute',
+    label: activeThread.is_muted ? '取消静音会话' : '静音会话',
+    icon: activeThread.is_muted ? <Volume2 size={15} /> : <VolumeX size={15} />,
+    separatorBefore: true,
+    onSelect: onToggleThreadMute,
+  });
+  const responseItems: ContextMenuItem[] = [
+    {
+      id: 'thread-reply-all',
+      label: '回复全部',
+      icon: <ReplyAll size={15} />,
+      disabled: !activeThreadSelected,
+      onSelect: () => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll'),
+    },
+    {
+      id: 'thread-forward',
+      label: '转发最新邮件',
+      icon: <Forward size={15} />,
+      disabled: !activeThreadSelected,
+      onSelect: () => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward'),
+    },
+  ];
+  const threadMenuItems = [...responseItems, ...contextItems];
 
   return (
     <>
@@ -105,83 +137,40 @@ function ThreadReaderList({
           <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
             <button
               className="icon-only-action"
-              title={threadStates.allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-              aria-label={threadStates.allThreadStarred ? '取消整个会话星标' : '添加整个会话星标'}
-              onClick={() => onRunThreadAction(threadStates.allThreadStarred ? 'unstar' : 'star')}
+              title={threadStates.actionState.allStarred ? '取消整个会话星标' : '添加整个会话星标'}
+              aria-label={threadStates.actionState.allStarred ? '取消整个会话星标' : '添加整个会话星标'}
+              onClick={() => starEntry && runEntry(starEntry)}
             >
-              <Star size={17} fill={threadStates.allThreadStarred ? 'currentColor' : 'none'} />
+              <Star size={17} fill={threadStates.actionState.allStarred ? 'currentColor' : 'none'} />
             </button>
             <button
               className="icon-only-action"
-              title="归档会话中的收件邮件"
               aria-label="归档会话中的收件邮件"
-              disabled={threadStates.threadArchiveCount === 0}
-              onClick={() => onRunThreadAction('archive')}
+              disabled={!archiveEntry}
+              title={archiveEntry
+                ? `归档 · ${collectionActionDetail(archiveEntry.messages.length, threadStates.actionState.totalCount)}`
+                : '会话中没有可归档的邮件'}
+              onClick={() => archiveEntry && runEntry(archiveEntry)}
             >
               <Archive size={16} />
             </button>
           </div>
-          <details className="reader-more-menu compact-menu" ref={moreMenuRef}>
+          <details
+            className="reader-more-menu compact-menu"
+            ref={moreMenuRef}
+            data-floating-menu="true"
+          >
             <summary className="icon-only-summary" title="更多会话操作" aria-label="更多会话操作">
               <MoreHorizontal size={17} />
             </summary>
-            <div onClick={() => moreMenu.closeMenu()}>
-              <span className="menu-section-title">回复</span>
-              <button
-                type="button"
-                disabled={!activeThreadSelected}
-                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll')}
-              >
-                <ReplyAll size={14} /> 回复全部
-              </button>
-              <button
-                type="button"
-                disabled={!activeThreadSelected}
-                onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
-              >
-                <Forward size={14} /> 转发最新邮件
-              </button>
-              <span className="menu-section-title">会话</span>
-              <button
-                type="button"
-                onClick={() => onRunThreadAction(threadStates.allThreadRead ? 'unread' : 'read')}
-              >
-                {threadStates.allThreadRead ? <Mail size={14} /> : <MailOpen size={14} />}
-                {threadStates.allThreadRead ? '标为未读' : '标为已读'}
-              </button>
-              <button type="button" onClick={onToggleThreadMute}>
-                {activeThread.is_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                {activeThread.is_muted ? '取消静音会话' : '静音会话'}
-              </button>
-              <button
-                type="button"
-                className="danger-menu-item"
-                disabled={threadStates.threadTrashCount === 0}
-                onClick={() => onRunThreadAction('trash')}
-              >
-                <Trash2 size={14} /> 移到废纸篓
-              </button>
-              <span className="menu-section-title">标签</span>
-              {labels.map((label) => (
-                <button
-                  type="button"
-                  key={label.id}
-                  className={threadStates.labelStateByName.get(label.name) ? 'active' : ''}
-                  onClick={() => onToggleThreadLabel(label)}
-                >
-                  <span className="label-dot" style={{ background: label.color }} />
-                  {label.name}
-                </button>
-              ))}
-              <span className="menu-section-title">移动到</span>
-              {threadStates.threadMoveFolders.map((folder) => (
-                <button type="button" key={folder.id} onClick={() => onMoveThreadToFolder(folder)}>
-                  {folder.name}
-                </button>
-              ))}
-              {threadStates.threadMoveFolders.length === 0 && (
-                <span className="menu-empty-note">多账号会话或当前邮件不可移动</span>
-              )}
+            <div className="context-menu-surface context-menu--anchored reader-more-menu-panel">
+              <ContextMenuContent
+                items={threadMenuItems}
+                onClose={moreMenu.closeMenu}
+                ariaLabel="会话操作"
+                title={activeThread.subject || '(无主题)'}
+                detail={`${threadMessages.length} 封邮件`}
+              />
             </div>
           </details>
         </div>

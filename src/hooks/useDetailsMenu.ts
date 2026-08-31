@@ -1,9 +1,14 @@
 import { useCallback, useEffect } from 'react';
 import type { RefObject } from 'react';
+import { containWheelWithin } from '../app/wheelContainment';
 
 type UseDetailsMenuOptions = {
   floating?: boolean;
+  align?: 'start' | 'end';
 };
+
+const VIEWPORT_GAP = 8;
+const ANCHOR_GAP = 6;
 
 /**
  * 原生 <details> 菜单的统一行为辅助：
@@ -17,7 +22,7 @@ type UseDetailsMenuOptions = {
  */
 export function useDetailsMenu(
   ref: RefObject<HTMLElement>,
-  { floating = false }: UseDetailsMenuOptions = {},
+  { floating = false, align = 'end' }: UseDetailsMenuOptions = {},
 ) {
   const closeMenu = useCallback(() => {
     const details = ref.current;
@@ -50,24 +55,30 @@ export function useDetailsMenu(
       const panel = menu.querySelector<HTMLElement>(':scope > div');
       if (!summary || !panel) return;
 
-      const viewportGap = 8;
-      const anchorGap = 6;
       const summaryRect = summary.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
-      const panelWidth = Math.min(panelRect.width, window.innerWidth - viewportGap * 2);
-      const measuredHeight = Math.min(panel.scrollHeight, 320);
-      const roomBelow = window.innerHeight - summaryRect.bottom - anchorGap - viewportGap;
-      const roomAbove = summaryRect.top - anchorGap - viewportGap;
+      const maximumViewportWidth = Math.max(0, window.innerWidth - VIEWPORT_GAP * 2);
+      const maximumViewportHeight = Math.max(0, window.innerHeight - VIEWPORT_GAP * 2);
+      const panelWidth = Math.min(panelRect.width, maximumViewportWidth);
+      const measuredHeight = Math.min(panel.scrollHeight, maximumViewportHeight);
+      const roomBelow = Math.max(
+        0,
+        window.innerHeight - summaryRect.bottom - ANCHOR_GAP - VIEWPORT_GAP,
+      );
+      const roomAbove = Math.max(0, summaryRect.top - ANCHOR_GAP - VIEWPORT_GAP);
       const placeBelow = roomBelow >= Math.min(measuredHeight, 220) || roomBelow >= roomAbove;
-      const availableHeight = Math.max(120, placeBelow ? roomBelow : roomAbove);
+      const availableHeight = placeBelow ? roomBelow : roomAbove;
       const panelHeight = Math.min(measuredHeight, availableHeight);
+      const preferredLeft = align === 'start'
+        ? summaryRect.left
+        : summaryRect.right - panelWidth;
       const left = Math.min(
-        Math.max(summaryRect.right - panelWidth, viewportGap),
-        window.innerWidth - panelWidth - viewportGap,
+        Math.max(preferredLeft, VIEWPORT_GAP),
+        window.innerWidth - panelWidth - VIEWPORT_GAP,
       );
       const top = placeBelow
-        ? summaryRect.bottom + anchorGap
-        : Math.max(viewportGap, summaryRect.top - anchorGap - panelHeight);
+        ? summaryRect.bottom + ANCHOR_GAP
+        : Math.max(VIEWPORT_GAP, summaryRect.top - ANCHOR_GAP - panelHeight);
 
       menu.style.setProperty('--floating-menu-left', `${Math.round(left)}px`);
       menu.style.setProperty('--floating-menu-top', `${Math.round(top)}px`);
@@ -121,6 +132,12 @@ export function useDetailsMenu(
       if (menu.hasAttribute('open')) closeMenu();
     }
 
+    function handleWheel(event: WheelEvent) {
+      if (!menu.hasAttribute('open')) return;
+      const panel = menu.querySelector<HTMLElement>(':scope > div');
+      if (panel) containWheelWithin(panel, event);
+    }
+
     menu.addEventListener('toggle', handleToggle);
     document.addEventListener('pointerdown', handlePointerDown, true);
     // Capture phase prevents the same Escape from reaching application-level
@@ -128,6 +145,7 @@ export function useDetailsMenu(
     document.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
+    menu.addEventListener('wheel', handleWheel, { passive: false });
     if (menu.hasAttribute('open')) scheduleFloatingPosition();
     return () => {
       clearPositionFrame();
@@ -136,6 +154,7 @@ export function useDetailsMenu(
       document.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
+      menu.removeEventListener('wheel', handleWheel);
     };
   // Intentionally attach after every render. Some owners keep this hook
   // mounted while conditionally rendering the actual <details> node (the

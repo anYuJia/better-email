@@ -97,6 +97,15 @@
   --ui-control-padding-inline: 10px;
   --ui-dropdown-max-width: 560px;
 
+  /* Transient menu anatomy. Context menus, toolbar overflow menus, compact
+     dropdowns and selects share these measurements so the same command does
+     not change visual language between mail surfaces. */
+  --ui-menu-width: 232px;
+  --ui-menu-padding: 5px;
+  --ui-menu-item-height: 34px;
+  --ui-menu-item-padding-inline: 9px;
+  --ui-menu-item-radius: var(--ui-radius-control);
+
   /* Integrated native titlebar geometry. The app shell owns this row, so
      panes do not need scattered top-padding compensation. */
   --app-titlebar-height: 54px;

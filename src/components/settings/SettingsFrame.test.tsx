@@ -225,7 +225,9 @@ describe('SettingsFrame application shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /统一邮箱/ }));
     expect(screen.getByRole('menu', { name: '邮箱范围选择' })).not.toBeNull();
-    expect(screen.getByRole('menuitemradio', { name: /统一邮箱.*所有邮箱账号/ })).not.toBeNull();
+    const unifiedItem = screen.getByRole('menuitemradio', { name: '统一邮箱' });
+    const unifiedDescription = document.getElementById(unifiedItem.getAttribute('aria-describedby') ?? '');
+    expect(unifiedDescription?.textContent).toContain('所有邮箱账号');
   });
 
   it('guards a scope change while settings are dirty', () => {

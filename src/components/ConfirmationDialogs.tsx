@@ -17,21 +17,21 @@ type ConfirmationDialogsProps = {
   confirmDeleteContact: Contact | null;
   confirmDeleteLabel: Label | null;
   confirmEmptyTrashState: ConfirmEmptyTrashState | null;
-  confirmPermanentlyDelete: MessageSummary | null;
+  confirmPermanentlyDelete: MessageSummary[] | null;
   setConfirmDeleteFolder: Dispatch<SetStateAction<Folder | null>>;
   setConfirmDeleteIdentity: Dispatch<SetStateAction<MailIdentity | null>>;
   setConfirmDeleteRule: Dispatch<SetStateAction<MailRule | null>>;
   setConfirmDeleteContact: Dispatch<SetStateAction<Contact | null>>;
   setConfirmDeleteLabel: Dispatch<SetStateAction<Label | null>>;
   setConfirmEmptyTrashState: Dispatch<SetStateAction<ConfirmEmptyTrashState | null>>;
-  setConfirmPermanentlyDelete: Dispatch<SetStateAction<MessageSummary | null>>;
+  setConfirmPermanentlyDelete: Dispatch<SetStateAction<MessageSummary[] | null>>;
   onDeleteFolderConfirmed: (folder: Folder) => Promise<void>;
   onDeleteIdentityConfirmed: (identity: MailIdentity) => Promise<void>;
   onDeleteRuleConfirmed: (rule: MailRule) => Promise<void>;
   onDeleteContactConfirmed: (contact: Contact) => Promise<void>;
   onDeleteLabelConfirmed: (labelId: number) => Promise<void>;
   onEmptyTrashConfirmed: (accountId: number) => Promise<void>;
-  onPermanentlyDeleteConfirmed: (message: MessageSummary) => Promise<void>;
+  onPermanentlyDeleteConfirmed: (messages: MessageSummary[]) => Promise<void>;
 };
 
 export default function ConfirmationDialogs({
@@ -139,9 +139,13 @@ export default function ConfirmationDialogs({
       />
       <ConfirmDialog
         open={!!confirmPermanentlyDelete}
-        title="永久删除邮件"
-        summaryText={confirmPermanentlyDelete ? `确认要永久删除邮件 "${confirmPermanentlyDelete.subject || '(无主题)'}" 吗？` : '确认要永久删除选中的这封邮件吗？'}
-        description="此操作不可逆。这封邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
+        title={confirmPermanentlyDelete && confirmPermanentlyDelete.length > 1 ? '永久删除多封邮件' : '永久删除邮件'}
+        summaryText={confirmPermanentlyDelete
+          ? confirmPermanentlyDelete.length > 1
+            ? `确认要永久删除选中的 ${confirmPermanentlyDelete.length} 封邮件吗？`
+            : `确认要永久删除邮件 "${confirmPermanentlyDelete[0]?.subject || '(无主题)'}" 吗？`
+          : '确认要永久删除选中的邮件吗？'}
+        description="此操作不可逆。邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
         onConfirm={async () => {
           if (confirmPermanentlyDelete) {
             await onPermanentlyDeleteConfirmed(confirmPermanentlyDelete);

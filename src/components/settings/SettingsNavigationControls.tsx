@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 import {
   accountScopedSections,
   getSettingsDetailItems,
@@ -78,7 +79,9 @@ export const SettingsSearch = memo(function SettingsSearch({
   const [query, setQuery] = useState('');
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchPopoverRef = useRef<HTMLDivElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
+  useWheelContainment(searchPopoverRef, Boolean(normalizedQuery));
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
     return settingsSearchEntries.filter((entry) => (
@@ -154,7 +157,11 @@ export const SettingsSearch = memo(function SettingsSearch({
         )}
       </div>
       {normalizedQuery && (
-        <div className="settings-search-popover" aria-label="设置搜索结果">
+        <div
+          ref={searchPopoverRef}
+          className="settings-search-popover"
+          aria-label="设置搜索结果"
+        >
           <span className="settings-nav-match-count">
             {searchResults.length > 0 ? `${searchResults.length} 个匹配` : '没有匹配'}
           </span>

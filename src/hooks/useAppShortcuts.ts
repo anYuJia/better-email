@@ -1,7 +1,14 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { ListMode, MessageSummary, UndoAction } from '../app/types';
+import {
+  canArchiveMessageRole,
+  canChangeMessageReadStateRole,
+  canMoveMessageToTrashRole,
+  buildMessageCollectionActionState,
+  messagesForCollectionAction,
+  type BulkMessageAction,
+} from '../app/messageActionState';
 
-type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash';
 type ComposeMode = 'reply' | 'replyAll' | 'forward';
 
 type UseAppShortcutsOptions = {
@@ -27,7 +34,7 @@ type UseAppShortcutsOptions = {
   openShortcuts: () => void;
   composeNew: () => void;
   setSelectedId: (messageId: number) => void;
-  runBulkAction: (action: BulkAction) => Promise<void>;
+  runBulkAction: (action: BulkMessageAction) => Promise<void>;
   composeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
   toggleStar: (message: MessageSummary) => Promise<void>;
   toggleRead: (message: MessageSummary) => Promise<void>;
@@ -202,18 +209,28 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         }
         if (key === 'm') {
           event.preventDefault();
-          const action = selectedMessages.every((message) => message.is_read) ? 'unread' : 'read';
-          runSafely(runBulkAction(action));
+          const state = buildMessageCollectionActionState(selectedMessages);
+          const readAction = state.entries.find((item) => item.action === 'read' || item.action === 'unread');
+          if (readAction && readAction.action !== 'snooze') runSafely(runBulkAction(readAction.action));
+          else setStatus('所选邮件没有可更改的已读状态');
           return;
         }
         if (key === 'e') {
           event.preventDefault();
-          runSafely(runBulkAction('archive'));
+          if (messagesForCollectionAction(selectedMessages, 'archive').length > 0) {
+            runSafely(runBulkAction('archive'));
+          } else {
+            setStatus('所选邮件无法归档');
+          }
           return;
         }
         if (key === '#' || key === 'delete' || key === 'backspace') {
           event.preventDefault();
-          runSafely(runBulkAction('trash'));
+          if (messagesForCollectionAction(selectedMessages, 'trash').length > 0) {
+            runSafely(runBulkAction('trash'));
+          } else {
+            setStatus('废纸篓中的邮件需使用“永久删除”并确认');
+          }
           return;
         }
       }
@@ -236,13 +253,16 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         runSafely(toggleStar(selected));
       } else if (key === 'm') {
         event.preventDefault();
-        runSafely(toggleRead(selected));
+        if (canChangeMessageReadStateRole(selected.folder_role)) runSafely(toggleRead(selected));
+        else setStatus('这封邮件没有可更改的已读状态');
       } else if (key === 'e') {
         event.preventDefault();
-        runSafely(moveSelected('archive'));
+        if (canArchiveMessageRole(selected.folder_role)) runSafely(moveSelected('archive'));
+        else setStatus('这封邮件无法归档');
       } else if (key === '#' || key === 'delete' || key === 'backspace') {
         event.preventDefault();
-        runSafely(moveSelected('trash'));
+        if (canMoveMessageToTrashRole(selected.folder_role)) runSafely(moveSelected('trash'));
+        else setStatus('废纸篓中的邮件需使用“永久删除”并确认');
       }
     }
 

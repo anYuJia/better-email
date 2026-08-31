@@ -14,12 +14,17 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 36px;
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 0;
   border-radius: var(--ui-radius-sm);
-  background: var(--workspace-toolbar);
+  background: transparent;
   color: var(--ui-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   list-style: none;
 }
@@ -30,57 +35,18 @@
 
 .reader-ai-trigger:hover,
 .reader-ai-menu[open] .reader-ai-trigger {
-  border-color: var(--ui-border-strong);
   background: var(--quiet-row-hover);
   color: var(--ui-text);
 }
 
 .reader-ai-trigger:focus-visible {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+  box-shadow: var(--ui-focus-ring);
 }
 
-.reader-ai-menu > div {
-  position: absolute;
-  z-index: 42;
-  top: calc(100% + 6px);
-  right: 0;
-  width: 210px;
-  padding: 6px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-panel);
-  background: var(--color-surface-raised);
-  box-shadow: var(--ui-shadow-popover);
-}
-
-.reader-ai-menu > div > button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 9px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  background: transparent;
-  color: var(--ui-text);
-  text-align: left;
-}
-
-.reader-ai-menu > div > button:hover:not(:disabled) {
-  background: var(--quiet-row-hover);
-}
-
-.reader-ai-menu > div > button:disabled {
-  opacity: 0.58;
-}
-
-.reader-ai-privacy-note {
-  display: block;
-  padding: 6px 9px 3px;
-  color: var(--ui-text-tertiary);
-  font-size: 11px;
-  line-height: 1.45;
+.reader-ai-trigger:active {
+  scale: 0.96;
 }
 
 .reader-ai-result {
@@ -138,13 +104,24 @@
   border-color: color-mix(in srgb, var(--color-danger) 32%, var(--ui-border));
 }
 
+@media (min-width: 721px) {
+  .app-shell .reader-ai-trigger {
+    min-width: 36px;
+    min-height: 36px;
+    height: 36px;
+  }
+}
+
 @media (max-width: 720px) {
   .reader-ai-trigger span {
     display: none;
   }
 
   .reader-ai-trigger {
-    width: 36px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
     padding: 0;
   }
 
@@ -159,8 +136,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reader-ai-trigger,
-  .reader-ai-menu > div > button {
+  .reader-ai-trigger {
     transition: none;
   }
 }

@@ -97,5 +97,5 @@ export function parseFutureDateTimeLocal(value: string, now = new Date()) {
 }
 
 export function canSnoozeRole(role: FolderRole) {
-  return !['drafts', 'outbox', 'sent', 'trash', 'snoozed'].includes(role);
+  return !['drafts', 'outbox', 'sent', 'spam', 'trash', 'snoozed'].includes(role);
 }

@@ -627,24 +627,25 @@
   min-width: max-content;
   max-width: min(92vw, 320px);
   max-height: 320px;
-  padding: 5px;
+  padding: var(--ui-menu-padding);
   overflow-x: hidden;
   overflow-y: auto;
-  border: 0;
+  border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
 
 .compact-menu > div button {
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: var(--ui-menu-item-height);
+  padding: 0 var(--ui-menu-item-padding-inline);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--ui-menu-item-radius);
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
+  font-weight: 500;
   text-align: left;
   display: flex;
   align-items: center;
@@ -652,8 +653,14 @@
   cursor: pointer;
 }
 
-.compact-menu > div button:hover {
+.compact-menu > div button:hover,
+.compact-menu > div button:focus-visible {
   background: var(--quiet-row-hover);
+  outline: none;
+}
+
+.compact-menu > div button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--color-focus);
 }
 
 .compact-menu > div button.active {
@@ -667,9 +674,9 @@
 
 .menu-section-title {
   display: block;
-  padding: 6px 10px 2px;
+  padding: 7px var(--ui-menu-item-padding-inline) 3px;
   color: var(--ui-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ui-font-size-meta);
   font-weight: 600;
 }
 
@@ -686,24 +693,6 @@
 .app-shell .compact-menu[open] > div {
   z-index: 2500;
 }
-
-/* Menus inside horizontally scrollable toolbars need a viewport-anchored
- * panel. The hook writes clamped coordinates after native <details> opens;
- * hiding the one-frame measuring state prevents an off-screen flash. */
-.compact-menu[data-floating-menu="true"] > div {
-  position: fixed;
-  top: var(--floating-menu-top, 0);
-  left: var(--floating-menu-left, 0);
-  right: auto;
-  bottom: auto;
-  max-height: min(320px, var(--floating-menu-max-height, 320px));
-  visibility: hidden;
-}
-
-.compact-menu[data-floating-menu="true"][data-menu-positioned="true"] > div {
-  visibility: visible;
-}
-
 
 /* ---------------------------------------------------------------------------
  * 6 · Bulk toolbar
@@ -780,18 +769,6 @@
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
-
-/* Bulk more-menu expands upward since the strip sits below the list head. */
-.bulk-toolbar .bulk-more-menu > div {
-  top: calc(100% + 4px);
-  bottom: auto;
-}
-
-.bulk-toolbar .compact-menu[data-floating-menu="true"] > div {
-  top: var(--floating-menu-top, 0);
-  bottom: auto;
-}
-
 
 /* ---------------------------------------------------------------------------
  * 7 · Date group headers
@@ -2240,7 +2217,7 @@
   width: max-content;
   min-width: 0;
   max-width: min(var(--ui-dropdown-max-width), calc(100vw - 24px));
-  padding: 4px;
+  padding: var(--ui-menu-padding);
   display: grid;
   gap: 1px;
   border: 1px solid var(--ui-border-strong);
@@ -2255,17 +2232,18 @@
 }
 
 .compact-dropdown > div button {
-  min-height: 33px;
-  padding: 0 8px;
+  min-height: var(--ui-menu-item-height);
+  padding: 0 var(--ui-menu-item-padding-inline);
   display: flex;
   align-items: center;
   gap: 6px;
   border: 0;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-menu-item-radius);
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
+  font-weight: 500;
   text-align: left;
   white-space: nowrap;
 }

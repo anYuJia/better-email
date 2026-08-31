@@ -149,7 +149,7 @@
 
 :root[data-theme="dark"] .compact-menu > div {
   background: var(--ui-surface);
-  border: 0;
+  border: 1px solid var(--ui-border-strong);
   box-shadow: var(--ui-shadow-popover);
 }
 
@@ -236,15 +236,9 @@
 }
 
 :root[data-theme="dark"] .reader-warning-panel {
-  border-color: var(--ui-warning-border);
+  border-color: var(--ui-border);
   color: var(--ui-text-secondary);
-  background: color-mix(in srgb, var(--ui-warning-bg) 56%, var(--ui-reader));
-}
-
-:root[data-theme="dark"] .reader-warning-badge {
-  border-color: transparent;
-  color: var(--ui-warning);
-  background: transparent;
+  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
 }
 
 :root[data-theme="dark"] .quick-reply {

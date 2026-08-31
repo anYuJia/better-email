@@ -229,7 +229,7 @@ function MessageListPane({
   );
   const threadMovableMessages = React.useMemo(
     () => threadContextMessages.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+      (message) => !['drafts', 'outbox', 'sent'].includes(message.folder_role),
     ),
     [threadContextMessages],
   );
@@ -239,6 +239,7 @@ function MessageListPane({
     const items = buildBulkMessageContextItems({
       selectedMessages: threadContextMessages,
       movableMessages: threadMovableMessages,
+      scope: 'thread',
       folders,
       labels,
       onRunBulkAction: (action) => onRunThreadAction(threadMenu.thread, threadContextMessages, action),
@@ -354,8 +355,8 @@ function MessageListPane({
           y={threadMenu.y}
           items={threadContextItems}
           title={threadMenu.thread.subject || '(无主题)'}
-          detail={`${threadMenu.messages.length} 封邮件 · 会话操作`}
-          ariaLabel={`${threadMenu.thread.subject || '会话'}操作`}
+          detail={`${threadMenu.messages.length} 封邮件`}
+          ariaLabel="会话操作"
           onClose={() => setThreadMenu(null)}
         />
       )}
@@ -364,9 +365,9 @@ function MessageListPane({
           x={messageMenu.x}
           y={messageMenu.y}
           items={messageContextItems}
-          title={isBulkContext ? `已选择 ${selectedMessages.length} 封邮件` : messageMenu.message.subject || '(无主题)'}
-          detail={isBulkContext ? '操作将应用到当前选择' : messageMenu.message.sender_name || messageMenu.message.sender_email}
-          ariaLabel={isBulkContext ? '批量邮件操作' : `${messageMenu.message.subject || '邮件'}操作`}
+          title={isBulkContext ? `已选 ${selectedMessages.length} 封邮件` : messageMenu.message.subject || '(无主题)'}
+          detail={isBulkContext ? '更改将应用到全部已选邮件' : messageMenu.message.sender_name || messageMenu.message.sender_email}
+          ariaLabel={isBulkContext ? '批量邮件操作' : '邮件操作'}
           onClose={() => setMessageMenu(null)}
         />
       )}

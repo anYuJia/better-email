@@ -40,7 +40,6 @@ function summary(id: number, labels: string[]): MessageSummary {
   };
 }
 
-const folders: Folder[] = [{ id: 101, account_id: 1, name: '收件箱', role: 'inbox', unread_count: 2, is_virtual: false }];
 const labels: Label[] = [{ id: 1, name: '工作', color: '#2f7ed8', message_count: 0 }];
 const label = labels[0];
 
@@ -75,15 +74,12 @@ function renderController(
     queueUndoAction: vi.fn(),
     clearSelectedDetailIf: vi.fn(),
     patchSelectedDetailMetadata: vi.fn(),
-    visibleFolderIdForRole: vi.fn().mockReturnValue(null),
     refreshAll: vi.fn().mockResolvedValue(undefined),
   };
 
   const hook = renderHook(({ selected }) => useSelectedMessageActions({
     selected,
     messages,
-    folders,
-    labels,
     folderId: options.folderId === undefined ? 101 : options.folderId,
     loadMeta: mocks.loadMeta,
     loadMessages: mocks.loadMessages,
@@ -94,7 +90,6 @@ function renderController(
     queueUndoAction: mocks.queueUndoAction,
     clearSelectedDetailIf: mocks.clearSelectedDetailIf,
     patchSelectedDetailMetadata: mocks.patchSelectedDetailMetadata,
-    visibleFolderIdForRole: mocks.visibleFolderIdForRole,
   }), { initialProps: { selected } });
 
   return { ...hook, mocks };
@@ -223,7 +218,6 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
     });
     expect(mocks.loadMeta).toHaveBeenCalledWith(101);
     expect(mocks.loadMessages).toHaveBeenCalledWith(101);
-    expect(mocks.visibleFolderIdForRole).not.toHaveBeenCalled();
     expect(mocks.clearSelectedDetailIf).toHaveBeenCalledWith(current.id);
     expect(mocks.setSelectedId).toHaveBeenLastCalledWith(next.id);
     expect(mocks.queueUndoAction).toHaveBeenCalledWith('归档', [
@@ -246,7 +240,7 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
     expect(mocks.loadMeta).toHaveBeenCalledWith(101);
     expect(mocks.loadMessages).toHaveBeenCalledWith(101);
     expect(mocks.setSelectedId).toHaveBeenLastCalledWith(first.id);
-    expect(mocks.queueUndoAction).toHaveBeenCalledWith('删除', expect.any(Array));
+    expect(mocks.queueUndoAction).toHaveBeenCalledWith('移到废纸篓', expect.any(Array));
   });
 
   it('移动到指定文件夹后保留目标 metadata，但仍刷新源列表', async () => {
@@ -348,7 +342,6 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
 
     expect(mocks.loadMeta).toHaveBeenCalledWith(101);
     expect(mocks.loadMessages).toHaveBeenCalledWith(101);
-    expect(mocks.visibleFolderIdForRole).not.toHaveBeenCalled();
     expect(mocks.patchSelectedDetailMetadata).toHaveBeenCalledWith(current.id, expect.objectContaining({
       folder_id: 101,
       folder_role: 'inbox',
@@ -390,21 +383,4 @@ describe('useSelectedMessageActions 移动后列表与选择语义', () => {
     );
   });
 
-  it('永久删除也选择相邻项并刷新源列表', async () => {
-    const current = summary(1, []);
-    const next = summary(2, []);
-    const { result, mocks } = renderController(current, {
-      messages: [current, next],
-      refreshedMessages: [next],
-    });
-
-    await act(async () => {
-      await result.current.permanentlyDeleteMessageConfirmed(current);
-    });
-
-    expect(mocks.refreshAll).not.toHaveBeenCalled();
-    expect(mocks.loadMessages).toHaveBeenCalledWith(101);
-    expect(mocks.setSelectedId).toHaveBeenLastCalledWith(next.id);
-    expect(mocks.setStatus).toHaveBeenCalledWith('操作完成');
-  });
 });

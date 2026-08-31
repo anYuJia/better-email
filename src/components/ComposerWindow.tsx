@@ -28,6 +28,7 @@ import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuickTools';
 import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
 import useModalAccessibility from '../hooks/useModalAccessibility';
+import { useWheelContainment } from '../hooks/useWheelContainment';
 import './composer/composer.css';
 import './composer/composer-polish.css';
 
@@ -184,6 +185,7 @@ export default function ComposerWindow({
   const scheduleAnchorRef = useRef<HTMLButtonElement | null>(null);
   const templateButtonRef = useRef<HTMLButtonElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const sendMenuItemRefs = useRef<HTMLButtonElement[]>([]);
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
@@ -202,6 +204,7 @@ export default function ComposerWindow({
   const [formattingOpen, setFormattingOpen] = useState(true);
   const [popoverMode, setPopoverMode] = useState<ComposerPopoverMode>(null);
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
+  useWheelContainment(sendMenuRef, sendMenuOpen);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
   const [saveDraftPending, setSaveDraftPending] = useState(false);
@@ -721,7 +724,12 @@ export default function ComposerWindow({
                     <ChevronDown size={17} aria-hidden="true" />
                   </button>
                   {sendMenuOpen && (
-                    <div className="composer-send-menu" role="menu" aria-label="发送选项">
+                    <div
+                      ref={sendMenuRef}
+                      className="composer-send-menu"
+                      role="menu"
+                      aria-label="发送选项"
+                    >
                       <button ref={(element) => { if (element) sendMenuItemRefs.current[0] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); onSendDraft(); }}>
                         立即发送
                       </button>

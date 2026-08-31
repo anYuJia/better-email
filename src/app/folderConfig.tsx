@@ -23,6 +23,7 @@ export function movableFoldersForMessage(folders: Folder[], message?: MessageSum
   return folders.filter((folder) => {
     if (!isMovableMessageFolder(folder)) return false;
     if (message && folder.account_id !== message.account_id) return false;
+    if (message && folder.role === message.folder_role) return false;
     return true;
   });
 }
@@ -33,7 +34,8 @@ export function movableFoldersForBulk(folders: Folder[], selectedMessages: Messa
   if (accountIds.size !== 1) return [];
   return folders.filter((folder) => {
     if (!isMovableMessageFolder(folder)) return false;
-    return folder.account_id === selectedMessages[0].account_id;
+    if (folder.account_id !== selectedMessages[0].account_id) return false;
+    return selectedMessages.some((message) => message.folder_role !== folder.role);
   });
 }
 

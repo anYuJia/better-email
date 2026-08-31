@@ -8,6 +8,9 @@ import {
   normalizeGeneratedReply,
   readerAiSource,
 } from '../../app/aiContextActions';
+import { useDetailsMenu } from '../../hooks/useDetailsMenu';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
+import { ContextMenuContent, type ContextMenuItem } from '../ContextMenu';
 
 type ReaderAiContextActionsProps = {
   message: Message;
@@ -21,13 +24,12 @@ export default function ReaderAiContextActions({
   onComposeFromMessage,
 }: ReaderAiContextActionsProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
   const [busyAction, setBusyAction] = useState<AiBusyAction>(null);
   const [summary, setSummary] = useState('');
   const [error, setError] = useState('');
-
-  function closeMenu() {
-    menuRef.current?.removeAttribute('open');
-  }
+  const menu = useDetailsMenu(menuRef, { floating: true });
+  useWheelContainment(resultRef, Boolean(summary || error));
 
   async function summarize() {
     if (busyAction) return;
@@ -41,10 +43,10 @@ export default function ReaderAiContextActions({
       }
       const result = await summarizeMessage(source);
       setSummary(result.content.trim());
-      closeMenu();
+      menu.closeMenu();
     } catch (caught) {
       setError(aiErrorMessage(caught as AiRequestError));
-      closeMenu();
+      menu.closeMenu();
     } finally {
       setBusyAction(null);
     }
@@ -61,38 +63,71 @@ export default function ReaderAiContextActions({
         setError('AI 未生成有效回复正文，请重试。');
         return;
       }
-      closeMenu();
+      menu.closeMenu();
       onComposeFromMessage(message, 'reply', body);
     } catch (caught) {
       setError(aiErrorMessage(caught as AiRequestError));
-      closeMenu();
+      menu.closeMenu();
     } finally {
       setBusyAction(null);
     }
   }
 
+  const menuItems: ContextMenuItem[] = [
+    {
+      id: 'ai-summary',
+      label: '总结邮件',
+      icon: busyAction === 'summary'
+        ? <Loader2 size={15} className="reader-translation-spinner" />
+        : <MessageSquareText size={15} />,
+      disabled: Boolean(busyAction),
+      onSelect: () => void summarize(),
+    },
+    {
+      id: 'ai-reply',
+      label: '生成回复',
+      icon: busyAction === 'reply'
+        ? <Loader2 size={15} className="reader-translation-spinner" />
+        : <WandSparkles size={15} />,
+      disabled: Boolean(busyAction),
+      onSelect: () => void generateReply(),
+    },
+  ];
+
   return (
     <div className="reader-ai-context">
-      <details ref={menuRef} className="reader-ai-menu compact-menu">
-        <summary className="reader-ai-trigger" aria-label="AI 邮件工具" title="AI 邮件工具">
+      <details
+        ref={menuRef}
+        className="reader-ai-menu compact-menu"
+        data-floating-menu="true"
+      >
+        <summary
+          className="reader-ai-trigger"
+          aria-label="AI 邮件工具"
+          aria-haspopup="menu"
+          title="AI 邮件工具"
+        >
           <Sparkles size={15} aria-hidden="true" />
           <span>AI</span>
         </summary>
-        <div role="menu" aria-label="AI 邮件工具">
-          <button type="button" role="menuitem" onClick={() => void summarize()} disabled={Boolean(busyAction)}>
-            {busyAction === 'summary' ? <Loader2 size={15} className="reader-translation-spinner" /> : <MessageSquareText size={15} />}
-            总结邮件
-          </button>
-          <button type="button" role="menuitem" onClick={() => void generateReply()} disabled={Boolean(busyAction)}>
-            {busyAction === 'reply' ? <Loader2 size={15} className="reader-translation-spinner" /> : <WandSparkles size={15} />}
-            生成回复
-          </button>
-          <span className="reader-ai-privacy-note">外部 AI 仍遵循设置中的隐私确认</span>
+        <div className="context-menu-surface context-menu--anchored reader-ai-menu-panel">
+          <ContextMenuContent
+            items={menuItems}
+            onClose={menu.closeMenu}
+            ariaLabel="AI 邮件工具"
+            title="AI 工具"
+            note="外部 AI 遵循隐私确认设置"
+          />
         </div>
       </details>
 
       {(summary || error) && (
-        <aside className={`reader-ai-result${error ? ' is-error' : ''}`} role="status" aria-live="polite">
+        <aside
+          ref={resultRef}
+          className={`reader-ai-result${error ? ' is-error' : ''}`}
+          role="status"
+          aria-live="polite"
+        >
           <div>
             <Sparkles size={14} aria-hidden="true" />
             <strong>{error ? 'AI 暂不可用' : 'AI 摘要'}</strong>

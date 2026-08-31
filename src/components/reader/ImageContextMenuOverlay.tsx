@@ -1,4 +1,5 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useRef, type Dispatch, type SetStateAction } from 'react';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 import type { PreviewImage } from './useImagePreview';
 
 export type ImageContextMenuState = PreviewImage & { x: number; y: number } | null;
@@ -22,8 +23,12 @@ export default function ImageContextMenuOverlay({
   copyPreviewImageToClipboard,
   copyPreviewImageSource,
 }: ImageContextMenuOverlayProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  useWheelContainment(menuRef);
+
   return (
     <div
+      ref={menuRef}
       className="reader-image-context-menu"
       style={{ left: imageContextMenu.x, top: imageContextMenu.y }}
       role="menu"

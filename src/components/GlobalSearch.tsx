@@ -7,6 +7,7 @@ import {
   buildMessageSearchSuggestions,
 } from './messageListSearchSuggestions';
 import { useDetailsMenu } from '../hooks/useDetailsMenu';
+import { useWheelContainment } from '../hooks/useWheelContainment';
 
 export type GlobalSearchProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -42,7 +43,8 @@ export default function GlobalSearch({
   const searchBlurTimerRef = React.useRef<number | null>(null);
   const searchSuggestionListId = React.useId();
   const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
-  const searchScopeMenu = useDetailsMenu(searchScopeMenuRef);
+  const searchSuggestionPanelRef = React.useRef<HTMLDivElement>(null);
+  const searchScopeMenu = useDetailsMenu(searchScopeMenuRef, { floating: true });
   const deferredQuery = React.useDeferredValue(query);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
     ?? searchScopeOptions[0];
@@ -56,6 +58,7 @@ export default function GlobalSearch({
     [searchEntries, trimmedQuery],
   );
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
+  useWheelContainment(searchSuggestionPanelRef, showSearchSuggestions);
   const activeSearchSuggestion = activeSearchSuggestionIndex >= 0
     ? searchSuggestions[activeSearchSuggestionIndex]
     : null;
@@ -156,7 +159,11 @@ export default function GlobalSearch({
           <X size={14} aria-hidden="true" />
         </button>
       )}
-      <details className="compact-menu search-scope-menu" ref={searchScopeMenuRef}>
+      <details
+        className="compact-menu search-scope-menu"
+        ref={searchScopeMenuRef}
+        data-floating-menu="true"
+      >
         <summary
           title={`搜索范围：${activeSearchScope.label}`}
           aria-label={`搜索范围：${activeSearchScope.label}`}
@@ -187,6 +194,7 @@ export default function GlobalSearch({
       <span className="global-search-shortcut" aria-hidden="true">{shortcutLabel}</span>
       {showSearchSuggestions && (
         <div
+          ref={searchSuggestionPanelRef}
           className="search-suggestion-panel"
           id={searchSuggestionListId}
           role="listbox"

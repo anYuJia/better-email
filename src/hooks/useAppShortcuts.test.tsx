@@ -135,4 +135,33 @@ describe('useAppShortcuts text selection boundary', () => {
 
     expect(options.setSelectedId).not.toHaveBeenCalled();
   });
+
+  it('clears a selection when only closed anchored menu surfaces exist', () => {
+    const options = makeOptions();
+    options.selectedMessageIds = [1];
+    const anchoredSurface = document.createElement('div');
+    anchoredSurface.className = 'context-menu-surface context-menu--anchored';
+    document.body.append(anchoredSurface);
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(options.clearSelection).toHaveBeenCalledOnce();
+    expect(options.setStatus).toHaveBeenCalledWith('已取消邮件选择');
+    anchoredSurface.remove();
+  });
+
+  it('leaves Escape to an open floating context menu', () => {
+    const options = makeOptions();
+    options.selectedMessageIds = [1];
+    const floatingMenu = document.createElement('div');
+    floatingMenu.className = 'context-menu context-menu-surface';
+    document.body.append(floatingMenu);
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(options.clearSelection).not.toHaveBeenCalled();
+    floatingMenu.remove();
+  });
 });

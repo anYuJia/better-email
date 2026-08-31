@@ -3,7 +3,6 @@ import type {
   Label,
   MessageSummary,
 } from '../app/types';
-import type { BulkMessageAction } from '../components/messageContextMenu';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 
@@ -13,23 +12,9 @@ export function uniqueMessages(items: MessageSummary[]) {
   return [...new Map(items.map((message) => [message.id, message])).values()];
 }
 
-export function threadMessagesForAction(items: MessageSummary[], action: BulkMessageAction) {
-  if (action === 'archive') {
-    return items.filter(
-      (message) => !['archive', 'drafts', 'sent', 'trash'].includes(message.folder_role),
-    );
-  }
-  if (action === 'trash') {
-    return items.filter(
-      (message) => message.folder_role !== 'drafts' && message.folder_role !== 'trash',
-    );
-  }
-  return items;
-}
-
 export function threadMovableMessages(items: MessageSummary[]) {
   return items.filter(
-    (message) => message.folder_role !== 'drafts' && message.folder_role !== 'sent',
+    (message) => !['drafts', 'outbox', 'sent'].includes(message.folder_role),
   );
 }
 

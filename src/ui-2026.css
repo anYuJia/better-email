@@ -18,6 +18,7 @@
 @import './styles/skeleton.css';
 @import './styles/workspace-polish.css';
 @import './styles/ai-context.css';
+@import './styles/popovers.css';
 
 /* Shared overlays and chrome */
 @import './styles/overlay.css';

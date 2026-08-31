@@ -372,13 +372,6 @@
   left: 10px;
 }
 
-/* The reader overflow menu is short enough to stay in the document flow of
- * the reader viewport. Do not create a second scroll container inside it. */
-.app-shell .reader-more-menu > div {
-  max-height: none;
-  overflow: visible;
-}
-
 .reader-more-menu .menu-empty-note {
   display: block;
   max-width: 220px;
@@ -388,14 +381,8 @@
   line-height: 1.45;
 }
 
-/* Open menus paint above reader content */
-.app-shell .reader-more-menu[open] > div,
-.app-shell .label-menu[open] > .label-menu-container {
-  z-index: 2500;
-}
-
-/* The outer panel owns scrolling; the article paints overflow so label/action
-   menus aren't clipped by the article scroll box. */
+/* The outer panel remains the single document-scroll owner. Anchored menus
+   leave this scroll context through the shared viewport popover layer. */
 .app-shell .reader-panel {
   overflow: auto;
 }
@@ -819,7 +806,7 @@
   padding: 8px;
   gap: 8px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
   z-index: 200;
@@ -1693,82 +1680,90 @@
  * 8. Security banner
  * --------------------------------------------------------------------------- */
 
-/* Quiet security status: a section in the reading flow. Top and bottom
-   hairlines communicate scope without enclosing the content in a large box. */
+/* Compact privacy status: visually quieter than the message, but still easy
+   to scan before loading remote content or revealing links. */
 .reader-warning-panel {
   max-width: 760px;
   margin: var(--ui-space-3) 0 var(--ui-space-4);
-  padding: 9px 0;
-  display: flex;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  column-gap: 10px;
-  row-gap: 4px;
-  border: 0;
-  border-top: 1px solid var(--ui-warning-border);
-  border-bottom: 1px solid var(--ui-warning-border);
-  border-radius: 0;
+  gap: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: color-mix(in srgb, var(--ui-warning-bg) 58%, var(--ui-reader));
+  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-shell .reader-warning-panel {
-  padding: 9px 0;
-  border-color: color-mix(in srgb, var(--ui-warning-border) 72%, transparent);
+  padding: 10px 12px;
+  border-color: var(--ui-border);
 }
 
-.reader-warning-heading {
+.reader-warning-icon {
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--ui-space-2);
-  margin: 0;
-  flex: 0 0 auto;
+  justify-content: center;
+  align-self: start;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
-.reader-warning-heading strong {
-  color: var(--ui-text);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.reader-warning-badge {
+.reader-warning-panel.is-caution .reader-warning-icon {
   color: var(--ui-warning);
-  font-size: 12px;
+  background: var(--ui-warning-bg);
+}
+
+.reader-warning-content {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.reader-warning-content > strong {
+  color: var(--ui-text);
+  font-size: 12.5px;
   font-weight: 600;
+  line-height: 1.35;
+}
+
+.reader-warning-messages {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .reader-warning-panel p {
-  max-width: 65ch;
   margin: 0;
   color: var(--ui-text-secondary);
   font-size: 12px;
-  flex: 0 1 auto;
-  line-height: 1.4;
+  line-height: 1.45;
   text-wrap: pretty;
-}
-
-.reader-warning-panel p + p {
-  margin-top: 3px;
 }
 
 .reader-warning-action-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 0 auto;
+  justify-self: end;
 }
 
 .reader-warning-more > summary {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .reader-warning-more > summary:hover,
@@ -1782,57 +1777,79 @@
   min-width: 150px;
 }
 
-.reader-warning-primary-action,
-.reader-warning-secondary-action {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
+.reader-security-primary-action {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 0;
   border-radius: var(--ui-radius-sm);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
   transition: var(--ui-transition-fast-color-background);
 }
 
+.reader-security-primary-action:hover {
+  color: var(--ui-accent-hover);
+  background: color-mix(in srgb, var(--ui-accent-soft) 76%, var(--ui-surface));
+}
+
+.reader-security-primary-action:focus-visible,
+.reader-warning-more > summary:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+  box-shadow: var(--ui-focus-ring);
+}
+
+@container (max-width: 560px) {
+  .reader-warning-panel {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .reader-warning-action-row {
+    grid-column: 2;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .reader-security-primary-action {
+    min-height: var(--ui-control-height);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell.is-mobile-app .reader-warning-panel {
+    padding: 12px;
+  }
+
+  .app-shell.is-mobile-app .reader-security-primary-action,
+  .app-shell.is-mobile-app .reader-warning-more > summary {
+    min-height: var(--ui-control-height-touch);
+  }
+
+  .app-shell.is-mobile-app .reader-warning-more > summary {
+    width: var(--ui-control-height-touch);
+  }
+}
+
+/* Reader body fallback actions reuse the standard neutral button language. */
 .reader-warning-primary-action {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text);
   background: var(--ui-surface);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-fast-color-background);
 }
 
 .reader-warning-primary-action:hover {
   color: var(--ui-text);
   background: var(--ui-surface-muted);
-}
-
-.reader-warning-secondary-action {
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
-
-.reader-warning-secondary-action:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-@container (max-width: 500px) {
-  .reader-warning-action-row {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .reader-warning-primary-action,
-  .reader-warning-secondary-action {
-    width: auto;
-    min-height: var(--ui-control-height);
-    padding: 4px 8px;
-    line-height: 1.25;
-  }
-}
-
-/* Reader primary action link inside body content */
-.reader-warning-primary-action {
-  color: var(--ui-text);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2373,9 +2390,9 @@
   position: fixed;
   z-index: 110;
   min-width: 176px;
-  padding: 6px;
+  padding: var(--ui-menu-padding);
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
@@ -2384,13 +2401,14 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: var(--ui-menu-item-height);
+  padding: 0 var(--ui-menu-item-padding-inline);
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ui-menu-item-radius);
   color: var(--ui-text);
   background: transparent;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
 }
 

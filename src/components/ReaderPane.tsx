@@ -74,6 +74,7 @@ export type ReaderPaneProps = {
   onComposeNew: (fields?: ComposeNewFields) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode, prefillBody?: string) => void;
   onRunThreadAction: (action: BulkMessageAction) => void;
+  onRequestSnooze: (messages: MessageSummary[]) => void;
   onMoveThreadToFolder: (folder: Folder) => void;
   onToggleThreadLabel: (label: Label) => void;
   onToggleThreadMute: () => void;
@@ -147,6 +148,7 @@ function ReaderPane({
   onComposeNew,
   onComposeFromMessage,
   onRunThreadAction,
+  onRequestSnooze,
   onMoveThreadToFolder,
   onToggleThreadLabel,
   onToggleThreadMute,
@@ -360,6 +362,7 @@ if (activeThread && threadMessages.length > 0) {
               labels={labels}
               onSelectMessage={onSelectMessage}
               onRunThreadAction={onRunThreadAction}
+              onRequestSnooze={onRequestSnooze}
               onComposeFromMessage={onComposeFromMessage}
               onMoveThreadToFolder={onMoveThreadToFolder}
               onToggleThreadLabel={onToggleThreadLabel}

@@ -6,14 +6,17 @@ import type {
   ThreadSummary,
   UndoMessageSnapshot,
 } from '../app/types';
-import type { BulkMessageAction } from '../components/messageContextMenu';
+import {
+  messageCollectionActionLabel,
+  messagesForCollectionAction,
+  type BulkMessageAction,
+} from '../app/messageActionState';
 import { invoke } from '../tauriBridge';
 import {
   crossAccountBlockReason,
   moveMessagesToRole,
   setMessagesRead,
   setMessagesStarred,
-  threadMessagesForAction,
   threadMovableMessages,
   toggleMessagesLabel,
   uniqueMessages,
@@ -28,6 +31,7 @@ type BulkMessageActionOptions = {
   setActiveThread: React.Dispatch<React.SetStateAction<ThreadSummary | null>>;
   setSelectedMessageIds: React.Dispatch<React.SetStateAction<number[]>>;
   setStatus: React.Dispatch<React.SetStateAction<string>>;
+  onRequestPermanentDelete: (messages: MessageSummary[]) => void;
   snapshotMessages: (messages: MessageSummary[]) => UndoMessageSnapshot[];
   queueUndoAction: (
     title: string,
@@ -44,6 +48,7 @@ export default function useBulkMessageActions({
   setActiveThread,
   setSelectedMessageIds,
   setStatus,
+  onRequestPermanentDelete,
   snapshotMessages,
   queueUndoAction,
   onReadStateChange,
@@ -55,9 +60,19 @@ export default function useBulkMessageActions({
       context: 'bulk' | 'thread',
       threadTitle = '',
     ) {
-      const targetMessages = uniqueMessages(items);
+      const sourceMessages = uniqueMessages(items);
+      const targetMessages = messagesForCollectionAction(items, action, context);
       if (targetMessages.length === 0) {
-        setStatus(context === 'thread' ? '会话中没有可执行此操作的邮件' : '请先选择邮件');
+        if (sourceMessages.length === 0) {
+          setStatus(context === 'thread' ? '会话中没有可操作的邮件' : '请先选择邮件');
+        } else {
+          const actionLabel = messageCollectionActionLabel(action);
+          setStatus(context === 'thread' ? `会话中没有可${actionLabel}的邮件` : `所选邮件无法${actionLabel}`);
+        }
+        return;
+      }
+      if (action === 'permanent-delete') {
+        onRequestPermanentDelete(targetMessages);
         return;
       }
       const undoSnapshots = snapshotMessages(targetMessages);
@@ -65,8 +80,16 @@ export default function useBulkMessageActions({
         await setMessagesRead(targetMessages, action === 'read');
       } else if (action === 'star' || action === 'unstar') {
         await setMessagesStarred(targetMessages, action === 'star');
+      } else if (action === 'restore' || action === 'not-spam') {
+        for (const message of targetMessages) {
+          await invoke(IPC.RestoreMessageToInbox, { messageId: message.id });
+        }
+      } else if (action === 'unsnooze') {
+        for (const message of targetMessages) {
+          await invoke(IPC.UnsnoozeMessage, { messageId: message.id });
+        }
       } else {
-        await moveMessagesToRole(targetMessages, action);
+        await moveMessagesToRole(targetMessages, action === 'spam' ? 'spam' : action);
       }
       if (action === 'read' || action === 'unread') {
         onReadStateChange?.(
@@ -77,18 +100,7 @@ export default function useBulkMessageActions({
       const count = targetMessages.length;
       setSelectedMessageIds([]);
       await refreshAll();
-      const actionLabel =
-        action === 'read'
-          ? '标为已读'
-          : action === 'unread'
-            ? '标为未读'
-            : action === 'star'
-              ? '添加星标'
-              : action === 'unstar'
-                ? '取消星标'
-                : action === 'archive'
-                  ? '归档'
-                  : '删除';
+      const actionLabel = messageCollectionActionLabel(action);
       if (context === 'thread') {
         setStatus(`已对会话${actionLabel} ${count} 封邮件：${threadTitle || '(无主题)'}`);
         queueUndoAction(`会话${actionLabel}`, undoSnapshots, `${count} 封邮件`);
@@ -108,7 +120,7 @@ export default function useBulkMessageActions({
       action: BulkMessageAction,
     ) {
       await runMessageCollectionAction(
-        threadMessagesForAction(items, action),
+        items,
         action,
         'thread',
         thread.subject,
@@ -124,7 +136,11 @@ export default function useBulkMessageActions({
       const targetMessages = uniqueMessages(items)
         .filter((message) => message.folder_role !== folder.role);
       if (targetMessages.length === 0) {
-        setStatus(context === 'thread' ? `会话邮件已在 ${folder.name}` : '请先选择邮件');
+        setStatus(uniqueMessages(items).length === 0
+          ? '请先选择邮件'
+          : context === 'thread'
+            ? `会话邮件已在 ${folder.name}`
+            : `所选邮件已在 ${folder.name}`);
         return;
       }
       const canMove = movableFoldersForBulk(folders, targetMessages)
@@ -262,5 +278,6 @@ export default function useBulkMessageActions({
     setStatus,
     snapshotMessages,
     onReadStateChange,
+    onRequestPermanentDelete,
   ]);
 }

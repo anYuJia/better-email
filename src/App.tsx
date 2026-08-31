@@ -52,6 +52,7 @@ import useMessageUndoActions from './hooks/useMessageUndoActions';
 import useMessageSelectionControls from './hooks/useMessageSelectionControls';
 import useSelectedMessageActions from './hooks/useSelectedMessageActions';
 import useSingleMessageActions from './hooks/useSingleMessageActions';
+import usePermanentDeleteController from './hooks/usePermanentDeleteController';
 import useStorageManagement from './hooks/useStorageManagement';
 import useTrashController from './hooks/useTrashController';
 import useThemeMode from './hooks/useThemeMode';
@@ -84,7 +85,6 @@ import type {
   Label,
   Attachment,
   MessageSummary,
-  UndoMessageSnapshot,
   RemoteImageTrust,
   MailIdentity,
   MailStats,
@@ -114,6 +114,7 @@ import type {
   SendUndoDelaySeconds,
 } from './app/appConfig';
 import { buildMailboxContextKey } from './app/mailboxContext';
+import { snapshotMessageSummaries as snapshotMessages } from './app/messageActionState';
 import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
 import './ui-2026.css';
@@ -432,7 +433,6 @@ function MailboxApp({
     setStatus,
   });
   const [isSelectingAllMessages, setIsSelectingAllMessages] = useState(false);
-  const [confirmPermanentlyDelete, setConfirmPermanentlyDelete] = useState<MessageSummary | null>(null);
   const [, setBackgroundSyncStatus] = useState('后台同步待机');
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTask[]>([]);
   const [, setSyncSchedulePlan] = useState<SyncSchedulePlan | null>(null);
@@ -1201,19 +1201,6 @@ function MailboxApp({
     setIsSelectingAllMessages,
   );
 
-  function snapshotMessages(items: MessageSummary[]): UndoMessageSnapshot[] {
-    return items.map((message) => ({
-      id: message.id,
-      subject: message.subject || '(无主题)',
-      account_id: message.account_id,
-      folder_role: message.folder_role,
-      is_read: message.is_read,
-      is_starred: message.is_starred,
-      snoozed_until: message.snoozed_until,
-      labels: [...message.labels],
-    }));
-  }
-
   const {
     snoozeTarget,
     setSnoozeTarget,
@@ -1236,9 +1223,26 @@ function MailboxApp({
     queueUndoAction,
   });
 
-  function requestPermanentlyDeleteMessage(message: MessageSummary) {
-    setConfirmPermanentlyDelete(message);
-  }
+  const {
+    confirmPermanentlyDelete,
+    setConfirmPermanentlyDelete,
+    requestPermanentlyDeleteMessages,
+    handlePermanentlyDelete,
+    permanentlyDeleteMessageConfirmed,
+  } = usePermanentDeleteController({
+    selected,
+    messages,
+    threadMessages,
+    folderId,
+    loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
+    loadMessages,
+    setSelectedId,
+    setSelectedMessageIds,
+    setActiveThread,
+    setThreadMessages,
+    setStatus,
+    clearSelectedDetailIf,
+  });
 
   const {
     runBulkAction,
@@ -1255,6 +1259,7 @@ function MailboxApp({
     setActiveThread,
     setSelectedMessageIds,
     setStatus,
+    onRequestPermanentDelete: requestPermanentlyDeleteMessages,
     snapshotMessages,
     queueUndoAction,
     onReadStateChange: rememberManualReadState,
@@ -1270,7 +1275,7 @@ function MailboxApp({
     folderId,
     refreshAll,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
-    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    loadMessages,
     setSelectedMessageIds,
     setSelectedId,
     setStatus,
@@ -1297,7 +1302,7 @@ function MailboxApp({
     clearSelectedDetailIf,
     patchSelectedDetailMetadata,
     onRequestSnooze: requestSnooze,
-    onRequestPermanentDelete: requestPermanentlyDeleteMessage,
+    onRequestPermanentDelete: requestPermanentlyDeleteMessages,
   });
   const {
     moveSelected,
@@ -1305,25 +1310,21 @@ function MailboxApp({
     markSelectedAsSpam,
     markSelectedNotSpam,
     restoreSelectedFromTrash,
-    permanentlyDeleteMessageConfirmed,
     unsnoozeSelected,
     toggleLabel,
   } = useSelectedMessageActions({
     selected,
     messages,
-    folders,
-    labels,
     folderId,
     refreshAll,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
-    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    loadMessages,
     setSelectedId,
     setStatus,
     snapshotMessages,
     queueUndoAction,
     clearSelectedDetailIf,
     patchSelectedDetailMetadata,
-    visibleFolderIdForRole,
   });
 
   const {
@@ -1354,7 +1355,7 @@ function MailboxApp({
     currentFolderAccountId,
     visibleFolderIdForRole,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
-    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    loadMessages,
     refreshAll,
     setStatus,
   });
@@ -1452,7 +1453,7 @@ function MailboxApp({
     selected,
     setAttachments,
     loadMeta: (nextFolderId) => loadMeta(nextFolderId, accountScope, { mode: 'mailbox' }),
-    loadMessages: (nextFolderId) => loadMessages(nextFolderId),
+    loadMessages,
     setStatus,
   });
 
@@ -1533,6 +1534,10 @@ function MailboxApp({
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));
   }, [moveSelectedMessagesToFolder, setStatus]);
+
+  const handleRunBulkAction = useCallback((action: BulkMessageAction) => {
+    runBulkAction(action).catch((error) => setStatus(String(error)));
+  }, [runBulkAction, setStatus]);
 
   const handleToggleBulkLabel = useCallback((label: Label) => {
     toggleBulkLabel(label).catch((error) => setStatus(String(error)));
@@ -1634,10 +1639,6 @@ function MailboxApp({
   const handleAllowRemoteImagesOnce = useCallback(() => {
     allowRemoteImagesForSelectedOnce().catch((error) => setStatus(String(error)));
   }, [allowRemoteImagesForSelectedOnce, setStatus]);
-
-  const handlePermanentlyDelete = useCallback(() => {
-    if (selected) requestPermanentlyDeleteMessage(selected);
-  }, [selected, requestPermanentlyDeleteMessage]);
 
   const handleMoveToFolder = useCallback((folder: Folder) => {
     moveSelectedToFolder(folder).catch((error) => setStatus(String(error)));
@@ -1760,7 +1761,7 @@ function MailboxApp({
         onToggleAllVisible={toggleAllMessages}
         isSelectingAll={isSelectingAllMessages}
         isAllMessagesSelected={isAllMessagesSelected}
-        onRunBulkAction={runBulkAction}
+        onRunBulkAction={handleRunBulkAction}
         onRequestSnooze={requestSnooze}
         onMoveBulkToFolder={handleMoveBulkToFolder}
         onToggleBulkLabel={handleToggleBulkLabel}
@@ -1813,6 +1814,7 @@ function MailboxApp({
         onComposeNew={handleComposeNew}
         onComposeFromMessage={composeFromMessage}
         onRunThreadAction={handleRunActiveThreadAction}
+        onRequestSnooze={requestSnooze}
         onMoveThreadToFolder={handleMoveActiveThreadToFolder}
         onToggleThreadLabel={handleToggleActiveThreadLabel}
         onToggleThreadMute={handleToggleActiveThreadMute}

@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useWheelContainment } from '../../hooks/useWheelContainment';
 
 type ComposerSchedulePickerProps = {
   value: string;
@@ -201,6 +202,7 @@ export default function ComposerSchedulePicker({
   });
   const [position, setPosition] = useState<PickerPosition | null>(null);
   const [error, setError] = useState('');
+  useWheelContainment(popoverRef, open);
   const committedDate = parseDateTimeLocal(value);
   const draftDateValue = dateFromParts(draftDate, draftTime);
   const calendarDays = buildCalendarDays(viewMonth);

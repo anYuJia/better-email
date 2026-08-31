@@ -44,6 +44,7 @@ describe('snooze helpers', () => {
     expect(canSnoozeRole('archive')).toBe(true);
     expect(canSnoozeRole('custom')).toBe(true);
     expect(canSnoozeRole('sent')).toBe(false);
+    expect(canSnoozeRole('spam')).toBe(false);
     expect(canSnoozeRole('drafts')).toBe(false);
     expect(canSnoozeRole('trash')).toBe(false);
     expect(canSnoozeRole('snoozed')).toBe(false);

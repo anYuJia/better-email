@@ -1,12 +1,14 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
+import { useWheelContainment } from '../hooks/useWheelContainment';
 import './context-menu.css';
 
 export type ContextMenuItem = {
   id: string;
   label: string;
   detail?: string;
+  tooltip?: string;
   icon?: React.ReactNode;
   shortcut?: string;
   danger?: boolean;
@@ -28,7 +30,13 @@ type ContextMenuProps = {
   ariaLabel?: string;
   title?: string;
   detail?: string;
+  note?: string;
 };
+
+type ContextMenuContentProps = Pick<
+  ContextMenuProps,
+  'items' | 'onClose' | 'ariaLabel' | 'title' | 'detail' | 'note'
+>;
 
 function positionSubmenuForBranch(branch: HTMLElement) {
   const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
@@ -43,7 +51,7 @@ function positionSubmenuForBranch(branch: HTMLElement) {
 
   submenu.style.display = 'block';
   submenu.style.visibility = 'hidden';
-  const width = Math.min(submenu.offsetWidth || 226, window.innerWidth - margin * 2);
+  const width = Math.min(submenu.offsetWidth || 232, window.innerWidth - margin * 2);
   const height = Math.min(submenu.offsetHeight || submenu.scrollHeight || 0, window.innerHeight - margin * 2);
 
   let left = triggerBounds.right + gap;
@@ -72,44 +80,89 @@ function MenuItems({
   items: ContextMenuItem[];
   onClose: () => void;
 }) {
+  const [pointerOpenId, setPointerOpenId] = useState<string | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const detailIdPrefix = useId();
+  const reserveLeadingSlot = items.some((item) => item.icon || item.checked !== undefined);
 
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+  }, []);
+
+  function cancelScheduledClose() {
+    if (closeTimerRef.current === null) return;
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }
 
   function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
+    cancelScheduledClose();
+    setPointerOpenId(
+      event.currentTarget.querySelector(':scope > button')?.getAttribute('data-context-item') ?? null,
+    );
     positionSubmenuForBranch(event.currentTarget);
   }
 
-  return items.map((item) => (
+  function scheduleSubmenuClose(itemId: string) {
+    cancelScheduledClose();
+    // Leave enough time to cross the small visual gap between two fixed
+    // surfaces. Entering the submenu cancels this timer through the branch.
+    closeTimerRef.current = window.setTimeout(() => {
+      setPointerOpenId((current) => current === itemId ? null : current);
+      closeTimerRef.current = null;
+    }, 260);
+  }
+
+  return items.map((item, index) => {
+    const detailId = item.detail ? `${detailIdPrefix}-detail-${index}` : undefined;
+    return (
     <React.Fragment key={item.id}>
       {item.separatorBefore && <div className="context-menu-separator" role="separator" />}
       <div
-        className={item.children?.length ? 'context-menu-branch' : undefined}
+        className={item.children?.length
+          ? `context-menu-branch${pointerOpenId === item.id ? ' is-pointer-open' : ''}`
+          : undefined}
         onPointerEnter={item.children?.length ? positionSubmenu : undefined}
+        onPointerLeave={item.children?.length ? () => scheduleSubmenuClose(item.id) : undefined}
       >
         <button
           type="button"
           role={item.selectionRole === 'radio'
             ? 'menuitemradio'
             : item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+          aria-label={item.label}
+          aria-describedby={detailId}
           aria-checked={item.selectionRole || item.checked !== undefined ? Boolean(item.checked) : undefined}
           data-context-item={item.id}
           className={[
             item.danger ? 'danger' : '',
             item.detail ? 'has-detail' : '',
+            reserveLeadingSlot ? '' : 'without-leading-slot',
           ].filter(Boolean).join(' ') || undefined}
           disabled={item.disabled}
           aria-haspopup={item.children?.length ? 'menu' : undefined}
-          onClick={() => {
-            if (item.children?.length || !item.onSelect) return;
+          title={item.tooltip}
+          onClick={(event) => {
+            if (item.children?.length) {
+              const branch = event.currentTarget.parentElement;
+              if (branch) positionSubmenuForBranch(branch);
+              cancelScheduledClose();
+              setPointerOpenId(item.id);
+              return;
+            }
+            if (!item.onSelect) return;
             item.onSelect();
             onClose();
           }}
         >
-          <span className="context-menu-icon" aria-hidden="true">
-            {item.checked ? <Check size={14} /> : item.icon}
-          </span>
+          {reserveLeadingSlot && (
+            <span className="context-menu-icon" aria-hidden="true">
+              {item.checked ? <Check size={14} /> : item.icon}
+            </span>
+          )}
           <span className="context-menu-copy">
             <span className="context-menu-label">{item.label}</span>
-            {item.detail && <small>{item.detail}</small>}
+            {item.detail && <small id={detailId}>{item.detail}</small>}
           </span>
           {item.shortcut && <kbd>{item.shortcut}</kbd>}
           {item.children?.length ? <ChevronRight className="context-menu-chevron" size={14} /> : null}
@@ -121,7 +174,103 @@ function MenuItems({
         ) : null}
       </div>
     </React.Fragment>
-  ));
+    );
+  });
+}
+
+export function ContextMenuItems({
+  items,
+  onClose,
+  ariaLabel = '快捷操作',
+}: Pick<ContextMenuContentProps, 'items' | 'onClose' | 'ariaLabel'>) {
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const activeButton = event.target instanceof HTMLButtonElement
+      ? event.target
+      : document.activeElement instanceof HTMLButtonElement
+        ? document.activeElement
+        : null;
+    const activeMenu = activeButton?.closest<HTMLElement>('[role="menu"]') ?? event.currentTarget;
+    const buttons = Array.from(activeMenu.querySelectorAll<HTMLButtonElement>(
+      ':scope > div > button:not(:disabled)',
+    ));
+    if (!buttons.length) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const currentIndex = buttons.indexOf(activeButton as HTMLButtonElement);
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = currentIndex < 0
+        ? 0
+        : (currentIndex + direction + buttons.length) % buttons.length;
+      buttons[nextIndex]?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      buttons[event.key === 'Home' ? 0 : buttons.length - 1]?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      const branch = activeButton?.parentElement?.classList.contains('context-menu-branch')
+        ? activeButton.parentElement
+        : null;
+      const submenu = branch?.querySelector<HTMLElement>(':scope > .context-submenu') ?? null;
+      const firstChild = submenu?.querySelector<HTMLButtonElement>(
+        ':scope > div > button:not(:disabled)',
+      );
+      if (branch && firstChild) {
+        event.preventDefault();
+        positionSubmenuForBranch(branch);
+        branch.classList.add('is-keyboard-open');
+        firstChild.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' && activeMenu.classList.contains('context-submenu')) {
+      const parentButton = activeMenu.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
+      if (parentButton) {
+        event.preventDefault();
+        activeMenu.parentElement?.classList.remove('is-keyboard-open');
+        parentButton.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  return (
+    <div
+      className="context-menu-items"
+      role="menu"
+      aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
+    >
+      <MenuItems items={items} onClose={onClose} />
+    </div>
+  );
+}
+
+export function ContextMenuContent({
+  items,
+  onClose,
+  ariaLabel = '快捷操作',
+  title,
+  detail,
+  note,
+}: ContextMenuContentProps) {
+  return (
+    <>
+      {(title || detail) && (
+        <div className="context-menu-heading">
+          {title && <strong>{title}</strong>}
+          {detail && <span>{detail}</span>}
+        </div>
+      )}
+      <ContextMenuItems items={items} onClose={onClose} ariaLabel={ariaLabel} />
+      {note && <p className="context-menu-note">{note}</p>}
+    </>
+  );
 }
 
 export default function ContextMenu({
@@ -134,8 +283,10 @@ export default function ContextMenu({
   ariaLabel = '快捷操作',
   title,
   detail,
+  note,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  useWheelContainment(menuRef);
   const [position, setPosition] = useState({ x, y });
   const previousFocusRef = useRef<HTMLElement | null>(null);
   // Tab 关闭时浏览器已把焦点移到下一个自然目标，不能再把焦点拉回触发元素。
@@ -203,62 +354,16 @@ export default function ContextMenu({
         return;
       }
 
-      const eventButton = event.target instanceof HTMLButtonElement ? event.target : null;
-      const activeButton = eventButton
-        ?? (document.activeElement instanceof HTMLButtonElement ? document.activeElement : null);
-      const activeMenu = activeButton?.closest<HTMLElement>('[role="menu"]')
-        ?? menuRef.current?.querySelector<HTMLElement>('.context-menu-items')
-        ?? null;
-      const buttons = Array.from(activeMenu?.querySelectorAll<HTMLButtonElement>(
-        ':scope > div > button:not(:disabled)',
-      ) ?? []);
-      if (!buttons.length) return;
-
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        const currentIndex = buttons.indexOf(activeButton as HTMLButtonElement);
-        const direction = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = currentIndex < 0
-          ? 0
-          : (currentIndex + direction + buttons.length) % buttons.length;
-        buttons[nextIndex]?.focus();
-        return;
-      }
-
-      if (event.key === 'Home' || event.key === 'End') {
-        event.preventDefault();
-        buttons[event.key === 'Home' ? 0 : buttons.length - 1]?.focus();
-        return;
-      }
-
-      if (event.key === 'ArrowRight') {
-        const branch = activeButton?.parentElement?.classList.contains('context-menu-branch')
-          ? activeButton.parentElement
-          : null;
-        const submenu = branch?.querySelector<HTMLElement>(':scope > .context-submenu') ?? null;
-        const firstChild = submenu?.querySelector<HTMLButtonElement>(
-          ':scope > div > button:not(:disabled)',
-        );
-        if (branch && firstChild) {
-          event.preventDefault();
-          positionSubmenuForBranch(branch);
-          branch.classList.add('is-keyboard-open');
-          firstChild.focus({ preventScroll: true });
-        }
-        return;
-      }
-
-      if (event.key === 'ArrowLeft' && activeMenu?.classList.contains('context-submenu')) {
-        const parentButton = activeMenu.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
-        if (parentButton) {
-          event.preventDefault();
-          activeMenu.parentElement?.classList.remove('is-keyboard-open');
-          parentButton.focus({ preventScroll: true });
-        }
-      }
     }
 
-    function handleViewportChange() {
+    function handleViewportChange(event: Event) {
+      if (
+        event.type === 'scroll'
+        && event.target instanceof Node
+        && menuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
       onClose();
     }
 
@@ -280,20 +385,20 @@ export default function ContextMenu({
       ref={menuRef}
       className={[
         'context-menu',
+        'context-menu-surface',
         className ?? '',
       ].filter(Boolean).join(' ')}
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      {(title || detail) && (
-        <div className="context-menu-heading">
-          {title && <strong>{title}</strong>}
-          {detail && <span>{detail}</span>}
-        </div>
-      )}
-      <div className="context-menu-items" role="menu" aria-label={ariaLabel}>
-        <MenuItems items={items} onClose={onClose} />
-      </div>
+      <ContextMenuContent
+        items={items}
+        onClose={onClose}
+        ariaLabel={ariaLabel}
+        title={title}
+        detail={detail}
+        note={note}
+      />
     </div>,
     document.body,
   );

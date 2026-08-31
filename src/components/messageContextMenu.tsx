@@ -19,10 +19,21 @@ import {
 } from 'lucide-react';
 import { movableFoldersForBulk } from '../app/appConfig';
 import { canSnoozeRole } from '../app/snooze';
+import {
+  buildMessageCollectionActionState,
+  canArchiveMessageRole,
+  canChangeMessageReadStateRole,
+  canMarkMessageAsSpamRole,
+  canReplyToMessageRole,
+  collectionActionDetail,
+  type BulkMessageAction,
+  type MessageCollectionActionEntry,
+  type MessageCollectionScope,
+} from '../app/messageActionState';
 import type { Folder, Label, MessageSummary } from '../app/types';
 import type { ContextMenuItem } from './ContextMenu';
 
-export type BulkMessageAction = 'archive' | 'star' | 'unstar' | 'trash' | 'read' | 'unread';
+export type { BulkMessageAction } from '../app/messageActionState';
 export type ComposeMode = 'reply' | 'replyAll' | 'forward';
 export type MessageContextAction =
   | 'archive'
@@ -43,6 +54,7 @@ export type MessageContextAction =
 type BulkContextOptions = {
   selectedMessages: MessageSummary[];
   movableMessages?: MessageSummary[];
+  scope?: MessageCollectionScope;
   folders: Folder[];
   labels: Label[];
   onRunBulkAction: (action: BulkMessageAction) => void;
@@ -54,6 +66,7 @@ type BulkContextOptions = {
 export function buildBulkMessageContextItems({
   selectedMessages,
   movableMessages = selectedMessages,
+  scope = 'bulk',
   folders,
   labels,
   onRunBulkAction,
@@ -61,77 +74,84 @@ export function buildBulkMessageContextItems({
   onMoveBulkToFolder,
   onToggleBulkLabel,
 }: BulkContextOptions): ContextMenuItem[] {
-  const allRead = selectedMessages.every((message) => message.is_read);
-  const allStarred = selectedMessages.every((message) => message.is_starred);
+  const actionState = buildMessageCollectionActionState(selectedMessages, scope);
   const movableFolders = movableFoldersForBulk(folders, movableMessages);
-  const snoozableMessages = selectedMessages.filter((message) => canSnoozeRole(message.folder_role));
+  const iconForAction = (item: MessageCollectionActionEntry) => {
+    switch (item.action) {
+      case 'read': return <MailOpen size={15} />;
+      case 'unread': return <Mail size={15} />;
+      case 'star': return <Star size={15} />;
+      case 'unstar': return <StarOff size={15} />;
+      case 'snooze':
+      case 'unsnooze': return <Clock size={15} />;
+      case 'archive': return <Archive size={15} />;
+      case 'restore':
+      case 'not-spam': return <RotateCcw size={15} />;
+      case 'spam': return <ShieldAlert size={15} />;
+      case 'trash':
+      case 'permanent-delete': return <Trash2 size={15} />;
+    }
+  };
+  const actionItems = actionState.entries.map((item, index, items): ContextMenuItem => {
+    const actionDetail = collectionActionDetail(item.messages.length, actionState.totalCount);
+    return {
+      id: item.action === 'read' || item.action === 'unread'
+        ? `${scope}-read-state`
+        : item.action === 'star' || item.action === 'unstar'
+          ? `${scope}-star-state`
+          : `${scope}-${item.action}`,
+      label: item.label,
+      // The menu heading already describes the whole selection. Show a second
+      // line only when an action applies to a subset instead of repeating
+      // “N 封邮件” on every row.
+      detail: item.messages.length === actionState.totalCount ? undefined : actionDetail,
+      tooltip: `${item.label} · ${actionDetail}`,
+      icon: iconForAction(item),
+      shortcut: item.shortcut,
+      danger: item.danger,
+      separatorBefore: index > 0 && items[index - 1].group !== item.group,
+      onSelect: () => {
+        if (item.action === 'snooze') {
+          onRequestSnooze(item.messages);
+        } else {
+          onRunBulkAction(item.action);
+        }
+      },
+    };
+  });
+  const dangerIndex = actionItems.findIndex((item) => item.danger);
+  const beforeDanger = dangerIndex < 0 ? actionItems.length : dangerIndex;
 
-  return [
-    {
-      id: 'bulk-read-state',
-      label: allRead ? '全部标为未读' : '全部标为已读',
-      icon: allRead ? <Mail size={15} /> : <MailOpen size={15} />,
-      shortcut: 'M',
-      onSelect: () => onRunBulkAction(allRead ? 'unread' : 'read'),
-    },
-    {
-      id: 'bulk-star-state',
-      label: allStarred ? '取消全部星标' : '全部添加星标',
-      icon: allStarred ? <StarOff size={15} /> : <Star size={15} />,
-      shortcut: 'S',
-      onSelect: () => onRunBulkAction(allStarred ? 'unstar' : 'star'),
-    },
-    {
-      id: 'bulk-snooze',
-      label: '批量稍后处理',
-      detail: snoozableMessages.length === selectedMessages.length
-        ? `${snoozableMessages.length} 封邮件`
-        : `${snoozableMessages.length} 封可处理`,
-      icon: <Clock size={15} />,
-      disabled: snoozableMessages.length === 0,
-      separatorBefore: true,
-      onSelect: () => onRequestSnooze(snoozableMessages),
-    },
-    {
-      id: 'bulk-archive',
-      label: '批量归档',
-      icon: <Archive size={15} />,
-      shortcut: 'E',
-      separatorBefore: true,
-      onSelect: () => onRunBulkAction('archive'),
-    },
-    {
-      id: 'bulk-move',
-      label: '批量移动到',
+  const collectionItems: ContextMenuItem[] = [];
+  if (movableFolders.length > 0) {
+    collectionItems.push({
+      id: `${scope}-move`,
+      label: '移动到',
       icon: <FolderInput size={15} />,
-      disabled: movableFolders.length === 0,
       children: movableFolders.map((folder) => ({
-        id: `bulk-move-${folder.id}`,
+        id: `${scope}-move-${folder.id}`,
         label: folder.name,
         onSelect: () => onMoveBulkToFolder(folder),
       })),
-    },
-    {
-      id: 'bulk-labels',
-      label: '批量标签',
+    });
+  }
+  if (labels.length > 0) {
+    collectionItems.push({
+      id: `${scope}-labels`,
+      label: '标签',
       icon: <Tag size={15} />,
-      disabled: labels.length === 0,
       children: labels.map((label) => ({
-        id: `bulk-label-${label.id}`,
+        id: `${scope}-label-${label.id}`,
         label: label.name,
-        checked: selectedMessages.every((message) => message.labels.includes(label.name)),
+        icon: <span className="label-dot" style={{ background: label.color }} />,
+        checked: selectedMessages.length > 0
+          && selectedMessages.every((message) => message.labels.includes(label.name)),
         onSelect: () => onToggleBulkLabel(label),
       })),
-    },
-    {
-      id: 'bulk-trash',
-      label: '批量移到废纸篓',
-      icon: <Trash2 size={15} />,
-      danger: true,
-      separatorBefore: true,
-      onSelect: () => onRunBulkAction('trash'),
-    },
-  ];
+    });
+  }
+  actionItems.splice(beforeDanger, 0, ...collectionItems);
+  return actionItems;
 }
 
 type SingleContextOptions = {
@@ -164,7 +184,7 @@ export function buildSingleMessageContextItems({
       icon: <MailOpen size={15} />,
       onSelect: () => onSelectMessage(message.id),
     },
-    ...(message.folder_role !== 'drafts'
+    ...(canReplyToMessageRole(message.folder_role)
       ? [
           {
             id: 'reply',
@@ -188,14 +208,16 @@ export function buildSingleMessageContextItems({
           },
         ]
       : []),
-    {
-      id: 'read-state',
-      label: message.is_read ? '标为未读' : '标为已读',
-      icon: message.is_read ? <Mail size={15} /> : <MailOpen size={15} />,
-      shortcut: 'M',
-      separatorBefore: message.folder_role !== 'drafts',
-      onSelect: () => onRunMessageAction(message, message.is_read ? 'unread' : 'read'),
-    },
+    ...(canChangeMessageReadStateRole(message.folder_role)
+      ? [{
+          id: 'read-state',
+          label: message.is_read ? '标为未读' : '标为已读',
+          icon: message.is_read ? <Mail size={15} /> : <MailOpen size={15} />,
+          shortcut: 'M',
+          separatorBefore: canReplyToMessageRole(message.folder_role),
+          onSelect: () => onRunMessageAction(message, message.is_read ? 'unread' : 'read'),
+        }]
+      : []),
     {
       id: 'star-state',
       label: message.is_starred ? '取消星标' : '添加星标',
@@ -234,9 +256,7 @@ export function buildSingleMessageContextItems({
               },
             ]
           : []),
-    ...(message.folder_role !== 'archive'
-      && message.folder_role !== 'trash'
-      && message.folder_role !== 'drafts'
+    ...(canArchiveMessageRole(message.folder_role)
       ? [
           {
             id: 'archive',
@@ -247,29 +267,32 @@ export function buildSingleMessageContextItems({
           },
         ]
       : []),
-    {
-      id: 'move',
-      label: '移动到',
-      icon: <FolderInput size={15} />,
-      disabled: movableFolders.length === 0,
-      children: movableFolders.map((folder) => ({
-        id: `move-${folder.id}`,
-        label: folder.name,
-        onSelect: () => onMoveMessageToFolder(message, folder),
-      })),
-    },
-    {
-      id: 'labels',
-      label: '标签',
-      icon: <Tag size={15} />,
-      disabled: labels.length === 0,
-      children: labels.map((label) => ({
-        id: `label-${label.id}`,
-        label: label.name,
-        checked: message.labels.includes(label.name),
-        onSelect: () => onToggleMessageLabel(message, label),
-      })),
-    },
+    ...(movableFolders.length > 0
+      ? [{
+          id: 'move',
+          label: '移动到',
+          icon: <FolderInput size={15} />,
+          children: movableFolders.map((folder) => ({
+            id: `move-${folder.id}`,
+            label: folder.name,
+            onSelect: () => onMoveMessageToFolder(message, folder),
+          })),
+        }]
+      : []),
+    ...(labels.length > 0
+      ? [{
+          id: 'labels',
+          label: '标签',
+          icon: <Tag size={15} />,
+          children: labels.map((label) => ({
+            id: `label-${label.id}`,
+            label: label.name,
+            icon: <span className="label-dot" style={{ background: label.color }} />,
+            checked: message.labels.includes(label.name),
+            onSelect: () => onToggleMessageLabel(message, label),
+          })),
+        }]
+      : []),
     {
       id: 'copy-message-info',
       label: '复制信息',
@@ -302,7 +325,7 @@ export function buildSingleMessageContextItems({
             onSelect: () => onRunMessageAction(message, 'not-spam'),
           },
         ]
-      : message.folder_role !== 'trash' && message.folder_role !== 'drafts'
+      : canMarkMessageAsSpamRole(message.folder_role)
         ? [
             {
               id: 'spam',

@@ -112,7 +112,10 @@ describe('AccountSwitcher', () => {
     expect(trigger.textContent).not.toContain('first@example.com');
 
     openMenu(trigger);
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /First.*first@example\.com/ }));
+    const accountItem = screen.getByRole('menuitemradio', { name: 'First' });
+    const accountDescription = document.getElementById(accountItem.getAttribute('aria-describedby') ?? '');
+    expect(accountDescription?.textContent).toContain('first@example.com');
+    fireEvent.click(accountItem);
     expect(onChange).toHaveBeenCalledWith('1');
   });
 

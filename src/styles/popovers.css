@@ -1,0 +1,83 @@
+/*
+ * Shared anchored popover geometry.
+ *
+ * The mail panes normally use layout/paint containment for rendering
+ * isolation. A fixed descendant would otherwise use the pane as its
+ * containing block even though useDetailsMenu calculates viewport
+ * coordinates. Containment is relaxed only while an anchored menu is open;
+ * the menu then sits in viewport space, can flip at an edge, and cannot be
+ * clipped by a pane or toolbar.
+ */
+.app-shell > :is(.sidebar, .message-list-panel, .reader-panel):has(
+  details[data-floating-menu="true"][open]
+) {
+  contain: none;
+}
+
+details[data-floating-menu="true"].compact-menu[open] > div,
+details[data-floating-menu="true"].compact-dropdown[open] > div {
+  box-sizing: border-box;
+  position: fixed;
+  top: var(--floating-menu-top, 0);
+  right: auto;
+  bottom: auto;
+  left: var(--floating-menu-left, 0);
+  z-index: 2500;
+  max-width: calc(100vw - 16px);
+  max-height: min(460px, var(--floating-menu-max-height, calc(100dvh - 16px)));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  visibility: hidden;
+}
+
+details[data-floating-menu="true"][data-menu-positioned="true"].compact-menu > div,
+details[data-floating-menu="true"][data-menu-positioned="true"].compact-dropdown > div {
+  visibility: visible;
+}
+
+/* One restrained surface language for every transient, anchored layer. The
+ * internal layout may vary (commands, options, forms or AI output), but the
+ * elevation, edge, radius and scroll treatment must not change by feature. */
+:is(.compact-menu, .compact-dropdown) > div,
+.custom-select-dropdown,
+.search-suggestion-panel,
+.mobile-inbox-filter-popover,
+.settings-search-popover,
+.label-menu-container,
+.composer-advanced-popover,
+.composer-schedule-picker-popover,
+.composer-send-menu,
+.recipient-suggestions,
+.reader-ai-result,
+.reader-image-context-menu {
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+}
+
+:is(.compact-menu, .compact-dropdown) > div {
+  padding: var(--ui-menu-padding);
+}
+
+/* Native scroll-chaining fallback for non-details transient surfaces. Their
+ * non-passive wheel guard also covers the important non-scrollable boundary. */
+.context-menu-surface,
+.context-submenu,
+.custom-select-dropdown,
+.search-suggestion-panel,
+.mobile-inbox-filter-popover,
+.settings-search-popover,
+.composer-advanced-popover,
+.composer-schedule-picker-popover,
+.composer-send-menu,
+.recipient-suggestions,
+.reader-ai-result,
+.reader-image-context-menu {
+  overscroll-behavior: contain;
+}

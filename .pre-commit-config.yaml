@@ -1,0 +1,19 @@
+ci:
+  autofix_prs: true
+  autofix_commit_msg: "chore(pre-commit): apply automatic fixes"
+  autoupdate_commit_msg: "chore(pre-commit): update hooks"
+  autoupdate_schedule: monthly
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]

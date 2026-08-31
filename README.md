@@ -210,5 +210,7 @@ Better Email 的界面目标不是“更炫”，而是 **更快、更稳、更�
   &nbsp;&nbsp;·&nbsp;&nbsp;
   <a href="https://github.com/anYuJia/better-email/issues">Report an issue</a>
   &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="./CONTRIBUTORS.md">Contributors</a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
   <a href="./LICENSE">MIT License</a>
 </p>

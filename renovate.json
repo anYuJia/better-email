@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Asia/Shanghai",
+  "schedule": [
+    "before 8am on monday"
+  ],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "enabledManagers": [
+    "npm",
+    "cargo",
+    "github-actions"
+  ],
+  "packageRules": [
+    {
+      "description": "Dependabot owns non-major updates for these ecosystems",
+      "matchManagers": [
+        "npm",
+        "cargo",
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "lockFileMaintenance"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Renovate owns major upgrades",
+      "matchManagers": [
+        "npm",
+        "cargo",
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": false
+    }
+  ]
+}

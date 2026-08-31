@@ -1,0 +1,17 @@
+{
+  "projectName": "better-email",
+  "projectOwner": "anYuJia",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "CONTRIBUTORS.md"
+  ],
+  "imageSize": 72,
+  "commit": false,
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributorsSortAlphabetically": true,
+  "linkToUsage": true,
+  "skipCi": true,
+  "contributors": []
+}

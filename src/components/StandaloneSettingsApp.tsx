@@ -149,6 +149,7 @@ export default function StandaloneSettingsApp() {
       standaloneSettingsWindow
       requestedSettingsSection={requestedSection}
       requestedSettingsAccountScope={requestedAccountScope}
+      onSettingsScopeChange={setRequestedAccountScope}
       nativeSettingsCloseRequestVersion={nativeCloseRequestVersion}
       onStandaloneSettingsReady={handleSurfaceReady}
     />

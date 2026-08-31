@@ -143,6 +143,7 @@ type AppProps = {
   standaloneSettingsWindow?: boolean;
   requestedSettingsSection?: SettingsSectionId;
   requestedSettingsAccountScope?: AccountScope;
+  onSettingsScopeChange?: (scope: AccountScope) => void;
   nativeSettingsCloseRequestVersion?: number;
   onStandaloneSettingsReady?: () => void;
 };
@@ -151,6 +152,7 @@ export default function App({
   standaloneSettingsWindow = false,
   requestedSettingsSection = 'accounts',
   requestedSettingsAccountScope,
+  onSettingsScopeChange,
   nativeSettingsCloseRequestVersion = 0,
   onStandaloneSettingsReady,
 }: AppProps) {
@@ -159,6 +161,7 @@ export default function App({
       standaloneSettingsWindow={standaloneSettingsWindow}
       requestedSettingsSection={requestedSettingsSection}
       requestedSettingsAccountScope={requestedSettingsAccountScope}
+      onSettingsScopeChange={onSettingsScopeChange}
       nativeSettingsCloseRequestVersion={nativeSettingsCloseRequestVersion}
       onStandaloneSettingsReady={onStandaloneSettingsReady}
     />
@@ -169,6 +172,7 @@ function MailboxApp({
   standaloneSettingsWindow,
   requestedSettingsSection,
   requestedSettingsAccountScope,
+  onSettingsScopeChange,
   nativeSettingsCloseRequestVersion,
   onStandaloneSettingsReady,
 }: AppProps & { standaloneSettingsWindow: boolean; requestedSettingsSection: SettingsSectionId }) {
@@ -1419,7 +1423,6 @@ function MailboxApp({
     setIdentities,
     setFolders,
     setStatus,
-    onScopeChange: (scope) => changeAccountScope(String(scope)),
   });
   const accountScopedPreferences = useAccountScopedSettings({
     accountScope,
@@ -1672,6 +1675,7 @@ function MailboxApp({
     accountsLoaded: initialAccountListLoaded,
     standaloneSettingsWindow,
     useNativeSettingsWindow,
+    onSettingsScopeChange,
     setAccount,
     setAccounts,
     setAccountForm,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import AccountSwitcher from './AccountSwitcher';
 import type { Account } from '../app/types';
@@ -93,5 +93,43 @@ describe('AccountSwitcher', () => {
 
     fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('单账号时明确显示统一范围，并把具体账号选择交给父级', () => {
+    const onChange = vi.fn();
+    render(
+      <AccountSwitcher
+        accountScope="all"
+        accounts={[accounts[0]]}
+        onChange={onChange}
+        onSetDefault={() => undefined}
+        onAddAccount={() => undefined}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: /统一邮箱/ });
+    expect(trigger.textContent).toContain('所有邮箱账号 · 1 个账号');
+    expect(trigger.textContent).not.toContain('first@example.com');
+
+    openMenu(trigger);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /First.*first@example\.com/ }));
+    expect(onChange).toHaveBeenCalledWith('1');
+  });
+
+  it('具体账号的顶部副标题只显示邮箱，避免服务商信息挤出邮箱', () => {
+    render(
+      <AccountSwitcher
+        accountScope={accounts[0].id}
+        accounts={accounts}
+        onChange={() => undefined}
+        onSetDefault={() => undefined}
+        onAddAccount={() => undefined}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: /First/ });
+    expect(trigger.textContent).toContain('first@example.com');
+    expect(trigger.textContent).not.toContain('Gmail');
+    expect(trigger.textContent).not.toContain('默认');
   });
 });

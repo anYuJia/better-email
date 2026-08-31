@@ -151,6 +151,11 @@
 .account-switcher-menu .context-menu-copy small {
   color: var(--ui-text-tertiary);
   font-size: var(--ui-font-size-meta);
+  line-height: 1.35;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .account-switcher-menu [data-context-item='add-account'] {
